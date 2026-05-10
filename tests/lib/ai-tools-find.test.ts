@@ -245,8 +245,8 @@ describe('findDealTool', () => {
     expect(d.stageName).toBe('Under Contract');
     expect(d.status).toBe('active');
     // daysInStage is null until migration 20260526000000 (adds Deal.stageChangedAt)
-    // ships in prod. The tool stops selecting the column to avoid crashing the
-    // chat on workspaces that haven't run the migration yet.
+    // ships in prod. The tool stops selecting the column to avoid crashing
+    // on workspaces that haven't run the migration yet.
     expect(d.daysInStage).toBeNull();
     expect(d.daysSinceUpdate).toBe(3);
     expect(d.contact_name).toBe('Jane Doe');

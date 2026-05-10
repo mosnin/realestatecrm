@@ -16,6 +16,30 @@ vars listed in config.py.
 from __future__ import annotations
 
 import modal
+import re
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Secret masking — applied to all log output that includes external data
+# ---------------------------------------------------------------------------
+
+_SECRET_PATTERNS = [
+    (re.compile(r'sk-[A-Za-z0-9]{20,}'), 'sk-[REDACTED]'),
+    (re.compile(r'Bearer\s+[A-Za-z0-9\-._~+/]+=*'), 'Bearer [REDACTED]'),
+    (re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'), '[email]'),
+    (re.compile(r'\+?1?\s*\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}'), '[phone]'),
+    (re.compile(r'ey[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+'), '[jwt]'),
+]
+
+
+def mask_secrets(text: str) -> str:
+    if not isinstance(text, str):
+        text = str(text)
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
 
 # ---------------------------------------------------------------------------
 # Image
@@ -51,44 +75,50 @@ secrets = [modal.Secret.from_name("chippi-secrets")]
 # Manual trigger — run a single space on demand
 # ---------------------------------------------------------------------------
 
-@app.function(secrets=secrets, timeout=300)
+@app.function(secrets=secrets, timeout=600)
 async def run_space(space_id: str) -> None:
     """Run Chippi for one space. Useful for local testing / cron drains."""
     import sys
     sys.path.insert(0, "/app")
 
-    from db import supabase
-    from schemas import AgentSettings, Space
-    from orchestrator import run_agent_for_space
+    try:
+        from db import supabase
+        from schemas import AgentSettings, Space
+        from orchestrator import run_agent_for_space
 
-    db = await supabase()
+        db = await supabase()
 
-    sr = await (
-        db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
-    )
-    if not sr.data:
-        print(f"No AgentSettings found for space {space_id}")
-        return
+        sr = await (
+            db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
+        )
+        if not sr.data:
+            logger.warning("run_space_no_settings", space_id=space_id)
+            return
 
-    spr = await (
-        db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
-    )
-    if not spr.data:
-        print(f"Space {space_id} not found")
-        return
+        spr = await (
+            db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
+        )
+        if not spr.data:
+            logger.warning("run_space_not_found", space_id=space_id)
+            return
 
-    agent_settings = AgentSettings.model_validate(sr.data)
-    space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
+        agent_settings = AgentSettings.model_validate(sr.data)
+        space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
 
-    await run_agent_for_space(space, agent_settings)
-    print(f"Done: ran agent for {space.name} ({space_id})")
+        await run_agent_for_space(space, agent_settings)
+        logger.info("run_space_done", space_id=space_id)
+
+    except Exception as e:
+        masked_error = mask_secrets(str(e))
+        logger.error("modal_run_space_failed", error=masked_error, space_id=space_id)
+        raise
 
 
 # ---------------------------------------------------------------------------
 # Web endpoint — autonomous run from the UI / trigger queue
 # ---------------------------------------------------------------------------
 
-@app.function(secrets=secrets, timeout=300)
+@app.function(secrets=secrets, timeout=600)
 @modal.fastapi_endpoint(method="POST")
 async def run_now_webhook(item: dict) -> dict:
     """HTTP webhook that runs Chippi autonomously for a space.
@@ -100,34 +130,62 @@ async def run_now_webhook(item: dict) -> dict:
     import sys
     sys.path.insert(0, "/app")
 
-    expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
-    secret = (item.get("secret") or "")
-    if not expected or secret != expected:
-        return {"error": "Unauthorized"}
+    try:
+        expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
+        secret = (item.get("secret") or "")
+        if not expected or secret != expected:
+            return {"error": "Unauthorized"}
 
-    space_id = (item.get("space_id") or "").strip()
-    if not space_id:
-        return {"error": "space_id required"}
+        space_id = (item.get("space_id") or "").strip()
+        if not space_id:
+            return {"error": "space_id required"}
 
-    from db import supabase
-    from schemas import AgentSettings, Space
-    from orchestrator import run_agent_for_space
+        from db import supabase
+        from schemas import AgentSettings, Space
+        from orchestrator import run_agent_for_space
 
-    db = await supabase()
-    sr = await (
-        db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
-    )
-    spr = await (
-        db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
-    )
-    if not sr.data or not spr.data:
-        return {"error": f"space or agent settings not found: {space_id}"}
+        db = await supabase()
+        sr = await (
+            db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
+        )
+        spr = await (
+            db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
+        )
+        if not sr.data or not spr.data:
+            return {"error": f"space or agent settings not found: {space_id}"}
 
-    await run_agent_for_space(
-        Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
-        AgentSettings.model_validate(sr.data),
-    )
-    return {"ok": True, "space_id": space_id}
+        await run_agent_for_space(
+            Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
+            AgentSettings.model_validate(sr.data),
+        )
+        return {"ok": True, "space_id": space_id}
+
+    except Exception as e:
+        masked_error = mask_secrets(str(e))
+        logger.error("modal_run_now_webhook_failed", error=masked_error, space_id=item.get("space_id") if isinstance(item, dict) else None)
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Web endpoint — swarm execution (called fire-and-forget by /api/swarm)
+# ---------------------------------------------------------------------------
+
+@app.function(
+    image=image,
+    secrets=[modal.Secret.from_name("chippi-secrets")],
+    timeout=600,  # 10 min max for swarm runs
+    max_containers=10,
+)
+@modal.fastapi_endpoint(method="POST", label="run_swarm")
+async def run_swarm_endpoint(payload: dict) -> dict:
+    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm."""
+    from swarm_orchestrator import run_swarm
+    try:
+        await run_swarm(payload)
+        return {"status": "completed"}
+    except Exception as exc:
+        logger.error("run_swarm_endpoint_error", error=str(exc))
+        return {"status": "failed", "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +238,7 @@ async def chat_turn(item: dict):
         return {"error": f"space or agent settings not found: {space_id}"}
 
     from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
+    from openai.types.shared import Reasoning
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
@@ -253,20 +312,20 @@ async def chat_turn(item: dict):
             data = getattr(event, "data", None)
             if data is None:
                 return None
-            # The Responses API streams BOTH response.output_text.delta
-            # (model text) and response.function_call_arguments.delta
-            # (the JSON args being constructed for a tool call). Both
-            # carry a `delta` attribute. Without filtering, the function-
-            # call arg JSON leaks into the chat as "raw" model text right
-            # before each tool card. Only forward genuine output_text
-            # deltas; function-call args land properly via the
-            # RunItemStreamEvent → tool_call_item path below.
             data_type = getattr(data, "type", "") or ""
-            if data_type and data_type != "response.output_text.delta":
-                return None
-            delta = getattr(data, "delta", None)
-            if delta:
-                return {"type": "token", "delta": str(delta)}
+            # Forward genuine output_text deltas as tokens.
+            # Forward reasoning_text deltas as reasoning_delta (shown in the
+            # collapsible "Thinking" section in the client).
+            # Filter everything else (function_call_arguments.delta etc.) so
+            # raw tool-arg JSON doesn't leak into the chat as model text.
+            if data_type == "response.output_text.delta":
+                delta = getattr(data, "delta", None)
+                if delta:
+                    return {"type": "token", "delta": str(delta)}
+            elif data_type == "response.reasoning_text.delta":
+                delta = getattr(data, "delta", None)
+                if delta:
+                    return {"type": "reasoning_delta", "delta": str(delta)}
             return None
 
         if name == "RunItemStreamEvent":
@@ -327,7 +386,10 @@ async def chat_turn(item: dict):
 
     run_config = RunConfig(
         tracing_disabled=False,
-        model_settings=ModelSettings(truncation="auto"),
+        model_settings=ModelSettings(
+            truncation="auto",
+            reasoning=Reasoning(effort="medium"),
+        ),
     )
 
     async def event_stream():
@@ -360,11 +422,13 @@ async def chat_turn(item: dict):
         except InputGuardrailTripwireTriggered as exc:
             info = exc.guardrail_result.output.output_info or {}
             reason = info.get("reason", "Run blocked.")
-            err = json.dumps({"type": "error", "message": reason})
+            err = json.dumps({"type": "error", "message": mask_secrets(reason)})
             yield f"data: {err}\n\n"
 
         except Exception as e:
-            err = json.dumps({"type": "error", "message": str(e)})
+            masked_error = mask_secrets(str(e))
+            logger.error("chat_turn_stream_failed", error=masked_error, space_id=space_id)
+            err = json.dumps({"type": "error", "message": masked_error})
             yield f"data: {err}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

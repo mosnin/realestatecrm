@@ -174,6 +174,7 @@ function summariseOne(p: PersonContext): string {
 
 export const findPersonTool = defineTool<typeof parameters, FindPersonResult>({
   name: 'find_person',
+  riskLevel: 'safe',
   description:
     "Find a person in this workspace by name, email, or phone. Returns the person's full context — score, last activity, active deals — so you don't need a follow-up call.",
   parameters,

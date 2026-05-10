@@ -1112,16 +1112,24 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
   );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
+    <div className="relative">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {/*
+          overflow-hidden prevents the fixed-width palette + properties panels
+          from leaking outside the grid column when viewport is narrow.
+          The DragOverlay is portalled out of this container by dnd-kit so it
+          is unaffected by overflow-hidden.
+        */}
+        <div className="flex flex-col lg:flex-row gap-6 min-h-[600px] overflow-hidden">
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
-          <div className="sticky top-4 space-y-3">
+          {/* top-[4.5rem] = 56px sticky header + 16px — avoids header overlap */}
+          <div className="sticky top-[4.5rem] space-y-3">
             <p className={SECTION_LABEL}>Field types</p>
             <div className="grid grid-cols-2 gap-2">
               {QUESTION_TYPES.map((qt) => (
@@ -1141,8 +1149,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         </div>
 
         {/* Center Panel - Form Layout */}
-        <div className="flex-1 min-w-0">
-          <div className="space-y-3">
+        <div className="flex-1 min-w-0 min-h-0">
+          <div className="space-y-3 pb-8">
             <SortableContext
               items={config.sections.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
@@ -1163,8 +1171,9 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             </SortableContext>
 
             {config.sections.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border/70 p-8 text-center">
-                <p className="text-sm text-muted-foreground">No sections yet. Add one to get started.</p>
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No sections yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">Add a section below to start building your form.</p>
               </div>
             )}
 
@@ -1180,11 +1189,12 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
 
         {/* Right Panel - Property Editor */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
-          <div className="sticky top-4 space-y-3">
+          {/* top-[4.5rem] keeps panel below sticky header; maxHeight fills the rest of the viewport */}
+          <div className="sticky top-[4.5rem] space-y-3">
             <p className={SECTION_LABEL}>Properties</p>
             <div
               className="rounded-xl border border-border/70 bg-background overflow-y-auto"
-              style={{ maxHeight: 'calc(100vh - 160px)' }}
+              style={{ maxHeight: 'calc(100vh - 5.5rem - 4rem)' }}
             >
               <div className="p-4">
                 {selectedQuestion ? (
@@ -1211,54 +1221,60 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* Drag overlay */}
-      <DragOverlay>
-        {activeDragId && (() => {
-          // If dragging from the palette, show the field type info
-          if (activeDragId.startsWith('palette-')) {
-            const fieldType = activeDragId.replace('palette-', '');
-            const qtConfig = QUESTION_TYPES.find((qt) => qt.type === fieldType);
-            if (qtConfig) {
-              const OverlayIcon = qtConfig.icon;
+        {/*
+          DragOverlay — dnd-kit portals this to <body> at z-index 999 by default.
+          The sticky preview aside uses natural stacking (z-index auto) within
+          the grid column. Setting zIndex here to a lower value ensures the
+          drag ghost never paints over the adjacent preview panel.
+        */}
+        <DragOverlay zIndex={200}>
+          {activeDragId && (() => {
+            // If dragging from the palette, show the field type info
+            if (activeDragId.startsWith('palette-')) {
+              const fieldType = activeDragId.replace('palette-', '');
+              const qtConfig = QUESTION_TYPES.find((qt) => qt.type === fieldType);
+              if (qtConfig) {
+                const OverlayIcon = qtConfig.icon;
+                return (
+                  <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                    <OverlayIcon size={14} className="text-muted-foreground" />
+                    {qtConfig.label}
+                  </div>
+                );
+              }
+            }
+            // For questions, show the question label
+            const draggedQuestion = allQuestions.find((q) => q.id === activeDragId);
+            if (draggedQuestion) {
+              const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
+              const OverlayIcon = qtConfig?.icon;
               return (
                 <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                  <OverlayIcon size={14} className="text-muted-foreground" />
-                  {qtConfig.label}
+                  {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
+                  {draggedQuestion.label}
                 </div>
               );
             }
-          }
-          // For questions, show the question label
-          const draggedQuestion = allQuestions.find((q) => q.id === activeDragId);
-          if (draggedQuestion) {
-            const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
-            const OverlayIcon = qtConfig?.icon;
+            // For sections, show section title
+            const draggedSection = config.sections.find((s) => s.id === activeDragId);
+            if (draggedSection) {
+              return (
+                <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                  <GripVertical size={14} className="text-muted-foreground" />
+                  {draggedSection.title}
+                </div>
+              );
+            }
             return (
-              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
-                {draggedQuestion.label}
+              <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                Dragging…
               </div>
             );
-          }
-          // For sections, show section title
-          const draggedSection = config.sections.find((s) => s.id === activeDragId);
-          if (draggedSection) {
-            return (
-              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                <GripVertical size={14} className="text-muted-foreground" />
-                {draggedSection.title}
-              </div>
-            );
-          }
-          return (
-            <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-              Dragging…
-            </div>
-          );
-        })()}
-      </DragOverlay>
-    </DndContext>
+          })()}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }

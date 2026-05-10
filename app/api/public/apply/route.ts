@@ -308,13 +308,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
 
-    // ── Extract leadType from the raw payload ─────────────────────────────
+    // ── Extract leadType and sourceLabel from the raw payload ────────────
     // The "Getting Started" step sends leadType: 'rental' | 'buyer'.
     // We need this BEFORE fetching the form config so we fetch the correct one.
     const rawBody = requestBody as Record<string, unknown>;
     const rawLeadType = rawBody.leadType;
     const resolvedLeadType: 'rental' | 'buyer' =
       rawLeadType === 'buyer' ? 'buyer' : 'rental';
+
+    // Accept a sourceLabel from the client only for the known AI-chat value.
+    // All other sources default to 'intake-form' (set on contactInsert below).
+    const ALLOWED_SOURCE_LABELS = new Set(['intake-form', 'intake-chat-ai']);
+    const rawSourceLabel = typeof rawBody.sourceLabel === 'string' ? rawBody.sourceLabel : null;
+    const resolvedSourceLabel: string =
+      rawSourceLabel && ALLOWED_SOURCE_LABELS.has(rawSourceLabel)
+        ? rawSourceLabel
+        : 'intake-form';
 
     // ── Determine if this space uses a dynamic form config ────────────────
     // Fetch the CORRECT config based on leadType (rental vs buyer)
@@ -400,7 +409,9 @@ export async function POST(req: NextRequest) {
       // Use the resolved leadType from the "Getting Started" step, not the config's leadType
       // (the config's leadType reflects which form template it is, but the user's choice is authoritative)
       contactLeadType = resolvedLeadType;
-      contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.monthlyGrossIncome ?? null);
+      // `data.budget` is the generic key emitted by the AI chat; the traditional
+      // form uses `monthlyRent` (rental) or `buyerBudget` (buyer). Check all.
+      contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.budget ?? data.monthlyGrossIncome ?? null);
       contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
       contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
       privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
@@ -555,10 +566,14 @@ export async function POST(req: NextRequest) {
       properties: [],
       leadType: contactLeadType,
       formLeadType: contactLeadType,
-      tags: ['application-link', 'new-lead'],
+      tags: [
+        'application-link',
+        'new-lead',
+        ...(resolvedSourceLabel === 'intake-chat-ai' ? ['ai-chat'] : []),
+      ],
       scoringStatus: 'pending',
       scoreLabel: 'unscored',
-      sourceLabel: 'intake-form',
+      sourceLabel: resolvedSourceLabel,
       applicationData,
       applicationRef,
       statusPortalToken,

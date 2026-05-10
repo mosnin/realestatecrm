@@ -31,6 +31,7 @@ interface SummarizeRealtorResult {
 
 export const summarizeRealtorTool = defineTool<typeof parameters, SummarizeRealtorResult>({
   name: 'summarize_realtor',
+  riskLevel: 'safe',
   description:
     'Broker-only. Roll up one realtor\'s deals, contacts, and drafts over the last N days (default 7).',
   parameters,

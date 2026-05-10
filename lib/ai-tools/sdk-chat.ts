@@ -1,7 +1,7 @@
 /**
- * The new in-process chat runtime, built on `@openai/agents`.
+ * TypeScript in-process chat runtime (fallback). Active when CHIPPI_CHAT_RUNTIME=ts.
  *
- * This replaces the Modal/Python proxy at `app/api/ai/task/route.ts` when
+ * The primary runtime is Modal (agent/modal_app.py). This module is the fallback when
  * `CHIPPI_CHAT_RUNTIME=ts` is set. The flag default is `'modal'`, so this
  * code is dormant until explicitly activated — see `runtime-flag.ts`.
  *
@@ -29,7 +29,7 @@ import {
   applyApprovalDecision,
   type ApprovalDecision,
 } from './sdk-bridge';
-import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-skills';
+import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
@@ -40,17 +40,18 @@ import { logger } from '@/lib/logger';
 // ── Config ─────────────────────────────────────────────────────────────────
 
 /** Same model the bridge defaults to. Cheap enough to absorb chat traffic. */
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
- * to spelunk the catalog can't run our token bill into the ground. 8 is
- * generous for a real conversation: read-research-think-act-confirm
- * fits inside it. If the model needs more, it should ask the realtor
- * a clarifying question, not loop.
+ * to spelunk the catalog can't run our token bill into the ground. 15
+ * gives the agent enough headroom to chain multi-step workflows
+ * autonomously (look up a person → read their activity → find their
+ * deal → draft a follow-up) without stopping mid-task to ask the
+ * realtor a clarifying question.
  */
-const MAX_TURNS_PER_TURN = 8;
+const MAX_TURNS_PER_TURN = 15;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export function buildChatAgent(
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
   const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: opts.model });
   const contactResearcher = buildContactResearcherAgent(ctx, { model: opts.model });
+  const planner = buildPlannerAgent(ctx, { model: opts.model });
 
   const skillTools = [
     pipelineAnalyst.asTool({
@@ -84,6 +86,11 @@ export function buildChatAgent(
       toolName: 'research_person',
       toolDescription:
         'Research everything we know about a person and recommend the next action.',
+    }),
+    planner.asTool({
+      toolName: 'planner',
+      toolDescription:
+        'Break a complex multi-step task into a concrete execution plan before starting work. Call this first when the user asks for something that requires several distinct actions.',
     }),
   ];
 
@@ -238,7 +245,7 @@ export interface RunChatTurnInput {
   history?: ChatHistoryRow[];
   /**
    * Optional override for the model (tests, A/B). The default
-   * `gpt-4.1-mini` matches the bridge.
+   * `gpt-5-mini` matches the bridge.
    */
   model?: string;
 }

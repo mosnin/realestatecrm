@@ -29,6 +29,7 @@ interface MarkDealLostResult {
 
 export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult>({
   name: 'mark_deal_lost',
+  riskLevel: 'destructive',
   description:
     "Mark a deal as lost. Reason is required and recorded for post-mortems. Prompts for approval first.",
   parameters,

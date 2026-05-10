@@ -302,10 +302,9 @@ describe('createDealTool', () => {
   });
 
   it('errors when the workspace has no pipeline stages at all', async () => {
-    // stageId resolution falls through to the default-stage lookup, which
-    // queries DealStage with a pipelineType filter and then without; both
-    // return nothing in this mock. With no stage to land in, the tool
-    // surfaces a workspace-config error instead of writing.
+    // create_deal now falls back to a default stage when the passed stageId
+    // doesn't match. The genuine error case is "workspace has no stages
+    // configured anywhere" — no buyer pipeline, no seller pipeline, nothing.
     mockByTable = { DealStage: { single: null } };
     const result = await createDealTool.handler(
       { title: 'X', stageId: 'bogus' },

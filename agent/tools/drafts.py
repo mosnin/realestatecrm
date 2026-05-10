@@ -19,14 +19,17 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 _VALID_CHANNELS = {"sms", "email", "note"}
 _DEDUPE_WINDOW_HOURS = 48
 
 
+@idempotent_tool
 @function_tool
 async def draft_message(
     ctx: RunContextWrapper[AgentContext],
@@ -54,9 +57,11 @@ async def draft_message(
     space_id = ctx.context.space_id
 
     if channel not in _VALID_CHANNELS:
-        return {"error": f"channel must be one of {_VALID_CHANNELS}"}
+        agent_err = from_supabase_error({"message": f"channel must be one of {_VALID_CHANNELS}", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     if channel == "email" and not subject:
-        return {"error": "subject is required for email channel"}
+        agent_err = from_supabase_error({"message": "subject is required for email channel", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     db = await supabase()
 
@@ -69,7 +74,8 @@ async def draft_message(
         .execute()
     )
     if not check.data:
-        return {"error": "Contact not found in space"}
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     contact_name = check.data.get("name", "contact")
 
     # ── Dedup: existing pending draft for same contact+channel in window ──
@@ -111,7 +117,11 @@ async def draft_message(
         "expiresAt": expires_at,
     }
 
-    result = await db.table("AgentDraft").insert(draft).execute()
+    try:
+        result = await with_retry(lambda: db.table("AgentDraft").insert(draft).execute())
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -129,8 +139,9 @@ async def draft_message(
             contact_id=contact_id,
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     created = result.data[0] if result.data else draft
     return {

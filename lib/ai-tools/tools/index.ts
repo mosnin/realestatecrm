@@ -96,6 +96,9 @@ import { requestDealReviewTool } from './request-deal-review';
 import { recallHistoryTool } from './recall-history';
 import { readAttachmentTool } from './read-attachment';
 
+// Planning
+import { createPlanTool } from './plan';
+
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
  * intentionally NOT in this list — it gets added at the `registry` layer.
@@ -171,4 +174,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+
+  // ── Planning ───────────────────────────────────────────────────────────
+  createPlanTool as ToolDefinition,
 ];

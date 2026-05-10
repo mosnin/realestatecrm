@@ -92,7 +92,7 @@ export default async function LeadDetailPage({
                 {lead.sourceLabel && (
                   <span className="inline-flex items-center gap-1"><Tag size={10} />{lead.sourceLabel}</span>
                 )}
-                <Badge variant="secondary" className="text-[10px]">{lead.leadType === 'buyer' ? 'Buyer' : 'Rental'}</Badge>
+                <Badge variant="secondary" className="text-[10px]">{lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}</Badge>
               </div>
             </div>
           </div>

@@ -88,20 +88,26 @@ export default async function LeadsPage({
   };
 
   return (
-    <div className="space-y-4 max-w-[1320px]">
-      {/* Page header — H1 only. The voice lives on /chippi home; this
-          surface is utility chrome. */}
-      <header>
+    <div className="space-y-6 max-w-[1320px]">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">People.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          People
+          Applications
         </h1>
+        <p className="text-sm text-muted-foreground">
+          {leads.length === 0
+            ? 'Share your intake link and leads will appear here.'
+            : unreadLeads.length > 0
+              ? `${unreadLeads.length} new since you last checked.`
+              : 'All caught up — no new applications.'}
+        </p>
       </header>
 
       <PeopleTabs slug={slug} newCount={unreadLeads.length} />
 
       {/* Tier summary bar */}
       {leads.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             {leads.length} {leads.length === 1 ? 'application' : 'applications'}
           </span>
@@ -136,19 +142,16 @@ export default async function LeadsPage({
       )}
 
       {leads.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-card py-16 text-center px-6">
-          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
-            <Phone size={20} className="text-muted-foreground" />
-          </div>
-          <p className="font-semibold text-foreground mb-1">No leads yet</p>
-          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Share your intake link and new applications will appear here.
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">No applications yet.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Share your intake link — new applications will appear here.
           </p>
           <Link
-            href={`/s/${slug}`}
-            className="inline-flex items-center gap-1.5 mt-4 text-sm text-primary font-medium hover:underline underline-offset-2"
+            href={`/s/${slug}/intake/share`}
+            className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Get your intake link <ArrowRight size={13} />
+            Get your intake link <ArrowRight size={12} />
           </Link>
         </div>
       ) : (

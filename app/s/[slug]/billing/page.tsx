@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { BillingPage } from '@/components/billing/billing-page';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
+import { H1, TITLE_FONT } from '@/lib/typography';
 
 export default async function Billing({
   params,
@@ -67,12 +68,22 @@ export default async function Billing({
     }
   }
 
+  const statusLabel =
+    subscriptionStatus === 'active' ? 'Subscription active.' :
+    subscriptionStatus === 'trialing' ? 'Trial in progress.' :
+    subscriptionStatus === 'past_due' ? 'Payment past due — update your card to keep access.' :
+    subscriptionStatus === 'canceled' ? 'Subscription canceled.' :
+    'No active subscription.';
+
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground">Manage your subscription and payment details</p>
-      </div>
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Billing.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Subscription
+        </h1>
+        <p className="text-sm text-muted-foreground">{statusLabel}</p>
+      </header>
       <BillingPage
         slug={slug}
         subscriptionStatus={subscriptionStatus}

@@ -67,6 +67,7 @@ interface ScheduleTourResult {
 
 export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult>({
   name: 'schedule_tour',
+  riskLevel: 'high',
   description:
     'Schedule a property tour. Uses a saved contact when provided, otherwise captures a walk-in guest. Always prompts for approval.',
   parameters,

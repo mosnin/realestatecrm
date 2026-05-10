@@ -26,6 +26,7 @@ interface FindOverdueResult {
 
 export const findOverdueFollowupsTool = defineTool<typeof parameters, FindOverdueResult>({
   name: 'find_overdue_followups',
+  riskLevel: 'safe',
   description: 'Contacts where followUpAt is in the past. Up to 10, oldest first.',
   parameters,
   requiresApproval: false,

@@ -6,6 +6,8 @@ import { Upload, FileText, Download, Trash2, Loader2, ArrowUpFromLine } from 'lu
 import { cn } from '@/lib/utils';
 import {
   DEAL_DOCUMENT_KINDS,
+  defaultDocumentKind,
+  documentKindsForPipeline,
   documentKindLabel,
   formatFileSize,
   type DealDocument,
@@ -15,6 +17,7 @@ import {
 interface DealDocumentsProps {
   dealId: string;
   initial?: DealDocument[];
+  pipelineType?: string | null;
 }
 
 /**
@@ -22,11 +25,15 @@ interface DealDocumentsProps {
  * signed-URL download. Deliberately minimal — the win here is having a
  * typed, labeled place to store these files at all, not a full DMS.
  */
-export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
+export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocumentsProps) {
   const [docs, setDocs] = useState<DealDocument[]>(initial);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [selectedKind, setSelectedKind] = useState<DealDocumentKind>('offer');
+  const [selectedKind, setSelectedKind] = useState<DealDocumentKind>(() => defaultDocumentKind(pipelineType));
+  const orderedKinds = documentKindsForPipeline(pipelineType);
+  const sortedKinds = DEAL_DOCUMENT_KINDS.slice().sort(
+    (a, b) => orderedKinds.indexOf(a.value) - orderedKinds.indexOf(b.value),
+  );
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,7 +141,7 @@ export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
               className="text-xs border border-border rounded px-2 py-1.5 bg-card"
               disabled={uploading}
             >
-              {DEAL_DOCUMENT_KINDS.map((k) => (
+              {sortedKinds.map((k) => (
                 <option key={k.value} value={k.value}>{k.label}</option>
               ))}
             </select>

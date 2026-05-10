@@ -151,6 +151,7 @@ function summariseOne(d: DealContext): string {
 
 export const findDealTool = defineTool<typeof parameters, FindDealResult>({
   name: 'find_deal',
+  riskLevel: 'safe',
   description:
     "Find a deal in this workspace by title, address, or filter. Returns each deal's full context — stage, recency, primary contact — so you don't need a follow-up call.",
   parameters,

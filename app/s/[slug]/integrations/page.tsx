@@ -9,6 +9,16 @@
  * The realtor's lens — what does Chippi DO once I connect Gmail? — is
  * answered by the app's blurb in the row, not by a help article. If the
  * blurb doesn't sell it, fix the blurb.
+ *
+ * Health status: ConnectedAppsSection fetches /api/integrations/health
+ * client-side (non-blocking, refreshes on window focus) and shows a
+ * colored dot + label next to each connected app:
+ *   - green  "Connected"        — Composio reports ACTIVE
+ *   - yellow "Auth expired"     — Composio reports EXPIRED; realtor must reconnect
+ *   - red    "Connection error" — Composio reports FAILED or a fetch error
+ *   - gray   "Not connected"    — no connection in our DB or Composio
+ * This surfaces broken auth before Chippi tries to use the integration,
+ * eliminating silent task failures.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -52,18 +62,13 @@ export default async function IntegrationsPage({
 
   return (
     <div className={PAGE_RHYTHM}>
-      <header className="space-y-2">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Integrations.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Integrations
+          Connected apps
         </h1>
         <p className={BODY_MUTED}>
-          Connect Chippi to the apps you already use. Drafts go where you
-          send mail. Tours land on your calendar. Notes show up where your
-          team works.
-        </p>
-        <p className={BODY_MUTED}>
-          Chippi never sends without your tap. Connecting just means your
-          approved drafts go through your account.
+          Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap.
         </p>
       </header>
 

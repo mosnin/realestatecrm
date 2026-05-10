@@ -10,9 +10,10 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (22 tools):
-  - find_contacts / get_contact_activity / update_contact
-  - find_deals / update_deal / advance_deal_stage / request_deal_review
+Tool surface (31 tools):
+  - create_contact / find_contacts / get_contact_activity / update_contact
+  - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
+  - recall_docs
   - book_tour
   - route_lead
   - add_property / send_property_packet
@@ -25,6 +26,9 @@ Tool surface (22 tools):
   - read_attachment
   - ask_realtor
   - log_activity_run
+  - create_plan
+  - get_intake_form / add_intake_question / remove_intake_question
+    / update_intake_question / save_intake_form
 """
 
 from __future__ import annotations
@@ -33,9 +37,11 @@ from agents import Agent
 
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
+from tools.docs import recall_docs
+from tools.plan import create_plan
 from tools.attachments import read_attachment
-from tools.contacts import find_contacts, get_contact_activity, update_contact
-from tools.deals import advance_deal_stage, find_deals, request_deal_review, update_deal
+from tools.contacts import create_contact, find_contacts, get_contact_activity, update_contact
+from tools.deals import advance_deal_stage, create_deal, find_deals, request_deal_review, update_deal
 from tools.drafts import draft_message
 from tools.goals import manage_goal
 from tools.inbound import process_inbound_message
@@ -47,6 +53,7 @@ from tools.properties import add_property, send_property_packet
 from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour
+from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -78,6 +85,42 @@ For "what's the topic?" questions use recall_memory(query="...") —
 semantic search across the whole workspace. For a specific contact
 use recall_memory(entity_id=...). Always check memory before drafting
 anything contact-facing.
+
+# Planning
+Before executing any task that requires multiple tool calls spanning contacts,
+deals, or calendar events, call create_plan FIRST with a one-sentence task
+description and an ordered list of steps. This shows the realtor exactly what
+you're about to do before you do it.
+
+When to plan (call create_plan before proceeding):
+- Any task involving 2+ distinct contacts or deals
+- Requests that combine CRM reads with drafting or writes
+- Sweep runs or autonomous runs with multiple triggers
+- Any task where you'll need 3+ tool calls to complete it
+- Multi-step outreach or follow-up sequences
+- Pipeline analysis + action (find stalled deals → draft emails)
+
+When NOT to plan (skip create_plan entirely):
+- Single-contact lookups or simple questions ("find Jane Smith", "what's her email")
+- Adding one note or updating one field on one record
+- A direct question answerable in one or two tool calls
+- Simple single-contact drafts ("draft a follow-up for John")
+
+After create_plan returns, execute the steps in the announced order. Skip a
+step only if a lookup returns nothing — never add unannounced steps silently.
+
+# Creating records
+When the realtor says "add a lead", "create a contact", "log a new person",
+"add a buyer/rental/seller" — call create_contact immediately. Don't ask for
+permission, don't store in memory instead. The contact goes in the real CRM.
+
+When the realtor says "create a deal", "start a deal", "open a deal for [name]"
+— call create_deal. Link the relevant contact_ids if you have them. Stage is
+optional — leave it blank and the deal lands in the right pipeline automatically.
+
+Never say "I've noted this" or "I've added this to memory" as a substitute for
+actually creating the record. Memory is for observations; create_contact and
+create_deal are for CRM records.
 
 # Lifecycle moves (brokerage-grade actions)
 Beyond reading and drafting you can directly move the deal lifecycle:
@@ -122,9 +165,32 @@ preferences, ghosting patterns.
 - [Think: ...] → systematic. State what you know, what you don't,
   what tools you'll use, then execute.
 
+# App help and how-to questions
+When the realtor asks "how do I...", "where is...", "why isn't... working",
+or "what does X do" — call recall_docs(query="...") first. It searches the
+app knowledge base and returns accurate how-to content. Don't guess at app
+behavior — look it up. This tool is never called for routine CRM tasks.
+
 # Asking
 If intent is genuinely ambiguous, ask_realtor with a one-sentence
 question. Don't ask for trivia a tool call would resolve.
+
+# Intake form editing
+You can read and modify the realtor's lead intake form directly:
+- get_intake_form(lead_type) — fetch the current form sections and questions.
+- add_intake_question(lead_type, section_title, question_label, question_type,
+  required, options?) — add a new question to a section (creates the section
+  if it doesn't exist).
+- remove_intake_question(lead_type, question_label) — remove a question by its
+  label. System fields (Name, Email, Phone) cannot be removed.
+- update_intake_question(lead_type, question_label, new_label?, new_options?,
+  new_required?) — rename, re-option, or change required status.
+- save_intake_form(lead_type, form_config) — write a fully restructured form
+  config in one call. Use only when doing a wholesale rewrite; prefer the
+  surgical tools for targeted edits.
+Always call get_intake_form first before any edit so you know the current
+state. Confirm the change with the realtor before calling save_intake_form or
+any mutation unless the instruction is unambiguous.
 
 # Boundaries
 - Never reveal internal IDs, API keys, or per-row metadata. Use names.
@@ -141,18 +207,60 @@ suggest the closest thing you can.
 """.strip()
 
 
-def make_chippi_agent() -> Agent:
+async def load_ai_profile(space_id: str, db) -> str | None:
+    """Load the AIUserProfile for a space and format it as a prompt injection."""
+    try:
+        result = await db.table("AIUserProfile").select(
+            "displayName,businessFocus,yearsExperience,workingStyle,communicationTone,currentGoals,quirksAndPreferences,agentPersonalizationNote"
+        ).eq("spaceId", space_id).maybeSingle().execute()
+
+        profile = result.data
+        if not profile:
+            return None
+
+        parts = []
+        if profile.get("displayName"):
+            parts.append(f"The realtor's preferred name: {profile['displayName']}")
+        if profile.get("businessFocus"):
+            parts.append(f"Business focus: {', '.join(profile['businessFocus'])}")
+        if profile.get("yearsExperience") is not None:
+            parts.append(f"Years of experience: {profile['yearsExperience']}")
+        if profile.get("workingStyle"):
+            parts.append(f"Working style: {profile['workingStyle']}")
+        if profile.get("communicationTone"):
+            parts.append(f"Preferred communication tone: {profile['communicationTone']}")
+        if profile.get("currentGoals"):
+            parts.append(f"Current goals: {profile['currentGoals']}")
+        if profile.get("quirksAndPreferences"):
+            parts.append(f"Preferences: {profile['quirksAndPreferences']}")
+        if profile.get("agentPersonalizationNote"):
+            parts.append(f"Special instructions: {profile['agentPersonalizationNote']}")
+
+        if not parts:
+            return None
+
+        return "# Realtor profile\n" + "\n".join(f"- {p}" for p in parts)
+    except Exception:
+        return None
+
+
+def make_chippi_agent(ai_profile_text: str | None = None) -> Agent:
     """Build the single Chippi agent. Constructed fresh per run."""
+    instructions = CHIPPI_INSTRUCTIONS
+    if ai_profile_text:
+        instructions = ai_profile_text + "\n\n" + instructions
     return Agent[None](
         name="Chippi",
-        model="gpt-4.1-mini",
-        instructions=CHIPPI_INSTRUCTIONS,
+        model="gpt-5-mini",
+        instructions=instructions,
         tools=[
             # Contacts
+            create_contact,
             find_contacts,
             get_contact_activity,
             update_contact,
             # Deals + lifecycle
+            create_deal,
             find_deals,
             update_deal,
             advance_deal_stage,
@@ -181,6 +289,16 @@ def make_chippi_agent() -> Agent:
             # Asking + audit
             ask_realtor,
             log_activity_run,
+            # App knowledge base (help / how-to — lazy loaded)
+            recall_docs,
+            # Planning
+            create_plan,
+            # Intake form
+            get_intake_form,
+            add_intake_question,
+            remove_intake_question,
+            update_intake_question,
+            save_intake_form,
         ],
         input_guardrails=[pending_drafts_guardrail],
     )

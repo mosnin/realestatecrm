@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
 
 const parameters = z
   .object({
@@ -54,6 +55,7 @@ interface SendSMSResult {
 
 export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
   name: 'send_sms',
+  riskLevel: 'high',
   description:
     'Send an SMS to a person (or free-form phone number). Always prompts for approval. Use for tour confirmations, quick check-ins.',
   parameters,
@@ -117,7 +119,10 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // number, premium prefix, provider error). Distinguish between "we
     // didn't send" vs "provider accepted but silently dropped" isn't
     // possible here — treat false as a delivery failure.
-    const ok = await sendSMS({ to: resolvedPhone, body: args.body });
+    const idemKey = makeIdempotencyKey('send_sms', ctx.space.id, resolvedPhone, args.body);
+    const ok = await withIdempotency(idemKey, () =>
+      sendSMS({ to: resolvedPhone!, body: args.body }),
+    );
     if (!ok) {
       return {
         summary: `SMS send failed for ${resolvedPhone}. Check the number, Telnyx credentials, or provider logs.`,

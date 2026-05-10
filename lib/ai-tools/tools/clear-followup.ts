@@ -30,6 +30,7 @@ interface ClearFollowupResult {
 
 export const clearFollowupTool = defineTool<typeof parameters, ClearFollowupResult>({
   name: 'clear_followup',
+  riskLevel: 'low',
   description:
     "Clear a contact's scheduled follow-up. Requires a reason — it goes on the timeline. Prompts for approval first.",
   parameters,

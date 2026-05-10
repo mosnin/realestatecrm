@@ -28,6 +28,7 @@ interface NoteOnDealResult {
 
 export const noteOnDealTool = defineTool<typeof parameters, NoteOnDealResult>({
   name: 'note_on_deal',
+  riskLevel: 'low',
   description:
     "Add a plain note to a deal's activity log. Prompts for approval first.",
   parameters,

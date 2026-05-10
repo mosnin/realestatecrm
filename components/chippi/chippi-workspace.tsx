@@ -1,19 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
-import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/blocks';
+import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
@@ -21,6 +22,11 @@ import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
+import { PlanCard } from '@/components/chippi/plan-card';
+import { useSplitPanel } from '@/hooks/use-split-panel';
+import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
+import { RightPanel } from '@/components/chippi/right-panel';
+import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -55,6 +61,57 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
+
+/** Available slash commands for the autocomplete dropdown. */
+const SLASH_COMMANDS = [
+  {
+    name: '/plan',
+    description: 'Break a complex task into steps',
+    placeholder: '/plan schedule tours for all hot leads this week',
+  },
+] as const;
+
+/**
+ * Extract the task description from a `/plan <task>` message.
+ * Returns null if the message is not a /plan command.
+ */
+function extractPlanTask(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.toLowerCase().startsWith('/plan')) return null;
+  const task = trimmed.slice('/plan'.length).trim();
+  return task || null;
+}
+
+/**
+ * Transform a /plan message into an agent-friendly directive.
+ * The directive tells the agent to call create_plan before acting.
+ */
+function toPlanDirective(task: string): string {
+  return `[/plan] Before doing anything, call the create_plan tool to break this task into steps. Task: ${task}`;
+}
+
+/**
+ * Parse a create_plan tool call result into { task, steps }.
+ * Returns null if the data doesn't match the expected shape.
+ */
+function parsePlanResult(
+  data: unknown,
+): { task: string; steps: Array<{ title: string; description: string }> } | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const task = typeof d.task === 'string' ? d.task : null;
+  const steps = Array.isArray(d.steps) ? d.steps : null;
+  if (!task || !steps) return null;
+  const parsedSteps = steps.map((s: unknown) => {
+    if (!s || typeof s !== 'object') return { title: '', description: '' };
+    const step = s as Record<string, unknown>;
+    return {
+      title: typeof step.title === 'string' ? step.title : '',
+      description: typeof step.description === 'string' ? step.description : '',
+    };
+  });
+  return { task, steps: parsedSteps };
+}
 
 function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   return messages.map((m, i) => ({
@@ -100,6 +157,34 @@ export function ChippiWorkspace({
     { messageId: string; kind: ApprovalKind; subject?: string } | null
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
+
+  // Slash-command dropdown state. Opens when the user clicks "/plan" in the
+  // hint strip; closes on outside click, Escape, or after a command is chosen.
+  const [slashOpen, setSlashOpen] = useState(false);
+  const slashRef = useRef<HTMLDivElement>(null);
+
+  // (no per-plan animation state needed — isAnimating is derived from the
+  //  message's streaming flag, which already tracks live vs. settled.)
+
+  // Close slash dropdown on outside click.
+  useEffect(() => {
+    if (!slashOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!slashRef.current?.contains(e.target as Node)) setSlashOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSlashOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [slashOpen]);
 
   const {
     messages,
@@ -107,6 +192,9 @@ export function ChippiWorkspace({
     isStreaming,
     pendingApproval,
     liveCallIds,
+    error: agentError,
+    streamingReasoning,
+    activePlan,
     send,
     approve,
     deny,
@@ -117,9 +205,10 @@ export function ChippiWorkspace({
     conversationId: activeConversationId,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
-      // Mark it synced so the prop-sync effect doesn't try to re-hydrate
-      // (and clobber the streaming bubble) when the URL update below arrives.
-      lastLoadedConvIdRef.current = id;
+      // Mark as loaded so the conversation-loading effect won't try to
+      // re-fetch when the URL update below arrives (messages are already
+      // in the UI from the optimistic send).
+      loadedConvIdRef.current = id;
       // Minimal placeholder — the sidebar picks up the real title on refresh,
       // and `send` already titled the conversation server-side.
       setConversations((prev) =>
@@ -142,6 +231,50 @@ export function ChippiWorkspace({
       router.replace(`/s/${slug}/chippi?conversationId=${id}`, { scroll: false });
     },
   });
+
+  // ── Retry support ────────────────────────────────────────────────────────
+  // Store the last user message so the retry button can re-send it without
+  // the user having to retype. Populated on every send() call.
+  const lastUserMsgRef = useRef<string>('');
+
+  // retryLastMessage — re-send the last user message. Falls back to the ref
+  // when the hook doesn't export retryLastMessage (current state of the hook).
+  const retryLastMessage = useCallback(async () => {
+    if (!lastUserMsgRef.current || isStreaming) return;
+    await send(lastUserMsgRef.current);
+  }, [send, isStreaming]);
+
+  // ── Rate-limit countdown ──────────────────────────────────────────────────
+  // When the hook surfaces a rate_limited error, start a local 60-second
+  // countdown so the composer shows "Ready in 0:59…" feedback.
+  const RATE_LIMIT_TEXT = "You've been moving fast";
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const rateLimitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (agentError && agentError.includes(RATE_LIMIT_TEXT)) {
+      // Clear any existing timer before starting a fresh one.
+      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+      setRateLimitSeconds(60);
+      rateLimitTimerRef.current = setInterval(() => {
+        setRateLimitSeconds((s) => {
+          if (s <= 1) {
+            if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+            rateLimitTimerRef.current = null;
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }
+  }, [agentError]);
+
+  // Clean up the interval on unmount.
+  useEffect(() => {
+    return () => {
+      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+    };
+  }, []);
 
   // Wrap approve / alwaysAllow so the moment the realtor approves a
   // celebrate-able tool, the prompt's surface flips into the win sentence.
@@ -175,65 +308,80 @@ export function ChippiWorkspace({
   const approveCelebrating = celebrateThen(approve);
   const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
-  // Two redundant paths feed messages into the transcript so a flake on
-  // one path doesn't black-hole the user:
+  // ── Conversation loading ─────────────────────────────────────────────────
   //
-  //  1. Server-driven prop sync. Whenever the page server component
-  //     re-renders (it reads `?conversationId=` and fetches the matching
-  //     transcript), the new `initialMessages` / `initialConversationId`
-  //     props arrive and we adopt them. We DON'T gate this with a one-shot
-  //     `hydratedRef` — that meant a server re-render couldn't update the
-  //     transcript. The streaming guard prevents clobbering a mid-flight
-  //     bubble.
+  // Single source of truth: the URL's `?conversationId=` param.
   //
-  //  2. Client-side URL fetch. `useSearchParams` updates on every Link
-  //     click; when `?conversationId=X` differs from what we last loaded,
-  //     hit `/api/ai/messages?conversationId=X` directly. Belt-and-suspenders
-  //     in case Next.js's router cache serves a stale render.
+  // When the URL changes (sidebar click, new conversation, etc.) we load the
+  // matching messages. On initial mount we prefer the server-provided
+  // initialMessages (already fetched server-side) to avoid a redundant
+  // round-trip. When the server props are stale or empty we fall back to a
+  // client fetch from /api/ai/messages.
   //
-  // Either path produces the same end state (messages = X's messages).
-  // Whichever wins the race, the transcript ends up correct.
+  // loadedConvIdRef guards against re-loading the same conversation twice
+  // (e.g. when React fires the effect after an unrelated state change, or
+  // when onConversationCreated updates the URL to the just-created conv).
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
-  const lastLoadedConvIdRef = useRef<string | null>(null);
+  const loadedConvIdRef = useRef<string | null>(null);
 
-  // Path 1 — adopt props.
-  useEffect(() => {
-    if (isStreaming) return;
-    if (initialConversationId === lastLoadedConvIdRef.current) return;
-    if (!initialConversationId) return;
-    console.log('[Chat] sync from props', initialConversationId, 'msgs:', initialMessages.length);
-    lastLoadedConvIdRef.current = initialConversationId;
-    setActiveConversationId(initialConversationId);
-    setMessages(initialMessages.length > 0 ? legacyToUi(initialMessages) : []);
-  }, [initialConversationId, initialMessages, isStreaming, setMessages]);
-
-  // Path 2 — fetch on URL change.
-  useEffect(() => {
-    if (!urlConversationId) return;
-    if (isStreaming) return;
-    if (urlConversationId === lastLoadedConvIdRef.current) return;
-    console.log('[Chat] url-effect fetching', urlConversationId);
-    lastLoadedConvIdRef.current = urlConversationId;
-    setActiveConversationId(urlConversationId);
-    void (async () => {
+  const loadConversation = useCallback(
+    async (convId: string) => {
       try {
-        const res = await fetch(`/api/ai/messages?conversationId=${urlConversationId}`);
+        const res = await fetch(`/api/ai/messages?conversationId=${convId}`);
         if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          console.error('[Chat] Load failed', res.status, body);
-          toast.error("Couldn't load that conversation. Try again.");
+          const errBody = await res.text().catch(() => '');
+          console.error('[Chat] fetch failed', res.status, errBody);
+          toast.error("Couldn't load that conversation.", {
+            action: { label: 'Retry', onClick: () => void loadConversation(convId) },
+          });
           return;
         }
         const data = (await res.json()) as LegacyMessage[];
-        console.log('[Chat] url-effect loaded', urlConversationId, 'msgs:', data.length);
         setMessages(legacyToUi(data));
       } catch (err) {
-        console.error('[Chat] Failed to load conversation:', err);
-        toast.error("Couldn't load that conversation. Try again.");
+        console.error('[Chat] fetch error', err);
+        toast.error("Couldn't load that conversation.", {
+          action: { label: 'Retry', onClick: () => void loadConversation(convId) },
+        });
       }
-    })();
-  }, [urlConversationId, isStreaming, setMessages]);
+    },
+    [setMessages],
+  );
+
+  useEffect(() => {
+    if (isStreaming) return;
+
+    // Determine which conversation the user should see right now.
+    // URL is authoritative; fall back to what the server pre-loaded.
+    const targetId = urlConversationId ?? initialConversationId ?? null;
+    if (!targetId) {
+      // No conversation at all — ensure empty state.
+      if (loadedConvIdRef.current !== '') {
+        loadedConvIdRef.current = '';
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+      return;
+    }
+
+    // Already showing this conversation — nothing to do.
+    if (targetId === loadedConvIdRef.current) return;
+
+    loadedConvIdRef.current = targetId;
+    setActiveConversationId(targetId);
+
+    // Server already fetched the right messages for this exact conversation —
+    // use them immediately (zero extra round-trip).
+    if (targetId === initialConversationId && initialMessages.length > 0) {
+      setMessages(legacyToUi(initialMessages));
+      return;
+    }
+
+    // Server props are empty or stale (e.g. router-cache served an old render,
+    // or this is a conversation outside the server's top-50 list). Fetch fresh.
+    void loadConversation(targetId);
+  }, [urlConversationId, initialConversationId, initialMessages, isStreaming, loadConversation, setMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -348,7 +496,15 @@ export function ChippiWorkspace({
         );
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
-      await send(contextPrefix + text, attachmentIds);
+
+      // Slash-command interception: /plan <task> → planning directive.
+      const planTask = extractPlanTask(text);
+      const finalText = planTask ? toPlanDirective(planTask) : text;
+
+      // Record the full text so the retry button can replay it.
+      lastUserMsgRef.current = contextPrefix + finalText;
+
+      await send(contextPrefix + finalText, attachmentIds);
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;
@@ -462,25 +618,212 @@ export function ChippiWorkspace({
   }
 
   // The trailing assistant message — used to detect the "thinking" state
-  // (streaming but no blocks have landed yet) and to pin the permission
-  // prompt at the end of the transcript.
+  // and to pin the permission prompt at the end of the transcript.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
-  const showThinking =
-    isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
+  // Keep the ThinkingIndicator visible for the entire streaming turn, not just
+  // while blocks are empty — it moves to the bottom of the turn as a persistent
+  // "still working" signal.
+  const showThinking = isStreaming && tailMessage?.role === 'assistant';
+
+  // Map in-flight tool call names to human-readable status phrases.
+  const TOOL_ACTION_MAP: Record<string, string> = {
+    search_contacts: 'Searching your contacts…',
+    find_person: 'Searching your contacts…',
+    get_contact: 'Looking up contact…',
+    pipeline_summary: 'Analyzing your pipeline…',
+    find_stuck_deals: 'Analyzing your pipeline…',
+    find_deal: 'Looking up deals…',
+    search_deals: 'Looking up deals…',
+    schedule_tour: 'Checking the calendar…',
+    reschedule_tour: 'Checking the calendar…',
+    find_tours: 'Checking the calendar…',
+    send_email: 'Drafting your email…',
+    draft_email: 'Drafting your email…',
+    send_sms: 'Drafting your message…',
+    draft_sms: 'Drafting your message…',
+    recall_history: 'Checking history…',
+    set_followup: 'Updating follow-up…',
+    clear_followup: 'Updating follow-up…',
+    create_deal: 'Updating deal…',
+    mark_deal_won: 'Updating deal…',
+    mark_deal_lost: 'Updating deal…',
+    note_on_person: 'Adding note…',
+    note_on_deal: 'Adding note…',
+    planner: 'Building a plan…',
+    create_plan: 'Building a plan…',
+  };
+
+  // Best-effort: map tool name keywords to which plan step is likely active.
+  // Matches on lower-cased step title. Not guaranteed to be exact — just a
+  // visual hint while the agent is running.
+  const TOOL_STEP_KEYWORDS: Record<string, string[]> = {
+    search_contacts: ['contact'],
+    find_contacts: ['contact'],
+    find_person: ['contact'],
+    get_contact: ['contact'],
+    send_email: ['email', 'draft'],
+    draft_email: ['email', 'draft'],
+    send_sms: ['sms', 'message', 'text'],
+    draft_sms: ['sms', 'message', 'text'],
+    advance_deal_stage: ['deal', 'stage'],
+    create_deal: ['deal'],
+    mark_deal_won: ['deal'],
+    mark_deal_lost: ['deal'],
+    find_deal: ['deal'],
+    search_deals: ['deal'],
+    find_stuck_deals: ['deal'],
+    pipeline_summary: ['pipeline', 'deal'],
+    schedule_tour: ['tour', 'calendar', 'schedule'],
+    reschedule_tour: ['tour', 'calendar', 'schedule'],
+    find_tours: ['tour', 'calendar'],
+    set_followup: ['follow'],
+    clear_followup: ['follow'],
+    recall_history: ['history', 'note'],
+    note_on_person: ['note'],
+    note_on_deal: ['note'],
+  };
+
+  const activePlanStepIndex = useMemo<number | undefined>(() => {
+    if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return undefined;
+    // Find the name of the currently live tool call.
+    let liveToolName: string | undefined;
+    for (const block of tailMessage.blocks) {
+      if (
+        block.type === 'tool_call' &&
+        'callId' in block &&
+        liveCallIds.has((block as { callId: string }).callId)
+      ) {
+        liveToolName = (block as { name: string }).name;
+        break;
+      }
+    }
+    if (!liveToolName) return undefined;
+    // Find the plan (create_plan) block in the same message to get step list.
+    const planBlock = tailMessage.blocks.find(
+      (b): b is ToolCallBlock => b.type === 'tool_call' && (b as ToolCallBlock).name === 'create_plan',
+    );
+    if (!planBlock) return undefined;
+    const plan = parsePlanResult(planBlock.result?.data ?? planBlock.args);
+    if (!plan) return undefined;
+    // Match the live tool name against step titles via keywords.
+    const keywords = TOOL_STEP_KEYWORDS[liveToolName] ?? [];
+    if (keywords.length === 0) return undefined;
+    const matchIndex = plan.steps.findIndex((s) =>
+      keywords.some((kw) => s.title.toLowerCase().includes(kw)),
+    );
+    return matchIndex >= 0 ? matchIndex : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tailMessage, liveCallIds]);
+
+  const currentAction = useMemo<string | null>(() => {
+    if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return null;
+    for (const block of tailMessage.blocks) {
+      if (
+        block.type === 'tool_call' &&
+        'callId' in block &&
+        liveCallIds.has((block as { callId: string }).callId)
+      ) {
+        const name = (block as { name: string }).name;
+        return TOOL_ACTION_MAP[name] ?? 'Working on it…';
+      }
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tailMessage, liveCallIds]);
 
   // Reusable input — shared between the empty hero and the docked footer
-  // so the focal point lives wherever it should.
+  // so the focal point lives wherever it should. Wrapped in a relative
+  // container so the slash-command dropdown can float above it.
   const renderInput = () => (
-    <ChippiPromptBox
-      placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
-      onSend={handleSend}
-      onMentionSearch={handleMentionSearch}
-      onVoiceStart={() => setVoiceOpen(true)}
-      onAbort={abort}
-      disabled={isStreaming || pendingApproval !== null}
-      isLoading={isStreaming}
-      prefill={prefill ?? undefined}
-    />
+    <div className="relative" ref={slashRef}>
+      {/* Slash-command autocomplete dropdown — floats above the input */}
+      {slashOpen && (
+        <div
+          role="listbox"
+          aria-label="Slash commands"
+          className={cn(
+            'absolute left-0 right-0 bottom-full mb-2 z-30',
+            'rounded-xl border border-border/70 bg-popover shadow-lg shadow-foreground/5',
+            'overflow-hidden py-1',
+          )}
+        >
+          {SLASH_COMMANDS.map((cmd) => (
+            <button
+              key={cmd.name}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onClick={() => {
+                setSlashOpen(false);
+                setPrefill({ text: cmd.name + ' ', nonce: Date.now() });
+              }}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 text-left',
+                'hover:bg-foreground/[0.04] transition-colors duration-100',
+              )}
+            >
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground flex-shrink-0">
+                <ListTodo size={13} strokeWidth={1.85} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-foreground leading-tight">
+                  {cmd.name}
+                </p>
+                <p className="text-[11px] text-muted-foreground/80 leading-tight mt-0.5">
+                  {cmd.description}
+                </p>
+              </div>
+              <span className="text-[10px] text-muted-foreground/50 truncate max-w-[140px] hidden sm:block">
+                {cmd.placeholder}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Slash-command trigger strip — a quiet "/" hint button left of the
+          composer. Tapping it opens the dropdown; the user picks a command
+          and the text is prefilled into the input. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setSlashOpen((v) => !v)}
+          disabled={isStreaming || pendingApproval !== null}
+          aria-label="Slash commands"
+          aria-expanded={slashOpen}
+          aria-haspopup="listbox"
+          title="/plan and other commands"
+          className={cn(
+            'flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg',
+            'text-[13px] font-mono font-semibold text-muted-foreground/60',
+            'hover:text-foreground hover:bg-foreground/[0.06] transition-colors duration-150',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+            slashOpen && 'text-foreground bg-foreground/[0.06]',
+          )}
+        >
+          /
+        </button>
+        <div className="flex-1 min-w-0">
+          <ChippiPromptBox
+            placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
+            onSend={handleSend}
+            onMentionSearch={handleMentionSearch}
+            onVoiceStart={() => setVoiceOpen(true)}
+            onAbort={abort}
+            disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
+            isLoading={isStreaming}
+            prefill={prefill ?? undefined}
+          />
+        </div>
+      </div>
+      {/* Rate-limit countdown — shown below the composer when the API is
+          throttling. Counts down from 60 s and disappears automatically. */}
+      {rateLimitSeconds > 0 && (
+        <p className="text-xs text-muted-foreground/70 text-center py-2">
+          Ready in {Math.floor(rateLimitSeconds / 60)}:{String(rateLimitSeconds % 60).padStart(2, '0')}
+        </p>
+      )}
+    </div>
   );
 
   // Settings view — entirely separate surface; no chat input, no today feed.
@@ -574,6 +917,7 @@ export function ChippiWorkspace({
         >
           <Settings size={15} />
         </Link>
+        <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -606,6 +950,14 @@ export function ChippiWorkspace({
           <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
         </div>
       )}
+
+      {/* ── Main content area — supports split panel on desktop ──── */}
+      <div className="flex flex-1 min-w-0 overflow-hidden" ref={containerRef}>
+        {/* Left panel — all chat/workspace content */}
+        <div
+          className="flex flex-col h-full overflow-hidden min-w-0"
+          style={{ width: isSplit ? `${leftWidthPercent}%` : '100%' }}
+        >
 
       {/* ── Today view (no active conversation) ───────────────────── */}
       {isLoadingConversation ? (
@@ -680,7 +1032,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -700,12 +1052,40 @@ export function ChippiWorkspace({
                       return null;
                     }
                     if (msg.role === 'assistant') {
+                      // Find any create_plan tool call in this message and
+                      // render a PlanCard inline below the transcript blocks.
+                      const planBlocks = msg.blocks.filter(
+                        (b): b is ToolCallBlock =>
+                          b.type === 'tool_call' && b.name === 'create_plan',
+                      );
+
                       return (
                         <div key={msg.id} className="flex gap-3">
                           <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
                             <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                           </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
+                          <div className="flex-1 min-w-0 pt-0.5 space-y-3">
+                            {/* PlanCard — rendered for each create_plan tool
+                                call. Falls back to args so the card appears
+                                immediately on tool_call_start (before result
+                                comes in), which is the only data available in
+                                the Modal runtime path. */}
+                            {planBlocks.map((planBlock) => {
+                              const plan = parsePlanResult(planBlock.result?.data ?? planBlock.args);
+                              if (!plan) return null;
+                              // Animate steps in while the message is still
+                              // streaming; show settled state for history.
+                              const isAnimating = !!(msg.streaming && isStreaming);
+                              return (
+                                <PlanCard
+                                  key={planBlock.callId}
+                                  task={plan.task}
+                                  steps={plan.steps}
+                                  isAnimating={isAnimating}
+                                  activeStepIndex={isAnimating ? activePlanStepIndex : undefined}
+                                />
+                              );
+                            })}
                             <Transcript
                               blocks={msg.blocks}
                               role={msg.role}
@@ -732,6 +1112,18 @@ export function ChippiWorkspace({
                                   : undefined
                               }
                             />
+                            {/* Inline retry button — shown on the tail error
+                                message so the realtor doesn't have to retype. */}
+                            {isTail && agentError && !isStreaming && lastUserMsgRef.current && (
+                              <button
+                                type="button"
+                                onClick={() => void retryLastMessage()}
+                                className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                              >
+                                <RotateCcw size={11} />
+                                Try again
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -747,16 +1139,39 @@ export function ChippiWorkspace({
                     );
                   })}
 
-                  {showThinking && (
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
-                        <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        <ThinkingIndicator />
-                      </div>
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {showThinking && (
+                      <motion.div
+                        key="thinking-indicator"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex gap-3"
+                      >
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
+                          <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5 space-y-3">
+                          {/* Preview PlanCard — appears immediately when the
+                              plan_created event arrives, before the tool call
+                              settles into a message block. */}
+                          {activePlan && (
+                            <PlanCard
+                              task={activePlan.task}
+                              steps={activePlan.steps}
+                              isAnimating={true}
+                              activeStepIndex={activePlanStepIndex}
+                            />
+                          )}
+                          <ThinkingIndicator
+                            currentAction={currentAction}
+                            streamingReasoning={streamingReasoning}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode
@@ -803,6 +1218,26 @@ export function ChippiWorkspace({
           </div>
         </>
       )}
+
+        </div>{/* end left panel */}
+
+        {/* Right panel — visible only when split */}
+        {isSplit && (
+          <>
+            <PanelResizeHandle
+              onResize={setLeftWidthPercent}
+              containerRef={containerRef}
+              currentLeftWidth={leftWidthPercent}
+            />
+            <RightPanel
+              slug={slug}
+              activeTab={rightTab}
+              onTabChange={setRightTab}
+              className="flex-1 min-w-0"
+            />
+          </>
+        )}
+      </div>{/* end split panel container */}
 
       <VoiceMode
         open={voiceOpen}

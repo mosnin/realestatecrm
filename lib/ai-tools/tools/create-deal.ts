@@ -27,6 +27,7 @@ import { notifyNewDeal } from '@/lib/notify';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import type { Deal, DealStage } from '@/lib/types';
+import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
 
 const parameters = z
   .object({
@@ -64,6 +65,7 @@ interface CreateDealResult {
 
 export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
   name: 'create_deal',
+  riskLevel: 'low',
   description:
     'Create a new deal in a pipeline stage, optionally linking people. Prompts for approval first.',
   parameters,
@@ -188,22 +190,31 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     const nextPosition = (lastDealRow?.position ?? -1) + 1;
 
     const dealId = crypto.randomUUID();
-    const { data: dealRow, error: dealErr } = await supabase
-      .from('Deal')
-      .insert({
-        id: dealId,
-        spaceId: ctx.space.id,
-        title: args.title.trim().slice(0, 255),
-        description: args.description?.trim() || null,
-        value: args.value ?? null,
-        address: args.address?.trim() || null,
-        priority: args.priority ?? 'MEDIUM',
-        closeDate: args.closeDate ? new Date(args.closeDate).toISOString() : null,
-        stageId: finalStageId,
-        position: nextPosition,
-      })
-      .select()
-      .single();
+    const idemKey = makeIdempotencyKey(
+      'create_deal',
+      ctx.space.id,
+      args.title.trim(),
+      finalStageId,
+      String(args.value ?? ''),
+    );
+    const { data: dealRow, error: dealErr } = await withIdempotency(idemKey, async () =>
+      supabase
+        .from('Deal')
+        .insert({
+          id: dealId,
+          spaceId: ctx.space.id,
+          title: args.title.trim().slice(0, 255),
+          description: args.description?.trim() || null,
+          value: args.value ?? null,
+          address: args.address?.trim() || null,
+          priority: args.priority ?? 'MEDIUM',
+          closeDate: args.closeDate ? new Date(args.closeDate).toISOString() : null,
+          stageId: finalStageId,
+          position: nextPosition,
+        })
+        .select()
+        .single(),
+    );
     if (dealErr || !dealRow) {
       logger.error('[tools.create_deal] insert failed', { spaceId: ctx.space.id }, dealErr);
       return {

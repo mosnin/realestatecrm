@@ -158,7 +158,7 @@ export type Contact = {
   name: string;
   email: string | null;
   phone: string | null;
-  leadType: 'rental' | 'buyer';
+  leadType: 'rental' | 'buyer' | 'seller';
   address: string | null;
   notes: string | null;
   budget: number | null;
@@ -186,7 +186,7 @@ export type Contact = {
   consentIp: string | null;
   consentPrivacyPolicyUrl: string | null;
   formConfigSnapshot: IntakeFormConfig | null;
-  formLeadType: 'rental' | 'buyer' | null;
+  formLeadType: 'rental' | 'buyer' | 'seller' | null;
   /** Who sent this lead — free-form. Used for referral-fee tracking later. */
   referralSource: string | null;
   /** Hide this contact from the main People view until this date. */
@@ -475,6 +475,8 @@ export type Conversation = {
   title: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Last message content truncated to 60 chars, or null if no messages yet. */
+  preview?: string | null;
 };
 
 export type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';

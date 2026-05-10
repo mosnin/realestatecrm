@@ -59,15 +59,9 @@ export default async function ChippiPage({
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
 
-    // Pick which conversation to hydrate. The URL is the source of truth —
-    // when the realtor clicks a conversation in the sidebar, the Link
-    // navigates to `?conversationId=…` and we re-render the workspace with
-    // that conversation's messages already in props. No client-side
-    // round-trip; the URL drives state directly.
-    const targetConvId =
-      urlConversationId && conversations.some((c) => c.id === urlConversationId)
-        ? urlConversationId
-        : conversations[0]?.id ?? null;
+    // Pick which conversation to hydrate. URL is the source of truth.
+    // No URL param → show the new-chat screen (targetConvId = null).
+    const targetConvId = urlConversationId ?? null;
     if (targetConvId) {
       initialConversationId = targetConvId;
       const { data: msgData } = await supabase

@@ -15,9 +15,15 @@
  *
  * Categories are guidance, not a filter dropdown — they help the
  * realtor scan, not configure.
+ *
+ * Health badges: after the connection list loads, we fire a separate
+ * non-blocking fetch to /api/integrations/health so each connected row
+ * shows a live status badge (healthy / expired / error / disconnected).
+ * The badge refreshes on window focus — stale auth shows up the moment
+ * the realtor comes back to the tab, not just when they next open a chat.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CAPTION, BODY_MUTED } from '@/lib/typography';
@@ -34,6 +40,84 @@ interface ConnectionRow {
   status: 'active' | 'expired' | 'failed';
   label: string | null;
   lastError: string | null;
+}
+
+// ── Health badge types ────────────────────────────────────────────────────────
+
+export type HealthStatus = 'healthy' | 'expired' | 'error' | 'disconnected';
+
+interface ConnectionHealth {
+  toolkit: string;
+  name: string;
+  status: HealthStatus;
+  lastCheckedAt: string;
+  error?: string;
+}
+
+/**
+ * IntegrationHealthBadge — client component that shows the live Composio
+ * connection status for a single integration.
+ *
+ * Props are pushed down from ConnectedAppsSection which owns the fetch.
+ * Loading state is a pulsing dot skeleton; the badge never blocks render.
+ */
+function IntegrationHealthBadge({
+  health,
+  loading,
+}: {
+  health: ConnectionHealth | null | undefined;
+  loading: boolean;
+}) {
+  if (loading) {
+    // Skeleton: animate-pulse dot only — don't show stale text.
+    return (
+      <span className="inline-flex items-center gap-1.5" aria-label="Checking status">
+        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 animate-pulse" aria-hidden />
+      </span>
+    );
+  }
+
+  if (!health) return null;
+
+  const { status, error } = health;
+
+  const dotClass =
+    status === 'healthy'
+      ? 'bg-green-500'
+      : status === 'expired'
+        ? 'bg-yellow-500'
+        : status === 'error'
+          ? 'bg-red-500'
+          : 'bg-muted-foreground/40'; // disconnected
+
+  const label =
+    status === 'healthy'
+      ? 'Connected'
+      : status === 'expired'
+        ? 'Auth expired'
+        : status === 'error'
+          ? 'Connection error'
+          : 'Not connected';
+
+  const textClass =
+    status === 'healthy'
+      ? 'text-green-600 dark:text-green-400'
+      : status === 'expired'
+        ? 'text-yellow-600 dark:text-yellow-400'
+        : status === 'error'
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-muted-foreground';
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      title={error ?? label}
+      aria-label={label}
+    >
+      <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', dotClass)} aria-hidden />
+      <span className={cn('text-xs', textClass)}>{label}</span>
+    </span>
+  );
 }
 
 const CATEGORY_LABEL: Record<IntegrationCategory, string> = {
@@ -70,6 +154,12 @@ export function ConnectedAppsSection() {
   const [busyToolkit, setBusyToolkit] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Health state: null = not yet fetched, true = loading, false = loaded/failed.
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthByToolkit, setHealthByToolkit] = useState<Map<string, ConnectionHealth>>(
+    new Map(),
+  );
+
   useEffect(() => {
     void fetchConnections();
   }, []);
@@ -91,6 +181,36 @@ export function ConnectedAppsSection() {
       setConfigured(false);
     }
   }
+
+  // fetchHealth is intentionally non-blocking — it updates the health badges
+  // after the connections list is already on screen.
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch('/api/integrations/health');
+      if (!res.ok) return;
+      const data = (await res.json()) as { connections: ConnectionHealth[] };
+      const map = new Map<string, ConnectionHealth>();
+      for (const h of data.connections) {
+        map.set(h.toolkit, h);
+      }
+      setHealthByToolkit(map);
+    } catch {
+      // Health fetch failure is silent — the dot just won't render.
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+  // Fetch health on mount and whenever the window regains focus.
+  // This catches stale auth that expires while the realtor is away.
+  useEffect(() => {
+    void fetchHealth();
+
+    const onFocus = () => void fetchHealth();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchHealth]);
 
   async function handleConnect(toolkit: string) {
     setBusyToolkit(toolkit);
@@ -173,19 +293,27 @@ export function ConnectedAppsSection() {
           <div key={cat} className="space-y-3">
             <p className={CAPTION}>{CATEGORY_LABEL[cat]}</p>
             <div className="rounded-xl border border-border/70 bg-card divide-y divide-border/60">
-              {apps.map((app) => (
-                <Row
-                  key={app.toolkit}
-                  app={app}
-                  connection={byToolkit.get(app.toolkit) ?? null}
-                  busy={busyToolkit === app.toolkit || busyToolkit === byToolkit.get(app.toolkit)?.id}
-                  onConnect={() => handleConnect(app.toolkit)}
-                  onDisconnect={() => {
-                    const c = byToolkit.get(app.toolkit);
-                    if (c) void handleDisconnect(c.id);
-                  }}
-                />
-              ))}
+              {apps.map((app) => {
+                const connection = byToolkit.get(app.toolkit) ?? null;
+                // Only show health badge when there is an active connection —
+                // coming-soon and unconnected rows don't need one.
+                const showHealth = Boolean(connection) && !app.comingSoon;
+                return (
+                  <Row
+                    key={app.toolkit}
+                    app={app}
+                    connection={connection}
+                    busy={busyToolkit === app.toolkit || busyToolkit === byToolkit.get(app.toolkit)?.id}
+                    health={showHealth ? (healthByToolkit.get(app.toolkit) ?? null) : null}
+                    healthLoading={showHealth && healthLoading}
+                    onConnect={() => handleConnect(app.toolkit)}
+                    onDisconnect={() => {
+                      const c = byToolkit.get(app.toolkit);
+                      if (c) void handleDisconnect(c.id);
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         );
@@ -209,12 +337,16 @@ function Row({
   app,
   connection,
   busy,
+  health,
+  healthLoading,
   onConnect,
   onDisconnect,
 }: {
   app: IntegrationApp;
   connection: ConnectionRow | null;
   busy: boolean;
+  health: ConnectionHealth | null;
+  healthLoading: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
@@ -230,6 +362,10 @@ function Row({
           {connection?.label ? connection.label : app.blurb}
         </p>
       </div>
+      {/* Health badge: only rendered for connected (non-coming-soon) rows. */}
+      {(health !== null || healthLoading) && (
+        <IntegrationHealthBadge health={health} loading={healthLoading} />
+      )}
       <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
     </div>
   );

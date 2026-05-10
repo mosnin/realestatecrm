@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   if (pipelineId) {
     stageQuery = stageQuery.eq('pipelineId', pipelineId);
-  } else if (pipelineType === 'rental' || pipelineType === 'buyer') {
+  } else if (pipelineType === 'rental' || pipelineType === 'buyer' || pipelineType === 'seller') {
     // Legacy fallback: filter by pipelineType for pre-bootstrap spaces
     stageQuery = stageQuery.eq('pipelineType', pipelineType);
   }
@@ -150,9 +150,12 @@ export async function POST(req: NextRequest) {
   const safePipelineId = typeof pipelineId === 'string' && pipelineId.trim().length > 0
     ? pipelineId.trim()
     : null;
+  const VALID_PIPELINE_TYPES = ['rental', 'buyer', 'seller'] as const;
   const safePipelineType = safePipelineId
     ? (pipelineType ?? null)
-    : (pipelineType === 'buyer' ? 'buyer' : 'rental');
+    : (VALID_PIPELINE_TYPES.includes(pipelineType as typeof VALID_PIPELINE_TYPES[number])
+        ? pipelineType as typeof VALID_PIPELINE_TYPES[number]
+        : 'rental');
 
   // Get the last position within the same pipeline
   let lastQuery = supabase

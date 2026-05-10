@@ -25,6 +25,7 @@ interface CancelTourResult {
 
 export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
   name: 'cancel_tour',
+  riskLevel: 'destructive',
   description:
     'Cancel a tour. Records the reason on the linked contact. Prompts for approval first.',
   parameters,

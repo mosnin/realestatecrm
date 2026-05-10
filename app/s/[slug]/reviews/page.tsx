@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ReviewsClient, type ReviewRow } from './reviews-client';
+import { H1, TITLE_FONT } from '@/lib/typography';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -42,12 +43,13 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
   if (!space.brokerageId) {
     return (
       <div className="space-y-6 max-w-4xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">My reviews</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Deals you&apos;ve flagged for broker review
-          </p>
-        </div>
+        <header className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">Reviews.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            My reviews
+          </h1>
+          <p className="text-sm text-muted-foreground">No brokerage connected yet.</p>
+        </header>
         <ReviewsClient slug={slug} initialReviews={[]} />
       </div>
     );
@@ -136,14 +138,20 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
     return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
   });
 
+  const openCount = initialReviews.filter((r) => r.status === 'open').length;
+  const statusSentence = openCount > 0
+    ? `${openCount} open ${openCount === 1 ? 'review' : 'reviews'} waiting.`
+    : 'All caught up.';
+
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">My reviews</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Deals you&apos;ve flagged for broker review
-        </p>
-      </div>
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Reviews.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          My reviews
+        </h1>
+        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+      </header>
       <ReviewsClient slug={slug} initialReviews={initialReviews} />
     </div>
   );

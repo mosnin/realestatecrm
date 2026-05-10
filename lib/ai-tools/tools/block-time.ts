@@ -36,6 +36,7 @@ interface BlockTimeResult {
 
 export const blockTimeTool = defineTool<typeof parameters, BlockTimeResult>({
   name: 'block_time',
+  riskLevel: 'high',
   description:
     'Block a window on the realtor\'s calendar with a CalendarEvent. Prompts for approval.',
   parameters,

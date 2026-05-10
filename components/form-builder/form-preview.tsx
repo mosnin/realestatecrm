@@ -163,7 +163,7 @@ export function FormPreview({ config }: FormPreviewProps) {
   }
 
   return (
-    <div className="bg-background border border-border/70 rounded-lg p-6 max-w-2xl mx-auto">
+    <div className="bg-background border border-border/70 rounded-lg p-6 max-w-2xl mx-auto overflow-y-auto max-h-[calc(100vh-16rem)]">
       <div className="space-y-8">
         {config.sections.map((section) => (
           <PreviewSection key={section.id} section={section} allSections={config.sections} />

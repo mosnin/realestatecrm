@@ -74,6 +74,7 @@ function summariseOne(p: PropertyHit): string {
 
 export const findPropertyTool = defineTool<typeof parameters, FindPropertyResult>({
   name: 'find_property',
+  riskLevel: 'safe',
   description:
     "Find a property by address, MLS number, id, or status. Returns rich detail for a single match or a shortlist (≤8) when ambiguous.",
   parameters,

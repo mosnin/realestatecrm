@@ -58,10 +58,13 @@ export async function POST() {
     }
   }
 
-  // Path 1: Modal web endpoint configured — trigger immediately
+  // Path 1: Modal web endpoint configured — fire-and-forget to avoid Vercel timeout.
+  // Modal runs can take minutes; we must not await the response. We only await
+  // the initial connection/dispatch — if that throws, the request never left.
   if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     try {
-      const res = await fetch(MODAL_WEBHOOK_URL, {
+      // Start the fetch but do NOT await the response — let it run in the background.
+      const fetchPromise = fetch(MODAL_WEBHOOK_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,12 +72,14 @@ export async function POST() {
         },
         body: JSON.stringify({ space_id: space.id, secret: AGENT_INTERNAL_SECRET }),
       });
-      if (res.ok) {
-        return NextResponse.json({ triggered: true, method: 'modal' });
-      }
-      console.error('[agent/run-now] Modal webhook failed', res.status, await res.text());
+      // Suppress unhandled-rejection warnings by attaching a no-op catch.
+      fetchPromise.catch((err) => {
+        console.error('[agent/run-now] Modal webhook background error', err);
+      });
+      return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
     } catch (err) {
-      console.error('[agent/run-now] Modal webhook error', err);
+      // fetch() itself threw before the request could be dispatched (e.g. bad URL).
+      console.error('[agent/run-now] Modal webhook dispatch error', err);
     }
   }
 

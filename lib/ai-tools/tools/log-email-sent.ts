@@ -30,6 +30,7 @@ interface LogEmailResult {
 
 export const logEmailSentTool = defineTool<typeof parameters, LogEmailResult>({
   name: 'log_email_sent',
+  riskLevel: 'low',
   description:
     'Record an email the realtor sent OUTSIDE Chippi against a contact\'s timeline. Does NOT send anything.',
   parameters,

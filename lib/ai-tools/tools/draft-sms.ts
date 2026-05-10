@@ -28,6 +28,7 @@ interface DraftSmsResult {
 
 export const draftSmsTool = defineTool<typeof parameters, DraftSmsResult>({
   name: 'draft_sms',
+  riskLevel: 'safe',
   description: 'Compose an SMS draft for a contact (no send, no persistence). Returns body only.',
   parameters,
   requiresApproval: false,

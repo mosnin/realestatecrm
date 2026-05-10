@@ -41,6 +41,7 @@ interface SendPropertyPacketResult {
 
 export const sendPropertyPacketTool = defineTool<typeof parameters, SendPropertyPacketResult>({
   name: 'send_property_packet',
+  riskLevel: 'high',
   description:
     "Queue a property packet share to a contact (logs intent — actual send fires through the email pipeline). Prompts for approval first.",
   parameters,

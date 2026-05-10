@@ -42,6 +42,7 @@ interface MarkDealWonResult {
 
 export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>({
   name: 'mark_deal_won',
+  riskLevel: 'low',
   description:
     "Mark a deal as won. Optionally records the final sale price and a closing note. Prompts for approval first.",
   parameters,

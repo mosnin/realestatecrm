@@ -38,7 +38,7 @@ export default async function ChippiMemoryPage({
         <ArrowLeft size={12} />
         Back to Chippi
       </Link>
-      <PageTitle subtitle="Everything I've learned about you, your contacts, and your deals. Delete anything I got wrong — I'll re-learn it if it comes up again.">
+      <PageTitle label="Chippi." subtitle="Everything I've learned about you, your contacts, and your deals. Delete anything I got wrong — I'll re-learn it if it comes up again.">
         What I remember
       </PageTitle>
 
