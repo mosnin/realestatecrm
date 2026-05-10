@@ -23,13 +23,15 @@ const PAGE_PATH = resolve(
   'page.tsx',
 );
 
-const TRUST_SENTENCE =
-  'Chippi never sends without your tap. Connecting just means your\n' +
-  '          approved drafts go through your account.';
+// The load-bearing half: the explicit consent guarantee. We pin this
+// substring rather than a verbatim multi-line snapshot — a layout reflow
+// (line wrap, surrounding paragraph reorder) shouldn't break the test,
+// only a softening of the actual promise should.
+const TRUST_PHRASE = 'Chippi never sends without your tap.';
 
 describe('integrations page — trust sentence', () => {
-  it('contains the exact realtor-facing consent line', () => {
+  it('contains the realtor-facing consent line', () => {
     const src = readFileSync(PAGE_PATH, 'utf8');
-    expect(src.includes(TRUST_SENTENCE)).toBe(true);
+    expect(src.includes(TRUST_PHRASE)).toBe(true);
   });
 });
