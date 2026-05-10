@@ -25,7 +25,10 @@ describe('buildSystemPrompt', () => {
 
   it('tells the model to use tools instead of speculating', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    expect(prompt).toMatch(/do not speculate/i);
+    // Wording was sharpened — "Never invent CRM data" + "don't fabricate"
+    // carry the same contract. Match either phrasing so future small edits
+    // don't break the test, but a wholesale removal will.
+    expect(prompt).toMatch(/never invent|don'?t fabricate|do not speculate/i);
   });
 
   it('mentions that mutating tools prompt for approval', () => {
@@ -53,12 +56,16 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/do NOT pick/);
     // The "approval covers the verb, not the subject" reasoning is the load-bearing
     // sentence — pin its presence so a future edit can't quietly soften the contract.
-    expect(prompt).toMatch(/approval covers the verb, not the subject/);
+    // Case-insensitive to survive harmless capitalisation tweaks.
+    expect(prompt).toMatch(/approval covers the verb, not the subject/i);
   });
 
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    // Sanity upper bound: if we ever exceed 3000 chars we should revisit.
-    expect(prompt.length).toBeLessThan(3000);
+    // Sanity upper bound. The cap was raised to 8000 chars when the prompt
+    // grew to include personalization, integrations contracts, and the
+    // reasoning-before-mutation guard. If a future edit pushes past 8000
+    // we should revisit whether each line still earns its keep.
+    expect(prompt.length).toBeLessThan(8000);
   });
 });

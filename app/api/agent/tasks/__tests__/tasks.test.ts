@@ -54,6 +54,14 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
+// ── Kill-switch mock ──────────────────────────────────────────────────────────
+// Every agent route gates on `assertSpaceEnabled`. No-op for the happy path;
+// the "space is disabled" failure mode is covered by dedicated tests.
+
+vi.mock('@/lib/agent/kill-switch', () => ({
+  assertSpaceEnabled: vi.fn(async () => undefined),
+}));
+
 // ── task-state-machine mock (enqueueTask only) ────────────────────────────────
 
 vi.mock('@/lib/agent/task-state-machine', async () => {
