@@ -301,14 +301,17 @@ describe('createDealTool', () => {
     expect(notifyNewDealMock).toHaveBeenCalledTimes(1);
   });
 
-  it('errors when the stage does not belong to this space', async () => {
+  it('errors when the workspace has no pipeline stages at all', async () => {
+    // create_deal now falls back to a default stage when the passed stageId
+    // doesn't match. The genuine error case is "workspace has no stages
+    // configured anywhere" — no buyer pipeline, no seller pipeline, nothing.
     mockByTable = { DealStage: { single: null } };
     const result = await createDealTool.handler(
       { title: 'X', stageId: 'bogus' },
       makeCtx(),
     );
     expect(result.display).toBe('error');
-    expect(result.summary).toMatch(/Stage.*not found/);
+    expect(result.summary).toMatch(/No pipeline stages/);
     expect(syncDealMock).not.toHaveBeenCalled();
   });
 });

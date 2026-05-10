@@ -59,6 +59,16 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
+// ── Kill-switch mock ──────────────────────────────────────────────────────────
+// The route gates on `assertSpaceEnabled` (added in the agent-trigger work);
+// we no-op it for the happy path. The "space is disabled" failure mode is
+// covered by checking the route's gate logic in dedicated kill-switch tests,
+// not here.
+
+vi.mock('@/lib/agent/kill-switch', () => ({
+  assertSpaceEnabled: vi.fn(async () => undefined),
+}));
+
 // Import AFTER all mocks are registered.
 import { GET, POST } from '@/app/api/agent/approvals/route';
 import { requireAuth } from '@/lib/api-auth';
