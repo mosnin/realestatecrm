@@ -161,7 +161,12 @@ export async function loadToolsForEntity(args: {
 }) {
   if (args.toolkits.length === 0) return [];
   const composio = getComposio();
-  return composio.tools.get(args.entityId, { toolkits: args.toolkits });
+  // limit=1000 (server max) — without it, Composio's /api/v3/tools endpoint
+  // defaults to 20 items per page and the SDK doesn't paginate. That cap
+  // silently returns only the alphabetically-first 20 tools per toolkit,
+  // which is why HubSpot looked like it only had archive/association
+  // actions even after the realtor enabled 100+ slugs on the dashboard.
+  return composio.tools.get(args.entityId, { toolkits: args.toolkits, limit: 1000 });
 }
 
 /**
