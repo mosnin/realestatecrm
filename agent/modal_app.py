@@ -217,6 +217,12 @@ async def chat_turn(item: dict):
         return {"error": "Unauthorized"}
 
     space_id = (item.get("space_id") or "").strip()
+    # Clerk userId of the realtor sending this message. Required for
+    # Composio integration loading — connections are scoped per entity
+    # (Clerk userId) on Composio's side and per (spaceId, userId) in our
+    # IntegrationConnection table. Tolerate missing for backward
+    # compatibility with older Next.js deploys; Composio just won't load.
+    user_id = (item.get("user_id") or "").strip()
     message = item.get("message") or ""
     if not space_id or not isinstance(message, str) or not message.strip():
         return {"error": "space_id and message required"}
@@ -392,9 +398,27 @@ async def chat_turn(item: dict):
         ),
     )
 
+    # Load this realtor's connected-toolkit tools (Gmail, Slack, HubSpot,
+    # etc.) before building the agent. Empty list when user_id is missing
+    # (older Next.js deploy) or no integrations configured. Best-effort:
+    # a Composio outage degrades to native-tool-only chat, doesn't 500.
+    integration_tools: list = []
+    if user_id:
+        try:
+            from integrations import load_integration_tools
+
+            integration_tools = await load_integration_tools(space_id, user_id)
+        except Exception as ie:  # noqa: BLE001
+            logger.warning(
+                "load_integration_tools_failed",
+                space_id=space_id,
+                user_id=user_id,
+                error=str(ie)[:200],
+            )
+
     async def event_stream():
         try:
-            chippi = make_chippi_agent()
+            chippi = make_chippi_agent(extra_tools=integration_tools)
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
             yield f"data: {err}\n\n"

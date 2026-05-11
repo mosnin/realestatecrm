@@ -313,7 +313,22 @@ async def run_agent_for_space(
     # Load AI profile for personalization
     db = await supabase()
     ai_profile = await load_ai_profile(space.id, db)
-    chippi = make_chippi_agent(ai_profile_text=ai_profile)
+
+    # Autonomous runs have no "current user" — the workspace OWNER's
+    # Clerk userId is the entity whose Composio connections we use.
+    # Solo realtors: this is them. Brokerages: it's the broker_owner.
+    # Empty list when owner has no integrations or Composio is down.
+    integration_tools: list = []
+    try:
+        from integrations import load_integration_tools, resolve_owner_user_id
+
+        owner_clerk_id = await resolve_owner_user_id(space.id)
+        if owner_clerk_id:
+            integration_tools = await load_integration_tools(space.id, owner_clerk_id)
+    except Exception as ie:  # noqa: BLE001
+        log.warning("autonomous_load_integration_tools_failed", error=str(ie)[:200])
+
+    chippi = make_chippi_agent(ai_profile_text=ai_profile, extra_tools=integration_tools)
     prompt = _build_opening_prompt(space, memory_context, triggers)
 
     run_config = RunConfig(

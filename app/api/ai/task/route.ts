@@ -523,6 +523,13 @@ export async function POST(req: NextRequest) {
   const payload = {
     secret: process.env.AGENT_INTERNAL_SECRET ?? '',
     space_id: ctx.space.id,
+    // Composio scopes connections per "entity" (Clerk userId). Without
+    // this, Modal can't know which realtor's Gmail / Slack / etc. to
+    // load — the agent ends up with zero integration tools regardless
+    // of how many the realtor has connected. The Python side reads
+    // `user_id` to look up active toolkits in IntegrationConnection
+    // and load them via the Composio Python SDK.
+    user_id: ctx.userId,
     message,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     conversation_id: conversationId,

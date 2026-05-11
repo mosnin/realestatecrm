@@ -244,61 +244,74 @@ async def load_ai_profile(space_id: str, db) -> str | None:
         return None
 
 
-def make_chippi_agent(ai_profile_text: str | None = None) -> Agent:
-    """Build the single Chippi agent. Constructed fresh per run."""
+def make_chippi_agent(
+    ai_profile_text: str | None = None,
+    extra_tools: list | None = None,
+) -> Agent:
+    """
+    Build the single Chippi agent. Constructed fresh per run.
+
+    `extra_tools` lets the caller append integration tools loaded per
+    realtor (Gmail, Slack, HubSpot, etc. via Composio). Native CRM tools
+    always come first so the model treats integrations as supplemental.
+    Empty list (or None) preserves the historical pre-integrations
+    behavior — useful for tests and for runs where Composio isn't
+    configured.
+    """
     instructions = CHIPPI_INSTRUCTIONS
     if ai_profile_text:
         instructions = ai_profile_text + "\n\n" + instructions
+    base_tools = [
+        # Contacts
+        create_contact,
+        find_contacts,
+        get_contact_activity,
+        update_contact,
+        # Deals + lifecycle
+        create_deal,
+        find_deals,
+        update_deal,
+        advance_deal_stage,
+        request_deal_review,
+        # Tours
+        book_tour,
+        # Routing (brokerages)
+        route_lead,
+        # Properties + packets
+        add_property,
+        send_property_packet,
+        # Memory
+        recall_memory,
+        store_memory,
+        # Goals
+        manage_goal,
+        # Drafts + outcomes
+        draft_message,
+        outcome,
+        # Insights
+        analyze_portfolio,
+        generate_priority_list,
+        # I/O
+        process_inbound_message,
+        read_attachment,
+        # Asking + audit
+        ask_realtor,
+        log_activity_run,
+        # App knowledge base (help / how-to — lazy loaded)
+        recall_docs,
+        # Planning
+        create_plan,
+        # Intake form
+        get_intake_form,
+        add_intake_question,
+        remove_intake_question,
+        update_intake_question,
+        save_intake_form,
+    ]
     return Agent[None](
         name="Chippi",
         model="gpt-5-mini",
         instructions=instructions,
-        tools=[
-            # Contacts
-            create_contact,
-            find_contacts,
-            get_contact_activity,
-            update_contact,
-            # Deals + lifecycle
-            create_deal,
-            find_deals,
-            update_deal,
-            advance_deal_stage,
-            request_deal_review,
-            # Tours
-            book_tour,
-            # Routing (brokerages)
-            route_lead,
-            # Properties + packets
-            add_property,
-            send_property_packet,
-            # Memory
-            recall_memory,
-            store_memory,
-            # Goals
-            manage_goal,
-            # Drafts + outcomes
-            draft_message,
-            outcome,
-            # Insights
-            analyze_portfolio,
-            generate_priority_list,
-            # I/O
-            process_inbound_message,
-            read_attachment,
-            # Asking + audit
-            ask_realtor,
-            log_activity_run,
-            # App knowledge base (help / how-to — lazy loaded)
-            recall_docs,
-            # Planning
-            create_plan,
-            # Intake form
-            get_intake_form,
-            add_intake_question,
-            remove_intake_question,
-            update_intake_question,
-            save_intake_form,
-        ],
+        tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],
     )
