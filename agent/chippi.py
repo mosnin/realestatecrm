@@ -325,7 +325,7 @@ def make_chippi_agent(
     ]
     return Agent[None](
         name="Chippi",
-        model="gpt-5-mini",
+        model="gpt-5",
         instructions=instructions,
         tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],
