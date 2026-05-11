@@ -129,6 +129,27 @@ export async function deleteConnection(connectedAccountId: string): Promise<void
 }
 
 /**
+ * List the realtor's connected accounts on Composio's side. Used by the
+ * /settings reconcile pass to discover connections that Composio knows
+ * about but our DB doesn't (e.g. realtors who completed OAuth before
+ * the connect-time persistence fix landed).
+ *
+ * Composio's `list` returns items with `id`, `toolkit.slug`, `status`,
+ * `alias` (often the connected user's email), `createdAt`, `updatedAt`.
+ * Filterable by `userIds`, `statuses`, `toolkitSlugs`.
+ */
+export async function listConnectedAccountsForEntity(args: {
+  entityId: string;
+  statuses?: ('INITIALIZING' | 'INITIATED' | 'ACTIVE' | 'FAILED' | 'EXPIRED' | 'INACTIVE')[];
+}) {
+  const composio = getComposio();
+  return composio.connectedAccounts.list({
+    userIds: [args.entityId],
+    statuses: args.statuses ?? ['ACTIVE'],
+  });
+}
+
+/**
  * Fetch the SDK Tool[] for a given user across the toolkits they have
  * connected. Returned tools drop straight into our SDK Agent's `tools`
  * array via the bridge — that's the whole point of the OpenAI Agents

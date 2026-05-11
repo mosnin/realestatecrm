@@ -24,7 +24,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { getComposio } from '@/lib/integrations/composio';
-import { insertConnection, findActive, revoke } from '@/lib/integrations/connections';
+import { upsertByComposioId, findActive, revoke } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { logger } from '@/lib/logger';
 
@@ -133,7 +133,12 @@ export default async function IntegrationsCallback({
     await revoke(existing);
   }
 
-  const inserted = await insertConnection({
+  // Upsert by composioConnectionId — the connect route already inserted
+  // a row with this id at initiate-time, so the callback's job is to
+  // update the label (Composio surfaces the connected user's email after
+  // OAuth completes) and ensure status='active'. If the connect route
+  // somehow didn't persist (defensive), upsert falls back to insert.
+  const inserted = await upsertByComposioId({
     spaceId: space.id,
     userId,
     toolkit,

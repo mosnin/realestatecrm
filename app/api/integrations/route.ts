@@ -10,7 +10,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { listConnections } from '@/lib/integrations/connections';
+import { listConnections, reconcileFromComposio } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
 
 export async function GET() {
@@ -20,6 +20,17 @@ export async function GET() {
 
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const apiKeySet = composioConfigured();
+
+  // Reconcile from Composio first — backfills any active connection that
+  // Composio knows about but our DB doesn't (the recovery path for
+  // realtors who completed OAuth on the previous codebase where the row
+  // was only persisted in the callback, which was failing silently).
+  // Best-effort: failures don't block the panel from loading.
+  if (apiKeySet) {
+    await reconcileFromComposio({ spaceId: space.id, entityId: userId });
+  }
 
   const all = await listConnections(space.id);
   // Drop revoked rows — they're audit-only, not realtor-facing.
@@ -31,7 +42,6 @@ export async function GET() {
   // callback URL is undefined, the realtor completes OAuth at the provider,
   // and Composio falls back to its own default — which doesn't land them
   // back in our app. Hardest bug to diagnose without an explicit warning.
-  const apiKeySet = composioConfigured();
   const appUrlSet = Boolean(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL);
   const setup = {
     apiKeySet,

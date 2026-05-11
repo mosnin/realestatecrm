@@ -39,14 +39,30 @@ vi.mock('@/lib/integrations/composio', () => ({
   deleteConnection: vi.fn(),
 }));
 
-const { findActiveMock, revokeMock } = vi.hoisted(() => ({
+const { findActiveMock, revokeMock, insertConnectionMock } = vi.hoisted(() => ({
   // Loose return type so individual tests can mock the row shape they need.
   findActiveMock: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null),
   revokeMock: vi.fn(async () => undefined),
+  // Connect now persists at initiate-time. Default to a successful insert
+  // so the happy-path tests pass; failure-path tests can override.
+  insertConnectionMock: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
+    id: 'row_1',
+    spaceId: 'space_1',
+    userId: 'user_clerk_1',
+    toolkit: 'gmail',
+    composioConnectionId: 'pending_conn_1',
+    status: 'active',
+    label: null,
+    lastError: null,
+    lastUsedAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })),
 }));
 vi.mock('@/lib/integrations/connections', () => ({
   findActive: findActiveMock,
   revoke: revokeMock,
+  insertConnection: insertConnectionMock,
   activeToolkits: vi.fn(async () => []),
 }));
 
