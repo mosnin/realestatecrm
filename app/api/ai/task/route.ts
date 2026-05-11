@@ -45,6 +45,15 @@ import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 
+// Long-running chat: Modal cold start + Composio tool calls + LLM streaming
+// can comfortably exceed Vercel's default 60s function timeout, which would
+// cut the SSE stream mid-response and surface as "Something tripped me up"
+// to the realtor. 300s matches the upper bound for Vercel Pro fluid compute
+// and is well above the longest legit turn we've measured.
+export const maxDuration = 300;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 interface HistoryRow {
   role: 'user' | 'assistant';
   content: string;
@@ -498,7 +507,7 @@ export async function POST(req: NextRequest) {
 
   const hydratedAttachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
 
-  // ── TS fallback (local dev without Modal) ────────────────────────────────
+  // ── TS fallback (local dev without Modal) ─────────────────────────────────
   if (chatRuntime() === 'ts') {
     logger.info('[ai/task] using in-process TS runtime (CHIPPI_CHAT_RUNTIME=ts)', { spaceSlug });
     return streamTsChatTurn({
@@ -510,7 +519,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── Modal runtime (default) ──────────────────────────────────────────────
+  // ── Modal runtime (default) ─────────────────────────────────────────────
   const modalChatUrl = process.env.MODAL_CHAT_URL;
   if (!modalChatUrl) {
     logger.error('[ai/task] MODAL_CHAT_URL not set — cannot route to Modal sandbox', { spaceSlug });

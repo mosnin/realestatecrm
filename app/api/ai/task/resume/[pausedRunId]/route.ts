@@ -36,6 +36,11 @@ import type { ToolContext } from '@/lib/ai-tools/types';
 import { streamTsResumeTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 
+// Resume can take as long as a fresh turn — see /api/ai/task for context.
+export const maxDuration = 300;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 interface PostBody {
   approved: boolean;
   message?: string;
