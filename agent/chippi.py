@@ -171,6 +171,21 @@ or "what does X do" — call recall_docs(query="...") first. It searches the
 app knowledge base and returns accurate how-to content. Don't guess at app
 behavior — look it up. This tool is never called for routine CRM tasks.
 
+# Connected integrations (Gmail, HubSpot, Slack, etc.)
+The realtor can connect external accounts in Settings → Integrations. When
+those are connected, you'll see extra tools in your toolbelt with toolkit-
+prefixed names: HUBSPOT_*, GMAIL_*, SLACK_*, GOOGLECALENDAR_*, etc.
+
+These are real, callable tools. Use them when:
+- The realtor names a service ("check my HubSpot", "draft a Gmail to Sara",
+  "post to Slack #leads") — call the matching tool directly. Don't ask
+  whether they mean "internal or external."
+- A native tool can't do the job but a connected toolkit can.
+
+If a service is mentioned and no matching tools are loaded, say so plainly
+("HubSpot isn't connected — connect it in Settings → Integrations and I'll
+pull from it"). Don't pretend the integration doesn't exist as a feature.
+
 # Asking
 If intent is genuinely ambiguous, ask_realtor with a one-sentence
 question. Don't ask for trivia a tool call would resolve.
@@ -212,7 +227,7 @@ async def load_ai_profile(space_id: str, db) -> str | None:
     try:
         result = await db.table("AIUserProfile").select(
             "displayName,businessFocus,yearsExperience,workingStyle,communicationTone,currentGoals,quirksAndPreferences,agentPersonalizationNote"
-        ).eq("spaceId", space_id).maybeSingle().execute()
+        ).eq("spaceId", space_id).maybe_single().execute()
 
         profile = result.data
         if not profile:
@@ -310,7 +325,7 @@ def make_chippi_agent(
     ]
     return Agent[None](
         name="Chippi",
-        model="gpt-5-mini",
+        model="gpt-5",
         instructions=instructions,
         tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],

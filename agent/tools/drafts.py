@@ -29,8 +29,8 @@ _VALID_CHANNELS = {"sms", "email", "note"}
 _DEDUPE_WINDOW_HOURS = 48
 
 
-@idempotent_tool
 @function_tool
+@idempotent_tool
 async def draft_message(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,

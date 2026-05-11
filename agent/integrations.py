@@ -44,7 +44,7 @@ def composio_configured() -> bool:
 async def active_toolkits(space_id: str, user_id: str) -> list[str]:
     """Toolkit slugs the realtor has connected and our DB has marked active."""
     db = await supabase()
-    res = (
+    res = await (
         db.table("IntegrationConnection")
         .select("toolkit")
         .eq("spaceId", space_id)
@@ -63,7 +63,7 @@ async def mark_expired_by_toolkit(
     db = await supabase()
     try:
         # Find the active row for this triple.
-        find_res = (
+        find_res = await (
             db.table("IntegrationConnection")
             .select("id,status")
             .eq("spaceId", space_id)
@@ -76,13 +76,18 @@ async def mark_expired_by_toolkit(
         row = find_res.data
         if not row:
             return  # already gone or already expired
-        db.table("IntegrationConnection").update(
-            {
-                "status": "expired",
-                "lastError": reason[:500],
-                "updatedAt": "now()",
-            }
-        ).eq("id", row["id"]).execute()
+        await (
+            db.table("IntegrationConnection")
+            .update(
+                {
+                    "status": "expired",
+                    "lastError": reason[:500],
+                    "updatedAt": "now()",
+                }
+            )
+            .eq("id", row["id"])
+            .execute()
+        )
         logger.info(
             "integration_marked_expired_from_modal",
             space_id=space_id,
@@ -211,7 +216,7 @@ async def resolve_owner_user_id(space_id: str) -> str | None:
     """
     db = await supabase()
     try:
-        sp = (
+        sp = await (
             db.table("Space")
             .select("ownerId")
             .eq("id", space_id)
@@ -223,7 +228,7 @@ async def resolve_owner_user_id(space_id: str) -> str | None:
         owner_db_id = sp.data.get("ownerId")
         if not owner_db_id:
             return None
-        u = (
+        u = await (
             db.table("User")
             .select("clerkId")
             .eq("id", owner_db_id)

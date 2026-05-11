@@ -5,19 +5,20 @@ Usage
 Retry a Supabase mutation:
     result = await with_retry(lambda: db.table("Foo").update(patch).execute())
 
-Idempotency decorator (applied OUTSIDE @function_tool):
-    @idempotent_tool
+Idempotency decorator (applied INSIDE @function_tool so the
+FunctionTool stays the outermost object):
     @function_tool
+    @idempotent_tool
     async def create_something(ctx, ...): ...
 
-Rate-limit decorator (applied OUTSIDE @function_tool, outermost):
-    @rate_limited(max_calls=10, window_seconds=3600)
+Rate-limit decorator (also INSIDE @function_tool — same reason):
     @function_tool
+    @rate_limited(max_calls=10, window_seconds=3600)
     async def send_email(ctx, ...): ...
 
     # Or rely on DEFAULT_RATE_LIMITS for known tool names:
-    @rate_limited()
     @function_tool
+    @rate_limited()
     async def send_sms(ctx, ...): ...
 """
 
@@ -36,7 +37,7 @@ import structlog
 
 log = structlog.get_logger(__name__)
 
-# ── Retry ──────────────────────────────────────────────────────────────────────
+# ── Retry ───────────────────────────────────────────────────────────────────────────────
 
 # Exceptions that are never transient — do not retry.
 _NO_RETRY = (ValueError, PermissionError)
@@ -83,7 +84,7 @@ async def with_retry(
     raise last_exc  # type: ignore[misc]
 
 
-# ── Idempotency store ──────────────────────────────────────────────────────────
+# ── Idempotency store ─────────────────────────────────────────────────────────────────────
 
 _IDEM: dict[str, dict] = {}
 _TTL = timedelta(minutes=5)
@@ -119,7 +120,7 @@ class IdempotencyStore:
         _IDEM[key] = {**result, "_expires": datetime.now(timezone.utc) + _TTL}
 
 
-# ── Idempotency decorator ──────────────────────────────────────────────────────
+# ── Idempotency decorator ──────────────────────────────────────────────────────────────────
 
 def idempotent_tool(tool_fn: Callable) -> Callable:
     """Decorator for mutation tools that adds idempotency caching.
@@ -127,10 +128,12 @@ def idempotent_tool(tool_fn: Callable) -> Callable:
     Derive the cache key from function name + space_id (ctx.context.space_id)
     + the first positional string argument (typically an entity ID).
 
-    Apply OUTSIDE @function_tool:
+    Apply INSIDE @function_tool so the FunctionTool stays the outermost
+    object (otherwise the agents SDK sees a plain wrapper function and
+    rejects it with "Unknown tool type"):
 
-        @idempotent_tool
         @function_tool
+        @idempotent_tool
         async def my_mutation_tool(ctx, entity_id: str, ...): ...
 
     If a cached result is found it is returned immediately with _cached=True.
@@ -173,7 +176,7 @@ def idempotent_tool(tool_fn: Callable) -> Callable:
     return wrapper
 
 
-# ── Rate limiting ──────────────────────────────────────────────────────────────
+# ── Rate limiting ───────────────────────────────────────────────────────────────────────
 
 # Per-tool, per-space rate limit state.
 # key: "tool_name:space_id" → deque of monotonic timestamps (float)
@@ -241,7 +244,9 @@ def rate_limited(
 ) -> Callable:
     """Decorator that enforces a per-space sliding-window rate limit.
 
-    Apply OUTSIDE ``@function_tool`` so this is the outermost decorator.
+    Apply INSIDE ``@function_tool`` so the FunctionTool stays the outermost
+    object (otherwise the agents SDK rejects the wrapper with
+    "Unknown tool type").
 
     Parameters
     ----------

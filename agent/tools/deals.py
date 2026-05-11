@@ -96,8 +96,8 @@ async def find_deals(
     return result.data or []
 
 
-@idempotent_tool
 @function_tool
+@idempotent_tool
 async def update_deal(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str,

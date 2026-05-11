@@ -13,6 +13,7 @@ spaceId always comes from AgentContext — never from tool arguments.
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any, Literal
 
@@ -556,7 +557,7 @@ async def update_intake_question(
 async def save_intake_form(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
-    form_config: dict[str, Any],
+    form_config: str,
 ) -> dict[str, Any]:
     """Replace the entire intake form config with the provided structure.
 
@@ -565,7 +566,7 @@ async def save_intake_form(
     prefer add_intake_question / remove_intake_question / update_intake_question.
 
     lead_type: 'rental' or 'buyer'.
-    form_config: A complete IntakeFormConfig dict:
+    form_config: A JSON-encoded string of the complete IntakeFormConfig:
       {
         "version": 1,
         "leadType": "rental" | "buyer",
@@ -594,9 +595,13 @@ async def save_intake_form(
     """
     space_id = ctx.context.space_id
 
-    # Basic structural validation
+    try:
+        form_config = json.loads(form_config)
+    except (json.JSONDecodeError, TypeError):
+        return {"error": "form_config must be a JSON-encoded object.", "code": "VALIDATION_ERROR", "retryable": False}
+
     if not isinstance(form_config, dict):
-        return {"error": "form_config must be a dict.", "code": "VALIDATION_ERROR", "retryable": False}
+        return {"error": "form_config must decode to a dict.", "code": "VALIDATION_ERROR", "retryable": False}
     if "sections" not in form_config or not isinstance(form_config["sections"], list):
         return {"error": "form_config must have a 'sections' list.", "code": "VALIDATION_ERROR", "retryable": False}
 

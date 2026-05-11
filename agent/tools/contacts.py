@@ -234,8 +234,8 @@ async def create_contact(
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
 
-@idempotent_tool
 @function_tool
+@idempotent_tool
 async def update_contact(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,

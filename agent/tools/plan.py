@@ -17,20 +17,25 @@ nothing, but it should not add unannounced steps.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from agents import RunContextWrapper, function_tool
+from pydantic import BaseModel
 
 from security.context import AgentContext
 from tools.streaming import publish_event
+
+
+class PlanStep(BaseModel):
+    title: str
+    description: str = ""
 
 
 @function_tool
 async def create_plan(
     ctx: RunContextWrapper[AgentContext],
     task: str,
-    steps: list[dict[str, str]],
+    steps: list[PlanStep],
 ) -> dict[str, Any]:
     """Announce a structured execution plan before carrying out a complex task.
 
@@ -57,16 +62,13 @@ async def create_plan(
     """
     if not task or not isinstance(task, str):
         return {"error": "task must be a non-empty string"}
-    if not steps or not isinstance(steps, list):
+    if not steps:
         return {"error": "steps must be a non-empty list"}
 
-    # Normalise and validate each step — keep only title + description.
     clean_steps: list[dict[str, str]] = []
     for i, step in enumerate(steps):
-        if not isinstance(step, dict):
-            return {"error": f"step {i} must be a dict with 'title' and 'description'"}
-        title = (step.get("title") or "").strip()
-        description = (step.get("description") or "").strip()
+        title = (step.title or "").strip()
+        description = (step.description or "").strip()
         if not title:
             return {"error": f"step {i} is missing a 'title'"}
         clean_steps.append({"title": title, "description": description})

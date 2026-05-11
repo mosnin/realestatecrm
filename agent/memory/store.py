@@ -95,7 +95,7 @@ async def is_space_disabled(space_id: str) -> bool:
             .select("id")
             .eq("spaceId", space_id)
             .eq("isActive", True)
-            .maybeSingle()
+            .maybe_single()
             .execute()
         )
         is_disabled = result.data is not None
