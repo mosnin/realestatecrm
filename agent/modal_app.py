@@ -18,8 +18,15 @@ from __future__ import annotations
 import modal
 import re
 import structlog
+from pathlib import Path
 
 logger = structlog.get_logger(__name__)
+
+# Resolve the agent source directory from this file's location, NOT from the
+# deploy cwd. Without this, `modal deploy agent/modal_app.py` (from repo root)
+# mounts the WRONG dir at /app — db.py et al land at /app/agent/* and every
+# import inside chat_turn fails with ModuleNotFoundError.
+_AGENT_DIR = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
 # Secret masking — applied to all log output that includes external data
@@ -77,7 +84,7 @@ image = (
         "composio>=0.13.0",
         "composio-openai-agents>=0.13.0",
     )
-    .add_local_dir(".", remote_path="/app")
+    .add_local_dir(_AGENT_DIR, remote_path="/app")
 )
 
 app = modal.App("chippi-agent", image=image)
@@ -272,7 +279,7 @@ async def chat_turn(item: dict):
         space_name=space.name,
     )
 
-    # ── helpers ────────────────────────────────────────────────────────────
+    # ── helpers ──────────────────────────────────────────────────────────────────────────
 
     def attach_message(text: str, atts: list[dict[str, Any]]) -> str:
         if not atts:
@@ -389,7 +396,7 @@ async def chat_turn(item: dict):
 
         return None
 
-    # ── run ────────────────────────────────────────────────────────────────
+    # ── run ───────────────────────────────────────────────────────────────────────────────
 
     text_with_attachments = attach_message(message, attachments)
     user_content = build_user_input(text_with_attachments, attachments)
