@@ -184,7 +184,7 @@ async def run_now_webhook(item: dict) -> dict:
     timeout=600,  # 10 min max for swarm runs
     max_containers=10,
 )
-@modal.fastapi_endpoint(method="POST", label="run_swarm")
+@modal.fastapi_endpoint(method="POST", label="run-swarm")
 async def run_swarm_endpoint(payload: dict) -> dict:
     """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm."""
     from swarm_orchestrator import run_swarm
