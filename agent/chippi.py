@@ -212,7 +212,7 @@ async def load_ai_profile(space_id: str, db) -> str | None:
     try:
         result = await db.table("AIUserProfile").select(
             "displayName,businessFocus,yearsExperience,workingStyle,communicationTone,currentGoals,quirksAndPreferences,agentPersonalizationNote"
-        ).eq("spaceId", space_id).maybeSingle().execute()
+        ).eq("spaceId", space_id).maybe_single().execute()
 
         profile = result.data
         if not profile:
