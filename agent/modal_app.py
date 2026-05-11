@@ -62,6 +62,14 @@ image = (
         "pypdf>=5.0.0",
         "python-docx>=1.1.0",
         "openpyxl>=3.1.0",
+        # Composio integrations — load realtor's connected toolkits
+        # (Gmail, Slack, HubSpot, etc.) for chat AND autonomous runs.
+        # Mirrors lib/integrations/composio.ts. Without these, the
+        # Modal-side load_integration_tools() throws ImportError and
+        # the agent runs without any integration tools regardless of
+        # what's in the IntegrationConnection table.
+        "composio-core>=0.8.0",
+        "composio-openai-agents>=0.8.0",
     )
     .add_local_dir(".", remote_path="/app")
 )
