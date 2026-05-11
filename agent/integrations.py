@@ -118,6 +118,54 @@ def _is_auth_like_error(err: Exception) -> bool:
     return False
 
 
+def _wrap_for_logging(tool: Any, *, space_id: str, toolkit: str) -> None:
+    """Replace tool.on_invoke_tool with a logging wrapper.
+
+    Composio's provider returns FunctionTool instances whose on_invoke_tool
+    is the raw execute callable. We swap it for a coroutine that logs the
+    input, the result preview, and any exception at info level so we can
+    diagnose integration failures from Modal logs without having to enable
+    SDK debug logging.
+    """
+    original = getattr(tool, "on_invoke_tool", None)
+    name = getattr(tool, "name", "?")
+    if not callable(original):
+        return
+
+    async def logged(ctx: Any, payload: Any) -> Any:
+        preview_in = (str(payload) or "")[:300]
+        logger.info(
+            "integration_tool_invoked",
+            space_id=space_id,
+            toolkit=toolkit,
+            tool=name,
+            input_preview=preview_in,
+        )
+        try:
+            result = await original(ctx, payload)
+        except Exception as err:  # noqa: BLE001
+            logger.warning(
+                "integration_tool_failed",
+                space_id=space_id,
+                toolkit=toolkit,
+                tool=name,
+                error=str(err)[:500],
+            )
+            raise
+        preview_out = (str(result) or "")[:400]
+        logger.info(
+            "integration_tool_returned",
+            space_id=space_id,
+            toolkit=toolkit,
+            tool=name,
+            output_preview=preview_out,
+            output_len=len(str(result)) if result is not None else 0,
+        )
+        return result
+
+    tool.on_invoke_tool = logged
+
+
 async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
     """
     Fetch the realtor's connected-toolkit tools as agent-ready Tool objects.
@@ -169,6 +217,12 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
         try:
             tools = composio.tools.get(user_id, toolkits=[toolkit])
             if tools:
+                # Wrap each tool's on_invoke_tool to surface inputs/outputs
+                # at info level. Without this, integration tool calls are
+                # invisible in Modal logs and any failure looks like the
+                # model fumbling.
+                for t in tools:
+                    _wrap_for_logging(t, space_id=space_id, toolkit=toolkit)
                 collected.extend(tools)
         except Exception as err:  # noqa: BLE001
             if _is_auth_like_error(err):
@@ -203,6 +257,8 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
             user_id=user_id,
             toolkit_count=len(toolkits),
             tool_count=len(collected),
+            toolkits=toolkits,
+            tool_slugs=[getattr(t, "name", "?") for t in collected],
         )
 
     return collected
