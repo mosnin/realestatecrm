@@ -68,8 +68,14 @@ image = (
         # Modal-side load_integration_tools() throws ImportError and
         # the agent runs without any integration tools regardless of
         # what's in the IntegrationConnection table.
-        "composio-core>=0.8.0",
-        "composio-openai-agents>=0.8.0",
+        #
+        # NOTE on package naming: the Composio Python SDK was split.
+        # `composio-core` tops out at 0.7.21 (old SDK). The v3 SDK
+        # — which matches the TS `@composio/core 0.8.x` shape we use
+        # in lib/integrations/composio.ts — is published under the
+        # `composio` package at 0.13.x. Use that one.
+        "composio>=0.13.0",
+        "composio-openai-agents>=0.13.0",
     )
     .add_local_dir(".", remote_path="/app")
 )

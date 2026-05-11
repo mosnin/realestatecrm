@@ -23,8 +23,12 @@ dependencies = [
   # autonomous runs can act on the realtor's behalf through their
   # connected accounts. Mirrors the TypeScript-side wiring in
   # lib/integrations/composio.ts.
-  "composio-core>=0.8.0",
-  "composio-openai-agents>=0.8.0",
+  #
+  # Package name: the v3 Python SDK (which matches @composio/core 0.8.x
+  # on the TS side, NOT the older `composio-core` package which is
+  # frozen at 0.7.21) is published as plain `composio` at 0.13.x.
+  "composio>=0.13.0",
+  "composio-openai-agents>=0.13.0",
 ]
 
 [project.optional-dependencies]
