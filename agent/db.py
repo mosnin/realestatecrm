@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Any, Iterable
 
 import asyncpg
@@ -41,8 +42,42 @@ _pool: asyncpg.Pool | None = None
 _pool_lock = asyncio.Lock()
 
 
+def _encode_timestamp(v: Any) -> str:
+    """Convert a Python datetime OR an ISO string into Postgres text form.
+
+    Tools across the agent set createdAt/updatedAt/etc. as
+    `datetime.now(timezone.utc).isoformat()` (ISO string). asyncpg's default
+    binary protocol for timestamptz rejects strings with a confusing
+    `expected a datetime.date or datetime.datetime instance, got 'str'`
+    error. Registering a TEXT codec lets Postgres parse the value itself
+    and accepts either input form, so individual tools don't have to
+    remember whether to convert.
+    """
+    if isinstance(v, (datetime, date)):
+        return v.isoformat()
+    if isinstance(v, str):
+        # Trust the caller's format — Postgres parses ISO 8601 + many other
+        # text representations natively. If it's malformed we surface the
+        # SQL error rather than re-implementing a parser here.
+        return v
+    raise TypeError(f"Cannot encode {type(v).__name__} as timestamp")
+
+
+def _decode_timestamptz(v: str) -> datetime:
+    """Postgres timestamptz text → Python datetime. Tolerates the space
+    separator Postgres uses ("2026-05-12 22:33:27.010216+00") in addition to
+    the canonical ISO 8601 'T' form. Python 3.11+ fromisoformat handles
+    both; we replace just in case the runtime is older."""
+    return datetime.fromisoformat(v.replace(" ", "T", 1))
+
+
+def _decode_date(v: str) -> date:
+    return date.fromisoformat(v)
+
+
 async def _init_codecs(conn: asyncpg.Connection) -> None:
-    """Make jsonb columns automatically marshal to/from Python dicts/lists."""
+    """Marshal jsonb and timestamp columns so callers can pass Python-native
+    values OR pre-serialized strings without juggling shapes."""
     await conn.set_type_codec(
         "jsonb",
         encoder=json.dumps,
@@ -54,6 +89,30 @@ async def _init_codecs(conn: asyncpg.Connection) -> None:
         encoder=json.dumps,
         decoder=json.loads,
         schema="pg_catalog",
+    )
+    # Timestamp/date codecs in TEXT format — accepts either Python datetime
+    # objects or ISO strings on the way in, returns Python datetimes on the
+    # way out. See _encode_timestamp for the full rationale.
+    await conn.set_type_codec(
+        "timestamptz",
+        encoder=_encode_timestamp,
+        decoder=_decode_timestamptz,
+        schema="pg_catalog",
+        format="text",
+    )
+    await conn.set_type_codec(
+        "timestamp",
+        encoder=_encode_timestamp,
+        decoder=_decode_timestamptz,
+        schema="pg_catalog",
+        format="text",
+    )
+    await conn.set_type_codec(
+        "date",
+        encoder=_encode_timestamp,
+        decoder=_decode_date,
+        schema="pg_catalog",
+        format="text",
     )
 
 
