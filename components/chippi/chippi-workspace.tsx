@@ -620,10 +620,13 @@ export function ChippiWorkspace({
   // The trailing assistant message — used to detect the "thinking" state
   // and to pin the permission prompt at the end of the transcript.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
-  // Keep the ThinkingIndicator visible for the entire streaming turn, not just
-  // while blocks are empty — it moves to the bottom of the turn as a persistent
-  // "still working" signal.
-  const showThinking = isStreaming && tailMessage?.role === 'assistant';
+  // The indicator block (avatar + shimmer line + optional plan card) only
+  // renders when there's actually something to show. `currentAction` is
+  // computed below and falls back to "Thinking…" during the dead air
+  // before the first token, so this gate is effectively:
+  //   "we're streaming AND we have a status to communicate."
+  // Once real assistant text starts flowing, currentAction → null and
+  // the indicator slides out — the chat bubble takes over.
 
   // Map in-flight tool call names to human-readable status phrases.
   const TOOL_ACTION_MAP: Record<string, string> = {
@@ -753,6 +756,15 @@ export function ChippiWorkspace({
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, tailMessage, liveCallIds]);
+
+  // Final visibility gate for the indicator block — we want the avatar +
+  // shimmer line + plan card only when there's actually something to
+  // communicate, otherwise the row would render hollow once real text starts
+  // flowing into the assistant bubble below.
+  const showThinking =
+    isStreaming &&
+    tailMessage?.role === 'assistant' &&
+    (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan));
 
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. Wrapped in a relative

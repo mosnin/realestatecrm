@@ -748,8 +748,32 @@
   100% { background-position: -200% 0; }
 }
 
+.chippi-thinking-shimmer {
+  /* A bright wedge sweeps across the muted base. Foreground colors come
+     from CSS vars so dark mode flips automatically. The 200% bg-size lets
+     the keyframe push the highlight cleanly off both edges. */
+  background-image: linear-gradient(
+    100deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 38%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 62%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  /* 2.4s = calm. ease-in-out softens the turnaround so it never reads jittery. */
+  animation: chippi-thinking-shimmer 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  /* Reduced-motion: stop the shimmer, keep the gradient at a static contrast point. */
+  .chippi-thinking-shimmer {
+    animation: none;
+    background-position: 0 0;
+  }
+  /* Legacy inline-style selector kept for any old callsites. */
   [style*="chippi-thinking-shimmer"] { animation: none !important; background-position: 0 0 !important; }
 }
 
