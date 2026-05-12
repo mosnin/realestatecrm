@@ -228,28 +228,12 @@ export function ToolCallBlockView({
       ? block.result.summary
       : null;
 
-  // The handler's `display` hint tints the card so at-a-glance scanning
-  // of the transcript tells a realtor which rows landed safely vs which
-  // need a second look. We ONLY apply it to resolved blocks — in-flight
-  // rows stay neutral so the transition feels definitive. The warning
-  // variant (amber) is for "completed but caveat" cases — e.g. a
-  // sub-agent whose tool budget ran out before it could finish research.
-  const displayTint =
-    status === 'running'
-      ? 'border-border bg-muted/30'
-      : block.display === 'error' || status === 'error'
-        ? 'border-rose-500/25 bg-rose-500/5'
-        : block.display === 'warning'
-          ? 'border-amber-500/30 bg-amber-500/10'
-          : block.display === 'success' && status === 'complete'
-            ? 'border-emerald-500/25 bg-emerald-500/5'
-            : 'border-border bg-muted/30';
-
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
-  // Colored left-edge bar mirrors the displayTint semantic so the row is
-  // scannable without reading the status badge.
+  // Colored left-edge bar carries the status semantic so the row stays
+  // scannable without a card border. The body of the row is borderless
+  // and transparent — see STYLESHEET.md "paper-flat" principle.
   const accentBar =
     status === 'running'
       ? 'bg-muted-foreground/30'
@@ -283,10 +267,9 @@ export function ToolCallBlockView({
         disabled={!hasDetails}
         onClick={() => hasDetails && setExpanded((v) => !v)}
         className={cn(
-          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg border text-left min-h-[36px]',
+          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg text-left min-h-[36px]',
           'transition-colors',
-          displayTint,
-          hasDetails && 'hover:bg-muted/40 cursor-pointer',
+          hasDetails && 'hover:bg-muted/20 cursor-pointer',
           !hasDetails && 'cursor-default',
         )}
       >

@@ -32,7 +32,7 @@ export function ThinkingIndicator({
   const hasReasoning = Boolean(streamingReasoning?.trim());
 
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
+    <div className={cn('flex flex-col justify-center gap-1.5 min-h-7', className)}>
       {/* Row 1: dots + optional "Thinking ▾" toggle */}
       <div className="flex items-center gap-2">
         <div className="flex gap-1 items-center" aria-label="Thinking" role="status">

@@ -716,20 +716,43 @@ export function ChippiWorkspace({
   }, [tailMessage, liveCallIds]);
 
   const currentAction = useMemo<string | null>(() => {
-    if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return null;
-    for (const block of tailMessage.blocks) {
-      if (
-        block.type === 'tool_call' &&
-        'callId' in block &&
-        liveCallIds.has((block as { callId: string }).callId)
-      ) {
-        const name = (block as { name: string }).name;
-        return TOOL_ACTION_MAP[name] ?? 'Working on it…';
+    if (!isStreaming || !tailMessage) return null;
+    // Live tool call → its action verb wins.
+    if (liveCallIds && liveCallIds.size > 0) {
+      for (const block of tailMessage.blocks) {
+        if (
+          block.type === 'tool_call' &&
+          'callId' in block &&
+          liveCallIds.has((block as { callId: string }).callId)
+        ) {
+          const name = (block as { name: string }).name;
+          if (TOOL_ACTION_MAP[name]) return TOOL_ACTION_MAP[name];
+          // Composio toolkit-prefixed slugs (HUBSPOT_*, GMAIL_*, SLACK_*, …)
+          // get a friendly verb derived from the toolkit name so realtors
+          // don't see raw SDK slugs in the status line.
+          const prefix = name.split('_')[0];
+          if (prefix === 'HUBSPOT') return 'Reading HubSpot…';
+          if (prefix === 'GMAIL') return 'Reading Gmail…';
+          if (prefix === 'SLACK') return 'Talking to Slack…';
+          if (prefix === 'GOOGLECALENDAR' || prefix === 'GOOGLE') return 'Checking your calendar…';
+          if (prefix === 'NOTION') return 'Reading Notion…';
+          if (prefix === 'LINEAR') return 'Reading Linear…';
+          if (prefix === 'GITHUB') return 'Reading GitHub…';
+          return 'Working on it…';
+        }
       }
     }
+    // Streaming, no tool call active, no tokens yet → still warming up the
+    // container / fetching tools / waiting on first model token. Fill the
+    // dead air with a single calm status so the realtor knows Chippi is on
+    // it, not stuck.
+    const hasText = tailMessage.blocks.some(
+      (b) => b.type === 'text' && b.content.trim().length > 0,
+    );
+    if (!hasText) return 'Thinking…';
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tailMessage, liveCallIds]);
+  }, [isStreaming, tailMessage, liveCallIds]);
 
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. Wrapped in a relative
