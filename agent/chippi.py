@@ -264,6 +264,7 @@ async def load_ai_profile(space_id: str, db) -> str | None:
 def make_chippi_agent(
     ai_profile_text: str | None = None,
     extra_tools: list | None = None,
+    workspace_info: str | None = None,
 ) -> Agent:
     """
     Build the single Chippi agent. Constructed fresh per run.
@@ -274,10 +275,19 @@ def make_chippi_agent(
     Empty list (or None) preserves the historical pre-integrations
     behavior — useful for tests and for runs where Composio isn't
     configured.
+
+    `workspace_info` injects a per-run workspace block (intake URL,
+    workspace name) at the top of the system prompt so the model can
+    drop the realtor's intake link into any outbound message without
+    a tool call.
     """
-    instructions = CHIPPI_INSTRUCTIONS
+    parts: list[str] = []
+    if workspace_info:
+        parts.append(workspace_info)
     if ai_profile_text:
-        instructions = ai_profile_text + "\n\n" + instructions
+        parts.append(ai_profile_text)
+    parts.append(CHIPPI_INSTRUCTIONS)
+    instructions = "\n\n".join(parts)
     base_tools = [
         # Contacts
         create_contact,

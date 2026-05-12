@@ -328,7 +328,25 @@ async def run_agent_for_space(
     except Exception as ie:  # noqa: BLE001
         log.warning("autonomous_load_integration_tools_failed", error=str(ie)[:200])
 
-    chippi = make_chippi_agent(ai_profile_text=ai_profile, extra_tools=integration_tools)
+    # Workspace info — mirrors the chat path so autonomous drafts include
+    # the realtor's intake URL where it's useful.
+    _app_url = (settings.app_url or "").rstrip("/")
+    intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    workspace_info = (
+        "# Your workspace\n"
+        f"- Workspace: {space.name} (slug: {space.slug})\n"
+        f"- Intake link (share with new leads): {intake_url}\n"
+        "- Include the intake link in any contact-facing draft where it"
+        " makes sense — when reaching out to a fresh lead, when asking a"
+        " prospect to qualify, when nudging someone who never finished"
+        " applying. Use the full URL verbatim; no shortening."
+    ) if intake_url else None
+
+    chippi = make_chippi_agent(
+        ai_profile_text=ai_profile,
+        extra_tools=integration_tools,
+        workspace_info=workspace_info,
+    )
     prompt = _build_opening_prompt(space, memory_context, triggers)
 
     run_config = RunConfig(

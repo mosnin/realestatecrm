@@ -437,9 +437,29 @@ async def chat_turn(item: dict):
                 error=str(ie)[:200],
             )
 
+    # Workspace info — gives the model the realtor's intake URL up front
+    # so any drafted outreach (Gmail/Resend/SMS) can include the link
+    # without an extra tool call. app_url already includes scheme + host.
+    from config import settings as _settings
+
+    _app_url = (_settings.app_url or "").rstrip("/")
+    intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    workspace_info: str | None = (
+        "# Your workspace\n"
+        f"- Workspace: {space.name} (slug: {space.slug})\n"
+        f"- Intake link (share with new leads): {intake_url}\n"
+        "- Include the intake link in any contact-facing draft where it"
+        " makes sense — when reaching out to a fresh lead, when asking a"
+        " prospect to qualify, when nudging someone who never finished"
+        " applying. Use the full URL verbatim; no shortening."
+    ) if intake_url else None
+
     async def event_stream():
         try:
-            chippi = make_chippi_agent(extra_tools=integration_tools)
+            chippi = make_chippi_agent(
+                extra_tools=integration_tools,
+                workspace_info=workspace_info,
+            )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
             yield f"data: {err}\n\n"
