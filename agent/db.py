@@ -27,6 +27,7 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Iterable
 
 import asyncpg
@@ -114,6 +115,21 @@ async def _init_codecs(conn: asyncpg.Connection) -> None:
         schema="pg_catalog",
         format="text",
     )
+    # Numeric — same problem shape as timestamps: asyncpg's binary codec
+    # rejects Python floats with `expected Decimal, got float`, but every
+    # tool that writes a price / cost / probability / rate passes a float
+    # (ledger.py costUsd, properties.py listPrice & baths). Register a
+    # TEXT codec that accepts int / float / Decimal / pre-serialized
+    # string on the way in and returns Decimal on the way out so reads
+    # match Postgres semantics. None handling is explicit because asyncpg
+    # otherwise feeds the string "None" to the encoder.
+    await conn.set_type_codec(
+        "numeric",
+        encoder=lambda v: None if v is None else str(v),
+        decoder=lambda v: None if v is None else Decimal(v),
+        schema="pg_catalog",
+        format="text",
+    )
 
 
 async def _get_pool() -> asyncpg.Pool:
@@ -188,7 +204,7 @@ class QueryBuilder:
     _on_conflict: str | None = None
     _returning: bool = True
 
-    # ── reads ──────────────────────────────────────────────────────────
+    # ── reads ─────────────────────────────────────────────────────────────
     def select(self, columns: str = "*", count: str | None = None) -> "QueryBuilder":
         self._select = columns
         self._count_mode = count
@@ -276,7 +292,7 @@ class QueryBuilder:
         self._limit = 1
         return self
 
-    # ── writes ─────────────────────────────────────────────────────────
+    # ── writes ────────────────────────────────────────────────────────────
     def insert(self, payload: dict | list[dict]) -> "QueryBuilder":
         self._write_kind = "insert"
         self._payload = payload
@@ -297,7 +313,7 @@ class QueryBuilder:
         self._write_kind = "delete"
         return self
 
-    # ── execution ──────────────────────────────────────────────────────
+    # ── execution ───────────────────────────────────────────────────────────
     async def execute(self) -> Result:
         if self._write_kind == "insert":
             return await self._execute_insert()
@@ -309,7 +325,7 @@ class QueryBuilder:
             return await self._execute_delete()
         return await self._execute_select()
 
-    # ── SQL builders ───────────────────────────────────────────────────
+    # ── SQL builders ─────────────────────────────────────────────────────────
     def _quoted_table(self) -> str:
         return f'"{self.table}"'
 
@@ -380,7 +396,7 @@ class QueryBuilder:
         params.append(f.value)
         return f"{col} {sql_op} ${idx}", idx + 1
 
-    # ── execute paths ──────────────────────────────────────────────────
+    # ── execute paths ────────────────────────────────────────────────────────
     async def _execute_select(self) -> Result:
         params: list[Any] = []
         where_sql, _ = self._build_where(params, 1)

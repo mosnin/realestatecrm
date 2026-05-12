@@ -27,6 +27,7 @@ on the native catalog. A Composio outage must not take down chat.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -82,7 +83,7 @@ async def mark_expired_by_toolkit(
                 {
                     "status": "expired",
                     "lastError": reason[:500],
-                    "updatedAt": "now()",
+                    "updatedAt": datetime.now(timezone.utc).isoformat(),
                 }
             )
             .eq("id", row["id"])
