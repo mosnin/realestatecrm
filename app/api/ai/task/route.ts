@@ -251,6 +251,12 @@ function proxyModalStream({
             } else if (type === 'reasoning_delta') {
               push(controller, { type: 'reasoning_delta', delta: String(evt.delta ?? '') });
 
+            } else if (type === 'phase') {
+              // Modal-emitted status (e.g. "Loading your tools…", "Thinking…")
+              // surfaced before the first token. Pass through verbatim — the
+              // client renders the label directly as the shimmer line.
+              push(controller, { type: 'phase', label: String(evt.label ?? '') });
+
             } else if (type === 'tool_call_start') {
               const toolName = String(evt.tool ?? 'tool');
               const toolArgs = (evt.args ?? {}) as Record<string, unknown>;

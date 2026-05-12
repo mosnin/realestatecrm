@@ -420,24 +420,37 @@ async def chat_turn(item: dict):
     )
 
     # Load this realtor's connected-toolkit tools (Gmail, Slack, HubSpot,
-    # etc.) before building the agent. Empty list when user_id is missing
-    # (older Next.js deploy) or no integrations configured. Best-effort:
-    # a Composio outage degrades to native-tool-only chat, doesn't 500.
-    integration_tools: list = []
-    if user_id:
-        try:
-            from integrations import load_integration_tools
-
-            integration_tools = await load_integration_tools(space_id, user_id)
-        except Exception as ie:  # noqa: BLE001
-            logger.warning(
-                "load_integration_tools_failed",
-                space_id=space_id,
-                user_id=user_id,
-                error=str(ie)[:200],
-            )
+    # etc.) inside the event stream so we can surface a "Loading your tools"
+    # phase event before the actual fetch. Empty list when user_id is missing
+    # (older Next.js deploy) or no integrations configured. Best-effort: a
+    # Composio outage degrades to native-tool-only chat, doesn't 500.
 
     async def event_stream():
+        # Phase events keep the realtor informed during the 5-10s gap between
+        # POST and the model's first token. They map onto the actual stages
+        # of work happening on this container.
+        def phase(label: str) -> str:
+            return f"data: {json.dumps({'type': 'phase', 'label': label})}\n\n"
+
+        if user_id:
+            yield phase("Loading your tools…")
+            integration_tools: list = []
+            try:
+                from integrations import load_integration_tools
+
+                integration_tools = await load_integration_tools(space_id, user_id)
+            except Exception as ie:  # noqa: BLE001
+                logger.warning(
+                    "load_integration_tools_failed",
+                    space_id=space_id,
+                    user_id=user_id,
+                    error=str(ie)[:200],
+                )
+        else:
+            integration_tools = []
+
+        yield phase("Thinking…")
+
         try:
             chippi = make_chippi_agent(extra_tools=integration_tools)
         except Exception as e:

@@ -22,6 +22,7 @@ export type AgentEvent =
   | PermissionRequiredEvent
   | PermissionResolvedEvent
   | PlanCreatedEvent
+  | PhaseEvent
   | TurnCompleteEvent
   | ErrorEvent
   | SystemEvent;
@@ -134,6 +135,21 @@ export interface PlanCreatedEvent extends BaseEvent {
     title: string;
     description: string;
   }>;
+}
+
+/**
+ * Out-of-band status from the agent runtime — what it's doing right now.
+ * Emitted at known transition points before the first token can stream
+ * (e.g. "Loading your tools…" while Composio is being fetched, "Thinking…"
+ * once the agent is built but before the LLM responds). The client uses
+ * `label` directly as the shimmering status line, and clears it on the
+ * first `text_delta` or `tool_call_start` since real signal supersedes
+ * generic phases.
+ */
+export interface PhaseEvent extends BaseEvent {
+  type: 'phase';
+  /** Realtor-facing copy. Already first-person, already terminated with `…` when ongoing. */
+  label: string;
 }
 
 /** End-of-turn marker. Client disables the input until the user types again. */

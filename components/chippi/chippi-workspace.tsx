@@ -124,6 +124,75 @@ function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   }));
 }
 
+/**
+ * Friendly first-person status for a Composio toolkit-prefixed tool slug
+ * (e.g. `HUBSPOT_SEARCH_CONTACTS`). The slug carries both the toolkit name
+ * AND the verb the agent is performing; we extract both so the indicator
+ * tells the truth ("Searching HubSpot…" vs "Writing to HubSpot…") instead
+ * of a generic "Reading X…" for every action.
+ */
+const TOOLKIT_PRETTY: Record<string, string> = {
+  HUBSPOT: 'HubSpot',
+  GMAIL: 'Gmail',
+  SLACK: 'Slack',
+  GOOGLECALENDAR: 'your calendar',
+  GOOGLE: 'Google',
+  NOTION: 'Notion',
+  LINEAR: 'Linear',
+  GITHUB: 'GitHub',
+  SALESFORCE: 'Salesforce',
+  ZOOM: 'Zoom',
+};
+
+function labelForIntegrationTool(slug: string): string {
+  const parts = slug.split('_');
+  if (parts.length < 2) return 'Working on it…';
+  const toolkit = parts[0];
+  const verb = parts[1];
+  const pretty = TOOLKIT_PRETTY[toolkit] ?? toolkit.toLowerCase();
+
+  switch (verb) {
+    case 'SEARCH':
+    case 'FIND':
+    case 'QUERY':
+      return `Searching ${pretty}…`;
+    case 'LIST':
+    case 'GET':
+    case 'FETCH':
+    case 'READ':
+    case 'RETRIEVE':
+      return `Reading ${pretty}…`;
+    case 'CREATE':
+    case 'ADD':
+    case 'INSERT':
+    case 'SEND':
+    case 'POST':
+      return `Writing to ${pretty}…`;
+    case 'UPDATE':
+    case 'PATCH':
+    case 'MODIFY':
+    case 'EDIT':
+    case 'SET':
+      return `Updating ${pretty}…`;
+    case 'DELETE':
+    case 'REMOVE':
+    case 'ARCHIVE':
+      return `Cleaning up in ${pretty}…`;
+    case 'REPLY':
+    case 'COMMENT':
+    case 'MESSAGE':
+      return `Replying in ${pretty}…`;
+    case 'DOWNLOAD':
+    case 'EXPORT':
+      return `Downloading from ${pretty}…`;
+    case 'UPLOAD':
+      return `Uploading to ${pretty}…`;
+    default:
+      // Unknown verb — fall back to a calm generic.
+      return `Working in ${pretty}…`;
+  }
+}
+
 export function ChippiWorkspace({
   slug,
   view = 'workspace',
@@ -194,6 +263,7 @@ export function ChippiWorkspace({
     liveCallIds,
     error: agentError,
     streamingReasoning,
+    currentPhase,
     activePlan,
     send,
     approve,
@@ -720,7 +790,8 @@ export function ChippiWorkspace({
 
   const currentAction = useMemo<string | null>(() => {
     if (!isStreaming || !tailMessage) return null;
-    // Live tool call → its action verb wins.
+
+    // 1. Live tool call wins — it's the most concrete signal.
     if (liveCallIds && liveCallIds.size > 0) {
       for (const block of tailMessage.blocks) {
         if (
@@ -730,32 +801,24 @@ export function ChippiWorkspace({
         ) {
           const name = (block as { name: string }).name;
           if (TOOL_ACTION_MAP[name]) return TOOL_ACTION_MAP[name];
-          // Composio toolkit-prefixed slugs (HUBSPOT_*, GMAIL_*, SLACK_*, …)
-          // get a friendly verb derived from the toolkit name so realtors
-          // don't see raw SDK slugs in the status line.
-          const prefix = name.split('_')[0];
-          if (prefix === 'HUBSPOT') return 'Reading HubSpot…';
-          if (prefix === 'GMAIL') return 'Reading Gmail…';
-          if (prefix === 'SLACK') return 'Talking to Slack…';
-          if (prefix === 'GOOGLECALENDAR' || prefix === 'GOOGLE') return 'Checking your calendar…';
-          if (prefix === 'NOTION') return 'Reading Notion…';
-          if (prefix === 'LINEAR') return 'Reading Linear…';
-          if (prefix === 'GITHUB') return 'Reading GitHub…';
-          return 'Working on it…';
+          return labelForIntegrationTool(name);
         }
       }
     }
-    // Streaming, no tool call active, no tokens yet → still warming up the
-    // container / fetching tools / waiting on first model token. Fill the
-    // dead air with a single calm status so the realtor knows Chippi is on
-    // it, not stuck.
+
+    // 2. Runtime-emitted phase ("Loading your tools…" / "Thinking…" /
+    //    "Starting up…") fills the window before the first tool call or
+    //    token arrives.
+    if (currentPhase) return currentPhase;
+
+    // 3. Final fallback for any streaming gap a phase event didn't cover.
     const hasText = tailMessage.blocks.some(
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
     if (!hasText) return 'Thinking…';
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStreaming, tailMessage, liveCallIds]);
+  }, [isStreaming, tailMessage, liveCallIds, currentPhase]);
 
   // Final visibility gate for the indicator block — we want the avatar +
   // shimmer line + plan card only when there's actually something to

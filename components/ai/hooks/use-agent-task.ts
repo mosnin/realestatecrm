@@ -60,6 +60,13 @@ export interface UseAgentTaskResult {
   /** Accumulated reasoning tokens for the current streaming turn. Empty string when not streaming. */
   streamingReasoning: string;
   /**
+   * Latest `phase` event label from the agent runtime — e.g. "Loading your
+   * tools…", "Thinking…". Cleared on the first real signal (text_delta or
+   * tool_call_start) since concrete activity supersedes generic phases.
+   * Also cleared on turn_complete. Null when not in a phase window.
+   */
+  currentPhase: string | null;
+  /**
    * The plan emitted by the most recent `create_plan` tool call during the
    * current streaming turn. Null when not streaming or when no plan has been
    * created yet. Cleared automatically on `turn_complete`.
@@ -110,6 +117,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [activePlan, setActivePlan] = useState<{
     task: string;
     steps: Array<{ title: string; description: string }>;
@@ -264,6 +272,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     switch (event.type) {
       case 'text_delta': {
         if (!event.delta) return;
+        // First real token — phase signals (loading, thinking) are
+        // superseded by actual output. Clear so the indicator hides.
+        setCurrentPhase(null);
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setMessages((prev) => {
@@ -297,6 +308,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'tool_call_start': {
+        // Concrete tool call wins over a generic phase label.
+        setCurrentPhase(null);
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setLiveCallIds((s) => {
@@ -385,6 +398,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
+      case 'phase': {
+        // Runtime-emitted "what I'm doing now" label. Ignore empty payloads
+        // and let later text_delta/tool_call_start clear this naturally.
+        const label = event.label?.trim();
+        if (label) setCurrentPhase(label);
+        return;
+      }
+
       case 'turn_complete': {
         const targetId = streamingMsgIdRef.current;
         if (targetId) {
@@ -394,6 +415,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
         setStreamingReasoning('');
         setActivePlan(null);
+        setCurrentPhase(null);
         return;
       }
 
@@ -422,6 +444,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       abortRef.current = controller;
       setIsStreaming(true);
       setError(null);
+      // Initial status before the first byte arrives — covers Modal cold
+      // start + the network round trip. Modal will overwrite this with
+      // "Loading your tools…" / "Thinking…" as soon as it starts emitting.
+      setCurrentPhase('Starting up…');
 
       try {
         const res = await fetch(url, {
@@ -499,6 +525,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         setIsStreaming(false);
         setLiveCallIds(new Set());
         setStreamingReasoning('');
+        setCurrentPhase(null);
       }
     },
     [abort, applyEvent, landChippiError],
@@ -715,6 +742,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     liveCallIds,
     error,
     streamingReasoning,
+    currentPhase,
     activePlan,
     send,
     approve,
