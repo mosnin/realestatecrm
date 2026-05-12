@@ -215,7 +215,13 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
     collected: list[Any] = []
     for toolkit in toolkits:
         try:
-            tools = composio.tools.get(user_id, toolkits=[toolkit])
+            # limit=1000 (server max) — without it, Composio's /api/v3/tools
+            # endpoint defaults to 20 items per page and the SDK doesn't
+            # paginate. That cap silently truncated HubSpot to its
+            # alphabetically-first 20 actions (archive/association only),
+            # making the realtor's 100+ enabled slugs invisible to the
+            # agent. Mirrors the same fix on lib/integrations/composio.ts.
+            tools = composio.tools.get(user_id, toolkits=[toolkit], limit=1000)
             if tools:
                 # Wrap each tool's on_invoke_tool to surface inputs/outputs
                 # at info level. Without this, integration tool calls are
