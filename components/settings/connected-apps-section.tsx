@@ -127,6 +127,8 @@ const CATEGORY_LABEL: Record<IntegrationCategory, string> = {
   docs: 'Documents',
   crm: 'CRM',
   'real-estate': 'Real estate',
+  social: 'Social',
+  ads: 'Ads',
   'docs-sign': 'Signatures',
   tasks: 'Tasks',
   forms: 'Forms',
@@ -138,9 +140,11 @@ const CATEGORY_ORDER: IntegrationCategory[] = [
   'email',
   'messaging',
   'calendar',
-  'docs',
   'crm',
   'real-estate',
+  'social',
+  'ads',
+  'docs',
   'docs-sign',
   'tasks',
   'forms',
@@ -421,14 +425,12 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
         return (
           <div key={cat} className="space-y-3">
             <p className={CAPTION}>{CATEGORY_LABEL[cat]}</p>
-            <div className="rounded-xl border border-border/70 bg-card divide-y divide-border/60">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {apps.map((app) => {
                 const connection = byToolkit.get(app.toolkit) ?? null;
-                // Only show health badge when there is an active connection —
-                // coming-soon and unconnected rows don't need one.
                 const showHealth = Boolean(connection) && !app.comingSoon;
                 return (
-                  <Row
+                  <IntegrationCard
                     key={app.toolkit}
                     app={app}
                     connection={connection}
@@ -462,7 +464,59 @@ function rank(status: ConnectionRow['status']): number {
   return 1; // failed
 }
 
-function Row({
+function AppIcon({ app }: { app: IntegrationApp }) {
+  if (app.iconUrl) {
+    return (
+      <img
+        src={app.iconUrl}
+        alt=""
+        aria-hidden
+        className="w-8 h-8 object-contain flex-shrink-0"
+      />
+    );
+  }
+  // Fallback: first-letter circle in neutral chrome. Identifies the row
+  // without faking a brand mark we don't have.
+  return (
+    <span
+      aria-hidden
+      className="w-8 h-8 rounded-md bg-muted text-muted-foreground inline-flex items-center justify-center text-sm font-semibold flex-shrink-0"
+    >
+      {app.name[0]}
+    </span>
+  );
+}
+
+function StatusPill({
+  status,
+  comingSoon,
+}: {
+  status: ConnectionRow['status'] | null;
+  comingSoon?: boolean;
+}) {
+  if (comingSoon) return null;
+  if (status === 'active')
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+        Connected
+      </span>
+    );
+  if (status === 'expired')
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+        Auth expired
+      </span>
+    );
+  if (status === 'failed')
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400">
+        Connection error
+      </span>
+    );
+  return null;
+}
+
+function IntegrationCard({
   app,
   connection,
   busy,
@@ -481,53 +535,47 @@ function Row({
 }) {
   const status = connection?.status ?? null;
   const action = pickRowAction({ comingSoon: app.comingSoon, status, busy });
-  // Surface the failure reason to the realtor when a connection is amber/red.
-  // The reason was being captured (`IntegrationConnection.lastError`) but
-  // never rendered — silent state was the bug the audit flagged. Translate
-  // known Composio error shapes to a sentence the realtor can act on.
   const errorLine = connection?.lastError && status !== 'active'
     ? explainCallbackReason(connection.lastError, app.toolkit)
     : null;
 
   return (
-    <div className="flex items-start gap-3 px-4 py-3">
-      <Dot status={status} comingSoon={app.comingSoon} />
+    <div
+      className={cn(
+        'group rounded-xl border border-border/70 bg-card p-4 flex flex-col gap-3 transition-colors duration-150',
+        !app.comingSoon && 'hover:bg-muted/30',
+      )}
+    >
+      {/* Top row: brand icon + status pill */}
+      <div className="flex items-start justify-between gap-2">
+        <AppIcon app={app} />
+        <StatusPill status={status} comingSoon={app.comingSoon} />
+      </div>
+
+      {/* Name + blurb */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
-          {/* State pill — explicit "Connected" / "Auth expired" / "Connection
-              error" so the row state is unambiguous. The Disconnect/Reconnect
-              link below is the action, not the state. */}
-          {!app.comingSoon && status === 'active' && (
-            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
-              Connected
-            </span>
-          )}
-          {!app.comingSoon && status === 'expired' && (
-            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-              Auth expired
-            </span>
-          )}
-          {!app.comingSoon && status === 'failed' && (
-            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400">
-              Connection error
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
           {connection?.label ? connection.label : app.blurb}
         </p>
         {errorLine && (
-          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+          <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-3">
             {errorLine}
           </p>
         )}
       </div>
-      {/* Health badge: only rendered for connected (non-coming-soon) rows. */}
-      {(health !== null || healthLoading) && (
-        <IntegrationHealthBadge health={health} loading={healthLoading} />
-      )}
-      <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
+
+      {/* Bottom row: health badge + action */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {(health !== null || healthLoading) ? (
+            <IntegrationHealthBadge health={health} loading={healthLoading} />
+          ) : (
+            <Dot status={status} comingSoon={app.comingSoon} />
+          )}
+        </div>
+        <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
+      </div>
     </div>
   );
 }

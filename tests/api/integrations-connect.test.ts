@@ -111,9 +111,9 @@ function makeRequest(toolkit: string) {
 }
 
 describe('POST /api/integrations/connect/[toolkit] — coming-soon slugs', () => {
-  // The four new placeholders plus the original Follow-up Boss. If a future
-  // PR adds a sixth, this loop will exercise it automatically.
-  const PLACEHOLDERS = ['follow_up_boss', 'compass', 'boomtown', 'kvcore', 'real_geeks'];
+  // Real-estate-niche apps without a Composio toolkit yet. Follow-up Boss
+  // graduated out of this set once Composio provisioned its toolkit.
+  const PLACEHOLDERS = ['compass', 'boomtown', 'kvcore', 'real_geeks'];
 
   it('the COMING_SOON_TOOLKITS set covers every placeholder slug we promise', () => {
     for (const slug of PLACEHOLDERS) {

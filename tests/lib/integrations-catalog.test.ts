@@ -24,6 +24,8 @@ const VALID_CATEGORIES: ReadonlySet<IntegrationCategory> = new Set<IntegrationCa
   'docs',
   'crm',
   'real-estate',
+  'social',
+  'ads',
   'docs-sign',
   'tasks',
   'forms',
@@ -113,7 +115,7 @@ describe('catalog entry shape', () => {
   it('catalog size snapshot — accidental cuts surface loudly', () => {
     // Bump this number on purpose when the catalog grows or shrinks.
     // A drive-by removal that drops Gmail or Slack will fail this test.
-    expect(INTEGRATIONS.length).toBe(33);
+    expect(INTEGRATIONS.length).toBe(38);
   });
 
   it('includes the load-bearing realtor apps', () => {
