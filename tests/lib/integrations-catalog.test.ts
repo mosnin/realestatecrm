@@ -26,6 +26,7 @@ const VALID_CATEGORIES: ReadonlySet<IntegrationCategory> = new Set<IntegrationCa
   'real-estate',
   'social',
   'ads',
+  'payments',
   'docs-sign',
   'tasks',
   'forms',
@@ -115,7 +116,7 @@ describe('catalog entry shape', () => {
   it('catalog size snapshot — accidental cuts surface loudly', () => {
     // Bump this number on purpose when the catalog grows or shrinks.
     // A drive-by removal that drops Gmail or Slack will fail this test.
-    expect(INTEGRATIONS.length).toBe(38);
+    expect(INTEGRATIONS.length).toBe(44);
   });
 
   it('includes the load-bearing realtor apps', () => {
@@ -141,9 +142,9 @@ describe('catalog cuts (audit 7→8)', () => {
     const grouped = integrationsByCategory();
     expect(grouped.email).toBeDefined();
     expect(grouped.messaging).toBeDefined();
-    expect(grouped.email.map((a) => a.toolkit).sort()).toEqual(['gmail', 'outlook']);
+    expect(grouped.email.map((a) => a.toolkit).sort()).toEqual(['gmail', 'mailchimp', 'outlook']);
     expect(grouped.messaging.map((a) => a.toolkit).sort()).toEqual(
-      ['discord', 'microsoft_teams', 'slack'],
+      ['discord', 'microsoft_teams', 'slack', 'twilio', 'whatsapp'],
     );
   });
 

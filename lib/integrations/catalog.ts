@@ -27,6 +27,7 @@ export type IntegrationCategory =
   | 'real-estate'
   | 'social'
   | 'ads'
+  | 'payments'
   | 'docs-sign'
   | 'tasks'
   | 'forms'
@@ -88,6 +89,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // ── Email ────────────────────────────────────────────────────────────
   { toolkit: 'gmail', name: 'Gmail', blurb: 'Send drafts and watch for replies.', category: 'email', promoted: true, iconUrl: '/integrations/gmail.svg' },
   { toolkit: 'outlook', name: 'Outlook', blurb: 'Same, for Microsoft accounts.', category: 'email', promoted: true, iconUrl: '/integrations/outlook.svg' },
+  { toolkit: 'mailchimp', name: 'Mailchimp', blurb: 'Drip nurture, listing announcements, monthly newsletters.', category: 'email', promoted: true, iconUrl: '/integrations/mailchimp.svg' },
 
   // ── Calendar ─────────────────────────────────────────────────────────
   { toolkit: 'googlecalendar', name: 'Google Calendar', blurb: 'Schedule tours, block time, see availability.', category: 'calendar', promoted: true, iconUrl: '/integrations/googlecalendar.svg' },
@@ -96,6 +98,11 @@ export const INTEGRATIONS: IntegrationApp[] = [
   { toolkit: 'cal', name: 'Cal.com', blurb: 'Open-source booking pages.', category: 'calendar' },
 
   // ── Messaging ────────────────────────────────────────────────────────
+  // Twilio + WhatsApp are the realtor's phone — SMS for US clients, WhatsApp
+  // for international and under-40 segment. Slack/Discord/Teams are internal
+  // team comms; the SMS-class tools are client comms.
+  { toolkit: 'twilio', name: 'Twilio', blurb: 'SMS and voice with US clients — Chippi can reply where the conversation actually lives.', category: 'messaging', promoted: true, iconUrl: '/integrations/twilio.svg' },
+  { toolkit: 'whatsapp', name: 'WhatsApp', blurb: 'International buyers, co-buyer group threads, agent-to-agent.', category: 'messaging', promoted: true, iconUrl: '/integrations/whatsapp.svg' },
   { toolkit: 'slack', name: 'Slack', blurb: 'Post deals, alerts, and updates to your team channel.', category: 'messaging', promoted: true, iconUrl: '/integrations/slack.svg' },
   { toolkit: 'discord', name: 'Discord', blurb: 'Same, for Discord servers.', category: 'messaging', iconUrl: '/integrations/discord.svg' },
   { toolkit: 'microsoft_teams', name: 'Microsoft Teams', blurb: 'Same, for Teams channels.', category: 'messaging', iconUrl: '/integrations/microsoftteams.svg' },
@@ -107,10 +114,17 @@ export const INTEGRATIONS: IntegrationApp[] = [
   { toolkit: 'instagram', name: 'Instagram', blurb: 'Surface DMs and listing-post engagement.', category: 'social', promoted: true, iconUrl: '/integrations/instagram.svg' },
   { toolkit: 'linkedin', name: 'LinkedIn', blurb: 'Track outbound and inbound on your professional network.', category: 'social', promoted: true, iconUrl: '/integrations/linkedin.svg' },
   { toolkit: 'reddit', name: 'Reddit', blurb: 'Watch local-market subreddits for buyer signals.', category: 'social', iconUrl: '/integrations/reddit.svg' },
+  { toolkit: 'youtube', name: 'YouTube', blurb: 'Upload listing tours and market-update videos, pull view counts.', category: 'social', promoted: true, iconUrl: '/integrations/youtube.svg' },
 
   // ── Ads ──────────────────────────────────────────────────────────────
   // Paid-acquisition reporting and lead-form pulls.
   { toolkit: 'google_ads', name: 'Google Ads', blurb: 'Pull campaign performance and lead-form submissions.', category: 'ads', promoted: true, iconUrl: '/integrations/googleads.svg' },
+
+  // ── Payments ─────────────────────────────────────────────────────────
+  // Earnest-money deposits, transaction-coordination retainers, listing-prep
+  // fees. Realtors increasingly take money directly instead of waiting on
+  // closing — Chippi can draft and send the payment link.
+  { toolkit: 'stripe', name: 'Stripe', blurb: 'Collect earnest deposits, retainers, and service fees.', category: 'payments', promoted: true, iconUrl: '/integrations/stripe.svg' },
 
   // ── Docs ─────────────────────────────────────────────────────────────
   { toolkit: 'notion', name: 'Notion', blurb: 'Capture deals, tours, and notes in your workspace.', category: 'docs', promoted: true, iconUrl: '/integrations/notion.svg' },
@@ -154,6 +168,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // ── Video / meetings ─────────────────────────────────────────────────
   { toolkit: 'zoom', name: 'Zoom', blurb: 'Schedule virtual showings and broker calls.', category: 'video', iconUrl: '/integrations/zoom.svg' },
   { toolkit: 'googlemeet', name: 'Google Meet', blurb: 'Same, for Google Meet.', category: 'video', iconUrl: '/integrations/googlemeet.svg' },
+  { toolkit: 'loom', name: 'Loom', blurb: 'Async property walkthroughs and contract explanations buyers can replay.', category: 'video', promoted: true, iconUrl: '/integrations/loom.svg' },
 
   // ── Spreadsheets / lists ─────────────────────────────────────────────
   { toolkit: 'airtable', name: 'Airtable', blurb: 'Two-way sync for custom pipelines and lists.', category: 'docs', iconUrl: '/integrations/airtable.svg' },
