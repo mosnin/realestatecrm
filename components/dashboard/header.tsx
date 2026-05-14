@@ -26,6 +26,7 @@ import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
 import { ShareLinksMenu } from './share-links-menu';
+import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
@@ -560,6 +561,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
       <div className="flex items-center gap-0.5">
+        {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
