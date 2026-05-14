@@ -34,6 +34,9 @@ const EMPTY_PROFILE: PartialProfile = {
   currentGoals: null,
   quirksAndPreferences: null,
   agentPersonalizationNote: null,
+  role: null,
+  zipCode: null,
+  leadSources: [],
 };
 
 export function AIProfileForm({ slug: _slug, spaceId }: AIProfileFormProps) {
@@ -61,6 +64,9 @@ export function AIProfileForm({ slug: _slug, spaceId }: AIProfileFormProps) {
             currentGoals: data.currentGoals,
             quirksAndPreferences: data.quirksAndPreferences,
             agentPersonalizationNote: data.agentPersonalizationNote,
+            role: data.role ?? null,
+            zipCode: data.zipCode ?? null,
+            leadSources: data.leadSources ?? [],
           });
         }
       })

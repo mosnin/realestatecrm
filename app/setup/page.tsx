@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
-import { OnboardingQuick } from '@/components/onboarding/onboarding-quick';
+import { OnboardingRealtor } from '@/components/onboarding/onboarding-realtor';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export const metadata = { title: 'Create your workspace — Chippi' };
@@ -197,7 +197,7 @@ export default async function SetupPage({
   void email;
 
   if (useQuickPath) {
-    return <OnboardingQuick defaultName={resolvedUser?.name ?? ''} />;
+    return <OnboardingRealtor defaultName={resolvedUser?.name ?? ''} />;
   }
 
   return (
