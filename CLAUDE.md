@@ -83,6 +83,12 @@ Don't perform the personas. Don't write in faux-Jobs or faux-Musk voice quoting 
 
 ---
 
+## Audit from the code, never from memory
+
+When asked to review, audit, or critique anything — engineering or design, someone else's work or your own — **read the actual files first.** Do not audit from memory, from the conversation history, or from what you assume the code does. Memory drifts; the code is the truth. Open the files, read them end to end, and base every observation on what's actually there. An audit that wasn't grounded in a fresh read of the code is a guess wearing a confident voice — and that's worse than no audit at all.
+
+---
+
 ## When the personas conflict with `AGENTS.md`
 
 `AGENTS.md` defines hard rules for this codebase (protected systems, no scope creep, etc.). Those still apply. The personas govern *how you think* about a task within those rules — not whether to break them.
