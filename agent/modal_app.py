@@ -1,10 +1,13 @@
 """Modal entrypoint for Chippi.
 
-Two web endpoints, no scheduled functions. The 15-minute heartbeat is gone —
-Chippi only wakes up on real triggers or explicit user action.
+No Modal-side scheduling — runs are kicked off from the Next.js side
+(the 4-hour cron in vercel.json, the "Run now" button, or an event
+trigger) which calls these endpoints.
 
-  POST  chat_turn        — interactive chat surface (called by /api/ai/task)
-  POST  run_now_webhook  — autonomous run for a single space (or trigger-drain)
+  POST  chat_turn          — interactive chat surface (called by /api/ai/task)
+  POST  run_now_webhook    — autonomous run for a single space (or trigger-drain)
+  POST  run_swarm_endpoint — swarm execution (called fire-and-forget by /api/swarm)
+        run_space          — plain function for local testing / cron drains
 
 Deployment:
   modal deploy agent/modal_app.py

@@ -31,20 +31,18 @@ class Settings(BaseSettings):
     # Secret shared between Modal and the Next.js app for internal API calls
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
-    # Models
-    orchestrator_model: str = Field(default="gpt-5-mini")
+    # Model for the swarm orchestrator's fan-out workers. Chippi itself is
+    # built with its model set in chippi.py; the autonomous runner falls
+    # back through _FALLBACK_MODELS in orchestrator.py on 429s.
     worker_model: str = Field(default="gpt-5-mini")
-
-    # Safety limits
-    max_react_iterations: int = Field(default=6)       # max tool-call turns per specialist agent
-    default_daily_token_budget: int = Field(default=50_000)
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection
     max_output_tokens: int = Field(default=4_096)      # cap LLM output per turn
 
-    # Coordinator — covers survey turns + all specialist handoff turns
-    # Budget: ~3 coordinator turns + 4 specialists × 8 turns each = ~35; 50 gives headroom
+    # Max tool-call turns the SDK runner will take in a single agent run
+    # before stopping. One agent, no handoffs — 50 is generous headroom for
+    # a sweep that acts on a handful of things.
     coordinator_max_turns: int = Field(default=50)
 
     model_config = {"populate_by_name": True, "env_file": ".env.local"}
