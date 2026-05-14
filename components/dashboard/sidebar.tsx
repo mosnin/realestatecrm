@@ -15,6 +15,8 @@ import {
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarContextSection } from '@/components/dashboard/sidebar-context-section';
+import { ChippiInstrument } from '@/components/dashboard/chippi-instrument';
+import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
   ChevronLeft,
@@ -862,21 +864,21 @@ function RealtorNav({
     if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
-          {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+          <PulseNumber value={unreadLeadCount > 99 ? '99+' : unreadLeadCount} />
         </span>
       );
     }
     if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
-          {pendingDraftCount > 99 ? '99+' : pendingDraftCount}
+          <PulseNumber value={pendingDraftCount > 99 ? '99+' : pendingDraftCount} />
         </span>
       );
     }
     if (item.badgeKey === 'properties' && activePropertyCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
-          {activePropertyCount > 99 ? '99+' : activePropertyCount}
+          <PulseNumber value={activePropertyCount > 99 ? '99+' : activePropertyCount} />
         </span>
       );
     }
@@ -1253,6 +1255,9 @@ function RealtorSidebarShell({
         <div className="mt-3">
           <SearchPill collapsed={collapsed} />
         </div>
+
+        {/* Cockpit instrument — live agent readout (working / idle / paused) */}
+        <ChippiInstrument collapsed={collapsed} />
 
         {/* Primary nav + More + Settings */}
         <RealtorNav

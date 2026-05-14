@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, ChevronUp, Clock, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Sheet,
   SheetContent,
@@ -129,8 +130,8 @@ export function ApprovalsPill() {
         title={count === 1 ? '1 action awaiting your approval' : `${count} actions awaiting your approval`}
         aria-label={`${count} approval${count === 1 ? '' : 's'} pending`}
       >
-        <span className="tabular-nums font-semibold">{count}</span>
-        <span className="hidden sm:inline">{count === 1 ? 'to approve' : 'to approve'}</span>
+        <PulseNumber value={count} className="tabular-nums font-semibold" />
+        <span className="hidden sm:inline">to approve</span>
         <ChevronUp size={12} className="opacity-70" />
       </button>
 
