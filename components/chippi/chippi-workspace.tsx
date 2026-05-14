@@ -27,6 +27,7 @@ import { useSplitPanel } from '@/hooks/use-split-panel';
 import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
+import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -896,6 +897,7 @@ export function ChippiWorkspace({
     <div className="relative flex flex-col h-full min-h-0">
       {/* Floating control cluster — top-right, no top bar chrome */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
+        <ApprovalsPill />
         {messages.length >= MESSAGE_LIMIT * 0.8 && (
           <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
             {messages.length}/{MESSAGE_LIMIT}
@@ -937,7 +939,7 @@ export function ChippiWorkspace({
           <Mic size={15} />
         </button>
         <Link
-          href={`/s/${slug}/chippi/memory`}
+          href={`/s/${slug}/settings#memory`}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
           title="What I remember"
           aria-label="What Chippi remembers"

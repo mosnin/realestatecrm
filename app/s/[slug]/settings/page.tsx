@@ -9,6 +9,7 @@ import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntegrationsSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
+import { MemoryFeed } from '@/components/chippi/memory-feed';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H1,
@@ -154,6 +155,17 @@ export default async function SettingsPage({
           </p>
         </div>
         <AIProfileForm slug={slug} spaceId={space.id} />
+      </section>
+
+      {/* ── What Chippi remembers (formerly /chippi/memory) ─────────── */}
+      <section id="memory" className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24">
+        <div className="mb-6">
+          <h2 className="text-base font-semibold">What Chippi remembers</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Everything I&apos;ve learned about you, your contacts, and your deals. Delete anything I got wrong — I&apos;ll re-learn it if it comes up again.
+          </p>
+        </div>
+        <MemoryFeed slug={slug} />
       </section>
 
       {/* NOTIFICATIONS */}
