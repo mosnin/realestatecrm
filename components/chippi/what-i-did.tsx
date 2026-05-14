@@ -8,18 +8,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
-
-// Cockpit motion: each activity row settles in with a short stagger so a
-// fresh load reads as the agent's work landing, not a static list paint.
-const ROW_IN = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-} as const;
-const rowTransition = (i: number) => ({
-  delay: Math.min(i * 0.05, 0.3),
-  duration: 0.3,
-  ease: [0.22, 1, 0.36, 1] as const,
-});
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 
 interface ActivityEntry {
   id: string;
@@ -132,8 +121,13 @@ export function WhatIDid({ slug }: { slug: string }) {
       )}
 
       {!loading && entries.length > 0 && (
-        <div className="divide-y divide-border/60">
-          {entries.slice(0, 6).map((entry, i) => {
+        <motion.div
+          className="divide-y divide-border/60"
+          variants={STAGGER_CONTAINER}
+          initial="initial"
+          animate="enter"
+        >
+          {entries.slice(0, 6).map((entry) => {
             const { verb, icon: Icon } = metaFor(entry.actionType);
             const targetName = entry.Contact?.name ?? entry.Deal?.title ?? null;
             const targetHref = entry.Contact
@@ -176,7 +170,7 @@ export function WhatIDid({ slug }: { slug: string }) {
 
             if (targetHref) {
               return (
-                <motion.div key={entry.id} initial={ROW_IN.initial} animate={ROW_IN.animate} transition={rowTransition(i)}>
+                <motion.div key={entry.id} variants={STAGGER_ITEM}>
                   <Link
                     href={targetHref}
                     className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
@@ -189,16 +183,14 @@ export function WhatIDid({ slug }: { slug: string }) {
             return (
               <motion.div
                 key={entry.id}
-                initial={ROW_IN.initial}
-                animate={ROW_IN.animate}
-                transition={rowTransition(i)}
+                variants={STAGGER_ITEM}
                 className="flex items-center gap-3 py-3 first:pt-4"
               >
                 {RowInner}
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </section>
   );

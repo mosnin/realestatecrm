@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { Calendar, Clock, MapPin, Phone, Mail, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 
 interface FollowUpDue {
   id: string;
@@ -101,89 +103,96 @@ export function WhatsComing({ slug }: { slug: string }) {
       )}
 
       {!loading && total > 0 && (
-        <div className="divide-y divide-border/60">
+        <motion.div
+          className="divide-y divide-border/60"
+          variants={STAGGER_CONTAINER}
+          initial="initial"
+          animate="enter"
+        >
           {data.toursUpcoming.map((tour) => (
-            <Link
-              key={tour.id}
-              href={`/s/${slug}/calendar`}
-              className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
-            >
-              <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium text-foreground tabular-nums">
-                    {formatDay(tour.startsAt)} · {formatTime(tour.startsAt)}
-                  </span>
-                  {tour.guestName && (
-                    <span className="text-muted-foreground truncate">with {tour.guestName}</span>
+            <motion.div key={tour.id} variants={STAGGER_ITEM}>
+              <Link
+                href={`/s/${slug}/calendar`}
+                className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-foreground tabular-nums">
+                      {formatDay(tour.startsAt)} · {formatTime(tour.startsAt)}
+                    </span>
+                    {tour.guestName && (
+                      <span className="text-muted-foreground truncate">with {tour.guestName}</span>
+                    )}
+                  </div>
+                  {tour.propertyAddress && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <MapPin size={10} />
+                      <span className="truncate">{tour.propertyAddress}</span>
+                    </p>
                   )}
                 </div>
-                {tour.propertyAddress && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <MapPin size={10} />
-                    <span className="truncate">{tour.propertyAddress}</span>
-                  </p>
-                )}
-              </div>
-              <ChevronRight
-                size={13}
-                className="flex-shrink-0 text-muted-foreground/0 group-hover/row:text-muted-foreground/60 transition-colors"
-              />
-            </Link>
+                <ChevronRight
+                  size={13}
+                  className="flex-shrink-0 text-muted-foreground/0 group-hover/row:text-muted-foreground/60 transition-colors"
+                />
+              </Link>
+            </motion.div>
           ))}
 
           {data.followUpsDue.map((contact) => {
             const overdueMs = Date.now() - new Date(contact.followUpAt).getTime();
             const isOverdue = overdueMs > 0;
             return (
-              <Link
-                key={contact.id}
-                href={`/s/${slug}/contacts/${contact.id}`}
-                className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
-              >
-                <div
-                  className={cn(
-                    'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
-                    isOverdue
-                      ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                      : 'bg-muted text-muted-foreground',
-                  )}
+              <motion.div key={contact.id} variants={STAGGER_ITEM}>
+                <Link
+                  href={`/s/${slug}/contacts/${contact.id}`}
+                  className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
                 >
-                  <Clock size={14} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-foreground truncate">{contact.name}</span>
-                    <span
-                      className={cn(
-                        'text-xs',
-                        isOverdue ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
-                      )}
-                    >
-                      {isOverdue
-                        ? `overdue ${timeAgo(contact.followUpAt)}`
-                        : `due ${timeAgo(contact.followUpAt)}`}
-                    </span>
+                  <div
+                    className={cn(
+                      'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                      isOverdue
+                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    <Clock size={14} />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Follow-up you set
-                    {contact.type ? ` · ${contact.type}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
-                  {contact.phone && <Phone size={11} />}
-                  {contact.email && <Mail size={11} />}
-                  <ChevronRight
-                    size={13}
-                    className="ml-1 text-muted-foreground/0 group-hover/row:text-muted-foreground/60 transition-colors"
-                  />
-                </div>
-              </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-foreground truncate">{contact.name}</span>
+                      <span
+                        className={cn(
+                          'text-xs',
+                          isOverdue ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
+                        )}
+                      >
+                        {isOverdue
+                          ? `overdue ${timeAgo(contact.followUpAt)}`
+                          : `due ${timeAgo(contact.followUpAt)}`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Follow-up you set
+                      {contact.type ? ` · ${contact.type}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
+                    {contact.phone && <Phone size={11} />}
+                    {contact.email && <Mail size={11} />}
+                    <ChevronRight
+                      size={13}
+                      className="ml-1 text-muted-foreground/0 group-hover/row:text-muted-foreground/60 transition-colors"
+                    />
+                  </div>
+                </Link>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </section>
   );
