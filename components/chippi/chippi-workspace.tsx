@@ -7,9 +7,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
@@ -325,6 +331,20 @@ export function ChippiWorkspace({
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
   const loadedConvIdRef = useRef<string | null>(null);
+
+  // Deep-link to history: ?view=history (used by the collapsed sidebar's
+  // Chats icon) opens the conversation-history drawer on mount, then
+  // cleans the URL so a back/refresh doesn't re-trigger it.
+  useEffect(() => {
+    if (searchParams.get('view') === 'history') {
+      setDrawerOpen(true);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('view');
+      const qs = next.toString();
+      router.replace(`/s/${slug}/chippi${qs ? `?${qs}` : ''}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadConversation = useCallback(
     async (convId: string) => {
@@ -938,22 +958,35 @@ export function ChippiWorkspace({
         >
           <Mic size={15} />
         </button>
-        <Link
-          href={`/s/${slug}/settings#memory`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="What I remember"
-          aria-label="What Chippi remembers"
-        >
-          <NotebookText size={15} />
-        </Link>
-        <Link
-          href={`/s/${slug}/chippi?tab=settings`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="Settings"
-          aria-label="Chippi settings"
-        >
-          <Settings size={15} />
-        </Link>
+        {/* Secondary actions fold under a single overflow menu so the
+            cluster stays a small row of primary affordances — approvals,
+            run-now, history, voice — instead of seven competing icons. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="More"
+              aria-label="More options"
+            >
+              <MoreHorizontal size={15} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem asChild>
+              <Link href={`/s/${slug}/settings#memory`} className="cursor-pointer">
+                <NotebookText size={14} className="mr-2" />
+                What I remember
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
+                <Settings size={14} className="mr-2" />
+                Chippi settings
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />
       </div>
 

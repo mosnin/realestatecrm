@@ -46,6 +46,7 @@ import {
   Search,
   Sparkles,
   Flag,
+  History,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -944,6 +945,20 @@ function RealtorNav({
           {collapsed ? (
             <>
               <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+              {/* Chats — the collapsed-rail entry to conversation history.
+                  In expanded mode the Chats tab in SidebarContextSection
+                  shows the list inline; the rail is too narrow for that,
+                  so we route to /chippi with ?view=history which the
+                  workspace reads and opens the history drawer on mount. */}
+              <CollapsedTooltip enabled label="Conversations">
+                <Link
+                  href={`/s/${slug}/chippi?view=history`}
+                  aria-label="Conversation history"
+                  className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
+                >
+                  <History size={15} strokeWidth={1.75} />
+                </Link>
+              </CollapsedTooltip>
               <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
             </>
           ) : (
