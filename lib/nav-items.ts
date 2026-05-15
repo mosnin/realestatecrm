@@ -32,16 +32,14 @@ export interface NavItem {
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
-// Chippi is the home — the chat surface IS the OS. Everything else in the
-// sidebar is the realtor-facing substrate they still expect from a CRM:
-// People, Deals, Calendar, Properties, Intake. Settings catches the rest.
+// Chippi is the home — the chat surface IS the OS. The Chippi entry expands
+// into the agent's sub-surfaces (Full day, Drafts, Activity, Memory,
+// Integrations), so the chat root stays a clean chat-first hero and the
+// realtor reaches the dashboards via the dropdown rather than scrolling
+// past them every time they want to talk to Chippi.
 //
-// Agent primitives (Approvals, Tasks, Activity, Memory, Log) don't earn
-// sidebar slots — they surface inline on the Chippi page (approvals pill,
-// morning replay) or live in Settings (memory, log).
-//
-// Cut from primary nav: Agents, Swarm, Analytics, Reviews, Follow-ups,
-// Commissions, Integrations. Routes still resolve; they're not advertised.
+// Everything else in the sidebar is the realtor-facing substrate they still
+// expect from a CRM: People, Deals, Calendar, Properties, Intake.
 
 export const realtorNavItems: NavItem[] = [
   {
@@ -50,6 +48,13 @@ export const realtorNavItems: NavItem[] = [
     icon: Sparkles,
     isAI: true,
     badgeKey: 'pendingDrafts',
+    children: [
+      { href: '/chippi/today', label: 'Full day' },
+      { href: '/chippi/drafts', label: 'Drafts' },
+      { href: '/chippi/activity', label: 'Activity' },
+      { href: '/chippi/memory', label: 'Memory' },
+      { href: '/integrations', label: 'Integrations' },
+    ],
   },
   {
     href: '/contacts',

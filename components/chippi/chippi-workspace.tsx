@@ -23,8 +23,6 @@ import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-ta
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
-import { TodayFeed } from './today-feed';
-import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
@@ -559,6 +557,22 @@ export function ChippiWorkspace({
   const isEmpty = messages.length === 0 && !isLoadingConversation;
   const firstName = user?.firstName ?? '';
 
+  // Time-of-day greeting for the empty-state hero. Computed client-side
+  // (the server doesn't know the realtor's local hour); we render an
+  // invisible non-breaking space until the hour is set so the heading
+  // doesn't collapse and bump the composer up on first paint.
+  const [hour, setHour] = useState<number | null>(null);
+  useEffect(() => {
+    setHour(new Date().getHours());
+  }, []);
+  const greeting = (() => {
+    if (hour === null) return '';
+    const name = firstName.trim();
+    if (hour >= 5 && hour < 12) return name ? `Good morning, ${name}` : 'Good morning';
+    if (hour >= 12 && hour < 19) return name ? `Good afternoon, ${name}` : 'Good afternoon';
+    return 'Working late?';
+  })();
+
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
   // action, and seeded on mount when arriving from `?prefill=` (the
   // "or just tell Chippi →" shortcuts on /contacts and /deals, and
@@ -1035,68 +1049,36 @@ export function ChippiWorkspace({
           One moment.
         </div>
       ) : isEmpty ? (
-        <>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
-              {/* The home is one sentence — Chippi's composed morning story
-                  promoted to h1. Pulls stuck deals, overdue follow-ups, new
-                  arrivals, hot people, drafts, questions in one shot; names
-                  the loudest single fact and (when there's a top subject)
-                  becomes a doorway to that deal or person.
-
-                  The audit cut the "Good morning, Sarah" greeting (wallpaper —
-                  every productivity app ships it; nobody notices) and the
-                  MorningReplay recap card (the agent talking about itself
-                  instead of about the deals). The home now answers one
-                  question: what should I do next? */}
-              {/* Morning sentence + post-tour affordance — wrapped together so
-                  the tertiary "Just toured? Log it →" line sits tight under the
-                  headline (mt-3) instead of joining the page's space-y-12
-                  rhythm. The affordance is muted, single-line, centered — it
-                  has to be *findable* the second time a realtor uses Chippi
-                  without competing with the morning's primary action. */}
-              <div>
-                <MorningStory slug={slug} />
-                <div className="mt-3 text-center">
-                  <Link
-                    href={`/s/${slug}/chippi/log`}
-                    className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Just toured? Log it &rarr;
-                  </Link>
-                </div>
-                {showConnectBanner && (
-                  <div className="mt-1.5 text-center">
-                    <Link
-                      href={`/s/${slug}/integrations`}
-                      className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Connect Gmail to send your drafts &rarr;
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {/* Today's work — one focal item with Send / Edit / Hold. */}
-              <TodayFeed
-                slug={slug}
-                isFresh={isFresh}
-                firstName={firstName}
-                onTellMeAboutLead={handleTellMeAboutLead}
-              />
-            </div>
+        // Clean chat-first hero. The agentic surfaces (morning story, focus
+        // card, draft inbox, today feed) moved off the chat root and now live
+        // on /chippi/today — reachable from the Chippi nav dropdown. The
+        // realtor lands here to TALK to Chippi; they go to /chippi/today to
+        // SEE what Chippi has been working on. Two surfaces, one job each.
+        //
+        // The composer is wrapped in a motion.div with layoutId so it
+        // animates from this centered position to the chat-state sticky
+        // bottom when the first message ships. Greeting fades in on mount
+        // and unmounts with the hero when the state flips.
+        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20">
+          <div className="w-full max-w-2xl">
+            <motion.h1
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: greeting ? 1 : 0, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+              className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-8 sm:mb-10"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
+              {greeting || ' '}
+            </motion.h1>
+            <motion.div
+              layoutId="chippi-composer"
+              layout
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {renderInput()}
+            </motion.div>
           </div>
-
-          {/* Docked composer — sticky to viewport bottom so the input stays
-              reachable as the realtor scrolls. The four suggestion chips
-              that used to sit above were a crutch (and ChatGPT removed
-              theirs for a reason). The composer's placeholder already
-              cues the verbs: "draft a follow-up, prep a tour, summarize
-              your day…" — trust the user to type. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
-            {renderInput()}
-          </div>
-        </>
+        </div>
       ) : (
         <>
           {/* Active thread */}
@@ -1259,9 +1241,15 @@ export function ChippiWorkspace({
               composer's right-slot (Send → Stop swap) so the abort affordance
               sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
-          {/* Docked input — sticky to viewport bottom (matches the empty
-              state's composer dock so the input never rides up with messages). */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          {/* Docked input. Shares `layoutId="chippi-composer"` with the
+              empty-state hero composer so framer-motion animates the
+              transition from centered → docked when the first message ships. */}
+          <motion.div
+            layoutId="chippi-composer"
+            layout
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
+          >
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">
@@ -1285,7 +1273,7 @@ export function ChippiWorkspace({
             ) : (
               renderInput()
             )}
-          </div>
+          </motion.div>
         </>
       )}
 
