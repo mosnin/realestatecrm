@@ -22,7 +22,7 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from errors import from_supabase_error, from_exception
 from security.context import AgentContext
-from tools.base import with_retry
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 # ---------------------------------------------------------------------------
@@ -210,6 +210,7 @@ async def get_intake_form(
 
 
 @function_tool
+@idempotent_tool
 async def add_intake_question(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
@@ -339,6 +340,7 @@ async def add_intake_question(
 
 
 @function_tool
+@idempotent_tool
 async def remove_intake_question(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
@@ -416,6 +418,7 @@ async def remove_intake_question(
 
 
 @function_tool
+@idempotent_tool
 async def update_intake_question(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
@@ -554,6 +557,7 @@ async def update_intake_question(
 
 
 @function_tool
+@idempotent_tool
 async def save_intake_form(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,

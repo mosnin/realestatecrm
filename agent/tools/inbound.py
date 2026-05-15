@@ -17,10 +17,12 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.base import idempotent_tool
 from tools.streaming import publish_event
 
 
 @function_tool
+@idempotent_tool
 async def process_inbound_message(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,

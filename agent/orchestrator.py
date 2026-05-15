@@ -119,9 +119,14 @@ async def pop_triggers(space_id: str) -> list[dict]:
             return []
         r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
         key = f"agent:triggers:{space_id}"
-        items = await r.lrange(key, 0, 9)  # up to 10 triggers per run
+        # Read up to 10 from the head, then trim only what we read. The old
+        # `lrange + delete` had two bugs: (1) a producer-side RPUSH between
+        # those two calls was silently wiped, (2) if there were more than 10
+        # pending, items 11+ were also deleted without being processed. LTRIM
+        # to len(items) leaves the overflow for the next call.
+        items = await r.lrange(key, 0, 9)
         if items:
-            await r.delete(key)
+            await r.ltrim(key, len(items), -1)
         parsed = []
         for item in (items or []):
             try:

@@ -82,8 +82,11 @@ async def analyze_portfolio(
 
     overdue_followup_count = sum(1 for c in contacts if _is_overdue(c))
 
-    rental_count = sum(1 for c in contacts if c.get("leadType") == "RENTAL")
-    buyer_count = sum(1 for c in contacts if c.get("leadType") == "BUYER")
+    # Contacts are stored lowercase ("rental" / "buyer") per the LeadType
+    # Literal in schemas.py and the TS contract — uppercase comparison
+    # silently zeroed both counts on every run.
+    rental_count = sum(1 for c in contacts if (c.get("leadType") or "").lower() == "rental")
+    buyer_count = sum(1 for c in contacts if (c.get("leadType") or "").lower() == "buyer")
     rental_pct = round(rental_count / contact_count * 100, 1) if contact_count else 0.0
     buyer_pct = round(buyer_count / contact_count * 100, 1) if contact_count else 0.0
 

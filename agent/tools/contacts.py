@@ -131,6 +131,7 @@ async def get_contact_activity(
 
 
 @function_tool
+@idempotent_tool
 async def create_contact(
     ctx: RunContextWrapper[AgentContext],
     name: str,

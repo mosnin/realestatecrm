@@ -210,6 +210,7 @@ async def update_deal(
 
 
 @function_tool
+@idempotent_tool
 async def advance_deal_stage(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str,
@@ -357,6 +358,7 @@ async def advance_deal_stage(
 
 
 @function_tool
+@idempotent_tool
 async def create_deal(
     ctx: RunContextWrapper[AgentContext],
     title: str,
@@ -554,6 +556,7 @@ async def create_deal(
 
 
 @function_tool
+@idempotent_tool
 async def request_deal_review(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str,

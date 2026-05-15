@@ -20,6 +20,7 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import idempotent_tool
 from tools.streaming import publish_event
 
 
@@ -32,6 +33,7 @@ def _parse_iso(value: str) -> datetime | None:
 
 
 @function_tool
+@idempotent_tool
 async def book_tour(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
