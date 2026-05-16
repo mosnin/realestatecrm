@@ -50,7 +50,69 @@ logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Model-fallback runner (KR2)
+# Per-tool stream-event translator.
+#
+# Mirrors the translate() in modal_app.py:chat_turn — same SDK events, but
+# instead of yielding SSE we hand the caller a {message, metadata} dict so
+# the autonomous runner can publish each tool call/result to Redis. This is
+# the legibility lift: the previous autonomous path logged the whole run as
+# one opaque step, so a sweep that failed at the 4th tool gave the broker
+# zero information about which tool failed.
+# ---------------------------------------------------------------------------
+
+def _translate_tool_event(event: object) -> dict | None:
+    """Map an Agents SDK stream event to a publishable payload, or None.
+
+    Skips token deltas, reasoning deltas, and any other event that isn't a
+    tool call or tool result — those are noise for the autonomous trace.
+    """
+    if type(event).__name__ != "RunItemStreamEvent":
+        return None
+    it = getattr(event, "item", None)
+    if it is None:
+        return None
+    ev_name = getattr(event, "name", "") or ""
+    item_type = getattr(it, "type", "") or type(it).__name__
+
+    if ev_name == "tool_called" or item_type in ("tool_call_item", "ToolCallItem"):
+        tool_name = (
+            getattr(it, "tool_name", None)
+            or getattr(getattr(it, "raw_item", None), "name", None)
+            or "tool"
+        )
+        raw_args = getattr(getattr(it, "raw_item", None), "arguments", None)
+        args_str = str(raw_args) if raw_args else ""
+        if len(args_str) > 200:
+            args_str = args_str[:199] + "…"
+        return {
+            "message": f"Calling {tool_name}",
+            "metadata": {"tool": tool_name, "phase": "start", "args": args_str},
+        }
+
+    if ev_name == "tool_output" or item_type in ("tool_call_output_item", "ToolCallOutputItem"):
+        tool_name = (
+            getattr(it, "tool_name", None)
+            or getattr(getattr(it, "raw_item", None), "name", None)
+            or "tool"
+        )
+        output = getattr(it, "output", None)
+        summary = "" if output is None else str(output)
+        if len(summary) > 300:
+            summary = summary[:299] + "…"
+        return {
+            "message": f"{tool_name} done",
+            "metadata": {"tool": tool_name, "phase": "complete", "summary": summary},
+        }
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Model-fallback runner.
+#
+# Streams the run via Runner.run_streamed (same path chat_turn uses) so the
+# orchestrator can publish per-tool events live. The on_event callback is
+# fire-and-forget per event so a slow Redis push never throttles the agent.
 # ---------------------------------------------------------------------------
 
 async def _run_with_fallback(
@@ -58,20 +120,28 @@ async def _run_with_fallback(
     input_data,
     run_config: RunConfig,
     context,
+    on_event=None,
 ) -> object:
     """Run the agent, falling back through _FALLBACK_MODELS on 429 errors.
 
     The agent's model attribute is patched per attempt. On exhaustion raises
     RuntimeError so the caller can surface a clean error rather than a bare
-    exception.
+    exception. `on_event` receives each SDK stream event; it should not raise.
     """
     last_exc: Exception | None = None
     for i, model in enumerate(_FALLBACK_MODELS):
         try:
             agent.model = model
-            result = await Runner.run(
+            result = Runner.run_streamed(
                 agent, input=input_data, run_config=run_config, context=context
             )
+            async for event in result.stream_events():
+                if on_event is not None:
+                    try:
+                        on_event(event)
+                    except Exception:
+                        # Telemetry must never break the run.
+                        pass
             return result
         except (RateLimitError, APIStatusError) as exc:
             status = getattr(exc, "status_code", None)
@@ -312,9 +382,28 @@ async def run_agent_for_space(
     total_tokens = 0
     final_summary: str | None = None
 
+    # Per-tool stream emitter — publishes each tool call/result to Redis so
+    # the realtor's activity feed and the broker dashboard see what Chippi
+    # actually did, not just one opaque "I ran a sweep" summary. Fire-and-
+    # forget so the HTTP round-trip never throttles the SDK loop.
+    def on_event(event: object) -> None:
+        payload = _translate_tool_event(event)
+        if payload is None:
+            return
+        asyncio.create_task(
+            publish_event(
+                ctx,
+                "action",
+                payload["message"],
+                metadata=payload["metadata"],
+                agent_type="chippi",
+            )
+        )
+
     try:
         # Run with automatic fallback through cheaper models on a 429.
-        result = await _run_with_fallback(chippi, prompt, run_config, ctx)
+        # Streaming mode so on_event fires per tool call / result.
+        result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
 
         usage = getattr(result, "usage", None)
         if usage:
