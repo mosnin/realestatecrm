@@ -1048,40 +1048,40 @@ export function ChippiWorkspace({
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           One moment.
         </div>
-      ) : isEmpty ? (
-        // Clean chat-first hero. The agentic surfaces (morning story, focus
-        // card, draft inbox, today feed) moved off the chat root and now live
-        // on /chippi/today — reachable from the Chippi nav dropdown. The
-        // realtor lands here to TALK to Chippi; they go to /chippi/today to
-        // SEE what Chippi has been working on. Two surfaces, one job each.
-        //
-        // The composer is wrapped in a motion.div with layoutId so it
-        // animates from this centered position to the chat-state sticky
-        // bottom when the first message ships. Greeting fades in on mount
-        // and unmounts with the hero when the state flips.
-        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20">
-          <div className="w-full max-w-2xl">
-            <motion.h1
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: greeting ? 1 : 0, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
-              className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-8 sm:mb-10"
-              style={{ fontFamily: 'var(--font-title)' }}
-            >
-              {greeting || ' '}
-            </motion.h1>
-            <motion.div
-              layoutId="chippi-composer"
-              layout
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {renderInput()}
-            </motion.div>
-          </div>
-        </div>
       ) : (
         <>
-          {/* Active thread */}
+          <AnimatePresence mode="popLayout">
+            {isEmpty && (
+              <motion.div
+                key="chippi-hero"
+                exit={{ opacity: 0, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } }}
+                className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
+              >
+                <div className="w-full max-w-2xl">
+                  <motion.h1
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: greeting ? 1 : 0, y: 0 }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-8 sm:mb-10"
+                    style={{ fontFamily: 'var(--font-title)' }}
+                  >
+                    {greeting || ' '}
+                  </motion.h1>
+                  <motion.div
+                    layoutId="chippi-composer"
+                    layout
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {renderInput()}
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!isEmpty && (
+            <>
+              {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36">
@@ -1274,6 +1274,8 @@ export function ChippiWorkspace({
               renderInput()
             )}
           </motion.div>
+            </>
+          )}
         </>
       )}
 
