@@ -3,11 +3,12 @@
 /**
  * /chippi/drafts — pending drafts the realtor needs to review.
  *
- * Wraps the existing AgentDraftInbox in a dedicated page so it's reachable
- * from the Chippi nav-dropdown without being buried inside the full-day
- * dashboard. (The /chippi/approvals route is separate — that's the
- * AgentTask paused-state queue from the orchestrator, not the AgentDraft
- * inbox the realtor approves and sends.)
+ * Hero + AgentDraftInbox. The /chippi/approvals route is separate: that's
+ * the orchestrator's AgentTask paused-state queue, not the AgentDraft
+ * inbox the realtor signs off on.
+ *
+ * /chippi/today shows only a compact "X drafts waiting → review" summary
+ * that links here. This page is the dedicated queue.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -41,6 +42,17 @@ export default async function ChippiDraftsPage({
   return (
     <div className="h-full overflow-y-auto">
       <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24">
+        <header className="mb-8 sm:mb-10">
+          <h1
+            className="text-[2rem] sm:text-[2.5rem] tracking-tight leading-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Drafts
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md">
+            What Chippi drafted for you. Approve, edit, or skip — nothing leaves without your sign-off.
+          </p>
+        </header>
         <AgentDraftInbox slug={slug} />
       </div>
     </div>
