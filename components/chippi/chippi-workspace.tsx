@@ -1062,11 +1062,28 @@ export function ChippiWorkspace({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: greeting ? 1 : 0, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
-                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-8 sm:mb-10"
+                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-6 sm:mb-8"
                     style={{ fontFamily: 'var(--font-title)' }}
                   >
                     {greeting || ' '}
                   </motion.h1>
+                  {/* Day-one guidance — only for users with zero history.
+                      Without this the empty hero is just a greeting + blank
+                      composer, which is too sparse for first-run when the
+                      realtor doesn't yet know what Chippi can do. */}
+                  {isFresh && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+                      className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
+                    >
+                      Type below to get started — or browse{' '}
+                      <span className="text-foreground/70">Full day</span>,{' '}
+                      <span className="text-foreground/70">Drafts</span>, and{' '}
+                      <span className="text-foreground/70">Activity</span> from the sidebar.
+                    </motion.p>
+                  )}
                   <motion.div
                     layoutId="chippi-composer"
                     layout

@@ -4,6 +4,7 @@ import { syncDeal, deleteDealVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -344,6 +345,17 @@ export async function PATCH(
 
     syncDeal({ ...deal, stage: deal.stage ?? undefined }).catch(console.error);
     void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
+
+    // Fire the agent trigger on stage transitions so Chippi reacts in real
+    // time to a deal moving stages (e.g. drafts a "we're under contract" SMS
+    // to the contact, or marks the win/loss). Never fails the response.
+    if (stageChanged) {
+      try {
+        await fireAgentTrigger({ spaceId: space.id, event: 'deal_stage_changed', dealId: id });
+      } catch (e) {
+        console.error('[deals/PATCH] agent trigger failed:', e);
+      }
+    }
 
     return NextResponse.json(deal);
   } catch (err) {

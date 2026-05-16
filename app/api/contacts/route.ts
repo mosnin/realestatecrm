@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
+import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import type { Contact } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -138,6 +139,13 @@ export async function POST(req: NextRequest) {
       tags: tagsVal,
     });
   } catch (e) { console.error('[contacts] notification failed:', e); }
+
+  // Fire the agent trigger so Chippi can act on the new lead in real time
+  // instead of waiting for the 4-hour cron sweep. Never lets a trigger
+  // failure fail the response — the contact write is what was requested.
+  try {
+    await fireAgentTrigger({ spaceId: space.id, event: 'new_lead', contactId: contact.id });
+  } catch (e) { console.error('[contacts] agent trigger failed:', e); }
 
   return NextResponse.json(contact, { status: 201 });
 }
