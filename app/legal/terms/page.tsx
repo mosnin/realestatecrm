@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Terms of Service | Chippi',
-  description: 'Terms of Service for Chippi, a B2B SaaS real estate CRM.',
+  description: 'Terms of Service for Chippi, a B2B SaaS agentic OS for real estate agents and brokerages.',
 };
 
 export default function TermsPage() {

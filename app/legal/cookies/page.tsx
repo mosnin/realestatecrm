@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Cookie Policy | Chippi',
-  description: 'Cookie Policy for Chippi, a B2B SaaS real estate CRM.',
+  description: 'Cookie Policy for Chippi, a B2B SaaS agentic OS for real estate agents and brokerages.',
 };
 
 export default function CookiePolicyPage() {

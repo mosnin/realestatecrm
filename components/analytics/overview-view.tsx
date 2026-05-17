@@ -32,7 +32,7 @@ const dealsConfig = {
 
 export function OverviewView({ data }: { data: OverviewData }) {
   const statusSentence = data.totalContacts > 0
-    ? `${data.totalContacts} ${data.totalContacts === 1 ? 'person' : 'people'} in the CRM, ${data.totalDeals} active ${data.totalDeals === 1 ? 'deal' : 'deals'}.`
+    ? `${data.totalContacts} ${data.totalContacts === 1 ? 'person' : 'people'} in your book, ${data.totalDeals} active ${data.totalDeals === 1 ? 'deal' : 'deals'}.`
     : 'No data yet — start by adding your first contact.';
 
   return (
@@ -48,7 +48,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="New people" value={data.totalLeads} sub="all time" />
-        <StatCell label="Total people" value={data.totalContacts} sub="in CRM" />
+        <StatCell label="Total people" value={data.totalContacts} sub="in your book" />
         <StatCell label="Active deals" value={data.totalDeals} />
         <StatCell
           label="Pipeline value"

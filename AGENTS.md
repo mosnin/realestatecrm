@@ -8,7 +8,9 @@ All AI agents must read and follow this file before making any changes.
 
 ## 1. Project summary
 
-Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows. The product emphasizes speed, clarity, and a polished brand experience for solo realtors handling renter and leasing leads.
+Chippi is an **agentic operating system for U.S. real estate agents and brokerages.** The realtor's book of business — contacts, deals, stages, tours, applications — is the workspace; Chippi is an autonomous agent that works inside it on the realtor's behalf, with sign-off only where it's needed. The launch wedge is solo realtors handling renter and leasing leads; the product emphasizes speed, clarity, and a polished brand experience.
+
+CRM-style data structures (contacts, deals, pipelines) are the substrate, not the product. New work should make Chippi do **more** on the realtor's behalf — not add more configuration surfaces the realtor has to operate themselves.
 
 **Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/schema.sql`), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
 
@@ -22,11 +24,11 @@ The launch wedge is narrow and intentional:
 
 - **Who**: new solo realtors in the U.S.
 - **What**: renter and leasing lead qualification
-- **How**: fast setup, intake link activation, explainable AI-assisted scoring, lightweight CRM
+- **How**: fast setup, intake link activation, explainable AI-assisted scoring, an agent that actually does the work
 - **Activation event**: intake link generation
 - **Retention signal**: completed applications and repeated workflow use
 
-Do **not** treat this repo as a generic CRM expansion project unless explicitly instructed.
+Do **not** treat this repo as a generic CRM expansion project. The agentic OS positioning means new work should make Chippi act on the realtor's behalf, not add configuration surfaces the realtor has to operate themselves.
 
 ---
 
@@ -81,7 +83,7 @@ Do **not** modify these unless the task explicitly requires it:
 | 3 | AI prompts | `lib/ai.ts` (system prompt, provider routing) |
 | 4 | Scoring logic | `lib/lead-scoring.ts` (prompt, schema, thresholds, fallback) |
 | 5 | OpenAI / model configuration | Model names, temperature, response format in `lib/lead-scoring.ts` and `lib/ai.ts` |
-| 6 | CRM state logic | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
+| 6 | Workspace state (contacts, deals, stages) | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
 | 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
 | 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
 | 9 | Database schema and migrations | `supabase/schema.sql`, `supabase/migrations/*` |

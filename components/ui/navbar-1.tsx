@@ -41,7 +41,7 @@ const featureLinks = [
   {
     href: "/features/crm",
     icon: Users,
-    name: "Contact CRM",
+    name: "Contacts",
     description: "Full profiles, history & follow-ups",
   },
   {

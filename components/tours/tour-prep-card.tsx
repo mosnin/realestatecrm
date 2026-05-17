@@ -122,10 +122,10 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
               </div>
             )}
 
-            {/* CRM highlights */}
+            {/* Contact highlights */}
             {prep.contactHighlights.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">CRM Profile</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Contact profile</p>
                 <div className="space-y-0.5">
                   {prep.contactHighlights.map((h, i) => (
                     <p key={i} className="text-xs text-muted-foreground">{h}</p>

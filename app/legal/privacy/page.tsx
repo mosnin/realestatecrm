@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Privacy Policy | Chippi',
-  description: 'Privacy Policy for Chippi, a B2B SaaS real estate CRM.',
+  description: 'Privacy Policy for Chippi, a B2B SaaS agentic OS for real estate agents and brokerages.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">1. Who We Are</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>1.1. Chippi Inc. operates a B2B SaaS real estate CRM that serves realtors and brokerages. Our features include intake forms, AI lead scoring, deal pipelines, tour scheduling, voice AI assistant, MCP server integration, and brokerage team management.</p>
+          <p>1.1. Chippi Inc. operates a B2B SaaS agentic OS for real estate agents and brokerages. The platform combines an autonomous AI agent with intake forms, AI lead scoring, deal pipelines, tour scheduling, voice AI, MCP server integration, and brokerage team management.</p>
           <p>1.2. With respect to Subscriber Data (including Applicant data), Chippi acts as a <strong className="text-foreground">Data Processor</strong>. We process data on behalf of our Subscribers (realtors and brokerages), who are the <strong className="text-foreground">Data Controllers</strong>.</p>
           <p>1.3. For data we collect directly about Subscribers for account and billing purposes, Chippi acts as the Data Controller.</p>
         </div>

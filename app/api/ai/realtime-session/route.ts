@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 /**
  * POST /api/ai/realtime-session
- * Mints an ephemeral OpenAI Realtime token and returns it with CRM context
+ * Mints an ephemeral OpenAI Realtime token and returns it with workspace context
  * for the session instructions. The browser uses this token to connect
  * directly to OpenAI's Realtime API via WebRTC.
  */
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Build CRM context for the voice session
+  // Build workspace context for the voice session
   const [{ data: contacts }, { data: deals }, { data: notes }, { data: tours }, calResult] = await Promise.all([
     supabase
       .from('Contact')
@@ -104,12 +104,12 @@ export async function POST(req: Request) {
   ).join('\n');
 
   const instructions = [
-    `You are Chip, an intelligent voice assistant for the real estate CRM workspace "${space.name}".`,
+    `You are Chippi, the realtor's agentic workspace assistant for "${space.name}".`,
     `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
     `You help the agent manage their rental and buyer leads, deals, tours, notes, calendar, and follow-ups through natural conversation.`,
     `Buyer stages: Lead → Pre-Approved → Showings → Offer → Under Contract → Closing. Rental stages: Qualification → Tour → Application.`,
     `Be concise and conversational — you're speaking, not writing. Keep responses under 3 sentences unless asked for detail.`,
-    `Only reference data from the CRM context below. Never fabricate names, numbers, or details.`,
+    `Only reference data from the workspace context below. Never fabricate names, numbers, or details.`,
     `When asked about "recent" data, reference contacts and deals with the most recent createdAt dates.`,
     ``,
     contactCtx ? `Contacts:\n${contactCtx}` : 'No contacts yet.',

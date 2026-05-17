@@ -96,7 +96,7 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
           id: 'contact-created',
           kind: 'system',
           type: 'contact_created',
-          content: 'Contact was added to the CRM',
+          content: 'Contact was added to your workspace',
           metadata: null,
           createdAt: contactCreatedAt,
         });

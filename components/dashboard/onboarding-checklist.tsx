@@ -72,7 +72,7 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
     {
       id: 'first-contact',
       label: 'Add your first client',
-      description: 'Import or create a contact in your CRM',
+      description: 'Import or create your first contact',
       href: `${base}/contacts`,
       icon: Users,
       completed: hasContacts,
