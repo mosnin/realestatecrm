@@ -39,6 +39,7 @@ from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
 from tools.streaming import publish_event
+from trajectories import normalize_tool_call, record_trajectory
 
 # ---------------------------------------------------------------------------
 # Model fallback list — fall through these on 429s.
@@ -257,15 +258,24 @@ def _build_opening_prompt(
             "most three things."
         )
 
-    return (
-        f"AUTONOMOUS RUN\n"
-        f"Workspace: {space.name}\n"
-        f"Current time: {now}\n\n"
-        f"{triggers_block}\n\n"
-        f"{memory_context}\n\n"
+    # Order optimized for OpenAI implicit prompt caching. Cache hits on the
+    # longest common prefix, so anything that changes per-run (current time,
+    # triggers) moves to the BOTTOM of the user message. Everything above
+    # that line caches across runs of the same space — including the memory
+    # block, which is the biggest payload that's stable run-to-run.
+    static_header = (
+        "AUTONOMOUS RUN\n"
         "Take action where it's warranted. Draft, set follow-ups, store facts. "
         "Don't reply with chat text — log_activity_run with a one-line summary "
         "at the end."
+    )
+    return (
+        f"{static_header}\n\n"
+        f"Workspace: {space.name}\n\n"
+        f"{memory_context}\n\n"
+        f"---\n"
+        f"Current time: {now}\n\n"
+        f"{triggers_block}"
     ).strip()
 
 
@@ -288,6 +298,12 @@ async def run_agent_for_space(
         daily token budget.
     """
     run_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc)
+    # Tool-call accumulator for the trajectory record written at end-of-run.
+    # Filled by on_event below; passed to record_trajectory on every exit
+    # path (success, error, guardrail-blocked). See agent/trajectories.py
+    # for why this materialized record exists alongside the per-system logs.
+    trajectory_tool_calls: list[dict] = []
     log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
 
     # Respect the on/off switch. The realtor can pause Chippi from the header;
@@ -386,10 +402,15 @@ async def run_agent_for_space(
     # the realtor's activity feed and the broker dashboard see what Chippi
     # actually did, not just one opaque "I ran a sweep" summary. Fire-and-
     # forget so the HTTP round-trip never throttles the SDK loop.
+    #
+    # Also captures the tool call into the trajectory accumulator. The two
+    # paths share the same _translate_tool_event payload so the realtor's
+    # live view and the offline trajectory record stay in lockstep.
     def on_event(event: object) -> None:
         payload = _translate_tool_event(event)
         if payload is None:
             return
+        trajectory_tool_calls.append(normalize_tool_call(payload))
         asyncio.create_task(
             publish_event(
                 ctx,
@@ -427,6 +448,17 @@ async def run_agent_for_space(
             f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
             agent_type="chippi",
         )
+        await record_trajectory(
+            run_id=run_id,
+            space_id=space.id,
+            started_at=started_at,
+            status="guardrail_blocked",
+            trigger=(triggers[0] if triggers else None),
+            model=chippi.model,
+            total_tokens=total_tokens,
+            tool_calls=trajectory_tool_calls,
+            extra={"pending_drafts": pending},
+        )
         return
 
     except Exception as exc:
@@ -449,6 +481,17 @@ async def run_agent_for_space(
             )
         except Exception:
             log.warning("agent_run_failure_memory_write_failed")
+        await record_trajectory(
+            run_id=run_id,
+            space_id=space.id,
+            started_at=started_at,
+            status="error",
+            trigger=(triggers[0] if triggers else None),
+            model=chippi.model,
+            total_tokens=total_tokens,
+            tool_calls=trajectory_tool_calls,
+            extra={"error": str(exc)[:500]},
+        )
         return
 
     if total_tokens > 0:
@@ -470,5 +513,16 @@ async def run_agent_for_space(
         ctx, "complete",
         f"Run complete — {total_tokens:,} tokens used",
         metadata={"totalTokens": total_tokens},
+    )
+    await record_trajectory(
+        run_id=run_id,
+        space_id=space.id,
+        started_at=started_at,
+        status="completed",
+        trigger=(triggers[0] if triggers else None),
+        model=chippi.model,
+        total_tokens=total_tokens,
+        tool_calls=trajectory_tool_calls,
+        final_summary=final_summary,
     )
     log.info("agent_run_finished", total_tokens=total_tokens)

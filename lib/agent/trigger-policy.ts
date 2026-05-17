@@ -3,6 +3,8 @@ const VALID_EVENTS = [
   'tour_completed',
   'deal_stage_changed',
   'application_submitted',
+  'inbound_message',
+  'goal_completed',
 ] as const;
 
 export type TriggerEvent = typeof VALID_EVENTS[number];

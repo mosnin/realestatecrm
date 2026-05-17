@@ -277,16 +277,25 @@ def make_chippi_agent(
     configured.
 
     `workspace_info` injects a per-run workspace block (intake URL,
-    workspace name) at the top of the system prompt so the model can
-    drop the realtor's intake link into any outbound message without
-    a tool call.
+    workspace name) so the model can drop the realtor's intake link into
+    any outbound message without a tool call.
+
+    Assembly order matters for OpenAI's implicit prompt cache. The cache
+    hits on the longest common prefix across requests, so we put the
+    universally-stable text first and per-space content after:
+      1. CHIPPI_INSTRUCTIONS — identical across every space + every run.
+         Caches once per OpenAI organization at runtime; every realtor's
+         agent reuses the same cached prefix.
+      2. workspace_info — per-space, stable until the intake URL or name
+         changes. Caches per-space across runs.
+      3. ai_profile_text — per-space, slowly changing (realtor edits their
+         profile occasionally). Caches per-space until they edit it.
     """
-    parts: list[str] = []
+    parts: list[str] = [CHIPPI_INSTRUCTIONS]
     if workspace_info:
         parts.append(workspace_info)
     if ai_profile_text:
         parts.append(ai_profile_text)
-    parts.append(CHIPPI_INSTRUCTIONS)
     instructions = "\n\n".join(parts)
     base_tools = [
         # Contacts
