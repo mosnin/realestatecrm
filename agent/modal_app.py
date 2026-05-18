@@ -14,6 +14,20 @@ Deployment:
 
 Secrets: a single Modal secret named "chippi-secrets" containing all env
 vars listed in config.py.
+
+Sandbox economics — why we stay on Modal (audit, 2026-Q2):
+  Chippi uses @app.function + @modal.fastapi_endpoint — Modal's STANDARD
+  tier ($0.047/vCPU-hr), not modal.Sandbox tier ($0.142/vCPU-hr). A
+  prior audit conflated the two and recommended migration to Daytona
+  ($0.0504/vCPU-hr) on a ~3x cost-savings basis that did not exist.
+  At standard pricing Modal is cheaper than Daytona, simpler operationally
+  (fastapi_endpoint is built in; Daytona would need a fronting FastAPI
+  server on Fly/Render plus separate sandbox dispatch), and image-layer
+  caching is more mature. Re-evaluate only on: GPU adoption (Modal still
+  wins), Modal raising standard pricing >50%, or Chippi adding hostile-
+  code execution (which would push us onto sandbox tier and change the
+  math). Detailed model + traffic shapes for 10/100/1000 realtor scales
+  in commit message of this change.
 """
 
 from __future__ import annotations

@@ -1,98 +1,48 @@
 /**
- * SDK-native sub-agent factories.
+ * Specialist sub-agent factories. Delegates to the SKILL.md loader.
  *
- * The custom loop's `delegate_to_subagent` (lib/ai-tools/skills/*) hand-rolls
- * routing, system-prompt prefixing, and a tool allowlist per skill. The
- * `@openai/agents` SDK gives all of that for free via `Agent.asTool()`:
- * the parent agent calls a tool, the tool spins up the sub-agent with its
- * own context window + tool subset, returns the final text. Same boundary,
- * a fraction of the code.
+ * Before commit 8d51b97: each specialist's `name`, `instructions`, and
+ * tool list lived as hand-coded TS strings here. New skills meant a new
+ * exported function and inline copy that wasn't editable by non-engineers.
  *
- * This module builds the two existing skills as SDK Agents. The chat
- * runtime (`sdk-chat.ts`) attaches them via `.asTool()` so the model
- * picks `analyze_pipeline` / `research_person` instead of the generic
- * `delegate_to_subagent` indirection.
+ * After: each specialist is a `lib/ai-tools/skills/<slug>/SKILL.md` with
+ * Anthropic Agent Skills-style frontmatter. The exported functions below
+ * are the unchanged public surface that `sdk-chat.ts` (and tests) call.
+ * Internally they ask the loader to build the Agent from the SKILL.md.
  *
- * The custom loop keeps its own `delegate_to_subagent`. We don't wire it
- * into the SDK runtime — the SDK path uses asTool handoffs and never
- * touches the router.
+ * Why preserve these wrappers instead of having `sdk-chat.ts` call
+ * `buildSkillAgent('pipeline-analyst', ...)` directly: backwards-compat
+ * keeps the diff small. If a future commit ever inlines them, the loader
+ * is the source of truth either way.
  */
 
-import { Agent } from '@openai/agents';
-import { toSdkTool } from './sdk-bridge';
-import { ALL_TOOLS } from './tools';
-import type { ToolContext, ToolDefinition } from './types';
+import type { Agent } from '@openai/agents';
+import { buildSkillAgent } from './skills/loader';
+import type { ToolContext } from './types';
 
-const DEFAULT_MODEL = 'gpt-5-mini';
-
-/**
- * Pull tools by name from `ALL_TOOLS`. Unknown names throw at build time —
- * a typo here is a boot failure, not a silent runtime miss.
- */
-function pickTools(names: readonly string[]): ToolDefinition[] {
-  const byName = new Map(ALL_TOOLS.map((t) => [t.name, t]));
-  return names.map((n) => {
-    const t = byName.get(n);
-    if (!t) throw new Error(`sdk-skills: unknown tool "${n}"`);
-    return t;
-  });
+/** Pipeline analyst — surveys the deal pipeline and reports stuck deals,
+ *  quiet hot persons, and overdue follow-ups in one paragraph. */
+export function buildPipelineAnalystAgent(
+  ctx: ToolContext,
+  opts: { model?: string } = {},
+): Agent {
+  return buildSkillAgent('pipeline-analyst', ctx, opts);
 }
 
-/**
- * Pipeline analyst — surveys the deal pipeline and reports stuck deals,
- * quiet hot persons, and overdue follow-ups in one paragraph.
- */
-export function buildPipelineAnalystAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
-  const tools = pickTools([
-    'pipeline_summary',
-    'find_stuck_deals',
-    'find_quiet_hot_persons',
-    'find_overdue_followups',
-    'find_deal',
-  ]).map((t) => toSdkTool(t, ctx));
-
-  return new Agent({
-    name: 'pipeline_analyst',
-    instructions:
-      'You analyze the pipeline. Surface stuck deals, quiet hot persons, and overdue follow-ups. Return one paragraph the realtor can act on.',
-    tools,
-    model: opts.model ?? DEFAULT_MODEL,
-  });
+/** Contact researcher — digs up everything we know about one person and
+ *  recommends the next reasonable action. */
+export function buildContactResearcherAgent(
+  ctx: ToolContext,
+  opts: { model?: string } = {},
+): Agent {
+  return buildSkillAgent('contact-researcher', ctx, opts);
 }
 
-/**
- * Contact researcher — digs up everything we know about one person and
- * recommends the next reasonable action.
- */
-export function buildContactResearcherAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
-  const tools = pickTools([
-    'find_person',
-    'find_deal',
-    'recall_history',
-  ]).map((t) => toSdkTool(t, ctx));
-
-  return new Agent({
-    name: 'contact_researcher',
-    instructions:
-      'You research a person across their notes, activities, and deals. Return one paragraph naming the next reasonable action.',
-    tools,
-    model: opts.model ?? DEFAULT_MODEL,
-  });
-}
-
-/**
- * Planner — decomposes a complex user task into a concrete multi-step
- * execution plan and surfaces it to the UI via `create_plan` before any
- * domain tools run.
- */
-export function buildPlannerAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
-  const tools = pickTools(['create_plan']).map((t) => toSdkTool(t, ctx));
-
-  return new Agent({
-    name: 'planner',
-    instructions:
-      'Given a complex user task, break it into 3-7 concrete steps. Call create_plan with the full task description and an array of steps. Each step needs a short title (≤6 words) and a one-sentence description of what will happen. Be specific to the actual task — no generic steps.',
-    tools,
-    model: opts.model ?? DEFAULT_MODEL,
-  });
+/** Planner — decomposes a complex user task into a 3-7 step execution
+ *  plan and surfaces it via `create_plan` before any domain tools run. */
+export function buildPlannerAgent(
+  ctx: ToolContext,
+  opts: { model?: string } = {},
+): Agent {
+  return buildSkillAgent('planner', ctx, opts);
 }
