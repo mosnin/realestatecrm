@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -247,10 +248,50 @@ async def save_memory(
         LIMIT 1
     """
 
+    # Semantic dedup — feature-flagged because the failure mode (over-
+    # merging two distinct facts that share vocabulary) is hard to detect
+    # without an eval. Off by default; flip AGENT_MEMORY_SEMANTIC_DEDUP=1
+    # when ready to validate. When on, before the structural-key check we
+    # look for an existing memory in this space + same (entityType,
+    # entityId) with cosine similarity ≥ 0.92 to the new content. If
+    # found, we update that row instead. Threshold is intentionally
+    # conservative (0.85 is the Mem0 default; we start higher) — the
+    # cost of false-merge here is loss of a real fact, not a duplicate.
+    # The (entity_type, entity_id) scope keeps blast radius narrow:
+    # facts about different contacts can never accidentally merge.
+    semantic_dedup_enabled = os.environ.get("AGENT_MEMORY_SEMANTIC_DEDUP") == "1"
+    semantic_match_id: str | None = None
+    if semantic_dedup_enabled and vec is not None and entity_type and entity_id:
+        try:
+            similar = await search_similar(
+                space_id=space_id,
+                query=content,
+                limit=1,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                min_similarity=0.92,
+            )
+            if similar:
+                semantic_match_id = similar[0]["id"]
+                logger.info(
+                    "save_memory: semantic dedup matched existing row %s "
+                    "(space %s, %s/%s)",
+                    semantic_match_id, space_id, entity_type, entity_id,
+                )
+        except Exception as e:
+            # A dedup search failure must never block the save. Worst
+            # case we get a duplicate row, which the kill switch and
+            # the structural check already guard against in most paths.
+            logger.warning("save_memory: semantic dedup search failed: %s", e)
+
     async with pool.acquire() as conn:
         existing = await conn.fetchrow(
             check_sql, space_id, entity_type, entity_id, memory_type
         )
+        # Semantic dedup wins over structural — if both fire, the semantic
+        # match is the "this is the same fact, different phrasing" case.
+        if semantic_match_id and (not existing or existing["id"] != semantic_match_id):
+            existing = {"id": semantic_match_id}
 
         if existing:
             # UPDATE the existing row: refresh content, importance, embedding,

@@ -369,6 +369,7 @@ export async function POST(req: NextRequest) {
       { channel: sendBody.channel, subject: sendBody.channel === 'email' ? sendBody.subject! : null, content: sendBody.body.trim() },
       contact,
       space.name,
+      { spaceId: space.id, userId },
     );
 
     const finalStatus = deliveryResult.sent ? 'sent' : 'approved';

@@ -114,7 +114,11 @@ export async function chatWithRAG(
   let priorityDealIds = new Set<string>();
   try {
     const queryVector = await embedText(queryText);
-    const results = await searchVectors(spaceId, queryVector, 8);
+    // Pass queryText alongside the vector so searchVectors runs the
+    // hybrid RPC (cosine + BM25 RRF). Cosine alone loses to exact-string
+    // matches on addresses, MLS numbers, names — exactly the kinds of
+    // tokens realtors ask for. queryText is the realtor's literal utterance.
+    const results = await searchVectors(spaceId, queryVector, 8, queryText);
     for (const r of results) {
       if (r.entity_type === 'contact') priorityContactIds.add(r.entity_id);
       else if (r.entity_type === 'deal') priorityDealIds.add(r.entity_id);
