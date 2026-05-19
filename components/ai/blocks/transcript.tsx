@@ -5,6 +5,7 @@ import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { TextBlockView } from './text-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
+import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
@@ -78,22 +79,35 @@ export function Transcript({
     }
   }
 
-  // Group consecutive tool_call blocks so 2+ collapse into one ToolGroup
-  // header (Claude / ChatGPT pattern). Single-tool runs keep the existing
-  // per-block view — its inline rich-data cards (contacts / deals / tours /
-  // properties) read better solo than buried under a collapsed group.
+  // Group consecutive non-subagent tool_call blocks so 2+ collapse into one
+  // ToolGroup header (Claude / ChatGPT pattern). Single-tool runs keep the
+  // existing per-block view — its inline rich-data cards (contacts / deals /
+  // tours / properties) read better solo than buried under a collapsed group.
+  //
+  // Subagents (analyze_pipeline, research_person, planner) break the run and
+  // get their own one-line "Completed Subagent · <task>" row. They're
+  // conceptually distinct from regular tools so they're never grouped.
   type RenderItem =
     | { kind: 'text'; block: Extract<MessageBlock, { type: 'text' }>; originalIndex: number }
     | { kind: 'permission'; block: Extract<MessageBlock, { type: 'permission' }> }
     | { kind: 'tool-single'; block: ToolCallBlock }
-    | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string };
+    | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
+    | { kind: 'subagent'; block: ToolCallBlock };
 
   const items: RenderItem[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (block.type === 'tool_call') {
+      if (isSubagentTool(block.name)) {
+        items.push({ kind: 'subagent', block });
+        continue;
+      }
       const run: ToolCallBlock[] = [block];
-      while (i + 1 < blocks.length && blocks[i + 1].type === 'tool_call') {
+      while (
+        i + 1 < blocks.length &&
+        blocks[i + 1].type === 'tool_call' &&
+        !isSubagentTool((blocks[i + 1] as ToolCallBlock).name)
+      ) {
         run.push(blocks[i + 1] as ToolCallBlock);
         i++;
       }
@@ -140,6 +154,14 @@ export function Transcript({
                 key={item.groupId}
                 blocks={item.blocks}
                 liveCallIds={liveCallIds}
+              />
+            );
+          case 'subagent':
+            return (
+              <SubagentBlockView
+                key={`subagent-${item.block.callId}`}
+                block={item.block}
+                live={liveCallIds?.has(item.block.callId)}
               />
             );
           case 'permission':
