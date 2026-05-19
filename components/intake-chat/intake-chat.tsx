@@ -406,15 +406,55 @@ export function IntakeChat({
     }
   }
 
+  // Avatar repetition rule: show the realtor's avatar on the FIRST
+  // assistant turn only. The shell header already establishes who's
+  // speaking; repeating the same purple circle on every question reads
+  // as decoration, not identity. Subsequent assistant turns keep the
+  // indent so the conversational column stays aligned.
+  let firstAssistantSeen = false;
+
+  // Progress: count of visible questions vs how many the lead has
+  // answered (or actively skipped). Stays at top-right so the lead
+  // always has an answer to "how much longer is this?" without breaking
+  // the chat rhythm.
+  const totalQuestions = questionList.filter((q) =>
+    evaluateVisibility(q.visibleWhen, answers),
+  ).length;
+  const answeredCount = Object.keys(answers).length;
+  const showProgress =
+    phase === 'asking' && totalQuestions > 0 && answeredCount < totalQuestions;
+
   return (
     <div className="space-y-8">
-      {turns.map((turn) =>
-        turn.role === 'assistant' ? (
-          <AssistantTurn key={turn.id} text={turn.text} agentPhoto={agentPhoto} agentName={agentName} accentColor={customization.accentColor} />
-        ) : (
-          <UserTurn key={turn.id} text={turn.text} />
-        ),
+      {showProgress && (
+        <div className="flex items-center justify-end -mb-4 pt-1">
+          <p
+            className="text-[11px] tabular-nums text-muted-foreground/70"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            Question {answeredCount + 1} of {totalQuestions}
+          </p>
+        </div>
       )}
+
+      {turns.map((turn) => {
+        if (turn.role === 'assistant') {
+          const showAvatar = !firstAssistantSeen;
+          firstAssistantSeen = true;
+          return (
+            <AssistantTurn
+              key={turn.id}
+              text={turn.text}
+              agentPhoto={agentPhoto}
+              agentName={agentName}
+              accentColor={customization.accentColor}
+              showAvatar={showAvatar}
+            />
+          );
+        }
+        return <UserTurn key={turn.id} text={turn.text} />;
+      })}
 
       {phase === 'asking' && currentQuestion && (
         <CurrentQuestion
@@ -520,11 +560,16 @@ function AssistantTurn({
   agentPhoto,
   agentName,
   accentColor,
+  showAvatar,
 }: {
   text: string;
   agentPhoto?: string | null;
   agentName?: string;
   accentColor: string;
+  /** True on the first assistant turn only. Subsequent turns render an
+   *  avatar-sized spacer so the column stays aligned without repeating
+   *  the speaker's identity decor. */
+  showAvatar: boolean;
 }) {
   return (
     <motion.div
@@ -532,12 +577,17 @@ function AssistantTurn({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
       className="flex items-start gap-3"
+      aria-live="polite"
     >
-      <AssistantAvatar
-        agentPhoto={agentPhoto}
-        agentName={agentName}
-        accentColor={accentColor}
-      />
+      {showAvatar ? (
+        <AssistantAvatar
+          agentPhoto={agentPhoto}
+          agentName={agentName}
+          accentColor={accentColor}
+        />
+      ) : (
+        <span aria-hidden className="w-7 h-7 flex-shrink-0" />
+      )}
       <p className="text-[17px] sm:text-lg text-foreground leading-snug font-medium pt-0.5 whitespace-pre-wrap">
         {text}
       </p>
@@ -667,30 +717,54 @@ function ChoiceCards({
   // 5+ or long labels → stack vertically.
   const longest = options.reduce((m, o) => Math.max(m, o.label.length), 0);
   const stack = options.length > 4 || longest > 28;
+
+  // Selected-state flash on tap. Holds the chosen card in an accent-
+  // filled state for 180ms before committing the answer — the visual
+  // confirmation chat apps train leads to expect, and the difference
+  // between "responsive" and "did my tap register?" on slow connections.
+  const [pending, setPending] = useState<string | null>(null);
+
+  const handleTap = (value: string) => {
+    if (pending) return;
+    setPending(value);
+    setTimeout(() => onCommit(value), 180);
+  };
+
   return (
     <div className={cn(stack ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2.5')}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onCommit(option.value)}
-          className={cn(
-            'group relative inline-flex items-center gap-2',
-            'rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-border',
-            'px-5 py-3 text-[15px] font-medium text-foreground',
-            'transition-all duration-150 active:scale-[0.98]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            stack ? 'w-full text-left justify-start' : 'min-w-[140px] justify-center text-center',
-          )}
-          style={
-            {
-              ['--tw-ring-color' as never]: accentColor,
-            } as React.CSSProperties
-          }
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map((option) => {
+        const isPending = pending === option.value;
+        const otherPending = pending !== null && !isPending;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => handleTap(option.value)}
+            disabled={otherPending}
+            className={cn(
+              'group relative inline-flex items-center gap-2',
+              'rounded-xl border bg-card',
+              'px-5 py-3 text-[15px] font-medium text-foreground',
+              'transition-all duration-150 active:scale-[0.98]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              isPending
+                ? 'border-transparent text-white'
+                : 'border-border/70 hover:bg-muted/40 hover:border-border',
+              otherPending && 'opacity-50 cursor-not-allowed',
+              stack ? 'w-full text-left justify-start' : 'min-w-[140px] justify-center text-center',
+            )}
+            style={
+              isPending
+                ? { backgroundColor: accentColor }
+                : ({ ['--tw-ring-color' as never]: accentColor } as React.CSSProperties)
+            }
+            aria-pressed={isPending}
+          >
+            {isPending && <Check size={14} aria-hidden />}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -809,6 +883,25 @@ function DateField({ value, onChange, onCommit, accentColor, error }: InputProps
   );
 }
 
+/**
+ * Format a phone number as the user types. Strips non-digits and renders
+ * the (XXX) XXX-XXXX shape progressively for US-style numbers. Pure
+ * function so it's testable and predictable; not validation —
+ * `validateQuestion` still gates submission.
+ */
+function formatPhoneAsTyped(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 11);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return `+${digits.slice(0, 1)} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+}
+
+const EMAIL_INLINE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function ChatComposer({ question, value, onChange, onCommit, accentColor, error }: InputProps) {
   // Modern chat composer: rounded pill containing the input + a circular
   // send button. Mirrors the realtor-facing Chippi composer in shape.
@@ -832,11 +925,43 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
           : 'text';
 
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  // Inline email validation — fires only after the lead has typed an `@`,
+  // debounced 450ms. Silent while they're mid-address; gentle nudge when
+  // the shape's wrong. Distinct from `error` (which is the Continue-time
+  // gate from validateQuestion).
+  const [inlineEmailError, setInlineEmailError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Autofocus the input when each new question lands.
     inputRef.current?.focus();
   }, [question.id]);
+
+  useEffect(() => {
+    if (question.type !== 'email') {
+      if (inlineEmailError) setInlineEmailError(null);
+      return;
+    }
+    const trimmed = v.trim();
+    if (trimmed.length === 0 || !trimmed.includes('@')) {
+      if (inlineEmailError) setInlineEmailError(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setInlineEmailError(
+        EMAIL_INLINE_RE.test(trimmed) ? null : "Doesn't look like a valid email yet.",
+      );
+    }, 450);
+    return () => clearTimeout(t);
+  }, [v, question.type, inlineEmailError]);
+
+  // Phone format-as-you-type intercepts onChange so the displayed value
+  // stays (XXX) XXX-XXXX-shaped regardless of how the lead types.
+  const handleTextChange = (next: string) => {
+    if (question.type === 'phone') {
+      onChange(formatPhoneAsTyped(next));
+      return;
+    }
+    onChange(next);
+  };
 
   const onKeyDown = (
     e: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -856,60 +981,84 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
 
   const empty = v.trim().length === 0;
   const sendDisabled = question.required ? empty : false;
+  const showInlineError = !error && inlineEmailError !== null;
 
   return (
-    <div
-      className={cn(
-        'flex items-end gap-2 rounded-3xl border bg-background pl-4 pr-2 py-1.5',
-        'transition-colors duration-150',
-        error ? 'border-rose-500/60' : 'border-border/70 focus-within:border-foreground/40',
-      )}
-    >
-      {isTextarea ? (
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          value={v}
-          onChange={(e) => {
-            onChange(e.target.value);
-            // Auto-grow.
-            e.currentTarget.style.height = 'auto';
-            e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 200)}px`;
-          }}
-          onKeyDown={onKeyDown}
-          rows={1}
-          placeholder={question.placeholder ?? 'Type your answer…'}
-          className="flex-1 resize-none bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none leading-relaxed py-2 max-h-[200px]"
-        />
-      ) : (
-        <input
-          ref={inputRef as React.RefObject<HTMLInputElement>}
-          type={inputType}
-          inputMode={inputMode}
-          value={v}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={
-            question.placeholder ?? defaultPlaceholderFor(question.type)
-          }
-          className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none py-2"
-        />
-      )}
-      <button
-        type="button"
-        onClick={() => (sendDisabled ? undefined : onCommit(v))}
-        disabled={sendDisabled}
-        aria-label="Send answer"
+    <div className="space-y-1.5">
+      <div
         className={cn(
-          'w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center self-end mb-0.5',
-          'transition-all duration-150 active:scale-[0.94]',
-          sendDisabled
-            ? 'bg-foreground/15 text-foreground/40 cursor-not-allowed'
-            : 'text-white',
+          'flex items-end gap-2 rounded-3xl border bg-background pl-4 pr-2 py-1.5',
+          'transition-colors duration-150',
+          error || showInlineError
+            ? 'border-rose-500/60'
+            : 'border-border/70 focus-within:border-foreground/40',
         )}
-        style={sendDisabled ? undefined : { backgroundColor: accentColor }}
       >
-        <ArrowUp size={16} />
-      </button>
+        {isTextarea ? (
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={v}
+            onChange={(e) => {
+              handleTextChange(e.target.value);
+              // Auto-grow.
+              e.currentTarget.style.height = 'auto';
+              e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 200)}px`;
+            }}
+            onKeyDown={onKeyDown}
+            rows={1}
+            placeholder={question.placeholder ?? 'Type your answer…'}
+            className="flex-1 resize-none bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none leading-relaxed py-2 max-h-[200px]"
+            aria-invalid={Boolean(error || showInlineError)}
+          />
+        ) : (
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type={inputType}
+            inputMode={inputMode}
+            value={v}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={
+              question.placeholder ?? defaultPlaceholderFor(question.type)
+            }
+            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none py-2"
+            // autoComplete hints let iOS/Android suggest the right value
+            // from the platform keychain — small but real completion lift.
+            autoComplete={
+              question.type === 'email'
+                ? 'email'
+                : question.type === 'phone'
+                  ? 'tel-national'
+                  : undefined
+            }
+            aria-invalid={Boolean(error || showInlineError)}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => (sendDisabled ? undefined : onCommit(v))}
+          disabled={sendDisabled}
+          aria-label="Send answer"
+          className={cn(
+            'w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center self-end mb-0.5',
+            'transition-all duration-150 active:scale-[0.94]',
+            sendDisabled
+              ? 'bg-foreground/15 text-foreground/40 cursor-not-allowed'
+              : 'text-white',
+          )}
+          style={sendDisabled ? undefined : { backgroundColor: accentColor }}
+        >
+          <ArrowUp size={16} />
+        </button>
+      </div>
+      {showInlineError && (
+        <p
+          className="px-2 text-xs text-rose-600 dark:text-rose-400"
+          role="status"
+        >
+          {inlineEmailError}
+        </p>
+      )}
     </div>
   );
 }
