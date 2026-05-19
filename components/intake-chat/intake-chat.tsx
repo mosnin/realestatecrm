@@ -36,7 +36,12 @@ import { motion } from 'motion/react';
 import { validateQuestion } from '@/components/form-renderer/question-renderer';
 import { IntakeChatSuccess } from './intake-chat-success';
 import { cn } from '@/lib/utils';
-import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import {
+  DURATION_BASE,
+  EASE_OUT,
+  STAGGER_CONTAINER,
+  STAGGER_ITEM,
+} from '@/lib/motion';
 import {
   DEFAULT_RENTAL_FORM_CONFIG,
   DEFAULT_BUYER_FORM_CONFIG,
@@ -315,9 +320,11 @@ export function IntakeChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestion, phase, answers]);
 
-  // Auto-scroll on every meaningful change.
+  // Auto-scroll on every meaningful change. `block: 'nearest'` keeps the
+  // scroll inside the chat's own scroll container (the shell's <main>) and
+  // doesn't fight the page or pull the sticky header out of frame.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [turns, currentQuestion, phase]);
 
   // Commit a single answer and advance.
@@ -453,7 +460,13 @@ export function IntakeChat({
             />
           );
         }
-        return <UserTurn key={turn.id} text={turn.text} />;
+        return (
+          <UserTurn
+            key={turn.id}
+            text={turn.text}
+            accentColor={customization.accentColor}
+          />
+        );
       })}
 
       {phase === 'asking' && currentQuestion && (
@@ -595,7 +608,12 @@ function AssistantTurn({
   );
 }
 
-function UserTurn({ text }: { text: string }) {
+function UserTurn({ text, accentColor }: { text: string; accentColor: string }) {
+  // Accent-tinted bubble — the realtor's brand color at low opacity with
+  // foreground text. Reads as "this is your voice" without the
+  // confrontational pure-black slab the old `bg-foreground` produced. The
+  // accent border at 30% gives the bubble a defined edge without becoming
+  // a loud color block.
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -603,7 +621,13 @@ function UserTurn({ text }: { text: string }) {
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
       className="flex justify-end"
     >
-      <div className="max-w-[80%] ml-auto rounded-2xl rounded-br-md bg-foreground text-background px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap">
+      <div
+        className="max-w-[80%] ml-auto rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-foreground border"
+        style={{
+          backgroundColor: withAlpha(accentColor, 0.12),
+          borderColor: withAlpha(accentColor, 0.22),
+        }}
+      >
         {text}
       </div>
     </motion.div>
@@ -731,13 +755,19 @@ function ChoiceCards({
   };
 
   return (
-    <div className={cn(stack ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2.5')}>
+    <motion.div
+      variants={STAGGER_CONTAINER}
+      initial="initial"
+      animate="enter"
+      className={cn(stack ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2.5')}
+    >
       {options.map((option) => {
         const isPending = pending === option.value;
         const otherPending = pending !== null && !isPending;
         return (
-          <button
+          <motion.button
             key={option.value}
+            variants={STAGGER_ITEM}
             type="button"
             onClick={() => handleTap(option.value)}
             disabled={otherPending}
@@ -762,10 +792,10 @@ function ChoiceCards({
           >
             {isPending && <Check size={14} aria-hidden />}
             {option.label}
-          </button>
+          </motion.button>
         );
       })}
-    </div>
+    </motion.div>
   );
 }
 
@@ -788,12 +818,18 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <motion.div
+        variants={STAGGER_CONTAINER}
+        initial="initial"
+        animate="enter"
+        className="flex flex-wrap gap-2"
+      >
         {options.map((option) => {
           const isOn = selected.includes(option.value);
           return (
-            <button
+            <motion.button
               key={option.value}
+              variants={STAGGER_ITEM}
               type="button"
               onClick={() => toggle(option.value)}
               className={cn(
@@ -809,10 +845,10 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
             >
               {isOn && <Check size={13} aria-hidden />}
               {option.label}
-            </button>
+            </motion.button>
           );
         })}
-      </div>
+      </motion.div>
       <div className="flex justify-end">
         <PrimaryActionButton
           accentColor={accentColor}
@@ -1104,6 +1140,39 @@ function PrimaryActionButton({
       {children}
     </button>
   );
+}
+
+// ─── Color helper ────────────────────────────────────────────────────────────
+
+/**
+ * Add an alpha channel to a hex/rgb-style color string. Mirrors the
+ * shell's helper — kept local so the chat doesn't need to import from a
+ * sibling component file. Returns the input untouched on unknown formats
+ * so a malformed realtor accent color never crashes the page.
+ */
+function withAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  const hexMatch = color.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map((c) => c + c)
+        .join('');
+    }
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+  if (color.startsWith('rgb')) {
+    const nums = color.match(/[\d.]+/g);
+    if (nums && nums.length >= 3) {
+      return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${a})`;
+    }
+  }
+  return color;
 }
 
 // ─── Submitting / Error ──────────────────────────────────────────────────────

@@ -111,60 +111,120 @@ export function IntakeChatShell({
   const showSecondary =
     secondaryLabel && secondaryLabel.trim().length > 0 && secondaryLabel !== agentName;
 
+  // Soft accent-tinted gradient background — the previous "plain white
+  // slab" failure mode this shell was rebuilt to fix. The gradient is
+  // subtle (max 14% opacity) so it never competes with the chat content,
+  // but it's visible enough that the page reads as a designed surface
+  // rather than a default form.
+  const gradientStyle = {
+    backgroundImage: `radial-gradient(ellipse 90% 60% at 50% 0%, ${withAlpha(
+      accentColor || '#0c0c0d',
+      0.14,
+    )} 0%, transparent 65%)`,
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* ── Header — agent presence, ONE appearance ──────────────────── */}
+    <div className="relative h-dvh min-h-[600px] flex flex-col text-foreground overflow-hidden bg-background">
+      {/* Background gradient — sits below everything. The dot grid texture
+          adds craft: a 1px @ 0.04 opacity pattern that reads as paper, not
+          screen. Both layers are absolute so the flex layout above
+          remains correct. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 pointer-events-none"
+        style={gradientStyle}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 pointer-events-none opacity-[0.045] dark:opacity-[0.08]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+
+      {/* ── Sticky header — realtor presence pinned at the top ──────── */}
       <motion.header
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-        className="w-full pt-10 sm:pt-14"
+        className="flex-shrink-0 w-full bg-background/70 backdrop-blur-xl border-b border-border/40"
       >
-        <div className="max-w-2xl mx-auto px-5 sm:px-8">
+        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-4 sm:py-5">
           <div className="flex items-center gap-4">
-            {agentPhoto ? (
-              // Real photo wins every time it's available. The fallback
-              // initials only fire when the realtor hasn't uploaded one.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={agentPhoto}
-                alt={agentName}
-                className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
+            <div className="relative flex-shrink-0">
+              {agentPhoto ? (
+                // Real photo wins every time it's available. The fallback
+                // initials only fire when the realtor hasn't uploaded one.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={agentPhoto}
+                  alt={agentName}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover ring-2 ring-background"
+                  style={{ boxShadow: `0 0 0 1px ${withAlpha(accentColor || '#0c0c0d', 0.2)}` }}
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full inline-flex items-center justify-center text-base sm:text-lg font-semibold text-white select-none ring-2 ring-background"
+                  style={{
+                    backgroundColor: accentColor || '#0c0c0d',
+                    boxShadow: `0 0 0 1px ${withAlpha(accentColor || '#0c0c0d', 0.3)}`,
+                  }}
+                >
+                  {deriveInitials(agentName)}
+                </span>
+              )}
+              {/* Presence dot — subtle "available" signal in the realtor's
+                  accent color. Doesn't pulse (that would feel anxious);
+                  just sits there steadily. */}
               <span
                 aria-hidden
-                className="w-14 h-14 rounded-full flex-shrink-0 inline-flex items-center justify-center text-lg font-semibold text-white select-none"
-                style={{ backgroundColor: accentColor || '#0c0c0d' }}
-              >
-                {deriveInitials(agentName)}
-              </span>
-            )}
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-background"
+                style={{ backgroundColor: '#10b981' }}
+                title="Available"
+              />
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-semibold text-foreground leading-tight truncate">
+              <p className="text-[16px] sm:text-[17px] font-semibold text-foreground leading-tight truncate">
                 {agentName}
               </p>
               {showSecondary && (
-                <p className="mt-0.5 text-[13px] text-muted-foreground truncate">
+                <p className="mt-0.5 text-[12px] sm:text-[13px] text-muted-foreground truncate">
                   {secondaryLabel}
                 </p>
               )}
             </div>
           </div>
-          <div className="mt-8 h-px bg-border/60" />
         </div>
       </motion.header>
 
-      {/* ── Main — the chat fills this column ────────────────────────── */}
-      <main className="flex-1 w-full">
-        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-6 sm:py-8 pb-16">
-          {children}
+      {/* ── Main — scrollable chat with edge-fade masks ─────────────── */}
+      <main className="flex-1 w-full min-h-0 relative">
+        {/* Top edge-fade so content scrolls into the sticky header without
+            a hard cutoff. -mb negative pulls the next element up so the
+            visual rhythm doesn't gain extra space. */}
+        <div
+          aria-hidden
+          className="sticky top-0 z-10 h-6 -mb-6 bg-gradient-to-b from-background to-transparent pointer-events-none"
+        />
+        <div className="h-full overflow-y-auto scroll-smooth">
+          <div className="max-w-2xl mx-auto px-5 sm:px-8 py-8 pb-12">
+            {children}
+          </div>
         </div>
+        {/* Bottom edge-fade — the same trick on the other end. Content
+            scrolls into the sticky footer without abrupt clipping. */}
+        <div
+          aria-hidden
+          className="sticky bottom-0 z-10 h-8 -mt-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
+        />
       </main>
 
-      {/* ── Footer — small print, easy to ignore ─────────────────────── */}
-      <footer className="w-full pb-8 pt-2">
-        <div className="max-w-2xl mx-auto px-5 sm:px-8">
+      {/* ── Sticky footer — small print pinned at the bottom ────────── */}
+      <footer className="flex-shrink-0 w-full bg-background/70 backdrop-blur-xl border-t border-border/40">
+        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-3 sm:py-4">
           {/* Trust signals — only renders when the realtor supplies content.
               Sits above the Terms/Privacy/PoweredBy row, separated by a
               hairline. Paper-flat: text + rule, no chrome. */}
@@ -223,4 +283,36 @@ export function IntakeChatShell({
       </footer>
     </div>
   );
+}
+
+/**
+ * Add an alpha channel to a hex/rgb-style color string. Returns the
+ * input untouched if the format isn't recognized (so the realtor's
+ * arbitrary `intakeAccentColor` value never crashes the page).
+ */
+function withAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  // #RGB / #RRGGBB
+  const hexMatch = color.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map((c) => c + c)
+        .join('');
+    }
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+  // rgb(...) / rgba(...) — swap the alpha
+  if (color.startsWith('rgb')) {
+    const nums = color.match(/[\d.]+/g);
+    if (nums && nums.length >= 3) {
+      return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${a})`;
+    }
+  }
+  return color;
 }
