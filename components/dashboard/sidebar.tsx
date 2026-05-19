@@ -14,7 +14,7 @@ import {
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
-import { SidebarContextSection } from '@/components/dashboard/sidebar-context-section';
+import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { ChippiInstrument } from '@/components/dashboard/chippi-instrument';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
@@ -934,42 +934,54 @@ function RealtorNav({
         </div>
       </div>
 
-      {/* Context-aware second section — on /chippi the realtor sees their
-          conversation list; everywhere else they see the static More nav.
-          The two-tab pill at the top lets them flip without leaving the
-          page. Collapsed (icon-rail) mode skips the toggle entirely and
-          falls back to the static More-icon list — the rail's too narrow
-          to read titles. */}
-      {realtorMoreNavItems.length > 0 && (
-        <div>
-          {collapsed ? (
-            <>
-              <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
-              {/* Chats — the collapsed-rail entry to conversation history.
-                  In expanded mode the Chats tab in SidebarContextSection
-                  shows the list inline; the rail is too narrow for that,
-                  so we route to /chippi with ?view=history which the
-                  workspace reads and opens the history drawer on mount. */}
-              <CollapsedTooltip enabled label="Conversations">
-                <Link
-                  href={`/s/${slug}/chippi?view=history`}
-                  aria-label="Conversation history"
-                  className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
-                >
-                  <History size={15} strokeWidth={1.75} />
-                </Link>
-              </CollapsedTooltip>
-              <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
-            </>
-          ) : (
-            <SidebarContextSection
-              slug={slug}
-              pathname={pathname}
-              renderPages={() => <>{realtorMoreNavItems.map(renderItem)}</>}
-            />
-          )}
-        </div>
-      )}
+      {/* Context-aware second section. Route IS the signal:
+            - On /chippi/* → conversation list (expanded) or History icon
+              link (collapsed rail). Modern chat apps surface chat history
+              in their nav for a reason — you came back to find a thread.
+            - Elsewhere → render `realtorMoreNavItems` if it has anything.
+              It's intentionally empty today, but kept as the slot for
+              future secondary nav without re-plumbing the layout.
+          The previous Chats/Pages tab toggle was ceremony — Pages was
+          empty so flipping to it dead-ended. Removed. */}
+      {(() => {
+        const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
+        const hasMore = realtorMoreNavItems.length > 0;
+        if (!onChippi && !hasMore) return null;
+        return (
+          <div>
+            {collapsed ? (
+              <>
+                {onChippi && (
+                  <>
+                    <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+                    <CollapsedTooltip enabled label="Conversations">
+                      <Link
+                        href={`/s/${slug}/chippi?view=history`}
+                        aria-label="Conversation history"
+                        className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
+                      >
+                        <History size={15} strokeWidth={1.75} />
+                      </Link>
+                    </CollapsedTooltip>
+                  </>
+                )}
+                {hasMore && (
+                  <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+                )}
+              </>
+            ) : (
+              <>
+                {onChippi && <SidebarConversations slug={slug} />}
+                {hasMore && (
+                  <div className={cn('space-y-0.5', onChippi && 'mt-4')}>
+                    {realtorMoreNavItems.map(renderItem)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Settings — collapsible, pinned at bottom of scroll area */}
       <div className="pt-1">
@@ -1291,7 +1303,7 @@ function RealtorSidebarShell({
             (see EdgeCollapseHandle above) — discoverable on hover. */}
         <div className="border-t border-border/50" />
         <UserFooter
-          href={`${base}/settings#profile`}
+          href={`${base}/settings?tab=profile`}
           displayName={displayName}
           imageUrl={imageUrl}
           collapsed={collapsed}

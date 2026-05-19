@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
@@ -10,37 +11,63 @@ import { IntegrationsSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { MemoryFeed } from '@/components/chippi/memory-feed';
+import { cn } from '@/lib/utils';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H1,
   H2,
   TITLE_FONT,
-  BODY,
   BODY_MUTED,
-  SECTION_LABEL,
   PRIMARY_PILL,
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
 
 /**
- * One settings page. One scroll. Sections, not tabs. The realtor visits
- * here a few times a year — workspace name, billing pointer, who gets
- * pinged, MCP keys, danger zone. Everything else was theater.
+ * Settings — tabbed. Five buckets the realtor can hold in their head:
+ *   Workspace  — name/brand/legal/danger
+ *   Profile    — who you are + how Chippi knows you
+ *   Memory     — what Chippi remembers about your book
+ *   Notifications — what reaches your phone
+ *   Apps       — Composio integrations + API keys + message templates
+ *
+ * Tab state is a query param (`?tab=...`) so the URL is shareable, the
+ * sub-route redirects still resolve cleanly, and back-button history
+ * works. Each render hydrates only the section(s) for the active tab —
+ * cheaper than the old single-scroll page that hydrated all nine
+ * sections every load.
  */
+
+const TABS = [
+  { id: 'workspace', label: 'Workspace' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'apps', label: 'Apps' },
+] as const;
+
+type TabId = (typeof TABS)[number]['id'];
+
+function isValidTab(v: string | undefined | null): v is TabId {
+  return typeof v === 'string' && TABS.some((t) => t.id === v);
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  // `?integration=connected|failed&reason=...&toolkit=...` lands here after
-  // the OAuth callback redirects the realtor back. Read it on the server so
-  // ConnectedAppsSection can render a visible banner explaining what
-  // happened — silent failure was the #1 reported bug.
-  searchParams: Promise<{ integration?: string; reason?: string; toolkit?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    integration?: string;
+    reason?: string;
+    toolkit?: string;
+  }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
+  const activeTab: TabId = isValidTab(sp.tab) ? sp.tab : 'workspace';
+
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
@@ -73,21 +100,14 @@ export default async function SettingsPage({
     );
   }
 
-  // Fetch AI profile
-  const { data: aiProfile } = await supabase
-    .from('AIUserProfile')
-    .select('*')
-    .eq('spaceId', space.id)
-    .maybeSingle();
-
+  // Subscription status drives the narration line under the H1. Same
+  // narrator the old single-page version used; preserved verbatim.
   const subStatus =
     (space as { stripeSubscriptionStatus?: string }).stripeSubscriptionStatus ?? 'inactive';
   const periodEnd = (space as { stripePeriodEnd?: string }).stripePeriodEnd;
   const isTrialing = subStatus === 'trialing';
   const isActive = subStatus === 'active';
 
-  // ── Inline narration ladder ────────────────────────────────────────────
-  // One sentence under the H1, computed from the space state. No new files.
   let narration: string;
   if (isTrialing && periodEnd) {
     const days = Math.max(
@@ -131,97 +151,154 @@ export default async function SettingsPage({
         </p>
       </header>
 
-      {/* WORKSPACE */}
-      <section className="space-y-5 pt-4">
-        <p className={SECTION_LABEL}>Workspace</p>
-        <GeneralSettingsForm space={space} settings={settings} />
-      </section>
-
-      {/* PROFILE — identity, photo, bio, social */}
-      <section
-        id="profile"
-        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>Profile</p>
-        <ProfileSection slug={space.slug} />
-      </section>
-
-      {/* ── AI Personalization ──────────────────────────────────────── */}
-      <section id="ai-profile" className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24">
-        <div className="mb-6">
-          <h2 className="text-base font-semibold">AI Personalization</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Tell Chippi about you so responses feel tailored, not generic.
-          </p>
+      {/* Tab nav — horizontal-scroll on mobile, fits comfortably on desktop.
+          Active tab uses the foreground underline rule from STYLESHEET; the
+          rest stay muted. No pill chrome — paper-flat. */}
+      <nav className="border-b border-border/60" aria-label="Settings sections">
+        <div className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide">
+          {TABS.map((t) => {
+            const isActiveTab = t.id === activeTab;
+            return (
+              <Link
+                key={t.id}
+                href={`/s/${slug}/settings?tab=${t.id}`}
+                aria-current={isActiveTab ? 'page' : undefined}
+                className={cn(
+                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap',
+                  'border-b-2 -mb-px transition-colors duration-150',
+                  isActiveTab
+                    ? 'border-foreground text-foreground font-medium'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
         </div>
-        <AIProfileForm slug={slug} spaceId={space.id} />
-      </section>
+      </nav>
 
-      {/* ── What Chippi remembers (formerly /chippi/memory) ─────────── */}
-      <section id="memory" className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24">
-        <div className="mb-6">
-          <h2 className="text-base font-semibold">What Chippi remembers</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Everything I&apos;ve learned about you, your contacts, and your deals. Delete anything I got wrong — I&apos;ll re-learn it if it comes up again.
-          </p>
+      {/* Active-tab content. Each tab is a focused stack of related sections;
+          no cross-tab dependencies, so render order is just visual rhythm. */}
+      {activeTab === 'workspace' && (
+        <div className="space-y-12">
+          <section className="space-y-5">
+            <GeneralSettingsForm space={space} settings={settings} />
+          </section>
+          <section
+            id="legal"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">Legal</h2>
+              <p className="text-sm text-muted-foreground">
+                The privacy policy URL applicants see on your intake form.
+              </p>
+            </header>
+            <LegalSettingsForm
+              slug={space.slug}
+              privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
+            />
+          </section>
+          <section className="space-y-5 pt-10 border-t border-border/60">
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+              <p className="text-sm text-muted-foreground">
+                Irreversible. Don&apos;t click these unless you mean it.
+              </p>
+            </header>
+            <DangerZone space={space} />
+          </section>
         </div>
-        <MemoryFeed slug={slug} />
-      </section>
+      )}
 
-      {/* NOTIFICATIONS */}
-      <section
-        id="notifications"
-        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>Notifications</p>
-        <NotificationsSection slug={space.slug} />
-      </section>
+      {activeTab === 'profile' && (
+        <div className="space-y-12">
+          <section className="space-y-5">
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">Your profile</h2>
+              <p className="text-sm text-muted-foreground">
+                The face and voice your leads see on intake forms, tour
+                pages, and packets.
+              </p>
+            </header>
+            <ProfileSection slug={space.slug} />
+          </section>
+          <section
+            id="ai-profile"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">AI personalization</h2>
+              <p className="text-sm text-muted-foreground">
+                Tell Chippi about you so responses feel tailored, not generic.
+              </p>
+            </header>
+            <AIProfileForm slug={slug} spaceId={space.id} />
+          </section>
+        </div>
+      )}
 
-      {/* LEGAL */}
-      <section
-        id="legal"
-        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>Legal</p>
-        <LegalSettingsForm
-          slug={space.slug}
-          privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
-        />
-      </section>
+      {activeTab === 'memory' && (
+        <section id="memory" className="space-y-5">
+          <header className="space-y-1">
+            <h2 className="text-base font-semibold">What Chippi remembers</h2>
+            <p className="text-sm text-muted-foreground">
+              Everything I&apos;ve learned about you, your contacts, and your
+              deals. Delete anything I got wrong — I&apos;ll re-learn it if
+              it comes up again.
+            </p>
+          </header>
+          <MemoryFeed slug={slug} />
+        </section>
+      )}
 
-      {/* CONNECTED APPS — Composio integrations */}
-      <section
-        id="integrations"
-        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>Connected apps</p>
-        <ConnectedAppsSection
-          callbackResult={
-            sp.integration === 'connected' || sp.integration === 'failed'
-              ? {
-                  ok: sp.integration === 'connected',
-                  reason: sp.reason ?? null,
-                  toolkit: sp.toolkit ?? null,
-                }
-              : null
-          }
-        />
-      </section>
+      {activeTab === 'notifications' && (
+        <section id="notifications" className="space-y-5">
+          <NotificationsSection slug={space.slug} />
+        </section>
+      )}
 
-      {/* MCP KEYS + MESSAGE TEMPLATES */}
-      <section
-        id="api-keys"
-        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>API keys &amp; templates</p>
-        <IntegrationsSection slug={space.slug} />
-      </section>
-
-      {/* DANGER ZONE */}
-      <section className="space-y-5 pt-10 border-t border-border/60">
-        <p className={SECTION_LABEL}>Danger zone</p>
-        <DangerZone space={space} />
-      </section>
+      {activeTab === 'apps' && (
+        <div className="space-y-12">
+          <section
+            id="integrations"
+            className="space-y-5"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">Connected apps</h2>
+              <p className="text-sm text-muted-foreground">
+                Connect Gmail, Outlook, Slack, HubSpot, and the rest so
+                Chippi can act on your behalf through your own accounts.
+              </p>
+            </header>
+            <ConnectedAppsSection
+              callbackResult={
+                sp.integration === 'connected' || sp.integration === 'failed'
+                  ? {
+                      ok: sp.integration === 'connected',
+                      reason: sp.reason ?? null,
+                      toolkit: sp.toolkit ?? null,
+                    }
+                  : null
+              }
+            />
+          </section>
+          <section
+            id="api-keys"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">API keys &amp; templates</h2>
+              <p className="text-sm text-muted-foreground">
+                MCP keys for Claude.ai and other agent surfaces, plus the
+                message templates Chippi can paste from.
+              </p>
+            </header>
+            <IntegrationsSection slug={space.slug} />
+          </section>
+        </div>
+      )}
     </div>
   );
 }

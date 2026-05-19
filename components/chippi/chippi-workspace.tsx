@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -949,6 +949,20 @@ export function ChippiWorkspace({
             <span className="hidden sm:inline">Run now</span>
           </button>
         )}
+        {/* New chat — the discoverable affordance. Sits left of History so
+            the pair reads as "new ↔ old" — the same convention iMessage
+            and the major chat apps use. Pre-rebuild this only existed as
+            an opaque link inside the sidebar's conversation list, which
+            wasn't even rendering due to the More-nav conditional. */}
+        <button
+          type="button"
+          onClick={() => void handleNewConversation()}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          title="New chat"
+          aria-label="Start a new chat"
+        >
+          <SquarePen size={15} />
+        </button>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -987,8 +1001,12 @@ export function ChippiWorkspace({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={() => void handleNewConversation()} className="cursor-pointer">
+              <SquarePen size={14} className="mr-2" />
+              New chat
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href={`/s/${slug}/settings#memory`} className="cursor-pointer">
+              <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
                 <NotebookText size={14} className="mr-2" />
                 What I remember
               </Link>

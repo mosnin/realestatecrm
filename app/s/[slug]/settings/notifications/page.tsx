@@ -10,5 +10,5 @@ export default async function NotificationsRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/s/${slug}/settings#notifications`);
+  permanentRedirect(`/s/${slug}/settings?tab=notifications`);
 }

@@ -10,5 +10,5 @@ export default async function LegalRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/s/${slug}/settings#legal`);
+  permanentRedirect(`/s/${slug}/settings?tab=workspace#legal`);
 }
