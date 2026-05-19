@@ -19,8 +19,10 @@ import {
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
+import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
@@ -1259,6 +1261,27 @@ export function ChippiWorkspace({
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Suggested follow-ups — visible only when the conversation
+                      is idle (no thinking, no streaming, no error) and the
+                      last turn was an assistant turn with completed tool
+                      content. Click → fires the chip text as the next user
+                      message. Removes the typing step for the obvious next
+                      move (Claude / ChatGPT pattern). */}
+                  {!showThinking && !isStreaming && !agentError && (() => {
+                    const last = messages[messages.length - 1];
+                    if (!last || last.role !== 'assistant' || !last.blocks) return null;
+                    const suggestions = getSuggestionsForTurn(last.blocks);
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <SuggestedActions
+                        suggestions={suggestions}
+                        onSelect={(text) => {
+                          void handleSend(text, [], undefined);
+                        }}
+                      />
+                    );
+                  })()}
 
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode
