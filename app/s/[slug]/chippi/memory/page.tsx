@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * /chippi/memory — what Chippi has learned about this workspace.
  *

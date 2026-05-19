@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * /chippi/drafts — pending drafts the realtor needs to review.
  *

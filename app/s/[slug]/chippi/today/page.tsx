@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * /chippi/today — the full-day dashboard.
  *
