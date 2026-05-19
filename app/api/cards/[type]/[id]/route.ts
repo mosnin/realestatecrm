@@ -306,7 +306,7 @@ async function handleProperty(id: string, spaceId: string): Promise<NextResponse
   const { data: row, error } = await supabase
     .from('Property')
     .select(
-      'id, address, listPrice, beds, baths, squareFeet, listingStatus, notes, createdAt',
+      'id, address, listPrice, beds, baths, squareFeet, listingStatus, notes, photos, createdAt',
     )
     .eq('id', id)
     .eq('spaceId', spaceId)
@@ -341,6 +341,7 @@ async function handleProperty(id: string, spaceId: string): Promise<NextResponse
       daysOnMarket: null, // not stored in the Property table
       dealCount: dealCount ?? 0,
       description: row.notes ?? null,
+      photos: Array.isArray(row.photos) ? (row.photos as string[]) : [],
     },
   });
 }
