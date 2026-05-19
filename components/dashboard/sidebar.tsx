@@ -296,17 +296,33 @@ function CollapsibleNavItem({
   const isParentActive = doesItemOwnPath(item, pathname, base);
   const href = `${base}${item.href}`;
 
-  const handleClick = useCallback(
+  const handleClick = useCallback(() => {
+    // Parent row click should ALWAYS navigate to its own href. The previous
+    // behaviour `e.preventDefault(); onToggle();` left a lead stranded on a
+    // sub-page like /chippi/today with no obvious way back to /chippi — the
+    // sidebar's "Chippi" row only opened the dropdown.
+    //
+    // New behaviour: let the <Link> navigate as normal, and additionally
+    // ensure the dropdown is open so the lead can see where they are in
+    // the tree. If it was already open, leave it open (don't collapse on
+    // navigation — collapsing the section the user just navigated into is
+    // hostile).
+    if (hasChildren && !collapsed && !isExpanded) {
+      onToggle();
+    }
+  }, [hasChildren, collapsed, isExpanded, onToggle]);
+
+  // Dedicated chevron toggle so a lead who wants to expand/collapse the
+  // section without navigating still has that escape hatch. Stops the
+  // event from bubbling to the parent <Link>.
+  const handleChevronClick = useCallback(
     (e: React.MouseEvent) => {
-      // Collapsed mode: parent navigates to its own href. Children are only
-      // reachable via expanded sidebar or in-page navigation — deliberate
-      // trade so the rail stays a one-tap launcher.
-      if (hasChildren && !collapsed) {
-        e.preventDefault();
-        onToggle();
-      }
+      if (!hasChildren || collapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onToggle();
     },
-    [hasChildren, onToggle, collapsed],
+    [hasChildren, collapsed, onToggle],
   );
 
   const tooltipLabel = badgeText ? `${item.label} · ${badgeText}` : item.label;
@@ -359,13 +375,21 @@ function CollapsibleNavItem({
           {!collapsed && badge}
 
           {!collapsed && hasChildren && (
-            <ChevronRight
-              size={11}
-              className={cn(
-                'flex-shrink-0 text-muted-foreground/40 transition-transform duration-150',
-                isExpanded && 'rotate-90',
-              )}
-            />
+            <button
+              type="button"
+              onClick={handleChevronClick}
+              aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+              aria-expanded={isExpanded}
+              className="flex-shrink-0 -mr-1.5 p-1 rounded hover:bg-foreground/[0.04] transition-colors"
+            >
+              <ChevronRight
+                size={11}
+                className={cn(
+                  'text-muted-foreground/40 transition-transform duration-150',
+                  isExpanded && 'rotate-90',
+                )}
+              />
+            </button>
           )}
         </Link>
       </CollapsedTooltip>

@@ -66,6 +66,7 @@ export default async function PublicApplyPage({
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
         'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
+        'intakeLicenseNumber, intakeFairHousingNotice, intakeShowEqualHousingMark, ' +
         'formConfig, formConfigSource, rentalFormConfig, buyerFormConfig, trackingPixels'
       )
       .eq('spaceId', space.id)
@@ -103,6 +104,9 @@ export default async function PublicApplyPage({
     socialLinks: Record<string, string> | null;
     privacyPolicyUrl: string | null;
     consentCheckboxLabel: string | null;
+    intakeLicenseNumber: string | null;
+    intakeFairHousingNotice: string | null;
+    intakeShowEqualHousingMark: boolean | null;
     formConfig: import('@/lib/types').IntakeFormConfig | null;
     formConfigSource: string | null;
     rentalFormConfig: import('@/lib/types').IntakeFormConfig | null;
@@ -238,6 +242,9 @@ export default async function PublicApplyPage({
         termsUrl={`/apply/${slug}/terms`}
         hidePoweredBy={hidePoweredBy}
         footerLinks={customization.footerLinks}
+        licenseNumber={settings?.intakeLicenseNumber ?? null}
+        fairHousingNotice={settings?.intakeFairHousingNotice ?? null}
+        showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
       >
         <IntakeChat
           slug={slug}

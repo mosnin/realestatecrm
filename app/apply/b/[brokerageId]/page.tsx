@@ -116,7 +116,8 @@ export default async function BrokerageApplyPage({
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
-        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel'
+        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
+        'intakeLicenseNumber, intakeFairHousingNotice, intakeShowEqualHousingMark'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -153,6 +154,9 @@ export default async function BrokerageApplyPage({
     socialLinks: Record<string, string> | null;
     privacyPolicyUrl: string | null;
     consentCheckboxLabel: string | null;
+    intakeLicenseNumber: string | null;
+    intakeFairHousingNotice: string | null;
+    intakeShowEqualHousingMark: boolean | null;
   } | null;
 
   // Use brokerage name for title, fall back to space settings
@@ -206,6 +210,9 @@ export default async function BrokerageApplyPage({
       privacyPolicyUrl={customization.privacyPolicyUrl}
       hidePoweredBy={hidePoweredBy}
       footerLinks={customization.footerLinks}
+      licenseNumber={settings?.intakeLicenseNumber ?? null}
+      fairHousingNotice={settings?.intakeFairHousingNotice ?? null}
+      showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
     >
       <IntakeChat
         slug={space.slug}

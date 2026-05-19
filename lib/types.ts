@@ -129,6 +129,12 @@ export type SpaceSetting = {
   privacyPolicyUrl: string | null;
   privacyPolicyHtml: string | null;
   consentCheckboxLabel: string | null;
+  // Intake trust signals — realtor/brokerage-supplied compliance slots
+  // rendered in the public intake footer. Chippi provides the slot;
+  // the realtor fills the actual legal text.
+  intakeLicenseNumber: string | null;
+  intakeFairHousingNotice: string | null;
+  intakeShowEqualHousingMark: boolean;
   // Dynamic form builder
   formConfig: IntakeFormConfig | null;
   formConfigSource: FormConfigSource;
