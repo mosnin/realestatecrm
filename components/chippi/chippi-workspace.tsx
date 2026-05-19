@@ -1180,6 +1180,9 @@ export function ChippiWorkspace({
                               role={msg.role}
                               streaming={msg.streaming && isStreaming}
                               liveCallIds={liveCallIds}
+                              onUserIntent={(text) => {
+                                void handleSend(text, [], undefined);
+                              }}
                               pendingApproval={
                                 isTail && pendingApproval && !isStreaming
                                   ? {
@@ -1224,6 +1227,9 @@ export function ChippiWorkspace({
                         role={msg.role}
                         streaming={msg.streaming && isStreaming}
                         liveCallIds={liveCallIds}
+                        onUserIntent={(text) => {
+                          void handleSend(text, [], undefined);
+                        }}
                       />
                     );
                   })}

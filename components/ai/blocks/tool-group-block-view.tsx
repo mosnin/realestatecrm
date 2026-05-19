@@ -22,6 +22,7 @@ import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
 import { PropertiesResult } from './tool-results/properties-result';
+import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
 
 /** snake_case → "Search contacts". Repeated from tool-call-block-view to keep
  *  these two surfaces independent — the inline view may diverge later. */
@@ -86,7 +87,10 @@ function toNestedTool(block: ToolCallBlock): NestedTool {
 /** Inline rich card for completed tools that returned a known data shape.
  *  Same switch as tool-call-block-view — duplicated rather than re-exported
  *  to keep the two views structurally independent. */
-function richResultFor(block: ToolCallBlock): React.ReactNode {
+function richResultFor(
+  block: ToolCallBlock,
+  onUserIntent?: (text: string) => void,
+): React.ReactNode {
   if (block.status !== 'complete' || !block.result?.ok) return null;
   const data = block.result.data as Record<string, unknown> | undefined;
   if (!data) return null;
@@ -102,6 +106,26 @@ function richResultFor(block: ToolCallBlock): React.ReactNode {
   if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
     return <PropertiesResult data={data as { properties: never[] }} />;
   }
+  if (
+    block.display === 'availability-picker' &&
+    Array.isArray((data as { slots?: unknown[] }).slots)
+  ) {
+    const d = data as {
+      slots: Array<{ startsAt: string; endsAt: string; label: string }>;
+      contactId?: string;
+      propertyAddress?: string;
+      durationMinutes?: number;
+    };
+    return (
+      <AvailabilityPickerCard
+        slots={d.slots}
+        contactId={d.contactId}
+        propertyAddress={d.propertyAddress}
+        durationMinutes={d.durationMinutes ?? 60}
+        onSelectSlot={onUserIntent}
+      />
+    );
+  }
   return null;
 }
 
@@ -110,9 +134,11 @@ export interface ToolGroupBlockViewProps {
   /** Call IDs that are mid-flight this turn. If any group member is live the
    *  whole group renders in the `pending` shimmer state — Claude-style. */
   liveCallIds?: Set<string>;
+  /** Forwarded to interactive rich cards (availability picker). */
+  onUserIntent?: (text: string) => void;
 }
 
-export function ToolGroupBlockView({ blocks, liveCallIds }: ToolGroupBlockViewProps) {
+export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGroupBlockViewProps) {
   const nestedTools = useMemo(() => blocks.map(toNestedTool), [blocks]);
 
   const anyLive = blocks.some((b) => liveCallIds?.has(b.callId));
@@ -127,8 +153,8 @@ export function ToolGroupBlockView({ blocks, liveCallIds }: ToolGroupBlockViewPr
   // Rendered below the collapsed header so the realtor sees the answer
   // without needing to click expand.
   const richCards = blocks
-    .map((b, i) => {
-      const node = richResultFor(b);
+    .map((b) => {
+      const node = richResultFor(b, onUserIntent);
       return node ? <div key={`rich-${b.callId}`}>{node}</div> : null;
     })
     .filter(Boolean);

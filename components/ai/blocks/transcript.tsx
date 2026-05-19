@@ -51,6 +51,10 @@ interface TranscriptProps {
     subject?: string;
     onDone: () => void;
   };
+  /** Bubbled by interactive tool-result cards (currently the availability
+   *  picker). The workspace forwards the text as the realtor's next
+   *  message. Omit on read-only history surfaces. */
+  onUserIntent?: (text: string) => void;
   className?: string;
 }
 
@@ -67,6 +71,7 @@ export function Transcript({
   liveCallIds,
   pendingApproval,
   approvalCelebration,
+  onUserIntent,
   className,
 }: TranscriptProps) {
   // Find the last text block so we can scope the streaming caret to it.
@@ -152,6 +157,7 @@ export function Transcript({
                 key={`tool-${item.block.callId}`}
                 block={item.block}
                 live={liveCallIds?.has(item.block.callId)}
+                onUserIntent={onUserIntent}
               />
             );
           case 'tool-group':
@@ -160,6 +166,7 @@ export function Transcript({
                 key={item.groupId}
                 blocks={item.blocks}
                 liveCallIds={liveCallIds}
+                onUserIntent={onUserIntent}
               />
             );
           case 'subagent':

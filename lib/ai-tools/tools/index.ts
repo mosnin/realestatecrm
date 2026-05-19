@@ -71,6 +71,7 @@ import { noteOnPropertyTool } from './note-on-property';
 // Calendar
 import { checkAvailabilityTool } from './check-availability';
 import { blockTimeTool } from './block-time';
+import { proposeTourTimesTool } from './propose-tour-times';
 
 // Pipeline aggregates
 import { pipelineSummaryTool } from './pipeline-summary';
@@ -150,6 +151,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Calendar ───────────────────────────────────────────────────────────
   checkAvailabilityTool as ToolDefinition,
   blockTimeTool as ToolDefinition,
+  proposeTourTimesTool as ToolDefinition,
 
   // ── Pipeline aggregates ────────────────────────────────────────────────
   pipelineSummaryTool as ToolDefinition,
