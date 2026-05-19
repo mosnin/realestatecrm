@@ -7,6 +7,7 @@ import { GeneralSettingsForm, DangerZone } from './general-settings-form';
 import { ProfileSection } from './profile-section';
 import { NotificationsSection } from './notifications-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
+import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
 import { IntegrationsSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
@@ -198,6 +199,24 @@ export default async function SettingsPage({
             <LegalSettingsForm
               slug={space.slug}
               privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
+            />
+          </section>
+          <section
+            id="trust-signals"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">Compliance &amp; trust signals</h2>
+              <p className="text-sm text-muted-foreground">
+                Optional. License number, Fair Housing notice, and Equal Housing
+                mark — shown in your intake-form footer.
+              </p>
+            </header>
+            <IntakeTrustSignalsForm
+              slug={space.slug}
+              licenseNumber={settings?.intakeLicenseNumber ?? ''}
+              fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
+              showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
             />
           </section>
           <section className="space-y-5 pt-10 border-t border-border/60">

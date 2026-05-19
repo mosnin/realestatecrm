@@ -47,6 +47,12 @@ export type Brokerage = {
   stripeSubscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
   stripePeriodEnd: Date | null;
   createdAt: Date;
+  // Intake trust signals — brokerage-level compliance text inherited by
+  // /apply/b/[brokerageId]. Per-space SpaceSetting values take a back seat
+  // when the intake is served via the brokerage variant.
+  brokerageLicenseNumber: string | null;
+  brokerageFairHousingNotice: string | null;
+  brokerageShowEqualHousingMark: boolean;
 };
 
 export type BrokerageMembership = {

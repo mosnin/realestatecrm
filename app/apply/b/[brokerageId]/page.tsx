@@ -35,9 +35,20 @@ export default async function BrokerageApplyPage({
   // 1. Look up the brokerage
   const { data: brokerage } = await supabase
     .from('Brokerage')
-    .select('id, name, status, logoUrl')
+    .select(
+      'id, name, status, logoUrl, ' +
+      'brokerageLicenseNumber, brokerageFairHousingNotice, brokerageShowEqualHousingMark'
+    )
     .eq('id', brokerageId)
-    .maybeSingle();
+    .maybeSingle<{
+      id: string;
+      name: string;
+      status: 'active' | 'suspended';
+      logoUrl: string | null;
+      brokerageLicenseNumber: string | null;
+      brokerageFairHousingNotice: string | null;
+      brokerageShowEqualHousingMark: boolean | null;
+    }>();
 
   if (!brokerage || brokerage.status === 'suspended') notFound();
 
@@ -210,9 +221,9 @@ export default async function BrokerageApplyPage({
       privacyPolicyUrl={customization.privacyPolicyUrl}
       hidePoweredBy={hidePoweredBy}
       footerLinks={customization.footerLinks}
-      licenseNumber={settings?.intakeLicenseNumber ?? null}
-      fairHousingNotice={settings?.intakeFairHousingNotice ?? null}
-      showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
+      licenseNumber={brokerage.brokerageLicenseNumber ?? settings?.intakeLicenseNumber ?? null}
+      fairHousingNotice={brokerage.brokerageFairHousingNotice ?? settings?.intakeFairHousingNotice ?? null}
+      showEqualHousingMark={brokerage.brokerageShowEqualHousingMark ?? settings?.intakeShowEqualHousingMark ?? false}
     >
       <IntakeChat
         slug={space.slug}

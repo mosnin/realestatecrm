@@ -174,6 +174,9 @@ function makeBrokerage(overrides: Partial<Brokerage> = {}): Brokerage {
     stripeSubscriptionStatus: 'inactive',
     stripePeriodEnd: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    brokerageLicenseNumber: null,
+    brokerageFairHousingNotice: null,
+    brokerageShowEqualHousingMark: false,
     ...overrides,
   };
 }
