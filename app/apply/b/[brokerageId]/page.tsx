@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { IntakeChat } from '@/components/intake-chat/intake-chat';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import type { IntakeFormConfig } from '@/lib/types';
 import type { Metadata } from 'next';
 
@@ -198,18 +198,14 @@ export default async function BrokerageApplyPage({
   };
 
   return (
-    <PublicPageShell
-      logoUrl={logoUrl}
-      businessName={businessName}
+    <IntakeChatShell
       agentName={agentName}
-      agentPhone={null}
       agentPhoto={agentPhoto}
-      pageTitle={pageTitle}
-      pageIntro={pageIntro}
-      trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
-      agentPresenceLabel="Applying to"
+      secondaryLabel={null}
+      accentColor={customization.accentColor}
+      privacyPolicyUrl={customization.privacyPolicyUrl}
       hidePoweredBy={hidePoweredBy}
-      customization={customization}
+      footerLinks={customization.footerLinks}
     >
       <IntakeChat
         slug={space.slug}
@@ -228,6 +224,6 @@ export default async function BrokerageApplyPage({
           privacyPolicyUrl: customization.privacyPolicyUrl,
         }}
       />
-    </PublicPageShell>
+    </IntakeChatShell>
   );
 }

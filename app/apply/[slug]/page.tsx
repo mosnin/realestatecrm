@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import { IntakeChat } from '@/components/intake-chat/intake-chat';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
@@ -229,18 +229,15 @@ export default async function PublicApplyPage({
     <>
       {isPreview && <PreviewBridge />}
       <TrackingPixels pixels={trackingPixels} />
-      <PublicPageShell
-        logoUrl={logoUrl}
-        businessName={businessName}
+      <IntakeChatShell
         agentName={agentName}
-        agentPhone={null}
         agentPhoto={agentPhoto}
-        pageTitle={pageTitle}
-        pageIntro={pageIntro}
-        trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
-        agentPresenceLabel="Applying with"
+        secondaryLabel={businessName !== agentName ? businessName : null}
+        accentColor={customization.accentColor}
+        privacyPolicyUrl={customization.privacyPolicyUrl}
+        termsUrl={`/apply/${slug}/terms`}
         hidePoweredBy={hidePoweredBy}
-        customization={customization}
+        footerLinks={customization.footerLinks}
       >
         <IntakeChat
           slug={slug}
@@ -258,7 +255,7 @@ export default async function PublicApplyPage({
             privacyPolicyUrl: customization.privacyPolicyUrl,
           }}
         />
-      </PublicPageShell>
+      </IntakeChatShell>
     </>
   );
 }
