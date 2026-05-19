@@ -1,9 +1,10 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { TextBlockView } from './text-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
+import { ToolGroupBlockView } from './tool-group-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
@@ -77,29 +78,72 @@ export function Transcript({
     }
   }
 
+  // Group consecutive tool_call blocks so 2+ collapse into one ToolGroup
+  // header (Claude / ChatGPT pattern). Single-tool runs keep the existing
+  // per-block view — its inline rich-data cards (contacts / deals / tours /
+  // properties) read better solo than buried under a collapsed group.
+  type RenderItem =
+    | { kind: 'text'; block: Extract<MessageBlock, { type: 'text' }>; originalIndex: number }
+    | { kind: 'permission'; block: Extract<MessageBlock, { type: 'permission' }> }
+    | { kind: 'tool-single'; block: ToolCallBlock }
+    | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string };
+
+  const items: RenderItem[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (block.type === 'tool_call') {
+      const run: ToolCallBlock[] = [block];
+      while (i + 1 < blocks.length && blocks[i + 1].type === 'tool_call') {
+        run.push(blocks[i + 1] as ToolCallBlock);
+        i++;
+      }
+      if (run.length === 1) {
+        items.push({ kind: 'tool-single', block: run[0] });
+      } else {
+        items.push({
+          kind: 'tool-group',
+          blocks: run,
+          groupId: `group-${run[0].callId}`,
+        });
+      }
+    } else if (block.type === 'text') {
+      items.push({ kind: 'text', block, originalIndex: i });
+    } else if (block.type === 'permission') {
+      items.push({ kind: 'permission', block });
+    }
+  }
+
   return (
     <div className={cn('space-y-2.5', className)}>
-      {blocks.map((block, i) => {
-        switch (block.type) {
+      {items.map((item) => {
+        switch (item.kind) {
           case 'text':
             return (
               <TextBlockView
-                key={`text-${i}`}
-                block={block}
+                key={`text-${item.originalIndex}`}
+                block={item.block}
                 role={role}
-                streaming={i === lastTextIndex}
+                streaming={item.originalIndex === lastTextIndex}
               />
             );
-          case 'tool_call':
+          case 'tool-single':
             return (
               <ToolCallBlockView
-                key={`tool-${block.callId}`}
-                block={block}
-                live={liveCallIds?.has(block.callId)}
+                key={`tool-${item.block.callId}`}
+                block={item.block}
+                live={liveCallIds?.has(item.block.callId)}
+              />
+            );
+          case 'tool-group':
+            return (
+              <ToolGroupBlockView
+                key={item.groupId}
+                blocks={item.blocks}
+                liveCallIds={liveCallIds}
               />
             );
           case 'permission':
-            return <PermissionBlockView key={`perm-${block.callId}`} block={block} />;
+            return <PermissionBlockView key={`perm-${item.block.callId}`} block={item.block} />;
         }
       })}
 
