@@ -186,6 +186,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const abortRef = useRef<AbortController | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
+  // Wall-clock when the assistant turn started. Set on the first event of
+  // the turn; used to derive ReasoningBlock.durationMs at turn_complete.
+  const turnStartedAtRef = useRef<number | null>(null);
+  // Buffer for the current turn's reasoning. Mirrors `streamingReasoning`
+  // state but read synchronously inside the turn_complete handler — the
+  // setter is async and would lose data on the same tick.
+  const reasoningBufferRef = useRef<string>('');
   // Fix 2: remember the last user input so the UI can offer a one-tap retry.
   const lastUserInputRef = useRef<{ text: string; attachmentIds?: string[] } | null>(null);
   // Fix 3: store the Retry-After value so the countdown effect can read it
@@ -376,6 +383,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       case 'reasoning_delta': {
         if (!event.delta) return;
+        if (turnStartedAtRef.current === null) turnStartedAtRef.current = Date.now();
+        reasoningBufferRef.current += event.delta;
         setStreamingReasoning((prev) => prev + event.delta);
         return;
       }
@@ -387,9 +396,35 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       case 'turn_complete': {
         const targetId = streamingMsgIdRef.current;
+        // Snapshot + reset the reasoning buffer + start time before any
+        // async setState — we need both values inside the updater closure.
+        const reasoning = reasoningBufferRef.current;
+        const startedAt = turnStartedAtRef.current;
+        reasoningBufferRef.current = '';
+        turnStartedAtRef.current = null;
         if (targetId) {
           setMessages((prev) =>
-            prev.map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
+            prev.map((m) => {
+              if (m.id !== targetId) return m;
+              // Persist the reasoning trace as the first block of the
+              // assistant turn so reload reproduces the "Thought for Xs"
+              // disclosure. Only if reasoning was actually produced.
+              const trimmed = reasoning.trim();
+              if (!trimmed) return { ...m, streaming: false };
+              const durationMs = startedAt ? Date.now() - startedAt : undefined;
+              const reasoningBlock: MessageBlock = {
+                type: 'reasoning',
+                content: trimmed,
+                durationMs,
+              };
+              const existing = m.blocks ?? [];
+              // Place the reasoning block first — Claude / o1 pattern.
+              return {
+                ...m,
+                blocks: [reasoningBlock, ...existing],
+                streaming: false,
+              };
+            }),
           );
         }
         setStreamingReasoning('');

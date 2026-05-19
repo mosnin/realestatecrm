@@ -6,6 +6,7 @@ import { TextBlockView } from './text-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
 import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
+import { ReasoningBlockView } from './reasoning-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
@@ -90,6 +91,7 @@ export function Transcript({
   type RenderItem =
     | { kind: 'text'; block: Extract<MessageBlock, { type: 'text' }>; originalIndex: number }
     | { kind: 'permission'; block: Extract<MessageBlock, { type: 'permission' }> }
+    | { kind: 'reasoning'; block: Extract<MessageBlock, { type: 'reasoning' }> }
     | { kind: 'tool-single'; block: ToolCallBlock }
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
     | { kind: 'subagent'; block: ToolCallBlock };
@@ -97,6 +99,10 @@ export function Transcript({
   const items: RenderItem[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
+    if (block.type === 'reasoning') {
+      items.push({ kind: 'reasoning', block });
+      continue;
+    }
     if (block.type === 'tool_call') {
       if (isSubagentTool(block.name)) {
         items.push({ kind: 'subagent', block });
@@ -162,6 +168,14 @@ export function Transcript({
                 key={`subagent-${item.block.callId}`}
                 block={item.block}
                 live={liveCallIds?.has(item.block.callId)}
+              />
+            );
+          case 'reasoning':
+            return (
+              <ReasoningBlockView
+                key={`reasoning-${item.block.content.length}`}
+                block={item.block}
+                streaming={streaming && role === 'assistant'}
               />
             );
           case 'permission':
