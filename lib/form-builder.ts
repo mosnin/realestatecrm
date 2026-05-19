@@ -51,7 +51,9 @@ export function generateSystemFields(): FormQuestion[] {
 }
 
 // ── Default Rental Form Config ──
-// Maps the 10 hardcoded RENTAL_STEPS from application-form.tsx into IntakeFormConfig format
+// The 10-question rental intake used when a realtor hasn't customized
+// their form. Also the fallback IntakeChat uses on the brokerage variant
+// when no brokerage-level config exists.
 // Step 1: Getting Started  |  Step 2: Basics  |  Step 3: Move Timing  |  Step 4: Location
 // Step 5: Budget  |  Step 6: Income  |  Step 7: Employment  |  Step 8: Household
 // Step 9: Additional Info  |  Step 10: Ready?
@@ -264,7 +266,9 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
 };
 
 // ── Default Buyer Form Config ──
-// Maps the 9 hardcoded BUYER_STEPS from application-form.tsx into IntakeFormConfig format
+// The 9-question buyer intake used when a realtor hasn't customized
+// their form. Also the fallback IntakeChat uses on the brokerage variant
+// when no brokerage-level config exists.
 // Step 1: Getting Started  |  Step 2: Basics  |  Step 3: Budget
 // Step 4: Pre-Approval  |  Step 5: Property Type  |  Step 6: Must-Haves
 // Step 7: Timeline  |  Step 8: About You  |  Step 9: Ready?

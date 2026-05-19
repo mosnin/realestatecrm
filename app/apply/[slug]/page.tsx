@@ -4,7 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
-import { ApplicationFormLoader } from './application-form-loader';
+import { IntakeChat } from '@/components/intake-chat/intake-chat';
 import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
@@ -42,7 +42,10 @@ export default async function PublicApplyPage({
   searchParams: Promise<{ resume?: string; preview?: string }>;
 }) {
   const { slug } = await params;
-  const { resume: resumeToken, preview } = await searchParams;
+  // `resume` is preserved in the URL surface for backwards compatibility
+  // (old emailed draft links) but the chat flow doesn't restore drafts —
+  // a chat is a single session by nature.
+  const { preview } = await searchParams;
   const isPreview = preview === '1';
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -239,7 +242,22 @@ export default async function PublicApplyPage({
         hidePoweredBy={hidePoweredBy}
         customization={customization}
       >
-        <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} rentalFormConfig={resolvedRentalFormConfig} buyerFormConfig={resolvedBuyerFormConfig} resumeToken={resumeToken} />
+        <IntakeChat
+          slug={slug}
+          spaceId={space.id}
+          businessName={businessName}
+          agentName={agentName}
+          agentPhoto={agentPhoto}
+          rentalFormConfig={resolvedRentalFormConfig}
+          buyerFormConfig={resolvedBuyerFormConfig}
+          formConfig={resolvedFormConfig}
+          customization={{
+            accentColor: customization.accentColor,
+            thankYouTitle: customization.thankYouTitle,
+            thankYouMessage: customization.thankYouMessage,
+            privacyPolicyUrl: customization.privacyPolicyUrl,
+          }}
+        />
       </PublicPageShell>
     </>
   );

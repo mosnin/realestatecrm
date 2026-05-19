@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
-import { ApplicationFormLoader } from '@/app/apply/[slug]/application-form-loader';
+import { IntakeChat } from '@/components/intake-chat/intake-chat';
+import type { IntakeFormConfig } from '@/lib/types';
 import type { Metadata } from 'next';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
@@ -76,7 +77,32 @@ export default async function BrokerageApplyPage({
 
   if (!space) notFound();
 
-  // 4. Parallel queries for settings and owner info
+  // 4. Load brokerage-level form configs so leads applying via the
+  //    brokerage URL see the brokerage's customized intake (or the
+  //    library defaults if the brokerage hasn't customized). IntakeChat
+  //    falls back to library defaults when all three are null.
+  const { data: brokerageConfigs } = await supabase
+    .from('Brokerage')
+    .select('brokerageFormConfig, brokerageRentalFormConfig, brokerageBuyerFormConfig')
+    .eq('id', brokerage.id)
+    .maybeSingle();
+
+  const legacySingle = (brokerageConfigs?.brokerageFormConfig ?? null) as IntakeFormConfig | null;
+  let resolvedRentalFormConfig =
+    (brokerageConfigs?.brokerageRentalFormConfig ?? null) as IntakeFormConfig | null;
+  let resolvedBuyerFormConfig =
+    (brokerageConfigs?.brokerageBuyerFormConfig ?? null) as IntakeFormConfig | null;
+  // Legacy single-config brokerages: route the config to the matching
+  // leadType slot. Same compat logic /apply/[slug] uses.
+  if (!resolvedRentalFormConfig && !resolvedBuyerFormConfig && legacySingle) {
+    if (legacySingle.leadType === 'buyer') {
+      resolvedBuyerFormConfig = legacySingle;
+    } else {
+      resolvedRentalFormConfig = legacySingle;
+    }
+  }
+
+  // 5. Parallel queries for settings and owner info
   const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
@@ -185,11 +211,22 @@ export default async function BrokerageApplyPage({
       hidePoweredBy={hidePoweredBy}
       customization={customization}
     >
-      <ApplicationFormLoader
+      <IntakeChat
         slug={space.slug}
+        spaceId={space.id}
         businessName={businessName}
-        customization={customization}
+        agentName={agentName}
+        agentPhoto={agentPhoto}
         brokerageId={brokerage.id}
+        rentalFormConfig={resolvedRentalFormConfig}
+        buyerFormConfig={resolvedBuyerFormConfig}
+        formConfig={legacySingle}
+        customization={{
+          accentColor: customization.accentColor,
+          thankYouTitle: customization.thankYouTitle,
+          thankYouMessage: customization.thankYouMessage,
+          privacyPolicyUrl: customization.privacyPolicyUrl,
+        }}
       />
     </PublicPageShell>
   );
