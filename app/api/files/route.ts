@@ -39,6 +39,25 @@ function sanitizeFilename(raw: string): string {
   return cleaned.slice(0, 200) || 'file';
 }
 
+/** Map a chat Attachment row's mimeType to the File-shape category. The
+ *  Attachment table doesn't carry a category column (chat attachments
+ *  were never bucketed) so we derive it from the mime prefix. */
+function deriveCategory(mimeType: string): 'image' | 'document' | 'video' | 'audio' | 'other' {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (
+    mimeType === 'application/pdf' ||
+    mimeType.startsWith('application/vnd.openxmlformats-officedocument') ||
+    mimeType === 'application/msword' ||
+    mimeType === 'application/vnd.ms-excel' ||
+    mimeType.startsWith('text/')
+  ) {
+    return 'document';
+  }
+  return 'other';
+}
+
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -48,31 +67,88 @@ export async function GET(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const category = req.nextUrl.searchParams.get('category');
-  let query = supabase
-    .from('File')
-    .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
-    .eq('spaceId', space.id)
-    .order('createdAt', { ascending: false })
-    .limit(500);
 
-  if (category) query = query.eq('category', category);
+  // Query both surfaces in parallel — File (Files page uploads) AND
+  // Attachment (chat uploads). The Files page renders the union so the
+  // realtor sees every file in one place. Each row carries `source` so
+  // the UI can show a small "From chat" badge and the delete path can
+  // route to the right endpoint.
+  const [fileRes, attachmentRes] = await Promise.all([
+    (() => {
+      let q = supabase
+        .from('File')
+        .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
+        .eq('spaceId', space.id)
+        .order('createdAt', { ascending: false })
+        .limit(500);
+      if (category) q = q.eq('category', category);
+      return q;
+    })(),
+    supabase
+      .from('Attachment')
+      .select('id, filename, mimeType, sizeBytes, createdAt')
+      .eq('spaceId', space.id)
+      .order('createdAt', { ascending: false })
+      .limit(500),
+  ]);
 
-  const { data, error } = await query;
-  if (error) {
-    logger.error('[files] list failed', { spaceId: space.id }, error);
+  if (fileRes.error) {
+    logger.error('[files] list failed', { spaceId: space.id }, fileRes.error);
     return NextResponse.json({ error: 'Failed to list files' }, { status: 500 });
   }
 
-  // Compute current quota usage in the same response so the page header
-  // can render the gauge without a second round trip.
-  const { data: totals } = await supabase
-    .from('File')
-    .select('sizeBytes')
-    .eq('spaceId', space.id);
-  const usedBytes = (totals ?? []).reduce(
-    (sum, r) => sum + Number(r.sizeBytes ?? 0),
-    0,
+  type ListedFile = {
+    id: string;
+    name: string;
+    mimeType: string;
+    category: string;
+    sizeBytes: number;
+    isPublic: boolean;
+    createdAt: string;
+    source: 'file' | 'chat';
+  };
+
+  const fileRows: ListedFile[] = (fileRes.data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    mimeType: r.mimeType,
+    category: r.category,
+    sizeBytes: Number(r.sizeBytes ?? 0),
+    isPublic: Boolean(r.isPublic),
+    createdAt: r.createdAt,
+    source: 'file',
+  }));
+
+  // Chat attachments are public-served (the chat-attachments/ prefix is
+  // covered by the bucket policy) and always have a mime — categorize on
+  // the fly. Apply the same category filter the File query used.
+  const chatRows: ListedFile[] = ((attachmentRes.data ?? []) as Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number | null;
+    createdAt: string;
+  }>)
+    .map((r) => ({
+      id: r.id,
+      name: r.filename,
+      mimeType: r.mimeType,
+      category: deriveCategory(r.mimeType),
+      sizeBytes: Number(r.sizeBytes ?? 0),
+      isPublic: true,
+      createdAt: r.createdAt,
+      source: 'chat' as const,
+    }))
+    .filter((r) => !category || r.category === category);
+
+  const merged = [...fileRows, ...chatRows].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1,
   );
+
+  // Quota gauge counts File-table bytes only — chat attachments don't
+  // count against the realtor's storage quota (they're conversation
+  // ephemera with their own retention).
+  const usedBytes = fileRows.reduce((sum, r) => sum + r.sizeBytes, 0);
 
   // Plan tier may not exist yet in main — graceful default to 'free' until
   // the Plan migration lands. Cast through unknown for the optional column.
@@ -80,7 +156,7 @@ export async function GET(req: NextRequest) {
   const quota = quotaForPlan(planId);
 
   return NextResponse.json({
-    files: data ?? [],
+    files: merged,
     quota: {
       planId,
       totalBytes: quota.totalBytes,

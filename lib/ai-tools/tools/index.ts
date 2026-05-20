@@ -100,6 +100,7 @@ import { readAttachmentTool } from './read-attachment';
 // Files (Wasabi-backed user uploads)
 import { listFilesTool } from './list-files';
 import { readFileTool } from './read-file';
+import { attachFileToPropertyTool } from './attach-file-to-property';
 
 // Planning
 import { createPlanTool } from './plan';
@@ -182,6 +183,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   readAttachmentTool as ToolDefinition,
   listFilesTool as ToolDefinition,
   readFileTool as ToolDefinition,
+  attachFileToPropertyTool as ToolDefinition,
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,

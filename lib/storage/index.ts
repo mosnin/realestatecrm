@@ -26,6 +26,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -111,6 +112,33 @@ export async function getSignedDownloadUrl(
     client,
     new GetObjectCommand({ Bucket: bucket, Key: key }),
     { expiresIn: ttlSeconds },
+  );
+}
+
+/**
+ * Server-side copy an object to a new key. The source bytes never round
+ * trip through our infrastructure — Wasabi handles it internally. Use to
+ * promote a private file to a public prefix (e.g. files/ → property-photos/)
+ * without re-uploading.
+ */
+export async function copyObject(args: {
+  sourceKey: string;
+  destinationKey: string;
+  isPublic?: boolean;
+  contentType?: string;
+}): Promise<void> {
+  const client = getWasabiClient();
+  const bucket = getWasabiBucket();
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      // CopySource is bucket + key, URL-encoded.
+      CopySource: `/${bucket}/${args.sourceKey.split('/').map(encodeURIComponent).join('/')}`,
+      Key: args.destinationKey,
+      ACL: args.isPublic ? 'public-read' : undefined,
+      ContentType: args.contentType,
+      MetadataDirective: args.contentType ? 'REPLACE' : 'COPY',
+    }),
   );
 }
 

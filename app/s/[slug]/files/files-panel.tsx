@@ -37,6 +37,9 @@ interface FileRow {
   sizeBytes: number;
   isPublic: boolean;
   createdAt: string;
+  /** Where the file came from. 'chat' rows are read-only here; manage them
+   *  by removing the attachment inside the Chippi conversation. */
+  source: 'file' | 'chat';
 }
 
 interface Quota {
@@ -137,18 +140,29 @@ export function FilesPanel() {
   );
 
   const onDelete = useCallback(
-    async (id: string) => {
-      const res = await fetch(`/api/files/${id}`, { method: 'DELETE' });
+    async (file: FileRow) => {
+      const endpoint =
+        file.source === 'chat'
+          ? `/api/ai/attachments?id=${encodeURIComponent(file.id)}`
+          : `/api/files/${file.id}`;
+      const res = await fetch(endpoint, { method: 'DELETE' });
       if (res.ok) await refresh();
     },
     [refresh],
   );
 
-  const onDownload = useCallback(async (id: string) => {
-    const res = await fetch(`/api/files/${id}`);
+  const onDownload = useCallback(async (file: FileRow) => {
+    // Chat attachments are already public — fetch the row to get the URL.
+    // Files use a signed-URL endpoint that returns a 5-min download link.
+    const endpoint =
+      file.source === 'chat'
+        ? `/api/ai/attachments?id=${encodeURIComponent(file.id)}`
+        : `/api/files/${file.id}`;
+    const res = await fetch(endpoint);
     if (!res.ok) return;
-    const { url } = (await res.json()) as { url: string };
-    window.open(url, '_blank', 'noopener');
+    const body = (await res.json()) as { url?: string; publicUrl?: string };
+    const url = body.url ?? body.publicUrl;
+    if (url) window.open(url, '_blank', 'noopener');
   }, []);
 
   const visibleFiles = useMemo(() => {
@@ -300,8 +314,8 @@ function FileCard({
   onDownload,
 }: {
   file: FileRow;
-  onDelete: (id: string) => void;
-  onDownload: (id: string) => void;
+  onDelete: (file: FileRow) => void;
+  onDownload: (file: FileRow) => void;
 }) {
   const Icon = CATEGORY_ICON[file.category];
   return (
@@ -313,14 +327,24 @@ function FileCard({
         <p className="text-[12px] font-medium text-foreground truncate" title={file.name}>
           {file.name}
         </p>
-        <p className="text-[10.5px] text-muted-foreground tabular-nums">
-          {formatBytes(file.sizeBytes)}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10.5px] text-muted-foreground tabular-nums">
+            {formatBytes(file.sizeBytes)}
+          </p>
+          {file.source === 'chat' && (
+            <span
+              title="Uploaded inside a Chippi conversation"
+              className="text-[9px] uppercase tracking-wider font-medium px-1.5 py-px rounded-full bg-foreground/[0.06] text-foreground/55"
+            >
+              Chat
+            </span>
+          )}
+        </div>
       </div>
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
-          onClick={() => onDownload(file.id)}
+          onClick={() => onDownload(file)}
           title="Download"
           className="w-7 h-7 rounded-md bg-background/90 backdrop-blur-sm text-foreground/70 hover:text-foreground flex items-center justify-center border border-border/60"
         >
@@ -329,7 +353,7 @@ function FileCard({
         <button
           type="button"
           onClick={() => {
-            if (confirm(`Delete "${file.name}"?`)) onDelete(file.id);
+            if (confirm(`Delete "${file.name}"?`)) onDelete(file);
           }}
           title="Delete"
           className="w-7 h-7 rounded-md bg-background/90 backdrop-blur-sm text-rose-600 dark:text-rose-400 hover:bg-rose-500/15 flex items-center justify-center border border-rose-500/30"
