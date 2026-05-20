@@ -40,7 +40,7 @@ export const readFileTool = defineTool<typeof parameters, ReadFileResult>({
   name: 'read_file',
   riskLevel: 'safe',
   description:
-    'Return a short-lived (5 min) signed download URL plus metadata for an uploaded file. The URL is private — do not include it in messages meant to be shared; use it only as input to other tools (send_email attachments, attach_file_to_property) or to download for the realtor in this turn.',
+    'Return a 5-min signed download URL + metadata for an uploaded file. URL is private — pass to other tools (send_email attachments, attach_file_to_property) or download in this turn; do not quote as shareable.',
   parameters,
   requiresApproval: false,
 
