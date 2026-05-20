@@ -20,6 +20,19 @@ export function falConfigured(): boolean {
   return Boolean(process.env.FAL_KEY);
 }
 
+/** fal image models return either { images: [...] } or a single { image }. */
+function extractImage(data: unknown): GeneratedImage {
+  const d = data as {
+    images?: Array<{ url?: string; content_type?: string }>;
+    image?: { url?: string; content_type?: string };
+  };
+  const img = d.images?.[0] ?? d.image;
+  if (!img?.url) {
+    throw new Error('fal returned no image');
+  }
+  return { url: img.url, contentType: img.content_type ?? 'image/jpeg' };
+}
+
 /**
  * Generate an image from a text prompt. `fal.subscribe` submits to fal's
  * queue and resolves when the result is ready — image models finish in a few
@@ -32,12 +45,20 @@ export async function generateImage(args: {
   const result = await fal.subscribe(args.modelId, {
     input: { prompt: args.prompt },
   });
-  const data = result.data as {
-    images?: Array<{ url?: string; content_type?: string }>;
-  };
-  const image = data.images?.[0];
-  if (!image?.url) {
-    throw new Error('fal returned no image');
-  }
-  return { url: image.url, contentType: image.content_type ?? 'image/jpeg' };
+  return extractImage(result.data);
+}
+
+/**
+ * Transform an existing image — upscale, background removal, or an
+ * instruction edit. The source is passed to fal as a URL it fetches.
+ */
+export async function transformImage(args: {
+  modelId: string;
+  imageUrl: string;
+  prompt?: string;
+}): Promise<GeneratedImage> {
+  const input: Record<string, unknown> = { image_url: args.imageUrl };
+  if (args.prompt) input.prompt = args.prompt;
+  const result = await fal.subscribe(args.modelId, { input });
+  return extractImage(result.data);
 }

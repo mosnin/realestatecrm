@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import { Pencil } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EditPanel } from './edit-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 
@@ -24,14 +23,10 @@ export default async function StudioEditPage({
           Edit
         </h1>
         <p className={BODY_MUTED}>
-          Upscale, clean up backgrounds, and restyle any asset you make or upload.
+          Upscale, clean up backgrounds, and restyle any image.
         </p>
       </header>
-      <EmptyState
-        icon={Pencil}
-        title="Editing tools are on the way."
-        description="Upscaling, background removal, and listing text are coming soon."
-      />
+      <EditPanel />
     </div>
   );
 }

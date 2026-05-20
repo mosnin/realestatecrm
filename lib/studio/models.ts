@@ -47,3 +47,35 @@ export const STUDIO_MODELS: Record<string, StudioModel> = {
 
 /** Default model when the caller doesn't pick one. */
 export const DEFAULT_IMAGE_MODEL = 'flux-schnell';
+
+export interface StudioEditTool {
+  /** fal.ai model id. */
+  id: string;
+  label: string;
+  /** Whether the tool needs a text instruction (e.g. restyle). */
+  needsPrompt: boolean;
+  /** Estimated USD cost of one run. */
+  costUsd: number;
+}
+
+/** Edit / polish tools, keyed by our own stable slug. */
+export const STUDIO_EDIT_TOOLS: Record<string, StudioEditTool> = {
+  upscale: {
+    id: 'fal-ai/clarity-upscaler',
+    label: 'Upscale',
+    needsPrompt: false,
+    costUsd: 0.03,
+  },
+  'remove-bg': {
+    id: 'fal-ai/birefnet/v2',
+    label: 'Remove background',
+    needsPrompt: false,
+    costUsd: 0.01,
+  },
+  restyle: {
+    id: 'fal-ai/flux-pro/kontext',
+    label: 'Restyle',
+    needsPrompt: true,
+    costUsd: 0.04,
+  },
+};
