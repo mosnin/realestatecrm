@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 
 export const runtime = 'nodejs';
-
-const BUCKET = 'contact-documents';
 
 /**
  * GET /api/documents/[id]
@@ -53,17 +52,16 @@ export async function GET(
     });
   }
 
-  const { data: signed, error: signError } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(doc.storageKey, 60 * 5); // 5 min — enough for a download click.
-
-  if (signError || !signed?.signedUrl) {
-    logger.error('[documents/id] signed URL failed', { id }, signError);
+  let signedUrl: string;
+  try {
+    signedUrl = await getSignedDownloadUrl(doc.storageKey, 60 * 5); // 5 min — enough for a download click.
+  } catch (signError) {
+    logger.error('[documents/id] signed URL failed', { id }, signError as Error);
     return NextResponse.json({ error: 'Could not generate download link' }, { status: 500 });
   }
 
   return NextResponse.json({
-    url: signed.signedUrl,
+    url: signedUrl,
     fileName: doc.fileName,
     fileType: doc.fileType,
   });
@@ -111,7 +109,7 @@ export async function DELETE(
 
   // Storage cleanup only for non-legacy rows — legacy data URLs aren't in a bucket.
   if (typeof doc.storageKey === 'string' && !doc.storageKey.startsWith('data:')) {
-    await supabase.storage.from(BUCKET).remove([doc.storageKey]).catch((err) => {
+    await deleteObject(doc.storageKey).catch((err) => {
       logger.warn('[documents/id] storage cleanup failed', { id, path: doc.storageKey }, err);
     });
   }

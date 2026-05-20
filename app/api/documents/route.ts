@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
-const BUCKET = 'contact-documents';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -17,15 +17,6 @@ const ALLOWED_TYPES = [
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
-
-async function ensureBucket(): Promise<string | null> {
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) return `Could not verify storage configuration: ${listError.message}`;
-  if (buckets?.find((b) => b.name === BUCKET)) return null;
-  const { error: createError } = await supabase.storage.createBucket(BUCKET, { public: false });
-  if (createError) return `Could not create bucket: ${createError.message}`;
-  return null;
-}
 
 /**
  * POST — Upload a document for a contact.
@@ -120,25 +111,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many uploads' }, { status: 429 });
   }
 
-  const bucketError = await ensureBucket();
-  if (bucketError) {
-    logger.error('[documents] bucket prep failed', { contactId }, new Error(bucketError));
-    return NextResponse.json({ error: bucketError }, { status: 500 });
-  }
-
-  // Storage path: spaceId/contactId/<uuid>-<safeName>. Scoping by spaceId
-  // makes it trivial to purge a space's files on deletion; the UUID prefix
-  // prevents same-name collisions.
+  // Storage path: contact-documents/spaceId/contactId/<uuid>-<safeName>.
+  // The contactDocuments prefix groups the file with its peers; spaceId
+  // scoping makes "purge on space deletion" a single key-prefix delete.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
-  const storagePath = `${resolvedSpaceId}/${contactId}/${crypto.randomUUID()}-${safeName}`;
+  const storagePath = buildKey(
+    'contactDocuments',
+    resolvedSpaceId,
+    contactId,
+    `${crypto.randomUUID()}-${safeName}`,
+  );
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(storagePath, buffer, { contentType: file.type, upsert: false });
-
-  if (uploadError) {
-    logger.error('[documents] upload failed', { contactId }, uploadError);
+  try {
+    await uploadObject({
+      key: storagePath,
+      body: buffer,
+      contentType: file.type,
+      // Private — served only via signed URLs from /api/documents/[id].
+      isPublic: false,
+    });
+  } catch (uploadError) {
+    logger.error('[documents] upload failed', { contactId }, uploadError as Error);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
@@ -158,7 +152,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     // Best-effort rollback so we don't leak storage objects on failed inserts.
-    await supabase.storage.from(BUCKET).remove([storagePath]).catch(() => undefined);
+    await deleteObject(storagePath).catch(() => undefined);
     logger.error('[documents] insert failed', { contactId }, error);
     return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
   }

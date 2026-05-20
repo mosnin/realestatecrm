@@ -6,10 +6,10 @@ import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { isValidDocumentKind } from '@/lib/deals/documents';
+import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
-const BUCKET = 'deal-documents';
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB — closing disclosures with embedded exhibits can be large.
 
 const ALLOWED_MIME = new Set([
@@ -21,15 +21,6 @@ const ALLOWED_MIME = new Set([
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
-
-async function ensureBucket(): Promise<string | null> {
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) return `Could not verify storage configuration: ${listError.message}`;
-  if (buckets?.find((b) => b.name === BUCKET)) return null;
-  const { error: createError } = await supabase.storage.createBucket(BUCKET, { public: false });
-  if (createError) return `Could not create bucket: ${createError.message}`;
-  return null;
-}
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
@@ -103,24 +94,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ? labelRaw.trim().slice(0, 200)
     : file.name.slice(0, 200);
 
-  const bucketError = await ensureBucket();
-  if (bucketError) {
-    logger.error('[deals/docs] bucket prep failed', { dealId: id }, new Error(bucketError));
-    return NextResponse.json({ error: bucketError }, { status: 500 });
-  }
-
-  // Storage path: spaceId/dealId/<uuid>-<safeName>. Scoping by spaceId makes it
-  // straightforward to purge a space's files when it's deleted.
+  // Storage path: deal-documents/spaceId/dealId/<uuid>-<safeName>. The
+  // dealDocuments prefix groups files with their peers; spaceId scoping
+  // makes "purge on space deletion" a single key-prefix delete.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
-  const storagePath = `${space.id}/${id}/${crypto.randomUUID()}-${safeName}`;
+  const storagePath = buildKey(
+    'dealDocuments',
+    space.id,
+    id,
+    `${crypto.randomUUID()}-${safeName}`,
+  );
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(storagePath, buffer, { contentType: file.type, upsert: false });
-
-  if (uploadError) {
-    logger.error('[deals/docs] upload failed', { dealId: id }, uploadError);
+  try {
+    await uploadObject({
+      key: storagePath,
+      body: buffer,
+      contentType: file.type,
+      isPublic: false,
+    });
+  } catch (uploadError) {
+    logger.error('[deals/docs] upload failed', { dealId: id }, uploadError as Error);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
@@ -142,7 +136,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (insertError) {
     // Best-effort rollback — delete the uploaded object so we don't leak it.
-    await supabase.storage.from(BUCKET).remove([storagePath]).catch(() => undefined);
+    await deleteObject(storagePath).catch(() => undefined);
     logger.error('[deals/docs] insert failed', { dealId: id }, insertError);
     return NextResponse.json({ error: 'Failed to record document' }, { status: 500 });
   }

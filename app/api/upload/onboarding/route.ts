@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
+import { uploadObject, getPublicUrl, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
@@ -56,37 +56,23 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = detectedExt;
-    const fileName = `onboarding/${userId}/${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
-    const bucket = 'branding';
+    const key = buildKey('onboarding', userId, `${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`);
 
-    // Ensure bucket exists
-    const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
-    if (listErr) {
-      console.error('[upload/onboarding] failed to list buckets:', listErr);
-      return NextResponse.json({ error: 'Could not verify storage configuration.' }, { status: 500 });
-    }
-    if (!buckets?.find((b: { name: string }) => b.name === bucket)) {
-      const { error: createErr } = await supabase.storage.createBucket(bucket, { public: true });
-      if (createErr) {
-        console.error('[upload/onboarding] failed to create bucket:', createErr);
-        return NextResponse.json(
-          { error: 'Storage bucket "branding" does not exist and could not be created automatically.' },
-          { status: 500 },
-        );
-      }
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, buffer, { contentType: file.type, upsert: true });
-
-    if (uploadError) {
+    try {
+      await uploadObject({
+        key,
+        body: buffer,
+        contentType: file.type,
+        isPublic: true,
+      });
+    } catch (uploadError) {
       console.error('[upload/onboarding] storage error:', uploadError);
-      return NextResponse.json({ error: uploadError.message || 'Upload failed' }, { status: 500 });
+      return NextResponse.json(
+        { error: uploadError instanceof Error ? uploadError.message : 'Upload failed' },
+        { status: 500 },
+      );
     }
-
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    return NextResponse.json({ url: urlData.publicUrl });
+    return NextResponse.json({ url: getPublicUrl(key) });
   } catch (err) {
     console.error('[upload/onboarding] error:', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

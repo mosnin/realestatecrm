@@ -3,8 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
-
-const BUCKET = 'deal-documents';
+import { getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 
 async function resolveDoc(userId: string, dealId: string, docId: string) {
   const space = await getSpaceForUser(userId);
@@ -36,16 +35,15 @@ export async function GET(
   const ctx = await resolveDoc(userId, id, docId);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(ctx.doc.storagePath, 60 * 5); // 5 minutes is enough for a download click.
-
-  if (error || !data?.signedUrl) {
-    logger.error('[deals/docs] signed URL failed', { dealId: id, docId }, error);
+  let signedUrl: string;
+  try {
+    signedUrl = await getSignedDownloadUrl(ctx.doc.storagePath, 60 * 5); // 5 minutes is enough for a download click.
+  } catch (error) {
+    logger.error('[deals/docs] signed URL failed', { dealId: id, docId }, error as Error);
     return NextResponse.json({ error: 'Could not generate download link' }, { status: 500 });
   }
 
-  return NextResponse.json({ url: data.signedUrl, label: ctx.doc.label });
+  return NextResponse.json({ url: signedUrl, label: ctx.doc.label });
 }
 
 export async function DELETE(
@@ -76,7 +74,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
   }
 
-  await supabase.storage.from(BUCKET).remove([ctx.doc.storagePath]).catch((err) => {
+  await deleteObject(ctx.doc.storagePath).catch((err) => {
     logger.warn('[deals/docs] storage cleanup failed', { dealId: id, docId, path: ctx.doc.storagePath }, err);
   });
 
