@@ -10,7 +10,7 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (32 tools):
+Tool surface (33 tools):
   - create_contact / find_contacts / get_contact_activity / update_contact
   - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
   - recall_docs
@@ -29,7 +29,7 @@ Tool surface (32 tools):
   - create_plan
   - get_intake_form / add_intake_question / remove_intake_question
     / update_intake_question / save_intake_form
-  - generate_studio_image
+  - generate_studio_image / edit_studio_image
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
-from tools.studio import generate_studio_image
+from tools.studio import generate_studio_image, edit_studio_image
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -130,6 +130,10 @@ image, a branded quote card, a short listing video — call
 generate_studio_image with a vivid, specific description. It renders the
 asset on-brand and saves it to the realtor's Files and Studio. Make it;
 don't just describe what you would make.
+
+To change an image that already exists — upscale it, cut its background,
+or restyle it by instruction — call edit_studio_image with the file_id.
+Chain it after generate_studio_image to refine what you just made.
 
 # Lifecycle moves (brokerage-grade actions)
 Beyond reading and drafting you can directly move the deal lifecycle:
@@ -354,6 +358,7 @@ def make_chippi_agent(
         save_intake_form,
         # Studio — content generation
         generate_studio_image,
+        edit_studio_image,
     ]
     return Agent[None](
         name="Chippi",
