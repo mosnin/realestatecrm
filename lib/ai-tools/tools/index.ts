@@ -97,6 +97,10 @@ import { requestDealReviewTool } from './request-deal-review';
 import { recallHistoryTool } from './recall-history';
 import { readAttachmentTool } from './read-attachment';
 
+// Files (Wasabi-backed user uploads)
+import { listFilesTool } from './list-files';
+import { readFileTool } from './read-file';
+
 // Planning
 import { createPlanTool } from './plan';
 
@@ -176,6 +180,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+  listFilesTool as ToolDefinition,
+  readFileTool as ToolDefinition,
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,

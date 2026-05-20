@@ -42,6 +42,10 @@ async function getClient() {
 export interface SendSMSParams {
   to: string;
   body: string;
+  /** Optional public URLs for media attachments — when present Telnyx
+   *  upgrades the message to MMS. Carrier-side limits apply (typically
+   *  ~600 KB per asset, ~1 MB total). */
+  mediaUrls?: string[];
 }
 
 /**
@@ -85,12 +89,22 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
   }
 
   try {
+    const hasMedia = Array.isArray(params.mediaUrls) && params.mediaUrls.length > 0;
     const response = await client.messages.send({
       from: fromNumber,
       to: toNumber,
       text: params.body,
+      // Including media_urls promotes the send from SMS to MMS server-side.
+      // Telnyx expects an array of publicly fetchable URLs — caller is
+      // responsible for making sure the URLs resolve without auth.
+      ...(hasMedia ? { media_urls: params.mediaUrls } : {}),
     });
-    logger.info('[sms] sent', { to: toNumber, messageId: response?.data?.id ?? 'unknown', bodyLength: params.body.length });
+    logger.info('[sms] sent', {
+      to: toNumber,
+      messageId: response?.data?.id ?? 'unknown',
+      bodyLength: params.body.length,
+      mediaCount: hasMedia ? params.mediaUrls!.length : 0,
+    });
     return true;
   } catch (err: any) {
     logger.error('[sms] send failed', {

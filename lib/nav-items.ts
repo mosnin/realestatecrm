@@ -6,6 +6,7 @@ import {
   Calendar,
   ClipboardList,
   Building2,
+  FolderOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -81,6 +82,11 @@ export const realtorNavItems: NavItem[] = [
       { href: '/deals/new', label: 'Add property' },
       { href: '/properties/commissions', label: 'Commissions' },
     ],
+  },
+  {
+    href: '/files',
+    label: 'Files',
+    icon: FolderOpen,
   },
   {
     href: '/intake',

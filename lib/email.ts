@@ -249,12 +249,23 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   }
 }
 
+export interface SendEmailAttachment {
+  /** Filename the recipient sees. */
+  filename: string;
+  /** Raw bytes. The caller resolves these (typically by downloading from
+   *  Wasabi via the storage layer) before invoking sendEmailFromCRM. */
+  content: Buffer;
+  /** Optional explicit content-type. Resend infers from filename when omitted. */
+  contentType?: string;
+}
+
 export interface SendEmailFromCRMParams {
   toEmail: string;
   fromName: string;
   replyTo?: string;
   subject: string;
   body: string;
+  attachments?: SendEmailAttachment[];
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
@@ -263,7 +274,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
 
-  const { toEmail, fromName, replyTo, subject, body } = params;
+  const { toEmail, fromName, replyTo, subject, body, attachments } = params;
 
   const html = `
 <!DOCTYPE html>
@@ -292,6 +303,13 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
       replyTo: replyTo ?? undefined,
       subject: safeSubject,
       html,
+      attachments: attachments && attachments.length > 0
+        ? attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType,
+          }))
+        : undefined,
     });
     if (result.error) {
       logger.error('[email] CRM email: Resend API error', { to: toEmail, resendError: result.error });
