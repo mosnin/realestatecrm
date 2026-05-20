@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, CalendarDays, Check, Loader2 } from 'lucide-react';
+import { MessageCircle, CalendarDays, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FollowUpSuggestionsProps {
@@ -109,7 +109,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2.5">
       <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-        <Sparkles size={13} />
+        <MessageCircle size={13} />
         Suggested follow-ups
       </div>
       <div className="space-y-2">

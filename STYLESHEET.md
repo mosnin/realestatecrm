@@ -853,7 +853,7 @@ MessageSquare   SMS / draft
 Mail            email
 Bell            follow-up scheduled
 Brain           memory / observation
-Sparkles        Chippi (the agent itself)
+MessageCircle   Chippi (the agent itself)
 ```
 
 ---

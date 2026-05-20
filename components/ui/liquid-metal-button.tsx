@@ -1,5 +1,5 @@
 import { liquidMetalFragmentShader, ShaderMount } from "@paper-design/shaders";
-import { Sparkles } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
@@ -184,7 +184,7 @@ export function LiquidMetalButton({
             }}
           >
             {viewMode === "icon" && (
-              <Sparkles
+              <MessageCircle
                 size={16}
                 style={{
                   color: isLight ? "#374151" : "#666666",

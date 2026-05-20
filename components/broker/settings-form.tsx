@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle2, Upload, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle2, Upload, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
@@ -177,7 +177,7 @@ export function BrokerageSettingsForm({
                 toast.success('Privacy policy template generated');
               }}
             >
-              <Sparkles size={14} className="mr-1.5" />
+              <MessageCircle size={14} className="mr-1.5" />
               Generate template
             </Button>
           )}

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
   Loader2,
-  Sparkles,
+  MessageCircle,
   Save,
   ChevronDown,
   ChevronRight,
@@ -604,7 +604,7 @@ export function ScoringTab({
           {generating ? (
             <><Loader2 size={14} className="animate-spin" /> Thinking…</>
           ) : (
-            <><Sparkles size={14} /> Draft it for me</>
+            <><MessageCircle size={14} /> Draft it for me</>
           )}
         </PrimaryButton>
       </div>
@@ -632,7 +632,7 @@ export function ScoringTab({
               {generating ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
-                <Sparkles size={13} />
+                <MessageCircle size={13} />
               )}
               Regenerate
             </GhostButton>

@@ -51,7 +51,7 @@ import {
   ArrowUp,
   Check,
   Loader2,
-  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 import type { IntakeFormConfig, FormQuestion } from '@/lib/types';
 
@@ -563,7 +563,7 @@ function AssistantAvatar({
       aria-hidden
       className="w-7 h-7 rounded-full flex-shrink-0 inline-flex items-center justify-center bg-foreground/[0.06]"
     >
-      <Sparkles className="w-3 h-3 text-muted-foreground" />
+      <MessageCircle className="w-3 h-3 text-muted-foreground" />
     </span>
   );
 }

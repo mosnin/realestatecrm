@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, ArrowRight, Files, GalleryVerticalEnd, MapPin, Sparkles } from 'lucide-react';
+import { Activity, ArrowRight, Files, GalleryVerticalEnd, MapPin, MessageCircle } from 'lucide-react';
 import DottedMap from 'dotted-map';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card } from '@/components/ui/card';
@@ -76,7 +76,7 @@ export default function CombinedFeaturedSection() {
             description="Capture budget, timeline, and preferred areas in one clean form."
           />
           <FeatureCard
-            icon={<Sparkles className="w-4 h-4" />}
+            icon={<MessageCircle className="w-4 h-4" />}
             title="Practical scoring"
             subtitle="Actionable priority"
             description="See clear lead scores and context so you know who to call first."

@@ -44,7 +44,6 @@ import {
   Plus,
   Check,
   Search,
-  Sparkles,
   Flag,
   History,
 } from 'lucide-react';
@@ -88,7 +87,7 @@ const brokerAdminNavSections = [
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Chippi', icon: Sparkles, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },

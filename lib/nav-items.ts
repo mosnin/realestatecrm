@@ -1,7 +1,7 @@
 import {
   Users,
   Briefcase,
-  Sparkles,
+  MessageCircle,
   Settings,
   Calendar,
   ClipboardList,
@@ -46,7 +46,7 @@ export const realtorNavItems: NavItem[] = [
   {
     href: '/chippi',
     label: 'Chippi',
-    icon: Sparkles,
+    icon: MessageCircle,
     isAI: true,
     badgeKey: 'pendingDrafts',
     children: [
@@ -123,7 +123,7 @@ export const secondaryNavItems = [
 
 /** Primary items with shorter labels for the mobile bottom bar. */
 export const mobileNavItems = [
-  { href: '/chippi', label: 'Chippi', icon: Sparkles },
+  { href: '/chippi', label: 'Chippi', icon: MessageCircle },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/calendar', label: 'Calendar', icon: Calendar },

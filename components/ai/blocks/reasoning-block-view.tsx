@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { ReasoningBlock } from '@/lib/ai-tools/blocks';
@@ -68,7 +68,7 @@ export function ReasoningBlockView({ block, streaming }: ReasoningBlockViewProps
             expanded ? 'rotate-90' : 'rotate-0',
           )}
         />
-        <Sparkles
+        <MessageCircle
           className="w-3.5 h-3.5 shrink-0 text-neutral-500 dark:text-neutral-400"
           aria-hidden
         />

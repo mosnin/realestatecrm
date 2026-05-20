@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2, ArrowRight } from 'lucide-react';
+import { MessageCircle, Loader2, ArrowRight } from 'lucide-react';
 import {
   renderTemplate,
   type MessageChannel,
@@ -77,7 +77,7 @@ export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disa
         disabled={disabled}
         className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
-        {loading ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <MessageCircle size={11} />}
         {label}
       </button>
 

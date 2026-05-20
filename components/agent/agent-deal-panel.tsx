@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Brain, Activity, Zap, CheckCircle2, XCircle, RefreshCw, Loader2, Sparkles } from 'lucide-react';
+import { Brain, Activity, Zap, CheckCircle2, XCircle, RefreshCw, Loader2, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { ImportanceDot } from './importance-dot';
@@ -111,7 +111,7 @@ export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; sl
             href={`/s/${slug}/chippi?q=${encodeURIComponent(`Tell me about my deal "${dealTitle ?? 'this deal'}" and suggest next steps`)}`}
             className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
           >
-            <Sparkles size={11} />
+            <MessageCircle size={11} />
             Ask Chippi
           </Link>
           <button

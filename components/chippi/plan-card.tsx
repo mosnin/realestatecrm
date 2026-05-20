@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Check } from 'lucide-react';
+import { MessageCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL, BODY_MUTED, BODY_COMPACT } from '@/lib/typography';
 import { EASE_OUT, DURATION_BASE, DURATION_SLOW } from '@/lib/motion';
@@ -144,7 +144,7 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
                 : 'bg-muted text-muted-foreground',
             )}
           >
-            <Sparkles size={13} />
+            <MessageCircle size={13} />
           </motion.div>
 
           {/* Checkmark badge — fades in once all steps are visible */}

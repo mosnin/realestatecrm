@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { ArrowLeft, Wrench, Sparkles } from 'lucide-react';
+import { ArrowLeft, Wrench, MessageCircle } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -270,7 +270,7 @@ export default async function AgentTaskDetailPage({
                     {/* Tool name + type icon */}
                     <div className="flex items-center gap-1.5">
                       {isLlmCall ? (
-                        <Sparkles size={12} className="flex-shrink-0 text-muted-foreground" />
+                        <MessageCircle size={12} className="flex-shrink-0 text-muted-foreground" />
                       ) : (
                         <Wrench size={12} className="flex-shrink-0 text-muted-foreground" />
                       )}

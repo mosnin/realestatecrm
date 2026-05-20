@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, CheckCircle2, Loader2, Shield, Zap } from 'lucide-react';
+import { ArrowRight, MessageCircle, CheckCircle2, Loader2, Shield, Zap } from 'lucide-react';
 
 /**
  * Blocks dashboard access for users without an active subscription.
@@ -68,7 +68,7 @@ export function SubscriptionGate({
         <div className="rounded-2xl border border-border bg-card shadow-lg p-8 text-center space-y-6">
           <div className="space-y-2">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <Sparkles size={26} className="text-primary" />
+              <MessageCircle size={26} className="text-primary" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Start your free trial</h1>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">

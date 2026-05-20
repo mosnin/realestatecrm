@@ -13,7 +13,7 @@ import {
   Phone,
   Mail,
   Home,
-  Sparkles,
+  MessageCircle,
   CircleAlert,
   Briefcase,
   DollarSign,
@@ -122,7 +122,7 @@ export default async function LeadDetailPage({
         <div className="px-5 py-4 space-y-4">
           <div className="rounded-lg border border-border p-3">
             <div className="flex items-center gap-2 text-sm font-semibold mb-1">
-              <Sparkles size={14} className="text-primary" /> AI score
+              <MessageCircle size={14} className="text-primary" /> AI score
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-3xl font-bold tabular-nums">{lead.leadScore != null ? Math.round(lead.leadScore) : '—'}</span>

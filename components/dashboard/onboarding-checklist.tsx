@@ -8,7 +8,7 @@ import {
   Link2,
   Settings,
   Users,
-  Sparkles,
+  MessageCircle,
   CalendarDays,
   X,
   Rocket,
@@ -90,7 +90,7 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
       label: 'Create your first deal',
       description: 'Track a leasing opportunity in your pipeline',
       href: `${base}/deals`,
-      icon: Sparkles,
+      icon: MessageCircle,
       completed: hasDeals,
     },
   ];

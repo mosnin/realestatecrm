@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Send, Pencil, Clock, Loader2, MessageSquare, Mail, StickyNote, AlertTriangle,
-  CheckCircle2, ArrowRight, HelpCircle, Sparkles,
+  CheckCircle2, ArrowRight, HelpCircle, MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -564,7 +564,7 @@ function FocusWelcome({
         animate={{ scale: [1, 1.04, 1] }}
         transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
       >
-        <Sparkles size={20} className="text-amber-500 dark:text-amber-400" aria-hidden />
+        <MessageCircle size={20} className="text-amber-500 dark:text-amber-400" aria-hidden />
       </motion.div>
       <h2
         className="text-3xl tracking-tight text-foreground"

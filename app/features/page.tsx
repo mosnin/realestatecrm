@@ -14,7 +14,7 @@ import {
   Phone,
   Mail,
   Calendar,
-  Sparkles,
+  MessageCircle,
   Zap,
   TrendingUp,
   StickyNote,
@@ -146,7 +146,7 @@ export default function FeaturesPage() {
         <section className="px-6 pt-36 pb-20 text-center">
           <div className="mx-auto max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
-              <Sparkles size={12} />
+              <MessageCircle size={12} />
               Built for solo realtors
             </div>
             <h1 className="font-title text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">

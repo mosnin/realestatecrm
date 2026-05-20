@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bot, Target, TrendingUp, ChevronDown, ChevronUp, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Bot, Target, TrendingUp, ChevronDown, ChevronUp, MessageCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 

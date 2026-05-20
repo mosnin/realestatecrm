@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Sparkles,
+  MessageCircle,
   CheckCircle2,
   XCircle,
   Loader2,
@@ -79,7 +79,7 @@ function getEventStyle(type: string): EventStyle {
       };
     case 'plan_created':
       return {
-        icon: <Sparkles size={13} />,
+        icon: <MessageCircle size={13} />,
         dotClass: 'bg-blue-500',
         iconClass: 'text-blue-500',
       };

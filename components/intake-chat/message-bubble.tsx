@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { Sparkles } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface MessageBubbleProps {
@@ -58,13 +58,13 @@ function AgentAvatar({
     );
   }
 
-  // Fallback: Sparkles icon in a neutral circle
+  // Fallback: MessageCircle icon in a neutral circle
   return (
     <span
       className="w-6 h-6 rounded-full flex-shrink-0 inline-flex items-center justify-center bg-foreground/[0.06]"
       aria-hidden="true"
     >
-      <Sparkles className="w-3 h-3 text-muted-foreground" />
+      <MessageCircle className="w-3 h-3 text-muted-foreground" />
     </span>
   );
 }

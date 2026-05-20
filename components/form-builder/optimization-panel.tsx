@@ -13,7 +13,7 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  Sparkles,
+  MessageCircle,
   Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -198,7 +198,7 @@ function SuggestionRow({
             <p className="text-sm font-medium text-foreground leading-snug">{suggestion.title}</p>
             <MutedPill>{TYPE_LABELS[suggestion.type] ?? suggestion.type}</MutedPill>
             <MutedPill>
-              {isAI ? <Sparkles size={9} /> : <Database size={9} />}
+              {isAI ? <MessageCircle size={9} /> : <Database size={9} />}
               {isAI ? 'AI' : 'data'}
             </MutedPill>
           </div>

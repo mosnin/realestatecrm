@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Sparkles,
+  MessageCircle,
   User,
   Mail,
   Phone,
@@ -69,7 +69,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
         disabled={loading}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
       >
-        {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+        {loading ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
         Prep
         {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
       </button>
@@ -79,7 +79,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
           {/* Header */}
           <div className="px-4 py-3 bg-primary/5 border-b border-border">
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-              <Sparkles size={13} />
+              <MessageCircle size={13} />
               Tour Prep — {prep.guestName}
             </div>
             <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
