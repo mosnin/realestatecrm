@@ -87,6 +87,9 @@ export const realtorNavItems: NavItem[] = [
     href: '/files',
     label: 'Files',
     icon: FolderOpen,
+    children: [
+      { href: '/documents', label: 'Documents' },
+    ],
   },
   {
     href: '/intake',

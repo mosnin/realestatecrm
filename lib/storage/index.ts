@@ -116,6 +116,21 @@ export async function getSignedDownloadUrl(
 }
 
 /**
+ * Fetch an object's full contents as a UTF-8 string. For small text objects
+ * we own — editor-authored documents — where the caller needs the body
+ * inline rather than a download URL.
+ */
+export async function getObjectText(key: string): Promise<string> {
+  const client = getWasabiClient();
+  const bucket = getWasabiBucket();
+  const res = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+  if (!res.Body) return '';
+  return res.Body.transformToString('utf-8');
+}
+
+/**
  * Server-side copy an object to a new key. The source bytes never round
  * trip through our infrastructure — Wasabi handles it internally. Use to
  * promote a private file to a public prefix (e.g. files/ → property-photos/)
