@@ -17,6 +17,7 @@ import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
+import { inngest } from '@/lib/inngest/client';
 
 export const runtime = 'nodejs';
 
@@ -173,6 +174,34 @@ export async function POST(req: NextRequest) {
   if (postErr) {
     logger.error('[studio.schedule] post insert failed', { spaceId: space.id }, postErr);
     return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+  }
+
+  // Hand the post to Inngest — a delayed event fires the publish at the
+  // scheduled time. If the send fails the post would never go out, so mark
+  // it failed rather than leave a silent zombie.
+  try {
+    const sent = await inngest.send({
+      name: 'studio/post.scheduled',
+      data: { postId: post.id },
+      ts: scheduledAt.getTime(),
+    });
+    const eventId = sent.ids?.[0];
+    if (eventId) {
+      await supabase
+        .from('StudioPost')
+        .update({ inngestEventId: eventId })
+        .eq('id', post.id);
+    }
+  } catch (err) {
+    logger.error('[studio.schedule] inngest send failed', { spaceId: space.id }, err as Error);
+    await supabase
+      .from('StudioPost')
+      .update({ status: 'failed', updatedAt: new Date().toISOString() })
+      .eq('id', post.id);
+    return NextResponse.json(
+      { error: 'Could not schedule the post. Please try again.' },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json(post, { status: 201 });
