@@ -1,108 +1,109 @@
 # PRODUCT_SCOPE.md
 
-Current product truth and scope guardrails for Chippi.
+What Chippi is, who it serves, and the guardrails that keep new work on-product.
 
-This document protects the launch wedge and defines what is in scope now versus later.
-
----
-
-## 1. Primary user now
-
-New solo realtors in the U.S. who are handling renter and leasing leads.
-
-These users:
-- Are early in their career or building a solo practice
-- Need a fast, lightweight way to capture and qualify renter leads
-- Do not want or need enterprise CRM complexity
-- Value speed to first value over breadth of features
+Current as of 2026-05. Read alongside `AGENTS.md` §1–2 (the canonical definition) and `ROADMAP.md` (what's being built now). If this file disagrees with `AGENTS.md`, `AGENTS.md` wins.
 
 ---
 
-## 2. Launch wedge
+## 1. What Chippi is
 
-Chippi's launch wedge is **not** generic CRM breadth.
+Chippi is an **agentic operating system for U.S. real estate agents and brokerages.**
 
-The wedge is:
+A realtor's book of business — contacts, leads, deals, tours, properties, applications — is the workspace. Chippi is an autonomous AI agent that works *inside* that workspace on the realtor's behalf: it qualifies inbound leads, drafts and sends follow-up, schedules tours, advances deals, produces marketing content, and surfaces what needs attention — taking sign-off only where a human decision is genuinely required.
 
-1. One intake link — shareable anywhere (bio, DMs, ads, email)
-2. Structured renter qualification form — name, phone, budget, timeline, areas, notes
-3. Explainable AI-assisted lead scoring — practical triage, not black-box magic
-4. Lightweight CRM clarity — leads, contacts, deals in a clean interface
-5. Faster follow-up — less chaos, more context, professional workflow
+**The product is the agent.** The CRM-style data structures underneath it — contacts, deals, pipelines — are *substrate, not the product*. Chippi is not a database the realtor maintains; it is an operator that maintains it for them. It runs two ways:
 
-Everything in the product should serve this wedge until explicitly expanded.
+- **On request** — the realtor talks to Chippi in chat; it does the job and reports back.
+- **On its own** — workspace events (new lead, application submitted, tour completed, deal stage change, inbound message) and scheduled sweeps wake Chippi to act in near real-time, without being asked.
 
----
+Two principles follow, and they govern every scope decision:
 
-## 3. Core product promise
-
-Help realtors qualify renter and leasing leads faster, with less chaos, more context, and a more professional workflow.
+1. **New work should make Chippi do more on the user's behalf** — not add a surface the user operates themselves.
+2. **A configuration screen is a last resort.** "We'll add a setting" usually means the agent didn't do its job. Decide it, or teach the agent to.
 
 ---
 
-## 4. Current v1 scope (repo-confirmed)
+## 2. Who it serves
 
-| Feature | Status | Key files |
-|---|---|---|
-| Auth (Clerk sign-up/sign-in) | Implemented | `middleware.ts`, `app/(auth)/*` |
-| Onboarding wizard (7 steps to activation) | Implemented | `app/onboarding/*`, `app/api/onboarding/route.ts` |
-| Intake link setup and public form | Implemented | `app/apply/[slug]/*`, `app/api/public/apply/route.ts` |
-| Structured application ingestion into CRM | Implemented | `app/api/public/apply/route.ts` → Contact creation |
-| Lead scoring with explainable summary | Implemented | `lib/lead-scoring.ts` (OpenAI gpt-4o-mini) |
-| CRM: Leads list (intake-sourced) | Implemented | `app/s/[slug]/leads/page.tsx` |
-| CRM: Contacts CRUD with lifecycle types | Implemented | `app/s/[slug]/contacts/*`, `app/api/contacts/*` |
-| CRM: Deals kanban board | Implemented | `app/s/[slug]/deals/*`, `app/api/deals/*` |
-| AI assistant (chat with RAG context) | Implemented | `app/s/[slug]/ai/*`, `lib/ai.ts` |
-| Workspace settings | Implemented | `app/s/[slug]/settings/*`, `app/api/spaces/route.ts` |
-| Landing page | Implemented | `app/page.tsx` |
-| Legal pages (terms, privacy, cookies) | Implemented | `app/legal/*` |
+- **Solo and independent realtors** — Chippi runs the lead pipeline end to end.
+- **Brokerages** — broker owners and admins oversee a team of agents: lead routing, commissions, deal review, performance. The brokerage tier is *part of one product*, not a separate one — an operating system for real estate spans the individual agent and the firm they belong to.
+- **Broker-only users** — oversee a team without running a personal lead workspace.
 
 ---
 
-## 5. Explicit out-of-scope items (unless explicitly instructed)
+## 3. The launch wedge — the way in, not the ceiling
 
-- Broad "all-in-one CRM" expansion
-- Enterprise features (team accounts, roles, permissions)
-- Advanced automation systems not already present
-- Marketing campaign tools
-- Email sending or SMS integration
-- Property listing management
-- MLS integration
-- Transaction management
-- Document signing
-- Product direction rewrites
-- Multi-tenant team workspaces (currently one space per user)
+The product is broad. The **go-to-market entry point is deliberately narrow.** The wedge is how Chippi lands a first user and proves itself fast; it is not a cap on what Chippi is.
+
+- **Who**: new solo realtors in the U.S.
+- **What**: renter and leasing lead qualification
+- **Why this wedge**: it's the shortest path to a realtor *feeling* the agent do real work — minimal setup, one shareable intake link, an explainable score, follow-up that happens without being asked
+- **Activation event**: intake link generated
+- **Retention signal**: applications flowing in, and the realtor returning to act on what Chippi surfaced
+
+"Protect the wedge" means: keep the **first-run experience** fast and unsprawled — sign-up to live intake link stays minimal. It does **not** mean the product stops at renter leads. Depth elsewhere is welcome; friction on a new realtor's path to first value is not.
+
+---
+
+## 4. What Chippi does today
+
+A capability snapshot — categorical, not exhaustive. For the live surface map see `ARCHITECTURE.md` and `README.md`.
+
+- **Autonomous agent** — chat plus event-triggered background runs; tool-use across the whole workspace; every mutation is approval-gated; Chippi drafts, it never sends silently
+- **Public intake** — branded, customizable, conversational application pages; separate rental and buyer flows
+- **Explainable lead scoring** — every lead gets a score, a hot/warm/cold label, and a plain-language reason
+- **Lead → contact → deal pipeline** — the CRM substrate, with customizable stages
+- **Tours** — scheduling, public booking pages, calendar sync, reminders, post-tour feedback
+- **Properties** — listings and shareable property packets
+- **Brokerage tier** — team roster, invitations, lead routing, commission ledger, deal review, leaderboards, audit log
+- **Studio** — AI image and video generation, brand kit, social-post composer, scheduling and publishing
+- **Integrations** — connected toolkits (Gmail, HubSpot, Slack, Google Calendar) become agent tools; Chippi is also exposed as an MCP server
+- **Notifications** — email and SMS for leads, tours, deals, follow-ups
+- **Analytics** — pipeline, leads, tours, form traffic, team performance
+- **Files & documents** — uploads and an in-app document editor
+- **Billing** — per-seat brokerage subscriptions are in place; usage-based agent metering is in progress (see `ROADMAP.md`)
+
+---
+
+## 5. Scope guardrails — on-product vs. off-product
+
+Earlier versions of this file kept a list of *forbidden features*. Feature lists rot — several "out of scope" items (team accounts, SMS, marketing tools) shipped, and the doc went stale and started misdirecting. Judge new work by **principle** instead.
+
+**On-product** — the change:
+
+- makes the agent do more of the realtor's work, or do it better
+- removes a step the human currently does by hand
+- deepens a surface that already exists
+
+**Off-product** — the change:
+
+- adds a setting, toggle, or config surface the realtor must operate themselves — the agent should decide, or learn the preference
+- expands toward generic all-in-one CRM breadth that doesn't route through the agent
+- ships AI output that isn't explainable or actionable
+- adds friction to the sign-up → live intake link path
+
+The test, when unsure: *does this make Chippi more of an operator, or more of a tool the realtor operates?* Operator wins.
+
+Note for AI coding agents: this section describes *product* scope. It does not loosen `AGENTS.md` §3 and §8 — you still never build a feature without explicit instruction, on-product or not.
 
 ---
 
 ## 6. Anti-goals
 
-1. Do not drift toward generic CRM dashboards with low activation value.
-2. Do not prioritize feature count over qualification speed and clarity.
-3. Do not introduce "AI magic" without explainability — every AI output should be practical and transparent.
-4. Do not add complexity that increases setup friction.
-5. Do not build for enterprise workflows when the user is a solo realtor.
-6. Do not optimize for vanity metrics (page views, sign-ups) over activation metrics (intake link generated, applications received).
+1. Don't drift toward a generic CRM dashboard the realtor babysits. The agent does the work.
+2. Don't ship "AI magic" without explainability — every AI output is practical and transparent.
+3. Don't add setup friction. First-run stays minimal.
+4. Don't solve with a setting what the agent could decide or learn.
+5. Don't optimize vanity metrics (sign-ups, page views) over activation (intake link generated, applications received, agent actions taken).
+6. Don't let breadth degrade the wedge's first-run experience.
 
 ---
 
-## 7. What success looks like (this phase)
+## 7. What success looks like
 
-- **Fast setup**: realtor goes from sign-up to live intake link in under 5 minutes
-- **Activation**: intake link generated (the activation event)
-- **Usage**: repeated application submissions flowing through the CRM
-- **Reliability**: lead context arrives in CRM consistently with scoring
-- **Practical AI**: scoring helps follow-up decisions with explainable labels and summaries
-- **Retention signal**: repeated workflow use — realtor returns to check and act on leads
-
----
-
-## 8. Product principles that prevent drift
-
-1. **Protect the wedge**: renter/leasing qualification for new solo realtors.
-2. **Activation over vanity**: measure intake link generation and application completions, not page views.
-3. **Setup friction must stay low**: onboarding should feel like 3 minutes, not a configuration project.
-4. **AI must be practical and explainable**: score + label + summary, not opaque scores or vague recommendations.
-5. **Modern, calm, product-first tone**: the UI and copy should feel clean, not cluttered or enterprise-y.
-6. **Speed and clarity over breadth**: a smaller set of features that work well beats a larger set that feels busy.
-7. **Qualify, don't overwhelm**: the CRM exists to triage and follow up, not to manage entire real estate operations.
+- **Setup**: sign-up to live intake link in minutes, not a configuration project
+- **Activation**: intake link generated
+- **The agent earns trust**: Chippi takes real actions — scored leads, drafted follow-up, booked tours — and the realtor sees and approves them
+- **Retention**: the realtor returns to act on what Chippi surfaced, and lets it do more over time
+- **Brokerage**: brokers run team oversight — routing, commissions, review — through Chippi rather than spreadsheets
