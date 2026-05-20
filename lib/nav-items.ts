@@ -93,6 +93,7 @@ export const realtorNavItems: NavItem[] = [
       { href: '/studio/edit', label: 'Edit' },
       { href: '/studio/compose', label: 'Compose' },
       { href: '/studio/schedule', label: 'Schedule' },
+      { href: '/studio/library', label: 'Library' },
       { href: '/studio/brand', label: 'Brand' },
     ],
   },

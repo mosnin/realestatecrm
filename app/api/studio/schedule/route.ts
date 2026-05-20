@@ -206,3 +206,38 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(post, { status: 201 });
 }
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const space = await getSpaceForUser(auth.userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'Missing post id' }, { status: 400 });
+  }
+
+  // Only a still-scheduled post in this space can be canceled. The Inngest
+  // publish function skips any post that is not 'scheduled', so flipping the
+  // status is the whole cancel mechanism.
+  const { data, error } = await supabase
+    .from('StudioPost')
+    .update({ status: 'canceled', updatedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('spaceId', space.id)
+    .eq('status', 'scheduled')
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    logger.error('[studio.schedule] cancel failed', { spaceId: space.id }, error);
+    return NextResponse.json({ error: 'Could not cancel the post.' }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json(
+      { error: 'That post can no longer be canceled.' },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ id, status: 'canceled' });
+}

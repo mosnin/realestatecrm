@@ -43,6 +43,14 @@ function formatWhen(iso: string): string {
   });
 }
 
+const STATUS_TONE: Record<string, string> = {
+  scheduled: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  publishing: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  posted: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+  failed: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
+  canceled: 'text-muted-foreground bg-muted',
+};
+
 export function SchedulePanel({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -54,6 +62,7 @@ export function SchedulePanel({ slug }: { slug: string }) {
   const [when, setWhen] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -115,6 +124,25 @@ export function SchedulePanel({ slug }: { slug: string }) {
       setError(e instanceof Error ? e.message : 'Could not schedule the post.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleCancel(id: string) {
+    setCanceling(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/studio/schedule?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const b = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(b.error || 'Could not cancel the post.');
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not cancel the post.');
+    } finally {
+      setCanceling(null);
     }
   }
 
@@ -256,7 +284,22 @@ export function SchedulePanel({ slug }: { slug: string }) {
                     {formatWhen(post.scheduledAt)} · {post.platforms.map(nameOf).join(', ')}
                   </p>
                 </div>
-                <span className="inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 capitalize text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15 flex-shrink-0">
+                {post.status === 'scheduled' && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCancel(post.id)}
+                    disabled={canceling === post.id}
+                    className="text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 flex-shrink-0"
+                  >
+                    {canceling === post.id ? 'Canceling…' : 'Cancel'}
+                  </button>
+                )}
+                <span
+                  className={cn(
+                    'inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 capitalize flex-shrink-0',
+                    STATUS_TONE[post.status] ?? STATUS_TONE.scheduled,
+                  )}
+                >
                   {post.status}
                 </span>
               </li>
