@@ -18,6 +18,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface DocRow {
   id: string;
@@ -190,12 +191,10 @@ export function DocumentsPanel() {
           maxLength={200}
           className="w-full bg-transparent text-xl font-semibold text-foreground placeholder:text-muted-foreground/60 outline-none"
         />
-        <textarea
+        <RichTextEditor
           value={draft.content}
-          onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-          placeholder="Write or paste your document here…"
-          aria-label="Document content"
-          className="w-full min-h-[60vh] rounded-md border border-input bg-transparent px-3.5 py-3 text-base sm:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/70 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background transition-colors resize-y"
+          onChange={(html) => setDraft({ ...draft, content: html })}
+          placeholder="Write your document — headings, lists, links, quotes, the works."
         />
         <p className="text-[11px] text-muted-foreground">
           Saved to your documents. Chippi can read it and attach it to a deal — it won&apos;t change your wording.

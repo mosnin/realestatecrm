@@ -798,3 +798,17 @@
 @media (prefers-reduced-motion: reduce) {
   .chippi-cursor { animation: none; opacity: 1; }
 }
+
+/* ── Tiptap rich-text editor ─────────────────────────────────────────────────
+ * The Placeholder extension tags the empty first node; this renders the
+ * placeholder text into it. Scoped to .tiptap so it never leaks elsewhere. */
+.tiptap .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap:focus {
+  outline: none;
+}
