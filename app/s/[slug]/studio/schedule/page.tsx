@@ -8,10 +8,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function StudioSchedulePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ fileId?: string }>;
 }) {
   const { slug } = await params;
+  const { fileId } = await searchParams;
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -26,7 +29,10 @@ export default async function StudioSchedulePage({
           Queue a post to the social accounts you have connected.
         </p>
       </header>
-      <SchedulePanel slug={slug} />
+      <SchedulePanel
+        slug={slug}
+        initialFileId={typeof fileId === 'string' ? fileId : null}
+      />
     </div>
   );
 }

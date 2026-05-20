@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -16,6 +17,7 @@ interface LibraryItem {
   kind: string;
   model: string;
   prompt: string;
+  fileId: string;
   createdAt: string;
   url: string | null;
 }
@@ -85,11 +87,19 @@ export function LibraryPanel() {
               )
             ) : null}
           </div>
-          {item.prompt && (
-            <p className={cn(CAPTION, 'px-2.5 py-2 line-clamp-2')} title={item.prompt}>
-              {item.prompt}
-            </p>
-          )}
+          <div className="px-2.5 py-2 space-y-1.5">
+            {item.prompt && (
+              <p className={cn(CAPTION, 'line-clamp-2')} title={item.prompt}>
+                {item.prompt}
+              </p>
+            )}
+            <Link
+              href={`../schedule?fileId=${item.fileId}`}
+              className="inline-block text-[11.5px] font-medium text-foreground hover:underline underline-offset-2"
+            >
+              Schedule →
+            </Link>
+          </div>
         </div>
       ))}
     </div>

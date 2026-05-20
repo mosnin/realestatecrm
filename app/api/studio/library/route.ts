@@ -61,6 +61,7 @@ export async function GET() {
         kind: r.kind,
         model: r.model,
         prompt: r.prompt ?? '',
+        fileId: r.fileId,
         createdAt: r.createdAt,
         url: key ? await getSignedDownloadUrl(key, 3600) : null,
       };

@@ -92,9 +92,11 @@ export async function POST(req: NextRequest) {
     requested = [];
   }
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'The post needs an image.' }, { status: 400 });
-  }
+  const fileIdInput =
+    typeof formData.get('fileId') === 'string'
+      ? String(formData.get('fileId')).trim()
+      : '';
+
   if (caption.length > MAX_CAPTION) {
     return NextResponse.json({ error: 'That caption is too long.' }, { status: 400 });
   }
@@ -117,44 +119,62 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-  const validation = validateUpload({ mimeType: file.type, sizeBytes: file.size, header });
-  if (!validation.ok) {
-    return NextResponse.json({ error: validation.reason }, { status: 400 });
-  }
-  if (validation.category !== 'image') {
-    return NextResponse.json({ error: 'The post image must be an image file.' }, { status: 400 });
-  }
+  // Resolve the post image: an existing Studio asset handed off from
+  // Create / Edit / Library, or a fresh upload.
+  let fileId: string;
+  if (fileIdInput) {
+    const { data: existing } = await supabase
+      .from('File')
+      .select('id')
+      .eq('id', fileIdInput)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json({ error: 'That image was not found.' }, { status: 400 });
+    }
+    fileId = fileIdInput;
+  } else {
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: 'The post needs an image.' }, { status: 400 });
+    }
+    const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const validation = validateUpload({ mimeType: file.type, sizeBytes: file.size, header });
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.reason }, { status: 400 });
+    }
+    if (validation.category !== 'image') {
+      return NextResponse.json({ error: 'The post image must be an image file.' }, { status: 400 });
+    }
 
-  // Store the image as a File.
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const fileId = crypto.randomUUID();
-  const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg';
-  const name = `post-${fileId.slice(0, 8)}.${ext}`;
-  const storageKey = buildKey('studio', space.id, `${fileId}-${name}`);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    fileId = crypto.randomUUID();
+    const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg';
+    const name = `post-${fileId.slice(0, 8)}.${ext}`;
+    const storageKey = buildKey('studio', space.id, `${fileId}-${name}`);
 
-  try {
-    await uploadObject({ key: storageKey, body: buffer, contentType: file.type, isPublic: false });
-  } catch (err) {
-    logger.error('[studio.schedule] upload failed', { spaceId: space.id }, err as Error);
-    return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
-  }
+    try {
+      await uploadObject({ key: storageKey, body: buffer, contentType: file.type, isPublic: false });
+    } catch (err) {
+      logger.error('[studio.schedule] upload failed', { spaceId: space.id }, err as Error);
+      return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+    }
 
-  const { error: fileErr } = await supabase.from('File').insert({
-    id: fileId,
-    spaceId: space.id,
-    userId,
-    storageKey,
-    name,
-    mimeType: file.type,
-    category: 'image',
-    sizeBytes: buffer.length,
-    isPublic: false,
-  });
-  if (fileErr) {
-    await deleteObject(storageKey).catch(() => undefined);
-    logger.error('[studio.schedule] file insert failed', { spaceId: space.id }, fileErr);
-    return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+    const { error: fileErr } = await supabase.from('File').insert({
+      id: fileId,
+      spaceId: space.id,
+      userId,
+      storageKey,
+      name,
+      mimeType: file.type,
+      category: 'image',
+      sizeBytes: buffer.length,
+      isPublic: false,
+    });
+    if (fileErr) {
+      await deleteObject(storageKey).catch(() => undefined);
+      logger.error('[studio.schedule] file insert failed', { spaceId: space.id }, fileErr);
+      return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+    }
   }
 
   const { data: post, error: postErr } = await supabase

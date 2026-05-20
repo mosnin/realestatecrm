@@ -10,6 +10,7 @@
 
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { Upload, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -195,7 +196,15 @@ export function EditPanel() {
             alt="Edited image"
             className="w-full rounded-xl border border-border/60"
           />
-          <p className={CAPTION}>Saved to your files.</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className={CAPTION}>Saved to your files.</p>
+            <Link
+              href={`../schedule?fileId=${result.fileId}`}
+              className="text-[12.5px] font-medium text-foreground hover:underline underline-offset-2"
+            >
+              Schedule a post →
+            </Link>
+          </div>
         </motion.div>
       ) : null}
     </div>

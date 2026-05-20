@@ -51,12 +51,19 @@ const STATUS_TONE: Record<string, string> = {
   canceled: 'text-muted-foreground bg-muted',
 };
 
-export function SchedulePanel({ slug }: { slug: string }) {
+export function SchedulePanel({
+  slug,
+  initialFileId,
+}: {
+  slug: string;
+  initialFileId: string | null;
+}) {
   const [loading, setLoading] = useState(true);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [existingFileId, setExistingFileId] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [when, setWhen] = useState('');
@@ -83,10 +90,34 @@ export function SchedulePanel({ slug }: { slug: string }) {
     void refresh();
   }, [refresh]);
 
+  // An asset handed off from Create / Edit / Library — pre-load it as the
+  // post image so the realtor never has to re-upload.
+  useEffect(() => {
+    if (!initialFileId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/files/${initialFileId}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { url?: string };
+        if (!cancelled && data.url) {
+          setExistingFileId(initialFileId);
+          setPreview(data.url);
+        }
+      } catch {
+        // ignore — the realtor can still upload manually
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialFileId]);
+
   function pickFile(f: File | undefined) {
     if (!f) return;
     setError(null);
     if (preview) URL.revokeObjectURL(preview);
+    setExistingFileId(null);
     setFile(f);
     setPreview(URL.createObjectURL(f));
   }
@@ -99,14 +130,15 @@ export function SchedulePanel({ slug }: { slug: string }) {
 
   async function handleSchedule() {
     if (submitting) return;
-    if (!file) return setError('Add an image for the post.');
+    if (!file && !existingFileId) return setError('Add an image for the post.');
     if (selected.length === 0) return setError('Pick at least one platform.');
     if (!when) return setError('Pick a date and time.');
     setSubmitting(true);
     setError(null);
     try {
       const form = new FormData();
-      form.append('file', file);
+      if (existingFileId) form.append('fileId', existingFileId);
+      else if (file) form.append('file', file);
       form.append('caption', caption.trim());
       form.append('platforms', JSON.stringify(selected));
       form.append('scheduledAt', when);
@@ -115,6 +147,7 @@ export function SchedulePanel({ slug }: { slug: string }) {
       if (!res.ok) throw new Error(body.error || 'Could not schedule the post.');
       if (preview) URL.revokeObjectURL(preview);
       setFile(null);
+      setExistingFileId(null);
       setPreview(null);
       setCaption('');
       setSelected([]);
