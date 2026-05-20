@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import { ImagePlus } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
-import { EmptyState } from '@/components/ui/empty-state';
+import { CreatePanel } from './create-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 
@@ -24,14 +23,10 @@ export default async function StudioCreatePage({
           Create
         </h1>
         <p className={BODY_MUTED}>
-          Generate images and video for your brand and your listings.
+          Generate images for your listings and your personal brand.
         </p>
       </header>
-      <EmptyState
-        icon={ImagePlus}
-        title="Generation is on its way."
-        description="Image and video tools land here in the next update."
-      />
+      <CreatePanel />
     </div>
   );
 }
