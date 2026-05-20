@@ -15,6 +15,7 @@
  *   files/{spaceId}/{uuid}-{filename}          — generic file uploader
  *   property-photos/{spaceId}/{propertyId}/{uuid}-{filename}
  *   onboarding/{userId}/{uuid}-{filename}
+ *   studio/{spaceId}/{uuid}-{filename}          — Studio-generated media
  *
  * Public vs signed: feature attachments stay PRIVATE — we serve them via
  * `getSignedUrl()` with a short TTL. Property photos and avatars can be
@@ -182,6 +183,7 @@ export const STORAGE_PREFIXES = {
   files: 'files',
   propertyPhotos: 'property-photos',
   onboarding: 'onboarding',
+  studio: 'studio',
 } as const;
 
 /** Convenient key builder. Pass the prefix + the suffix segments and get a

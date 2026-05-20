@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Building2,
   FolderOpen,
+  Aperture,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -81,6 +82,17 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/deals/new', label: 'Add property' },
       { href: '/properties/commissions', label: 'Commissions' },
+    ],
+  },
+  {
+    href: '/studio',
+    label: 'Studio',
+    icon: Aperture,
+    children: [
+      { href: '/studio/create', label: 'Create' },
+      { href: '/studio/edit', label: 'Edit' },
+      { href: '/studio/schedule', label: 'Schedule' },
+      { href: '/studio/brand', label: 'Brand' },
     ],
   },
   {
