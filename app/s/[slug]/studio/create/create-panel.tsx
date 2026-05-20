@@ -22,6 +22,7 @@ import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 interface GenerateResult {
   url: string;
   fileId: string;
+  kind: 'image' | 'video';
 }
 
 export function CreatePanel() {
@@ -46,12 +47,17 @@ export function CreatePanel() {
       const body = (await res.json().catch(() => ({}))) as {
         url?: string;
         fileId?: string;
+        kind?: string;
         error?: string;
       };
       if (!res.ok || !body.url || !body.fileId) {
         throw new Error(body.error || 'Generation failed. Please try again.');
       }
-      setResult({ url: body.url, fileId: body.fileId });
+      setResult({
+        url: body.url,
+        fileId: body.fileId,
+        kind: body.kind === 'video' ? 'video' : 'image',
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed. Please try again.');
     } finally {
@@ -124,8 +130,16 @@ export function CreatePanel() {
       {/* Result */}
       {generating ? (
         <div className="rounded-xl border border-border/60 bg-muted/30 aspect-[4/3] flex flex-col items-center justify-center gap-1.5 animate-pulse">
-          <p className="text-sm text-foreground">Generating your image.</p>
-          <p className={CAPTION}>This usually takes a few seconds.</p>
+          <p className="text-sm text-foreground">
+            {STUDIO_MODELS[model]?.kind === 'video'
+              ? 'Generating your video.'
+              : 'Generating your image.'}
+          </p>
+          <p className={CAPTION}>
+            {STUDIO_MODELS[model]?.kind === 'video'
+              ? 'Video can take a few minutes — keep this tab open.'
+              : 'This usually takes a few seconds.'}
+          </p>
         </div>
       ) : result ? (
         <motion.div
@@ -134,12 +148,20 @@ export function CreatePanel() {
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className="space-y-2"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={result.url}
-            alt={prompt || 'Generated image'}
-            className="w-full rounded-xl border border-border/60"
-          />
+          {result.kind === 'video' ? (
+            <video
+              src={result.url}
+              controls
+              className="w-full rounded-xl border border-border/60"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={result.url}
+              alt={prompt || 'Generated image'}
+              className="w-full rounded-xl border border-border/60"
+            />
+          )}
           <p className={CAPTION}>Saved to your files.</p>
         </motion.div>
       ) : (

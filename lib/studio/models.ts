@@ -43,6 +43,12 @@ export const STUDIO_MODELS: Record<string, StudioModel> = {
     kind: 'image',
     costUsd: 0.04,
   },
+  'seedance-video': {
+    id: 'fal-ai/bytedance/seedance-2.0/text-to-video',
+    label: 'Video',
+    kind: 'video',
+    costUsd: 0.5,
+  },
 };
 
 /** Default model when the caller doesn't pick one. */

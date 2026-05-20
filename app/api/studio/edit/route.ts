@@ -22,7 +22,7 @@ import {
   getSignedDownloadUrl,
 } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
-import { transformImage, falConfigured, type GeneratedImage } from '@/lib/studio/fal';
+import { transformImage, falConfigured, type GeneratedAsset } from '@/lib/studio/fal';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 
 export const runtime = 'nodejs';
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
   };
 
   // ── Transform ─────────────────────────────────────────────────────────
-  let out: GeneratedImage;
+  let out: GeneratedAsset;
   try {
     out = await transformImage({
       modelId: tool.id,

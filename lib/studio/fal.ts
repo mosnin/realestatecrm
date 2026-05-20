@@ -9,7 +9,7 @@
 
 import { fal } from '@fal-ai/client';
 
-export interface GeneratedImage {
+export interface GeneratedAsset {
   /** fal-hosted URL of the result — temporary, copy the bytes promptly. */
   url: string;
   contentType: string;
@@ -21,7 +21,7 @@ export function falConfigured(): boolean {
 }
 
 /** fal image models return either { images: [...] } or a single { image }. */
-function extractImage(data: unknown): GeneratedImage {
+function extractImage(data: unknown): GeneratedAsset {
   const d = data as {
     images?: Array<{ url?: string; content_type?: string }>;
     image?: { url?: string; content_type?: string };
@@ -33,19 +33,44 @@ function extractImage(data: unknown): GeneratedImage {
   return { url: img.url, contentType: img.content_type ?? 'image/jpeg' };
 }
 
+/** fal video models return { video: { url } }. */
+function extractVideo(data: unknown): GeneratedAsset {
+  const d = data as { video?: { url?: string; content_type?: string } };
+  if (!d.video?.url) {
+    throw new Error('fal returned no video');
+  }
+  return { url: d.video.url, contentType: d.video.content_type ?? 'video/mp4' };
+}
+
 /**
  * Generate an image from a text prompt. `fal.subscribe` submits to fal's
  * queue and resolves when the result is ready — image models finish in a few
- * seconds. Video will use the async queue + webhook path in a later phase.
+ * seconds.
  */
 export async function generateImage(args: {
   modelId: string;
   prompt: string;
-}): Promise<GeneratedImage> {
+}): Promise<GeneratedAsset> {
   const result = await fal.subscribe(args.modelId, {
     input: { prompt: args.prompt },
   });
   return extractImage(result.data);
+}
+
+/**
+ * Generate a video from a text prompt. Video models run for a few minutes;
+ * `fal.subscribe` holds the request open until fal finishes, so the calling
+ * route sets a long maxDuration. A queue + webhook path is the eventual
+ * upgrade for scale.
+ */
+export async function generateVideo(args: {
+  modelId: string;
+  prompt: string;
+}): Promise<GeneratedAsset> {
+  const result = await fal.subscribe(args.modelId, {
+    input: { prompt: args.prompt },
+  });
+  return extractVideo(result.data);
 }
 
 /**
@@ -56,7 +81,7 @@ export async function transformImage(args: {
   modelId: string;
   imageUrl: string;
   prompt?: string;
-}): Promise<GeneratedImage> {
+}): Promise<GeneratedAsset> {
   const input: Record<string, unknown> = { image_url: args.imageUrl };
   if (args.prompt) input.prompt = args.prompt;
   const result = await fal.subscribe(args.modelId, { input });
