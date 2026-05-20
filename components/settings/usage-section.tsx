@@ -5,9 +5,11 @@
  * A by-model table and a 30-day sparkline give the shape of the spend
  * without a chart library — every bar is a plain <div>.
  *
- * Honesty line: the spend shown is autonomous agent runs. Live chat-turn
- * cost isn't captured yet, so the caption says so — the realtor should
- * never wonder why the number looks low.
+ * Honesty line: the spend covers chat turns + autonomous agent runs. The
+ * by-model table reflects chat + planner traffic; autonomous tool steps
+ * have no model column so they count toward the total only. The caption
+ * says this plainly — the realtor should never wonder why a number looks
+ * off.
  *
  * Server component. All data is pre-aggregated in lib/usage/queries.ts;
  * this file only formats and lays out.
@@ -90,8 +92,7 @@ export function UsageSection({
           </p>
         </div>
         <p className={CAPTION}>
-          Usage reflects autonomous agent runs. Live chat-turn tracking arrives
-          with the next model-provider update.
+          Usage covers autonomous agent runs and your chat turns with Chippi.
         </p>
       </div>
     );
@@ -199,9 +200,10 @@ export function UsageSection({
       {/* Honesty line — Jobs lens: the realtor should never wonder why the
           number looks low. Say plainly what is and isn't counted. */}
       <p className={CAPTION}>
-        Usage reflects autonomous agent runs — planning and tool steps Chippi
-        takes on your behalf. Live chat-turn tracking arrives with the next
-        model-provider update.
+        Usage covers your chat turns with Chippi plus autonomous agent runs —
+        planning and tool steps Chippi takes on your behalf. The by-model
+        breakdown reflects chat and planner traffic; autonomous tool steps
+        count toward the total.
       </p>
     </div>
   );

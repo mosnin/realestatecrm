@@ -16,9 +16,11 @@
  *                            table the Python ledger uses, which lets us show
  *                            a real by-model breakdown for planner traffic.
  *
- * Live chat-turn cost is NOT tracked yet — that arrives with the centralized
- * provider client. The UI says so plainly so the realtor isn't confused that
- * the number looks low.
+ *   ChatUsage              — one row per completed interactive Chippi chat
+ *                            turn, written by both runtimes (Modal + TS).
+ *                            Carries `model` AND a precomputed `costUsd`, so
+ *                            it feeds both the headline total and the
+ *                            by-model breakdown directly.
  *
  * All aggregation is in-process on a bounded set of rows: a single space's
  * telemetry over at most ~31 days. No unbounded scans, no RPCs to maintain.
@@ -91,11 +93,13 @@ function toNumber(v: string | number | null | undefined): number {
 /**
  * Total spend and by-model breakdown for one calendar month (UTC).
  *
- * `totalUsd` is the headline number: every ExecutionStep cost in the window
- * plus the derived cost of every planner decomposition in the window.
+ * `totalUsd` sums three sources in the window: every ExecutionStep cost
+ * (autonomous runs), every planner decomposition's derived cost, and every
+ * ChatUsage row's precomputed cost (interactive chat turns).
  *
- * `byModel` is planner-call traffic only — ExecutionStep has no model column,
- * so it can't be attributed. This is honest, not a gap to paper over.
+ * `byModel` covers planner traffic AND chat turns — both carry a model.
+ * ExecutionStep has no model column so its cost lands in the total but not
+ * the breakdown; that's honest, not a gap to paper over.
  */
 export async function getMonthlyUsage(
   spaceId: string,
@@ -105,7 +109,7 @@ export async function getMonthlyUsage(
   const start = monthStart(year, month);
   const end = monthEnd(year, month);
 
-  const [stepRes, decompRes] = await Promise.all([
+  const [stepRes, decompRes, chatRes] = await Promise.all([
     supabase
       .from('ExecutionStep')
       .select('costUsd')
@@ -118,10 +122,17 @@ export async function getMonthlyUsage(
       .eq('spaceId', spaceId)
       .gte('createdAt', start)
       .lt('createdAt', end),
+    supabase
+      .from('ChatUsage')
+      .select('model, costUsd')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', start)
+      .lt('createdAt', end),
   ]);
 
   if (stepRes.error) throw stepRes.error;
   if (decompRes.error) throw decompRes.error;
+  if (chatRes.error) throw chatRes.error;
 
   let totalUsd = 0;
   for (const row of stepRes.data ?? []) {
@@ -139,6 +150,20 @@ export async function getMonthlyUsage(
     const tokensIn = toNumber(r.promptTokens);
     const tokensOut = toNumber(r.completionTokens);
     const cost = decompositionCost(model, tokensIn, tokensOut);
+
+    totalUsd += cost;
+
+    const entry = modelMap.get(model) ?? { model, costUsd: 0, requests: 0 };
+    entry.costUsd += cost;
+    entry.requests += 1;
+    modelMap.set(model, entry);
+  }
+
+  // Chat turns — precomputed cost, real model attribution.
+  for (const row of chatRes.data ?? []) {
+    const r = row as { model: string | null; costUsd: string | number | null };
+    const model = r.model ?? 'unknown';
+    const cost = toNumber(r.costUsd);
 
     totalUsd += cost;
 
@@ -169,13 +194,21 @@ export async function getDailyUsage(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (days - 1)),
   );
 
-  const { data, error } = await supabase
-    .from('ExecutionStep')
-    .select('costUsd, createdAt')
-    .eq('spaceId', spaceId)
-    .gte('createdAt', windowStart.toISOString());
+  const [stepRes, chatRes] = await Promise.all([
+    supabase
+      .from('ExecutionStep')
+      .select('costUsd, createdAt')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', windowStart.toISOString()),
+    supabase
+      .from('ChatUsage')
+      .select('costUsd, createdAt')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', windowStart.toISOString()),
+  ]);
 
-  if (error) throw error;
+  if (stepRes.error) throw stepRes.error;
+  if (chatRes.error) throw chatRes.error;
 
   // Seed every day in the window with zeros so the sparkline is continuous.
   const buckets = new Map<string, DailyUsage>();
@@ -185,7 +218,8 @@ export async function getDailyUsage(
     buckets.set(key, { day: key, costUsd: 0, requests: 0 });
   }
 
-  for (const row of data ?? []) {
+  // Both autonomous steps and chat turns count toward the daily series.
+  for (const row of [...(stepRes.data ?? []), ...(chatRes.data ?? [])]) {
     const r = row as { costUsd: string | number | null; createdAt: string };
     const key = r.createdAt.slice(0, 10);
     const bucket = buckets.get(key);

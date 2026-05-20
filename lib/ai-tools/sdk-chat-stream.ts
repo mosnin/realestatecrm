@@ -32,6 +32,7 @@ import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
+import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 
 const COMPACTION_THRESHOLD_CHARS = 80_000;
 
@@ -148,7 +149,11 @@ interface SdkResultLike {
   toStream(): ReadableStream<unknown> | { getReader(): ReadableStreamDefaultReader<unknown> };
   completed: Promise<void>;
   interruptions?: ReadonlyArray<unknown>;
-  state?: { toString(): string };
+  state?: {
+    toString(): string;
+    /** Aggregated token usage for the run — written to ChatUsage telemetry. */
+    usage?: { inputTokens?: number; outputTokens?: number };
+  };
 }
 
 function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
@@ -334,6 +339,23 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           });
         }
       } finally {
+        // Record chat-turn cost telemetry (fire-and-forget — never blocks
+        // or fails the turn). The TS runtime builds the agent with the
+        // default model (see buildChatAgent / DEFAULT_MODEL in sdk-chat.ts);
+        // if that default ever becomes configurable, thread it through here.
+        const usage = result.state?.usage;
+        if (usage) {
+          void recordChatUsage({
+            spaceId: input.ctx.space.id,
+            userId: input.ctx.userId,
+            conversationId: input.conversationId,
+            model: 'gpt-5-mini',
+            promptTokens: usage.inputTokens ?? 0,
+            completionTokens: usage.outputTokens ?? 0,
+            runtime: 'ts',
+          });
+        }
+
         // Persist the assistant text. Empty buffers are normal on a paused
         // turn (the model hasn't said anything yet) — saveAssistantMessage
         // handles the empty-text case with a placeholder.

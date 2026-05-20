@@ -22,7 +22,7 @@ import { sendSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
-import { getPublicUrl } from '@/lib/storage';
+import { getSignedDownloadUrl } from '@/lib/storage';
 
 /** Telnyx MMS hard limits: keep media count ≤ 5 and total ≤ 1 MB to
  *  avoid carrier-side rejection. Per-asset rules vary by destination
@@ -53,7 +53,7 @@ const parameters = z
       .max(MMS_MAX_MEDIA_COUNT)
       .optional()
       .describe(
-        'Optional File.id list (images mostly) to attach as MMS. Files must be public (uploaded under a public prefix). Max 5 files / 1 MB combined per carrier rules.',
+        'Optional File.id list (images mostly) to attach as MMS. Any uploaded file works — public or private. Max 5 files / 1 MB combined per carrier rules.',
       ),
   })
   .refine((v) => v.contactId || v.toPhone, {
@@ -129,15 +129,16 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
       return { summary: 'Could not resolve a recipient phone number.', display: 'error' };
     }
 
-    // Resolve MMS media: each File must be public (we serve via signed
-    // URLs by default, but Telnyx fetches the URL itself from carrier
-    // infra and won't carry our auth headers). Files in the public
-    // prefixes (chat-attachments/, onboarding/, property-photos/) qualify.
+    // Resolve MMS media. Telnyx fetches each media URL itself from carrier
+    // infrastructure (no auth headers carried), so the URL must resolve
+    // without our session. We mint a 1-hour signed URL per file — Telnyx
+    // pulls the media within seconds of accepting the message, so the TTL
+    // is generous. No public-file requirement: private files work fine.
     let mediaUrls: string[] | undefined;
     if (args.mediaFileIds && args.mediaFileIds.length > 0) {
       const { data: rows, error: fileErr } = await supabase
         .from('File')
-        .select('id, name, storageKey, sizeBytes, isPublic')
+        .select('id, name, storageKey, sizeBytes')
         .in('id', args.mediaFileIds)
         .eq('spaceId', ctx.space.id);
       if (fileErr) {
@@ -148,18 +149,10 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
         name: string;
         storageKey: string;
         sizeBytes: number;
-        isPublic: boolean;
       }>;
       const missing = args.mediaFileIds.filter((id) => !found.find((r) => r.id === id));
       if (missing.length > 0) {
         return { summary: `Media file ids not found: ${missing.join(', ')}`, display: 'error' };
-      }
-      const notPublic = found.filter((r) => !r.isPublic);
-      if (notPublic.length > 0) {
-        return {
-          summary: `Cannot attach private files to MMS — carrier needs a public URL. Re-upload as public: ${notPublic.map((r) => r.name).join(', ')}.`,
-          display: 'error',
-        };
       }
       const totalBytes = found.reduce((sum, r) => sum + Number(r.sizeBytes ?? 0), 0);
       if (totalBytes > MMS_MAX_TOTAL_BYTES) {
@@ -168,7 +161,16 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
           display: 'error',
         };
       }
-      mediaUrls = found.map((r) => getPublicUrl(r.storageKey));
+      try {
+        mediaUrls = await Promise.all(
+          found.map((r) => getSignedDownloadUrl(r.storageKey, 60 * 60)),
+        );
+      } catch (err) {
+        return {
+          summary: `Could not prepare media for MMS: ${err instanceof Error ? err.message : 'unknown error'}`,
+          display: 'error',
+        };
+      }
     }
 
     // sendSMS returns false on any failure (credentials missing, invalid

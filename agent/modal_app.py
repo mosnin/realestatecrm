@@ -501,6 +501,41 @@ async def chat_turn(item: dict):
             done = json.dumps({"type": "done", "final_text": final_text})
             yield f"data: {done}\n\n"
 
+            # Record chat-turn cost telemetry into ChatUsage. Best-effort —
+            # a telemetry failure must never break the turn the realtor
+            # just had. Usage lives on the run's context wrapper; attribute
+            # paths are read defensively so an SDK shape change degrades to
+            # "no telemetry" rather than a crash.
+            try:
+                usage = getattr(
+                    getattr(result, "context_wrapper", None), "usage", None
+                )
+                tokens_in = int(getattr(usage, "input_tokens", 0) or 0) if usage else 0
+                tokens_out = int(getattr(usage, "output_tokens", 0) or 0) if usage else 0
+                if tokens_in or tokens_out:
+                    from ledger import _calculate_cost
+
+                    # make_chippi_agent pins the chat model to gpt-5.
+                    chat_model = "gpt-5"
+                    await db.table("ChatUsage").insert(
+                        {
+                            "spaceId": space_id,
+                            "userId": user_id or None,
+                            "conversationId": conversation_id or None,
+                            "model": chat_model,
+                            "promptTokens": tokens_in,
+                            "completionTokens": tokens_out,
+                            "costUsd": _calculate_cost(chat_model, tokens_in, tokens_out),
+                            "runtime": "modal",
+                        }
+                    ).execute()
+            except Exception as usage_err:  # noqa: BLE001 — telemetry is best-effort
+                logger.warning(
+                    "chat_usage_record_failed",
+                    error=str(usage_err),
+                    space_id=space_id,
+                )
+
         except InputGuardrailTripwireTriggered as exc:
             info = exc.guardrail_result.output.output_info or {}
             reason = info.get("reason", "Run blocked.")
