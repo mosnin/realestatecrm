@@ -73,6 +73,19 @@ export async function POST(req: NextRequest) {
       : DEFAULT_IMAGE_MODEL;
   const model = STUDIO_MODELS[modelSlug];
 
+  // Brand kit — fold the realtor's palette into the prompt so output comes
+  // out on-brand. The original prompt is what gets logged; fal sees the augment.
+  let effectivePrompt = prompt;
+  const { data: brand } = await supabase
+    .from('StudioBrand')
+    .select('colors')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const brandColors = (brand?.colors as string[] | null) ?? [];
+  if (brandColors.length > 0) {
+    effectivePrompt = `${prompt}\n\nUse a color palette of ${brandColors.join(', ')}.`;
+  }
+
   const generationId = crypto.randomUUID();
 
   // Record the generation up front so a mid-flight failure is still logged.
@@ -108,7 +121,7 @@ export async function POST(req: NextRequest) {
   // ── Generate ────────────────────────────────────────────────────────────
   let image: GeneratedImage;
   try {
-    image = await generateImage({ modelId: model.id, prompt });
+    image = await generateImage({ modelId: model.id, prompt: effectivePrompt });
   } catch (err) {
     logger.error(
       '[studio.generate] fal failed',

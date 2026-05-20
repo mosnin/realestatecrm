@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import { Palette } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
-import { EmptyState } from '@/components/ui/empty-state';
+import { BrandPanel } from './brand-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 
@@ -24,14 +23,10 @@ export default async function StudioBrandPage({
           Brand
         </h1>
         <p className={BODY_MUTED}>
-          The look Studio uses for everything it makes.
+          The look and voice Studio uses for everything it makes.
         </p>
       </header>
-      <EmptyState
-        icon={Palette}
-        title="Your brand kit is on the way."
-        description="Logo, colors, fonts, and voice — the kit every generation uses — coming soon."
-      />
+      <BrandPanel />
     </div>
   );
 }
