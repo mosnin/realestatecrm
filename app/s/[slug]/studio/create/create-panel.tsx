@@ -11,11 +11,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ImagePlus, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 
 interface GenerateResult {
   url: string;
@@ -24,6 +26,7 @@ interface GenerateResult {
 
 export function CreatePanel() {
   const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState<string>(DEFAULT_IMAGE_MODEL);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export function CreatePanel() {
       const res = await fetch('/api/studio/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ prompt: prompt.trim(), model }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         url?: string;
@@ -75,7 +78,28 @@ export function CreatePanel() {
           disabled={generating}
           className="min-h-[112px] resize-none"
         />
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1">
+            {Object.entries(STUDIO_MODELS).map(([slug, m]) => {
+              const active = slug === model;
+              return (
+                <button
+                  key={slug}
+                  type="button"
+                  onClick={() => setModel(slug)}
+                  disabled={generating}
+                  className={cn(
+                    'rounded-full px-3 h-8 text-[12.5px] font-medium transition-colors disabled:opacity-50',
+                    active
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                  )}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
           <Button onClick={() => void handleGenerate()} disabled={!canGenerate}>
             {generating ? 'Generating…' : 'Generate'}
           </Button>
