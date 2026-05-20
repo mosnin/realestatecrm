@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
+import { GeneratingState } from '@/components/studio/generating-state';
 
 interface GenerateResult {
   url: string;
@@ -129,18 +130,18 @@ export function CreatePanel() {
 
       {/* Result */}
       {generating ? (
-        <div className="rounded-xl border border-border/60 bg-muted/30 aspect-[4/3] flex flex-col items-center justify-center gap-1.5 animate-pulse">
-          <p className="text-sm text-foreground">
-            {STUDIO_MODELS[model]?.kind === 'video'
+        <GeneratingState
+          title={
+            STUDIO_MODELS[model]?.kind === 'video'
               ? 'Generating your video.'
-              : 'Generating your image.'}
-          </p>
-          <p className={CAPTION}>
-            {STUDIO_MODELS[model]?.kind === 'video'
+              : 'Generating your image.'
+          }
+          subtitle={
+            STUDIO_MODELS[model]?.kind === 'video'
               ? 'Video can take a few minutes — keep this tab open.'
-              : 'This usually takes a few seconds.'}
-          </p>
-        </div>
+              : 'This usually takes a few seconds.'
+          }
+        />
       ) : result ? (
         <motion.div
           initial={{ opacity: 0, y: 4 }}

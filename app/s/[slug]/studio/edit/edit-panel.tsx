@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
+import { GeneratingState } from '@/components/studio/generating-state';
 
 interface EditResult {
   url: string;
@@ -177,10 +178,10 @@ export function EditPanel() {
 
       {/* Result */}
       {processing ? (
-        <div className="rounded-xl border border-border/60 bg-muted/30 aspect-[4/3] flex flex-col items-center justify-center gap-1.5 animate-pulse">
-          <p className="text-sm text-foreground">Working on your image.</p>
-          <p className={CAPTION}>This usually takes a few seconds.</p>
-        </div>
+        <GeneratingState
+          title="Working on your image."
+          subtitle="This usually takes a few seconds."
+        />
       ) : result ? (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
