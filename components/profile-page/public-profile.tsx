@@ -4,15 +4,20 @@
  * A stranger taps the realtor's bio link and lands here. The page is one
  * narrow column: who the realtor is, then a short stack of links. The
  * application is the loud one — it's the conversion, the thing that turns
- * a stranger into a tracked lead — so it sits first and filled-black.
- * Everything else recedes to an outline tile.
+ * a stranger into a tracked lead — so it sits first, in the realtor's
+ * accent colour. Everything else recedes to an outline tile.
+ *
+ * Branding (logo, accent colour, light/dark) is inherited from the same
+ * SpaceSetting fields the intake and booking pages use — set once, every
+ * public surface matches.
  *
  * Server component: every element is a link, nothing needs the client.
  */
 
 import { ArrowRight, ArrowUpRight, CalendarCheck, Globe } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
-import { safeHref } from '@/lib/utils';
+import { cn, safeHref } from '@/lib/utils';
+import { pickContrastColor } from '@/lib/color';
 import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 export interface PublicProperty {
@@ -28,14 +33,17 @@ export interface PublicProperty {
 interface PublicProfileProps {
   slug: string;
   businessName: string;
+  logoUrl: string | null;
   agentName: string;
   agentPhoto: string | null;
   bio: string | null;
   headline: string | null;
   socialLinks: Record<string, string> | null;
+  accentColor: string;
+  darkMode: boolean;
   showIntake: boolean;
   showTours: boolean;
-  customLinks: Array<{ id: string; label: string; url: string }>;
+  customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
   properties: PublicProperty[];
   hidePoweredBy: boolean;
 }
@@ -123,11 +131,14 @@ function PropertyCard({ property }: { property: PublicProperty }) {
 export function PublicProfile({
   slug,
   businessName,
+  logoUrl,
   agentName,
   agentPhoto,
   bio,
   headline,
   socialLinks,
+  accentColor,
+  darkMode,
   showIntake,
   showTours,
   customLinks,
@@ -138,9 +149,12 @@ export function PublicProfile({
     ([, url]) => typeof url === 'string' && url.trim().length > 0,
   );
   const initial = (businessName || agentName || '?').trim().charAt(0).toUpperCase();
+  const ctaTextColor = pickContrastColor(accentColor);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className={cn('min-h-screen bg-background text-foreground', darkMode && 'dark')}
+    >
       <main className="mx-auto w-full max-w-md px-5 pt-12 pb-16 sm:pt-16">
         {/* Identity */}
         <header className="flex flex-col items-center text-center">
@@ -160,34 +174,45 @@ export function PublicProfile({
             </div>
           )}
 
-          <h1
-            className="mt-4 text-2xl tracking-tight text-foreground"
-            style={TITLE_FONT}
-          >
-            {businessName}
+          <h1 className="mt-4">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={businessName}
+                loading="eager"
+                decoding="async"
+                className="mx-auto h-8 max-w-[220px] object-contain"
+              />
+            ) : (
+              <span
+                className="text-2xl tracking-tight text-foreground"
+                style={TITLE_FONT}
+              >
+                {businessName}
+              </span>
+            )}
           </h1>
           {agentName && agentName !== businessName && (
             <p className="mt-0.5 text-sm text-muted-foreground">{agentName}</p>
           )}
-          {headline && (
-            <p className="mt-2 text-sm text-foreground">{headline}</p>
-          )}
+          {headline && <p className="mt-2 text-sm text-foreground">{headline}</p>}
           {bio && (
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{bio}</p>
           )}
         </header>
 
-        {/* Link stack — application first (the conversion), then tour, then
-            the realtor's own links. */}
+        {/* Link stack — application first (the conversion, in the realtor's
+            accent colour), then tour, then the realtor's own links. */}
         <div className="mt-8 space-y-3">
           {showIntake && (
             <a
               href={`/apply/${slug}`}
-              className="group flex items-center gap-3 rounded-xl bg-foreground px-5 py-4 text-background transition-transform duration-150 active:scale-[0.99]"
+              style={{ backgroundColor: accentColor, color: ctaTextColor }}
+              className="group flex items-center gap-3 rounded-xl px-5 py-4 transition-transform duration-150 active:scale-[0.99]"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Start your application</p>
-                <p className="truncate text-xs text-background/70">
+                <p className="truncate text-xs opacity-75">
                   A few quick questions about what you&apos;re looking for.
                 </p>
               </div>
@@ -225,6 +250,15 @@ export function PublicProfile({
               rel="noopener noreferrer"
               className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4 transition-colors hover:bg-muted/30"
             >
+              {link.thumbnail && (
+                <img
+                  src={link.thumbnail}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-10 w-10 shrink-0 rounded-md object-cover"
+                />
+              )}
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                 {link.label}
               </span>

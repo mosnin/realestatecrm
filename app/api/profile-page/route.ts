@@ -57,7 +57,8 @@ export async function PATCH(req: NextRequest) {
       typeof body.headline === 'string' ? body.headline.trim().slice(0, 200) || null : null;
   }
   if (Array.isArray(body.customLinks)) {
-    // Sanitize to [{ id, label, url }] — cap 20, http(s) URLs only.
+    // Sanitize to [{ id, label, url, thumbnail }] — cap 20, http(s) URLs only.
+    // thumbnail is optional and only kept when it's itself an http(s) URL.
     patch.customLinks = (body.customLinks as unknown[])
       .filter((l): l is Record<string, unknown> => Boolean(l) && typeof l === 'object')
       .slice(0, 20)
@@ -65,6 +66,10 @@ export async function PATCH(req: NextRequest) {
         id: typeof l.id === 'string' && l.id ? l.id : crypto.randomUUID(),
         label: typeof l.label === 'string' ? l.label.trim().slice(0, 80) : '',
         url: typeof l.url === 'string' ? l.url.trim().slice(0, 500) : '',
+        thumbnail:
+          typeof l.thumbnail === 'string' && /^https?:\/\//i.test(l.thumbnail.trim())
+            ? l.thumbnail.trim().slice(0, 500)
+            : '',
       }))
       .filter((l) => l.label && /^https?:\/\//i.test(l.url));
   }

@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const type = formData.get('type') as string; // 'logo' | 'photo' | 'favicon'
+    const type = formData.get('type') as string; // 'logo' | 'photo' | 'favicon' | 'link-thumb'
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    if (!['logo', 'photo', 'favicon'].includes(type)) {
+    if (!['logo', 'photo', 'favicon', 'link-thumb'].includes(type)) {
       return NextResponse.json({ error: 'Invalid upload type' }, { status: 400 });
     }
 

@@ -20,7 +20,7 @@ interface ProfileConfig {
   showIntake: boolean;
   showTours: boolean;
   showProperties: boolean;
-  customLinks: Array<{ id: string; label: string; url: string }>;
+  customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
 }
 
 const DEFAULT_CONFIG: ProfileConfig = {
@@ -44,7 +44,9 @@ export default async function PublicRealtorPage({
   const [{ data: settings }, { data: owner }, { data: profileRow }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('businessName, logoUrl, realtorPhotoUrl, bio, socialLinks')
+      .select(
+        'businessName, logoUrl, realtorPhotoUrl, bio, socialLinks, intakeAccentColor, intakeDarkMode',
+      )
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase.from('User').select('name, avatar').eq('id', space.ownerId).maybeSingle(),
@@ -81,11 +83,14 @@ export default async function PublicRealtorPage({
     <PublicProfile
       slug={slug}
       businessName={businessName}
+      logoUrl={settings?.logoUrl || null}
       agentName={owner?.name || businessName}
       agentPhoto={settings?.realtorPhotoUrl || owner?.avatar || null}
       bio={settings?.bio || null}
       headline={cfg.headline}
       socialLinks={(settings?.socialLinks as Record<string, string> | null) ?? null}
+      accentColor={(settings?.intakeAccentColor as string | null) || '#ff964f'}
+      darkMode={settings?.intakeDarkMode === true}
       showIntake={cfg.showIntake !== false}
       showTours={cfg.showTours !== false}
       customLinks={Array.isArray(cfg.customLinks) ? cfg.customLinks : []}

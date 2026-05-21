@@ -4,13 +4,15 @@
  * Editor for the realtor's public "link in bio" page (/p/[slug]).
  *
  * Reads and writes the ProfilePage row through /api/profile-page. The
- * realtor's photo, name, and bio aren't here — those come from
- * Settings → Profile so there's one place to edit identity. This screen
- * owns only the page-specific bits: live toggle, headline, which
- * sections show, and the custom links.
+ * realtor's photo, logo, accent colour, and light/dark theme aren't here
+ * — those are inherited from the workspace branding (Settings → Profile
+ * and the page-appearance setup), so the public page, the application,
+ * and the booking page all stay visually identical. This screen owns
+ * only the page-specific bits: live toggle, headline, which sections
+ * show, and the custom links (each with an optional thumbnail).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Loader2,
   CheckCircle2,
@@ -19,6 +21,7 @@ import {
   ArrowUpRight,
   Copy,
   Check,
+  ImagePlus,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +34,7 @@ interface CustomLink {
   id: string;
   label: string;
   url: string;
+  thumbnail: string;
 }
 
 const MAX_LINKS = 20;
@@ -90,10 +94,11 @@ export function ProfileEditor({ slug }: { slug: string }) {
     setShowProperties(data.showProperties !== false);
     setCustomLinks(
       Array.isArray(data.customLinks)
-        ? (data.customLinks as CustomLink[]).map((l) => ({
+        ? (data.customLinks as Partial<CustomLink>[]).map((l) => ({
             id: typeof l.id === 'string' && l.id ? l.id : newId(),
             label: typeof l.label === 'string' ? l.label : '',
             url: typeof l.url === 'string' ? l.url : '',
+            thumbnail: typeof l.thumbnail === 'string' ? l.thumbnail : '',
           }))
         : [],
     );
@@ -113,7 +118,7 @@ export function ProfileEditor({ slug }: { slug: string }) {
     setCustomLinks((links) =>
       links.length >= MAX_LINKS
         ? links
-        : [...links, { id: newId(), label: '', url: '' }],
+        : [...links, { id: newId(), label: '', url: '', thumbnail: '' }],
     );
   }
 
@@ -261,14 +266,15 @@ export function ProfileEditor({ slug }: { slug: string }) {
         <header className="space-y-1">
           <h2 className="text-base font-semibold">Headline</h2>
           <p className={BODY_MUTED}>
-            One line under your name. Your photo, name, and bio come from{' '}
+            One line under your name. Your photo, logo, accent colour, and
+            light/dark theme are inherited from your{' '}
             <a
-              href={`/s/${slug}/settings?tab=profile`}
+              href={`/s/${slug}/configure`}
               className="text-foreground underline underline-offset-2 hover:text-foreground/80"
             >
-              Settings → Profile
-            </a>
-            .
+              page appearance
+            </a>{' '}
+            — set your brand once and every public page matches.
           </p>
         </header>
         <div className="space-y-1.5">
@@ -332,7 +338,7 @@ export function ProfileEditor({ slug }: { slug: string }) {
           <h2 className="text-base font-semibold">Custom links</h2>
           <p className={BODY_MUTED}>
             Anything else worth a tap — your website, a saved-search page, a
-            review profile.
+            review profile. Add an image to make a link stand out.
           </p>
         </header>
 
@@ -341,33 +347,12 @@ export function ProfileEditor({ slug }: { slug: string }) {
         ) : (
           <div className="space-y-3">
             {customLinks.map((link) => (
-              <div key={link.id} className="flex items-start gap-2">
-                <div className="flex-1 space-y-2">
-                  <Input
-                    value={link.label}
-                    onChange={(e) => updateLink(link.id, { label: e.target.value })}
-                    placeholder="Link label"
-                    maxLength={80}
-                    aria-label="Link label"
-                  />
-                  <Input
-                    value={link.url}
-                    onChange={(e) => updateLink(link.id, { url: e.target.value })}
-                    placeholder="https://"
-                    maxLength={500}
-                    inputMode="url"
-                    aria-label="Link URL"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeLink(link.id)}
-                  aria-label="Remove link"
-                  className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
+              <LinkRow
+                key={link.id}
+                link={link}
+                onChange={(patch) => updateLink(link.id, patch)}
+                onRemove={() => removeLink(link.id)}
+              />
             ))}
           </div>
         )}
@@ -439,6 +424,121 @@ function ToggleRow({
         </Label>
         <p className={CAPTION}>{help}</p>
       </div>
+    </div>
+  );
+}
+
+function LinkRow({
+  link,
+  onChange,
+  onRemove,
+}: {
+  link: CustomLink;
+  onChange: (patch: Partial<CustomLink>) => void;
+  onRemove: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the realtor re-pick the same file
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Image must be under 2MB.');
+      return;
+    }
+    setUploadError('');
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'link-thumb');
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUploadError(data.error || 'Upload failed.');
+        return;
+      }
+      onChange({ thumbnail: data.url });
+    } catch {
+      setUploadError('Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-start gap-2">
+        {/* Thumbnail */}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          aria-label={link.thumbnail ? 'Change link image' : 'Add link image'}
+          className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-muted/30 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          {uploading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : link.thumbnail ? (
+            <img src={link.thumbnail} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus size={16} />
+          )}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleFile}
+        />
+
+        {/* Label + URL */}
+        <div className="flex-1 space-y-2">
+          <Input
+            value={link.label}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="Link label"
+            maxLength={80}
+            aria-label="Link label"
+          />
+          <Input
+            value={link.url}
+            onChange={(e) => onChange({ url: e.target.value })}
+            placeholder="https://"
+            maxLength={500}
+            inputMode="url"
+            aria-label="Link URL"
+          />
+        </div>
+
+        {/* Remove */}
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove link"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+
+      {(link.thumbnail || uploadError) && (
+        <div className="flex items-center gap-3 pl-[3.75rem]">
+          {link.thumbnail && (
+            <button
+              type="button"
+              onClick={() => onChange({ thumbnail: '' })}
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Remove image
+            </button>
+          )}
+          {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+        </div>
+      )}
     </div>
   );
 }
