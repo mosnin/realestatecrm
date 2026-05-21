@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     database_url: str = Field(alias="DATABASE_URL", default="")
 
     # OpenAI — embeddings + fallback when OpenRouter isn't configured.
-    openai_api_key: str = Field(alias="OPENAI_API_KEY")
+    # Optional: a pure-OpenRouter deploy doesn't need it.
+    openai_api_key: str = Field(alias="OPENAI_API_KEY", default="")
 
     # OpenRouter — primary LLM gateway. When set, every model call routes
     # through OpenRouter; empty falls back to calling OpenAI directly.

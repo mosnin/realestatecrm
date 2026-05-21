@@ -14,7 +14,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import OpenAI from 'openai';
+import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
@@ -93,8 +93,7 @@ async function composeBrokerAgentSentence(
   summary: BrokerMorningSummary,
 ): Promise<string | null> {
   if (!hasNamedSubject(summary)) return null;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  if (!hasLLMKey()) return null;
 
   const now = Date.now();
   const sigHash = namedSubjectsSignature(summary);
@@ -102,7 +101,7 @@ async function composeBrokerAgentSentence(
   const cached = agentCache.get(cacheKey);
   if (cached && cached.expiresAt > now) return cached.sentence;
 
-  const client = new OpenAI({ apiKey });
+  const client = getLLMClient();
   const userPayload = {
     topPerformer: summary.topPerformer,
     behindPaceAgent: summary.behindPaceAgent,
@@ -115,7 +114,7 @@ async function composeBrokerAgentSentence(
   try {
     const response = await client.chat.completions.create(
       {
-        model: AGENT_MODEL,
+        model: openaiModel(AGENT_MODEL),
         temperature: 0.5,
         max_tokens: 60,
         messages: [

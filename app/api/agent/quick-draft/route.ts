@@ -25,7 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
@@ -123,8 +123,7 @@ export async function composeDraftWithOpenAI(args: {
   leadScore?: number | null;
   voiceSamples: VoiceSample[];
 }): Promise<{ subject: string | null; body: string } | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  if (!hasLLMKey()) return null;
 
   const userPayload = {
     intent: args.intent,
@@ -141,7 +140,7 @@ export async function composeDraftWithOpenAI(args: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const client = new OpenAI({ apiKey });
+    const client = getLLMClient();
     // Voice samples ride alongside SYSTEM_PROMPT, never replacing it. Empty
     // sample list → no second system message (current behavior preserved).
     const voiceMessage =
@@ -154,7 +153,7 @@ export async function composeDraftWithOpenAI(args: {
 
     const response = await client.chat.completions.create(
       {
-        model: MODEL,
+        model: openaiModel(MODEL),
         temperature: 0.4,
         max_tokens: 220,
         response_format: { type: 'json_object' },

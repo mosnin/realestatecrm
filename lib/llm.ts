@@ -47,6 +47,11 @@ export function isOpenRouterConfigured(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
+/** True when at least one LLM provider key is configured (OpenRouter or OpenAI). */
+export function hasLLMKey(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY);
+}
+
 /**
  * Resolve a bare OpenAI model name to the slug the active provider wants —
  * vendor-prefixed (`openai/...`) for OpenRouter, bare for OpenAI direct.

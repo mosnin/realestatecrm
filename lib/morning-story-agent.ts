@@ -15,7 +15,8 @@
  *   - Any error returns null. We never throw upward into the route.
  */
 import { createHash } from 'crypto';
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
+import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
 import type { MorningSummary } from '@/app/api/agent/morning/route';
 
 const TIMEOUT_MS = 5_000;
@@ -79,8 +80,7 @@ export async function composeAgentSentence(
 ): Promise<string | null> {
   if (!hasNamedSubject(summary)) return null;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey && !opts.client) return null;
+  if (!hasLLMKey() && !opts.client) return null;
 
   const now = opts.now ? opts.now() : Date.now();
   const sigHash = namedSubjectsSignature(summary);
@@ -91,7 +91,7 @@ export async function composeAgentSentence(
     return cached.sentence;
   }
 
-  const client = opts.client ?? new OpenAI({ apiKey: apiKey! });
+  const client = opts.client ?? getLLMClient();
 
   // Only ship the named subjects + their salient facts. We don't need to
   // hand the model the full summary — it'd just invite hallucination of
@@ -109,7 +109,7 @@ export async function composeAgentSentence(
   try {
     const response = await client.chat.completions.create(
       {
-        model: MODEL,
+        model: openaiModel(MODEL),
         temperature: 0.5,
         max_tokens: 60,
         messages: [

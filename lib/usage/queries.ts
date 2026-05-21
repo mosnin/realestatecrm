@@ -16,9 +16,9 @@
  *                            table the Python ledger uses, which lets us show
  *                            a real by-model breakdown for planner traffic.
  *
- * Live chat-turn cost is NOT tracked yet — that arrives with the centralized
- * provider client. The UI says so plainly so the realtor isn't confused that
- * the number looks low.
+ *   ChatUsage              — one row per interactive chat turn, with a
+ *                            precomputed `costUsd` and `model`. Folded into
+ *                            the headline total and the by-model breakdown.
  *
  * All aggregation is in-process on a bounded set of rows: a single space's
  * telemetry over at most ~31 days. No unbounded scans, no RPCs to maintain.
@@ -35,6 +35,14 @@ const MODEL_PRICES: Record<string, { in: number; out: number }> = {
   'gpt-4o': { in: 2.5, out: 10.0 },
   'gpt-4.1': { in: 2.0, out: 8.0 },
   'gpt-4o-mini': { in: 0.15, out: 0.6 },
+  'openai/gpt-5.5': { in: 5.0, out: 30.0 },
+  'openai/gpt-5-mini': { in: 0.75, out: 4.5 },
+  'openai/gpt-4.1-mini': { in: 0.4, out: 1.6 },
+  'openai/gpt-4o-mini': { in: 0.15, out: 0.6 },
+  'x-ai/grok-4.3': { in: 1.25, out: 2.5 },
+  'anthropic/claude-opus-4.7': { in: 5.0, out: 25.0 },
+  'moonshotai/kimi-k2.6': { in: 0.73, out: 3.49 },
+  'qwen/qwen3.6-flash': { in: 0.19, out: 1.13 },
 };
 const DEFAULT_PRICE = { in: 2.5, out: 10.0 };
 
@@ -105,7 +113,7 @@ export async function getMonthlyUsage(
   const start = monthStart(year, month);
   const end = monthEnd(year, month);
 
-  const [stepRes, decompRes, studioRes] = await Promise.all([
+  const [stepRes, decompRes, studioRes, chatRes] = await Promise.all([
     supabase
       .from('ExecutionStep')
       .select('costUsd')
@@ -124,11 +132,18 @@ export async function getMonthlyUsage(
       .eq('spaceId', spaceId)
       .gte('createdAt', start)
       .lt('createdAt', end),
+    supabase
+      .from('ChatUsage')
+      .select('model, costUsd')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', start)
+      .lt('createdAt', end),
   ]);
 
   if (stepRes.error) throw stepRes.error;
   if (decompRes.error) throw decompRes.error;
   if (studioRes.error) throw studioRes.error;
+  if (chatRes.error) throw chatRes.error;
 
   let totalUsd = 0;
   for (const row of stepRes.data ?? []) {
@@ -170,6 +185,20 @@ export async function getMonthlyUsage(
     modelMap.set(model, entry);
   }
 
+  // Chat turns carry a precomputed costUsd and the model the turn ran on.
+  for (const row of chatRes.data ?? []) {
+    const r = row as { model: string | null; costUsd: string | number | null };
+    const model = r.model ?? 'unknown';
+    const cost = toNumber(r.costUsd);
+
+    totalUsd += cost;
+
+    const entry = modelMap.get(model) ?? { model, costUsd: 0, requests: 0 };
+    entry.costUsd += cost;
+    entry.requests += 1;
+    modelMap.set(model, entry);
+  }
+
   const byModel = [...modelMap.values()].sort((a, b) => b.costUsd - a.costUsd);
 
   return { totalUsd: round6(totalUsd), byModel };
@@ -191,7 +220,7 @@ export async function getDailyUsage(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (days - 1)),
   );
 
-  const [stepRes, studioRes] = await Promise.all([
+  const [stepRes, studioRes, chatRes] = await Promise.all([
     supabase
       .from('ExecutionStep')
       .select('costUsd, createdAt')
@@ -202,10 +231,16 @@ export async function getDailyUsage(
       .select('costUsd, createdAt')
       .eq('spaceId', spaceId)
       .gte('createdAt', windowStart.toISOString()),
+    supabase
+      .from('ChatUsage')
+      .select('costUsd, createdAt')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', windowStart.toISOString()),
   ]);
 
   if (stepRes.error) throw stepRes.error;
   if (studioRes.error) throw studioRes.error;
+  if (chatRes.error) throw chatRes.error;
 
   // Seed every day in the window with zeros so the sparkline is continuous.
   const buckets = new Map<string, DailyUsage>();
@@ -228,6 +263,10 @@ export async function getDailyUsage(
     addRow(r.costUsd, r.createdAt);
   }
   for (const row of studioRes.data ?? []) {
+    const r = row as { costUsd: string | number | null; createdAt: string };
+    addRow(r.costUsd, r.createdAt);
+  }
+  for (const row of chatRes.data ?? []) {
     const r = row as { costUsd: string | number | null; createdAt: string };
     addRow(r.costUsd, r.createdAt);
   }
