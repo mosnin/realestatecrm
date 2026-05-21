@@ -55,6 +55,7 @@ const isFullyPublicRoute = createRouteMatcher([
   '/apply/(.*)',
   '/apply/b/(.*)',
   '/book/(.*)',
+  '/p/(.*)',                 // realtor public "link in bio" pages
   '/status/(.*)',
   '/packet/(.*)',            // tokenised listing-packet share pages (Phase 11)
   '/api/packet/(.*)',        // token-scoped signed-URL endpoint for packet docs

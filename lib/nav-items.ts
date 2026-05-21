@@ -1,5 +1,6 @@
 import {
   Users,
+  UserCircle,
   Briefcase,
   MessageCircle,
   Settings,
@@ -103,6 +104,15 @@ export const realtorNavItems: NavItem[] = [
     icon: FolderOpen,
     children: [
       { href: '/documents', label: 'Documents' },
+    ],
+  },
+  {
+    href: '/profile-page',
+    label: 'Profile',
+    icon: UserCircle,
+    children: [
+      { href: '/profile-page#sections', label: 'Sections' },
+      { href: '/profile-page#links', label: 'Custom links' },
     ],
   },
   {
