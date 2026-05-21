@@ -14,7 +14,7 @@ from __future__ import annotations
 import structlog
 from openai import AsyncOpenAI
 
-from config import settings
+from llm import get_llm_client, openai_model
 
 logger = structlog.get_logger(__name__)
 
@@ -68,7 +68,7 @@ async def compact_messages(
     )
 
     try:
-        oai = client or AsyncOpenAI(api_key=settings.openai_api_key)
+        oai = client or get_llm_client()
 
         # Truncate each message's content to 500 chars so the summarization
         # prompt itself doesn't blow up the context of the summarizer.
@@ -78,7 +78,7 @@ async def compact_messages(
         )
 
         resp = await oai.chat.completions.create(
-            model=_COMPACTION_MODEL,
+            model=openai_model(_COMPACTION_MODEL),
             messages=[
                 {
                     "role": "system",

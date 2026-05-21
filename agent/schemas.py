@@ -107,6 +107,8 @@ class AgentSettings(BaseModel):
     space_id: str = Field(alias="spaceId")
     enabled: bool = False
     daily_token_budget: int = Field(50_000, alias="dailyTokenBudget")
+    # Realtor-picked primary chat model (OpenRouter slug). None = app default.
+    chat_model: str | None = Field(None, alias="chatModel")
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
 

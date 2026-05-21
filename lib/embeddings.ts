@@ -1,21 +1,17 @@
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
+import { getLLMClient, EMBEDDING_MODEL } from '@/lib/llm';
 
-let _openai: OpenAI | null = null;
+let _client: OpenAI | null = null;
 
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set');
-    }
-    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return _openai;
+function client(): OpenAI {
+  if (!_client) _client = getLLMClient();
+  return _client;
 }
 
 export async function embedText(text: string): Promise<number[]> {
-  const response = await getOpenAI().embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text.slice(0, 8000)
+  const response = await client().embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: text.slice(0, 8000),
   });
   return response.data[0].embedding;
 }

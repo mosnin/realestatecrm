@@ -1,19 +1,16 @@
 /**
- * Shared OpenAI client getter for the on-demand agent.
+ * Shared LLM client for the on-demand agent.
  *
- * `lib/ai.ts` already instantiates an OpenAI client inline for the legacy
- * chat route; we do the same here rather than sharing a module-level
- * singleton because the existing code reads `OPENAI_API_KEY` inside the
- * handler (friendlier for tests + serverless cold starts).
- *
- * Centralising the model constant means swapping it (or adding a broker /
- * enterprise override later) doesn't require touching the loop.
+ * Thin wrapper over `lib/llm.ts` (the app-wide OpenRouter client). Kept as
+ * its own module so the agent loop and tests have a stable import; the
+ * provider / base-URL logic lives in one place in `lib/llm.ts`.
  */
 
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
+import { getLLMClient } from '@/lib/llm';
 
-/** Default model for the on-demand agent. Tool-calling capable. */
-export const AGENT_MODEL = 'gpt-5-mini';
+/** Default model for the on-demand agent. OpenRouter slug. */
+export { DEFAULT_CHAT_MODEL as AGENT_MODEL } from '@/lib/llm';
 
 export interface OpenAIClientResult {
   client: OpenAI;
@@ -21,13 +18,15 @@ export interface OpenAIClientResult {
 
 export class MissingOpenAIKeyError extends Error {
   constructor() {
-    super('OPENAI_API_KEY is not configured for this environment.');
+    super('No LLM API key is configured for this environment.');
     this.name = 'MissingOpenAIKeyError';
   }
 }
 
 export function getOpenAIClient(): OpenAIClientResult {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new MissingOpenAIKeyError();
-  return { client: new OpenAI({ apiKey }) };
+  try {
+    return { client: getLLMClient() };
+  } catch {
+    throw new MissingOpenAIKeyError();
+  }
 }

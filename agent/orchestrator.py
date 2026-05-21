@@ -38,6 +38,7 @@ from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
+from llm import openai_model, resolve_chat_model
 from tools.streaming import publish_event
 from trajectories import normalize_tool_call, record_trajectory
 
@@ -45,7 +46,7 @@ from trajectories import normalize_tool_call, record_trajectory
 # Model fallback list — fall through these on 429s.
 # ---------------------------------------------------------------------------
 
-_FALLBACK_MODELS = ["gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini"]
+_FALLBACK_MODELS = [openai_model(m) for m in ("gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini")]
 
 logger = structlog.get_logger(__name__)
 
@@ -130,7 +131,10 @@ async def _run_with_fallback(
     exception. `on_event` receives each SDK stream event; it should not raise.
     """
     last_exc: Exception | None = None
-    for i, model in enumerate(_FALLBACK_MODELS):
+    # Try the workspace's picked model first (whatever make_chippi_agent
+    # built the agent with), then the OpenRouter fallback chain.
+    models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
+    for i, model in enumerate(models):
         try:
             agent.model = model
             result = Runner.run_streamed(
@@ -148,8 +152,8 @@ async def _run_with_fallback(
             status = getattr(exc, "status_code", None)
             err_str = str(exc)
             is_429 = isinstance(exc, RateLimitError) or status == 429 or "429" in err_str
-            if is_429 and i < len(_FALLBACK_MODELS) - 1:
-                next_model = _FALLBACK_MODELS[i + 1]
+            if is_429 and i < len(models) - 1:
+                next_model = models[i + 1]
                 logger.warning(
                     "model_rate_limited_falling_back",
                     model=model,
@@ -162,8 +166,8 @@ async def _run_with_fallback(
             raise
         except Exception as exc:
             err_str = str(exc)
-            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(_FALLBACK_MODELS) - 1:
-                next_model = _FALLBACK_MODELS[i + 1]
+            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(models) - 1:
+                next_model = models[i + 1]
                 logger.warning(
                     "model_rate_limited_falling_back",
                     model=model,
@@ -379,6 +383,7 @@ async def run_agent_for_space(
         ai_profile_text=ai_profile,
         extra_tools=integration_tools,
         workspace_info=workspace_info,
+        model=resolve_chat_model(agent_settings.chat_model),
     )
     prompt = _build_opening_prompt(space, memory_context, triggers)
 

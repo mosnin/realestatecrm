@@ -11,6 +11,7 @@ import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
 import { IntegrationsSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
+import { ChatModelPicker } from '@/components/agent/chat-model-picker';
 import { MemoryFeed } from '@/components/chippi/memory-feed';
 import { UsageSection } from '@/components/settings/usage-section';
 import { getMonthlyUsage, getDailyUsage } from '@/lib/usage/queries';
@@ -290,6 +291,20 @@ export default async function SettingsPage({
               </p>
             </header>
             <AIProfileForm slug={slug} spaceId={space.id} />
+          </section>
+          <section
+            id="chat-model"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <header className="space-y-1">
+              <h2 className="text-base font-semibold">Chippi&apos;s model</h2>
+              <p className="text-sm text-muted-foreground">
+                The model Chippi thinks with — in chat and when it works on
+                its own. The default suits almost everyone; switch it only
+                if you have a reason to.
+              </p>
+            </header>
+            <ChatModelPicker />
           </section>
         </div>
       )}

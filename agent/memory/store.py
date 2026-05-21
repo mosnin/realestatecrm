@@ -28,10 +28,10 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import settings
 from db import get_pool, supabase
+from llm import EMBEDDING_MODEL, get_llm_client
 
-_EMBED_MODEL = "text-embedding-3-small"
+_EMBED_MODEL = EMBEDDING_MODEL
 _EMBED_DIMS = 1536
 
 _openai: AsyncOpenAI | None = None
@@ -46,7 +46,7 @@ _KILL_SWITCH_TTL = 30.0  # seconds
 def _client() -> AsyncOpenAI:
     global _openai
     if _openai is None:
-        _openai = AsyncOpenAI(api_key=settings.openai_api_key)
+        _openai = get_llm_client()
     return _openai
 
 

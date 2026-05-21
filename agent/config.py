@@ -17,8 +17,12 @@ class Settings(BaseSettings):
     # Direct Postgres connection for async reads (faster than REST for bulk queries)
     database_url: str = Field(alias="DATABASE_URL", default="")
 
-    # OpenAI
+    # OpenAI — embeddings + fallback when OpenRouter isn't configured.
     openai_api_key: str = Field(alias="OPENAI_API_KEY")
+
+    # OpenRouter — primary LLM gateway. When set, every model call routes
+    # through OpenRouter; empty falls back to calling OpenAI directly.
+    openrouter_api_key: str = Field(alias="OPENROUTER_API_KEY", default="")
 
     # Upstash Redis — token budget enforcement
     kv_rest_api_url: str = Field(alias="KV_REST_API_URL", default="")

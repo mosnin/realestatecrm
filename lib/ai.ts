@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { getLLMClient, openaiModel } from '@/lib/llm';
 import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
 import { supabase } from '@/lib/supabase';
@@ -43,11 +43,9 @@ export async function chatWithRAG(
   _apiKey?: string | null,
   ownerName?: string | null
 ): Promise<ReadableStream> {
-  const openAIKey = process.env.OPENAI_API_KEY;
-
-  if (!openAIKey) {
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
     return textStream(
-      'No AI API key configured. Add OPENAI_API_KEY in your Vercel environment variables.'
+      'No AI API key configured. Add OPENROUTER_API_KEY (or OPENAI_API_KEY) in your Vercel environment variables.'
     );
   }
 
@@ -312,9 +310,9 @@ export async function chatWithRAG(
     .join('\n');
 
   try {
-    const openai = new OpenAI({ apiKey: openAIKey });
+    const openai = getLLMClient();
     const stream = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: openaiModel('gpt-4.1-mini'),
       temperature: 0.2,
       max_tokens: 2000,
       stream: true,

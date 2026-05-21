@@ -286,9 +286,11 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
+    from llm import resolve_chat_model
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
+    resolved_model = resolve_chat_model(agent_settings.chat_model)
 
     ctx = AgentContext.from_settings(
         agent_settings,
@@ -476,6 +478,7 @@ async def chat_turn(item: dict):
             chippi = make_chippi_agent(
                 extra_tools=integration_tools,
                 workspace_info=workspace_info,
+                model=resolved_model,
             )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
@@ -500,6 +503,24 @@ async def chat_turn(item: dict):
             )
             done = json.dumps({"type": "done", "final_text": final_text})
             yield f"data: {done}\n\n"
+
+            # Record this turn's token cost for the Usage page. Best-effort:
+            # a telemetry failure must never surface as a chat error.
+            try:
+                from ledger import record_chat_usage
+
+                turn_usage = getattr(result, "usage", None)
+                if turn_usage is not None:
+                    await record_chat_usage(
+                        space_id=space_id,
+                        model=resolved_model,
+                        prompt_tokens=getattr(turn_usage, "input_tokens", 0) or 0,
+                        completion_tokens=getattr(turn_usage, "output_tokens", 0) or 0,
+                        user_id=user_id or None,
+                        conversation_id=conversation_id or None,
+                    )
+            except Exception:
+                logger.warning("chat_turn_usage_record_failed", space_id=space_id)
 
         except InputGuardrailTripwireTriggered as exc:
             info = exc.guardrail_result.output.output_info or {}

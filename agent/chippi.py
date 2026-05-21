@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from agents import Agent
 
+from llm import configure_agents_sdk, resolve_chat_model
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
 from tools.docs import recall_docs
@@ -278,6 +279,7 @@ def make_chippi_agent(
     ai_profile_text: str | None = None,
     extra_tools: list | None = None,
     workspace_info: str | None = None,
+    model: str | None = None,
 ) -> Agent:
     """
     Build the single Chippi agent. Constructed fresh per run.
@@ -304,6 +306,7 @@ def make_chippi_agent(
       3. ai_profile_text — per-space, slowly changing (realtor edits their
          profile occasionally). Caches per-space until they edit it.
     """
+    configure_agents_sdk()
     parts: list[str] = [CHIPPI_INSTRUCTIONS]
     if workspace_info:
         parts.append(workspace_info)
@@ -362,7 +365,7 @@ def make_chippi_agent(
     ]
     return Agent[None](
         name="Chippi",
-        model="gpt-5",
+        model=resolve_chat_model(model),
         instructions=instructions,
         tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],
