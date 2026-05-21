@@ -14,7 +14,6 @@ import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { ChatModelPicker } from '@/components/agent/chat-model-picker';
 import { MemoryFeed } from '@/components/chippi/memory-feed';
 import { UsageSection } from '@/components/settings/usage-section';
-import { getMonthlyUsage, getDailyUsage } from '@/lib/usage/queries';
 import { cn } from '@/lib/utils';
 import type { SpaceSetting } from '@/lib/types';
 import {
@@ -104,38 +103,6 @@ export default async function SettingsPage({
         </div>
       </div>
     );
-  }
-
-  // Usage data — only fetched when the Usage tab is active, so the other
-  // four tabs don't pay for three telemetry queries they won't render.
-  let usage: {
-    monthTotalUsd: number;
-    lastMonthTotalUsd: number;
-    byModel: Awaited<ReturnType<typeof getMonthlyUsage>>['byModel'];
-    daily: Awaited<ReturnType<typeof getDailyUsage>>;
-  } | null = null;
-  if (activeTab === 'usage') {
-    try {
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth() + 1; // getUTCMonth is 0-indexed
-      const prevYear = month === 1 ? year - 1 : year;
-      const prevMonth = month === 1 ? 12 : month - 1;
-      const [thisMonth, lastMonth, daily] = await Promise.all([
-        getMonthlyUsage(space.id, year, month),
-        getMonthlyUsage(space.id, prevYear, prevMonth),
-        getDailyUsage(space.id, 30),
-      ]);
-      usage = {
-        monthTotalUsd: thisMonth.totalUsd,
-        lastMonthTotalUsd: lastMonth.totalUsd,
-        byModel: thisMonth.byModel,
-        daily,
-      };
-    } catch (err) {
-      console.error('[settings/usage] telemetry query failed', err);
-      // Leave usage null — the tab renders the empty state rather than 500ing.
-    }
   }
 
   // Subscription status drives the narration line under the H1. Same
@@ -372,12 +339,7 @@ export default async function SettingsPage({
 
       {activeTab === 'usage' && (
         <section id="usage">
-          <UsageSection
-            monthTotalUsd={usage?.monthTotalUsd ?? 0}
-            lastMonthTotalUsd={usage?.lastMonthTotalUsd ?? 0}
-            byModel={usage?.byModel ?? []}
-            daily={usage?.daily ?? []}
-          />
+          <UsageSection />
         </section>
       )}
     </div>
