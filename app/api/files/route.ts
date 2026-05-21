@@ -1,13 +1,14 @@
 /**
- * GET  /api/files               — list files in current space.
- * POST /api/files                — upload a file.
+ * GET  /api/files               — list files in the current space + folder.
+ * POST /api/files                — upload a file (optionally into a folder).
  *
  * Per-file: validates mime + magic bytes + category size cap.
  * Per-space: enforces the plan-tier total storage quota.
  * Per-user: 50 uploads / hour rate limit.
  *
- * Files are stored privately. The Files page fetches per-file signed URLs
- * lazily via /api/files/[id] when the user clicks Download.
+ * Files are stored privately. Image rows carry a short-lived signed
+ * `previewUrl` so the Files grid can render real thumbnails; other types
+ * fetch a signed URL lazily via /api/files/[id] when previewed.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +18,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import { uploadObject, deleteObject, buildKey, getPublicUrl } from '@/lib/storage';
+import { uploadObject, deleteObject, buildKey, getSignedDownloadUrl } from '@/lib/storage';
 import {
   validateUpload,
   quotaForPlan,
@@ -58,6 +59,22 @@ function deriveCategory(mimeType: string): 'image' | 'document' | 'video' | 'aud
   return 'other';
 }
 
+type ListedFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  category: string;
+  sizeBytes: number;
+  isPublic: boolean;
+  createdAt: string;
+  source: 'file' | 'chat';
+  /** Folder the file lives in. null = root. Chat attachments are always root. */
+  folderId: string | null;
+  /** Short-lived signed URL — present for image rows so the grid can show
+   *  a real thumbnail. Absent for non-images and chat attachments. */
+  previewUrl?: string;
+};
+
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -67,29 +84,35 @@ export async function GET(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const category = req.nextUrl.searchParams.get('category');
+  // No folderId (or 'root') means the top level. Chat attachments have no
+  // folder, so they only appear at the root.
+  const folderParam = req.nextUrl.searchParams.get('folderId');
+  const folderId = folderParam && folderParam !== 'root' ? folderParam : null;
+  const atRoot = folderId === null;
 
-  // Query both surfaces in parallel — File (Files page uploads) AND
-  // Attachment (chat uploads). The Files page renders the union so the
-  // realtor sees every file in one place. Each row carries `source` so
-  // the UI can show a small "From chat" badge and the delete path can
-  // route to the right endpoint.
-  const [fileRes, attachmentRes] = await Promise.all([
-    (() => {
-      let q = supabase
-        .from('File')
-        .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
-        .eq('spaceId', space.id)
-        .order('createdAt', { ascending: false })
-        .limit(500);
-      if (category) q = q.eq('category', category);
-      return q;
-    })(),
-    supabase
-      .from('Attachment')
-      .select('id, filename, mimeType, sizeBytes, createdAt')
+  const fileQuery = (() => {
+    let q = supabase
+      .from('File')
+      .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt, storageKey, folderId')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
-      .limit(500),
+      .limit(500);
+    if (category) q = q.eq('category', category);
+    return atRoot ? q.is('folderId', null) : q.eq('folderId', folderId);
+  })();
+
+  const [fileRes, attachmentRes, quotaRes] = await Promise.all([
+    fileQuery,
+    atRoot
+      ? supabase
+          .from('Attachment')
+          .select('id, filename, mimeType, sizeBytes, createdAt')
+          .eq('spaceId', space.id)
+          .order('createdAt', { ascending: false })
+          .limit(500)
+      : Promise.resolve({ data: [] as never[], error: null }),
+    // Quota counts every File row in the space — not just the current folder.
+    supabase.from('File').select('sizeBytes').eq('spaceId', space.id),
   ]);
 
   if (fileRes.error) {
@@ -97,31 +120,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to list files' }, { status: 500 });
   }
 
-  type ListedFile = {
-    id: string;
-    name: string;
-    mimeType: string;
-    category: string;
-    sizeBytes: number;
-    isPublic: boolean;
-    createdAt: string;
-    source: 'file' | 'chat';
-  };
+  const fileRows: ListedFile[] = await Promise.all(
+    (fileRes.data ?? []).map(async (r) => {
+      // Image rows get a signed thumbnail URL (1h — long enough for a
+      // working session; refresh() re-mints them). Errors degrade to icon.
+      let previewUrl: string | undefined;
+      if (r.category === 'image' && r.storageKey) {
+        try {
+          previewUrl = await getSignedDownloadUrl(r.storageKey, 60 * 60);
+        } catch {
+          previewUrl = undefined;
+        }
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        mimeType: r.mimeType,
+        category: r.category,
+        sizeBytes: Number(r.sizeBytes ?? 0),
+        isPublic: Boolean(r.isPublic),
+        createdAt: r.createdAt,
+        source: 'file' as const,
+        folderId: (r as { folderId?: string | null }).folderId ?? null,
+        previewUrl,
+      };
+    }),
+  );
 
-  const fileRows: ListedFile[] = (fileRes.data ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    mimeType: r.mimeType,
-    category: r.category,
-    sizeBytes: Number(r.sizeBytes ?? 0),
-    isPublic: Boolean(r.isPublic),
-    createdAt: r.createdAt,
-    source: 'file',
-  }));
-
-  // Chat attachments are public-served (the chat-attachments/ prefix is
-  // covered by the bucket policy) and always have a mime — categorize on
-  // the fly. Apply the same category filter the File query used.
+  // Chat attachments are public-served and always have a mime — categorize
+  // on the fly. They never carry a folder.
   const chatRows: ListedFile[] = ((attachmentRes.data ?? []) as Array<{
     id: string;
     filename: string;
@@ -138,6 +165,7 @@ export async function GET(req: NextRequest) {
       isPublic: true,
       createdAt: r.createdAt,
       source: 'chat' as const,
+      folderId: null,
     }))
     .filter((r) => !category || r.category === category);
 
@@ -146,12 +174,12 @@ export async function GET(req: NextRequest) {
   );
 
   // Quota gauge counts File-table bytes only — chat attachments don't
-  // count against the realtor's storage quota (they're conversation
-  // ephemera with their own retention).
-  const usedBytes = fileRows.reduce((sum, r) => sum + r.sizeBytes, 0);
+  // count against the realtor's storage quota.
+  const usedBytes = (quotaRes.data ?? []).reduce(
+    (sum, r) => sum + Number(r.sizeBytes ?? 0),
+    0,
+  );
 
-  // Plan tier may not exist yet in main — graceful default to 'free' until
-  // the Plan migration lands. Cast through unknown for the optional column.
   const planId = ((space as unknown) as { planId?: string }).planId ?? 'free';
   const quota = quotaForPlan(planId);
 
@@ -190,6 +218,19 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file');
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  }
+
+  // Optional target folder — the page sends the folder it's currently in.
+  const folderRaw = formData.get('folderId');
+  let folderId: string | null = null;
+  if (typeof folderRaw === 'string' && folderRaw && folderRaw !== 'root') {
+    const { data: folder } = await supabase
+      .from('Folder')
+      .select('id')
+      .eq('id', folderRaw)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (folder) folderId = folder.id;
   }
 
   // Pull the first 16 bytes for the magic-byte check before reading the
@@ -261,6 +302,7 @@ export async function POST(req: NextRequest) {
       category,
       sizeBytes: file.size,
       isPublic: false,
+      folderId,
     })
     .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
     .single();

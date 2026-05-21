@@ -48,6 +48,65 @@ export async function GET(
   return NextResponse.json({ url, name: row.name, mimeType: row.mimeType });
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
+
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { id } = await params;
+  const body = (await req.json().catch(() => ({}))) as { name?: unknown; folderId?: unknown };
+  const patch: Record<string, unknown> = {};
+
+  // Rename.
+  if (typeof body.name === 'string') {
+    const name = body.name.trim().slice(0, 200);
+    if (!name) return NextResponse.json({ error: 'A name is required.' }, { status: 400 });
+    patch.name = name;
+  }
+
+  // Move. null / '' / 'root' moves the file back to the top level.
+  if (body.folderId !== undefined) {
+    if (body.folderId === null || body.folderId === '' || body.folderId === 'root') {
+      patch.folderId = null;
+    } else if (typeof body.folderId === 'string') {
+      const { data: folder } = await supabase
+        .from('Folder')
+        .select('id')
+        .eq('id', body.folderId)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      if (!folder) return NextResponse.json({ error: 'Folder not found.' }, { status: 400 });
+      patch.folderId = folder.id;
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from('File')
+    .update(patch)
+    .eq('id', id)
+    .eq('spaceId', space.id)
+    .select('id, name, folderId')
+    .maybeSingle();
+
+  if (error) {
+    logger.error('[files/id] update failed', { id }, error);
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+  }
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  return NextResponse.json(data);
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
