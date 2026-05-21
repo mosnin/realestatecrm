@@ -36,10 +36,10 @@ class Settings(BaseSettings):
     # Secret shared between Modal and the Next.js app for internal API calls
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
-    # Model for the swarm orchestrator's fan-out workers. Chippi itself is
-    # built with its model set in chippi.py; the autonomous runner falls
-    # back through _FALLBACK_MODELS in orchestrator.py on 429s.
-    worker_model: str = Field(default="gpt-5-mini")
+    # Model for the swarm orchestrator's fan-out workers (the swarm sub-
+    # agents). The main Chippi agent's model is the per-workspace pick
+    # (see chippi.py / llm.py); this is swarm-only.
+    worker_model: str = Field(default="x-ai/grok-4.3")
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection

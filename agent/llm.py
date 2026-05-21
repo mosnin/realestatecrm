@@ -25,7 +25,7 @@ from config import settings
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # The model a workspace gets when it hasn't picked one. OpenRouter slug.
-DEFAULT_CHAT_MODEL = "openai/gpt-5.5"
+DEFAULT_CHAT_MODEL = "x-ai/grok-4.3"
 
 # Allowlist of realtor-selectable models — mirrors CHAT_MODELS in lib/llm.ts.
 CHAT_MODELS: tuple[str, ...] = (

@@ -18,19 +18,19 @@ export interface ChatModelOption {
 
 export const CHAT_MODELS: ChatModelOption[] = [
   {
+    id: 'x-ai/grok-4.3',
+    label: 'Grok 4.3',
+    tagline: 'Quick, direct, strong with fresh real-world context.',
+  },
+  {
     id: 'openai/gpt-5.5',
-    label: 'Chippi Default',
-    tagline: 'GPT-5.5 — fast, balanced, the right call for almost everything.',
+    label: 'GPT-5.5',
+    tagline: 'Fast and balanced — a strong all-rounder.',
   },
   {
     id: 'anthropic/claude-opus-4.7',
     label: 'Claude Opus 4.7',
     tagline: 'Deepest reasoning — reach for it on long, intricate work.',
-  },
-  {
-    id: 'x-ai/grok-4.3',
-    label: 'Grok 4.3',
-    tagline: 'Quick and direct, strong with fresh real-world context.',
   },
   {
     id: 'moonshotai/kimi-k2.6',
@@ -45,7 +45,7 @@ export const CHAT_MODELS: ChatModelOption[] = [
 ];
 
 /** The model used when a workspace hasn't picked one. */
-export const DEFAULT_CHAT_MODEL = 'openai/gpt-5.5';
+export const DEFAULT_CHAT_MODEL = 'x-ai/grok-4.3';
 
 /** Allowlist check — gate user-supplied model slugs before persisting. */
 export function isValidChatModel(value: unknown): value is string {
