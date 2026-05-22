@@ -19,10 +19,14 @@ function makeChain(): Record<string, unknown> {
   const terminal: TerminalResult = supabaseQueue.shift() ?? { data: null, error: null };
 
   const chain: Record<string, unknown> = {};
+  let isUpdate = false;
 
   const passthroughs = ['select', 'eq', 'update', 'insert', 'limit', 'order'];
   for (const method of passthroughs) {
-    chain[method] = vi.fn((..._args: unknown[]) => chain);
+    chain[method] = vi.fn((..._args: unknown[]) => {
+      if (method === 'update') isUpdate = true;
+      return chain;
+    });
   }
 
   // .single() terminates and resolves
@@ -30,12 +34,20 @@ function makeChain(): Record<string, unknown> {
   // .maybeSingle() same
   chain.maybeSingle = vi.fn(() => Promise.resolve(terminal));
 
-  // Allow `await supabase.from(...).update(...).eq(...)` — the terminal is the
-  // resolved value of the chain's thenable.
+  // Allow `await supabase.from(...).update(...).eq(...).select()`. Real
+  // Supabase resolves an update().select() to the affected rows; when a test
+  // queues only { error } (or { data: null }) for an update, treat a
+  // non-error result as one affected row so compare-and-swap sees it.
   chain.then = (
     resolve: (v: TerminalResult) => unknown,
     reject?: (e: unknown) => unknown,
-  ) => Promise.resolve(terminal).then(resolve, reject);
+  ) => {
+    const resolved: TerminalResult =
+      isUpdate && !terminal.error && terminal.data == null
+        ? { data: [{}], error: null }
+        : terminal;
+    return Promise.resolve(resolved).then(resolve, reject);
+  };
 
   return chain;
 }

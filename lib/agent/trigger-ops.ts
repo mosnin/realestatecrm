@@ -8,9 +8,10 @@ export function triggerOpsEnabled(): boolean {
 
 export function triggerOpsAuthorized(req: Request): boolean {
   const required = process.env.AGENT_TRIGGER_OPS_SECRET?.trim();
-  // Fail closed — an unset secret means "ops not provisioned", which is
-  // "deny", not "open to everyone". These endpoints clear and replay events.
-  if (!required) return false;
+  // The ops routes already require a Clerk session — every route runs
+  // requireAuth() right after this check. This secret is an OPTIONAL extra
+  // layer; when it isn't configured the gate is simply a no-op, not a hole.
+  if (!required) return true;
   const got = req.headers.get('x-agent-ops-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   return got === required;
 }

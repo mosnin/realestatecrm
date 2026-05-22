@@ -86,7 +86,12 @@ describe('POST /api/agent/trigger', () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes('agent%3Atrigger-dedupe')) {
         dedupeCount += 1;
-        return new Response(JSON.stringify({ result: dedupeCount }), { status: 200 });
+        // SET NX: 'OK' when the key was absent (first call), null when it
+        // already existed (a duplicate within the window).
+        return new Response(
+          JSON.stringify({ result: dedupeCount === 1 ? 'OK' : null }),
+          { status: 200 },
+        );
       }
       if (url.includes('/incr/')) return new Response(JSON.stringify({ result: 1 }), { status: 200 });
       if (url.includes('/expire/')) return new Response('OK', { status: 200 });
