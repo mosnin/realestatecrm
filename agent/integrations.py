@@ -36,6 +36,46 @@ from db import supabase
 logger = structlog.get_logger()
 
 
+# ---------------------------------------------------------------------------
+# Approval gating — which Composio actions are consequential
+# ---------------------------------------------------------------------------
+#
+# Claude-Code-style selective gating: a read or an internal write is a basic
+# step and runs without ceremony; an action that sends a message, posts, or
+# publishes to someone OUTSIDE the workspace is the one a realtor must stand
+# behind. Autonomous runs drop those actions entirely — nobody is present to
+# ask. Interactive chat keeps them: the realtor's own message is the request.
+
+# Action-slug segments meaning "this reaches someone outside the workspace".
+# Composio slugs are TOOLKIT_VERB_OBJECT; matched on the underscore-split
+# parts so a stray substring can't false-hit.
+_SEND_SEGMENTS = frozenset({
+    "send", "post", "publish", "reply", "comment", "dm",
+    "tweet", "broadcast", "email", "message", "call",
+})
+# On social / messaging toolkits a "create"/"upload" is itself a public post
+# (Instagram create-media, YouTube upload-video).
+_PUBLISH_TOOLKITS = frozenset({
+    "twilio", "whatsapp", "slack", "discord", "microsoft_teams",
+    "facebook", "instagram", "linkedin", "reddit", "youtube",
+})
+_PUBLISH_SEGMENTS = frozenset({"create", "upload"})
+
+
+def action_needs_approval(action_slug: str, toolkit_slug: str) -> bool:
+    """Whether a Composio action sends/posts to someone outside the workspace.
+
+    True  → consequential; an autonomous run must not fire it unattended.
+    False → a read or internal write; runs freely, no prompt.
+    """
+    parts = frozenset(action_slug.lower().split("_"))
+    if parts & _SEND_SEGMENTS:
+        return True
+    if toolkit_slug.lower() in _PUBLISH_TOOLKITS and (parts & _PUBLISH_SEGMENTS):
+        return True
+    return False
+
+
 def composio_configured() -> bool:
     """True when COMPOSIO_API_KEY is set. Modal secret must include it."""
     return bool(os.environ.get("COMPOSIO_API_KEY"))
@@ -166,9 +206,17 @@ def _wrap_for_logging(tool: Any, *, space_id: str, toolkit: str) -> None:
     tool.on_invoke_tool = logged
 
 
-async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
+async def load_integration_tools(
+    space_id: str, user_id: str, interactive: bool = False
+) -> list[Any]:
     """
     Fetch the realtor's connected-toolkit tools as agent-ready Tool objects.
+
+    `interactive` — True for a live chat turn: a realtor is present and
+    their message IS the request, so the full toolset loads. False for
+    autonomous runs: send/post actions (see `action_needs_approval`) are
+    dropped, because nothing should message a client with no one there to
+    stand behind it. Reads and internal writes load either way.
 
     Returns [] on any failure path so the agent always has SOMETHING to
     work with. A Composio outage degrades the experience (no integrations
@@ -223,6 +271,26 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
             # agent. Mirrors the same fix on lib/integrations/composio.ts.
             tools = composio.tools.get(user_id, toolkits=[toolkit], limit=1000)
             if tools:
+                # Autonomous runs drop send/post actions — no realtor is
+                # present to stand behind a message to a client. Reads and
+                # internal writes stay so the run still gets its work done.
+                if not interactive:
+                    kept: list[Any] = []
+                    dropped: list[str] = []
+                    for t in tools:
+                        slug = getattr(t, "name", "") or ""
+                        if action_needs_approval(slug, toolkit):
+                            dropped.append(slug)
+                        else:
+                            kept.append(t)
+                    if dropped:
+                        logger.info(
+                            "integration_send_tools_gated_out",
+                            space_id=space_id,
+                            toolkit=toolkit,
+                            tools=dropped,
+                        )
+                    tools = kept
                 # Wrap each tool's on_invoke_tool to surface inputs/outputs
                 # at info level. Without this, integration tool calls are
                 # invisible in Modal logs and any failure looks like the

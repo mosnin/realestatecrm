@@ -460,7 +460,11 @@ async def chat_turn(item: dict):
         try:
             from integrations import load_integration_tools
 
-            integration_tools = await load_integration_tools(space_id, user_id)
+            # interactive=True — a realtor is in this chat turn; their
+            # message is the request, so the full Composio toolset loads.
+            integration_tools = await load_integration_tools(
+                space_id, user_id, interactive=True
+            )
         except Exception as ie:  # noqa: BLE001
             logger.warning(
                 "load_integration_tools_failed",

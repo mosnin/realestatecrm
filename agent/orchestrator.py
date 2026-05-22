@@ -365,7 +365,12 @@ async def run_agent_for_space(
 
         owner_clerk_id = await resolve_owner_user_id(space.id)
         if owner_clerk_id:
-            integration_tools = await load_integration_tools(space.id, owner_clerk_id)
+            # interactive=False — no realtor is watching an autonomous run,
+            # so send/post Composio actions are dropped; the run can still
+            # read, and contact-facing messages go through the draft model.
+            integration_tools = await load_integration_tools(
+                space.id, owner_clerk_id, interactive=False
+            )
     except Exception as ie:  # noqa: BLE001
         log.warning("autonomous_load_integration_tools_failed", error=str(ie)[:200])
 
