@@ -21,6 +21,7 @@ interface ProfileConfig {
   showTours: boolean;
   showProperties: boolean;
   customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
+  videos: Array<{ id: string; url: string; title?: string }>;
 }
 
 const DEFAULT_CONFIG: ProfileConfig = {
@@ -30,6 +31,7 @@ const DEFAULT_CONFIG: ProfileConfig = {
   showTours: true,
   showProperties: true,
   customLinks: [],
+  videos: [],
 };
 
 export default async function PublicRealtorPage({
@@ -52,7 +54,9 @@ export default async function PublicRealtorPage({
     supabase.from('User').select('name, avatar').eq('id', space.ownerId).maybeSingle(),
     supabase
       .from('ProfilePage')
-      .select('enabled, headline, showIntake, showTours, showProperties, customLinks')
+      .select(
+        'enabled, headline, showIntake, showTours, showProperties, customLinks, videos',
+      )
       .eq('spaceId', space.id)
       .maybeSingle(),
   ]);
@@ -94,6 +98,7 @@ export default async function PublicRealtorPage({
       showIntake={cfg.showIntake !== false}
       showTours={cfg.showTours !== false}
       customLinks={Array.isArray(cfg.customLinks) ? cfg.customLinks : []}
+      videos={Array.isArray(cfg.videos) ? cfg.videos : []}
       properties={properties}
       hidePoweredBy={hidePoweredBy}
     />

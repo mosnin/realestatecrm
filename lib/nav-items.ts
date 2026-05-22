@@ -111,10 +111,6 @@ export const realtorNavItems: NavItem[] = [
     href: '/profile-page',
     label: 'Profile',
     icon: UserCircle,
-    children: [
-      { href: '/profile-page#sections', label: 'Sections' },
-      { href: '/profile-page#links', label: 'Custom links' },
-    ],
   },
   {
     href: '/intake',
