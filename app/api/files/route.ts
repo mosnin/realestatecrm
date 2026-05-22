@@ -17,7 +17,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import { uploadObject, deleteObject, buildKey, getPublicUrl } from '@/lib/storage';
+import { uploadObject, deleteObject, buildKey, getSignedDownloadUrl } from '@/lib/storage';
 import {
   validateUpload,
   quotaForPlan,
@@ -58,6 +58,17 @@ function deriveCategory(mimeType: string): 'image' | 'document' | 'video' | 'aud
   return 'other';
 }
 
+/** Sign a private File object for inline preview + thumbnails. Returns null
+ *  on failure so a single bad key never sinks the whole list. The 2-hour TTL
+ *  comfortably outlives a working session on the Files page. */
+async function signOrNull(storageKey: string): Promise<string | null> {
+  try {
+    return await getSignedDownloadUrl(storageKey, 60 * 60 * 2);
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -77,7 +88,7 @@ export async function GET(req: NextRequest) {
     (() => {
       let q = supabase
         .from('File')
-        .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
+        .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt, storageKey')
         .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
         .limit(500);
@@ -86,7 +97,7 @@ export async function GET(req: NextRequest) {
     })(),
     supabase
       .from('Attachment')
-      .select('id, filename, mimeType, sizeBytes, createdAt')
+      .select('id, filename, mimeType, sizeBytes, createdAt, publicUrl')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(500),
@@ -105,19 +116,23 @@ export async function GET(req: NextRequest) {
     sizeBytes: number;
     isPublic: boolean;
     createdAt: string;
+    url: string | null;
     source: 'file' | 'chat';
   };
 
-  const fileRows: ListedFile[] = (fileRes.data ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    mimeType: r.mimeType,
-    category: r.category,
-    sizeBytes: Number(r.sizeBytes ?? 0),
-    isPublic: Boolean(r.isPublic),
-    createdAt: r.createdAt,
-    source: 'file',
-  }));
+  const fileRows: ListedFile[] = await Promise.all(
+    (fileRes.data ?? []).map(async (r) => ({
+      id: r.id,
+      name: r.name,
+      mimeType: r.mimeType,
+      category: r.category,
+      sizeBytes: Number(r.sizeBytes ?? 0),
+      isPublic: Boolean(r.isPublic),
+      createdAt: r.createdAt,
+      url: await signOrNull(r.storageKey),
+      source: 'file' as const,
+    })),
+  );
 
   // Chat attachments are public-served (the chat-attachments/ prefix is
   // covered by the bucket policy) and always have a mime — categorize on
@@ -128,6 +143,7 @@ export async function GET(req: NextRequest) {
     mimeType: string;
     sizeBytes: number | null;
     createdAt: string;
+    publicUrl: string | null;
   }>)
     .map((r) => ({
       id: r.id,
@@ -137,6 +153,7 @@ export async function GET(req: NextRequest) {
       sizeBytes: Number(r.sizeBytes ?? 0),
       isPublic: true,
       createdAt: r.createdAt,
+      url: r.publicUrl ?? null,
       source: 'chat' as const,
     }))
     .filter((r) => !category || r.category === category);
