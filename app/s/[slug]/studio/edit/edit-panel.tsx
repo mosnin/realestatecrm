@@ -8,7 +8,7 @@
  * and its cost is metered into usage.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Upload, AlertCircle } from 'lucide-react';
@@ -34,6 +34,53 @@ export function EditPanel() {
   const [result, setResult] = useState<EditResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Resume-on-mount. A refresh or nav while fal is transforming the image
+  // would otherwise drop the realtor's result on the floor.
+  const processingRef = useRef(false);
+  useEffect(() => {
+    processingRef.current = processing;
+  }, [processing]);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch('/api/studio/recent-job?source=edit');
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          job: {
+            id: string;
+            status: 'running' | 'completed' | 'failed';
+            fileId?: string;
+            url?: string;
+            errorMessage?: string;
+          } | null;
+        };
+        if (cancelled || !data.job) return;
+        if (data.job.status === 'running') {
+          setProcessing(true);
+          timer = setTimeout(tick, 3000);
+          return;
+        }
+        if (!processingRef.current) return;
+        setProcessing(false);
+        if (data.job.status === 'completed' && data.job.fileId && data.job.url) {
+          setResult({ url: data.job.url, fileId: data.job.fileId });
+        } else if (data.job.status === 'failed') {
+          setError(data.job.errorMessage || 'The edit failed.');
+        }
+      } catch {
+        if (!cancelled) timer = setTimeout(tick, 5000);
+      }
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const needsPrompt = STUDIO_EDIT_TOOLS[tool]?.needsPrompt ?? false;
   const canApply =

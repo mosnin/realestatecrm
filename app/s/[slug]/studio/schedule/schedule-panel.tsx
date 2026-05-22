@@ -40,7 +40,17 @@ function formatWhen(iso: string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZoneName: 'short',
   });
+}
+
+/** Local "now" formatted for an <input type="datetime-local"> min attribute. */
+function nowLocalForInput(): string {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  // Shift by the offset so toISOString() (which formats UTC) reads as local.
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -161,6 +171,7 @@ export function SchedulePanel({
   }
 
   async function handleCancel(id: string) {
+    if (!window.confirm('Cancel this scheduled post?')) return;
     setCanceling(id);
     setError(null);
     try {
@@ -276,6 +287,7 @@ export function SchedulePanel({
           <Input
             type="datetime-local"
             value={when}
+            min={nowLocalForInput()}
             onChange={(e) => setWhen(e.target.value)}
             className="w-auto"
           />

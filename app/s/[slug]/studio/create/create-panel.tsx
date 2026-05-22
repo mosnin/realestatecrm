@@ -8,7 +8,7 @@
  * usage by the API route. This surface stays about the creative output.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ImagePlus, AlertCircle } from 'lucide-react';
@@ -33,6 +33,61 @@ export function CreatePanel() {
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The model kind picked up by the recovery poll — used to render the right
+  // spinner text when a job was started in a previous mount.
+  const [recoveredKind, setRecoveredKind] = useState<'image' | 'video' | null>(null);
+
+  // Resume-on-mount. Studio generation is synchronous on the server, so a
+  // refresh or nav mid-job dropped the result on the floor. The
+  // StudioGeneration row is the source of truth; we poll it.
+  const generatingRef = useRef(false);
+  useEffect(() => {
+    generatingRef.current = generating;
+  }, [generating]);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch('/api/studio/recent-job?source=create');
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          job: {
+            id: string;
+            status: 'running' | 'completed' | 'failed';
+            kind: 'image' | 'video';
+            fileId?: string;
+            url?: string;
+            errorMessage?: string;
+          } | null;
+        };
+        if (cancelled || !data.job) return;
+        if (data.job.status === 'running') {
+          setGenerating(true);
+          setRecoveredKind(data.job.kind);
+          timer = setTimeout(tick, 3000);
+          return;
+        }
+        // Terminal status — only adopt if we were waiting on a job;
+        // otherwise a recently-finished result lives in Library.
+        if (!generatingRef.current) return;
+        setGenerating(false);
+        if (data.job.status === 'completed' && data.job.fileId && data.job.url) {
+          setResult({ url: data.job.url, fileId: data.job.fileId, kind: data.job.kind });
+        } else if (data.job.status === 'failed') {
+          setError(data.job.errorMessage || 'Generation failed.');
+        }
+      } catch {
+        if (!cancelled) timer = setTimeout(tick, 5000);
+      }
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const canGenerate = prompt.trim().length > 0 && !generating;
 
@@ -133,13 +188,13 @@ export function CreatePanel() {
       {generating ? (
         <GeneratingState
           title={
-            STUDIO_MODELS[model]?.kind === 'video'
+            (recoveredKind ?? STUDIO_MODELS[model]?.kind) === 'video'
               ? 'Generating your video.'
               : 'Generating your image.'
           }
           subtitle={
-            STUDIO_MODELS[model]?.kind === 'video'
-              ? 'Video can take a few minutes — keep this tab open.'
+            (recoveredKind ?? STUDIO_MODELS[model]?.kind) === 'video'
+              ? 'Video can take a few minutes.'
               : 'This usually takes a few seconds.'
           }
         />

@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { inngest } from '@/lib/inngest/client';
@@ -77,16 +78,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
   }
 
+  // Hourly per-realtor cap so a script can't flood StudioPost / Inngest.
+  const rl = await checkRateLimit(`studio:schedule:${userId}`, 30, 3600);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many scheduled posts. Try again in a little while.' },
+      { status: 429 },
+    );
+  }
+
   const file = formData.get('file');
   const captionRaw = formData.get('caption');
-  const caption = typeof captionRaw === 'string' ? captionRaw.trim() : '';
+  // Strip ASCII control + zero-width + bidi + BOM before the caption lands on
+  // a social post. Keep newlines and tabs (0x0A, 0x09) — captions are multi-line.
+  const caption = typeof captionRaw === 'string'
+    ? Array.from(captionRaw.trim())
+        .filter((c) => {
+          const cp = c.codePointAt(0) ?? 0;
+          if (cp < 0x09) return false;             // 0x00–0x08
+          if (cp > 0x0A && cp < 0x20) return false; // 0x0B–0x1F (keep \t \n)
+          if (cp === 0x7F) return false;            // DEL
+          if (cp >= 0x200B && cp <= 0x200F) return false; // zero-width / bidi marks
+          if (cp >= 0x202A && cp <= 0x202E) return false; // bidi embed/override
+          if (cp === 0xFEFF) return false;           // BOM
+          return true;
+        })
+        .join('')
+    : '';
   const scheduledAtRaw = String(formData.get('scheduledAt') ?? '');
 
   let requested: string[] = [];
   try {
     const parsed: unknown = JSON.parse(String(formData.get('platforms') ?? '[]'));
     if (Array.isArray(parsed)) {
-      requested = parsed.filter((p): p is string => typeof p === 'string');
+      requested = parsed
+        .filter((p): p is string => typeof p === 'string')
+        .slice(0, 10); // cap; an honest UI never sends more than a handful
     }
   } catch {
     requested = [];
