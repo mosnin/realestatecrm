@@ -9,6 +9,7 @@ describe('POST /api/agent/trigger/replay', () => {
   beforeEach(() => {
     process.env = {
       ...OLD_ENV,
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -53,7 +54,7 @@ describe('POST /api/agent/trigger/replay', () => {
     const { POST } = await import('@/app/api/agent/trigger/replay/route');
     const req = new Request('http://localhost/api/agent/trigger/replay', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' },
       body: JSON.stringify({ offset: 0, reason: 'rerun missed trigger' }),
     });
 
@@ -71,7 +72,7 @@ describe('POST /api/agent/trigger/replay', () => {
     const { POST } = await import('@/app/api/agent/trigger/replay/route');
     const req = new Request('http://localhost/api/agent/trigger/replay', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' },
       body: JSON.stringify({ offset: -1 }),
     });
 
@@ -106,12 +107,12 @@ describe('POST /api/agent/trigger/replay', () => {
     const { POST } = await import('@/app/api/agent/trigger/replay/route');
     const req1 = new Request('http://localhost/api/agent/trigger/replay', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' },
       body: JSON.stringify({ offset: 0, idempotencyKey: 'abc-123' }),
     });
     const req2 = new Request('http://localhost/api/agent/trigger/replay', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' },
       body: JSON.stringify({ offset: 0, idempotencyKey: 'abc-123' }),
     });
 
@@ -137,7 +138,7 @@ describe('POST /api/agent/trigger/replay', () => {
     const { POST } = await import('@/app/api/agent/trigger/replay/route');
     const req = new Request('http://localhost/api/agent/trigger/replay', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' },
       body: JSON.stringify({ offset: 0 }),
     });
 

@@ -35,7 +35,7 @@ from config import settings
 from db import supabase
 from memory.store import format_memories_for_prompt, load_memories, prune_expired, save_memory
 from schemas import AgentSettings, Space
-from security.budget import check_budget, record_usage
+from security.budget import acquire_run_lock, check_budget, record_usage, release_run_lock
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
 from llm import extract_usage, fallback_models, resolve_chat_model
@@ -126,13 +126,20 @@ async def _run_with_fallback(
     context,
     on_event=None,
 ) -> object:
-    """Run the agent, falling back through _FALLBACK_MODELS on 429 errors.
+    """Run the agent, falling back through _FALLBACK_MODELS on 429/404 errors.
 
-    The agent's model attribute is patched per attempt. On exhaustion raises
-    RuntimeError so the caller can surface a clean error rather than a bare
-    exception. `on_event` receives each SDK stream event; it should not raise.
+    The agent's model attribute is patched per attempt. Fallback stops the
+    moment a tool executes — re-running the agent after a committed side
+    effect would duplicate it (a second draft, a second write) — so a
+    mid-run error past that point surfaces instead of retrying. On
+    exhaustion raises RuntimeError so the caller can surface a clean error.
+    `on_event` receives each SDK stream event; it should not raise.
     """
     last_exc: Exception | None = None
+    # Once any tool has executed, its side effects are committed; a model
+    # fallback would replay the whole run and re-fire them. Past that point
+    # an error must surface, not retry.
+    tools_ran = False
     # Try the workspace's picked model first (whatever make_chippi_agent
     # built the agent with), then the OpenRouter fallback chain.
     models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
@@ -143,6 +150,8 @@ async def _run_with_fallback(
                 agent, input=input_data, run_config=run_config, context=context
             )
             async for event in result.stream_events():
+                if not tools_ran and _translate_tool_event(event) is not None:
+                    tools_ran = True
                 if on_event is not None:
                     try:
                         on_event(event)
@@ -163,7 +172,7 @@ async def _run_with_fallback(
                 or "model_not_found" in lower
                 or "does not exist" in lower
             )
-            if should_fallback and i < len(models) - 1:
+            if should_fallback and not tools_ran and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
                     "model_falling_back",
@@ -184,7 +193,7 @@ async def _run_with_fallback(
                 or "model_not_found" in lower
                 or "does not exist" in lower
             )
-            if should_fallback and i < len(models) - 1:
+            if should_fallback and not tools_ran and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
                     "model_falling_back",
@@ -196,7 +205,7 @@ async def _run_with_fallback(
                 last_exc = exc
                 continue
             raise
-    raise RuntimeError(f"All models exhausted after rate-limit errors") from last_exc
+    raise RuntimeError("All models exhausted") from last_exc
 
 
 async def pop_triggers(space_id: str) -> list[dict]:
@@ -382,7 +391,39 @@ async def run_agent_for_space(
         routines cron. When set, the run focuses solely on that instruction
         and leaves the trigger queue untouched for a trigger-driven run.
     """
+    # Respect the on/off switch. The realtor can pause Chippi from the
+    # header; an autonomous run must honour that.
+    if not agent_settings.enabled:
+        logger.bind(space_id=space.id, space_slug=space.slug).info("agent_run_skipped_disabled")
+        return
+
+    # One autonomous run per space at a time. Two concurrent runs would both
+    # sweep the same stale leads and draft the same follow-ups — duplicate
+    # drafts in the realtor's inbox — and would both pass the daily-budget
+    # check before either recorded usage, overspending the cap. The lock
+    # closes both holes and auto-expires past Modal's timeout, so a crash
+    # can't wedge the space.
     run_id = str(uuid.uuid4())
+    if not await acquire_run_lock(space.id, run_id):
+        logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
+        return
+    try:
+        await _run_locked(space, agent_settings, run_id, instruction)
+    finally:
+        await release_run_lock(space.id, run_id)
+
+
+async def _run_locked(
+    space: Space,
+    agent_settings: AgentSettings,
+    run_id: str,
+    instruction: str | None,
+) -> None:
+    """Execute one autonomous run with the per-space run lock held.
+
+    Always invoked by `run_agent_for_space`, which owns the lock's
+    lifecycle — never call this directly.
+    """
     started_at = datetime.now(timezone.utc)
     # Tool-call accumulator for the trajectory record written at end-of-run.
     # Filled by on_event below; passed to record_trajectory on every exit
@@ -390,13 +431,6 @@ async def run_agent_for_space(
     # for why this materialized record exists alongside the per-system logs.
     trajectory_tool_calls: list[dict] = []
     log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
-
-    # Respect the on/off switch. The realtor can pause Chippi from the header;
-    # an autonomous run must honour that. (Previously ignored — the cron swept
-    # every active space regardless of whether the agent was enabled.)
-    if not agent_settings.enabled:
-        log.info("agent_run_skipped_disabled")
-        return
 
     if not await check_budget(space.id, agent_settings.daily_token_budget):
         log.warning("agent_run_skipped_budget_exhausted")

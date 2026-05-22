@@ -245,12 +245,20 @@ async def _commit_route(
     except Exception:
         pass
 
-    await (
+    # Scope the move by the SOURCE space. RLS is bypassed on the agent's
+    # direct-Postgres connection, so this .eq("spaceId", ...) is the only
+    # guard that the contact still belongs to the caller before it crosses
+    # the tenant boundary. A 0-row result means the contact left the space
+    # between the eligibility check and here — abort, don't fake success.
+    moved = await (
         db.table("Contact")
         .update({"spaceId": dest_space_id, "updatedAt": now})
         .eq("id", contact_id)
+        .eq("spaceId", ctx_ctx.space_id)
         .execute()
     )
+    if not moved.data:
+        return {"error": "Contact is no longer in this space — routing aborted"}
 
     # Mirror the log into the DESTINATION space so the receiving realtor
     # also sees a "lead_routed_in" entry on their activity feed.
