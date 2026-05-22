@@ -94,6 +94,9 @@ export interface AIUserProfile {
   currentGoals: string | null;
   quirksAndPreferences: string | null;
   agentPersonalizationNote: string | null;
+  role: string | null;
+  zipCode: string | null;
+  leadSources: string[];
   createdAt: string;
   updatedAt: string;
 }

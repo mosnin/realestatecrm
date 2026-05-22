@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
+import { isValidChatModel } from '@/lib/chat-models';
 
 export async function GET(_req: NextRequest) {
   const authResult = await requireAuth();
@@ -14,7 +15,7 @@ export async function GET(_req: NextRequest) {
 
   const { data } = await supabase
     .from('AgentSettings')
-    .select('spaceId, enabled, dailyTokenBudget')
+    .select('spaceId, enabled, dailyTokenBudget, chatModel')
     .eq('spaceId', space.id)
     .maybeSingle();
 
@@ -25,6 +26,7 @@ export async function GET(_req: NextRequest) {
       spaceId: space.id,
       enabled: false,
       dailyTokenBudget: 50_000,
+      chatModel: null,
     });
   }
 
@@ -55,13 +57,23 @@ export async function PATCH(req: NextRequest) {
     }
     patch.dailyTokenBudget = budget;
   }
+  if (body.chatModel !== undefined) {
+    // null clears the override — the workspace falls back to the app default.
+    if (body.chatModel !== null && !isValidChatModel(body.chatModel)) {
+      return NextResponse.json(
+        { error: 'chatModel must be a supported model.' },
+        { status: 400 },
+      );
+    }
+    patch.chatModel = body.chatModel;
+  }
 
   // Upsert — creates the row on first save (defensive; the auto-seed
   // trigger should have already inserted it).
   const { data, error } = await supabase
     .from('AgentSettings')
     .upsert({ spaceId: space.id, ...patch }, { onConflict: 'spaceId' })
-    .select('spaceId, enabled, dailyTokenBudget')
+    .select('spaceId, enabled, dailyTokenBudget, chatModel')
     .single();
 
   if (error) throw error;

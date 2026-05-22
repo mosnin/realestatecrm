@@ -26,6 +26,7 @@ import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
 import { PropertiesResult } from './tool-results/properties-result';
+import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -140,6 +141,10 @@ interface ToolCallBlockViewProps {
    * sequence detection is implemented; default false today.
    */
   isPartOfSequence?: boolean;
+  /** Interactive cards (availability picker) bubble user intents back up
+   *  through this prop. The workspace forwards them as the next user
+   *  message. Omitted on read-only history surfaces. */
+  onUserIntent?: (text: string) => void;
   className?: string;
 }
 
@@ -147,6 +152,7 @@ export function ToolCallBlockView({
   block,
   live,
   isPartOfSequence = false,
+  onUserIntent,
   className,
 }: ToolCallBlockViewProps) {
   const [expanded, setExpanded] = useState(false);
@@ -214,6 +220,26 @@ export function ToolCallBlockView({
     }
     if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
       return <PropertiesResult data={data as { properties: never[] }} />;
+    }
+    if (
+      block.display === 'availability-picker' &&
+      Array.isArray((data as { slots?: unknown[] }).slots)
+    ) {
+      const d = data as {
+        slots: Array<{ startsAt: string; endsAt: string; label: string }>;
+        contactId?: string;
+        propertyAddress?: string;
+        durationMinutes?: number;
+      };
+      return (
+        <AvailabilityPickerCard
+          slots={d.slots}
+          contactId={d.contactId}
+          propertyAddress={d.propertyAddress}
+          durationMinutes={d.durationMinutes ?? 60}
+          onSelectSlot={onUserIntent}
+        />
+      );
     }
     return null;
   })();

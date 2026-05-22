@@ -1,20 +1,46 @@
-name: Nightly Agent Evals
+name: Agent Evals
 
-# Runs the chat-agent eval suite once a day. The suite makes real OpenAI
-# calls (~$0.30 a run, ~30s) so it stays gated behind RUN_EVALS=1 and
-# does NOT run on every PR. Failures here mean tool-pick regressions —
-# the model started picking a different tool for a canonical realtor
-# utterance. Investigate the prompt diff before merging that day's PRs.
+# Runs the chat-agent eval suite. The suite makes real OpenAI calls
+# (~$0.30 a run, ~30s) so it stays gated behind RUN_EVALS=1.
 #
-# This workflow is allowed to fail without blocking PRs. The point is
-# the SIGNAL — a Slack/email follow-up when the suite goes red — not
-# enforcement. Treat it like a smoke alarm, not a gate.
+# Three triggers:
+#   - Nightly cron — catches model-side drift (gpt-5-mini behavior change
+#     without a prompt change on our side).
+#   - PR — gated to PRs that touch the prompt assembly surface (the
+#     primary regression risk on our side). Cost-bounded by the path
+#     filter; non-prompt PRs don't trigger.
+#   - Manual workflow_dispatch — ad-hoc runs after a prompt change.
+#
+# Failures are signal, not enforcement. The workflow is allowed to fail
+# without blocking PRs; the point is the alert when tool-pick judgment
+# drifts. Treat it like a smoke alarm.
+#
+# KNOWN GAP: this eval runs the TypeScript in-process runtime (the chat
+# fallback path, lib/ai-tools/sdk-chat.ts). It does NOT cover the Python
+# Modal runtime which is what production actually runs. The Python eval
+# harness is a separate, larger build — for now this catches TS-fallback
+# regressions and gives early signal on prompt-shape changes that affect
+# both runtimes (system prompt copy, tool descriptions).
 
 on:
   schedule:
     # 02:30 UTC daily. After most US contributors are done pushing for
     # the day so a flaky nightly doesn't burn the next morning.
     - cron: '30 2 * * *'
+  pull_request:
+    # Only run on PRs that touch prompt-assembly or tool-definition code
+    # so cost stays bounded. Non-prompt PRs don't trigger the eval.
+    paths:
+      - 'agent/chippi.py'
+      - 'agent/orchestrator.py'
+      - 'agent/tools/**'
+      - 'lib/ai.ts'
+      - 'lib/ai-tools/system-prompt.ts'
+      - 'lib/ai-tools/tools/**'
+      - 'lib/ai-tools/sdk-chat.ts'
+      - 'lib/ai-tools/sdk-bridge.ts'
+      - 'tests/evals/**'
+      - '.github/workflows/agent-evals.yml'
   workflow_dispatch:
     # Manual trigger for ad-hoc runs (e.g. after a prompt change).
     inputs:

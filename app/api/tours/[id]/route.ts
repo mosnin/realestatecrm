@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
+import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 
 async function resolveTour(userId: string, tourId: string) {
   const { data: tour, error } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
@@ -157,6 +158,21 @@ export async function PATCH(
       slug: spaceRow?.slug ?? '',
     };
     try { await sendTourFollowUp(emailData); } catch (e) { console.error('[tours] follow-up email failed:', e); }
+  }
+
+  // Fire the agent trigger on tour completion so Chippi reacts in real
+  // time (drafts a thank-you, asks for feedback, suggests next steps)
+  // instead of waiting for the 4-hour cron sweep. Never fails the response.
+  if (body.status === 'completed' && ctx.tour.status !== 'completed') {
+    try {
+      await fireAgentTrigger({
+        spaceId: ctx.space.id,
+        event: 'tour_completed',
+        contactId: data.contactId ?? undefined,
+      });
+    } catch (e) {
+      console.error('[tours/PATCH] agent trigger failed:', e);
+    }
   }
 
   return NextResponse.json(data);

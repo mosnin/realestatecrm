@@ -50,7 +50,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <StatCell label="Total contacts" value={data.totalContacts} sub="in CRM" />
+        <StatCell label="Total contacts" value={data.totalContacts} sub="in your book" />
         {stageCells.map((s) => (
           <StatCell key={s.label} label={s.label} value={s.count} />
         ))}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Sparkles, Circle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wrench, MessageCircle, Circle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT, DURATION_BASE } from '@/lib/motion';
 
@@ -36,7 +36,7 @@ function truncate(str: string | undefined, max: number): string {
 
 function StepIcon({ stepType }: { stepType: string }) {
   if (stepType === 'tool_call') return <Wrench size={13} />;
-  if (stepType === 'llm_call') return <Sparkles size={13} />;
+  if (stepType === 'llm_call') return <MessageCircle size={13} />;
   return <Circle size={13} />;
 }
 

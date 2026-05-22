@@ -20,10 +20,15 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { sendEmailFromCRM } from '@/lib/email';
+import { sendEmailFromCRM, type SendEmailAttachment } from '@/lib/email';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
+import { getSignedDownloadUrl } from '@/lib/storage';
+
+/** Max combined size of all attachments per email. Resend accepts up to
+ *  40 MB across all attachments; we cap below that for headroom. */
+const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 const parameters = z
   .object({
@@ -52,12 +57,19 @@ const parameters = z
       .email()
       .optional()
       .describe('Optional reply-to address, falling back to the workspace default.'),
+    attachmentFileIds: z
+      .array(z.string().min(1))
+      .max(10)
+      .optional()
+      .describe(
+        'Optional File.id list to attach to the email. Resolve filenames via list_files first; reads each from storage at send time. Max 10 files / 25 MB combined.',
+      ),
   })
   .refine((v) => v.contactId || v.toEmail, {
     message: 'Either contactId or toEmail is required.',
   })
   .describe(
-    'Send an email to a contact (or a free-form address). Always prompts the user for approval before sending.',
+    'Send an email to a contact (or a free-form address). Always prompts the user for approval before sending. Pass attachmentFileIds to include uploaded files.',
   );
 
 interface SendEmailResult {
@@ -147,6 +159,61 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     const fromName =
       (settings?.businessName as string | undefined) || ctx.space.name;
 
+    // Resolve attachments BEFORE the send — fetch each File row in this
+    // space, download the bytes via a signed URL, and build the Resend
+    // payload. We do this serially because attachment counts are small
+    // (≤10) and a parallel fetch storm against Wasabi for a single send
+    // isn't worth the complexity.
+    let resolvedAttachments: SendEmailAttachment[] | undefined;
+    if (args.attachmentFileIds && args.attachmentFileIds.length > 0) {
+      const ids = args.attachmentFileIds;
+      const { data: rows, error: fileErr } = await supabase
+        .from('File')
+        .select('id, name, mimeType, sizeBytes, storageKey')
+        .in('id', ids)
+        .eq('spaceId', ctx.space.id);
+      if (fileErr) {
+        return { summary: `Attachment lookup failed: ${fileErr.message}`, display: 'error' };
+      }
+      const found = (rows ?? []) as Array<{
+        id: string;
+        name: string;
+        mimeType: string;
+        sizeBytes: number;
+        storageKey: string;
+      }>;
+      const missing = ids.filter((id) => !found.find((r) => r.id === id));
+      if (missing.length > 0) {
+        return {
+          summary: `Attachment ids not found: ${missing.join(', ')}`,
+          display: 'error',
+        };
+      }
+      const totalBytes = found.reduce((sum, r) => sum + Number(r.sizeBytes ?? 0), 0);
+      if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+        return {
+          summary: `Attachments exceed ${Math.floor(MAX_TOTAL_ATTACHMENT_BYTES / 1024 / 1024)} MB combined limit.`,
+          display: 'error',
+        };
+      }
+      try {
+        resolvedAttachments = await Promise.all(
+          found.map(async (r) => {
+            const url = await getSignedDownloadUrl(r.storageKey, 60);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to fetch ${r.name} (${res.status})`);
+            const buffer = Buffer.from(await res.arrayBuffer());
+            return { filename: r.name, content: buffer, contentType: r.mimeType };
+          }),
+        );
+      } catch (err) {
+        return {
+          summary: `Failed to download attachment: ${err instanceof Error ? err.message : 'unknown error'}`,
+          display: 'error',
+        };
+      }
+    }
+
     const idemKey = makeIdempotencyKey('send_email', ctx.space.id, resolvedEmail, args.subject);
     try {
       await withIdempotency(idemKey, () =>
@@ -156,6 +223,7 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
           subject: args.subject,
           body: args.body,
           replyTo: args.replyTo,
+          attachments: resolvedAttachments,
         }),
       );
     } catch (err) {

@@ -136,14 +136,14 @@ export function HeroSection() {
                   <img
                     className="bg-background aspect-15/8 relative hidden rounded-2xl dark:block"
                     src="https://tailark.com//_next/image?url=%2Fmail2.png&w=3840&q=75"
-                    alt="Chippi CRM dashboard"
+                    alt="Chippi workspace dashboard"
                     width="2700"
                     height="1440"
                   />
                   <img
                     className="z-2 border-border/25 aspect-15/8 relative rounded-2xl border dark:hidden"
                     src="https://tailark.com/_next/image?url=%2Fmail2-light.png&w=3840&q=75"
-                    alt="Chippi CRM dashboard"
+                    alt="Chippi workspace dashboard"
                     width="2700"
                     height="1440"
                   />

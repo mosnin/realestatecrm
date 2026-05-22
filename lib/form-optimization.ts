@@ -350,21 +350,20 @@ export async function generateAISuggestions(
   performance: FormPerformance,
   formConfig: IntakeFormConfig,
 ): Promise<FormSuggestion[]> {
-  const openAIKey = process.env.OPENAI_API_KEY;
-  if (!openAIKey) {
-    console.warn('[form-optimization] OPENAI_API_KEY missing, skipping AI suggestions');
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+    console.warn('[form-optimization] no LLM key configured, skipping AI suggestions');
     return [];
   }
 
   try {
-    const { default: OpenAI } = await import('openai');
-    const openai = new OpenAI({ apiKey: openAIKey });
+    const { getLLMClient, openaiModel } = await import('@/lib/llm');
+    const openai = getLLMClient();
 
     const systemPrompt = buildOptimizationSystemPrompt();
     const userPrompt = buildOptimizationUserPrompt(performance, formConfig);
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: openaiModel('gpt-4.1-mini'),
       temperature: 0.3,
       max_tokens: 1500,
       response_format: {

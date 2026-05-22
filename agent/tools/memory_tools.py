@@ -19,6 +19,7 @@ from agents import RunContextWrapper, function_tool
 
 from memory.store import load_memories, save_memory, search_similar
 from security.context import AgentContext
+from tools.base import idempotent_tool
 
 _VALID_TYPES = {"fact", "observation", "preference", "reminder"}
 _VALID_ENTITIES = {"contact", "deal", "space"}
@@ -104,6 +105,7 @@ async def recall_memory(
 
 
 @function_tool
+@idempotent_tool
 async def store_memory(
     ctx: RunContextWrapper[AgentContext],
     entity_type: str,

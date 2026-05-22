@@ -8,7 +8,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Star,
-  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 
 // ── Testimonials ─────────────────────────────────────────────────────────────

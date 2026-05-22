@@ -19,7 +19,7 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
-from errors import AgentError, from_supabase_error, from_exception
+from errors import from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool, with_retry
@@ -139,9 +139,9 @@ async def draft_message(
             contact_id=contact_id,
             deal_id=deal_id,
         )
-    except Exception as e:
-        agent_err = from_exception(e)
-        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+    except Exception:
+        # The AgentDraft row already committed — logging is best-effort.
+        pass
 
     created = result.data[0] if result.data else draft
     return {

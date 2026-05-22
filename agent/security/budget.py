@@ -60,12 +60,3 @@ async def record_usage(space_id: str, tokens: int) -> int:
     if new_total == tokens:
         await r.expire(key, 172_800)  # 48 hours
     return new_total
-
-
-async def get_usage(space_id: str) -> int:
-    """Return tokens consumed today for a space."""
-    r = _get_redis()
-    if r is None:
-        return 0
-    val = await r.get(_today_key(space_id))
-    return int(val) if val else 0

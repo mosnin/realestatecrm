@@ -5,7 +5,7 @@ import {
   ArrowRight,
   CheckCircle2,
   XCircle,
-  Sparkles,
+  MessageCircle,
   Zap,
   Bot,
   Link2,
@@ -26,7 +26,7 @@ const planFeatures = [
   { icon: Users, label: 'Contact CRM', description: 'Full profiles, activity logs & email history' },
   { icon: TrendingUp, label: 'Deal pipeline', description: 'Kanban board with stages, values & close dates' },
   { icon: BarChart3, label: 'Analytics dashboard', description: 'Volume, conversion rates & pipeline health' },
-  { icon: Sparkles, label: 'Full follow-up workflow', description: 'Notes, calls, emails & follow-up scheduling' },
+  { icon: MessageCircle, label: 'Full follow-up workflow', description: 'Notes, calls, emails & follow-up scheduling' },
 ];
 
 type ComparisonCellValue = boolean | 'partial';
@@ -118,7 +118,7 @@ export default function PricingPage() {
                     href="/sign-up"
                     className="flex w-full items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity"
                   >
-                    Start 7-day free trial <Sparkles size={15} />
+                    Start 7-day free trial <MessageCircle size={15} />
                   </Link>
                   <Link
                     href="/login/realtor"

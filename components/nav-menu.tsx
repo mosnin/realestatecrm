@@ -12,7 +12,7 @@ import {
   BarChart3,
   ArrowRight,
   ChevronDown,
-  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 
 import { navLinks } from '@/lib/nav-links';
@@ -41,7 +41,7 @@ const featureLinks = [
   {
     href: '/features/crm',
     icon: Users,
-    name: 'Contact CRM',
+    name: 'Contacts',
     description: 'Full profiles, history & follow-ups',
   },
   {
@@ -198,7 +198,7 @@ export function NavMenu() {
                 <div className="p-4 bg-muted/40 flex flex-col justify-between">
                   <div>
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold mb-3">
-                      <Sparkles size={10} />
+                      <MessageCircle size={10} />
                       Free trial
                     </div>
                     <p className="text-sm font-semibold text-foreground leading-snug">

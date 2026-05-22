@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Send, Square, Loader2, X, ArrowUpRight, Sparkles, Mic } from 'lucide-react';
+import { Send, Square, Loader2, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
@@ -327,7 +327,7 @@ export function ChippiBar({ slug }: Props) {
           'pl-4 pr-1.5 py-1.5 shadow-lg',
         )}
       >
-        <Sparkles size={13} className="text-muted-foreground/80 flex-shrink-0" />
+        <MessageCircle size={13} className="text-muted-foreground/80 flex-shrink-0" />
         <input
           ref={inputRef}
           id="chippi-bar-input"

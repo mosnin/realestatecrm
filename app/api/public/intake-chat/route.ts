@@ -19,7 +19,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
+import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -364,20 +365,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  // ── Verify OpenAI key ───────────────────────────────────────────────────────
-  const openAIKey = process.env.OPENAI_API_KEY;
-  if (!openAIKey) {
-    logger.error('[intake-chat] OPENAI_API_KEY not configured');
+  // ── Verify an LLM key ───────────────────────────────────────────────────────
+  if (!hasLLMKey()) {
+    logger.error('[intake-chat] no LLM key configured');
     return NextResponse.json({ error: 'AI service not configured' }, { status: 500, headers: CORS_HEADERS });
   }
 
-  // ── Stream OpenAI response ──────────────────────────────────────────────────
-  const openai = new OpenAI({ apiKey: openAIKey });
+  // ── Stream the response ─────────────────────────────────────────────────────
+  const openai = getLLMClient();
 
   let openaiStream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
   try {
     openaiStream = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: openaiModel('gpt-4o-mini'),
       temperature: 0.7,
       max_tokens: 400,
       stream: true,

@@ -10,12 +10,16 @@ describe('parseImmediateEvents', () => {
     expect([...parseImmediateEvents(undefined)].sort()).toEqual([
       'application_submitted',
       'deal_stage_changed',
+      'goal_completed',
+      'inbound_message',
       'new_lead',
       'tour_completed',
     ]);
     expect([...parseImmediateEvents('all')].sort()).toEqual([
       'application_submitted',
       'deal_stage_changed',
+      'goal_completed',
+      'inbound_message',
       'new_lead',
       'tour_completed',
     ]);
@@ -33,6 +37,8 @@ describe('parseImmediateEvents', () => {
     expect([...parseImmediateEvents('tour_completed,nope')].sort()).toEqual([
       'application_submitted',
       'deal_stage_changed',
+      'goal_completed',
+      'inbound_message',
       'new_lead',
       'tour_completed',
     ]);

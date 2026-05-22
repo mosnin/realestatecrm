@@ -30,7 +30,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
-        {/* CRM workspace link (hidden for broker-only) */}
+        {/* Realtor workspace link (hidden for broker-only) */}
         {!isBrokerOnly && slug && (
           <Link
             href={base}
@@ -39,7 +39,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
             <div className="w-9 h-6 rounded-md flex items-center justify-center transition-colors">
               <Briefcase size={18} />
             </div>
-            <span>CRM</span>
+            <span>Workspace</span>
           </Link>
         )}
         {brokerMobileItems.map((item) => {

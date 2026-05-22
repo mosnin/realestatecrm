@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
-
-const BUCKET = 'deal-documents';
+import { getSignedDownloadUrl } from '@/lib/storage';
 
 /**
  * Public signed-URL endpoint for documents inside a packet. No auth — gated
@@ -41,14 +40,13 @@ export async function GET(
 
   if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(doc.storagePath, 60 * 5);
-
-  if (error || !data?.signedUrl) {
-    logger.error('[packet/docs] signed URL failed', { token, docId }, error);
+  let signedUrl: string;
+  try {
+    signedUrl = await getSignedDownloadUrl(doc.storagePath, 60 * 5);
+  } catch (error) {
+    logger.error('[packet/docs] signed URL failed', { token, docId }, error as Error);
     return NextResponse.json({ error: 'Could not generate download link' }, { status: 500 });
   }
 
-  return NextResponse.json({ url: data.signedUrl });
+  return NextResponse.json({ url: signedUrl });
 }

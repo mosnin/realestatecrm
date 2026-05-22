@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckCircle2, Circle, Trash2, Plus, Sparkles, Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Circle, Trash2, Plus, MessageCircle, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DealChecklistItem, ChecklistKind, TemplateId } from '@/lib/deals/checklist';
 import { TEMPLATES } from '@/lib/deals/checklist';
@@ -171,7 +171,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
                 className="flex-1 rounded-md border border-border bg-card hover:border-foreground hover:bg-muted/40 text-left px-3 py-2.5 transition-colors disabled:opacity-50"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  {seeding ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  {seeding ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
                   <span className="text-sm font-semibold">{t.label}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">{t.description}</p>

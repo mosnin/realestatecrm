@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
+
+export const runtime = 'nodejs';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = [
@@ -14,9 +20,16 @@ const ALLOWED_TYPES = [
 
 /**
  * POST — Upload a document for a contact.
- * Stores metadata in ContactDocument table. In production, the file binary
- * would go to S3/R2. For now we store a base64 data URL as the storageKey
- * (suitable for small files and MVP).
+ *
+ * Stores the file in the private `contact-documents` Supabase Storage
+ * bucket and records metadata in the ContactDocument table. The
+ * `storageKey` column holds the bucket path; the per-id GET endpoint
+ * mints short-lived signed URLs for download.
+ *
+ * Two auth paths:
+ * - uploadedBy === 'guest': restricted to public-intake contacts
+ *   created in the last 5 minutes (applicant uploading during apply flow).
+ * - otherwise: requireContactAccess (authenticated realtor).
  */
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -32,29 +45,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
   }
 
+  if (file.size === 0) {
+    return NextResponse.json({ error: 'Empty file' }, { status: 400 });
+  }
+
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json({ error: 'File type not supported' }, { status: 400 });
   }
 
-  // Validate file magic numbers to prevent MIME spoofing.
-  // WEBP magic is "WEBP" at bytes 8-11, so we need 12 bytes.
+  // Magic-number check — prevents MIME spoofing. WEBP magic is "WEBP"
+  // at bytes 8-11 so we need 12 bytes of header.
   const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46; // %PDF
   const isJpeg = header[0] === 0xFF && header[1] === 0xD8;
   const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
-  const isWebp = header.length >= 12 && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50; // WEBP at offset 8
+  const isWebp = header.length >= 12 && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50;
   const isDoc = header[0] === 0xD0 && header[1] === 0xCF; // OLE2 (DOC)
   const isDocx = header[0] === 0x50 && header[1] === 0x4B; // ZIP (DOCX)
   if (!isPdf && !isJpeg && !isPng && !isWebp && !isDoc && !isDocx) {
     return NextResponse.json({ error: 'File content does not match declared type' }, { status: 400 });
   }
 
-  // Verify access — guest uploads are restricted to recently-created public
-  // intake contacts to prevent arbitrary file uploads to any contact.
-  // NOTE: resolvedUploadedBy is derived from the auth path taken, NOT from the
-  // request body, to prevent callers from spoofing the uploadedBy value.
+  // Auth + space resolution. resolvedUploadedBy is derived from the auth
+  // path, NOT from the request body, so a caller can't claim 'agent' on
+  // a guest-restricted upload.
   let resolvedSpaceId: string;
   let resolvedUploadedBy: string;
+  let rateLimitKey: string;
   if (uploadedBy === 'guest') {
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: guestContact } = await supabase
@@ -69,6 +86,8 @@ export async function POST(req: NextRequest) {
     }
     resolvedSpaceId = guestContact.spaceId;
     resolvedUploadedBy = 'guest';
+    // Guest path: rate-limit per contactId since there's no userId.
+    rateLimitKey = `doc-upload:guest:${contactId}`;
   } else {
     const auth = await requireContactAccess(contactId);
     if (auth instanceof NextResponse) return auth;
@@ -83,12 +102,39 @@ export async function POST(req: NextRequest) {
     }
     resolvedSpaceId = authedContact.spaceId;
     resolvedUploadedBy = 'agent';
+    rateLimitKey = `doc-upload:${auth.userId}`;
   }
 
-  // Store file as base64 data URL (MVP approach — replace with S3 in production)
-  const buffer = await file.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString('base64');
-  const storageKey = `data:${file.type};base64,${base64}`;
+  // Rate-limit AFTER auth so we don't burn the limit on unauthorized requests.
+  const { allowed } = await checkRateLimit(rateLimitKey, 20, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many uploads' }, { status: 429 });
+  }
+
+  // Storage path: contact-documents/spaceId/contactId/<uuid>-<safeName>.
+  // The contactDocuments prefix groups the file with its peers; spaceId
+  // scoping makes "purge on space deletion" a single key-prefix delete.
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+  const storagePath = buildKey(
+    'contactDocuments',
+    resolvedSpaceId,
+    contactId,
+    `${crypto.randomUUID()}-${safeName}`,
+  );
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  try {
+    await uploadObject({
+      key: storagePath,
+      body: buffer,
+      contentType: file.type,
+      // Private — served only via signed URLs from /api/documents/[id].
+      isPublic: false,
+    });
+  } catch (uploadError) {
+    logger.error('[documents] upload failed', { contactId }, uploadError as Error);
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+  }
 
   const { data: doc, error } = await supabase
     .from('ContactDocument')
@@ -98,14 +144,16 @@ export async function POST(req: NextRequest) {
       fileName: file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255),
       fileType: file.type,
       fileSize: file.size,
-      storageKey,
+      storageKey: storagePath,
       uploadedBy: resolvedUploadedBy,
     })
     .select('id, fileName, fileType, fileSize, createdAt')
     .single();
 
   if (error) {
-    console.error('[documents] insert failed', error);
+    // Best-effort rollback so we don't leak storage objects on failed inserts.
+    await deleteObject(storagePath).catch(() => undefined);
+    logger.error('[documents] insert failed', { contactId }, error);
     return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
   }
 
@@ -113,7 +161,8 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * GET — List documents for a contact.
+ * GET — List documents for a contact (metadata only). For an individual
+ * file URL or content, use GET /api/documents/[id].
  */
 export async function GET(req: NextRequest) {
   const contactId = req.nextUrl.searchParams.get('contactId');

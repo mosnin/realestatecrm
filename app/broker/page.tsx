@@ -10,7 +10,7 @@ import {
   ChevronRight,
   ArrowRight,
   Mail,
-  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
@@ -250,7 +250,7 @@ export default async function BrokerOverviewPage() {
       {/* First-run nudge — only when the brokerage hasn't been set up yet */}
       {!hasSettings && (
         <section className="rounded-xl border border-border/70 bg-muted/30 px-4 py-3 flex items-start gap-3">
-          <Sparkles size={14} className="text-orange-500 flex-shrink-0 mt-0.5" />
+          <MessageCircle size={14} className="text-orange-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1 space-y-0.5">
             <p className="text-sm font-medium">Finish setting up your brokerage</p>
             <p className="text-[13px] text-muted-foreground">

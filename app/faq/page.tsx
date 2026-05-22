@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Zap } from 'lucide-react';
+import { ArrowRight, MessageCircle, Zap } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
 import AnimatedFooter from '@/components/ui/animated-footer';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
@@ -117,7 +117,7 @@ export default function FAQPage() {
         <section className="px-6 pt-36 pb-16 text-center">
           <div className="mx-auto max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
-              <Sparkles size={12} />
+              <MessageCircle size={12} />
               Common questions
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.1]">

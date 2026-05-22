@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Bot, Phone, Mail, ArrowRight, Inbox, HelpCircle,
-  Target, TrendingUp, AlertTriangle, Sparkles, ChevronRight,
+  Target, TrendingUp, AlertTriangle, MessageCircle, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';

@@ -17,8 +17,13 @@ class Settings(BaseSettings):
     # Direct Postgres connection for async reads (faster than REST for bulk queries)
     database_url: str = Field(alias="DATABASE_URL", default="")
 
-    # OpenAI
-    openai_api_key: str = Field(alias="OPENAI_API_KEY")
+    # OpenAI — embeddings + fallback when OpenRouter isn't configured.
+    # Optional: a pure-OpenRouter deploy doesn't need it.
+    openai_api_key: str = Field(alias="OPENAI_API_KEY", default="")
+
+    # OpenRouter — primary LLM gateway. When set, every model call routes
+    # through OpenRouter; empty falls back to calling OpenAI directly.
+    openrouter_api_key: str = Field(alias="OPENROUTER_API_KEY", default="")
 
     # Upstash Redis — token budget enforcement
     kv_rest_api_url: str = Field(alias="KV_REST_API_URL", default="")
@@ -31,20 +36,18 @@ class Settings(BaseSettings):
     # Secret shared between Modal and the Next.js app for internal API calls
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
-    # Models
-    orchestrator_model: str = Field(default="gpt-5-mini")
-    worker_model: str = Field(default="gpt-5-mini")
-
-    # Safety limits
-    max_react_iterations: int = Field(default=6)       # max tool-call turns per specialist agent
-    default_daily_token_budget: int = Field(default=50_000)
+    # Model for the swarm orchestrator's fan-out workers (the swarm sub-
+    # agents). The main Chippi agent's model is the per-workspace pick
+    # (see chippi.py / llm.py); this is swarm-only.
+    worker_model: str = Field(default="x-ai/grok-4.3")
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection
     max_output_tokens: int = Field(default=4_096)      # cap LLM output per turn
 
-    # Coordinator — covers survey turns + all specialist handoff turns
-    # Budget: ~3 coordinator turns + 4 specialists × 8 turns each = ~35; 50 gives headroom
+    # Max tool-call turns the SDK runner will take in a single agent run
+    # before stopping. One agent, no handoffs — 50 is generous headroom for
+    # a sweep that acts on a handful of things.
     coordinator_max_turns: int = Field(default=50)
 
     model_config = {"populate_by_name": True, "env_file": ".env.local"}

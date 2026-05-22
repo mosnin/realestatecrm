@@ -13,7 +13,7 @@ import {
   Check,
   RefreshCw,
   Loader2,
-  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
@@ -287,7 +287,7 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
             href={`/s/${slug}/chippi?q=${encodeURIComponent(`Tell me about ${contactName ?? 'this contact'} and suggest what I should do next`)}`}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
           >
-            <Sparkles size={11} />
+            <MessageCircle size={11} />
             Ask Chippi
           </Link>
           <button

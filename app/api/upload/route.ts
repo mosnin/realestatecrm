@@ -4,6 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
+import { uploadObject, getPublicUrl, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
@@ -21,10 +22,10 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const type = formData.get('type') as string; // 'logo' | 'photo' | 'favicon'
+    const type = formData.get('type') as string; // 'logo' | 'photo' | 'favicon' | 'link-thumb'
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    if (!['logo', 'photo', 'favicon'].includes(type)) {
+    if (!['logo', 'photo', 'favicon', 'link-thumb'].includes(type)) {
       return NextResponse.json({ error: 'Invalid upload type' }, { status: 400 });
     }
 
@@ -59,53 +60,30 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = detectedExt;
-    const fileName = `${space.id}/${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
-    const bucket = 'branding';
+    // Branding assets (logo / photo / favicon) live under the onboarding
+    // prefix — same key space as space-level profile uploads. Public-read
+    // because they're embedded on /apply public pages.
+    const key = buildKey(
+      'onboarding',
+      space.id,
+      `${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`,
+    );
 
-    // Ensure the storage bucket exists — create it if missing
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    if (listError) {
-      console.error('[upload] failed to list buckets:', listError);
-      return NextResponse.json(
-        { error: 'Could not verify storage configuration. Check your Supabase service role key.' },
-        { status: 500 },
-      );
-    }
-    if (!buckets?.find((b: { name: string }) => b.name === bucket)) {
-      const { error: createError } = await supabase.storage.createBucket(bucket, {
-        public: true,
-      });
-      if (createError) {
-        console.error('[upload] failed to create bucket:', createError);
-        return NextResponse.json(
-          {
-            error:
-              'Storage bucket "branding" does not exist and could not be created automatically. ' +
-              'Please create a PUBLIC bucket named "branding" in your Supabase Dashboard → Storage.',
-          },
-          { status: 500 },
-        );
-      }
-      console.log('[upload] created public storage bucket "branding"');
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, buffer, {
+    try {
+      await uploadObject({
+        key,
+        body: buffer,
         contentType: file.type,
-        upsert: true,
+        isPublic: true,
       });
-
-    if (uploadError) {
+    } catch (uploadError) {
       console.error('[upload] storage error:', uploadError);
       return NextResponse.json(
-        { error: uploadError.message || 'Upload failed' },
+        { error: uploadError instanceof Error ? uploadError.message : 'Upload failed' },
         { status: 500 },
       );
     }
-
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    const publicUrl = urlData.publicUrl;
+    const publicUrl = getPublicUrl(key);
 
     // Auto-save to SpaceSetting based on type
     const fieldMap: Record<string, string> = {

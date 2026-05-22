@@ -1,12 +1,19 @@
-"""Trigger-driven agent runs.
+"""Autonomous agent runs.
 
-There is no heartbeat. The agent wakes up only when something happens in the
-workspace: a new lead, a tour completed, a deal stage changed, an inbound
-message, a goal completed. Triggers are pushed to a Redis list by the Next.js
-side; this module pops them, builds the opening prompt, and runs Chippi.
+An autonomous run is kicked off three ways, all landing in
+`run_agent_for_space`:
+  - the 4-hour cron sweep (`vercel.json` → `/api/cron/agent-sweep`),
+  - the "Run now" button,
+  - an event trigger drained from the Redis list (`/api/agent/trigger`
+    pushes a new lead, a tour completed, a deal stage changed, etc.).
 
-For manual sweeps (the Run-now button), the trigger list is empty and the
-prompt tells Chippi to look for stale leads / stalled deals on its own.
+When the trigger list is empty the prompt puts Chippi in sweep mode — look
+for stale leads / stalled deals on its own.
+
+Runs are skipped when the agent is disabled for the space or its daily
+token budget is exhausted. Every contact-facing action drafts; nothing is
+sent without the realtor's approval — that draft-only boundary is the
+trust model, so there is no separate pre-run approval gate.
 
 Security: spaceId is set once in AgentContext and flows through
 RunContextWrapper. No tool ever accepts spaceId as an argument.
@@ -21,65 +28,93 @@ from datetime import datetime, timezone
 
 import structlog
 from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
-from openai import AsyncOpenAI, APIStatusError, RateLimitError
+from openai import APIStatusError, RateLimitError
+from openai.types.shared import Reasoning
 
 from config import settings
 from db import supabase
-from ledger import StepLedger
 from memory.store import format_memories_for_prompt, load_memories, prune_expired, save_memory
 from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
+from llm import openai_model, resolve_chat_model
 from tools.streaming import publish_event
+from trajectories import normalize_tool_call, record_trajectory
 
 # ---------------------------------------------------------------------------
-# Optional module guards (T8 modules — may not be committed yet)
+# Model fallback list — fall through these on 429s.
 # ---------------------------------------------------------------------------
 
-try:
-    from checkpoints import save_checkpoint, load_checkpoint
-    _CHECKPOINTS_AVAILABLE = True
-except ImportError:
-    _CHECKPOINTS_AVAILABLE = False
-    save_checkpoint = load_checkpoint = None  # type: ignore[assignment]
-
-try:
-    from heartbeat import HeartbeatPinger
-    _HEARTBEAT_AVAILABLE = True
-except ImportError:
-    _HEARTBEAT_AVAILABLE = False
-    HeartbeatPinger = None  # type: ignore[assignment,misc]
-
-try:
-    from compaction import compact_messages
-    _COMPACTION_AVAILABLE = True
-except ImportError:
-    _COMPACTION_AVAILABLE = False
-    compact_messages = None  # type: ignore[assignment]
-
-# ---------------------------------------------------------------------------
-# Model fallback list (KR2)
-# ---------------------------------------------------------------------------
-
-_FALLBACK_MODELS = ["gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini"]
-
-# ---------------------------------------------------------------------------
-# High-risk tool detection (KR4)
-# ---------------------------------------------------------------------------
-
-_HIGH_RISK_PATTERNS = ["send_", "archive_", "delete_", "mark_deal_lost", "mark_person"]
-
-
-def _is_high_risk_tool(tool_name: str) -> bool:
-    """Return True when a tool name matches a high-risk operation pattern."""
-    return any(tool_name.startswith(p) or p in tool_name for p in _HIGH_RISK_PATTERNS)
+_FALLBACK_MODELS = [openai_model(m) for m in ("gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini")]
 
 logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Model-fallback runner (KR2)
+# Per-tool stream-event translator.
+#
+# Mirrors the translate() in modal_app.py:chat_turn — same SDK events, but
+# instead of yielding SSE we hand the caller a {message, metadata} dict so
+# the autonomous runner can publish each tool call/result to Redis. This is
+# the legibility lift: the previous autonomous path logged the whole run as
+# one opaque step, so a sweep that failed at the 4th tool gave the broker
+# zero information about which tool failed.
+# ---------------------------------------------------------------------------
+
+def _translate_tool_event(event: object) -> dict | None:
+    """Map an Agents SDK stream event to a publishable payload, or None.
+
+    Skips token deltas, reasoning deltas, and any other event that isn't a
+    tool call or tool result — those are noise for the autonomous trace.
+    """
+    if type(event).__name__ != "RunItemStreamEvent":
+        return None
+    it = getattr(event, "item", None)
+    if it is None:
+        return None
+    ev_name = getattr(event, "name", "") or ""
+    item_type = getattr(it, "type", "") or type(it).__name__
+
+    if ev_name == "tool_called" or item_type in ("tool_call_item", "ToolCallItem"):
+        tool_name = (
+            getattr(it, "tool_name", None)
+            or getattr(getattr(it, "raw_item", None), "name", None)
+            or "tool"
+        )
+        raw_args = getattr(getattr(it, "raw_item", None), "arguments", None)
+        args_str = str(raw_args) if raw_args else ""
+        if len(args_str) > 200:
+            args_str = args_str[:199] + "…"
+        return {
+            "message": f"Calling {tool_name}",
+            "metadata": {"tool": tool_name, "phase": "start", "args": args_str},
+        }
+
+    if ev_name == "tool_output" or item_type in ("tool_call_output_item", "ToolCallOutputItem"):
+        tool_name = (
+            getattr(it, "tool_name", None)
+            or getattr(getattr(it, "raw_item", None), "name", None)
+            or "tool"
+        )
+        output = getattr(it, "output", None)
+        summary = "" if output is None else str(output)
+        if len(summary) > 300:
+            summary = summary[:299] + "…"
+        return {
+            "message": f"{tool_name} done",
+            "metadata": {"tool": tool_name, "phase": "complete", "summary": summary},
+        }
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Model-fallback runner.
+#
+# Streams the run via Runner.run_streamed (same path chat_turn uses) so the
+# orchestrator can publish per-tool events live. The on_event callback is
+# fire-and-forget per event so a slow Redis push never throttles the agent.
 # ---------------------------------------------------------------------------
 
 async def _run_with_fallback(
@@ -87,27 +122,38 @@ async def _run_with_fallback(
     input_data,
     run_config: RunConfig,
     context,
+    on_event=None,
 ) -> object:
     """Run the agent, falling back through _FALLBACK_MODELS on 429 errors.
 
     The agent's model attribute is patched per attempt. On exhaustion raises
     RuntimeError so the caller can surface a clean error rather than a bare
-    exception.
+    exception. `on_event` receives each SDK stream event; it should not raise.
     """
     last_exc: Exception | None = None
-    for i, model in enumerate(_FALLBACK_MODELS):
+    # Try the workspace's picked model first (whatever make_chippi_agent
+    # built the agent with), then the OpenRouter fallback chain.
+    models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
+    for i, model in enumerate(models):
         try:
             agent.model = model
-            result = await Runner.run(
+            result = Runner.run_streamed(
                 agent, input=input_data, run_config=run_config, context=context
             )
+            async for event in result.stream_events():
+                if on_event is not None:
+                    try:
+                        on_event(event)
+                    except Exception:
+                        # Telemetry must never break the run.
+                        pass
             return result
         except (RateLimitError, APIStatusError) as exc:
             status = getattr(exc, "status_code", None)
             err_str = str(exc)
             is_429 = isinstance(exc, RateLimitError) or status == 429 or "429" in err_str
-            if is_429 and i < len(_FALLBACK_MODELS) - 1:
-                next_model = _FALLBACK_MODELS[i + 1]
+            if is_429 and i < len(models) - 1:
+                next_model = models[i + 1]
                 logger.warning(
                     "model_rate_limited_falling_back",
                     model=model,
@@ -120,8 +166,8 @@ async def _run_with_fallback(
             raise
         except Exception as exc:
             err_str = str(exc)
-            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(_FALLBACK_MODELS) - 1:
-                next_model = _FALLBACK_MODELS[i + 1]
+            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(models) - 1:
+                next_model = models[i + 1]
                 logger.warning(
                     "model_rate_limited_falling_back",
                     model=model,
@@ -133,40 +179,6 @@ async def _run_with_fallback(
                 continue
             raise
     raise RuntimeError(f"All models exhausted after rate-limit errors") from last_exc
-
-
-# ---------------------------------------------------------------------------
-# Critic / verifier (KR3)
-# ---------------------------------------------------------------------------
-
-async def _run_critic(goal: str, outcome_summary: str, client: AsyncOpenAI) -> str:
-    """Ask a cheap LLM whether the agent accomplished its goal.
-
-    Returns a short verdict string like "YES — the agent ..." or "NO — ...".
-    On failure returns "UNKNOWN" so the caller can still store a metadata entry.
-    """
-    try:
-        resp = await client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You evaluate if an agent completed its goal. "
-                        "Respond: YES or NO, then one sentence why."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Goal: {goal}\n\nOutcome: {outcome_summary}",
-                },
-            ],
-            max_tokens=100,
-        )
-        return resp.choices[0].message.content or "UNKNOWN"
-    except Exception as exc:
-        logger.warning("critic_call_failed", error=str(exc))
-        return "UNKNOWN"
 
 
 async def pop_triggers(space_id: str) -> list[dict]:
@@ -182,9 +194,14 @@ async def pop_triggers(space_id: str) -> list[dict]:
             return []
         r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
         key = f"agent:triggers:{space_id}"
-        items = await r.lrange(key, 0, 9)  # up to 10 triggers per run
+        # Read up to 10 from the head, then trim only what we read. The old
+        # `lrange + delete` had two bugs: (1) a producer-side RPUSH between
+        # those two calls was silently wiped, (2) if there were more than 10
+        # pending, items 11+ were also deleted without being processed. LTRIM
+        # to len(items) leaves the overflow for the next call.
+        items = await r.lrange(key, 0, 9)
         if items:
-            await r.delete(key)
+            await r.ltrim(key, len(items), -1)
         parsed = []
         for item in (items or []):
             try:
@@ -193,10 +210,14 @@ async def pop_triggers(space_id: str) -> list[dict]:
                     logger.warning("trigger_malformed", item=str(item)[:100])
                     continue
                 parsed.append(obj)
-            except (json.JSONDecodeError, Exception):
+            except Exception:
                 logger.warning("trigger_parse_error", item=str(item)[:100])
         return parsed
-    except Exception:
+    except Exception as exc:
+        # A Redis outage here is otherwise indistinguishable from "no
+        # triggers" — the run would silently drop into sweep mode and
+        # never process the queued lead/tour/stage events. Log it.
+        logger.warning("pop_triggers_failed", space_id=space_id, error=str(exc)[:200])
         return []
 
 
@@ -245,40 +266,60 @@ def _build_opening_prompt(
             "most three things."
         )
 
-    return (
-        f"AUTONOMOUS RUN\n"
-        f"Workspace: {space.name}\n"
-        f"Current time: {now}\n\n"
-        f"{triggers_block}\n\n"
-        f"{memory_context}\n\n"
+    # Order optimized for OpenAI implicit prompt caching. Cache hits on the
+    # longest common prefix, so anything that changes per-run (current time,
+    # triggers) moves to the BOTTOM of the user message. Everything above
+    # that line caches across runs of the same space — including the memory
+    # block, which is the biggest payload that's stable run-to-run.
+    static_header = (
+        "AUTONOMOUS RUN\n"
         "Take action where it's warranted. Draft, set follow-ups, store facts. "
         "Don't reply with chat text — log_activity_run with a one-line summary "
         "at the end."
+    )
+    return (
+        f"{static_header}\n\n"
+        f"Workspace: {space.name}\n\n"
+        f"{memory_context}\n\n"
+        f"---\n"
+        f"Current time: {now}\n\n"
+        f"{triggers_block}"
     ).strip()
 
 
 async def run_agent_for_space(
     space: Space,
     agent_settings: AgentSettings,
-    task_id: str | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
-    Called from Modal `run_now_webhook` (manual trigger or trigger-queue
-    drain). Skips if the space's daily token budget is exhausted.
+    Called from Modal `run_now_webhook` (manual "Run now" or trigger-queue
+    drain) and the 4-hour cron sweep. Skips if the agent is disabled or the
+    space's daily token budget is exhausted.
 
     Parameters
     ----------
     space:
         The workspace to run against.
     agent_settings:
-        Per-space agent configuration including the daily token budget.
-    task_id:
-        Optional AgentTask id. When provided, checkpoints are saved/restored
-        and the heartbeat pinger is active. Autonomous sweeps pass None.
+        Per-space agent configuration including the enabled flag and the
+        daily token budget.
     """
     run_id = str(uuid.uuid4())
-    log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id, task_id=task_id)
+    started_at = datetime.now(timezone.utc)
+    # Tool-call accumulator for the trajectory record written at end-of-run.
+    # Filled by on_event below; passed to record_trajectory on every exit
+    # path (success, error, guardrail-blocked). See agent/trajectories.py
+    # for why this materialized record exists alongside the per-system logs.
+    trajectory_tool_calls: list[dict] = []
+    log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
+
+    # Respect the on/off switch. The realtor can pause Chippi from the header;
+    # an autonomous run must honour that. (Previously ignored — the cron swept
+    # every active space regardless of whether the agent was enabled.)
+    if not agent_settings.enabled:
+        log.info("agent_run_skipped_disabled")
+        return
 
     if not await check_budget(space.id, agent_settings.daily_token_budget):
         log.warning("agent_run_skipped_budget_exhausted")
@@ -328,7 +369,26 @@ async def run_agent_for_space(
     except Exception as ie:  # noqa: BLE001
         log.warning("autonomous_load_integration_tools_failed", error=str(ie)[:200])
 
-    chippi = make_chippi_agent(ai_profile_text=ai_profile, extra_tools=integration_tools)
+    # Workspace info — mirrors the chat path so autonomous drafts include
+    # the realtor's intake URL where it's useful.
+    _app_url = (settings.app_url or "").rstrip("/")
+    intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    workspace_info = (
+        "# Your workspace\n"
+        f"- Workspace: {space.name} (slug: {space.slug})\n"
+        f"- Intake link (share with new leads): {intake_url}\n"
+        "- Include the intake link in any contact-facing draft where it"
+        " makes sense — when reaching out to a fresh lead, when asking a"
+        " prospect to qualify, when nudging someone who never finished"
+        " applying. Use the full URL verbatim; no shortening."
+    ) if intake_url else None
+
+    chippi = make_chippi_agent(
+        ai_profile_text=ai_profile,
+        extra_tools=integration_tools,
+        workspace_info=workspace_info,
+        model=resolve_chat_model(agent_settings.chat_model),
+    )
     prompt = _build_opening_prompt(space, memory_context, triggers)
 
     run_config = RunConfig(
@@ -337,116 +397,45 @@ async def run_agent_for_space(
         model_settings=ModelSettings(
             max_tokens=settings.max_output_tokens,
             truncation="auto",
+            # Parity with the chat path. Autonomous runs make unsupervised
+            # judgement calls — they need reasoning effort at least as much
+            # as chat, where it was already set to "medium".
+            reasoning=Reasoning(effort="medium"),
         ),
     )
-
-    # task_id is not available for autonomous sweeps (no AgentTask row exists).
-    # The ledger will skip DB writes gracefully when task_id is None.
-    ledger = StepLedger(space_id=space.id, task_id=task_id)
-
-    # ── KR4: Approval gate — inspect tool roster before running ────────────
-    # In autonomous mode, any high-risk tool in the agent's toolkit requires
-    # explicit approval. We emit a requires_approval event and pause the task
-    # so the realtor can greenlight the action before it executes.
-    agent_tool_names = [
-        getattr(t, "name", "") or getattr(t, "__name__", "") or ""
-        for t in (chippi.tools or [])
-    ]
-    risky_tools = [name for name in agent_tool_names if name and _is_high_risk_tool(name)]
-    if risky_tools:
-        log.info("approval_gate_triggered", risky_tools=risky_tools)
-        await publish_event(
-            ctx, "info",
-            f"Run paused — high-risk tools require approval: {', '.join(risky_tools)}",
-            metadata={
-                "approvalRequired": True,
-                "pendingAction": risky_tools[0],
-                "allRiskyTools": risky_tools,
-            },
-            agent_type="chippi",
-        )
-        # Persist the paused state so the Next.js poller can surface it.
-        if task_id:
-            try:
-                db = await supabase()
-                await db.table("AgentTask").update(
-                    {
-                        "status": "paused",
-                        "metadata": {
-                            "approvalRequired": True,
-                            "pendingAction": risky_tools[0],
-                            "allRiskyTools": risky_tools,
-                        },
-                    }
-                ).eq("id", task_id).execute()
-            except Exception as exc:
-                log.warning("approval_gate_db_update_failed", error=str(exc))
-        # Emit to Redis for real-time notification.
-        try:
-            if settings.kv_rest_api_url and settings.kv_rest_api_token:
-                from upstash_redis.asyncio import Redis
-                r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
-                event_payload = json.dumps({
-                    "event": "requires_approval",
-                    "spaceId": space.id,
-                    "taskId": task_id,
-                    "riskyTools": risky_tools,
-                })
-                await r.lpush(f"agent:approvals:{space.id}", event_payload)
-        except Exception as exc:
-            log.warning("approval_gate_redis_failed", error=str(exc))
-        return
-
-    # ── KR1: Checkpoint restore — pick up from last known state ────────────
-    initial_messages: list[dict] = []
-    current_step_index: int = 0
-    if _CHECKPOINTS_AVAILABLE and task_id:
-        checkpoint = await load_checkpoint(task_id)  # type: ignore[misc]
-        if checkpoint:
-            initial_messages = checkpoint.get("messages", [])
-            current_step_index = checkpoint.get("stepIndex", 0)
-            log.info(
-                "checkpoint_restored",
-                task_id=task_id,
-                step_index=current_step_index,
-                message_count=len(initial_messages),
-            )
-
-    # ── KR5: Heartbeat — keep the task alive during long runs ──────────────
-    pinger = (
-        HeartbeatPinger(task_id=task_id)  # type: ignore[misc]
-        if _HEARTBEAT_AVAILABLE and HeartbeatPinger is not None and task_id
-        else None
-    )
-    if pinger:
-        await pinger.start()
-
-    # Shared OpenAI client for critic and compaction calls.
-    openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     total_tokens = 0
     final_summary: str | None = None
 
-    try:
-        # ── KR5: Compaction — trim history before running ───────────────────
-        messages_to_run = initial_messages or [{"role": "user", "content": prompt}]
-        if not initial_messages:
-            # First run — seed with the opening prompt as the user turn.
-            messages_to_run = [{"role": "user", "content": prompt}]
-        if _COMPACTION_AVAILABLE and compact_messages is not None:
-            messages_to_run = await compact_messages(
-                messages_to_run, max_chars=80_000, client=openai_client
+    # Per-tool stream emitter — publishes each tool call/result to Redis so
+    # the realtor's activity feed and the broker dashboard see what Chippi
+    # actually did, not just one opaque "I ran a sweep" summary. Fire-and-
+    # forget so the HTTP round-trip never throttles the SDK loop.
+    #
+    # Also captures the tool call into the trajectory accumulator. The two
+    # paths share the same _translate_tool_event payload so the realtor's
+    # live view and the offline trajectory record stay in lockstep.
+    def on_event(event: object) -> None:
+        payload = _translate_tool_event(event)
+        if payload is None:
+            return
+        trajectory_tool_calls.append(normalize_tool_call(payload))
+        asyncio.create_task(
+            publish_event(
+                ctx,
+                "action",
+                payload["message"],
+                metadata=payload["metadata"],
+                agent_type="chippi",
             )
+        )
 
-        # ── KR2: Model fallback — run with automatic retry on 429 ───────────
-        # When initial_messages are present we pass them directly; the first
-        # run uses the prompt string for a cleaner Runner.run() call.
-        agent_input = prompt if not initial_messages else messages_to_run
-        result = await _run_with_fallback(chippi, agent_input, run_config, ctx)
+    try:
+        # Run with automatic fallback through cheaper models on a 429.
+        # Streaming mode so on_event fires per tool call / result.
+        result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
 
         usage = getattr(result, "usage", None)
-        tokens_in: int = 0
-        tokens_out: int = 0
         if usage:
             tokens_in = getattr(usage, "input_tokens", 0) or 0
             tokens_out = getattr(usage, "output_tokens", 0) or 0
@@ -457,53 +446,7 @@ async def run_agent_for_space(
         if isinstance(final_output, str):
             final_summary = final_output[:280]
 
-        # ── KR1: Checkpoint save — persist state after successful run ───────
-        if _CHECKPOINTS_AVAILABLE and save_checkpoint is not None and task_id:
-            # Extract message history from the result for checkpoint storage.
-            result_messages: list[dict] = []
-            raw_history = getattr(result, "raw_responses", None) or []
-            for resp in raw_history:
-                content = getattr(resp, "output", None)
-                if content:
-                    result_messages.append({"role": "assistant", "content": str(content)[:2000]})
-            current_step_index += 1
-            await save_checkpoint(  # type: ignore[misc]
-                task_id=task_id,
-                space_id=space.id,
-                step_index=current_step_index,
-                messages=result_messages,
-                metadata={"lastOutputSummary": final_summary or ""},
-            )
-
-        # Record the full agent run as a single LLM-call step in the ledger.
-        await ledger.record_llm_call(
-            tool_name="chippi",
-            input_summary=prompt[:500],
-            output_summary=final_summary or f"{total_tokens:,} tokens used",
-            model=chippi.model or settings.orchestrator_model,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-        )
-
         log.info("agent_run_completed", total_tokens=total_tokens, model_used=chippi.model)
-
-        # ── KR3: Critic — verify the agent accomplished the goal ────────────
-        outcome_text = final_summary or f"{total_tokens:,} tokens used, no text output."
-        critic_verdict = await _run_critic(
-            goal=prompt[:500],
-            outcome_summary=outcome_text,
-            client=openai_client,
-        )
-        log.info("critic_verdict", verdict=critic_verdict[:120])
-        # Store verdict in AgentTask metadata when a task_id is available.
-        if task_id:
-            try:
-                db = await supabase()
-                await db.table("AgentTask").update(
-                    {"metadata": {"criticVerdict": critic_verdict}}
-                ).eq("id", task_id).execute()
-            except Exception as exc:
-                log.warning("critic_verdict_store_failed", error=str(exc))
 
     except InputGuardrailTripwireTriggered as exc:
         info = exc.guardrail_result.output.output_info or {}
@@ -514,16 +457,51 @@ async def run_agent_for_space(
             f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
             agent_type="chippi",
         )
+        await record_trajectory(
+            run_id=run_id,
+            space_id=space.id,
+            started_at=started_at,
+            status="guardrail_blocked",
+            trigger=(triggers[0] if triggers else None),
+            model=chippi.model,
+            total_tokens=total_tokens,
+            tool_calls=trajectory_tool_calls,
+            extra={"pending_drafts": pending},
+        )
         return
 
     except Exception as exc:
         log.exception("agent_run_failed")
         await publish_event(ctx, "error", f"Agent error: {exc}", agent_type="chippi")
-
-    finally:
-        # ── KR5: Heartbeat — always stop the pinger ─────────────────────────
-        if pinger:
-            await pinger.stop()
+        # Make the failure visible. A swallowed error leaves the realtor's
+        # activity feed blank with no signal that a run even happened.
+        try:
+            await save_memory(
+                space_id=space.id,
+                entity_type="space",
+                entity_id=space.id,
+                memory_type="observation",
+                content=(
+                    "Autonomous run failed on "
+                    f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}: "
+                    f"{str(exc)[:200]}"
+                ),
+                importance=0.3,
+            )
+        except Exception:
+            log.warning("agent_run_failure_memory_write_failed")
+        await record_trajectory(
+            run_id=run_id,
+            space_id=space.id,
+            started_at=started_at,
+            status="error",
+            trigger=(triggers[0] if triggers else None),
+            model=chippi.model,
+            total_tokens=total_tokens,
+            tool_calls=trajectory_tool_calls,
+            extra={"error": str(exc)[:500]},
+        )
+        return
 
     if total_tokens > 0:
         memory_content = (
@@ -544,5 +522,16 @@ async def run_agent_for_space(
         ctx, "complete",
         f"Run complete — {total_tokens:,} tokens used",
         metadata={"totalTokens": total_tokens},
+    )
+    await record_trajectory(
+        run_id=run_id,
+        space_id=space.id,
+        started_at=started_at,
+        status="completed",
+        trigger=(triggers[0] if triggers else None),
+        model=chippi.model,
+        total_tokens=total_tokens,
+        tool_calls=trajectory_tool_calls,
+        final_summary=final_summary,
     )
     log.info("agent_run_finished", total_tokens=total_tokens)

@@ -6,6 +6,7 @@ import { redis } from '@/lib/redis';
 import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
+import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import type { Contact } from '@/lib/types';
 import {
   applicationFingerprintKey,
@@ -718,6 +719,19 @@ export async function POST(req: NextRequest) {
 
     await Promise.all([realtorNotification, applicantConfirmation]);
     logger.debug('[apply] notifications dispatched', { contactId: contact.id });
+
+    // Fire the agent trigger so Chippi reacts to the new application in real
+    // time (drafts a follow-up, scores against the realtor's criteria, etc.)
+    // instead of waiting for the 4-hour cron sweep.
+    try {
+      await fireAgentTrigger({
+        spaceId: space.id,
+        event: 'application_submitted',
+        contactId: contact.id,
+      });
+    } catch (e) {
+      logger.error('[apply] agent trigger failed (non-fatal)', { contactId: contact.id }, e);
+    }
 
     return NextResponse.json(
       {

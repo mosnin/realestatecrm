@@ -9,7 +9,7 @@ from typing import Any, Literal
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
-from errors import AgentError, from_supabase_error, from_exception
+from errors import from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
 from tools.base import idempotent_tool, with_retry
@@ -131,6 +131,7 @@ async def get_contact_activity(
 
 
 @function_tool
+@idempotent_tool
 async def create_contact(
     ctx: RunContextWrapper[AgentContext],
     name: str,
@@ -377,6 +378,9 @@ async def update_contact(
             summary_parts.append("score-expl")
 
     # ── Activity log ──
+    # The Contact update above already committed. Activity rows are a
+    # best-effort audit trail — a failed insert must not report the whole
+    # tool as failed, or the model retries an update that already succeeded.
     for act in activities:
         try:
             await db.table("ContactActivity").insert({
@@ -387,9 +391,8 @@ async def update_contact(
                 "content": act["content"],
                 "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
             }).execute()
-        except Exception as e:
-            agent_err = from_exception(e)
-            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+        except Exception:
+            pass
 
     if summary_parts:
         await publish_event(

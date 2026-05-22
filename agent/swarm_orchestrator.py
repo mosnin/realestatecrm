@@ -17,6 +17,7 @@ from openai import AsyncOpenAI
 
 from config import settings
 from db import supabase as get_supabase
+from llm import configure_agents_sdk, get_llm_client, openai_model, resolve_chat_model
 
 logger = structlog.get_logger(__name__)
 
@@ -66,7 +67,7 @@ Rules:
 - wave=1 for first-wave parallel tasks, wave=2 for tasks that depend on wave-1 results
 """
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model("gpt-4o-mini"),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         max_tokens=1000,
@@ -99,7 +100,7 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
         agent = Agent(
             name=member["name"],
             instructions=system_prompt,
-            model=settings.worker_model,
+            model=resolve_chat_model(settings.worker_model),
             model_settings=ModelSettings(max_tokens=2048),
         )
 
@@ -158,7 +159,7 @@ Synthesize these results into a clear, comprehensive final answer.
 Format with markdown headers for readability."""
 
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model("gpt-4o-mini"),
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
     )
@@ -167,13 +168,14 @@ Format with markdown headers for readability."""
 
 async def run_swarm(payload: dict) -> None:
     """Main entry point called by the Modal endpoint."""
+    configure_agents_sdk()
     swarm_run_id: str = payload["swarmRunId"]
     goal: str = payload["goal"]
     space_id: str = payload["spaceId"]
     custom_agents: list[dict] = payload.get("customAgents", [])
 
     db = await get_supabase()
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = get_llm_client()
 
     try:
         # Planning phase

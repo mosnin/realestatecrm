@@ -80,7 +80,17 @@ export interface ToolResult<TData = unknown> {
    * - `contacts` / `deals` / `tours` / `notes` / `plain` — neutral hints
    *   for rich inline cards.
    */
-  display?: 'contacts' | 'deals' | 'tours' | 'notes' | 'properties' | 'plain' | 'success' | 'error' | 'warning';
+  display?:
+    | 'contacts'
+    | 'deals'
+    | 'tours'
+    | 'notes'
+    | 'properties'
+    | 'availability-picker'
+    | 'plain'
+    | 'success'
+    | 'error'
+    | 'warning';
 }
 
 // ── Tool definition ────────────────────────────────────────────────────────

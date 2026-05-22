@@ -573,7 +573,7 @@ segmented-control trick. **Use it for any tab strip or window selector.**
 
 ## Voice
 
-The product talks like a sharp colleague who already knows your CRM.
+The product talks like a sharp colleague who already knows your book of business.
 
 - Lowercase verb in toasts: `"Tour booked — Sarah Chen."` Period.
 - One-sentence status lines under every page title.
@@ -853,7 +853,7 @@ MessageSquare   SMS / draft
 Mail            email
 Bell            follow-up scheduled
 Brain           memory / observation
-Sparkles        Chippi (the agent itself)
+MessageCircle   Chippi (the agent itself)
 ```
 
 ---

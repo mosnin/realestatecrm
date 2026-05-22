@@ -125,8 +125,13 @@ class IdempotencyStore:
 def idempotent_tool(tool_fn: Callable) -> Callable:
     """Decorator for mutation tools that adds idempotency caching.
 
-    Derive the cache key from function name + space_id (ctx.context.space_id)
-    + the first positional string argument (typically an entity ID).
+    The cache key is a hash of (function name + space_id + all positional
+    args after ctx + all keyword args). Previously this keyed on only the
+    first positional string argument — which silently dropped legitimate
+    distinct mutations on the same entity (e.g. `update_contact(id, reason=A)`
+    then `update_contact(id, reason=B)` within 5 minutes would return the
+    cached A response for the B call). Hashing the full arg set fixes that
+    while still deduping true retries (identical args).
 
     Apply INSIDE @function_tool so the FunctionTool stays the outermost
     object (otherwise the agents SDK sees a plain wrapper function and
@@ -141,7 +146,7 @@ def idempotent_tool(tool_fn: Callable) -> Callable:
     """
     @wraps(tool_fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Locate ctx — it's the first arg that has `.context.space_id`
+        # Locate ctx — it's the first arg, with `.context.space_id`
         ctx = args[0] if args else None
         space_id: str = ""
         try:
@@ -149,16 +154,14 @@ def idempotent_tool(tool_fn: Callable) -> Callable:
         except AttributeError:
             pass
 
-        # First string positional argument after ctx (entity id, etc.)
-        first_str = next(
-            (a for a in args[1:] if isinstance(a, str)),
-            next((v for v in kwargs.values() if isinstance(v, str)), ""),
-        )
-
+        # Fingerprint: all positional args after ctx + all kwargs. `default=str`
+        # handles non-JSON-native values (Pydantic models, datetimes) without
+        # raising; the resulting string is deterministic for repeated calls.
         key = IdempotencyStore.make_key(
             tool_name=tool_fn.__name__,
             space_id=space_id,
-            first_arg=first_str,
+            args=list(args[1:]),
+            kwargs=kwargs,
         )
 
         cached = IdempotencyStore.check(key)

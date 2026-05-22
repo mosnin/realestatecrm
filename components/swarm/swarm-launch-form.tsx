@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, SECTION_LABEL, PRIMARY_PILL } from '@/lib/typography';
 import type { CustomAgent } from '@/lib/swarm-types';
@@ -166,7 +166,7 @@ export function SwarmLaunchForm({ slug, availableAgents }: SwarmLaunchFormProps)
           {isSubmitting ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
-            <Sparkles size={14} />
+            <MessageCircle size={14} />
           )}
           {isSubmitting ? 'Launching…' : 'Launch Swarm'}
         </button>

@@ -586,6 +586,70 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });
     }
 
+    if (action === 'save_realtor_profile') {
+      // Persist the realtor's onboarding answers into AIUserProfile. Requires
+      // a Space — the new flow creates the space first, then upserts this row.
+      if (!space) {
+        return NextResponse.json({ error: 'Workspace must exist first' }, { status: 409 });
+      }
+
+      const {
+        role, zipCode, yearsExperience, businessFocus,
+        communicationTone, quirksAndPreferences, leadSources,
+      } = body as {
+        role?: string;
+        zipCode?: string;
+        yearsExperience?: number;
+        businessFocus?: string[];
+        communicationTone?: string;
+        quirksAndPreferences?: string;
+        leadSources?: string[];
+      };
+
+      const ALLOWED_ROLES = ['solo', 'team_lead', 'brokerage_owner'];
+      const ALLOWED_TONES = ['warm', 'direct', 'formal', 'casual'];
+
+      // Whitelist enum-style fields; truncate strings; coerce arrays to plain
+      // string[] to defend against unexpected payload shapes.
+      const profileUpdate: Record<string, unknown> = {};
+      if (role && ALLOWED_ROLES.includes(role)) profileUpdate.role = role;
+      if (typeof zipCode === 'string') profileUpdate.zipCode = zipCode.trim().slice(0, 12);
+      if (typeof yearsExperience === 'number' && Number.isFinite(yearsExperience)) {
+        profileUpdate.yearsExperience = Math.max(0, Math.min(100, Math.trunc(yearsExperience)));
+      }
+      if (Array.isArray(businessFocus)) {
+        profileUpdate.businessFocus = businessFocus.filter((s) => typeof s === 'string').slice(0, 8);
+      }
+      if (communicationTone && ALLOWED_TONES.includes(communicationTone)) {
+        profileUpdate.communicationTone = communicationTone;
+      }
+      if (typeof quirksAndPreferences === 'string') {
+        profileUpdate.quirksAndPreferences = quirksAndPreferences.slice(0, 1000);
+      }
+      if (Array.isArray(leadSources)) {
+        profileUpdate.leadSources = leadSources.filter((s) => typeof s === 'string').slice(0, 20);
+      }
+
+      const { error: profileErr } = await supabase
+        .from('AIUserProfile')
+        .upsert(
+          {
+            id: crypto.randomUUID(),
+            spaceId: space.id,
+            displayName: user.name ?? null,
+            ...profileUpdate,
+            updatedAt: new Date().toISOString(),
+          },
+          { onConflict: 'spaceId' },
+        );
+      if (profileErr) {
+        console.error('[onboarding] AIUserProfile upsert failed:', profileErr);
+        return NextResponse.json({ error: 'Could not save profile' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     if (action === 'check_slug') {
       const { slug } = body as { slug: string };
       if (!slug) return NextResponse.json({ available: false });

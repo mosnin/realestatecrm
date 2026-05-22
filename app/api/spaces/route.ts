@@ -142,6 +142,12 @@ export async function PATCH(req: NextRequest) {
   const intakeConfirmationEmail = typeof body.intakeConfirmationEmail === 'string' ? body.intakeConfirmationEmail.slice(0, 5000) : (body.intakeConfirmationEmail === null ? null : undefined);
   const intakeDisclaimerText    = typeof body.intakeDisclaimerText    === 'string' ? body.intakeDisclaimerText.slice(0, 2000)   : (body.intakeDisclaimerText === null ? null : undefined);
   const intakeFooterLinks       = Array.isArray(body.intakeFooterLinks) ? body.intakeFooterLinks : undefined;
+  // Trust signals — three optional compliance slots rendered in the intake footer.
+  // License number: short identifier; cap conservatively. Fair housing notice:
+  // multi-line text; cap at 2KB. Mark: boolean.
+  const intakeLicenseNumber         = typeof body.intakeLicenseNumber === 'string' ? body.intakeLicenseNumber.trim().slice(0, 200) : (body.intakeLicenseNumber === null ? null : undefined);
+  const intakeFairHousingNotice     = typeof body.intakeFairHousingNotice === 'string' ? body.intakeFairHousingNotice.slice(0, 2000) : (body.intakeFairHousingNotice === null ? null : undefined);
+  const intakeShowEqualHousingMark  = typeof body.intakeShowEqualHousingMark === 'boolean' ? body.intakeShowEqualHousingMark : undefined;
 
   // Legal & compliance fields
   const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
@@ -268,6 +274,10 @@ export async function PATCH(req: NextRequest) {
   if (intakeConfirmationEmail !== undefined) settingsPayload.intakeConfirmationEmail = intakeConfirmationEmail;
   if (intakeDisclaimerText !== undefined) settingsPayload.intakeDisclaimerText = intakeDisclaimerText;
   if (intakeFooterLinks !== undefined) settingsPayload.intakeFooterLinks = intakeFooterLinks;
+  // Trust signals
+  if (intakeLicenseNumber !== undefined) settingsPayload.intakeLicenseNumber = intakeLicenseNumber || null;
+  if (intakeFairHousingNotice !== undefined) settingsPayload.intakeFairHousingNotice = intakeFairHousingNotice || null;
+  if (intakeShowEqualHousingMark !== undefined) settingsPayload.intakeShowEqualHousingMark = intakeShowEqualHousingMark;
 
   // Tour availability settings
   if (typeof body.tourDuration === 'number' && [15, 30, 45, 60, 90, 120].includes(body.tourDuration)) {

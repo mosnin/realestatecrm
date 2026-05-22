@@ -14,7 +14,9 @@ import {
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
-import { SidebarContextSection } from '@/components/dashboard/sidebar-context-section';
+import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
+import { ChippiInstrument } from '@/components/dashboard/chippi-instrument';
+import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
   ChevronLeft,
@@ -42,8 +44,8 @@ import {
   Plus,
   Check,
   Search,
-  Sparkles,
   Flag,
+  History,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -85,7 +87,7 @@ const brokerAdminNavSections = [
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Chippi', icon: Sparkles, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
@@ -293,17 +295,33 @@ function CollapsibleNavItem({
   const isParentActive = doesItemOwnPath(item, pathname, base);
   const href = `${base}${item.href}`;
 
-  const handleClick = useCallback(
+  const handleClick = useCallback(() => {
+    // Parent row click should ALWAYS navigate to its own href. The previous
+    // behaviour `e.preventDefault(); onToggle();` left a lead stranded on a
+    // sub-page like /chippi/today with no obvious way back to /chippi — the
+    // sidebar's "Chippi" row only opened the dropdown.
+    //
+    // New behaviour: let the <Link> navigate as normal, and additionally
+    // ensure the dropdown is open so the lead can see where they are in
+    // the tree. If it was already open, leave it open (don't collapse on
+    // navigation — collapsing the section the user just navigated into is
+    // hostile).
+    if (hasChildren && !collapsed && !isExpanded) {
+      onToggle();
+    }
+  }, [hasChildren, collapsed, isExpanded, onToggle]);
+
+  // Dedicated chevron toggle so a lead who wants to expand/collapse the
+  // section without navigating still has that escape hatch. Stops the
+  // event from bubbling to the parent <Link>.
+  const handleChevronClick = useCallback(
     (e: React.MouseEvent) => {
-      // Collapsed mode: parent navigates to its own href. Children are only
-      // reachable via expanded sidebar or in-page navigation — deliberate
-      // trade so the rail stays a one-tap launcher.
-      if (hasChildren && !collapsed) {
-        e.preventDefault();
-        onToggle();
-      }
+      if (!hasChildren || collapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onToggle();
     },
-    [hasChildren, onToggle, collapsed],
+    [hasChildren, collapsed, onToggle],
   );
 
   const tooltipLabel = badgeText ? `${item.label} · ${badgeText}` : item.label;
@@ -356,13 +374,21 @@ function CollapsibleNavItem({
           {!collapsed && badge}
 
           {!collapsed && hasChildren && (
-            <ChevronRight
-              size={11}
-              className={cn(
-                'flex-shrink-0 text-muted-foreground/40 transition-transform duration-150',
-                isExpanded && 'rotate-90',
-              )}
-            />
+            <button
+              type="button"
+              onClick={handleChevronClick}
+              aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+              aria-expanded={isExpanded}
+              className="flex-shrink-0 -mr-1.5 p-1 rounded hover:bg-foreground/[0.04] transition-colors"
+            >
+              <ChevronRight
+                size={11}
+                className={cn(
+                  'text-muted-foreground/40 transition-transform duration-150',
+                  isExpanded && 'rotate-90',
+                )}
+              />
+            </button>
           )}
         </Link>
       </CollapsedTooltip>
@@ -862,21 +888,21 @@ function RealtorNav({
     if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
-          {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+          <PulseNumber value={unreadLeadCount > 99 ? '99+' : unreadLeadCount} />
         </span>
       );
     }
     if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
-          {pendingDraftCount > 99 ? '99+' : pendingDraftCount}
+          <PulseNumber value={pendingDraftCount > 99 ? '99+' : pendingDraftCount} />
         </span>
       );
     }
     if (item.badgeKey === 'properties' && activePropertyCount > 0) {
       return (
         <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
-          {activePropertyCount > 99 ? '99+' : activePropertyCount}
+          <PulseNumber value={activePropertyCount > 99 ? '99+' : activePropertyCount} />
         </span>
       );
     }
@@ -931,28 +957,54 @@ function RealtorNav({
         </div>
       </div>
 
-      {/* Context-aware second section — on /chippi the realtor sees their
-          conversation list; everywhere else they see the static More nav.
-          The two-tab pill at the top lets them flip without leaving the
-          page. Collapsed (icon-rail) mode skips the toggle entirely and
-          falls back to the static More-icon list — the rail's too narrow
-          to read titles. */}
-      {realtorMoreNavItems.length > 0 && (
-        <div>
-          {collapsed ? (
-            <>
-              <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
-              <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
-            </>
-          ) : (
-            <SidebarContextSection
-              slug={slug}
-              pathname={pathname}
-              renderPages={() => <>{realtorMoreNavItems.map(renderItem)}</>}
-            />
-          )}
-        </div>
-      )}
+      {/* Context-aware second section. Route IS the signal:
+            - On /chippi/* → conversation list (expanded) or History icon
+              link (collapsed rail). Modern chat apps surface chat history
+              in their nav for a reason — you came back to find a thread.
+            - Elsewhere → render `realtorMoreNavItems` if it has anything.
+              It's intentionally empty today, but kept as the slot for
+              future secondary nav without re-plumbing the layout.
+          The previous Chats/Pages tab toggle was ceremony — Pages was
+          empty so flipping to it dead-ended. Removed. */}
+      {(() => {
+        const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
+        const hasMore = realtorMoreNavItems.length > 0;
+        if (!onChippi && !hasMore) return null;
+        return (
+          <div>
+            {collapsed ? (
+              <>
+                {onChippi && (
+                  <>
+                    <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+                    <CollapsedTooltip enabled label="Conversations">
+                      <Link
+                        href={`/s/${slug}/chippi?view=history`}
+                        aria-label="Conversation history"
+                        className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
+                      >
+                        <History size={15} strokeWidth={1.75} />
+                      </Link>
+                    </CollapsedTooltip>
+                  </>
+                )}
+                {hasMore && (
+                  <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+                )}
+              </>
+            ) : (
+              <>
+                {onChippi && <SidebarConversations slug={slug} />}
+                {hasMore && (
+                  <div className={cn('space-y-0.5', onChippi && 'mt-4')}>
+                    {realtorMoreNavItems.map(renderItem)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Settings — collapsible, pinned at bottom of scroll area */}
       <div className="pt-1">
@@ -1254,6 +1306,9 @@ function RealtorSidebarShell({
           <SearchPill collapsed={collapsed} />
         </div>
 
+        {/* Cockpit instrument — live agent readout (working / idle / paused) */}
+        <ChippiInstrument collapsed={collapsed} />
+
         {/* Primary nav + More + Settings */}
         <RealtorNav
           slug={slug}
@@ -1271,7 +1326,7 @@ function RealtorSidebarShell({
             (see EdgeCollapseHandle above) — discoverable on hover. */}
         <div className="border-t border-border/50" />
         <UserFooter
-          href={`${base}/settings#profile`}
+          href={`${base}/settings?tab=profile`}
           displayName={displayName}
           imageUrl={imageUrl}
           collapsed={collapsed}

@@ -71,6 +71,7 @@ import { noteOnPropertyTool } from './note-on-property';
 // Calendar
 import { checkAvailabilityTool } from './check-availability';
 import { blockTimeTool } from './block-time';
+import { proposeTourTimesTool } from './propose-tour-times';
 
 // Pipeline aggregates
 import { pipelineSummaryTool } from './pipeline-summary';
@@ -95,6 +96,11 @@ import { requestDealReviewTool } from './request-deal-review';
 // Memory
 import { recallHistoryTool } from './recall-history';
 import { readAttachmentTool } from './read-attachment';
+
+// Files (Wasabi-backed user uploads)
+import { listFilesTool } from './list-files';
+import { readFileTool } from './read-file';
+import { attachFileToPropertyTool } from './attach-file-to-property';
 
 // Planning
 import { createPlanTool } from './plan';
@@ -150,6 +156,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Calendar ───────────────────────────────────────────────────────────
   checkAvailabilityTool as ToolDefinition,
   blockTimeTool as ToolDefinition,
+  proposeTourTimesTool as ToolDefinition,
 
   // ── Pipeline aggregates ────────────────────────────────────────────────
   pipelineSummaryTool as ToolDefinition,
@@ -174,6 +181,9 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+  listFilesTool as ToolDefinition,
+  readFileTool as ToolDefinition,
+  attachFileToPropertyTool as ToolDefinition,
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,

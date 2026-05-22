@@ -1,11 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Building2, ChevronRight, ChevronDown, MapPin, ImageOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { CardSkeleton } from '../card-skeleton';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
+
+function googleMapsUrl(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+/** Google Maps Static image — no geocoding step needed (the API accepts a
+ *  raw address as the center). Gated on NEXT_PUBLIC_GOOGLE_MAPS_KEY; when
+ *  unset the map slot is hidden and the "View on Maps" link in the actions
+ *  row carries the navigation intent. */
+const GMAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+
+function staticMapUrl(address: string): string | null {
+  if (!GMAPS_KEY) return null;
+  const enc = encodeURIComponent(address);
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${enc}&zoom=15&size=640x240&scale=2&maptype=roadmap&markers=color:0xff5a1f%7C${enc}&key=${GMAPS_KEY}`;
+}
 
 interface PropertySummary {
   id: string;
@@ -28,6 +44,7 @@ interface PropertyDetail {
   daysOnMarket: number | null;
   dealCount: number;
   description: string | null;
+  photos?: string[];
 }
 
 interface PropertyCardProps {
@@ -185,6 +202,18 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
 
               {!loading && detail && (
                 <>
+                  {/* Hero image — first photo if any. 16:9, object-cover so
+                      the address line up top reads even with mismatched
+                      aspect ratios. Falls back to a quiet placeholder when
+                      no photo is attached. */}
+                  <PropertyHero photos={detail.photos ?? []} address={detail.address} />
+
+                  {/* Static map preview — only rendered when
+                      NEXT_PUBLIC_GOOGLE_MAPS_KEY is configured. Without a
+                      key, the action-row "Open in Maps" link carries the
+                      same intent. */}
+                  <PropertyMap address={detail.address} />
+
                   {/* Specs grid */}
                   <div className="grid grid-cols-2 gap-px rounded-lg overflow-hidden border border-border/60 bg-border/60 text-[12px]">
                     <div className="bg-background px-3 py-2 flex flex-col gap-0.5">
@@ -268,7 +297,7 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
                   )}
 
                   {/* Actions */}
-                  <div>
+                  <div className="flex items-center gap-4 flex-wrap">
                     <a
                       href={`/s/${slug}/properties/${property.id}`}
                       target="_blank"
@@ -277,6 +306,15 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
                     >
                       View Property
                       <ChevronRight size={12} />
+                    </a>
+                    <a
+                      href={googleMapsUrl(detail.address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <MapPin size={12} />
+                      Open in Maps
                     </a>
                   </div>
                 </>
@@ -293,5 +331,67 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+/** Hero photo or quiet empty-state. Real estate is visual; lead with
+ *  imagery the moment the realtor opens a property card. */
+function PropertyHero({ photos, address }: { photos: string[]; address: string }) {
+  const [errored, setErrored] = useState(false);
+  const src = photos[0];
+  if (!src || errored) {
+    return (
+      <div className="aspect-[16/9] w-full rounded-lg border border-border/40 bg-muted/40 flex items-center justify-center text-muted-foreground/60">
+        <ImageOff size={20} aria-hidden />
+      </div>
+    );
+  }
+  return (
+    <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-border/40 bg-muted/20">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={address}
+        className="w-full h-full object-cover"
+        onError={() => setErrored(true)}
+        loading="lazy"
+      />
+      {photos.length > 1 && (
+        <span className="absolute bottom-2 right-2 text-[10px] font-medium bg-background/80 backdrop-blur-sm rounded-full px-2 py-0.5 text-foreground/80">
+          +{photos.length - 1}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Static map preview. Rendered only when NEXT_PUBLIC_GOOGLE_MAPS_KEY is
+ *  set — the env-driven gate keeps the codebase free of vendor lock-in
+ *  while shipping the rendering path. Falls back silently when no key. */
+function PropertyMap({ address }: { address: string }) {
+  const [errored, setErrored] = useState(false);
+  const url = staticMapUrl(address);
+  if (!url || errored) return null;
+  return (
+    <a
+      href={googleMapsUrl(address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block relative aspect-[16/6] w-full rounded-lg overflow-hidden border border-border/40 group/map"
+      aria-label={`Open ${address} in Google Maps`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={`Map of ${address}`}
+        className="w-full h-full object-cover group-hover/map:scale-[1.01] transition-transform duration-300"
+        onError={() => setErrored(true)}
+        loading="lazy"
+      />
+      <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 text-[10px] font-medium bg-background/85 backdrop-blur-sm rounded-full px-2 py-0.5 text-foreground/80">
+        <MapPin size={9} />
+        Tap to open
+      </span>
+    </a>
   );
 }

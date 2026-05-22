@@ -24,6 +24,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.base import idempotent_tool
 from tools.streaming import publish_event
 
 VALID_OUTCOMES = {"responded", "no_response", "bounced", "unsubscribed", "meeting_booked"}
@@ -39,6 +40,7 @@ _SCORE_DELTAS = {
 
 
 @function_tool
+@idempotent_tool
 async def outcome(
     ctx: RunContextWrapper[AgentContext],
     action: str,

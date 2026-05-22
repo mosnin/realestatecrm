@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -27,10 +28,10 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import settings
 from db import get_pool, supabase
+from llm import EMBEDDING_MODEL, get_llm_client
 
-_EMBED_MODEL = "text-embedding-3-small"
+_EMBED_MODEL = EMBEDDING_MODEL
 _EMBED_DIMS = 1536
 
 _openai: AsyncOpenAI | None = None
@@ -45,7 +46,7 @@ _KILL_SWITCH_TTL = 30.0  # seconds
 def _client() -> AsyncOpenAI:
     global _openai
     if _openai is None:
-        _openai = AsyncOpenAI(api_key=settings.openai_api_key)
+        _openai = get_llm_client()
     return _openai
 
 
@@ -247,10 +248,50 @@ async def save_memory(
         LIMIT 1
     """
 
+    # Semantic dedup — feature-flagged because the failure mode (over-
+    # merging two distinct facts that share vocabulary) is hard to detect
+    # without an eval. Off by default; flip AGENT_MEMORY_SEMANTIC_DEDUP=1
+    # when ready to validate. When on, before the structural-key check we
+    # look for an existing memory in this space + same (entityType,
+    # entityId) with cosine similarity ≥ 0.92 to the new content. If
+    # found, we update that row instead. Threshold is intentionally
+    # conservative (0.85 is the Mem0 default; we start higher) — the
+    # cost of false-merge here is loss of a real fact, not a duplicate.
+    # The (entity_type, entity_id) scope keeps blast radius narrow:
+    # facts about different contacts can never accidentally merge.
+    semantic_dedup_enabled = os.environ.get("AGENT_MEMORY_SEMANTIC_DEDUP") == "1"
+    semantic_match_id: str | None = None
+    if semantic_dedup_enabled and vec is not None and entity_type and entity_id:
+        try:
+            similar = await search_similar(
+                space_id=space_id,
+                query=content,
+                limit=1,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                min_similarity=0.92,
+            )
+            if similar:
+                semantic_match_id = similar[0]["id"]
+                logger.info(
+                    "save_memory: semantic dedup matched existing row %s "
+                    "(space %s, %s/%s)",
+                    semantic_match_id, space_id, entity_type, entity_id,
+                )
+        except Exception as e:
+            # A dedup search failure must never block the save. Worst
+            # case we get a duplicate row, which the kill switch and
+            # the structural check already guard against in most paths.
+            logger.warning("save_memory: semantic dedup search failed: %s", e)
+
     async with pool.acquire() as conn:
         existing = await conn.fetchrow(
             check_sql, space_id, entity_type, entity_id, memory_type
         )
+        # Semantic dedup wins over structural — if both fire, the semantic
+        # match is the "this is the same fact, different phrasing" case.
+        if semantic_match_id and (not existing or existing["id"] != semantic_match_id):
+            existing = {"id": semantic_match_id}
 
         if existing:
             # UPDATE the existing row: refresh content, importance, embedding,
@@ -348,57 +389,6 @@ async def save_memory(
         "entityId": entity_id, "memoryType": memory_type, "content": content,
         "importance": importance_clamped,
     }
-
-
-async def load_task_memories(
-    space_id: str,
-    task_id: str,
-    limit: int = 20,
-) -> list[dict]:
-    """Load memories scoped to a specific task within a space.
-
-    Ordered by importance DESC then createdAt DESC. Useful for injecting
-    task-specific context at the start of a sub-task run.
-    """
-    db = await supabase()
-
-    result = await (
-        db.table("AgentMemory")
-        .select("id,entityType,entityId,memoryType,content,importance,taskId,createdAt,updatedAt")
-        .eq("spaceId", space_id)
-        .eq("taskId", task_id)
-        .order("importance", desc=True)
-        .order("createdAt", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    return result.data or []
-
-
-async def prune_task_memories(space_id: str, task_id: str) -> int:
-    """Delete all memories for a given spaceId + taskId combination.
-
-    Returns the count of deleted rows. Intended for cleanup after a task
-    completes so task-scoped memories don't pollute the global memory pool.
-    DB errors are non-blocking — log and return 0.
-    """
-    try:
-        db = await supabase()
-        result = await (
-            db.table("AgentMemory")
-            .delete()
-            .eq("spaceId", space_id)
-            .eq("taskId", task_id)
-            .execute()
-        )
-        return len(result.data) if result.data else 0
-    except Exception:
-        logger.warning(
-            "prune_task_memories: DB error for space %s task %s — skipping",
-            space_id,
-            task_id,
-        )
-        return 0
 
 
 async def prune_expired(space_id: str) -> int:

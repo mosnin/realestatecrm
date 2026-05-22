@@ -34,7 +34,8 @@ import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-promp
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
-import { loadToolsForEntity, composioConfigured } from '@/lib/integrations/composio';
+import { composioConfigured } from '@/lib/integrations/composio';
+import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
 import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -111,12 +112,18 @@ export function buildChatAgent(
  * Loaded fresh per request — connect/disconnect changes take effect on
  * the next message without any cache invalidation.
  *
+ * The actual tool building lives in `lib/integrations/agent-tools.ts`:
+ * each connected toolkit's Composio actions become approval-gated SDK
+ * tools whose handlers delegate to `executeToolForEntity`. This function
+ * owns the orchestration around it — the active-toolkit lookup and the
+ * reconcile-on-error loop.
+ *
  * Failure mode: if Composio is unconfigured, unreachable, or returns an
  * error, we log and proceed WITHOUT integration tools. The chat keeps
  * working on its native catalog. Hard-fail would mean a Composio outage
  * takes down all chat — wrong tradeoff.
  *
- * Reconcile-on-error: per-toolkit load so a single dead connection (the
+ * Reconcile-on-error: per-toolkit build so a single dead connection (the
  * realtor revoked our OAuth grant on the provider's side and our row is
  * still 'active') doesn't poison the entire batch. When the SDK throws a
  * `ComposioConnectedAccountNotFoundError` or an HTTP 401/403 on a
@@ -139,14 +146,14 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
   }
   if (toolkits.length === 0) return [];
 
-  // Per-toolkit load lets us attribute auth failures to the right row.
+  // Per-toolkit build lets us attribute auth failures to the right row.
   // The cost is N round-trips instead of 1, but N is bounded by how
   // many apps the realtor has connected (typically 2-5).
   const collected: SdkTool[] = [];
   for (const toolkit of toolkits) {
     try {
-      const tools = await loadToolsForEntity({ entityId: ctx.userId, toolkits: [toolkit] });
-      collected.push(...(tools as unknown as SdkTool[]));
+      const tools = await buildToolkitAgentTools({ toolkit, userId: ctx.userId });
+      collected.push(...tools);
     } catch (err) {
       if (isAuthLikeError(err)) {
         // Don't await — keep the chat hot. The DB write is fire-and-

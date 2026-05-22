@@ -30,6 +30,9 @@ type SettingsResponse = {
   lastAssignedUserId: string | null;
   lastAssignedUserName: string | null;
   realtorMemberCount: number;
+  brokerageLicenseNumber: string | null;
+  brokerageFairHousingNotice: string | null;
+  brokerageShowEqualHousingMark: boolean;
 };
 
 /**
@@ -129,6 +132,9 @@ export async function GET() {
     lastAssignedUserId: auto.lastAssignedUserId,
     lastAssignedUserName: auto.lastAssignedUserName,
     realtorMemberCount: auto.realtorMemberCount,
+    brokerageLicenseNumber: ctx.brokerage.brokerageLicenseNumber ?? null,
+    brokerageFairHousingNotice: ctx.brokerage.brokerageFairHousingNotice ?? null,
+    brokerageShowEqualHousingMark: ctx.brokerage.brokerageShowEqualHousingMark ?? false,
   };
 
   return NextResponse.json(response);
@@ -212,6 +218,30 @@ export async function PATCH(req: Request) {
     updates.autoAssignEnabled = body.autoAssignEnabled;
   }
 
+  // Trust signals — three optional compliance slots rendered in the
+  // brokerage intake footer. Each independent; missing keys leave the
+  // existing column untouched.
+  if (body.brokerageLicenseNumber !== undefined) {
+    if (body.brokerageLicenseNumber === null || body.brokerageLicenseNumber === '') {
+      updates.brokerageLicenseNumber = null;
+    } else if (typeof body.brokerageLicenseNumber === 'string') {
+      updates.brokerageLicenseNumber = body.brokerageLicenseNumber.trim().slice(0, 200) || null;
+    }
+  }
+  if (body.brokerageFairHousingNotice !== undefined) {
+    if (body.brokerageFairHousingNotice === null || body.brokerageFairHousingNotice === '') {
+      updates.brokerageFairHousingNotice = null;
+    } else if (typeof body.brokerageFairHousingNotice === 'string') {
+      updates.brokerageFairHousingNotice = body.brokerageFairHousingNotice.slice(0, 2000) || null;
+    }
+  }
+  if (body.brokerageShowEqualHousingMark !== undefined) {
+    if (typeof body.brokerageShowEqualHousingMark !== 'boolean') {
+      return NextResponse.json({ error: 'brokerageShowEqualHousingMark must be a boolean' }, { status: 400 });
+    }
+    updates.brokerageShowEqualHousingMark = body.brokerageShowEqualHousingMark;
+  }
+
   if (body.assignmentMethod !== undefined) {
     if (
       typeof body.assignmentMethod !== 'string' ||
@@ -252,7 +282,10 @@ export async function PATCH(req: Request) {
   const auto = await resolveAutoAssignMeta(ctx.brokerage.id);
   const { data: brokerage } = await supabase
     .from('Brokerage')
-    .select('id, name, websiteUrl, logoUrl, status, privacyPolicyHtml')
+    .select(
+      'id, name, websiteUrl, logoUrl, status, privacyPolicyHtml, ' +
+      'brokerageLicenseNumber, brokerageFairHousingNotice, brokerageShowEqualHousingMark'
+    )
     .eq('id', ctx.brokerage.id)
     .maybeSingle<{
       id: string;
@@ -261,6 +294,9 @@ export async function PATCH(req: Request) {
       logoUrl: string | null;
       status: 'active' | 'suspended';
       privacyPolicyHtml: string | null;
+      brokerageLicenseNumber: string | null;
+      brokerageFairHousingNotice: string | null;
+      brokerageShowEqualHousingMark: boolean | null;
     }>();
 
   const response: SettingsResponse = {
@@ -275,6 +311,9 @@ export async function PATCH(req: Request) {
     lastAssignedUserId: auto.lastAssignedUserId,
     lastAssignedUserName: auto.lastAssignedUserName,
     realtorMemberCount: auto.realtorMemberCount,
+    brokerageLicenseNumber: brokerage?.brokerageLicenseNumber ?? ctx.brokerage.brokerageLicenseNumber ?? null,
+    brokerageFairHousingNotice: brokerage?.brokerageFairHousingNotice ?? ctx.brokerage.brokerageFairHousingNotice ?? null,
+    brokerageShowEqualHousingMark: brokerage?.brokerageShowEqualHousingMark ?? ctx.brokerage.brokerageShowEqualHousingMark ?? false,
   };
 
   return NextResponse.json(response);

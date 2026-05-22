@@ -55,7 +55,7 @@ const drawerMenuVariants = {
 const drawerFeatureLinks = [
   { href: '/features/intake', icon: Link2, name: 'Intake Link' },
   { href: '/features/ai-scoring', icon: Bot, name: 'AI Scoring' },
-  { href: '/features/crm', icon: Users, name: 'Contact CRM' },
+  { href: '/features/crm', icon: Users, name: 'Contacts' },
   { href: '/features/pipeline', icon: TrendingUp, name: 'Deal Pipeline' },
   { href: '/features/analytics', icon: BarChart3, name: 'Analytics' },
 ];

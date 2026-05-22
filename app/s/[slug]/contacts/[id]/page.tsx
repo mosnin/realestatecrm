@@ -8,7 +8,7 @@ import {
   Phone,
   MapPin,
   ExternalLink,
-  Sparkles,
+  MessageCircle,
   Calendar,
   Mic,
 } from 'lucide-react';
@@ -231,7 +231,7 @@ export default async function ClientDetailPage({
         <details open className="group border-t border-border/60 pt-4">
           <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
             <span className="inline-flex items-center gap-2">
-              <Sparkles size={13} className="text-orange-500 dark:text-orange-400" />
+              <MessageCircle size={13} className="text-orange-500 dark:text-orange-400" />
               Lead score
             </span>
             <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>

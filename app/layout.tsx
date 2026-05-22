@@ -9,19 +9,19 @@ import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Chippi — AI-Powered CRM for Real Estate Agents',
-  description: 'Chippi helps real estate agents close deals faster with AI lead scoring, automated follow-ups, tour scheduling, and a deal pipeline built for how realtors work. Start your 7-day free trial.',
-  keywords: ['CRM', 'real estate', 'realtors', 'AI lead scoring', 'property management', 'deal pipeline', 'tour scheduling', 'brokerages'],
+  title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
+  description: 'An AI agent that runs your realtor workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current so you can focus on the deals that matter. Start your 7-day free trial.',
+  keywords: ['agentic OS', 'AI agent', 'real estate', 'realtors', 'brokerages', 'AI lead scoring', 'lead qualification', 'tour scheduling', 'deal pipeline', 'CRM'],
   openGraph: {
-    title: 'Chippi — AI-Powered CRM for Real Estate Agents',
-    description: 'Score leads with AI, automate follow-ups, and manage your pipeline. Join agents closing deals faster with Chippi.',
+    title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
+    description: 'An AI agent that runs your realtor workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current.',
     siteName: 'Chippi',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Chippi — AI-Powered CRM for Real Estate Agents',
-    description: 'Score leads with AI, automate follow-ups, and manage your pipeline. Join agents closing deals faster.',
+    title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
+    description: 'An AI agent that runs your realtor workspace — qualifies leads, drafts follow-ups, schedules tours, keeps your pipeline current.',
   },
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },

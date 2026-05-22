@@ -10,7 +10,7 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (31 tools):
+Tool surface (33 tools):
   - create_contact / find_contacts / get_contact_activity / update_contact
   - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
   - recall_docs
@@ -29,12 +29,15 @@ Tool surface (31 tools):
   - create_plan
   - get_intake_form / add_intake_question / remove_intake_question
     / update_intake_question / save_intake_form
+  - generate_studio_image / edit_studio_image
 """
 
 from __future__ import annotations
 
+import structlog
 from agents import Agent
 
+from llm import configure_agents_sdk, resolve_chat_model
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
 from tools.docs import recall_docs
@@ -54,6 +57,9 @@ from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
+from tools.studio import generate_studio_image, edit_studio_image
+
+logger = structlog.get_logger(__name__)
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -121,6 +127,17 @@ optional — leave it blank and the deal lands in the right pipeline automatical
 Never say "I've noted this" or "I've added this to memory" as a substitute for
 actually creating the record. Memory is for observations; create_contact and
 create_deal are for CRM records.
+
+# Creating content (Studio)
+When the realtor asks for marketing content — a listing graphic, a social
+image, a branded quote card, a short listing video — call
+generate_studio_image with a vivid, specific description. It renders the
+asset on-brand and saves it to the realtor's Files and Studio. Make it;
+don't just describe what you would make.
+
+To change an image that already exists — upscale it, cut its background,
+or restyle it by instruction — call edit_studio_image with the file_id.
+Chain it after generate_studio_image to refine what you just made.
 
 # Lifecycle moves (brokerage-grade actions)
 Beyond reading and drafting you can directly move the deal lifecycle:
@@ -257,13 +274,16 @@ async def load_ai_profile(space_id: str, db) -> str | None:
             return None
 
         return "# Realtor profile\n" + "\n".join(f"- {p}" for p in parts)
-    except Exception:
+    except Exception as e:
+        logger.warning("load_ai_profile_failed", space_id=space_id, error=str(e)[:200])
         return None
 
 
 def make_chippi_agent(
     ai_profile_text: str | None = None,
     extra_tools: list | None = None,
+    workspace_info: str | None = None,
+    model: str | None = None,
 ) -> Agent:
     """
     Build the single Chippi agent. Constructed fresh per run.
@@ -274,10 +294,29 @@ def make_chippi_agent(
     Empty list (or None) preserves the historical pre-integrations
     behavior — useful for tests and for runs where Composio isn't
     configured.
+
+    `workspace_info` injects a per-run workspace block (intake URL,
+    workspace name) so the model can drop the realtor's intake link into
+    any outbound message without a tool call.
+
+    Assembly order matters for OpenAI's implicit prompt cache. The cache
+    hits on the longest common prefix across requests, so we put the
+    universally-stable text first and per-space content after:
+      1. CHIPPI_INSTRUCTIONS — identical across every space + every run.
+         Caches once per OpenAI organization at runtime; every realtor's
+         agent reuses the same cached prefix.
+      2. workspace_info — per-space, stable until the intake URL or name
+         changes. Caches per-space across runs.
+      3. ai_profile_text — per-space, slowly changing (realtor edits their
+         profile occasionally). Caches per-space until they edit it.
     """
-    instructions = CHIPPI_INSTRUCTIONS
+    configure_agents_sdk()
+    parts: list[str] = [CHIPPI_INSTRUCTIONS]
+    if workspace_info:
+        parts.append(workspace_info)
     if ai_profile_text:
-        instructions = ai_profile_text + "\n\n" + instructions
+        parts.append(ai_profile_text)
+    instructions = "\n\n".join(parts)
     base_tools = [
         # Contacts
         create_contact,
@@ -324,10 +363,13 @@ def make_chippi_agent(
         remove_intake_question,
         update_intake_question,
         save_intake_form,
+        # Studio — content generation
+        generate_studio_image,
+        edit_studio_image,
     ]
     return Agent[None](
         name="Chippi",
-        model="gpt-5",
+        model=resolve_chat_model(model),
         instructions=instructions,
         tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],

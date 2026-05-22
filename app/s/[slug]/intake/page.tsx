@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { IntakeLinkRow } from './intake-link-row';
 import { timeAgo } from '@/lib/formatting';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, MessageCircle } from 'lucide-react';
 import {
   H1,
   H3,
@@ -145,7 +145,7 @@ export default async function IntakeOverviewPage({
       {/* AI chat mode — informational, near the share link */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-muted-foreground/70" />
+          <MessageCircle size={13} className="text-muted-foreground/70" />
           <h2 className={H3}>AI chat mode</h2>
           <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground font-medium">
             New

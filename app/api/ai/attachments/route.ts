@@ -21,10 +21,10 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
+import { uploadObject, deleteObject, getPublicUrl, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
-const BUCKET = 'chat-attachments';
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 const MAX_FILENAME_LEN = 200;
 
@@ -93,30 +93,6 @@ function validateMagicBytes(mime: string, buf: Buffer): string | null {
   }
 }
 
-async function ensureBucket(): Promise<NextResponse | null> {
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) {
-    logger.error('[ai/attachments] failed to list buckets', {}, listError);
-    return NextResponse.json(
-      { error: 'Could not verify storage configuration.' },
-      { status: 500 },
-    );
-  }
-  if (!buckets?.find((b: { name: string }) => b.name === BUCKET)) {
-    const { error: createError } = await supabase.storage.createBucket(BUCKET, {
-      public: true,
-    });
-    if (createError) {
-      logger.error('[ai/attachments] failed to create bucket', {}, createError);
-      return NextResponse.json(
-        { error: `Storage bucket "${BUCKET}" missing and could not be created.` },
-        { status: 500 },
-      );
-    }
-  }
-  return null;
-}
-
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -175,29 +151,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const bucketErr = await ensureBucket();
-  if (bucketErr) return bucketErr;
-
   const id = crypto.randomUUID();
   const sanitized = sanitizeFilename(file.name || 'file');
-  const storagePath = `${space.id}/${id}-${sanitized}`;
+  const storagePath = buildKey('chatAttachments', space.id, `${id}-${sanitized}`);
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(storagePath, buffer, {
+  try {
+    await uploadObject({
+      key: storagePath,
+      body: buffer,
       contentType: mimeType,
-      upsert: false,
+      isPublic: true,
     });
-  if (uploadError) {
-    logger.error('[ai/attachments] storage upload failed', { spaceId: space.id }, uploadError);
+  } catch (uploadError) {
+    logger.error('[ai/attachments] storage upload failed', { spaceId: space.id }, uploadError as Error);
     return NextResponse.json(
-      { error: uploadError.message || 'Upload failed' },
+      { error: uploadError instanceof Error ? uploadError.message : 'Upload failed' },
       { status: 500 },
     );
   }
 
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-  const publicUrl = urlData.publicUrl;
+  const publicUrl = getPublicUrl(storagePath);
 
   const isImage = mimeType.startsWith('image/');
   // Images go straight to the model via vision — no extraction needed. Anything
@@ -218,7 +191,7 @@ export async function POST(req: NextRequest) {
   });
   if (insertError) {
     // Best-effort cleanup so we don't orphan the storage object.
-    await supabase.storage.from(BUCKET).remove([storagePath]).catch(() => {});
+    await deleteObject(storagePath).catch(() => {});
     logger.error('[ai/attachments] insert failed', { spaceId: space.id }, insertError);
     return NextResponse.json(
       { error: insertError.message || 'Could not save attachment' },
@@ -264,7 +237,7 @@ export async function DELETE(req: NextRequest) {
 
   // Delete the storage object first; if the row delete fails afterwards the
   // worst case is an orphaned DB row pointing at a missing object — survivable.
-  await supabase.storage.from(BUCKET).remove([data.storagePath]).catch((err) => {
+  await deleteObject(data.storagePath).catch((err) => {
     logger.warn('[ai/attachments] storage remove failed', { spaceId: space.id }, err);
   });
 

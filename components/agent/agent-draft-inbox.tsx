@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
   Loader2, RefreshCw, Pencil, Copy, Check,
-  AlertTriangle, Send, TriangleAlert, Sparkles, Paperclip,
+  AlertTriangle, Send, TriangleAlert, MessageCircle, Paperclip,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -381,7 +381,7 @@ function DraftRow({
               className="absolute inset-0 rounded-full border-2 border-emerald-500 border-r-transparent border-b-transparent animate-spin"
               style={{ animationDuration: '1.2s' }}
             />
-            <Sparkles size={9} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />
+            <MessageCircle size={9} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />
           </span>
           <span className="font-medium">
             Auto-sending in {Math.ceil(autoSendRemainingMs / 1000)}s

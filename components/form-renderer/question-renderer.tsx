@@ -114,6 +114,18 @@ export interface QuestionRendererProps {
   // longer paints selection states with the brand accent — selection uses
   // foreground tones. The prop is retained but intentionally unused.
   accentColor?: string;
+  /**
+   * Suppress the `<FieldLabel>` row above the input. Used by the intake
+   * chat surface — there, the assistant message *is* the question, so a
+   * second label below would be duplicative. Default false preserves the
+   * form-builder preview's appearance exactly.
+   */
+  hideLabel?: boolean;
+  /**
+   * Suppress the helper-description row. Same chat-surface reason.
+   * Default false.
+   */
+  hideDescription?: boolean;
 }
 
 /**
@@ -125,6 +137,8 @@ export function QuestionRenderer({
   value,
   onChange,
   error,
+  hideLabel = false,
+  hideDescription = false,
 }: QuestionRendererProps) {
   const generatedId = useId();
   const inputId = `q-${question.id}-${generatedId}`;
@@ -134,13 +148,23 @@ export function QuestionRenderer({
   const hasError = !!error;
   const errorBorder = hasError ? 'border-rose-500/60 focus:border-rose-500/60' : '';
 
+  // Single source for the optional label + description rows so every case
+  // in the switch below opts in identically. Checkbox keeps its inline
+  // label regardless of `hideLabel` — the label is the interactive target.
+  const labelNode =
+    !hideLabel && question.type !== 'checkbox' ? (
+      <FieldLabel htmlFor={inputId} question={question} />
+    ) : null;
+  const descriptionNode =
+    !hideDescription ? <FieldDescription description={question.description} /> : null;
+
   switch (question.type) {
     // ── Text input ──
     case 'text':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <input
             id={inputId}
             type="text"
@@ -159,8 +183,8 @@ export function QuestionRenderer({
     case 'textarea':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <textarea
             id={inputId}
             placeholder={question.placeholder}
@@ -178,8 +202,8 @@ export function QuestionRenderer({
     case 'email':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <input
             id={inputId}
             type="email"
@@ -196,8 +220,8 @@ export function QuestionRenderer({
     case 'phone':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <input
             id={inputId}
             type="tel"
@@ -214,8 +238,8 @@ export function QuestionRenderer({
     case 'number':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <input
             id={inputId}
             type="number"
@@ -235,8 +259,8 @@ export function QuestionRenderer({
     case 'select':
       return (
         <div className="space-y-1.5">
-          <FieldLabel question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <div className="space-y-2 pt-1">
             {(question.options ?? []).map((option) => (
               <SelectionTile
@@ -263,8 +287,8 @@ export function QuestionRenderer({
       };
       return (
         <div className="space-y-1.5">
-          <FieldLabel question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <div className="flex flex-wrap gap-2 pt-1">
             {(question.options ?? []).map((option) => (
               <MultiSelectPill
@@ -284,8 +308,8 @@ export function QuestionRenderer({
     case 'radio':
       return (
         <div className="space-y-1.5">
-          <FieldLabel question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <div className="space-y-2 pt-1">
             {(question.options ?? []).map((option) => (
               <SelectionTile
@@ -331,8 +355,8 @@ export function QuestionRenderer({
     case 'date':
       return (
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={inputId} question={question} />
-          <FieldDescription description={question.description} />
+          {labelNode}
+          {descriptionNode}
           <input
             id={inputId}
             type="date"

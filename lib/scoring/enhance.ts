@@ -36,14 +36,11 @@ const BUYER_LEAD_STATES = [
 
 type LeadType = 'rental' | 'buyer';
 
-async function getOpenAIClient(): Promise<InstanceType<typeof OpenAI>> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY missing');
-  }
+async function getScoringLLM(): Promise<{ client: InstanceType<typeof OpenAI>; model: string }> {
   // Lazy-import to keep the heavy OpenAI SDK out of the server bundle
   // for pages that don't use scoring (e.g. /apply/[slug]).
-  const { default: OpenAIClient } = await import('openai');
-  return new OpenAIClient({ apiKey: process.env.OPENAI_API_KEY });
+  const { getLLMClient, openaiModel } = await import('@/lib/llm');
+  return { client: getLLMClient(), model: openaiModel('gpt-4.1-mini') };
 }
 
 export async function enhanceWithAI(
@@ -51,7 +48,7 @@ export async function enhanceWithAI(
   input: { name: string; applicationData: ApplicationData | null; leadType?: LeadType },
 ): Promise<AIEnhancement | null> {
   try {
-    const openai = await getOpenAIClient();
+    const { client: openai, model } = await getScoringLLM();
     const leadType = input.leadType ?? 'rental';
     const isBuyer = leadType === 'buyer';
     const validStates = isBuyer ? BUYER_LEAD_STATES : RENTAL_LEAD_STATES;
@@ -105,7 +102,7 @@ export async function enhanceWithAI(
         ].join(' ');
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model,
       temperature: 0,
       max_tokens: 300,
       response_format: {

@@ -142,6 +142,7 @@ export async function PATCH(
     { channel: existing.channel, subject: existing.subject, content: finalContent },
     contact,
     space.name,
+    { spaceId: space.id, userId },
   );
 
   // sent=true → "sent"; sent=false → "approved" (human reviewed, delivery unconfigured/failed)

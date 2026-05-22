@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
-import { ApplicationFormLoader } from '@/app/apply/[slug]/application-form-loader';
+import { IntakeChat } from '@/components/intake-chat/intake-chat';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
+import type { IntakeFormConfig } from '@/lib/types';
 import type { Metadata } from 'next';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
@@ -34,9 +35,20 @@ export default async function BrokerageApplyPage({
   // 1. Look up the brokerage
   const { data: brokerage } = await supabase
     .from('Brokerage')
-    .select('id, name, status, logoUrl')
+    .select(
+      'id, name, status, logoUrl, ' +
+      'brokerageLicenseNumber, brokerageFairHousingNotice, brokerageShowEqualHousingMark'
+    )
     .eq('id', brokerageId)
-    .maybeSingle();
+    .maybeSingle<{
+      id: string;
+      name: string;
+      status: 'active' | 'suspended';
+      logoUrl: string | null;
+      brokerageLicenseNumber: string | null;
+      brokerageFairHousingNotice: string | null;
+      brokerageShowEqualHousingMark: boolean | null;
+    }>();
 
   if (!brokerage || brokerage.status === 'suspended') notFound();
 
@@ -76,7 +88,32 @@ export default async function BrokerageApplyPage({
 
   if (!space) notFound();
 
-  // 4. Parallel queries for settings and owner info
+  // 4. Load brokerage-level form configs so leads applying via the
+  //    brokerage URL see the brokerage's customized intake (or the
+  //    library defaults if the brokerage hasn't customized). IntakeChat
+  //    falls back to library defaults when all three are null.
+  const { data: brokerageConfigs } = await supabase
+    .from('Brokerage')
+    .select('brokerageFormConfig, brokerageRentalFormConfig, brokerageBuyerFormConfig')
+    .eq('id', brokerage.id)
+    .maybeSingle();
+
+  const legacySingle = (brokerageConfigs?.brokerageFormConfig ?? null) as IntakeFormConfig | null;
+  let resolvedRentalFormConfig =
+    (brokerageConfigs?.brokerageRentalFormConfig ?? null) as IntakeFormConfig | null;
+  let resolvedBuyerFormConfig =
+    (brokerageConfigs?.brokerageBuyerFormConfig ?? null) as IntakeFormConfig | null;
+  // Legacy single-config brokerages: route the config to the matching
+  // leadType slot. Same compat logic /apply/[slug] uses.
+  if (!resolvedRentalFormConfig && !resolvedBuyerFormConfig && legacySingle) {
+    if (legacySingle.leadType === 'buyer') {
+      resolvedBuyerFormConfig = legacySingle;
+    } else {
+      resolvedRentalFormConfig = legacySingle;
+    }
+  }
+
+  // 5. Parallel queries for settings and owner info
   const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
@@ -90,7 +127,8 @@ export default async function BrokerageApplyPage({
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
-        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel'
+        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
+        'intakeLicenseNumber, intakeFairHousingNotice, intakeShowEqualHousingMark'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -127,6 +165,9 @@ export default async function BrokerageApplyPage({
     socialLinks: Record<string, string> | null;
     privacyPolicyUrl: string | null;
     consentCheckboxLabel: string | null;
+    intakeLicenseNumber: string | null;
+    intakeFairHousingNotice: string | null;
+    intakeShowEqualHousingMark: boolean | null;
   } | null;
 
   // Use brokerage name for title, fall back to space settings
@@ -172,25 +213,35 @@ export default async function BrokerageApplyPage({
   };
 
   return (
-    <PublicPageShell
-      logoUrl={logoUrl}
-      businessName={businessName}
+    <IntakeChatShell
       agentName={agentName}
-      agentPhone={null}
       agentPhoto={agentPhoto}
-      pageTitle={pageTitle}
-      pageIntro={pageIntro}
-      trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
-      agentPresenceLabel="Applying to"
+      secondaryLabel={null}
+      accentColor={customization.accentColor}
+      privacyPolicyUrl={customization.privacyPolicyUrl}
       hidePoweredBy={hidePoweredBy}
-      customization={customization}
+      footerLinks={customization.footerLinks}
+      licenseNumber={brokerage.brokerageLicenseNumber ?? settings?.intakeLicenseNumber ?? null}
+      fairHousingNotice={brokerage.brokerageFairHousingNotice ?? settings?.intakeFairHousingNotice ?? null}
+      showEqualHousingMark={brokerage.brokerageShowEqualHousingMark ?? settings?.intakeShowEqualHousingMark ?? false}
     >
-      <ApplicationFormLoader
+      <IntakeChat
         slug={space.slug}
+        spaceId={space.id}
         businessName={businessName}
-        customization={customization}
+        agentName={agentName}
+        agentPhoto={agentPhoto}
         brokerageId={brokerage.id}
+        rentalFormConfig={resolvedRentalFormConfig}
+        buyerFormConfig={resolvedBuyerFormConfig}
+        formConfig={legacySingle}
+        customization={{
+          accentColor: customization.accentColor,
+          thankYouTitle: customization.thankYouTitle,
+          thankYouMessage: customization.thankYouMessage,
+          privacyPolicyUrl: customization.privacyPolicyUrl,
+        }}
       />
-    </PublicPageShell>
+    </IntakeChatShell>
   );
 }

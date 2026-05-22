@@ -21,11 +21,12 @@ import { secondaryNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Wallet } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
 import { ShareLinksMenu } from './share-links-menu';
+import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
@@ -202,7 +203,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   {/* AI — single Chippi entry, matches the redesigned sidebar */}
                   <p className={`${SECTION_LABEL} px-3 pb-2 pt-1 select-none`}>AI</p>
                   {[
-                    { href: `${base}/chippi`, label: 'Chippi', icon: Sparkles, exact: false },
+                    { href: `${base}/chippi`, label: 'Chippi', icon: MessageCircle, exact: false },
                   ].map((item) => {
                     const isActive = pathname.startsWith(item.href);
                     return (
@@ -304,6 +305,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                           </p>
                           {[
                             { href: '/calendar', label: 'Calendar', icon: Calendar },
+                            { href: '/files', label: 'Files', icon: FolderOpen },
                             { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
                             { href: '/intake', label: 'Intake form', icon: ClipboardList },
                             { href: '/analytics', label: 'Analytics', icon: BarChart2 },
@@ -560,6 +562,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
       <div className="flex items-center gap-0.5">
+        {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}

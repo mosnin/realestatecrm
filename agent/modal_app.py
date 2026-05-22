@@ -1,16 +1,33 @@
 """Modal entrypoint for Chippi.
 
-Two web endpoints, no scheduled functions. The 15-minute heartbeat is gone —
-Chippi only wakes up on real triggers or explicit user action.
+No Modal-side scheduling — runs are kicked off from the Next.js side
+(the 4-hour cron in vercel.json, the "Run now" button, or an event
+trigger) which calls these endpoints.
 
-  POST  chat_turn        — interactive chat surface (called by /api/ai/task)
-  POST  run_now_webhook  — autonomous run for a single space (or trigger-drain)
+  POST  chat_turn          — interactive chat surface (called by /api/ai/task)
+  POST  run_now_webhook    — autonomous run for a single space (or trigger-drain)
+  POST  run_swarm_endpoint — swarm execution (called fire-and-forget by /api/swarm)
+        run_space          — plain function for local testing / cron drains
 
 Deployment:
   modal deploy agent/modal_app.py
 
 Secrets: a single Modal secret named "chippi-secrets" containing all env
 vars listed in config.py.
+
+Sandbox economics — why we stay on Modal (audit, 2026-Q2):
+  Chippi uses @app.function + @modal.fastapi_endpoint — Modal's STANDARD
+  tier ($0.047/vCPU-hr), not modal.Sandbox tier ($0.142/vCPU-hr). A
+  prior audit conflated the two and recommended migration to Daytona
+  ($0.0504/vCPU-hr) on a ~3x cost-savings basis that did not exist.
+  At standard pricing Modal is cheaper than Daytona, simpler operationally
+  (fastapi_endpoint is built in; Daytona would need a fronting FastAPI
+  server on Fly/Render plus separate sandbox dispatch), and image-layer
+  caching is more mature. Re-evaluate only on: GPU adoption (Modal still
+  wins), Modal raising standard pricing >50%, or Chippi adding hostile-
+  code execution (which would push us onto sandbox tier and change the
+  math). Detailed model + traffic shapes for 10/100/1000 realtor scales
+  in commit message of this change.
 """
 
 from __future__ import annotations
@@ -199,7 +216,20 @@ async def run_now_webhook(item: dict) -> dict:
 )
 @modal.fastapi_endpoint(method="POST", label="run-swarm")
 async def run_swarm_endpoint(payload: dict) -> dict:
-    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm."""
+    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm.
+
+    Secured with AGENT_INTERNAL_SECRET — same as run_now_webhook and
+    chat_turn. The swarm runner writes SwarmRun/SwarmMember/SwarmEvent rows
+    and burns LLM tokens for whatever spaceId the payload names, so an
+    unauthenticated caller could run billable swarms against any workspace.
+    """
+    import os
+
+    expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
+    secret = (payload.get("secret") or "")
+    if not expected or secret != expected:
+        return {"status": "failed", "error": "Unauthorized"}
+
     from swarm_orchestrator import run_swarm
     try:
         await run_swarm(payload)
@@ -269,9 +299,11 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
+    from llm import resolve_chat_model
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
+    resolved_model = resolve_chat_model(agent_settings.chat_model)
 
     ctx = AgentContext.from_settings(
         agent_settings,
@@ -437,9 +469,30 @@ async def chat_turn(item: dict):
                 error=str(ie)[:200],
             )
 
+    # Workspace info — gives the model the realtor's intake URL up front
+    # so any drafted outreach (Gmail/Resend/SMS) can include the link
+    # without an extra tool call. app_url already includes scheme + host.
+    from config import settings as _settings
+
+    _app_url = (_settings.app_url or "").rstrip("/")
+    intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    workspace_info: str | None = (
+        "# Your workspace\n"
+        f"- Workspace: {space.name} (slug: {space.slug})\n"
+        f"- Intake link (share with new leads): {intake_url}\n"
+        "- Include the intake link in any contact-facing draft where it"
+        " makes sense — when reaching out to a fresh lead, when asking a"
+        " prospect to qualify, when nudging someone who never finished"
+        " applying. Use the full URL verbatim; no shortening."
+    ) if intake_url else None
+
     async def event_stream():
         try:
-            chippi = make_chippi_agent(extra_tools=integration_tools)
+            chippi = make_chippi_agent(
+                extra_tools=integration_tools,
+                workspace_info=workspace_info,
+                model=resolved_model,
+            )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
             yield f"data: {err}\n\n"
@@ -463,6 +516,24 @@ async def chat_turn(item: dict):
             )
             done = json.dumps({"type": "done", "final_text": final_text})
             yield f"data: {done}\n\n"
+
+            # Record this turn's token cost for the Usage page. Best-effort:
+            # a telemetry failure must never surface as a chat error.
+            try:
+                from ledger import record_chat_usage
+
+                turn_usage = getattr(result, "usage", None)
+                if turn_usage is not None:
+                    await record_chat_usage(
+                        space_id=space_id,
+                        model=resolved_model,
+                        prompt_tokens=getattr(turn_usage, "input_tokens", 0) or 0,
+                        completion_tokens=getattr(turn_usage, "output_tokens", 0) or 0,
+                        user_id=user_id or None,
+                        conversation_id=conversation_id or None,
+                    )
+            except Exception:
+                logger.warning("chat_turn_usage_record_failed", space_id=space_id)
 
         except InputGuardrailTripwireTriggered as exc:
             info = exc.guardrail_result.output.output_info or {}

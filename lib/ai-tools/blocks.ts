@@ -11,7 +11,7 @@
 
 import type { ToolResult } from './types';
 
-export type MessageBlock = TextBlock | ToolCallBlock | PermissionBlock;
+export type MessageBlock = TextBlock | ToolCallBlock | PermissionBlock | ReasoningBlock;
 
 export interface TextBlock {
   type: 'text';
@@ -54,6 +54,23 @@ export interface PermissionBlock {
   summary: string;
   decision: 'denied' | 'dismissed';
   display?: ToolResult['display'];
+}
+
+/**
+ * The model's chain of thought for one assistant turn. Populated from
+ * `reasoning_delta` events the SDK emits for reasoning-capable models
+ * (gpt-5 family with reasoning_effort enabled, o1/o3, Claude with extended
+ * thinking). Rendered as a collapsible "Thought for Xs" row above the
+ * assistant's first text/tool block — Claude / o1 pattern.
+ *
+ * Persisted in the message so reload of an old conversation still shows
+ * the reasoning trace. Optional `durationMs` lets the UI surface elapsed
+ * time without re-computing from token counts.
+ */
+export interface ReasoningBlock {
+  type: 'reasoning';
+  content: string;
+  durationMs?: number;
 }
 
 /**

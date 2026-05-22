@@ -10,5 +10,5 @@ export default async function IntegrationsRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/s/${slug}/settings#integrations`);
+  permanentRedirect(`/s/${slug}/settings?tab=apps`);
 }

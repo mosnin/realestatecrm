@@ -47,6 +47,12 @@ export type Brokerage = {
   stripeSubscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
   stripePeriodEnd: Date | null;
   createdAt: Date;
+  // Intake trust signals — brokerage-level compliance text inherited by
+  // /apply/b/[brokerageId]. Per-space SpaceSetting values take a back seat
+  // when the intake is served via the brokerage variant.
+  brokerageLicenseNumber: string | null;
+  brokerageFairHousingNotice: string | null;
+  brokerageShowEqualHousingMark: boolean;
 };
 
 export type BrokerageMembership = {
@@ -129,6 +135,12 @@ export type SpaceSetting = {
   privacyPolicyUrl: string | null;
   privacyPolicyHtml: string | null;
   consentCheckboxLabel: string | null;
+  // Intake trust signals — realtor/brokerage-supplied compliance slots
+  // rendered in the public intake footer. Chippi provides the slot;
+  // the realtor fills the actual legal text.
+  intakeLicenseNumber: string | null;
+  intakeFairHousingNotice: string | null;
+  intakeShowEqualHousingMark: boolean;
   // Dynamic form builder
   formConfig: IntakeFormConfig | null;
   formConfigSource: FormConfigSource;

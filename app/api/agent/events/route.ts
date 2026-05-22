@@ -62,5 +62,17 @@ export async function POST(req: NextRequest) {
   await redis.ltrim(key, -500, -1);
   await redis.expire(key, 7_200);
 
+  // Maintain an active-runs index per space so the UI can discover
+  // autonomous runs as they happen. ZSET keyed by timestamp so stale
+  // entries can be pruned by score; ZADD is idempotent on re-receipt of
+  // an info event.
+  const activeKey = `agent:active-runs:${spaceId}`;
+  if (type === 'info') {
+    await redis.zadd(activeKey, { score: Date.now(), member: runId });
+    await redis.expire(activeKey, 7_200);
+  } else if (type === 'complete' || type === 'error') {
+    await redis.zrem(activeKey, runId);
+  }
+
   return NextResponse.json({ ok: true });
 }

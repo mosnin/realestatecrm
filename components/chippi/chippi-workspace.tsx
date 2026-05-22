@@ -7,18 +7,24 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
+import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
-import { TodayFeed } from './today-feed';
-import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
@@ -27,6 +33,7 @@ import { useSplitPanel } from '@/hooks/use-split-panel';
 import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
+import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -325,6 +332,20 @@ export function ChippiWorkspace({
   const urlConversationId = searchParams.get('conversationId');
   const loadedConvIdRef = useRef<string | null>(null);
 
+  // Deep-link to history: ?view=history (used by the collapsed sidebar's
+  // Chats icon) opens the conversation-history drawer on mount, then
+  // cleans the URL so a back/refresh doesn't re-trigger it.
+  useEffect(() => {
+    if (searchParams.get('view') === 'history') {
+      setDrawerOpen(true);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('view');
+      const qs = next.toString();
+      router.replace(`/s/${slug}/chippi${qs ? `?${qs}` : ''}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadConversation = useCallback(
     async (convId: string) => {
       try {
@@ -537,6 +558,22 @@ export function ChippiWorkspace({
   const atLimit = messages.length >= MESSAGE_LIMIT;
   const isEmpty = messages.length === 0 && !isLoadingConversation;
   const firstName = user?.firstName ?? '';
+
+  // Time-of-day greeting for the empty-state hero. Computed client-side
+  // (the server doesn't know the realtor's local hour); we render an
+  // invisible non-breaking space until the hour is set so the heading
+  // doesn't collapse and bump the composer up on first paint.
+  const [hour, setHour] = useState<number | null>(null);
+  useEffect(() => {
+    setHour(new Date().getHours());
+  }, []);
+  const greeting = (() => {
+    if (hour === null) return '';
+    const name = firstName.trim();
+    if (hour >= 5 && hour < 12) return name ? `Good morning, ${name}` : 'Good morning';
+    if (hour >= 12 && hour < 19) return name ? `Good afternoon, ${name}` : 'Good afternoon';
+    return 'Working late?';
+  })();
 
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
   // action, and seeded on mount when arriving from `?prefill=` (the
@@ -896,6 +933,7 @@ export function ChippiWorkspace({
     <div className="relative flex flex-col h-full min-h-0">
       {/* Floating control cluster — top-right, no top bar chrome */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
+        <ApprovalsPill />
         {messages.length >= MESSAGE_LIMIT * 0.8 && (
           <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
             {messages.length}/{MESSAGE_LIMIT}
@@ -913,10 +951,24 @@ export function ChippiWorkspace({
             <span className="hidden sm:inline">Run now</span>
           </button>
         )}
+        {/* New chat — the discoverable affordance. Sits left of History so
+            the pair reads as "new ↔ old" — the same convention iMessage
+            and the major chat apps use. Pre-rebuild this only existed as
+            an opaque link inside the sidebar's conversation list, which
+            wasn't even rendering due to the More-nav conditional. */}
+        <button
+          type="button"
+          onClick={() => void handleNewConversation()}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          title="New chat"
+          aria-label="Start a new chat"
+        >
+          <SquarePen size={15} />
+        </button>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
           title="Conversation history"
           aria-label="Open conversation history"
         >
@@ -936,22 +988,39 @@ export function ChippiWorkspace({
         >
           <Mic size={15} />
         </button>
-        <Link
-          href={`/s/${slug}/chippi/memory`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="What I remember"
-          aria-label="What Chippi remembers"
-        >
-          <NotebookText size={15} />
-        </Link>
-        <Link
-          href={`/s/${slug}/chippi?tab=settings`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="Settings"
-          aria-label="Chippi settings"
-        >
-          <Settings size={15} />
-        </Link>
+        {/* Secondary actions fold under a single overflow menu so the
+            cluster stays a small row of primary affordances — approvals,
+            run-now, history, voice — instead of seven competing icons. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="More"
+              aria-label="More options"
+            >
+              <MoreHorizontal size={15} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={() => void handleNewConversation()} className="cursor-pointer">
+              <SquarePen size={14} className="mr-2" />
+              New chat
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
+                <NotebookText size={14} className="mr-2" />
+                What I remember
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
+                <Settings size={14} className="mr-2" />
+                Chippi settings
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />
       </div>
 
@@ -999,72 +1068,57 @@ export function ChippiWorkspace({
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           One moment.
         </div>
-      ) : isEmpty ? (
-        <>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
-              {/* The home is one sentence — Chippi's composed morning story
-                  promoted to h1. Pulls stuck deals, overdue follow-ups, new
-                  arrivals, hot people, drafts, questions in one shot; names
-                  the loudest single fact and (when there's a top subject)
-                  becomes a doorway to that deal or person.
-
-                  The audit cut the "Good morning, Sarah" greeting (wallpaper —
-                  every productivity app ships it; nobody notices) and the
-                  MorningReplay recap card (the agent talking about itself
-                  instead of about the deals). The home now answers one
-                  question: what should I do next? */}
-              {/* Morning sentence + post-tour affordance — wrapped together so
-                  the tertiary "Just toured? Log it →" line sits tight under the
-                  headline (mt-3) instead of joining the page's space-y-12
-                  rhythm. The affordance is muted, single-line, centered — it
-                  has to be *findable* the second time a realtor uses Chippi
-                  without competing with the morning's primary action. */}
-              <div>
-                <MorningStory slug={slug} />
-                <div className="mt-3 text-center">
-                  <Link
-                    href={`/s/${slug}/chippi/log`}
-                    className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Just toured? Log it &rarr;
-                  </Link>
-                </div>
-                {showConnectBanner && (
-                  <div className="mt-1.5 text-center">
-                    <Link
-                      href={`/s/${slug}/integrations`}
-                      className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Connect Gmail to send your drafts &rarr;
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {/* Today's work — one focal item with Send / Edit / Hold. */}
-              <TodayFeed
-                slug={slug}
-                isFresh={isFresh}
-                firstName={firstName}
-                onTellMeAboutLead={handleTellMeAboutLead}
-              />
-            </div>
-          </div>
-
-          {/* Docked composer — sticky to viewport bottom so the input stays
-              reachable as the realtor scrolls. The four suggestion chips
-              that used to sit above were a crutch (and ChatGPT removed
-              theirs for a reason). The composer's placeholder already
-              cues the verbs: "draft a follow-up, prep a tour, summarize
-              your day…" — trust the user to type. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
-            {renderInput()}
-          </div>
-        </>
       ) : (
         <>
-          {/* Active thread */}
+          <AnimatePresence mode="popLayout">
+            {isEmpty && (
+              <motion.div
+                key="chippi-hero"
+                exit={{ opacity: 0, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } }}
+                className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
+              >
+                <div className="w-full max-w-2xl">
+                  <motion.h1
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: greeting ? 1 : 0, y: 0 }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-6 sm:mb-8"
+                    style={{ fontFamily: 'var(--font-title)' }}
+                  >
+                    {greeting || ' '}
+                  </motion.h1>
+                  {/* Day-one guidance — only for users with zero history.
+                      Without this the empty hero is just a greeting + blank
+                      composer, which is too sparse for first-run when the
+                      realtor doesn't yet know what Chippi can do. */}
+                  {isFresh && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+                      className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
+                    >
+                      Type below to get started — or browse{' '}
+                      <span className="text-foreground/70">Full day</span>,{' '}
+                      <span className="text-foreground/70">Drafts</span>, and{' '}
+                      <span className="text-foreground/70">Activity</span> from the sidebar.
+                    </motion.p>
+                  )}
+                  <motion.div
+                    layoutId="chippi-composer"
+                    layout
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {renderInput()}
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!isEmpty && (
+            <>
+              {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36">
@@ -1126,6 +1180,9 @@ export function ChippiWorkspace({
                               role={msg.role}
                               streaming={msg.streaming && isStreaming}
                               liveCallIds={liveCallIds}
+                              onUserIntent={(text) => {
+                                void handleSend(text, [], undefined);
+                              }}
                               pendingApproval={
                                 isTail && pendingApproval && !isStreaming
                                   ? {
@@ -1170,6 +1227,9 @@ export function ChippiWorkspace({
                         role={msg.role}
                         streaming={msg.streaming && isStreaming}
                         liveCallIds={liveCallIds}
+                        onUserIntent={(text) => {
+                          void handleSend(text, [], undefined);
+                        }}
                       />
                     );
                   })}
@@ -1208,6 +1268,27 @@ export function ChippiWorkspace({
                     )}
                   </AnimatePresence>
 
+                  {/* Suggested follow-ups — visible only when the conversation
+                      is idle (no thinking, no streaming, no error) and the
+                      last turn was an assistant turn with completed tool
+                      content. Click → fires the chip text as the next user
+                      message. Removes the typing step for the obvious next
+                      move (Claude / ChatGPT pattern). */}
+                  {!showThinking && !isStreaming && !agentError && (() => {
+                    const last = messages[messages.length - 1];
+                    if (!last || last.role !== 'assistant' || !last.blocks) return null;
+                    const suggestions = getSuggestionsForTurn(last.blocks);
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <SuggestedActions
+                        suggestions={suggestions}
+                        onSelect={(text) => {
+                          void handleSend(text, [], undefined);
+                        }}
+                      />
+                    );
+                  })()}
+
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode
                       reads like Chippi talking, not a red system banner. The
@@ -1224,9 +1305,15 @@ export function ChippiWorkspace({
               composer's right-slot (Send → Stop swap) so the abort affordance
               sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
-          {/* Docked input — sticky to viewport bottom (matches the empty
-              state's composer dock so the input never rides up with messages). */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          {/* Docked input. Shares `layoutId="chippi-composer"` with the
+              empty-state hero composer so framer-motion animates the
+              transition from centered → docked when the first message ships. */}
+          <motion.div
+            layoutId="chippi-composer"
+            layout
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
+          >
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">
@@ -1250,7 +1337,9 @@ export function ChippiWorkspace({
             ) : (
               renderInput()
             )}
-          </div>
+          </motion.div>
+            </>
+          )}
         </>
       )}
 

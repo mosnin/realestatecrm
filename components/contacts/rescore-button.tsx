@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, RotateCcw } from 'lucide-react';
+import { MessageCircle, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -56,7 +56,7 @@ export function RescoreButton({ contactId, onComplete }: Props) {
         {loading ? (
           <RotateCcw size={11} className="animate-spin" />
         ) : done ? (
-          <Sparkles size={11} />
+          <MessageCircle size={11} />
         ) : (
           <RotateCcw size={11} />
         )}

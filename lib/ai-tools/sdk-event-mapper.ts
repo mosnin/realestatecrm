@@ -202,9 +202,25 @@ function mapRunItemEvent(
 
     case 'tool_search_called':
     case 'tool_search_output_created':
-    case 'reasoning_item_created':
       // Model-internal — not user-facing. Drop.
       return null;
+
+    case 'reasoning_item_created': {
+      // The SDK delivers reasoning as a single finalised item with a content
+      // array of { type: 'reasoning_text' | 'input_text', text }. We extract
+      // the reasoning_text segments and emit them as one delta — the
+      // client-side buffer concatenates and renders a collapsible trace.
+      // Drop silently if the model doesn't produce reasoning (most don't
+      // unless reasoning_effort is enabled).
+      const raw = (event.item as { rawItem?: { content?: Array<{ type?: string; text?: string }> } }).rawItem;
+      const chunks = Array.isArray(raw?.content) ? raw.content : [];
+      const text = chunks
+        .filter((c) => c?.type === 'reasoning_text' && typeof c.text === 'string')
+        .map((c) => c.text as string)
+        .join('');
+      if (!text) return null;
+      return { type: 'reasoning_delta', delta: text };
+    }
 
     default:
       return null;

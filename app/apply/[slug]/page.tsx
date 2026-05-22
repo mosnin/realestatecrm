@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
-import { ApplicationFormLoader } from './application-form-loader';
+import { IntakeChat } from '@/components/intake-chat/intake-chat';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
@@ -42,7 +42,10 @@ export default async function PublicApplyPage({
   searchParams: Promise<{ resume?: string; preview?: string }>;
 }) {
   const { slug } = await params;
-  const { resume: resumeToken, preview } = await searchParams;
+  // `resume` is preserved in the URL surface for backwards compatibility
+  // (old emailed draft links) but the chat flow doesn't restore drafts —
+  // a chat is a single session by nature.
+  const { preview } = await searchParams;
   const isPreview = preview === '1';
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -63,6 +66,7 @@ export default async function PublicApplyPage({
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
         'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
+        'intakeLicenseNumber, intakeFairHousingNotice, intakeShowEqualHousingMark, ' +
         'formConfig, formConfigSource, rentalFormConfig, buyerFormConfig, trackingPixels'
       )
       .eq('spaceId', space.id)
@@ -100,6 +104,9 @@ export default async function PublicApplyPage({
     socialLinks: Record<string, string> | null;
     privacyPolicyUrl: string | null;
     consentCheckboxLabel: string | null;
+    intakeLicenseNumber: string | null;
+    intakeFairHousingNotice: string | null;
+    intakeShowEqualHousingMark: boolean | null;
     formConfig: import('@/lib/types').IntakeFormConfig | null;
     formConfigSource: string | null;
     rentalFormConfig: import('@/lib/types').IntakeFormConfig | null;
@@ -226,21 +233,36 @@ export default async function PublicApplyPage({
     <>
       {isPreview && <PreviewBridge />}
       <TrackingPixels pixels={trackingPixels} />
-      <PublicPageShell
-        logoUrl={logoUrl}
-        businessName={businessName}
+      <IntakeChatShell
         agentName={agentName}
-        agentPhone={null}
         agentPhoto={agentPhoto}
-        pageTitle={pageTitle}
-        pageIntro={pageIntro}
-        trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
-        agentPresenceLabel="Applying with"
+        secondaryLabel={businessName !== agentName ? businessName : null}
+        accentColor={customization.accentColor}
+        privacyPolicyUrl={customization.privacyPolicyUrl}
+        termsUrl={`/apply/${slug}/terms`}
         hidePoweredBy={hidePoweredBy}
-        customization={customization}
+        footerLinks={customization.footerLinks}
+        licenseNumber={settings?.intakeLicenseNumber ?? null}
+        fairHousingNotice={settings?.intakeFairHousingNotice ?? null}
+        showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
       >
-        <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} rentalFormConfig={resolvedRentalFormConfig} buyerFormConfig={resolvedBuyerFormConfig} resumeToken={resumeToken} />
-      </PublicPageShell>
+        <IntakeChat
+          slug={slug}
+          spaceId={space.id}
+          businessName={businessName}
+          agentName={agentName}
+          agentPhoto={agentPhoto}
+          rentalFormConfig={resolvedRentalFormConfig}
+          buyerFormConfig={resolvedBuyerFormConfig}
+          formConfig={resolvedFormConfig}
+          customization={{
+            accentColor: customization.accentColor,
+            thankYouTitle: customization.thankYouTitle,
+            thankYouMessage: customization.thankYouMessage,
+            privacyPolicyUrl: customization.privacyPolicyUrl,
+          }}
+        />
+      </IntakeChatShell>
     </>
   );
 }

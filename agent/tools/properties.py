@@ -16,6 +16,7 @@ from config import settings
 from db import supabase
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import idempotent_tool
 from tools.streaming import publish_event
 
 _ALLOWED_PROPERTY_TYPES = {
@@ -38,6 +39,7 @@ _ALLOWED_LISTING_STATUS = {
 
 
 @function_tool
+@idempotent_tool
 async def add_property(
     ctx: RunContextWrapper[AgentContext],
     address: str,
@@ -128,6 +130,7 @@ async def add_property(
 
 
 @function_tool
+@idempotent_tool
 async def send_property_packet(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,

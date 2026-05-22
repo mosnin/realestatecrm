@@ -10,5 +10,5 @@ export default async function TemplatesRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/s/${slug}/settings#templates`);
+  permanentRedirect(`/s/${slug}/settings?tab=apps#api-keys`);
 }

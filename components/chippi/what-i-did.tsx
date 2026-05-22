@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   CheckCircle2, MessageSquare, Mail, StickyNote, Bell, Activity, Brain, ChevronRight, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 
 interface ActivityEntry {
   id: string;
@@ -119,7 +121,12 @@ export function WhatIDid({ slug }: { slug: string }) {
       )}
 
       {!loading && entries.length > 0 && (
-        <div className="divide-y divide-border/60">
+        <motion.div
+          className="divide-y divide-border/60"
+          variants={STAGGER_CONTAINER}
+          initial="initial"
+          animate="enter"
+        >
           {entries.slice(0, 6).map((entry) => {
             const { verb, icon: Icon } = metaFor(entry.actionType);
             const targetName = entry.Contact?.name ?? entry.Deal?.title ?? null;
@@ -163,22 +170,27 @@ export function WhatIDid({ slug }: { slug: string }) {
 
             if (targetHref) {
               return (
-                <Link
-                  key={entry.id}
-                  href={targetHref}
-                  className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
-                >
-                  {RowInner}
-                </Link>
+                <motion.div key={entry.id} variants={STAGGER_ITEM}>
+                  <Link
+                    href={targetHref}
+                    className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
+                  >
+                    {RowInner}
+                  </Link>
+                </motion.div>
               );
             }
             return (
-              <div key={entry.id} className="flex items-center gap-3 py-3 first:pt-4">
+              <motion.div
+                key={entry.id}
+                variants={STAGGER_ITEM}
+                className="flex items-center gap-3 py-3 first:pt-4"
+              >
                 {RowInner}
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </section>
   );

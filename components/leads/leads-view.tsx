@@ -13,7 +13,7 @@ import {
   PawPrint,
   AlertTriangle,
   ArrowRight,
-  Sparkles,
+  MessageCircle,
   LayoutGrid,
   List,
   UserCheck,

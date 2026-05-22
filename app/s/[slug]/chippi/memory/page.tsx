@@ -1,13 +1,21 @@
+/**
+ * /chippi/memory — what Chippi has learned about this workspace.
+ *
+ * Reads AgentMemory rows for the space, grouped by entity. Replaces the old
+ * redirect-to-settings stub now that the page is surfaced in the Chippi nav
+ * dropdown — a dead link in the IA was worse than building the page.
+ *
+ * Editing isn't supported in v1 (vector embeddings would silently desync);
+ * the correction pattern is "delete the wrong fact and let Chippi re-learn it."
+ */
+
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { MemoryFeed } from '@/components/chippi/memory-feed';
-import { PageTitle } from '@/components/ui/page-title';
+import { MemoryList } from '@/components/chippi/memory-list';
 
-export const metadata = { title: 'What I remember — Chippi' };
+export const dynamic = 'force-dynamic';
 
 export default async function ChippiMemoryPage({
   params,
@@ -30,19 +38,22 @@ export default async function ChippiMemoryPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 py-2">
-      <Link
-        href={`/s/${slug}/chippi`}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={12} />
-        Back to Chippi
-      </Link>
-      <PageTitle label="Chippi." subtitle="Everything I've learned about you, your contacts, and your deals. Delete anything I got wrong — I'll re-learn it if it comes up again.">
-        What I remember
-      </PageTitle>
-
-      <MemoryFeed slug={slug} />
+    <div className="h-full overflow-y-auto">
+      <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24">
+        <header className="mb-8">
+          <h1
+            className="text-2xl sm:text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            What I remember
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Facts, preferences, and observations I&apos;ve picked up while working with you.
+            Delete anything you want me to forget.
+          </p>
+        </header>
+        <MemoryList />
+      </div>
     </div>
   );
 }

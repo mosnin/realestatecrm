@@ -6,22 +6,23 @@
  * apps, all need to return an empty array and let the native tool
  * catalog answer the user. A throw here = chat-down.
  *
- * The implementation loads per-toolkit (so a single dead connection
- * doesn't poison the batch) and flips the row to 'expired' on auth-
- * shaped errors. Both behaviors are guarded here.
+ * The implementation builds tools per-toolkit (so a single dead
+ * connection doesn't poison the batch) and flips the row to 'expired'
+ * on auth-shaped errors. Both behaviors are guarded here. The per-
+ * toolkit builder lives in `lib/integrations/agent-tools.ts`.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const {
   activeToolkitsMock,
-  loadToolsForEntityMock,
+  buildToolkitAgentToolsMock,
   composioConfiguredMock,
   markExpiredByToolkitMock,
   loggerWarnMock,
 } = vi.hoisted(() => ({
   activeToolkitsMock: vi.fn(),
-  loadToolsForEntityMock: vi.fn(),
+  buildToolkitAgentToolsMock: vi.fn(),
   composioConfiguredMock: vi.fn(() => true),
   markExpiredByToolkitMock: vi.fn(),
   loggerWarnMock: vi.fn(),
@@ -33,8 +34,11 @@ vi.mock('@/lib/integrations/connections', () => ({
 }));
 
 vi.mock('@/lib/integrations/composio', () => ({
-  loadToolsForEntity: loadToolsForEntityMock,
   composioConfigured: composioConfiguredMock,
+}));
+
+vi.mock('@/lib/integrations/agent-tools', () => ({
+  buildToolkitAgentTools: buildToolkitAgentToolsMock,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -56,7 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   composioConfiguredMock.mockReturnValue(true);
   activeToolkitsMock.mockResolvedValue([]);
-  loadToolsForEntityMock.mockResolvedValue([]);
+  buildToolkitAgentToolsMock.mockResolvedValue([]);
   markExpiredByToolkitMock.mockResolvedValue(undefined);
 });
 
@@ -67,7 +71,7 @@ describe('loadIntegrationTools — short-circuit paths', () => {
     expect(out).toEqual([]);
     // Don't pay the DB round-trip when there's no point.
     expect(activeToolkitsMock).not.toHaveBeenCalled();
-    expect(loadToolsForEntityMock).not.toHaveBeenCalled();
+    expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
   });
 
   it('returns [] when the realtor has zero active toolkits — no Composio call', async () => {
@@ -76,14 +80,14 @@ describe('loadIntegrationTools — short-circuit paths', () => {
     expect(out).toEqual([]);
     expect(activeToolkitsMock).toHaveBeenCalledTimes(1);
     // Critical: no point asking Composio for tools across zero toolkits.
-    expect(loadToolsForEntityMock).not.toHaveBeenCalled();
+    expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
   });
 });
 
 describe('loadIntegrationTools — happy path', () => {
-  it('loads tools per-toolkit (one call per active toolkit) and concatenates results', async () => {
+  it('builds tools per-toolkit (one call per active toolkit) and concatenates results', async () => {
     activeToolkitsMock.mockResolvedValue(['gmail', 'slack']);
-    loadToolsForEntityMock
+    buildToolkitAgentToolsMock
       .mockResolvedValueOnce([{ name: 'gmail.send' }])
       .mockResolvedValueOnce([{ name: 'slack.post' }]);
 
@@ -91,14 +95,14 @@ describe('loadIntegrationTools — happy path', () => {
 
     // Per-toolkit isolation — a refactor that batches all toolkits
     // into one call would silence the auth-error reconciliation below.
-    expect(loadToolsForEntityMock).toHaveBeenCalledTimes(2);
-    expect(loadToolsForEntityMock).toHaveBeenNthCalledWith(1, {
-      entityId: 'user_clerk_123',
-      toolkits: ['gmail'],
+    expect(buildToolkitAgentToolsMock).toHaveBeenCalledTimes(2);
+    expect(buildToolkitAgentToolsMock).toHaveBeenNthCalledWith(1, {
+      toolkit: 'gmail',
+      userId: 'user_clerk_123',
     });
-    expect(loadToolsForEntityMock).toHaveBeenNthCalledWith(2, {
-      entityId: 'user_clerk_123',
-      toolkits: ['slack'],
+    expect(buildToolkitAgentToolsMock).toHaveBeenNthCalledWith(2, {
+      toolkit: 'slack',
+      userId: 'user_clerk_123',
     });
     // Result is the concatenation, in toolkit order.
     expect(out).toEqual([{ name: 'gmail.send' }, { name: 'slack.post' }]);
@@ -106,7 +110,7 @@ describe('loadIntegrationTools — happy path', () => {
 
   it('uses the realtor\'s clerk userId as the entityId — Composio identity boundary', async () => {
     activeToolkitsMock.mockResolvedValue(['gmail']);
-    loadToolsForEntityMock.mockResolvedValue([{ name: 'gmail.send' }]);
+    buildToolkitAgentToolsMock.mockResolvedValue([{ name: 'gmail.send' }]);
     await loadIntegrationTools(makeCtx());
     // entityId must NOT be the DB user id or the space id — Composio
     // scopes connections per "entity", and the clerk id is what we
@@ -115,9 +119,9 @@ describe('loadIntegrationTools — happy path', () => {
       spaceId: 'space_1',
       userId: 'user_clerk_123',
     });
-    expect(loadToolsForEntityMock).toHaveBeenCalledWith({
-      entityId: 'user_clerk_123',
-      toolkits: ['gmail'],
+    expect(buildToolkitAgentToolsMock).toHaveBeenCalledWith({
+      toolkit: 'gmail',
+      userId: 'user_clerk_123',
     });
   });
 });
@@ -128,7 +132,7 @@ describe('loadIntegrationTools — failure modes (chat must keep working)', () =
     const out = await loadIntegrationTools(makeCtx());
     expect(out).toEqual([]);
     // Composio must not be called when the toolkit list lookup itself failed.
-    expect(loadToolsForEntityMock).not.toHaveBeenCalled();
+    expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledTimes(1);
     const [, warnCtx] = loggerWarnMock.mock.calls[0];
     expect((warnCtx as { err: string }).err).toContain('db unreachable');
@@ -136,7 +140,7 @@ describe('loadIntegrationTools — failure modes (chat must keep working)', () =
 
   it('one toolkit failing (non-auth error) drops only that toolkit\'s tools — others still load', async () => {
     activeToolkitsMock.mockResolvedValue(['gmail', 'slack']);
-    loadToolsForEntityMock
+    buildToolkitAgentToolsMock
       .mockRejectedValueOnce(new Error('composio 503'))
       .mockResolvedValueOnce([{ name: 'slack.post' }]);
 
@@ -158,7 +162,7 @@ describe('loadIntegrationTools — failure modes (chat must keep working)', () =
     const authErr = Object.assign(new Error('not found'), {
       name: 'ComposioConnectedAccountNotFoundError',
     });
-    loadToolsForEntityMock
+    buildToolkitAgentToolsMock
       .mockRejectedValueOnce(authErr)
       .mockResolvedValueOnce([{ name: 'slack.post' }]);
 
@@ -181,7 +185,7 @@ describe('loadIntegrationTools — failure modes (chat must keep working)', () =
   it('401 from Composio is treated as auth-like (statusCode match)', async () => {
     activeToolkitsMock.mockResolvedValue(['gmail']);
     const httpErr = Object.assign(new Error('unauthorized'), { statusCode: 401 });
-    loadToolsForEntityMock.mockRejectedValueOnce(httpErr);
+    buildToolkitAgentToolsMock.mockRejectedValueOnce(httpErr);
 
     const out = await loadIntegrationTools(makeCtx());
 
@@ -199,7 +203,7 @@ describe('loadIntegrationTools — failure modes (chat must keep working)', () =
     const authErr = Object.assign(new Error('gone'), {
       name: 'ComposioConnectedAccountNotFoundError',
     });
-    loadToolsForEntityMock.mockRejectedValueOnce(authErr);
+    buildToolkitAgentToolsMock.mockRejectedValueOnce(authErr);
     markExpiredByToolkitMock.mockRejectedValueOnce(new Error('supabase down'));
 
     await expect(loadIntegrationTools(makeCtx())).resolves.toEqual([]);

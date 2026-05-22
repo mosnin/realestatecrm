@@ -1,16 +1,14 @@
 import {
   Users,
+  UserCircle,
   Briefcase,
-  Sparkles,
+  MessageCircle,
   Settings,
   Calendar,
-  FileText,
   ClipboardList,
-  BarChart2,
-  Wallet,
-  Plug,
   Building2,
-  Bot,
+  FolderOpen,
+  Aperture,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -37,22 +35,29 @@ export interface NavItem {
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
-// Five items. Chippi is the home — "Today" isn't a separate destination, it's
-// the morning view of the agent surface. Tours/Calendar/Notes/Reviews/
-// Analytics/Intake are reachable by URL but don't earn a nav slot; they'll be
-// absorbed into the agent surface in Phase 5 as inline tools the agent calls.
+// Chippi is the home — the chat surface IS the OS. The Chippi entry expands
+// into the agent's sub-surfaces (Full day, Drafts, Activity, Memory,
+// Integrations), so the chat root stays a clean chat-first hero and the
+// realtor reaches the dashboards via the dropdown rather than scrolling
+// past them every time they want to talk to Chippi.
 //
-// Properties is now a primary nav item (standalone catalogue view).
-// Settings stays as the only true configuration destination. Sub-pages live
-// behind an in-page tab strip in app/s/[slug]/settings/layout.tsx.
+// Everything else in the sidebar is the realtor-facing substrate they still
+// expect from a CRM: People, Deals, Calendar, Properties, Intake.
 
 export const realtorNavItems: NavItem[] = [
   {
     href: '/chippi',
     label: 'Chippi',
-    icon: Sparkles,
+    icon: MessageCircle,
     isAI: true,
     badgeKey: 'pendingDrafts',
+    children: [
+      { href: '/chippi/today', label: 'Full day' },
+      { href: '/chippi/drafts', label: 'Drafts' },
+      { href: '/chippi/activity', label: 'Activity' },
+      { href: '/chippi/memory', label: 'Memory' },
+      { href: '/integrations', label: 'Integrations' },
+    ],
   },
   {
     href: '/contacts',
@@ -66,6 +71,11 @@ export const realtorNavItems: NavItem[] = [
     icon: Briefcase,
   },
   {
+    href: '/calendar',
+    label: 'Calendar',
+    icon: Calendar,
+  },
+  {
     href: '/properties',
     label: 'Properties',
     icon: Building2,
@@ -76,6 +86,41 @@ export const realtorNavItems: NavItem[] = [
     ],
   },
   {
+    href: '/studio',
+    label: 'Studio',
+    icon: Aperture,
+    children: [
+      { href: '/studio/create', label: 'Create' },
+      { href: '/studio/edit', label: 'Edit' },
+      { href: '/studio/compose', label: 'Compose' },
+      { href: '/studio/schedule', label: 'Schedule' },
+      { href: '/studio/library', label: 'Library' },
+      { href: '/studio/brand', label: 'Brand' },
+    ],
+  },
+  {
+    href: '/files',
+    label: 'Files',
+    icon: FolderOpen,
+    children: [
+      { href: '/documents', label: 'Documents' },
+    ],
+  },
+  {
+    href: '/profile-page',
+    label: 'Profile',
+    icon: UserCircle,
+    children: [
+      { href: '/profile-page#sections', label: 'Sections' },
+      { href: '/profile-page#links', label: 'Custom links' },
+    ],
+  },
+  {
+    href: '/intake',
+    label: 'Intake form',
+    icon: ClipboardList,
+  },
+  {
     href: '/settings',
     label: 'Settings',
     icon: Settings,
@@ -83,27 +128,16 @@ export const realtorNavItems: NavItem[] = [
 ];
 
 /**
- * Secondary realtor nav — visually subordinate "More" section. Calendar
- * absorbs Tours (a tour is just a calendar event with a property + contact
- * attached). Intake collapses to a single destination: the overview is the
- * home of the form (link + recent submissions) and the only other surface
- * that earns its place is /customize, reachable inline from the overview.
- * Sub-pages for Share / Tracking / Submissions were configuration disguised
- * as features and have been cut.
+ * Secondary "More" section — intentionally empty. The sidebar checks
+ * `realtorMoreNavItems.length > 0` and hides the section when it is.
  *
- * The standalone Properties list is gone. Realtors who use Chippi properties
- * use them via deals — properties enter the system through /deals/new and are
- * read from deal-detail. The only standalone properties surface that earns
- * its place is the YTD commissions roll-up (a revenue view, not a property
- * catalogue), which lives on its own here.
+ * Routes that used to live here are reachable two ways:
+ *   - Settings → Integrations (was: /integrations)
+ *   - Settings → Chippi → Build your own agents (was: /agents)
+ *   - Per-surface stats tabs (was: /analytics)
+ * Anything else is reachable by direct URL but doesn't earn nav weight.
  */
-export const realtorMoreNavItems: NavItem[] = [
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/agents', label: 'Agents', icon: Bot },
-  { href: '/integrations', label: 'Integrations', icon: Plug },
-  { href: '/intake', label: 'Intake form', icon: ClipboardList },
-  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-];
+export const realtorMoreNavItems: NavItem[] = [];
 
 // ── Header right-side menu ───────────────────────────────────────────────────
 
@@ -113,9 +147,9 @@ export const secondaryNavItems = [
 
 /** Primary items with shorter labels for the mobile bottom bar. */
 export const mobileNavItems = [
-  { href: '/chippi', label: 'Chippi', icon: Sparkles },
+  { href: '/chippi', label: 'Chippi', icon: MessageCircle },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/properties', label: 'Properties', icon: Building2 },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
