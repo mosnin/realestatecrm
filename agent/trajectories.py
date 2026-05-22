@@ -92,9 +92,6 @@ async def record_trajectory(
     kill switch something visible to grep against.
     """
     pool = await get_pool()
-    if pool is None:
-        logger.warning("agent_trajectory_skipped_no_pool", extra={"run_id": run_id})
-        return
 
     capped_tool_calls = (tool_calls or [])[:_MAX_TOOL_CALLS]
     truncated_summary = _truncate(final_summary, 280)

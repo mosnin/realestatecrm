@@ -15,8 +15,7 @@ can compare with ``==`` without importing the enum type.
 
 Importable as::
 
-    from errors import AgentError, from_supabase_error, from_http_error
-    from errors import from_exception, is_retryable
+    from errors import AgentError, from_supabase_error, from_exception
 
 Valid error codes
 -----------------
@@ -139,80 +138,6 @@ def from_supabase_error(err_dict: dict[str, Any]) -> AgentError:
     return AgentError("UNKNOWN", message, False, err_dict)
 
 
-# ── HTTP status → AgentError ──────────────────────────────────────────────
-
-
-def from_http_error(status: int, body: Any = None) -> AgentError:
-    """Map an HTTP status code to an AgentError.
-
-    Works for any HTTP call — not just Supabase.
-
-    Parameters
-    ----------
-    status:
-        The HTTP response status code.
-    body:
-        Optional response body (str, dict, or None).  Included in context
-        and previewed in the message.
-    """
-    if isinstance(body, str):
-        preview = body[:200]
-    else:
-        try:
-            preview = json.dumps(body or "")[:200]
-        except (TypeError, ValueError):
-            preview = str(body)[:200]
-
-    if status == 429:
-        return AgentError(
-            "RATE_LIMITED",
-            f"Rate limited (HTTP 429): {preview}",
-            True,
-            body,
-        )
-    if status in (401, 403):
-        return AgentError(
-            "PERMISSION_DENIED",
-            f"Permission denied (HTTP {status}): {preview}",
-            False,
-            body,
-        )
-    if status == 404:
-        return AgentError(
-            "TOOL_NOT_FOUND",
-            f"Resource not found (HTTP 404): {preview}",
-            False,
-            body,
-        )
-    if status in (408, 504):
-        return AgentError(
-            "TIMEOUT",
-            f"Request timed out (HTTP {status}): {preview}",
-            True,
-            body,
-        )
-    if status in (400, 422):
-        return AgentError(
-            "VALIDATION_ERROR",
-            f"Validation error (HTTP {status}): {preview}",
-            False,
-            body,
-        )
-    if status >= 500:
-        return AgentError(
-            "DB_ERROR",
-            f"Server error (HTTP {status}): {preview}",
-            True,
-            body,
-        )
-    return AgentError(
-        "UNKNOWN",
-        f"Unexpected HTTP {status}: {preview}",
-        False,
-        body,
-    )
-
-
 # ── Generic exception → AgentError ───────────────────────────────────────
 
 # Ordered list of (substring_list, error_code, retryable).
@@ -295,16 +220,3 @@ def from_exception(exc: Any) -> AgentError:
             return AgentError(code, message, retryable, exc)
 
     return AgentError("UNKNOWN", message, False, exc)
-
-
-# ── Utility ───────────────────────────────────────────────────────────────
-
-
-def is_retryable(err: Any) -> bool:
-    """Return ``True`` when the orchestrator should schedule a retry.
-
-    Accepts any value — normalises to :class:`AgentError` internally.
-    """
-    if isinstance(err, AgentError):
-        return err.retryable
-    return from_exception(err).retryable

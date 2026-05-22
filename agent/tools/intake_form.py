@@ -654,16 +654,3 @@ async def save_intake_form(
     except Exception as e:
         agent_err = from_exception(e)
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
-
-
-# ---------------------------------------------------------------------------
-# Export — imported by chippi.py
-# ---------------------------------------------------------------------------
-
-intake_form_tools = [
-    get_intake_form,
-    add_intake_question,
-    remove_intake_question,
-    update_intake_question,
-    save_intake_form,
-]

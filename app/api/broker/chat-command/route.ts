@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
+import { assignLeadToRealtor } from '@/lib/broker-assign-lead';
 import { z } from 'zod';
 
 const commandSchema = z.object({
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await executeCommand(command, args, ctx.brokerage);
+    const result = await executeCommand(command, args, ctx.brokerage, ctx.dbUserId);
     return NextResponse.json({ result });
   } catch (error) {
     console.error('[chat-command] error', { command, error });
@@ -58,6 +59,7 @@ async function executeCommand(
   command: string,
   args: string,
   brokerage: { id: string; ownerId: string; name: string },
+  dbUserId: string,
 ): Promise<string> {
   switch (command) {
     case '/status':
@@ -67,7 +69,7 @@ async function executeCommand(
     case '/pipeline':
       return handlePipeline(brokerage);
     case '/assign':
-      return handleAssign(args, brokerage);
+      return handleAssign(args, brokerage, dbUserId);
     case '/tours-today':
       return handleToursToday(brokerage);
     case '/followups':
@@ -203,7 +205,11 @@ async function handlePipeline(brokerage: { id: string }) {
 
 // ── /assign ──────────────────────────────────────────────────────────────────
 
-async function handleAssign(args: string, brokerage: { id: string; ownerId: string }) {
+async function handleAssign(
+  args: string,
+  brokerage: { id: string; ownerId: string; name: string },
+  dbUserId: string,
+) {
   // Parse: /assign @LeadName @RealtorName
   const mentions = args.match(/@([^@]+)/g);
   if (!mentions || mentions.length < 2) {
@@ -259,30 +265,21 @@ async function handleAssign(args: string, brokerage: { id: string; ownerId: stri
     return `No team member found matching "${realtorName}".`;
   }
 
-  // Call the existing assign-lead endpoint logic
+  // Assign directly via the shared helper. The previous version POSTed to
+  // /api/broker/assign-lead with no session cookie, so requireBroker() there
+  // always 403'd — the command matched the lead but never assigned it.
   const lead = unassignedLeads[0];
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const result = await assignLeadToRealtor({
+    brokerage,
+    assignedByUserId: dbUserId,
+    contactId: lead.id,
+    realtorUserId: matchedRealtor.id,
+  });
 
-  try {
-    const res = await fetch(`${appUrl}/api/broker/assign-lead`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contactId: lead.id,
-        realtorUserId: matchedRealtor.id,
-      }),
-    });
-
-    if (res.ok) {
-      return `Lead "${lead.name}" assigned to ${matchedRealtor.name ?? matchedRealtor.email}`;
-    }
-
-    const err = await res.json().catch(() => ({}));
-    return `Assignment failed: ${err.error ?? 'Unknown error'}`;
-  } catch {
-    // If internal fetch fails, do it directly
-    return `Lead "${lead.name}" matched with ${matchedRealtor.name ?? matchedRealtor.email}. Use the Leads page to complete assignment.`;
+  if (result.ok) {
+    return `Lead "${lead.name}" assigned to ${matchedRealtor.name ?? matchedRealtor.email}`;
   }
+  return `Assignment failed: ${result.error}`;
 }
 
 // ── /tours-today ─────────────────────────────────────────────────────────────

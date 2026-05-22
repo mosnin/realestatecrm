@@ -34,6 +34,7 @@ Tool surface (33 tools):
 
 from __future__ import annotations
 
+import structlog
 from agents import Agent
 
 from llm import configure_agents_sdk, resolve_chat_model
@@ -57,6 +58,8 @@ from tools.routing import route_lead
 from tools.tours import book_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 from tools.studio import generate_studio_image, edit_studio_image
+
+logger = structlog.get_logger(__name__)
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -271,7 +274,8 @@ async def load_ai_profile(space_id: str, db) -> str | None:
             return None
 
         return "# Realtor profile\n" + "\n".join(f"- {p}" for p in parts)
-    except Exception:
+    except Exception as e:
+        logger.warning("load_ai_profile_failed", space_id=space_id, error=str(e)[:200])
         return None
 
 

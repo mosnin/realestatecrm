@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 # Enums / Literals
 # ---------------------------------------------------------------------------
 
-LeadType = Literal["rental", "buyer"]
+LeadType = Literal["rental", "buyer", "seller"]
 DealStatus = Literal["active", "won", "lost", "on_hold"]
 Priority = Literal["LOW", "MEDIUM", "HIGH"]
 ContactType = Literal["QUALIFICATION", "TOUR", "APPLICATION"]

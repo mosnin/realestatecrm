@@ -9,7 +9,7 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
-from errors import AgentError, from_supabase_error, from_exception
+from errors import from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool, with_retry
@@ -183,6 +183,8 @@ async def update_deal(
             agent_err = from_exception(e)
             return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
+    # The Deal update above already committed. Activity rows are a
+    # best-effort audit trail — a failed insert must not fail the tool.
     for act in activities:
         try:
             await db.table("DealActivity").insert({
@@ -193,9 +195,8 @@ async def update_deal(
                 "content": act["content"],
                 "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
             }).execute()
-        except Exception as e:
-            agent_err = from_exception(e)
-            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+        except Exception:
+            pass
 
     if summary_parts:
         await publish_event(
@@ -325,9 +326,9 @@ async def advance_deal_stage(
                 "newProbability": new_probability,
             },
         }).execute()
-    except Exception as e:
-        agent_err = from_exception(e)
-        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+    except Exception:
+        # The stage move already committed — audit logging is best-effort.
+        pass
 
     await publish_event(
         ctx.context,
@@ -345,9 +346,9 @@ async def advance_deal_stage(
             reasoning=f"{deal_title} → {new_stage_name}. {reason}",
             deal_id=deal_id,
         )
-    except Exception as e:
-        agent_err = from_exception(e)
-        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+    except Exception:
+        # The stage move already committed — audit logging is best-effort.
+        pass
 
     return {
         "ok": True,
@@ -633,9 +634,9 @@ async def request_deal_review(
             reasoning=reason.strip()[:500],
             deal_id=deal_id,
         )
-    except Exception as e:
-        agent_err = from_exception(e)
-        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+    except Exception:
+        # The review request row already committed — logging is best-effort.
+        pass
 
     return {
         "ok": True,

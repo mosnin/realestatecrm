@@ -216,7 +216,20 @@ async def run_now_webhook(item: dict) -> dict:
 )
 @modal.fastapi_endpoint(method="POST", label="run-swarm")
 async def run_swarm_endpoint(payload: dict) -> dict:
-    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm."""
+    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm.
+
+    Secured with AGENT_INTERNAL_SECRET — same as run_now_webhook and
+    chat_turn. The swarm runner writes SwarmRun/SwarmMember/SwarmEvent rows
+    and burns LLM tokens for whatever spaceId the payload names, so an
+    unauthenticated caller could run billable swarms against any workspace.
+    """
+    import os
+
+    expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
+    secret = (payload.get("secret") or "")
+    if not expected or secret != expected:
+        return {"status": "failed", "error": "Unauthorized"}
+
     from swarm_orchestrator import run_swarm
     try:
         await run_swarm(payload)

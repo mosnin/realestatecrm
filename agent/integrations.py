@@ -200,7 +200,7 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
         logger.error(
             "composio_import_failed",
             error=str(err),
-            hint="ensure composio-core and composio-openai-agents are in agent/pyproject.toml",
+            hint="ensure composio and composio-openai-agents are in agent/pyproject.toml",
         )
         return []
 
@@ -232,14 +232,12 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
                 collected.extend(tools)
         except Exception as err:  # noqa: BLE001
             if _is_auth_like_error(err):
-                # Don't await — keep the agent build hot. Same
-                # fire-and-forget pattern as the TypeScript side.
-                import asyncio
-
-                asyncio.create_task(
-                    mark_expired_by_toolkit(
-                        space_id, user_id, toolkit, str(err)[:500]
-                    )
+                # Await it: a bare asyncio.create_task can be garbage-
+                # collected before it runs, and a short-lived Modal
+                # container may tear down first. This is a rare error
+                # path — the extra single-row write is negligible.
+                await mark_expired_by_toolkit(
+                    space_id, user_id, toolkit, str(err)[:500]
                 )
                 logger.warning(
                     "integration_auth_failed_marked_expired",

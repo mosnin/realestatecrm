@@ -391,57 +391,6 @@ async def save_memory(
     }
 
 
-async def load_task_memories(
-    space_id: str,
-    task_id: str,
-    limit: int = 20,
-) -> list[dict]:
-    """Load memories scoped to a specific task within a space.
-
-    Ordered by importance DESC then createdAt DESC. Useful for injecting
-    task-specific context at the start of a sub-task run.
-    """
-    db = await supabase()
-
-    result = await (
-        db.table("AgentMemory")
-        .select("id,entityType,entityId,memoryType,content,importance,taskId,createdAt,updatedAt")
-        .eq("spaceId", space_id)
-        .eq("taskId", task_id)
-        .order("importance", desc=True)
-        .order("createdAt", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    return result.data or []
-
-
-async def prune_task_memories(space_id: str, task_id: str) -> int:
-    """Delete all memories for a given spaceId + taskId combination.
-
-    Returns the count of deleted rows. Intended for cleanup after a task
-    completes so task-scoped memories don't pollute the global memory pool.
-    DB errors are non-blocking — log and return 0.
-    """
-    try:
-        db = await supabase()
-        result = await (
-            db.table("AgentMemory")
-            .delete()
-            .eq("spaceId", space_id)
-            .eq("taskId", task_id)
-            .execute()
-        )
-        return len(result.data) if result.data else 0
-    except Exception:
-        logger.warning(
-            "prune_task_memories: DB error for space %s task %s — skipping",
-            space_id,
-            task_id,
-        )
-        return 0
-
-
 async def prune_expired(space_id: str) -> int:
     """Delete memories past their expiry date. Called at run start."""
     db = await supabase()

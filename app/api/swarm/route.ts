@@ -150,9 +150,9 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.AGENT_INTERNAL_SECRET}`,
       },
       body: JSON.stringify({
+        secret: process.env.AGENT_INTERNAL_SECRET,
         swarmRunId: run.id,
         goal,
         spaceId: space.id,

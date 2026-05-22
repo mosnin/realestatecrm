@@ -1,13 +1,13 @@
 """LLM provider — OpenRouter.
 
-The agent (chat + autonomous runs, swarm, compaction, memory embeddings)
+The agent (chat + autonomous runs, swarm, memory embeddings)
 routes every model call through OpenRouter. OpenRouter is OpenAI-API
 compatible, so this is a base-URL + key swap on the OpenAI client.
 
 `configure_agents_sdk()` points the OpenAI Agents SDK's default client at
 OpenRouter — that covers every `Agent` run (chat_turn, autonomous,
 swarm members). `get_llm_client()` is for the direct `AsyncOpenAI` calls
-(swarm planning/audit, compaction, memory embeddings).
+(swarm planning/audit, memory embeddings).
 
 Fallback: when `OPENROUTER_API_KEY` is absent everything falls back to
 calling OpenAI directly with `OPENAI_API_KEY`, so a deploy without the
@@ -43,11 +43,6 @@ EMBEDDING_MODEL = (
     if settings.openrouter_api_key
     else "text-embedding-3-small"
 )
-
-
-def is_openrouter_configured() -> bool:
-    """True when OpenRouter is the active provider."""
-    return bool(settings.openrouter_api_key)
 
 
 def get_llm_client() -> AsyncOpenAI:

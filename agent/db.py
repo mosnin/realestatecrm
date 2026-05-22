@@ -474,14 +474,47 @@ class QueryBuilder:
 
 
 # ---------------------------------------------------------------------------
+# RPC — call a Postgres function: db.rpc("fn", {...}).execute()
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _RpcCall:
+    """Invoke a Postgres function with named arguments.
+
+    Named-arg invocation means the params dict maps straight onto the
+    function's parameter names, order-independent. Returns the function's
+    result set as rows — same shape as a SELECT.
+    """
+    function: str
+    params: dict[str, Any]
+
+    async def execute(self) -> Result:
+        keys = list(self.params.keys())
+        if keys:
+            arg_sql = ", ".join(f'"{k}" => ${i + 1}' for i, k in enumerate(keys))
+            values = [self.params[k] for k in keys]
+        else:
+            arg_sql = ""
+            values = []
+        sql = f'SELECT * FROM "{self.function}"({arg_sql})'
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(sql, *values)
+            return Result(data=[dict(r) for r in rows])
+
+
+# ---------------------------------------------------------------------------
 # Public client — drop-in replacement for the old `await supabase()` call
 # ---------------------------------------------------------------------------
 
 class Client:
-    """Minimal client that exposes the .table(...) entrypoint used by the tools."""
+    """Minimal client exposing the .table(...) and .rpc(...) entrypoints."""
 
     def table(self, name: str) -> QueryBuilder:
         return QueryBuilder(table=name)
+
+    def rpc(self, function: str, params: dict[str, Any] | None = None) -> _RpcCall:
+        return _RpcCall(function=function, params=params or {})
 
 
 _client = Client()

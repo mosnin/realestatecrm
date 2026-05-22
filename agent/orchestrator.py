@@ -210,10 +210,14 @@ async def pop_triggers(space_id: str) -> list[dict]:
                     logger.warning("trigger_malformed", item=str(item)[:100])
                     continue
                 parsed.append(obj)
-            except (json.JSONDecodeError, Exception):
+            except Exception:
                 logger.warning("trigger_parse_error", item=str(item)[:100])
         return parsed
-    except Exception:
+    except Exception as exc:
+        # A Redis outage here is otherwise indistinguishable from "no
+        # triggers" — the run would silently drop into sweep mode and
+        # never process the queued lead/tour/stage events. Log it.
+        logger.warning("pop_triggers_failed", space_id=space_id, error=str(exc)[:200])
         return []
 
 
