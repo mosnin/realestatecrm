@@ -6,6 +6,7 @@ import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
 import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
+import { loadUserInvocableSkills } from '@/lib/ai-tools/skills/loader';
 
 // Force dynamic rendering — the page reads searchParams to pick which
 // conversation to hydrate, and we need a fresh server render on every
@@ -97,6 +98,10 @@ export default async function ChippiPage({
   // banner stays hidden — there's nothing to connect to.
   const showConnectBanner = composioConfigured() && !hasIntegrations;
 
+  // The skills offered in the composer's `/` menu — read from the SKILL.md
+  // files at request time (cached for the process lifetime).
+  const skills = loadUserInvocableSkills();
+
   return (
     <div className="flex h-full flex-col">
       <ChippiWorkspace
@@ -108,6 +113,7 @@ export default async function ChippiPage({
         initialInput={initialInput}
         initialPrefill={initialPrefill}
         showConnectBanner={showConnectBanner}
+        skills={skills}
       />
     </div>
   );

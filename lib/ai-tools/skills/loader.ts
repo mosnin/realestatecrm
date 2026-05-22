@@ -26,6 +26,12 @@
  *   - `tools` (optional) — array of tool names from `ALL_TOOLS`. Unknown
  *     names throw at build time so a typo is a boot failure, not a silent
  *     runtime miss.
+ *   - `title` + `prompt` (optional, paired) — make the skill user-invocable
+ *     from the chat's `/` menu. `title` is the menu label; `prompt` is the
+ *     text dropped into the composer when the skill is picked (it may carry
+ *     one `{placeholder}` for the realtor to fill in). A skill appears in
+ *     the menu only when BOTH are present — there is no separate flag.
+ *   - `order` (optional) — sort position in the `/` menu; lower is higher.
  *
  * Anthropic convention bits we explicitly dropped:
  *   - `allowed-tools` (we use `tools`, simpler), `disable-model-invocation`,
@@ -58,6 +64,12 @@ interface SkillFrontmatter {
   description: string;
   model?: string;
   tools?: string[];
+  /** Menu label — present (with `prompt`) iff the skill is user-invocable. */
+  title?: string;
+  /** Composer text dropped in when the skill is picked from the `/` menu. */
+  prompt?: string;
+  /** Sort position in the `/` menu; lower is higher. */
+  order?: number;
 }
 
 export interface SkillDefinition {
@@ -121,12 +133,16 @@ function parseFrontmatter(text: string, sourceForError: string): {
     throw new Error(`${sourceForError}: frontmatter missing required \`description\``);
   }
 
+  const orderRaw = typeof fm.order === 'string' ? Number(fm.order) : NaN;
   return {
     frontmatter: {
       name: fm.name,
       description: fm.description,
       model: typeof fm.model === 'string' ? fm.model : undefined,
       tools: Array.isArray(fm.tools) ? (fm.tools as string[]) : undefined,
+      title: typeof fm.title === 'string' ? fm.title : undefined,
+      prompt: typeof fm.prompt === 'string' ? fm.prompt : undefined,
+      order: Number.isFinite(orderRaw) ? orderRaw : undefined,
     },
     body: body.trim(),
   };
@@ -182,6 +198,36 @@ export function loadSkillDefinitions(): SkillDefinition[] {
 /** Reset the cache. Test-only — production should never need this. */
 export function __resetSkillCacheForTests(): void {
   _cached = null;
+}
+
+/** A skill the realtor can invoke from the chat `/` menu. */
+export interface UserSkill {
+  slug: string;
+  title: string;
+  description: string;
+  /** Composer text; may contain one `{placeholder}` for the realtor to fill. */
+  prompt: string;
+}
+
+/**
+ * The skills offered in the chat `/` menu — every skill that declares both
+ * a `title` and a `prompt` — ordered by the frontmatter `order` (lower
+ * first), then by slug. A skill is just a prompt: picking one drops its
+ * text into the composer, and sending it is an ordinary chat turn, so this
+ * works against the live Modal chat with no extra runtime.
+ */
+export function loadUserInvocableSkills(): UserSkill[] {
+  return loadSkillDefinitions()
+    .filter((d) => d.frontmatter.title && d.frontmatter.prompt)
+    .map((d) => ({
+      slug: d.slug,
+      title: d.frontmatter.title as string,
+      description: d.frontmatter.description,
+      prompt: d.frontmatter.prompt as string,
+      order: d.frontmatter.order ?? 100,
+    }))
+    .sort((a, b) => a.order - b.order || a.slug.localeCompare(b.slug))
+    .map(({ slug, title, description, prompt }) => ({ slug, title, description, prompt }));
 }
 
 function pickTools(names: readonly string[], slug: string): ToolDefinition[] {

@@ -1,6 +1,9 @@
 ---
 name: contact_researcher
 description: Builds a complete read on one person — notes, activities, deals, and full history — and lands on the single next action. Use when the realtor asks about a specific contact or whether to follow up.
+title: "Research a contact"
+prompt: "Research {a contact} — pull their notes, deals, and history, and tell me where they stand and the one thing to do next."
+order: 3
 model: gpt-5-mini
 tools:
   - find_person
