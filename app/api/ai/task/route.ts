@@ -44,6 +44,14 @@ import {
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
+
+// A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
+// proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
+// the stream mid-turn and the assistant message is lost. nodejs runtime is
+// required — this route streams and uses Node `crypto`.
+export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -125,10 +133,14 @@ async function loadHistory(spaceId: string, conversationId: string): Promise<His
     .select('role, content, createdAt')
     .eq('spaceId', spaceId)
     .eq('conversationId', conversationId)
-    .order('createdAt', { ascending: true })
+    .order('createdAt', { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const rows = (data ?? []) as Array<{ role: string; content: string }>;
+  // ascending:false + limit fetches the most RECENT n; reverse to restore
+  // chronological order. The old ascending:true + limit silently fed the
+  // model the OLDEST n messages and dropped every recent turn once a
+  // conversation passed n messages.
+  const rows = ((data ?? []) as Array<{ role: string; content: string }>).reverse();
   return rows
     .filter((r) => r.role === 'user' || r.role === 'assistant')
     .map((r) => ({
@@ -216,9 +228,31 @@ function proxyModalStream({
       const decoder = new TextDecoder();
       let lineBuf = '';
       const textChunks: string[] = [];
+      // Ordered render list assembled as the turn streams — text + tool-call
+      // blocks. Persisted verbatim so a reloaded conversation shows what
+      // Chippi actually did (tool calls, plan cards), not just a flat reply.
+      const blocks: MessageBlock[] = [];
       // Track args from the most recent create_plan tool_call_start so we can
       // emit plan_created when the matching tool_call_result arrives.
       let pendingPlanArgs: Record<string, unknown> | null = null;
+      // Persist exactly once — on `done`, on `error`, or on the stream simply
+      // dropping. Before this only the `done` path saved, so any mid-stream
+      // Modal failure erased the whole assistant turn from history.
+      let persisted = false;
+      async function persistOnce(finalText?: string): Promise<void> {
+        if (persisted) return;
+        persisted = true;
+        let toSave: MessageBlock[] = blocks;
+        if (toSave.length === 0 && finalText && finalText.trim()) {
+          toSave = [{ type: 'text', content: finalText }];
+        }
+        if (toSave.length === 0) return;
+        try {
+          await saveAssistantMessage({ spaceId, conversationId, blocks: toSave });
+        } catch (err) {
+          logger.warn('[ai/task] modal: persist assistant message failed', { spaceId }, err);
+        }
+      }
 
       try {
         while (true) {
@@ -246,6 +280,7 @@ function proxyModalStream({
             if (type === 'token') {
               const delta = String(evt.delta ?? '');
               textChunks.push(delta);
+              blocks.push({ type: 'text', content: delta });
               push(controller, { type: 'text_delta', delta });
 
             } else if (type === 'reasoning_delta') {
@@ -254,19 +289,47 @@ function proxyModalStream({
             } else if (type === 'tool_call_start') {
               const toolName = String(evt.tool ?? 'tool');
               const toolArgs = (evt.args ?? {}) as Record<string, unknown>;
+              // Use the SDK call_id Modal now forwards so the browser can
+              // correlate the result back to this call; fall back to a fresh
+              // id for older Modal deploys that don't send one.
+              const callId =
+                typeof evt.call_id === 'string' && evt.call_id
+                  ? evt.call_id
+                  : crypto.randomUUID();
               // Remember create_plan args so we can emit plan_created on result.
               if (toolName === 'create_plan') {
                 pendingPlanArgs = toolArgs;
               }
+              blocks.push({
+                type: 'tool_call',
+                callId,
+                name: toolName,
+                args: toolArgs,
+                status: 'complete',
+              });
               push(controller, {
                 type: 'tool_call_start',
                 name: toolName,
                 args: toolArgs,
-                callId: crypto.randomUUID(),
+                callId,
               });
 
             } else if (type === 'tool_call_result') {
               const toolName = String(evt.tool ?? 'tool');
+              const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
+              const ok = evt.ok !== false;
+              const summary = String(evt.summary ?? '');
+              // Settle the result onto its tool-call block — by call_id when
+              // present, else the most recent still-unresolved tool call.
+              for (let i = blocks.length - 1; i >= 0; i--) {
+                const b = blocks[i];
+                if (b.type !== 'tool_call') continue;
+                if (callId ? b.callId === callId : !b.result) {
+                  b.result = { ok, summary };
+                  b.status = ok ? 'complete' : 'error';
+                  break;
+                }
+              }
               // Emit plan_created before the result so the browser can render
               // the plan card immediately, before the tool call settles.
               if (toolName === 'create_plan' && pendingPlanArgs !== null) {
@@ -283,8 +346,9 @@ function proxyModalStream({
               push(controller, {
                 type: 'tool_call_result',
                 name: toolName,
-                ok: evt.ok ?? true,
-                summary: evt.summary ?? '',
+                ok,
+                summary,
+                callId,
               });
 
             } else if (type === 'done') {
@@ -292,21 +356,13 @@ function proxyModalStream({
                 typeof evt.final_text === 'string' && evt.final_text.trim()
                   ? evt.final_text
                   : textChunks.join('');
-
-              if (finalText.trim()) {
-                try {
-                  await saveAssistantMessage({
-                    spaceId,
-                    conversationId,
-                    blocks: [{ type: 'text', content: finalText }],
-                  });
-                } catch (err) {
-                  logger.warn('[ai/task] modal: persist assistant message failed', { spaceId }, err);
-                }
-              }
+              await persistOnce(finalText);
               push(controller, { type: 'turn_complete', reason: 'complete' });
 
             } else if (type === 'error') {
+              // Persist whatever streamed before the failure so a mid-turn
+              // Modal error doesn't erase the assistant message the user saw.
+              await persistOnce();
               push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
             }
           }
@@ -319,14 +375,11 @@ function proxyModalStream({
             try {
               const evt = JSON.parse(raw) as Record<string, unknown>;
               if (evt.type === 'done') {
-                const finalText = String(evt.final_text ?? textChunks.join(''));
-                if (finalText.trim()) {
-                  await saveAssistantMessage({
-                    spaceId,
-                    conversationId,
-                    blocks: [{ type: 'text', content: finalText }],
-                  }).catch(() => undefined);
-                }
+                const finalText =
+                  typeof evt.final_text === 'string' && evt.final_text.trim()
+                    ? evt.final_text
+                    : textChunks.join('');
+                await persistOnce(finalText);
                 push(controller, { type: 'turn_complete', reason: 'complete' });
               }
             } catch {
@@ -340,6 +393,9 @@ function proxyModalStream({
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
         }
       } finally {
+        // Safety net — the stream ended with no `done`/`error` event (Modal
+        // crash, dropped connection). Idempotent via the `persisted` flag.
+        await persistOnce();
         controller.close();
         reader.releaseLock();
       }

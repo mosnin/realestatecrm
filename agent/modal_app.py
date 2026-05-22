@@ -371,6 +371,21 @@ async def chat_turn(item: dict):
                 return {"raw": value}
         return {"raw": str(value)}
 
+    def _call_id(it: Any) -> str | None:
+        """The SDK call_id that links a tool call to its output.
+
+        The tool-call raw_item (ResponseFunctionToolCall) exposes it as an
+        attribute; the output raw_item (FunctionCallOutput) is a dict. Try
+        both so the browser can correlate a result to its originating call.
+        """
+        raw = getattr(it, "raw_item", None)
+        if raw is None:
+            return None
+        cid = getattr(raw, "call_id", None)
+        if cid is None and isinstance(raw, dict):
+            cid = raw.get("call_id")
+        return str(cid) if cid else None
+
     def translate(event: Any) -> dict | None:
         """Map an OpenAI Agents SDK stream event to our JSONL protocol."""
         name = type(event).__name__
@@ -413,6 +428,7 @@ async def chat_turn(item: dict):
                     "type": "tool_call_start",
                     "tool": tool_name,
                     "args": safe_json_loads(raw_args),
+                    "call_id": _call_id(it),
                 }
 
             if ev_name == "tool_output" or item_type in ("tool_call_output_item", "ToolCallOutputItem"):
@@ -430,6 +446,7 @@ async def chat_turn(item: dict):
                     "tool": tool_name,
                     "ok": True,
                     "summary": summary,
+                    "call_id": _call_id(it),
                 }
 
             return None
