@@ -1,9 +1,6 @@
 ---
 name: pipeline_analyst
 description: Triages the whole pipeline — stuck deals, hot leads going cold, overdue follow-ups — and surfaces the few things that need attention today. Use when the realtor asks how their pipeline or deals are doing.
-title: "Triage my pipeline"
-prompt: "Triage my pipeline — show me the deals and leads most at risk right now, ranked, with what to do about each."
-order: 1
 model: gpt-5-mini
 tools:
   - pipeline_summary

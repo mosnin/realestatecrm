@@ -22,9 +22,12 @@ beforeEach(() => {
 });
 
 describe('loadUserInvocableSkills', () => {
-  it('returns every skill that declares both a title and a prompt', () => {
+  it('returns the curated menu skills, each with a title and prompt', () => {
     const skills = loadUserInvocableSkills();
-    expect(skills.length).toBeGreaterThanOrEqual(5);
+    const slugs = skills.map((s) => s.slug);
+    for (const expected of ['my-day', 'new-lead', 'follow-ups', 'meeting-prep', 'my-deals']) {
+      expect(slugs).toContain(expected);
+    }
     for (const s of skills) {
       expect(s.slug).toBeTruthy();
       expect(s.title).toBeTruthy();
@@ -35,13 +38,10 @@ describe('loadUserInvocableSkills', () => {
 
   it('orders skills by the frontmatter `order` field', () => {
     const slugs = loadUserInvocableSkills().map((s) => s.slug);
-    // pipeline-analyst is order 1; contact-researcher 3; planner 5.
-    expect(slugs.indexOf('pipeline-analyst')).toBeLessThan(
-      slugs.indexOf('contact-researcher'),
-    );
-    expect(slugs.indexOf('contact-researcher')).toBeLessThan(
-      slugs.indexOf('planner'),
-    );
+    // my-day is order 1; follow-ups 3; my-deals 5.
+    expect(slugs[0]).toBe('my-day');
+    expect(slugs.indexOf('my-day')).toBeLessThan(slugs.indexOf('follow-ups'));
+    expect(slugs.indexOf('follow-ups')).toBeLessThan(slugs.indexOf('my-deals'));
   });
 
   it('offers a skill in the menu iff it has both a title and a prompt', () => {

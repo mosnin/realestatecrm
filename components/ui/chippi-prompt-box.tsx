@@ -18,11 +18,10 @@ import {
   Search,
   Slash,
   MessageCircle,
-  TrendingUp,
   Send,
-  UserSearch,
-  MapPin,
-  ListTodo,
+  Sunrise,
+  UserPlus,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -67,11 +66,11 @@ export function expandSkillPrompt(prompt: string): {
 
 /** Per-skill menu icons, keyed by slug. Falls back to the Chippi mark. */
 const SKILL_ICONS: Record<string, LucideIcon> = {
-  'pipeline-analyst': TrendingUp,
-  'quiet-lead-followups': Send,
-  'contact-researcher': UserSearch,
-  'tour-prep': MapPin,
-  planner: ListTodo,
+  'my-day': Sunrise,
+  'new-lead': UserPlus,
+  'follow-ups': Send,
+  'meeting-prep': ClipboardCheck,
+  'my-deals': Briefcase,
 };
 
 type Mode = 'draft' | null;

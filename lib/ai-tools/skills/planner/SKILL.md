@@ -1,9 +1,6 @@
 ---
 name: planner
 description: Breaks a complex, multi-step request into a concrete 3-7 step plan and surfaces it via create_plan before any work begins. Use first when a task needs several distinct actions.
-title: "Plan a complex task"
-prompt: "Plan this out before you start — lay out the steps as a clear plan and show it to me first: {the task}"
-order: 5
 model: gpt-5-mini
 tools:
   - create_plan
