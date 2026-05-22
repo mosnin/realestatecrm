@@ -8,7 +8,9 @@ export function triggerOpsEnabled(): boolean {
 
 export function triggerOpsAuthorized(req: Request): boolean {
   const required = process.env.AGENT_TRIGGER_OPS_SECRET?.trim();
-  if (!required) return true;
+  // Fail closed — an unset secret means "ops not provisioned", which is
+  // "deny", not "open to everyone". These endpoints clear and replay events.
+  if (!required) return false;
   const got = req.headers.get('x-agent-ops-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   return got === required;
 }

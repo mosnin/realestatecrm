@@ -194,14 +194,11 @@ async def pop_triggers(space_id: str) -> list[dict]:
             return []
         r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
         key = f"agent:triggers:{space_id}"
-        # Read up to 10 from the head, then trim only what we read. The old
-        # `lrange + delete` had two bugs: (1) a producer-side RPUSH between
-        # those two calls was silently wiped, (2) if there were more than 10
-        # pending, items 11+ were also deleted without being processed. LTRIM
-        # to len(items) leaves the overflow for the next call.
-        items = await r.lrange(key, 0, 9)
-        if items:
-            await r.ltrim(key, len(items), -1)
+        # Atomically pop up to 10 from the head. LPOP-with-count is a single
+        # Redis op, so two concurrent runs for the same space can't both read
+        # the same items — the lrange+ltrim it replaced was two ops and
+        # double-processed triggers whenever runs overlapped.
+        items = await r.lpop(key, 10)
         parsed = []
         for item in (items or []):
             try:
@@ -219,6 +216,45 @@ async def pop_triggers(space_id: str) -> list[dict]:
         # never process the queued lead/tour/stage events. Log it.
         logger.warning("pop_triggers_failed", space_id=space_id, error=str(exc)[:200])
         return []
+
+
+async def requeue_triggers(
+    space_id: str, triggers: list[dict], *, increment_attempts: bool
+) -> None:
+    """Push triggers back onto the queue when a run didn't process them.
+
+    A crashed run would otherwise drop the realtor's events silently. When
+    `increment_attempts` is set (a genuine failure) a per-trigger counter
+    caps retries — a poison trigger is dropped after 3 attempts rather than
+    looping forever; a deferral (guardrail block) re-queues without counting.
+    """
+    if not triggers:
+        return
+    try:
+        from upstash_redis.asyncio import Redis
+
+        if not settings.kv_rest_api_url or not settings.kv_rest_api_token:
+            return
+        r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
+        key = f"agent:triggers:{space_id}"
+        survivors: list[str] = []
+        for t in triggers:
+            if increment_attempts:
+                attempts = int(t.get("_attempts", 0)) + 1
+                if attempts > 3:
+                    logger.warning(
+                        "trigger_dropped_after_retries",
+                        space_id=space_id,
+                        event=t.get("event"),
+                    )
+                    continue
+                t["_attempts"] = attempts
+            survivors.append(json.dumps(t))
+        if survivors:
+            # LPUSH to the head so the retry is the next run's first work.
+            await r.lpush(key, *reversed(survivors))
+    except Exception as exc:
+        logger.warning("requeue_triggers_failed", space_id=space_id, error=str(exc)[:200])
 
 
 def _build_opening_prompt(
@@ -244,7 +280,7 @@ def _build_opening_prompt(
             "summarising what the routine did."
         )
     elif triggers:
-        valid = {
+        known = {
             "new_lead",
             "tour_completed",
             "deal_stage_changed",
@@ -255,8 +291,16 @@ def _build_opening_prompt(
         lines = []
         for t in triggers:
             event = t.get("event", "")
-            if event not in valid:
+            # run_now is a bare wake signal (the "Run now" button and its
+            # Modal-down fallback). It carries no specific action — drained so
+            # the queue empties, then the run falls through to sweep mode.
+            if not event or event == "run_now":
                 continue
+            # An unrecognised event is still a real workspace event — surface
+            # it rather than silently dropping it (it was already consumed
+            # from Redis). Just flag the producer/consumer drift.
+            if event not in known:
+                logger.warning("trigger_unknown_event", event=event, space_id=space.id)
             parts = [f"- {event}"]
             if t.get("contactId"):
                 parts.append(f"contactId: {t['contactId']}")
@@ -466,6 +510,9 @@ async def run_agent_for_space(
         info = exc.guardrail_result.output.output_info or {}
         pending = info.get("pending_drafts", "?")
         log.info("agent_run_blocked_input_guardrail", pending_drafts=pending)
+        # Deferred, not failed — re-queue the triggers (no attempt increment)
+        # so the events still get processed once the drafts are reviewed.
+        await requeue_triggers(space.id, triggers, increment_attempts=False)
         await publish_event(
             ctx, "info",
             f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
@@ -486,6 +533,9 @@ async def run_agent_for_space(
 
     except Exception as exc:
         log.exception("agent_run_failed")
+        # Re-queue so a crashed run doesn't silently drop the realtor's
+        # events; the per-trigger attempt cap stops a poison trigger looping.
+        await requeue_triggers(space.id, triggers, increment_attempts=True)
         await publish_event(ctx, "error", f"Agent error: {exc}", agent_type="chippi")
         # Make the failure visible. A swallowed error leaves the realtor's
         # activity feed blank with no signal that a run even happened.

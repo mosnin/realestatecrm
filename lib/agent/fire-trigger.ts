@@ -94,21 +94,19 @@ async function isDuplicate(
   kvToken: string,
   input: FireTriggerInput,
 ): Promise<boolean> {
-  const bucket = Math.floor(Date.now() / Math.max(1, DEDUPE_WINDOW_S * 1000));
-  const key = `agent:trigger-dedupe:${input.spaceId}:${input.event}:${input.contactId ?? 'none'}:${input.dealId ?? 'none'}:${bucket}`;
-  const res = await fetch(`${kvUrl}/incr/${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${kvToken}` },
-  });
-  if (!res.ok) return false;
-  const { result: count } = (await res.json()) as { result: number };
-  if (count === 1) {
-    await fetch(`${kvUrl}/expire/${encodeURIComponent(key)}/${Math.max(1, DEDUPE_WINDOW_S * 2)}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${kvToken}` },
-    });
-  }
-  return count > 1;
+  const key = `agent:trigger-dedupe:${input.spaceId}:${input.event}:${input.contactId ?? 'none'}:${input.dealId ?? 'none'}`;
+  // SET NX EX in one atomic op. The key lives DEDUPE_WINDOW_S from THIS
+  // event, so it is a true sliding window. The old floor(now/window) bucket
+  // reset at fixed clock boundaries — two identical events that straddled a
+  // boundary both got through — and its INCR+EXPIRE was also non-atomic.
+  const res = await fetch(
+    `${kvUrl}/set/${encodeURIComponent(key)}/1/EX/${Math.max(1, DEDUPE_WINDOW_S)}/NX`,
+    { method: 'POST', headers: { Authorization: `Bearer ${kvToken}` } },
+  );
+  if (!res.ok) return false; // fail open — never drop a real trigger
+  const { result } = (await res.json()) as { result: string | null };
+  // 'OK' → key was absent → first occurrence. null → key existed → duplicate.
+  return result === null;
 }
 
 export async function fireAgentTrigger(input: FireTriggerInput): Promise<FireTriggerResult> {
