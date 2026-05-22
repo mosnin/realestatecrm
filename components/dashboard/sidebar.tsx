@@ -15,7 +15,6 @@ import {
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { ChippiInstrument } from '@/components/dashboard/chippi-instrument';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
@@ -1305,9 +1304,6 @@ function RealtorSidebarShell({
         <div className="mt-3">
           <SearchPill collapsed={collapsed} />
         </div>
-
-        {/* Cockpit instrument — live agent readout (working / idle / paused) */}
-        <ChippiInstrument collapsed={collapsed} />
 
         {/* Primary nav + More + Settings */}
         <RealtorNav

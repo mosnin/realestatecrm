@@ -6,11 +6,8 @@
  * Polls /api/agent/active-runs every few seconds; when an autonomous run
  * appears, opens an SSE stream to /api/agent/stream and surfaces the
  * agent's current tool call in a compact pill at the bottom-right of the
- * viewport. Auto-dismisses a few seconds after the run completes.
- *
- * Pairs with the sidebar ChippiInstrument: the instrument is the persistent
- * status indicator (working / idle / paused), this is the live narration
- * ("Chippi · find_contacts…") that appears only while a run is in flight.
+ * viewport — live narration ("Chippi · find_contacts…") shown only while
+ * a run is in flight. Auto-dismisses a few seconds after the run completes.
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
