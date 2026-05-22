@@ -38,7 +38,7 @@ from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import openai_model, resolve_chat_model
+from llm import fallback_models, resolve_chat_model
 from tools.streaming import publish_event
 from trajectories import normalize_tool_call, record_trajectory
 
@@ -46,7 +46,7 @@ from trajectories import normalize_tool_call, record_trajectory
 # Model fallback list — fall through these on 429s.
 # ---------------------------------------------------------------------------
 
-_FALLBACK_MODELS = [openai_model(m) for m in ("gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini")]
+_FALLBACK_MODELS = fallback_models()
 
 logger = structlog.get_logger(__name__)
 
