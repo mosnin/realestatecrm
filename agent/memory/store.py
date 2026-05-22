@@ -26,6 +26,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from asyncpg.exceptions import UndefinedColumnError
 from openai import AsyncOpenAI
 
 from db import get_pool, supabase
@@ -318,9 +319,11 @@ async def save_memory(
                     source_run_id, source_tool_name, source_conversation_id,
                     existing["id"],
                 )
-            except Exception:
-                # Source attribution columns may not exist yet if migration
-                # 20260601000007 hasn't run. Fall back to updating without them.
+            except UndefinedColumnError:
+                # The source attribution columns don't exist yet (migration
+                # 20260601000007 hasn't run). Fall back to updating without
+                # them. A transient DB error is deliberately NOT caught here —
+                # it must propagate, not be misdiagnosed as a missing column.
                 logger.warning(
                     "save_memory: source attribution columns unavailable, "
                     "updating without attribution for space %s", space_id
@@ -362,9 +365,11 @@ async def save_memory(
                     content, importance_clamped, vec_lit, expires_at, task_id,
                     source_run_id, source_tool_name, source_conversation_id,
                 )
-            except Exception:
-                # Source attribution columns may not exist yet. Fall back to
-                # insert without them so the write still succeeds.
+            except UndefinedColumnError:
+                # The source attribution columns don't exist yet. Fall back to
+                # insert without them. A transient DB error is deliberately NOT
+                # caught here — it must propagate, not be misdiagnosed as a
+                # missing column.
                 logger.warning(
                     "save_memory: source attribution columns unavailable, "
                     "inserting without attribution for space %s", space_id

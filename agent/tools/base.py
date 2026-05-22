@@ -35,6 +35,8 @@ from typing import Any, Callable
 
 import structlog
 
+from errors import AgentError
+
 log = structlog.get_logger(__name__)
 
 # ── Retry ───────────────────────────────────────────────────────────────────────────────
@@ -61,6 +63,13 @@ async def with_retry(
     for attempt in range(1, max_attempts + 1):
         try:
             return await coro_fn()
+        except AgentError as exc:
+            # Honour the error taxonomy's retryable flag — a non-retryable
+            # AgentError (bad args, permission denied) must fail fast instead
+            # of burning three attempts on a permanent failure.
+            if not exc.retryable:
+                raise
+            last_exc = exc
         except _NO_RETRY as exc:
             raise
         except RuntimeError as exc:

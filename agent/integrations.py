@@ -114,7 +114,10 @@ def _is_auth_like_error(err: Exception) -> bool:
         return True
     # HTTP status sometimes appears on the exception attrs
     status = getattr(err, "status_code", None) or getattr(err, "statusCode", None)
-    if status in (401, 403):
+    # 404 included: the toolkit slug came from our own IntegrationConnection
+    # row, so a 404 from Composio means the connected account is gone on their
+    # side — an auth-expiry to reconcile, not a generic error.
+    if status in (401, 403, 404):
         return True
     return False
 
