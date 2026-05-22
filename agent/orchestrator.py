@@ -40,6 +40,7 @@ from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
 from llm import extract_usage, fallback_models, resolve_chat_model
 from tools.streaming import publish_event
+from tools.base import result_is_ok
 from trajectories import normalize_tool_call, record_trajectory
 
 # ---------------------------------------------------------------------------
@@ -101,9 +102,10 @@ def _translate_tool_event(event: object) -> dict | None:
         summary = "" if output is None else str(output)
         if len(summary) > 300:
             summary = summary[:299] + "…"
+        ok = result_is_ok(output)
         return {
-            "message": f"{tool_name} done",
-            "metadata": {"tool": tool_name, "phase": "complete", "summary": summary},
+            "message": f"{tool_name} done" if ok else f"{tool_name} failed",
+            "metadata": {"tool": tool_name, "phase": "complete", "ok": ok, "summary": summary},
         }
 
     return None
@@ -151,11 +153,20 @@ async def _run_with_fallback(
         except (RateLimitError, APIStatusError) as exc:
             status = getattr(exc, "status_code", None)
             err_str = str(exc)
-            is_429 = isinstance(exc, RateLimitError) or status == 429 or "429" in err_str
-            if is_429 and i < len(models) - 1:
+            lower = err_str.lower()
+            # Fall through on a 429 (rate limit) OR a 404/model-not-found — a
+            # stale model slug must not hard-fail the whole run.
+            should_fallback = (
+                isinstance(exc, RateLimitError)
+                or status in (429, 404)
+                or "429" in err_str
+                or "model_not_found" in lower
+                or "does not exist" in lower
+            )
+            if should_fallback and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
-                    "model_rate_limited_falling_back",
+                    "model_falling_back",
                     model=model,
                     next_model=next_model,
                     attempt=i + 1,
@@ -166,10 +177,17 @@ async def _run_with_fallback(
             raise
         except Exception as exc:
             err_str = str(exc)
-            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(models) - 1:
+            lower = err_str.lower()
+            should_fallback = (
+                "429" in err_str
+                or "rate_limit" in lower
+                or "model_not_found" in lower
+                or "does not exist" in lower
+            )
+            if should_fallback and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
-                    "model_rate_limited_falling_back",
+                    "model_falling_back",
                     model=model,
                     next_model=next_model,
                     attempt=i + 1,
@@ -434,6 +452,10 @@ async def run_agent_for_space(
     # Workspace info — mirrors the chat path so autonomous drafts include
     # the realtor's intake URL where it's useful.
     _app_url = (settings.app_url or "").rstrip("/")
+    # A localhost app_url (NEXT_PUBLIC_APP_URL missing from the Modal secret)
+    # must never become a customer-facing intake link in a drafted message.
+    if "localhost" in _app_url or "127.0.0.1" in _app_url:
+        _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
     workspace_info = (
         "# Your workspace\n"
@@ -455,7 +477,9 @@ async def run_agent_for_space(
 
     run_config = RunConfig(
         max_turns=settings.coordinator_max_turns,
-        tracing_disabled=False,
+        # Tracing exports only reach OpenAI's backend; disable on a pure-
+        # OpenRouter deploy, which may carry no OpenAI key at all.
+        tracing_disabled=bool(settings.openrouter_api_key),
         model_settings=ModelSettings(
             max_tokens=settings.max_output_tokens,
             truncation="auto",
@@ -477,18 +501,25 @@ async def run_agent_for_space(
     # Also captures the tool call into the trajectory accumulator. The two
     # paths share the same _translate_tool_event payload so the realtor's
     # live view and the offline trajectory record stay in lockstep.
+    # Tasks are kept in `publish_tasks` and drained in the finally below — a
+    # bare un-referenced create_task can be garbage-collected mid-flight, and
+    # the Modal container can tear down before the last events flush.
+    publish_tasks: list[asyncio.Task] = []
+
     def on_event(event: object) -> None:
         payload = _translate_tool_event(event)
         if payload is None:
             return
         trajectory_tool_calls.append(normalize_tool_call(payload))
-        asyncio.create_task(
-            publish_event(
-                ctx,
-                "action",
-                payload["message"],
-                metadata=payload["metadata"],
-                agent_type="chippi",
+        publish_tasks.append(
+            asyncio.create_task(
+                publish_event(
+                    ctx,
+                    "action",
+                    payload["message"],
+                    metadata=payload["metadata"],
+                    agent_type="chippi",
+                )
             )
         )
 
@@ -566,6 +597,11 @@ async def run_agent_for_space(
             extra={"error": str(exc)[:500]},
         )
         return
+    finally:
+        # Drain the fire-and-forget publish tasks so the realtor's activity
+        # feed gets every tool event before the Modal container exits.
+        if publish_tasks:
+            await asyncio.gather(*publish_tasks, return_exceptions=True)
 
     if total_tokens > 0:
         memory_content = (

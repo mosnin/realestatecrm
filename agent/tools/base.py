@@ -304,3 +304,25 @@ def rate_limited(
         return wrapper
 
     return decorator
+
+
+# ── Result inspection ─────────────────────────────────────────────────────────────────────
+
+def result_is_ok(output: Any) -> bool:
+    """Whether a tool result represents success.
+
+    Tools return a dict; a failure carries an "error" key (see idempotent_tool,
+    which only caches dicts without one). The Agents SDK sometimes serializes
+    the output to a JSON string, so parse that too. Unknown shapes default to
+    ok — never report a working tool as failed.
+    """
+    if isinstance(output, dict):
+        return "error" not in output
+    if isinstance(output, str):
+        try:
+            parsed = json.loads(output)
+        except (json.JSONDecodeError, ValueError):
+            return True
+        if isinstance(parsed, dict):
+            return "error" not in parsed
+    return True

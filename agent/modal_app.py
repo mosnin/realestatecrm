@@ -72,20 +72,24 @@ def mask_secrets(text: str) -> str:
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install(
-        "openai-agents>=0.0.15",
-        "openai>=1.75.0",
-        "asyncpg>=0.30.0",
-        "pydantic>=2.11.0",
-        "pydantic-settings>=2.9.0",
-        "httpx>=0.28.0",
-        "upstash-redis>=1.3.0",
-        "structlog>=25.1.0",
+        # Upper bounds keep a rebuild from silently pulling a breaking
+        # release. openai-agents is pre-1.0 — translate() matches its event
+        # class names by name — so it is held to the 0.0.x line. Keep these
+        # in sync with agent/pyproject.toml.
+        "openai-agents>=0.0.15,<0.1",
+        "openai>=1.75.0,<2",
+        "asyncpg>=0.30.0,<1",
+        "pydantic>=2.11.0,<3",
+        "pydantic-settings>=2.9.0,<3",
+        "httpx>=0.28.0,<1",
+        "upstash-redis>=1.3.0,<2",
+        "structlog>=25.1.0,<26",
         # Required by Modal's @fastapi_endpoint
-        "fastapi[standard]>=0.115.0",
+        "fastapi[standard]>=0.115.0,<1",
         # Attachment extraction (read_attachment tool)
-        "pypdf>=5.0.0",
-        "python-docx>=1.1.0",
-        "openpyxl>=3.1.0",
+        "pypdf>=5.0.0,<6",
+        "python-docx>=1.1.0,<2",
+        "openpyxl>=3.1.0,<4",
         # Composio integrations — load realtor's connected toolkits
         # (Gmail, Slack, HubSpot, etc.) for chat AND autonomous runs.
         # Mirrors lib/integrations/composio.ts. Without these, the
@@ -98,8 +102,8 @@ image = (
         # — which matches the TS `@composio/core 0.8.x` shape we use
         # in lib/integrations/composio.ts — is published under the
         # `composio` package at 0.13.x. Use that one.
-        "composio>=0.13.0",
-        "composio-openai-agents>=0.13.0",
+        "composio>=0.13.0,<0.14",
+        "composio-openai-agents>=0.13.0,<0.14",
     )
     .add_local_dir(_AGENT_DIR, remote_path="/app")
 )
@@ -307,7 +311,9 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
+    from config import settings
     from llm import extract_usage, fallback_models, resolve_chat_model
+    from tools.base import result_is_ok
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
@@ -444,7 +450,7 @@ async def chat_turn(item: dict):
                 return {
                     "type": "tool_call_result",
                     "tool": tool_name,
-                    "ok": True,
+                    "ok": result_is_ok(output),
                     "summary": summary,
                     "call_id": _call_id(it),
                 }
@@ -469,7 +475,9 @@ async def chat_turn(item: dict):
     input_items.append({"role": "user", "content": user_content})
 
     run_config = RunConfig(
-        tracing_disabled=False,
+        # Tracing exports only reach OpenAI's backend; disable on a pure-
+        # OpenRouter deploy, which may carry no OpenAI key at all.
+        tracing_disabled=bool(settings.openrouter_api_key),
         model_settings=ModelSettings(
             truncation="auto",
             reasoning=Reasoning(effort="medium"),
@@ -497,9 +505,11 @@ async def chat_turn(item: dict):
     # Workspace info — gives the model the realtor's intake URL up front
     # so any drafted outreach (Gmail/Resend/SMS) can include the link
     # without an extra tool call. app_url already includes scheme + host.
-    from config import settings as _settings
-
-    _app_url = (_settings.app_url or "").rstrip("/")
+    _app_url = (settings.app_url or "").rstrip("/")
+    # A localhost app_url (NEXT_PUBLIC_APP_URL missing from the Modal secret)
+    # must never become a customer-facing intake link in a drafted email.
+    if "localhost" in _app_url or "127.0.0.1" in _app_url:
+        _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
     workspace_info: str | None = (
         "# Your workspace\n"
@@ -580,13 +590,23 @@ async def chat_turn(item: dict):
 
             except Exception as e:
                 err_str = str(e)
-                is_rate_limited = "429" in err_str or "rate_limit" in err_str.lower()
-                if is_rate_limited and not streamed and attempt < len(models) - 1:
+                lower = err_str.lower()
+                is_rate_limited = "429" in err_str or "rate_limit" in lower
+                # A stale/removed model slug returns 404 — fall through to the
+                # next model instead of hard-failing the whole turn.
+                is_bad_model = (
+                    "404" in err_str
+                    or "model_not_found" in lower
+                    or "does not exist" in lower
+                    or "invalid model" in lower
+                )
+                if (is_rate_limited or is_bad_model) and not streamed and attempt < len(models) - 1:
                     logger.warning(
-                        "chat_turn_model_rate_limited_falling_back",
+                        "chat_turn_model_falling_back",
                         model=model,
                         next_model=models[attempt + 1],
                         space_id=space_id,
+                        reason="rate_limited" if is_rate_limited else "bad_model",
                     )
                     continue
                 masked_error = mask_secrets(err_str)
