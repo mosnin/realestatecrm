@@ -80,14 +80,21 @@ export async function transitionTask(
     update.metadata = { pausedReason: meta.pausedReason };
   }
 
-  // 4. Write to AgentTask.
-  const { error: updateError } = await supabase
+  // 4. Write to AgentTask — compare-and-swap on the status read in step 1.
+  // If a concurrent transition already moved the task, the status filter
+  // matches no rows and we report the lost race instead of overwriting it.
+  const { data: updated, error: updateError } = await supabase
     .from('AgentTask')
     .update(update)
-    .eq('id', taskId);
+    .eq('id', taskId)
+    .eq('status', current)
+    .select('id');
 
   if (updateError) {
     return { ok: false, error: updateError.message };
+  }
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: 'invalid_transition' };
   }
 
   return { ok: true };

@@ -139,11 +139,12 @@ function mapRunItemEvent(
     }
 
     case 'tool_output': {
-      // The output item references the upstream call by callId. The actual
-      // tool output is a string we produced server-side from `serialiseResult`
-      // in the bridge — that string is also what the model sees.
+      // Correlate strictly by callId — the field that references the
+      // originating call. An output item's own `id` is its identity, never a
+      // valid correlation key; falling back to it mismatched the result
+      // against its tool_call_start (tool stuck "running", step never closed).
       const raw = event.item.rawItem;
-      const callId = raw?.callId ?? raw?.id ?? '';
+      const callId = raw?.callId ?? '';
       const summary = stringifyOutput(event.item.output ?? raw?.output);
       const ok = !summary.startsWith('Error: ');
       const cleanSummary = ok ? summary : summary.slice('Error: '.length);

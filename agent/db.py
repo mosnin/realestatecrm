@@ -399,6 +399,11 @@ class QueryBuilder:
             set_parts.append(f'"{k}" = ${len(params)}')
 
         where_sql, _ = self._build_where(params, len(params) + 1)
+        if not where_sql:
+            raise RuntimeError(
+                "update() without filters is refused — guards against a "
+                "full-table overwrite."
+            )
 
         returning = " RETURNING *" if self._returning else ""
         sql = (
