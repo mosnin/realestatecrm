@@ -307,7 +307,7 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
-    from llm import fallback_models, resolve_chat_model
+    from llm import extract_usage, fallback_models, resolve_chat_model
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
@@ -540,13 +540,13 @@ async def chat_turn(item: dict):
                 try:
                     from ledger import record_chat_usage
 
-                    turn_usage = getattr(result, "usage", None)
-                    if turn_usage is not None:
+                    tokens_in, tokens_out, _ = extract_usage(result)
+                    if tokens_in or tokens_out:
                         await record_chat_usage(
                             space_id=space_id,
                             model=model,
-                            prompt_tokens=getattr(turn_usage, "input_tokens", 0) or 0,
-                            completion_tokens=getattr(turn_usage, "output_tokens", 0) or 0,
+                            prompt_tokens=tokens_in,
+                            completion_tokens=tokens_out,
                             user_id=user_id or None,
                             conversation_id=conversation_id or None,
                         )

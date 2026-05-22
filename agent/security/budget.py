@@ -56,7 +56,8 @@ async def record_usage(space_id: str, tokens: int) -> int:
         return tokens
     key = _today_key(space_id)
     new_total = await r.incrby(key, tokens)
-    # Set expiry on first write (INCRBY creates the key)
-    if new_total == tokens:
-        await r.expire(key, 172_800)  # 48 hours
+    # EXPIRE on every write — idempotent, and the first-write heuristic
+    # (new_total == tokens) misses when two runs race the first INCRBY,
+    # leaving a key with no TTL that lingers past its day.
+    await r.expire(key, 172_800)  # 48 hours
     return new_total

@@ -106,3 +106,26 @@ def configure_agents_sdk() -> None:
     set_default_openai_client(get_llm_client(), use_for_tracing=False)
     set_tracing_disabled(True)
     _configured = True
+
+
+def extract_usage(result: object) -> tuple[int, int, int]:
+    """Return (input, output, total) token counts from an Agents SDK run.
+
+    Usage is accumulated on the run context — `result.context_wrapper.usage`
+    — NOT on `result` itself. A bare `result.usage` does not exist on
+    RunResultStreaming; reading it silently yields None and zeroes out every
+    usage and budget number. Both shapes are tried so an SDK change can't
+    quietly re-break metering.
+    """
+    usage = None
+    ctx_wrapper = getattr(result, "context_wrapper", None)
+    if ctx_wrapper is not None:
+        usage = getattr(ctx_wrapper, "usage", None)
+    if usage is None:
+        usage = getattr(result, "usage", None)
+    if usage is None:
+        return (0, 0, 0)
+    tokens_in = int(getattr(usage, "input_tokens", 0) or 0)
+    tokens_out = int(getattr(usage, "output_tokens", 0) or 0)
+    total = int(getattr(usage, "total_tokens", 0) or 0) or (tokens_in + tokens_out)
+    return (tokens_in, tokens_out, total)

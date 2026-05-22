@@ -38,7 +38,7 @@ from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import fallback_models, resolve_chat_model
+from llm import extract_usage, fallback_models, resolve_chat_model
 from tools.streaming import publish_event
 from trajectories import normalize_tool_call, record_trajectory
 
@@ -453,12 +453,8 @@ async def run_agent_for_space(
         # Streaming mode so on_event fires per tool call / result.
         result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
 
-        usage = getattr(result, "usage", None)
-        if usage:
-            tokens_in = getattr(usage, "input_tokens", 0) or 0
-            tokens_out = getattr(usage, "output_tokens", 0) or 0
-            total_tokens = getattr(usage, "total_tokens", 0) or (tokens_in + tokens_out)
-            ctx.tokens_used = total_tokens
+        _, _, total_tokens = extract_usage(result)
+        ctx.tokens_used = total_tokens
 
         final_output = getattr(result, "final_output", None)
         if isinstance(final_output, str):
