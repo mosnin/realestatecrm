@@ -299,7 +299,7 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
-    from llm import resolve_chat_model
+    from llm import fallback_models, resolve_chat_model
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
@@ -498,54 +498,77 @@ async def chat_turn(item: dict):
             yield f"data: {err}\n\n"
             return
 
-        try:
-            result = Runner.run_streamed(
-                chippi, input=input_items, context=ctx, run_config=run_config
-            )
-            async for event in result.stream_events():
-                try:
-                    out = translate(event)
-                except Exception:
-                    out = None
-                if out:
-                    yield f"data: {json.dumps(out, default=str)}\n\n"
+        # Model fallback — attempt the workspace's model first, then the
+        # OpenRouter fallback chain. A retry is only possible BEFORE the
+        # first event is streamed to the client; once output is on the wire
+        # we are committed to the current model and surface the error.
+        models = [resolved_model, *(m for m in fallback_models() if m != resolved_model)]
+        streamed = False
 
-            final = getattr(result, "final_output", None)
-            final_text = (
-                final if isinstance(final, str) else (str(final) if final is not None else "")
-            )
-            done = json.dumps({"type": "done", "final_text": final_text})
-            yield f"data: {done}\n\n"
-
-            # Record this turn's token cost for the Usage page. Best-effort:
-            # a telemetry failure must never surface as a chat error.
+        for attempt, model in enumerate(models):
+            chippi.model = model
             try:
-                from ledger import record_chat_usage
+                result = Runner.run_streamed(
+                    chippi, input=input_items, context=ctx, run_config=run_config
+                )
+                async for event in result.stream_events():
+                    try:
+                        out = translate(event)
+                    except Exception:
+                        out = None
+                    if out:
+                        streamed = True
+                        yield f"data: {json.dumps(out, default=str)}\n\n"
 
-                turn_usage = getattr(result, "usage", None)
-                if turn_usage is not None:
-                    await record_chat_usage(
+                final = getattr(result, "final_output", None)
+                final_text = (
+                    final if isinstance(final, str) else (str(final) if final is not None else "")
+                )
+                done = json.dumps({"type": "done", "final_text": final_text})
+                yield f"data: {done}\n\n"
+
+                # Record this turn's token cost for the Usage page. Best-effort:
+                # a telemetry failure must never surface as a chat error.
+                try:
+                    from ledger import record_chat_usage
+
+                    turn_usage = getattr(result, "usage", None)
+                    if turn_usage is not None:
+                        await record_chat_usage(
+                            space_id=space_id,
+                            model=model,
+                            prompt_tokens=getattr(turn_usage, "input_tokens", 0) or 0,
+                            completion_tokens=getattr(turn_usage, "output_tokens", 0) or 0,
+                            user_id=user_id or None,
+                            conversation_id=conversation_id or None,
+                        )
+                except Exception:
+                    logger.warning("chat_turn_usage_record_failed", space_id=space_id)
+                return
+
+            except InputGuardrailTripwireTriggered as exc:
+                info = exc.guardrail_result.output.output_info or {}
+                reason = info.get("reason", "Run blocked.")
+                err = json.dumps({"type": "error", "message": mask_secrets(reason)})
+                yield f"data: {err}\n\n"
+                return
+
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limited = "429" in err_str or "rate_limit" in err_str.lower()
+                if is_rate_limited and not streamed and attempt < len(models) - 1:
+                    logger.warning(
+                        "chat_turn_model_rate_limited_falling_back",
+                        model=model,
+                        next_model=models[attempt + 1],
                         space_id=space_id,
-                        model=resolved_model,
-                        prompt_tokens=getattr(turn_usage, "input_tokens", 0) or 0,
-                        completion_tokens=getattr(turn_usage, "output_tokens", 0) or 0,
-                        user_id=user_id or None,
-                        conversation_id=conversation_id or None,
                     )
-            except Exception:
-                logger.warning("chat_turn_usage_record_failed", space_id=space_id)
-
-        except InputGuardrailTripwireTriggered as exc:
-            info = exc.guardrail_result.output.output_info or {}
-            reason = info.get("reason", "Run blocked.")
-            err = json.dumps({"type": "error", "message": mask_secrets(reason)})
-            yield f"data: {err}\n\n"
-
-        except Exception as e:
-            masked_error = mask_secrets(str(e))
-            logger.error("chat_turn_stream_failed", error=masked_error, space_id=space_id)
-            err = json.dumps({"type": "error", "message": masked_error})
-            yield f"data: {err}\n\n"
+                    continue
+                masked_error = mask_secrets(err_str)
+                logger.error("chat_turn_stream_failed", error=masked_error, space_id=space_id)
+                err = json.dumps({"type": "error", "message": masked_error})
+                yield f"data: {err}\n\n"
+                return
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

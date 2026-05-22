@@ -61,6 +61,17 @@ def openai_model(name: str) -> str:
     return f"openai/{name}" if settings.openrouter_api_key else name
 
 
+# Models to fall through on a 429, in order. Bare OpenAI names; resolved
+# for the active provider by fallback_models(). Shared by the chat path
+# (modal_app.chat_turn) and the autonomous path (orchestrator).
+FALLBACK_MODELS: tuple[str, ...] = ("gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini")
+
+
+def fallback_models() -> list[str]:
+    """Resolved 429-fallback model slugs for the active provider."""
+    return [openai_model(m) for m in FALLBACK_MODELS]
+
+
 def resolve_chat_model(model: str | None) -> str:
     """Return a valid chat model slug — the workspace's pick or the default.
 
