@@ -110,16 +110,45 @@ async def mark_expired_by_toolkit(
 
 
 def _is_auth_like_error(err: Exception) -> bool:
-    """Match Composio's auth-failure shapes. Mirrors isAuthLikeError() in TS."""
+    """Match Composio's CONNECTED-ACCOUNT auth-failure shapes specifically.
+
+    Returns True only when the error is about ONE user's connection being
+    dead (expired token, revoked grant, missing account). Returns False on
+    platform-level errors (wrong COMPOSIO_API_KEY, IP allowlist rejection,
+    rate limit) — those are infrastructure problems with our master key
+    and must not flip the user's IntegrationConnection row to 'expired'.
+    A bare 401 used to qualify here, but production hit a 401 with the
+    message "This API key is not authorized from the current IP address"
+    when Composio's IP allowlist didn't include Modal's egress range;
+    every toolkit got marked expired in one sweep and the realtor lost
+    access to all their integrations until they re-connected from scratch.
+    """
     name = type(err).__name__
     if name == "ComposioConnectedAccountNotFoundError":
         return True
     msg = str(err).lower()
-    if "connected_account" in msg:
+    if "connected_account" in msg or "connected account" in msg:
         return True
-    # HTTP status sometimes appears on the exception attrs
+    # Only treat a 4xx as a user-connection issue when the message also
+    # carries a token/grant marker. Bare auth status codes mean nothing
+    # without context — they're as often a platform issue as a per-user
+    # one, and the wrong side of that guess costs the realtor every
+    # toolkit they've connected.
     status = getattr(err, "status_code", None) or getattr(err, "statusCode", None)
-    if status in (401, 403):
+    has_auth_status = status in (401, 403) or "401" in msg or "403" in msg
+    if has_auth_status and any(
+        marker in msg
+        for marker in (
+            "token expired",
+            "token_expired",
+            "token revoked",
+            "token_revoked",
+            "invalid_grant",
+            "refresh failed",
+            "refresh_failed",
+            "unauthorized_client",
+        )
+    ):
         return True
     return False
 

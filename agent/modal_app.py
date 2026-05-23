@@ -76,8 +76,18 @@ image = (
         # release. openai-agents is pre-1.0 — translate() matches its event
         # class names by name — so it is held to the 0.0.x line. Keep these
         # in sync with agent/pyproject.toml.
+        #
+        # openai is capped below 1.97 — at 1.97 the SDK made `logprobs`
+        # required on ResponseTextDeltaEvent. openai-agents 0.0.x streams
+        # chat-completions chunks from non-OpenAI providers (OpenRouter)
+        # WITHOUT logprobs, so a chat turn dies with
+        # `1 validation error for ResponseTextDeltaEvent / logprobs /
+        # Field required` before the first token reaches the client.
+        # Upstream fixes shipped in openai-python (PR #2500) and
+        # openai-agents 0.2.x (PR #1246); neither is in the version line
+        # we're pinned to. Stay below the openai schema change.
         "openai-agents>=0.0.15,<0.1",
-        "openai>=1.75.0,<2",
+        "openai>=1.75.0,<1.97",
         "asyncpg>=0.30.0,<1",
         "pydantic>=2.11.0,<3",
         "pydantic-settings>=2.9.0,<3",
