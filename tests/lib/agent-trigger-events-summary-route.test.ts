@@ -9,6 +9,7 @@ describe('GET /api/agent/trigger/events/summary', () => {
   beforeEach(() => {
     process.env = {
       ...OLD_ENV,
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -30,7 +31,7 @@ describe('GET /api/agent/trigger/events/summary', () => {
     }), { status: 200 })) as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/events/summary/route');
-    const res = await GET(new Request('http://localhost/api/agent/trigger/events/summary?limit=100&dedupeWarnThreshold=0.7&modalWarnThreshold=0.1'));
+    const res = await GET(new Request('http://localhost/api/agent/trigger/events/summary?limit=100&dedupeWarnThreshold=0.7&modalWarnThreshold=0.1', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);

@@ -10,6 +10,7 @@ describe('GET /api/agent/trigger/health', () => {
     process.env = {
       ...OLD_ENV,
       AGENT_TRIGGER_OPS_ENABLED: 'true',
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -30,7 +31,7 @@ describe('GET /api/agent/trigger/health', () => {
     }), { status: 200 })) as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/health/route');
-    const res = await GET(new Request('http://localhost/test'));
+    const res = await GET(new Request('http://localhost/test', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);

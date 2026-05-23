@@ -115,7 +115,7 @@ export async function runStudioGeneration(args: {
       { spaceId: args.spaceId, model: model.id },
       err as Error,
     );
-    await markFailed(err instanceof Error ? err.message : 'Generation failed');
+    await markFailed('Generation failed');
     throw new StudioGenerationError('Generation failed. Please try again.', 502);
   }
 

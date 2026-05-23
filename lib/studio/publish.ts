@@ -1,6 +1,7 @@
 /**
  * Studio publishing — post a Studio asset to a connected social platform via
- * Composio. Called by the studio-publish cron, once per (post, platform).
+ * Composio. Called by the Studio publish Inngest function in
+ * lib/inngest/functions.ts, once per (post, platform).
  *
  * ─── Verification note ──────────────────────────────────────────────────────
  * The per-platform Composio action slugs and argument shapes below are derived

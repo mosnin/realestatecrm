@@ -1,7 +1,8 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
+import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Mic } from 'lucide-react';
 import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
@@ -40,8 +41,17 @@ export default async function DealDetailPage({
   const { tab } = await searchParams;
   const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'documents' || tab === 'milestones' ? tab : 'overview';
 
+  // Middleware only requires login; ownership of /s/[slug] is enforced here.
+  // Without this, a logged-in realtor could read another realtor's deal data
+  // (value, GCI, address, contacts, activities) by guessing the URL.
+  const { userId } = await auth();
+  if (!userId) redirect('/login/realtor');
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) notFound();
 
   let dealRow: Record<string, unknown>;
   let dealContacts: { dealId: string; contactId: string; role: string | null; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
@@ -67,9 +77,9 @@ export default async function DealDetailPage({
     const [stagesResult, dcResult, activityResult, checklistResult, docsResult] = await Promise.all([
       supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
       supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type, email, phone)').eq('dealId', id),
-      supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
-      supabase.from('DealChecklistItem').select('*').eq('dealId', id).order('position', { ascending: true }),
-      supabase.from('DealDocument').select('*').eq('dealId', id).order('createdAt', { ascending: false }),
+      supabase.from('DealActivity').select('*').eq('dealId', id).eq('spaceId', space.id).order('createdAt', { ascending: false }).limit(100),
+      supabase.from('DealChecklistItem').select('*').eq('dealId', id).eq('spaceId', space.id).order('position', { ascending: true }),
+      supabase.from('DealDocument').select('*').eq('dealId', id).eq('spaceId', space.id).order('createdAt', { ascending: false }),
     ]);
 
     if (stagesResult.error) throw stagesResult.error;

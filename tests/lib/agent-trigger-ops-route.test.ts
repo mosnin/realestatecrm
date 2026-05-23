@@ -10,6 +10,7 @@ describe('agent trigger ops route', () => {
     process.env = {
       ...OLD_ENV,
       AGENT_TRIGGER_OPS_ENABLED: 'true',
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -40,7 +41,7 @@ describe('agent trigger ops route', () => {
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/ops/route');
-    const res = await GET(new Request('http://localhost/api/agent/trigger/ops?limit=10&offset=5'));
+    const res = await GET(new Request('http://localhost/api/agent/trigger/ops?limit=10&offset=5', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -62,7 +63,7 @@ describe('agent trigger ops route', () => {
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/ops/route');
-    const res = await GET(new Request('http://localhost/api/agent/trigger/ops?action=replay_event'));
+    const res = await GET(new Request('http://localhost/api/agent/trigger/ops?action=replay_event', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -76,7 +77,7 @@ describe('agent trigger ops route', () => {
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const { DELETE } = await import('@/app/api/agent/trigger/ops/route');
-    const res = await DELETE(new Request('http://localhost/test', { method: 'DELETE' }));
+    const res = await DELETE(new Request('http://localhost/test', { method: 'DELETE', headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);

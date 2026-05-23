@@ -144,12 +144,21 @@ export async function POST(
   // continuation lands a NEW pause, the stream pump will write a NEW
   // AgentPausedRun row — we don't reuse the old one because the run state
   // has advanced past it.
-  const { error: markErr } = await supabase
+  // Compare-and-swap: only the request that flips pending→resumed proceeds.
+  // Without the status filter two concurrent resumes both passed the
+  // `status !== 'pending'` check above and both ran the approved tool.
+  const { data: marked, error: markErr } = await supabase
     .from('AgentPausedRun')
     .update({ status: 'resumed', updatedAt: new Date().toISOString() })
-    .eq('id', paused.id);
+    .eq('id', paused.id)
+    .eq('status', 'pending')
+    .select('id');
   if (markErr) {
-    logger.warn('[ai/task resume] status update failed (continuing)', { pausedRunId }, markErr);
+    logger.error('[ai/task resume] status update failed', { pausedRunId }, markErr);
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  }
+  if (!marked || marked.length === 0) {
+    return NextResponse.json({ error: 'Run is already resumed' }, { status: 409 });
   }
 
   return streamTsResumeTurn({

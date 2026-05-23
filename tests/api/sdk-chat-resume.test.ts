@@ -42,7 +42,7 @@ vi.mock('@/lib/ai-tools/sdk-chat-stream', () => ({
 // vs Space. Hoisted because vi.mock factories are pulled to the top.
 const { tableQueue, updateMock } = vi.hoisted(() => ({
   tableQueue: {} as Record<string, Array<{ data?: unknown; error?: unknown }>>,
-  updateMock: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  updateMock: vi.fn(() => Promise.resolve({ data: [{ id: 'run_1' }], error: null })),
 }));
 
 vi.mock('@/lib/supabase', () => {
@@ -56,7 +56,10 @@ vi.mock('@/lib/supabase', () => {
     obj.single = vi.fn(() => Promise.resolve(terminal));
     obj.update = vi.fn(() => {
       const upd: Record<string, unknown> = {};
-      upd.eq = vi.fn(() => updateMock());
+      // .update().eq().eq().select() — the compare-and-swap shape. eq()
+      // chains; select() resolves to the affected rows via updateMock.
+      upd.eq = vi.fn(() => upd);
+      upd.select = vi.fn(() => updateMock());
       return upd;
     });
     obj.insert = vi.fn(() => Promise.resolve({ data: null, error: null }));
@@ -79,7 +82,7 @@ beforeEach(() => {
   process.env.CHIPPI_CHAT_RUNTIME = 'ts';
   mockedAuth.mockResolvedValue({ userId: 'user_clerk_123' });
   for (const k of Object.keys(tableQueue)) delete tableQueue[k];
-  updateMock.mockResolvedValue({ data: null, error: null });
+  updateMock.mockResolvedValue({ data: [{ id: 'run_1' }], error: null });
 });
 
 afterEach(() => {

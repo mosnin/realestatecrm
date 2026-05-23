@@ -212,15 +212,23 @@ async def run_swarm(payload: dict) -> None:
             result = await db.table("SwarmMember").insert(member_row).execute()
             members.append(result.data[0])
 
-        # Run wave 1 in parallel
+        # Run wave 1 in parallel. return_exceptions=True so one member whose
+        # DB write escapes run_member's own handler can't cancel its siblings
+        # mid-flight — each sub-agent stands or falls on its own.
         wave_1 = [m for m in members if m.get("wave", 1) == 1]
-        await asyncio.gather(*[run_member(db, swarm_run_id, m, space_id) for m in wave_1])
+        await asyncio.gather(
+            *[run_member(db, swarm_run_id, m, space_id) for m in wave_1],
+            return_exceptions=True,
+        )
 
         # Run wave 2 if any (sequential after wave 1)
         wave_2 = [m for m in members if m.get("wave", 1) == 2]
         if wave_2:
             await emit_event(db, swarm_run_id, "wave_2_starting", {"agentCount": len(wave_2)})
-            await asyncio.gather(*[run_member(db, swarm_run_id, m, space_id) for m in wave_2])
+            await asyncio.gather(
+                *[run_member(db, swarm_run_id, m, space_id) for m in wave_2],
+                return_exceptions=True,
+            )
 
         # Audit phase
         await db.table("SwarmRun").update({"status": "auditing"}).eq("id", swarm_run_id).execute()

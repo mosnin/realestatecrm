@@ -9,6 +9,7 @@ describe('GET /api/agent/trigger/events', () => {
   beforeEach(() => {
     process.env = {
       ...OLD_ENV,
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -28,7 +29,7 @@ describe('GET /api/agent/trigger/events', () => {
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/events/route');
-    const res = await GET(new Request('http://localhost/api/agent/trigger/events?limit=10&offset=20'));
+    const res = await GET(new Request('http://localhost/api/agent/trigger/events?limit=10&offset=20', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -51,7 +52,7 @@ describe('GET /api/agent/trigger/events', () => {
     }), { status: 200 })) as unknown as typeof fetch);
 
     const { GET } = await import('@/app/api/agent/trigger/events/route');
-    const res = await GET(new Request('http://localhost/api/agent/trigger/events?status=deduped'));
+    const res = await GET(new Request('http://localhost/api/agent/trigger/events?status=deduped', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -68,6 +69,7 @@ describe('DELETE /api/agent/trigger/events', () => {
   beforeEach(() => {
     process.env = {
       ...OLD_ENV,
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       KV_REST_API_URL: 'https://kv.example.com',
       KV_REST_API_TOKEN: 'kv-token',
     };
@@ -83,7 +85,7 @@ describe('DELETE /api/agent/trigger/events', () => {
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const { DELETE } = await import('@/app/api/agent/trigger/events/route');
-    const req = new Request('http://localhost/api/agent/trigger/events', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'cleanup after incident' }) });
+    const req = new Request('http://localhost/api/agent/trigger/events', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-agent-ops-secret': 'test-ops-secret' }, body: JSON.stringify({ reason: 'cleanup after incident' }) });
     const res = await DELETE(req);
     const body = await res.json();
 

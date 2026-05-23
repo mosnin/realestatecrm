@@ -223,6 +223,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const nowIso = new Date().toISOString();
   const { data: dealRow, error: dealError } = await supabase.from('Deal').insert({
     id: dealId,
     spaceId: space.id,
@@ -236,6 +237,9 @@ export async function POST(req: NextRequest) {
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,
     stageId: finalStageId,
+    // The deal enters its initial stage right now. Without this, dealHealth
+    // can't compute "days in stage" until the first stage move sets it.
+    stageChangedAt: nowIso,
     position: lastPosition + 1,
   }).select().single();
   if (dealError) throw dealError;

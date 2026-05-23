@@ -17,6 +17,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
 import { falConfigured } from '@/lib/studio/fal';
+import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
 
@@ -60,6 +61,13 @@ export async function POST(req: NextRequest) {
   const toolSlug = String(formData.get('tool') ?? '');
   const promptRaw = formData.get('prompt');
   const prompt = typeof promptRaw === 'string' ? promptRaw : '';
+
+  // Validate the tool slug BEFORE touching storage. The previous order
+  // uploaded the source image and inserted a File row, then discovered an
+  // unknown slug — an orphan in both storage and the DB on every typo.
+  if (!toolSlug || !STUDIO_EDIT_TOOLS[toolSlug]) {
+    return NextResponse.json({ error: 'Unknown edit tool.' }, { status: 400 });
+  }
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'No image provided.' }, { status: 400 });

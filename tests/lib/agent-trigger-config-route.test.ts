@@ -9,6 +9,7 @@ describe('GET /api/agent/trigger/config', () => {
   beforeEach(() => {
     process.env = {
       ...OLD_ENV,
+      AGENT_TRIGGER_OPS_SECRET: 'test-ops-secret',
       AGENT_IMMEDIATE_EVENTS: 'tour_completed,new_lead',
       AGENT_TRIGGER_DEDUPE_WINDOW_S: '180',
       MODAL_WEBHOOK_URL: 'https://modal.example.com/webhook',
@@ -41,7 +42,7 @@ describe('GET /api/agent/trigger/config', () => {
 
   it('returns effective trigger runtime configuration for current space', async () => {
     const { GET } = await import('@/app/api/agent/trigger/config/route');
-    const res = await GET(new Request('http://localhost/test'));
+    const res = await GET(new Request('http://localhost/test', { headers: { 'x-agent-ops-secret': 'test-ops-secret' } }));
     const body = await res.json();
 
     expect(res.status).toBe(200);

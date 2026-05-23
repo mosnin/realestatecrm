@@ -61,6 +61,17 @@ export async function POST(
     body: emailBody.trim().slice(0, 10000),
   });
 
+  // Bump lastContactedAt so the contact list ordering and the "X days quiet"
+  // line on the detail page both reflect this send immediately — not just the
+  // activity row, which not every consumer reads.
+  const now = new Date().toISOString();
+  const { error: contactUpdateError } = await supabase
+    .from('Contact')
+    .update({ lastContactedAt: now, updatedAt: now })
+    .eq('id', id)
+    .eq('spaceId', space.id);
+  if (contactUpdateError) console.error('[email/route] failed to update lastContactedAt', contactUpdateError);
+
   // Log as ContactActivity — non-blocking; email already sent
   const { error: activityError } = await supabase.from('ContactActivity').insert({
     id: crypto.randomUUID(),

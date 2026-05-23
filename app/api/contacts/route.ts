@@ -101,8 +101,30 @@ export async function POST(req: NextRequest) {
 
   const id = crypto.randomUUID();
   const budgetVal = budget != null && budget !== '' ? parseFloat(budget) : null;
-  const propsVal = properties || [];
-  const tagsVal = tags || [];
+  if (budgetVal !== null && (Number.isNaN(budgetVal) || budgetVal < 0)) {
+    return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+  }
+
+  // Match PATCH's structural bounds — name was the only field validated here,
+  // so everything else could land in the DB at any size.
+  const emailVal = email ? String(email).trim().slice(0, 254) : null;
+  const phoneVal = phone ? String(phone).trim().slice(0, 20) : null;
+  const addressVal = address ? String(address).trim().slice(0, 500) : null;
+  const notesVal = notes ? String(notes).trim().slice(0, 5000) : null;
+  const preferencesVal = preferences ? String(preferences).trim().slice(0, 5000) : null;
+
+  const propsVal = Array.isArray(properties)
+    ? properties
+        .filter((p: unknown): p is string => typeof p === 'string')
+        .slice(0, 50)
+        .map((p) => p.slice(0, 500))
+    : [];
+  const tagsVal = Array.isArray(tags)
+    ? tags
+        .filter((t: unknown): t is string => typeof t === 'string')
+        .slice(0, 50)
+        .map((t) => t.slice(0, 100))
+    : [];
 
   const VALID_TYPES = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
   const contactType = VALID_TYPES.includes(type) ? type : 'QUALIFICATION';
@@ -110,14 +132,14 @@ export async function POST(req: NextRequest) {
   const { data: contact, error } = await supabase.from('Contact').insert({
     id,
     spaceId: space.id,
-    name,
-    email: email || null,
-    phone: phone || null,
-    address: address || null,
-    notes: notes || null,
+    name: name.trim().slice(0, 200),
+    email: emailVal,
+    phone: phoneVal,
+    address: addressVal,
+    notes: notesVal,
     type: contactType,
     budget: budgetVal,
-    preferences: preferences || null,
+    preferences: preferencesVal,
     properties: propsVal,
     tags: tagsVal,
   }).select().single();
@@ -134,8 +156,8 @@ export async function POST(req: NextRequest) {
     await notifyNewContact({
       spaceId: space.id,
       contactName: name,
-      contactPhone: phone || null,
-      contactEmail: email || null,
+      contactPhone: phoneVal,
+      contactEmail: emailVal,
       tags: tagsVal,
     });
   } catch (e) { console.error('[contacts] notification failed:', e); }

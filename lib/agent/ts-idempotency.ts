@@ -33,8 +33,14 @@ export function withIdempotency<T>(
   key: string,
   fn: () => Promise<T>
 ): Promise<T> {
-  const cached = checkIdempotency(key);
-  if (cached !== null) return Promise.resolve(cached as T);
+  // Read the store directly rather than via checkIdempotency: that helper
+  // returns null for BOTH "miss" and "cached a null result", so a tool that
+  // legitimately resolves to null/undefined would re-execute on every retry.
+  const entry = store.get(key);
+  if (entry) {
+    if (Date.now() <= entry.expiresAt) return Promise.resolve(entry.result as T);
+    store.delete(key);
+  }
   return fn().then(result => {
     storeIdempotency(key, result);
     return result;

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
@@ -39,6 +40,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'spaceId, fileId and tool are required' },
       { status: 400 },
+    );
+  }
+
+  // Per-space hourly call cap. The bearer secret authenticates Modal, not the
+  // upstream agent run — a runaway loop must not blow the wallet.
+  const rl = await checkRateLimit(`studio:internal:edit:${spaceId}`, 30, 3600);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many Studio edits for this workspace. Try again in an hour.' },
+      { status: 429 },
     );
   }
 

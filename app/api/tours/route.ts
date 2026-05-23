@@ -64,22 +64,40 @@ export async function POST(req: NextRequest) {
     validContactId = contactRow?.id ?? null;
   }
 
+  // Generate a manage token even for manually-created tours — the guest
+  // still gets a /tour/[token] URL in their confirmation, so they can
+  // self-cancel without bothering the agent.
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const manageToken = Array.from(tokenBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+  // Route through the same atomic RPC the public /book endpoint uses — locks
+  // overlapping tours and rejects conflicts. Without this, an agent creating
+  // a manual tour on an already-booked slot silently double-books.
+  const tourId = crypto.randomUUID();
+  const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_atomic', {
+    p_id: tourId,
+    p_space_id: space.id,
+    p_contact_id: validContactId,
+    p_guest_name: guestName.trim(),
+    p_guest_email: guestEmail.trim().toLowerCase(),
+    p_guest_phone: guestPhone?.trim() || null,
+    p_property_address: propertyAddress?.trim() || null,
+    p_notes: notes?.trim() || null,
+    p_starts_at: start.toISOString(),
+    p_ends_at: end.toISOString(),
+    p_property_profile_id: null,
+    p_manage_token: manageToken,
+  });
+  if (rpcError) throw rpcError;
+  if (!bookedId) {
+    return NextResponse.json({ error: 'This time slot conflicts with an existing tour' }, { status: 409 });
+  }
+
   const { data, error } = await supabase
     .from('Tour')
-    .insert({
-      id: crypto.randomUUID(),
-      spaceId: space.id,
-      contactId: validContactId,
-      guestName: guestName.trim(),
-      guestEmail: guestEmail.trim().toLowerCase(),
-      guestPhone: guestPhone?.trim() || null,
-      propertyAddress: propertyAddress?.trim() || null,
-      notes: notes?.trim() || null,
-      startsAt: start.toISOString(),
-      endsAt: end.toISOString(),
-      status: 'scheduled',
-    })
-    .select()
+    .select('*')
+    .eq('id', tourId)
     .single();
   if (error) throw error;
 

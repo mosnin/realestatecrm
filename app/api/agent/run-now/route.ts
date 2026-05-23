@@ -58,47 +58,55 @@ export async function POST() {
     }
   }
 
-  // Path 1: Modal web endpoint configured — fire-and-forget to avoid Vercel timeout.
-  // Modal runs can take minutes; we must not await the response. We only await
-  // the initial connection/dispatch — if that throws, the request never left.
-  if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
-    try {
-      // Start the fetch but do NOT await the response — let it run in the background.
-      const fetchPromise = fetch(MODAL_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${AGENT_INTERNAL_SECRET}`,
-        },
-        body: JSON.stringify({ space_id: space.id, secret: AGENT_INTERNAL_SECRET }),
-      });
-      // Suppress unhandled-rejection warnings by attaching a no-op catch.
-      fetchPromise.catch((err) => {
-        console.error('[agent/run-now] Modal webhook background error', err);
-      });
-      return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
-    } catch (err) {
-      // fetch() itself threw before the request could be dispatched (e.g. bad URL).
-      console.error('[agent/run-now] Modal webhook dispatch error', err);
-    }
-  }
-
-  // Path 2: Fallback — push a trigger to Redis so it runs at next heartbeat
+  // Always queue the trigger to Redis first when Redis is available — that is
+  // the DURABLE record. The old code only queued when Modal was unconfigured,
+  // so a Modal outage (the fire-and-forget fetch rejects asynchronously and is
+  // never caught) dropped the run entirely while still reporting success.
+  let queued = false;
   if (kvUrl && kvToken) {
     const trigger = JSON.stringify({
-      event: 'new_lead',  // generic trigger — prompts all agents to run
+      event: 'run_now', // bare wake signal — the agent run falls through to a sweep
       spaceId: space.id,
       queuedAt: new Date().toISOString(),
       source: 'run_now',
     });
     const key = `agent:triggers:${space.id}`;
-    await fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${kvToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([trigger]),
-    });
-    return NextResponse.json({ triggered: true, method: 'queued', note: 'Will run at next heartbeat (≤15 min)' });
+    try {
+      const pushRes = await fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${kvToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify([trigger]),
+      });
+      queued = pushRes.ok;
+    } catch (err) {
+      console.error('[agent/run-now] Redis enqueue failed', err);
+    }
   }
 
-  return NextResponse.json({ triggered: false, reason: 'Neither Modal webhook nor Redis is configured' });
+  // Fast path — fire the Modal webhook so the run starts now instead of at the
+  // next heartbeat. Fire-and-forget (a Modal run takes minutes); a rejection
+  // is harmless because the trigger above is already durably queued.
+  if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
+    fetch(MODAL_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ space_id: space.id, secret: AGENT_INTERNAL_SECRET }),
+    }).catch((err) => {
+      console.error('[agent/run-now] Modal webhook background error', err);
+    });
+    return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
+  }
+
+  if (queued) {
+    return NextResponse.json({
+      triggered: true,
+      method: 'queued',
+      note: 'Will run at next heartbeat (≤15 min)',
+    });
+  }
+
+  return NextResponse.json(
+    { triggered: false, reason: 'Neither Modal webhook nor Redis is configured' },
+    { status: 503 },
+  );
 }

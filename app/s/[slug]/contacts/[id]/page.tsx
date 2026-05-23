@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -26,7 +27,7 @@ import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
 import { formatCurrency } from '@/lib/formatting';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
 import {
   buildPeopleDetailActions,
@@ -47,8 +48,16 @@ export default async function ClientDetailPage({
 }) {
   const { slug, id } = await params;
 
+  // Middleware only requires login; ownership of /s/[slug] is enforced here.
+  // Skipping this lets any logged-in realtor see any other realtor's contacts.
+  const { userId } = await auth();
+  if (!userId) redirect('/login/realtor');
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) notFound();
 
   let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; stage: { name: string; color: string } } }[]; tours: { id: string; startsAt: string; endsAt: string; status: string; propertyAddress: string | null }[] }) | null = null;
   let lastActivity: { type: string; content: string | null; createdAt: string } | null = null;
@@ -64,7 +73,7 @@ export default async function ClientDetailPage({
       if (c.spaceId !== space.id) notFound();
       const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, status, priority, DealStage(name, color))').eq('contactId', id);
       if (dealError) throw dealError;
-      const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
+      const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).eq('spaceId', space.id).order('startsAt', { ascending: false }).limit(10);
       const { data: latest } = await supabase
         .from('ContactActivity')
         .select('type, content, createdAt')

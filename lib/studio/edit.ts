@@ -44,15 +44,24 @@ export async function runStudioEdit(args: {
     throw new StudioGenerationError('That instruction is too long.', 400);
   }
 
-  // Load the source File — must exist and belong to the space.
+  // Load the source File — must exist, belong to the space, BE an image, and
+  // fit under fal's input ceiling. Skipping the category check sends fal a
+  // PDF or a 4K video and bills the failed call.
+  const MAX_EDIT_BYTES = 20 * 1024 * 1024;
   const { data: source } = await supabase
     .from('File')
-    .select('storageKey')
+    .select('storageKey, category, sizeBytes')
     .eq('id', args.sourceFileId)
     .eq('spaceId', args.spaceId)
     .maybeSingle();
   if (!source?.storageKey) {
     throw new StudioGenerationError('The image to edit was not found.', 404);
+  }
+  if (source.category !== 'image') {
+    throw new StudioGenerationError('That file is not an image.', 400);
+  }
+  if (typeof source.sizeBytes === 'number' && source.sizeBytes > MAX_EDIT_BYTES) {
+    throw new StudioGenerationError('That image is too large to edit (max 20 MB).', 400);
   }
   const sourceUrl = await getSignedDownloadUrl(source.storageKey as string, 3600);
 
@@ -93,7 +102,7 @@ export async function runStudioEdit(args: {
     });
   } catch (err) {
     logger.error('[studio.edit] fal failed', { spaceId: args.spaceId, model: tool.id }, err as Error);
-    await markFailed(err instanceof Error ? err.message : 'Edit failed');
+    await markFailed('Edit failed');
     throw new StudioGenerationError('The edit failed. Please try again.', 502);
   }
 

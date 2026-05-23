@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { decrypt } from '@/lib/crypto';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /** Public endpoint — returns available time slots for the next 14 days. */
 export async function GET(req: NextRequest) {
@@ -9,6 +10,14 @@ export async function GET(req: NextRequest) {
   const dateStr = req.nextUrl.searchParams.get('date'); // YYYY-MM-DD
   const propertyId = req.nextUrl.searchParams.get('propertyId');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+
+  // This route runs 2-3 Supabase queries plus a Google Calendar freeBusy
+  // round-trip per request. Without a cap, any scanner can burn through
+  // GCal quota and Supabase reads. 60/hour per (slug, IP) leaves headroom
+  // for legitimate users (a real booking page makes ~5 calls per session).
+  const ip = getClientIp(req);
+  const { allowed } = await checkRateLimit(`available:${slug}:${ip}`, 60, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });

@@ -54,9 +54,26 @@ export async function POST(
   const body = await req.json();
   const { type, content, metadata } = body;
 
-  const VALID_TYPES = ['note', 'call', 'email', 'meeting', 'follow_up', 'stage_change', 'status_change'];
-  if (!type || !VALID_TYPES.includes(type)) {
+  // Only user-facing activity types are accepted here. `stage_change` and
+  // `status_change` are server-internal and written from PATCH /api/deals/[id]
+  // when the stage or status actually changes. Letting clients POST those
+  // would let a malicious caller forge a fake stage-change history that
+  // didn't reflect a real DB transition.
+  const PUBLIC_TYPES = ['note', 'call', 'email', 'meeting', 'follow_up'];
+  if (!type || !PUBLIC_TYPES.includes(type)) {
     return NextResponse.json({ error: 'Invalid activity type' }, { status: 400 });
+  }
+
+  // Cap metadata size — match the contact-activity equivalent. Without this,
+  // a 10 MB metadata object lands in the DB unchecked.
+  if (metadata !== undefined && metadata !== null) {
+    try {
+      if (JSON.stringify(metadata).length > 10000) {
+        return NextResponse.json({ error: 'metadata too large (max 10KB)' }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'metadata must be JSON-serializable' }, { status: 400 });
+    }
   }
 
   const { data, error } = await supabase

@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioGeneration, StudioGenerationError } from '@/lib/studio/generate';
 
@@ -38,6 +39,17 @@ export async function POST(req: NextRequest) {
   const spaceId = typeof body.spaceId === 'string' ? body.spaceId : '';
   if (!spaceId) {
     return NextResponse.json({ error: 'spaceId is required' }, { status: 400 });
+  }
+
+  // Per-space hourly call cap — the bearer secret authenticates Modal, but a
+  // compromised secret or a runaway agent loop must not be able to fan out
+  // unlimited fal generations. seedance-video is $0.50/call.
+  const rl = await checkRateLimit(`studio:internal:generate:${spaceId}`, 10, 3600);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many Studio generations for this workspace. Try again in an hour.' },
+      { status: 429 },
+    );
   }
 
   // The agent context carries spaceId only — resolve the space owner's Clerk

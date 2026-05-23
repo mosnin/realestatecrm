@@ -35,6 +35,8 @@ from typing import Any, Callable
 
 import structlog
 
+from errors import AgentError
+
 log = structlog.get_logger(__name__)
 
 # ── Retry ───────────────────────────────────────────────────────────────────────────────
@@ -61,6 +63,13 @@ async def with_retry(
     for attempt in range(1, max_attempts + 1):
         try:
             return await coro_fn()
+        except AgentError as exc:
+            # Honour the error taxonomy's retryable flag — a non-retryable
+            # AgentError (bad args, permission denied) must fail fast instead
+            # of burning three attempts on a permanent failure.
+            if not exc.retryable:
+                raise
+            last_exc = exc
         except _NO_RETRY as exc:
             raise
         except RuntimeError as exc:
@@ -304,3 +313,25 @@ def rate_limited(
         return wrapper
 
     return decorator
+
+
+# ── Result inspection ─────────────────────────────────────────────────────────────────────
+
+def result_is_ok(output: Any) -> bool:
+    """Whether a tool result represents success.
+
+    Tools return a dict; a failure carries an "error" key (see idempotent_tool,
+    which only caches dicts without one). The Agents SDK sometimes serializes
+    the output to a JSON string, so parse that too. Unknown shapes default to
+    ok — never report a working tool as failed.
+    """
+    if isinstance(output, dict):
+        return "error" not in output
+    if isinstance(output, str):
+        try:
+            parsed = json.loads(output)
+        except (json.JSONDecodeError, ValueError):
+            return True
+        if isinstance(parsed, dict):
+            return "error" not in parsed
+    return True

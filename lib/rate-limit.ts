@@ -86,7 +86,11 @@ export async function checkRateLimit(
       const memCount = memIncr(key, windowSeconds);
       return { allowed: memCount <= max };
     }
-    if (count === 1) await redis.expire(key, windowSeconds);
+    // EXPIRE … NX sets the TTL only when the key has none — covers the first
+    // increment AND self-heals a key whose earlier EXPIRE was skipped (a crash
+    // or transient error between INCR and EXPIRE). NX means a fixed window:
+    // the TTL is never extended while calls keep coming in.
+    await redis.expire(key, windowSeconds, 'NX');
     redisFailCount = 0; // Reset on success
     return { allowed: count <= max };
   } catch {

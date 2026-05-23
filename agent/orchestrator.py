@@ -35,11 +35,12 @@ from config import settings
 from db import supabase
 from memory.store import format_memories_for_prompt, load_memories, prune_expired, save_memory
 from schemas import AgentSettings, Space
-from security.budget import check_budget, record_usage
+from security.budget import acquire_run_lock, check_budget, record_usage, release_run_lock
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import fallback_models, resolve_chat_model
+from llm import extract_usage, fallback_models, resolve_chat_model
 from tools.streaming import publish_event
+from tools.base import result_is_ok
 from trajectories import normalize_tool_call, record_trajectory
 
 # ---------------------------------------------------------------------------
@@ -101,9 +102,10 @@ def _translate_tool_event(event: object) -> dict | None:
         summary = "" if output is None else str(output)
         if len(summary) > 300:
             summary = summary[:299] + "…"
+        ok = result_is_ok(output)
         return {
-            "message": f"{tool_name} done",
-            "metadata": {"tool": tool_name, "phase": "complete", "summary": summary},
+            "message": f"{tool_name} done" if ok else f"{tool_name} failed",
+            "metadata": {"tool": tool_name, "phase": "complete", "ok": ok, "summary": summary},
         }
 
     return None
@@ -124,13 +126,20 @@ async def _run_with_fallback(
     context,
     on_event=None,
 ) -> object:
-    """Run the agent, falling back through _FALLBACK_MODELS on 429 errors.
+    """Run the agent, falling back through _FALLBACK_MODELS on 429/404 errors.
 
-    The agent's model attribute is patched per attempt. On exhaustion raises
-    RuntimeError so the caller can surface a clean error rather than a bare
-    exception. `on_event` receives each SDK stream event; it should not raise.
+    The agent's model attribute is patched per attempt. Fallback stops the
+    moment a tool executes — re-running the agent after a committed side
+    effect would duplicate it (a second draft, a second write) — so a
+    mid-run error past that point surfaces instead of retrying. On
+    exhaustion raises RuntimeError so the caller can surface a clean error.
+    `on_event` receives each SDK stream event; it should not raise.
     """
     last_exc: Exception | None = None
+    # Once any tool has executed, its side effects are committed; a model
+    # fallback would replay the whole run and re-fire them. Past that point
+    # an error must surface, not retry.
+    tools_ran = False
     # Try the workspace's picked model first (whatever make_chippi_agent
     # built the agent with), then the OpenRouter fallback chain.
     models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
@@ -141,6 +150,8 @@ async def _run_with_fallback(
                 agent, input=input_data, run_config=run_config, context=context
             )
             async for event in result.stream_events():
+                if not tools_ran and _translate_tool_event(event) is not None:
+                    tools_ran = True
                 if on_event is not None:
                     try:
                         on_event(event)
@@ -151,11 +162,20 @@ async def _run_with_fallback(
         except (RateLimitError, APIStatusError) as exc:
             status = getattr(exc, "status_code", None)
             err_str = str(exc)
-            is_429 = isinstance(exc, RateLimitError) or status == 429 or "429" in err_str
-            if is_429 and i < len(models) - 1:
+            lower = err_str.lower()
+            # Fall through on a 429 (rate limit) OR a 404/model-not-found — a
+            # stale model slug must not hard-fail the whole run.
+            should_fallback = (
+                isinstance(exc, RateLimitError)
+                or status in (429, 404)
+                or "429" in err_str
+                or "model_not_found" in lower
+                or "does not exist" in lower
+            )
+            if should_fallback and not tools_ran and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
-                    "model_rate_limited_falling_back",
+                    "model_falling_back",
                     model=model,
                     next_model=next_model,
                     attempt=i + 1,
@@ -166,10 +186,17 @@ async def _run_with_fallback(
             raise
         except Exception as exc:
             err_str = str(exc)
-            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(models) - 1:
+            lower = err_str.lower()
+            should_fallback = (
+                "429" in err_str
+                or "rate_limit" in lower
+                or "model_not_found" in lower
+                or "does not exist" in lower
+            )
+            if should_fallback and not tools_ran and i < len(models) - 1:
                 next_model = models[i + 1]
                 logger.warning(
-                    "model_rate_limited_falling_back",
+                    "model_falling_back",
                     model=model,
                     next_model=next_model,
                     attempt=i + 1,
@@ -178,7 +205,7 @@ async def _run_with_fallback(
                 last_exc = exc
                 continue
             raise
-    raise RuntimeError(f"All models exhausted after rate-limit errors") from last_exc
+    raise RuntimeError("All models exhausted") from last_exc
 
 
 async def pop_triggers(space_id: str) -> list[dict]:
@@ -194,14 +221,11 @@ async def pop_triggers(space_id: str) -> list[dict]:
             return []
         r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
         key = f"agent:triggers:{space_id}"
-        # Read up to 10 from the head, then trim only what we read. The old
-        # `lrange + delete` had two bugs: (1) a producer-side RPUSH between
-        # those two calls was silently wiped, (2) if there were more than 10
-        # pending, items 11+ were also deleted without being processed. LTRIM
-        # to len(items) leaves the overflow for the next call.
-        items = await r.lrange(key, 0, 9)
-        if items:
-            await r.ltrim(key, len(items), -1)
+        # Atomically pop up to 10 from the head. LPOP-with-count is a single
+        # Redis op, so two concurrent runs for the same space can't both read
+        # the same items — the lrange+ltrim it replaced was two ops and
+        # double-processed triggers whenever runs overlapped.
+        items = await r.lpop(key, 10)
         parsed = []
         for item in (items or []):
             try:
@@ -219,6 +243,45 @@ async def pop_triggers(space_id: str) -> list[dict]:
         # never process the queued lead/tour/stage events. Log it.
         logger.warning("pop_triggers_failed", space_id=space_id, error=str(exc)[:200])
         return []
+
+
+async def requeue_triggers(
+    space_id: str, triggers: list[dict], *, increment_attempts: bool
+) -> None:
+    """Push triggers back onto the queue when a run didn't process them.
+
+    A crashed run would otherwise drop the realtor's events silently. When
+    `increment_attempts` is set (a genuine failure) a per-trigger counter
+    caps retries — a poison trigger is dropped after 3 attempts rather than
+    looping forever; a deferral (guardrail block) re-queues without counting.
+    """
+    if not triggers:
+        return
+    try:
+        from upstash_redis.asyncio import Redis
+
+        if not settings.kv_rest_api_url or not settings.kv_rest_api_token:
+            return
+        r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
+        key = f"agent:triggers:{space_id}"
+        survivors: list[str] = []
+        for t in triggers:
+            if increment_attempts:
+                attempts = int(t.get("_attempts", 0)) + 1
+                if attempts > 3:
+                    logger.warning(
+                        "trigger_dropped_after_retries",
+                        space_id=space_id,
+                        event=t.get("event"),
+                    )
+                    continue
+                t["_attempts"] = attempts
+            survivors.append(json.dumps(t))
+        if survivors:
+            # LPUSH to the head so the retry is the next run's first work.
+            await r.lpush(key, *reversed(survivors))
+    except Exception as exc:
+        logger.warning("requeue_triggers_failed", space_id=space_id, error=str(exc)[:200])
 
 
 def _build_opening_prompt(
@@ -244,7 +307,7 @@ def _build_opening_prompt(
             "summarising what the routine did."
         )
     elif triggers:
-        valid = {
+        known = {
             "new_lead",
             "tour_completed",
             "deal_stage_changed",
@@ -255,8 +318,16 @@ def _build_opening_prompt(
         lines = []
         for t in triggers:
             event = t.get("event", "")
-            if event not in valid:
+            # run_now is a bare wake signal (the "Run now" button and its
+            # Modal-down fallback). It carries no specific action — drained so
+            # the queue empties, then the run falls through to sweep mode.
+            if not event or event == "run_now":
                 continue
+            # An unrecognised event is still a real workspace event — surface
+            # it rather than silently dropping it (it was already consumed
+            # from Redis). Just flag the producer/consumer drift.
+            if event not in known:
+                logger.warning("trigger_unknown_event", event=event, space_id=space.id)
             parts = [f"- {event}"]
             if t.get("contactId"):
                 parts.append(f"contactId: {t['contactId']}")
@@ -320,7 +391,39 @@ async def run_agent_for_space(
         routines cron. When set, the run focuses solely on that instruction
         and leaves the trigger queue untouched for a trigger-driven run.
     """
+    # Respect the on/off switch. The realtor can pause Chippi from the
+    # header; an autonomous run must honour that.
+    if not agent_settings.enabled:
+        logger.bind(space_id=space.id, space_slug=space.slug).info("agent_run_skipped_disabled")
+        return
+
+    # One autonomous run per space at a time. Two concurrent runs would both
+    # sweep the same stale leads and draft the same follow-ups — duplicate
+    # drafts in the realtor's inbox — and would both pass the daily-budget
+    # check before either recorded usage, overspending the cap. The lock
+    # closes both holes and auto-expires past Modal's timeout, so a crash
+    # can't wedge the space.
     run_id = str(uuid.uuid4())
+    if not await acquire_run_lock(space.id, run_id):
+        logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
+        return
+    try:
+        await _run_locked(space, agent_settings, run_id, instruction)
+    finally:
+        await release_run_lock(space.id, run_id)
+
+
+async def _run_locked(
+    space: Space,
+    agent_settings: AgentSettings,
+    run_id: str,
+    instruction: str | None,
+) -> None:
+    """Execute one autonomous run with the per-space run lock held.
+
+    Always invoked by `run_agent_for_space`, which owns the lock's
+    lifecycle — never call this directly.
+    """
     started_at = datetime.now(timezone.utc)
     # Tool-call accumulator for the trajectory record written at end-of-run.
     # Filled by on_event below; passed to record_trajectory on every exit
@@ -328,13 +431,6 @@ async def run_agent_for_space(
     # for why this materialized record exists alongside the per-system logs.
     trajectory_tool_calls: list[dict] = []
     log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
-
-    # Respect the on/off switch. The realtor can pause Chippi from the header;
-    # an autonomous run must honour that. (Previously ignored — the cron swept
-    # every active space regardless of whether the agent was enabled.)
-    if not agent_settings.enabled:
-        log.info("agent_run_skipped_disabled")
-        return
 
     if not await check_budget(space.id, agent_settings.daily_token_budget):
         log.warning("agent_run_skipped_budget_exhausted")
@@ -390,6 +486,10 @@ async def run_agent_for_space(
     # Workspace info — mirrors the chat path so autonomous drafts include
     # the realtor's intake URL where it's useful.
     _app_url = (settings.app_url or "").rstrip("/")
+    # A localhost app_url (NEXT_PUBLIC_APP_URL missing from the Modal secret)
+    # must never become a customer-facing intake link in a drafted message.
+    if "localhost" in _app_url or "127.0.0.1" in _app_url:
+        _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
     workspace_info = (
         "# Your workspace\n"
@@ -411,7 +511,9 @@ async def run_agent_for_space(
 
     run_config = RunConfig(
         max_turns=settings.coordinator_max_turns,
-        tracing_disabled=False,
+        # Tracing exports only reach OpenAI's backend; disable on a pure-
+        # OpenRouter deploy, which may carry no OpenAI key at all.
+        tracing_disabled=bool(settings.openrouter_api_key),
         model_settings=ModelSettings(
             max_tokens=settings.max_output_tokens,
             truncation="auto",
@@ -433,18 +535,25 @@ async def run_agent_for_space(
     # Also captures the tool call into the trajectory accumulator. The two
     # paths share the same _translate_tool_event payload so the realtor's
     # live view and the offline trajectory record stay in lockstep.
+    # Tasks are kept in `publish_tasks` and drained in the finally below — a
+    # bare un-referenced create_task can be garbage-collected mid-flight, and
+    # the Modal container can tear down before the last events flush.
+    publish_tasks: list[asyncio.Task] = []
+
     def on_event(event: object) -> None:
         payload = _translate_tool_event(event)
         if payload is None:
             return
         trajectory_tool_calls.append(normalize_tool_call(payload))
-        asyncio.create_task(
-            publish_event(
-                ctx,
-                "action",
-                payload["message"],
-                metadata=payload["metadata"],
-                agent_type="chippi",
+        publish_tasks.append(
+            asyncio.create_task(
+                publish_event(
+                    ctx,
+                    "action",
+                    payload["message"],
+                    metadata=payload["metadata"],
+                    agent_type="chippi",
+                )
             )
         )
 
@@ -453,12 +562,8 @@ async def run_agent_for_space(
         # Streaming mode so on_event fires per tool call / result.
         result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
 
-        usage = getattr(result, "usage", None)
-        if usage:
-            tokens_in = getattr(usage, "input_tokens", 0) or 0
-            tokens_out = getattr(usage, "output_tokens", 0) or 0
-            total_tokens = getattr(usage, "total_tokens", 0) or (tokens_in + tokens_out)
-            ctx.tokens_used = total_tokens
+        _, _, total_tokens = extract_usage(result)
+        ctx.tokens_used = total_tokens
 
         final_output = getattr(result, "final_output", None)
         if isinstance(final_output, str):
@@ -470,6 +575,9 @@ async def run_agent_for_space(
         info = exc.guardrail_result.output.output_info or {}
         pending = info.get("pending_drafts", "?")
         log.info("agent_run_blocked_input_guardrail", pending_drafts=pending)
+        # Deferred, not failed — re-queue the triggers (no attempt increment)
+        # so the events still get processed once the drafts are reviewed.
+        await requeue_triggers(space.id, triggers, increment_attempts=False)
         await publish_event(
             ctx, "info",
             f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
@@ -490,6 +598,9 @@ async def run_agent_for_space(
 
     except Exception as exc:
         log.exception("agent_run_failed")
+        # Re-queue so a crashed run doesn't silently drop the realtor's
+        # events; the per-trigger attempt cap stops a poison trigger looping.
+        await requeue_triggers(space.id, triggers, increment_attempts=True)
         await publish_event(ctx, "error", f"Agent error: {exc}", agent_type="chippi")
         # Make the failure visible. A swallowed error leaves the realtor's
         # activity feed blank with no signal that a run even happened.
@@ -520,6 +631,11 @@ async def run_agent_for_space(
             extra={"error": str(exc)[:500]},
         )
         return
+    finally:
+        # Drain the fire-and-forget publish tasks so the realtor's activity
+        # feed gets every tool event before the Modal container exits.
+        if publish_tasks:
+            await asyncio.gather(*publish_tasks, return_exceptions=True)
 
     if total_tokens > 0:
         memory_content = (
