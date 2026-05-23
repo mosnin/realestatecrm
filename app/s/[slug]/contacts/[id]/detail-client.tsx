@@ -265,7 +265,7 @@ export function LastActivityLine({
       }
     })();
     return () => {
-      cancelled = false;
+      cancelled = true;
     };
   }, [contactId, contactFirstName]);
 

@@ -5,7 +5,16 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_TYPES = new Set(['QUALIFICATION', 'TOUR', 'APPLICATION']);
 
+// 1 MB ceiling — 500 rows × generous per-row size is comfortably under this.
+// Cuts off pathological JSON bodies before parsing into memory.
+const MAX_BODY_BYTES = 1_048_576;
+
 export async function POST(req: NextRequest) {
+  const contentLength = req.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+  }
+
   const body = await req.json();
   const { slug, rows } = body as {
     slug: string;

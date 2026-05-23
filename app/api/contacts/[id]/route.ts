@@ -120,10 +120,46 @@ export async function PATCH(
     if (body.address !== undefined) updates.address = body.address ? String(body.address).slice(0, 500) : null;
     if (body.notes !== undefined) updates.notes = body.notes ? String(body.notes).slice(0, 5000) : null;
     if (body.preferences !== undefined) updates.preferences = body.preferences ? String(body.preferences).slice(0, 5000) : null;
-    if (body.properties !== undefined) updates.properties = body.properties ?? [];
-    if (body.tags !== undefined) updates.tags = body.tags ?? [];
-    if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
-    if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
+    if (body.properties !== undefined) {
+      if (!Array.isArray(body.properties)) {
+        return NextResponse.json({ error: 'properties must be an array' }, { status: 400 });
+      }
+      if (body.properties.length > 50) {
+        return NextResponse.json({ error: 'properties: max 50 entries' }, { status: 400 });
+      }
+      updates.properties = body.properties
+        .filter((p: unknown): p is string => typeof p === 'string')
+        .map((p: string) => p.slice(0, 500));
+    }
+    if (body.tags !== undefined) {
+      if (!Array.isArray(body.tags)) {
+        return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
+      }
+      if (body.tags.length > 50) {
+        return NextResponse.json({ error: 'tags: max 50 entries' }, { status: 400 });
+      }
+      updates.tags = body.tags
+        .filter((t: unknown): t is string => typeof t === 'string')
+        .map((t: string) => t.slice(0, 100));
+    }
+    if (body.followUpAt !== undefined) {
+      if (body.followUpAt === null || body.followUpAt === '') {
+        updates.followUpAt = null;
+      } else {
+        const d = new Date(body.followUpAt);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid followUpAt' }, { status: 400 });
+        updates.followUpAt = d.toISOString();
+      }
+    }
+    if (body.lastContactedAt !== undefined) {
+      if (body.lastContactedAt === null || body.lastContactedAt === '') {
+        updates.lastContactedAt = null;
+      } else {
+        const d = new Date(body.lastContactedAt);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid lastContactedAt' }, { status: 400 });
+        updates.lastContactedAt = d.toISOString();
+      }
+    }
     if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel ? String(body.sourceLabel).slice(0, 200) : null;
     if (body.referralSource !== undefined) {
       updates.referralSource = body.referralSource ? String(body.referralSource).trim().slice(0, 200) : null;

@@ -9,6 +9,10 @@ export const runtime = 'nodejs';
 // one-or-two-sentence note, so 500 chars is a generous ceiling.
 const MAX_INPUT_CHARS = 500;
 
+// 32 KB body ceiling — the parsed text is capped at 500 chars; the body has no
+// reason to be larger than this. Stops a 100 MB JSON from being parsed first.
+const MAX_BODY_BYTES = 32_768;
+
 // Match the API contract documented in the modal.
 type ParsedContact = {
   name: string;
@@ -59,6 +63,11 @@ function badRequest(error: string, code: ParseError['code']): NextResponse {
 }
 
 export async function POST(req: NextRequest) {
+  const contentLength = req.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+    return badRequest('Request body too large', 'invalid_input');
+  }
+
   let body: unknown;
   try {
     body = await req.json();

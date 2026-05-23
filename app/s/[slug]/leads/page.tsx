@@ -35,7 +35,7 @@ export default async function LeadsPage({
       .is('brokerageId', null) // Exclude brokerage leads
       .contains('tags', ['application-link'])
       .order('createdAt', { ascending: false })
-      .limit(100);
+      .limit(500);
     if (error) throw error;
     leads = (data ?? []) as Contact[];
   } catch (err) {
@@ -58,7 +58,10 @@ export default async function LeadsPage({
     );
   }
 
-  // Mark new leads as read (clear new-lead tag)
+  // Mark new leads as read (clear new-lead tag). One UPDATE per row — the
+  // existing tags differ between rows, so a single bulk update with one value
+  // would clobber them. Still cheap at ≤500 rows. Logged loudly so a silent
+  // failure mode (DB write fails, badge stays forever) gets caught.
   const unreadLeads = leads.filter((lead) => lead.tags.includes('new-lead'));
   if (unreadLeads.length) {
     try {
@@ -72,8 +75,12 @@ export default async function LeadsPage({
             .eq('spaceId', space.id);
         }),
       );
-    } catch {
-      // non-blocking
+    } catch (err) {
+      console.error('[leads] failed to clear new-lead tags', {
+        spaceId: space.id,
+        count: unreadLeads.length,
+        error: err,
+      });
     }
   }
 
