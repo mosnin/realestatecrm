@@ -97,7 +97,27 @@ export async function PATCH(
   if (new Date(effectiveEnd as string) <= new Date(effectiveStart as string)) {
     return NextResponse.json({ error: 'endsAt must be after startsAt' }, { status: 400 });
   }
-  if (body.contactId !== undefined) update.contactId = body.contactId || null;
+  // Validate the new contactId belongs to the SAME space — without this,
+  // an owner could link their tour to a contact from another space, and
+  // the /[id]/prep route would then pull cross-space contact data into
+  // this tour's prep card.
+  if (body.contactId !== undefined) {
+    if (body.contactId) {
+      const { data: contactRow, error: cErr } = await supabase
+        .from('Contact')
+        .select('id')
+        .eq('id', body.contactId)
+        .eq('spaceId', ctx.space.id)
+        .maybeSingle();
+      if (cErr) throw cErr;
+      if (!contactRow) {
+        return NextResponse.json({ error: 'Contact not found in this space' }, { status: 400 });
+      }
+      update.contactId = contactRow.id;
+    } else {
+      update.contactId = null;
+    }
+  }
 
   const { data, error } = await supabase
     .from('Tour')

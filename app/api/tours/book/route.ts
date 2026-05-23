@@ -9,7 +9,11 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
-  const { allowed } = await checkRateLimit(`book:rl:${ip}`, 10, 3600);
+  // Per-IP cap — tightened from 10 to 3/hour. The booking endpoint sends a
+  // real-looking confirmation email to whatever `guestEmail` is provided,
+  // which is a platform-as-spammer amplifier. A single IP shouldn't be
+  // legitimately booking 3+ tours per hour.
+  const { allowed } = await checkRateLimit(`book:rl:${ip}`, 3, 3600);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const body = await req.json();
@@ -20,8 +24,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'guestName, guestEmail, startsAt required' }, { status: 400 });
   }
 
+  // Length check FIRST — defends against running the regex on a multi-MB
+  // string (ReDoS-ish CPU burn).
+  if (guestEmail.length > 254) {
+    return NextResponse.json({ error: 'Email too long' }, { status: 400 });
+  }
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(guestEmail.trim()) || guestEmail.length > 254) {
+  if (!emailRegex.test(guestEmail.trim())) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
 
@@ -33,6 +42,15 @@ export async function POST(req: NextRequest) {
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+
+  // Per-space cap — catches distributed attacks (botnets rotating IPs) hitting
+  // a single victim space. A real space gets at most a handful of bookings per
+  // hour; 20 is well above legitimate traffic and well below the daily volume
+  // a spammer would want.
+  const spaceCheck = await checkRateLimit(`book:space:${space.id}`, 20, 3600);
+  if (!spaceCheck.allowed) {
+    return NextResponse.json({ error: 'Too many requests for this space' }, { status: 429 });
+  }
 
   // Get duration from settings
   const { data: settings } = await supabase
