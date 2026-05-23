@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation';
-import { getSpaceFromSlug } from '@/lib/space';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { DealsPageClient } from '@/components/deals/deals-page-client';
 
 export default async function DealsPage({
@@ -8,6 +9,10 @@ export default async function DealsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  // Middleware only requires login; ownership of /s/[slug] is enforced here.
+  const { userId } = await auth();
+  if (!userId) redirect('/login/realtor');
 
   let space;
   try {
@@ -25,6 +30,9 @@ export default async function DealsPage({
     );
   }
   if (!space) notFound();
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) notFound();
 
   return <DealsPageClient slug={slug} />;
 }

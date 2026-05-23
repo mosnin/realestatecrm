@@ -316,6 +316,8 @@ export type Deal = {
   stageId: string;
   position: number;
   status: 'active' | 'won' | 'lost' | 'on_hold';
+  /** Bumped whenever stageId changes; the Deal moved to its current stage at this instant. */
+  stageChangedAt: Date | null;
   followUpAt: Date | null;
   commissionRate: number | null;
   probability: number | null;

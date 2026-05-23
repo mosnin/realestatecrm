@@ -36,7 +36,7 @@ export async function GET(
   const [stageResult, dcResult, activityResult] = await Promise.all([
     supabase.from('DealStage').select('*').eq('id', deal.stageId).maybeSingle(),
     supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
-    supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
+    supabase.from('DealActivity').select('*').eq('dealId', id).eq('spaceId', ctx.space.id).order('createdAt', { ascending: false }).limit(50),
   ]);
 
   if (stageResult.error && stageResult.error.code !== 'PGRST116') throw stageResult.error;
@@ -221,31 +221,60 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid priority' }, { status: 400 });
     }
 
-    // Handle dealContacts replacement — verify all contacts belong to this space
+    // Handle dealContacts replacement — diff-based instead of delete-all-then-insert.
+    // The old approach left the list empty between the DELETE and the INSERT, so
+    // two concurrent PATCHes raced (both DELETE, then both INSERT — losing the
+    // other side's edits). A failed INSERT after a successful DELETE left the
+    // deal with NO contacts. Computing the add/remove diff keeps the list in a
+    // valid intermediate state at every step.
     if (body.contactIds) {
-      const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
-      if (delError) {
-        console.error('[deals/PATCH] dealContact delete error:', delError);
-        return NextResponse.json({ error: 'Failed to update deal contacts' }, { status: 500 });
+      const { data: existingRows, error: exErr } = await supabase
+        .from('DealContact')
+        .select('contactId')
+        .eq('dealId', id);
+      if (exErr) {
+        console.error('[deals/PATCH] dealContact fetch error:', exErr);
+        return NextResponse.json({ error: 'Failed to read deal contacts' }, { status: 500 });
       }
-      if (body.contactIds.length > 0) {
+      const existingIds = new Set<string>((existingRows ?? []).map((r: { contactId: string }) => r.contactId));
+
+      const wantedRaw = body.contactIds as string[];
+      let wantedIds: Set<string>;
+      if (wantedRaw.length > 0) {
         const { data: validContacts, error: vcError } = await supabase
           .from('Contact')
           .select('id')
-          .in('id', body.contactIds)
+          .in('id', wantedRaw)
           .eq('spaceId', space.id);
         if (vcError) {
           console.error('[deals/PATCH] contact validation error:', vcError);
           return NextResponse.json({ error: 'Failed to validate contacts' }, { status: 500 });
         }
-        const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
-        const dcInserts = (body.contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId: id, contactId: cId }));
-        if (dcInserts.length > 0) {
-          const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
-          if (insertError) {
-            console.error('[deals/PATCH] dealContact insert error:', insertError);
-            return NextResponse.json({ error: 'Failed to link contacts' }, { status: 500 });
-          }
+        wantedIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+      } else {
+        wantedIds = new Set();
+      }
+
+      const toRemove = [...existingIds].filter((cId) => !wantedIds.has(cId));
+      const toAdd = [...wantedIds].filter((cId) => !existingIds.has(cId));
+
+      if (toRemove.length > 0) {
+        const { error: delError } = await supabase
+          .from('DealContact')
+          .delete()
+          .eq('dealId', id)
+          .in('contactId', toRemove);
+        if (delError) {
+          console.error('[deals/PATCH] dealContact delete error:', delError);
+          return NextResponse.json({ error: 'Failed to update deal contacts' }, { status: 500 });
+        }
+      }
+      if (toAdd.length > 0) {
+        const dcInserts = toAdd.map((cId) => ({ dealId: id, contactId: cId }));
+        const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+        if (insertError) {
+          console.error('[deals/PATCH] dealContact insert error:', insertError);
+          return NextResponse.json({ error: 'Failed to link contacts' }, { status: 500 });
         }
       }
     }
@@ -264,6 +293,10 @@ export async function PATCH(
         ...(body.stageId !== undefined && { stageId: body.stageId }),
         ...(body.position !== undefined && { position: body.position }),
         ...(body.status !== undefined && { status: body.status }),
+        // When stageId changes, stamp stageChangedAt so daysInStage actually
+        // reflects "time in current stage" — not "time since any field edit".
+        // Mirrors the Contact behaviour added in migration 20260316000004.
+        ...(stageChanged && { stageChangedAt: new Date().toISOString() }),
         ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
@@ -386,7 +419,11 @@ export async function DELETE(
 
   const deal = dealRows[0];
 
-  const { error: deleteError } = await supabase.from('Deal').delete().eq('id', id);
+  const { error: deleteError } = await supabase
+    .from('Deal')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (deleteError) throw deleteError;
   deleteDealVector(deal.spaceId, id).catch(console.error);
   void audit({

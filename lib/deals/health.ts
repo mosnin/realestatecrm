@@ -42,17 +42,37 @@ function daysBetween(a: Date, b: Date): number {
  *
  * Won / lost / on-hold deals always return 'on-track' — they aren't in flight.
  */
-export function dealHealth(
-  deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'nextAction' | 'nextActionDueAt'>,
-): DealHealthMeta {
+// stageChangedAt is optional in the input so callers that pre-date the column
+// (broker pipeline, morning routes, old tests) keep compiling. Internally we
+// prefer it when present and fall back to updatedAt when not.
+type DealHealthInput = {
+  status: Deal['status'];
+  stageChangedAt?: Deal['stageChangedAt'];
+  updatedAt?: Deal['updatedAt'];
+  closeDate: Deal['closeDate'];
+  followUpAt: Deal['followUpAt'];
+  nextAction: Deal['nextAction'];
+  nextActionDueAt: Deal['nextActionDueAt'];
+};
+
+export function dealHealth(deal: DealHealthInput): DealHealthMeta {
   if (deal.status !== 'active') return { state: 'on-track', reason: '' };
 
   const today = startOfToday();
 
-  // Stage age (proxy: updatedAt — same limitation the existing card has).
-  const updated = deal.updatedAt ? new Date(deal.updatedAt) : null;
-  const stageDays = updated && !isNaN(updated.getTime())
-    ? daysBetween(today, new Date(updated.getFullYear(), updated.getMonth(), updated.getDate()))
+  // Days the deal has sat in its current stage. `stageChangedAt` is bumped by
+  // PATCH /api/deals/[id] whenever stageId changes (and by POST /api/deals
+  // when the deal is first created). Pre-migration rows were backfilled to
+  // updatedAt so daysInStage isn't null for old data — but `updatedAt` is a
+  // misleading fallback (any field edit bumps it), so we prefer null over
+  // wrong, and fall back to updatedAt only if stageChangedAt is missing.
+  const stageRef = deal.stageChangedAt
+    ? new Date(deal.stageChangedAt as unknown as string)
+    : deal.updatedAt
+      ? new Date(deal.updatedAt as unknown as string)
+      : null;
+  const stageDays = stageRef && !isNaN(stageRef.getTime())
+    ? daysBetween(today, new Date(stageRef.getFullYear(), stageRef.getMonth(), stageRef.getDate()))
     : null;
 
   // Expected close date — overdue means something the realtor expected to close
