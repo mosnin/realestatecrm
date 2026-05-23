@@ -81,14 +81,25 @@ export const publishScheduledPost = inngest.createFunction(
       return { failed: 'missing image' };
     }
 
-    // Claim it so a duplicate event can't double-publish.
-    await step.run('claim', async () => {
-      await supabase
+    // Claim it so a duplicate event can't double-publish. Compare-and-swap
+    // on `status='scheduled'` — Inngest is at-least-once, so two concurrent
+    // deliveries can both read the row at 'scheduled', and without the CAS
+    // both would update to 'publishing' and post twice. If the CAS returns
+    // no row, another worker already claimed it; bail.
+    const claim = await step.run('claim', async () => {
+      const { data: claimedRow, error: claimErr } = await supabase
         .from('StudioPost')
         .update({ status: 'publishing', updatedAt: new Date().toISOString() })
-        .eq('id', postId);
-      return { done: true };
+        .eq('id', postId)
+        .eq('status', 'scheduled')
+        .select('id')
+        .maybeSingle();
+      if (claimErr) throw claimErr;
+      return { claimed: claimedRow !== null };
     });
+    if (!claim.claimed) {
+      return { skipped: 'already claimed by another worker' };
+    }
 
     const imageUrl = await step.run('sign-image', () =>
       getSignedDownloadUrl(post.storageKey as string, 3600),

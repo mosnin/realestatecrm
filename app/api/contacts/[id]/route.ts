@@ -197,6 +197,12 @@ export async function PATCH(
       .from('Contact')
       .update(updates)
       .eq('id', id)
+      // Scope by spaceId too — the existence check above proved the row
+      // is in this space NOW, but between check and write the row could
+      // theoretically be reassigned (admin tool, future cross-space
+      // merge). Adding the scope makes the write a CAS on space ownership
+      // — TOCTOU-safe.
+      .eq('spaceId', space.id)
       .select()
       .single();
     if (updateError) {

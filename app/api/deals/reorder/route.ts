@@ -44,6 +44,21 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Re-verify the deal STILL belongs to this space immediately before the
+  // RPC — closes the TOCTOU window between the lookup above and the RPC.
+  // The RPC itself updates by id alone; without this check a between-
+  // check-and-write reassignment could let realtor A reorder realtor B's
+  // pipeline.
+  const { data: dealStill } = await supabase
+    .from('Deal')
+    .select('id')
+    .eq('id', dealId)
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  if (!dealStill) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   // Atomically shift affected deals and move the deal via a DB function.
   // This replaces the previous N individual updates which had a race condition
   // under concurrent drag-and-drop: two requests could both read the same

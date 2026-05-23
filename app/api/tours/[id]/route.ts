@@ -123,6 +123,10 @@ export async function PATCH(
     .from('Tour')
     .update(update)
     .eq('id', id)
+    // resolveTour proved space ownership at read time; scope the write
+    // by spaceId too so a between-check-and-write reassignment can't
+    // cross-tenant the row.
+    .eq('spaceId', ctx.space.id)
     .select()
     .single();
   if (error) throw error;
@@ -210,7 +214,12 @@ export async function DELETE(
   const ctx = await resolveTour(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase.from('Tour').delete().eq('id', id);
+  const { error } = await supabase
+    .from('Tour')
+    .delete()
+    .eq('id', id)
+    // Scope by spaceId so the delete can't cross-tenant on reassignment.
+    .eq('spaceId', ctx.space.id);
   if (error) throw error;
 
   return NextResponse.json({ success: true });
