@@ -24,6 +24,78 @@ from config import settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+
+# ---------------------------------------------------------------------------
+# SDK schema patches — applied on module import, before any Agent runs.
+#
+# openai 1.97+ made `logprobs` required on ResponseTextDeltaEvent (and
+# `refusal` on the related delta event), but openai-agents 0.0.x streams
+# chat-completions chunks from non-OpenAI providers (OpenRouter et al.)
+# WITHOUT those fields, so every chat turn dies on pydantic with
+# `Field required [type=missing, ...]` before the first token. Upstream
+# fixes shipped in openai-python (PR #2500) and openai-agents 0.2.x
+# (PR #1246); neither is in the version line we're pinned to (the cap
+# `openai-agents<0.1` is load-bearing because translate() in modal_app.py
+# matches event class names that moved between 0.0 and 0.2).
+#
+# Inject a default for the missing fields on the construction paths the
+# SDK uses (__init__ for direct kwargs, model_validate for dict input).
+# Idempotent and version-tolerant — if the field already has a default or
+# the event class isn't present in the installed openai, the patch is a
+# no-op.
+# ---------------------------------------------------------------------------
+def _patch_openai_event_schemas() -> None:
+    try:
+        from openai.types.responses import (
+            ResponseTextDeltaEvent,
+        )
+    except ImportError:
+        return
+
+    event_classes_and_fields = [
+        (ResponseTextDeltaEvent, {"logprobs": list}),
+    ]
+    # Refusal event is in newer openai versions only — wire it up if present.
+    try:
+        from openai.types.responses import ResponseRefusalDeltaEvent
+
+        event_classes_and_fields.append((ResponseRefusalDeltaEvent, {"logprobs": list}))
+    except ImportError:
+        pass
+
+    for cls, field_defaults in event_classes_and_fields:
+        if getattr(cls, "_chippi_patched", False):
+            continue
+
+        orig_init = cls.__init__
+        orig_model_validate = cls.model_validate
+
+        def make_patched_init(orig, defaults):
+            def patched_init(self, /, **data):
+                for name, factory in defaults.items():
+                    data.setdefault(name, factory())
+                orig(self, **data)
+            return patched_init
+
+        def make_patched_validate(orig, defaults):
+            def patched_validate(obj, *args, **kwargs):
+                if isinstance(obj, dict):
+                    needs_default = any(name not in obj for name in defaults)
+                    if needs_default:
+                        obj = dict(obj)
+                        for name, factory in defaults.items():
+                            obj.setdefault(name, factory())
+                return orig(obj, *args, **kwargs)
+            return patched_validate
+
+        cls.__init__ = make_patched_init(orig_init, field_defaults)
+        cls.model_validate = make_patched_validate(orig_model_validate, field_defaults)
+        cls._chippi_patched = True
+
+
+_patch_openai_event_schemas()
+
+
 # The model a workspace gets when it hasn't picked one. OpenRouter slug.
 DEFAULT_CHAT_MODEL = "x-ai/grok-4.3"
 
