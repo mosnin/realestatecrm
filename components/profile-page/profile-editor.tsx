@@ -5,11 +5,10 @@
  *
  * Reads and writes the ProfilePage row through /api/profile-page. The
  * realtor's photo, logo, accent colour, and light/dark theme aren't here
- * — those are inherited from the workspace branding (Settings → Profile
- * and the page-appearance setup), so the public page, the application,
- * and the booking page all stay visually identical. This screen owns
- * only the page-specific bits: live toggle, headline, which sections
- * show, and the custom links (each with an optional thumbnail).
+ * — those are inherited from the workspace branding, so the public page,
+ * the application, and the booking page all stay visually identical. This
+ * screen owns the page-specific bits: live toggle, headline, which
+ * sections show, featured YouTube videos, and the custom links.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -22,12 +21,14 @@ import {
   Copy,
   Check,
   ImagePlus,
+  Play,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { parseYouTubeId, youTubeThumbnail } from '@/lib/profile-page';
 import { BODY_MUTED, CAPTION, PRIMARY_PILL } from '@/lib/typography';
 
 interface CustomLink {
@@ -37,11 +38,18 @@ interface CustomLink {
   thumbnail: string;
 }
 
+interface VideoItem {
+  id: string;
+  url: string;
+  title: string;
+}
+
 const MAX_LINKS = 20;
+const MAX_VIDEOS = 12;
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return `link-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function ProfileEditor({ slug }: { slug: string }) {
@@ -54,6 +62,7 @@ export function ProfileEditor({ slug }: { slug: string }) {
   const [showTours, setShowTours] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,23 +111,40 @@ export function ProfileEditor({ slug }: { slug: string }) {
           }))
         : [],
     );
-  }
-
-  function updateLink(id: string, patch: Partial<CustomLink>) {
-    setCustomLinks((links) =>
-      links.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    setVideos(
+      Array.isArray(data.videos)
+        ? (data.videos as Partial<VideoItem>[]).map((v) => ({
+            id: typeof v.id === 'string' && v.id ? v.id : newId(),
+            url: typeof v.url === 'string' ? v.url : '',
+            title: typeof v.title === 'string' ? v.title : '',
+          }))
+        : [],
     );
   }
 
+  function updateLink(id: string, patch: Partial<CustomLink>) {
+    setCustomLinks((links) => links.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  }
   function removeLink(id: string) {
     setCustomLinks((links) => links.filter((l) => l.id !== id));
   }
-
   function addLink() {
     setCustomLinks((links) =>
       links.length >= MAX_LINKS
         ? links
         : [...links, { id: newId(), label: '', url: '', thumbnail: '' }],
+    );
+  }
+
+  function updateVideo(id: string, patch: Partial<VideoItem>) {
+    setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  }
+  function removeVideo(id: string) {
+    setVideos((vs) => vs.filter((v) => v.id !== id));
+  }
+  function addVideo() {
+    setVideos((vs) =>
+      vs.length >= MAX_VIDEOS ? vs : [...vs, { id: newId(), url: '', title: '' }],
     );
   }
 
@@ -138,16 +164,21 @@ export function ProfileEditor({ slug }: { slug: string }) {
     e.preventDefault();
     setSaveError('');
 
-    const cleaned = customLinks
+    const cleanedLinks = customLinks
       .map((l) => ({ ...l, label: l.label.trim(), url: l.url.trim() }))
       .filter((l) => l.label || l.url);
-    const hasInvalid = cleaned.some(
-      (l) => !l.label || !/^https?:\/\//i.test(l.url),
-    );
-    if (hasInvalid) {
+    if (cleanedLinks.some((l) => !l.label || !/^https?:\/\//i.test(l.url))) {
       setSaveError(
         'Each link needs a label and a URL that starts with http:// or https://.',
       );
+      return;
+    }
+
+    const cleanedVideos = videos
+      .map((v) => ({ ...v, url: v.url.trim(), title: v.title.trim() }))
+      .filter((v) => v.url || v.title);
+    if (cleanedVideos.some((v) => !parseYouTubeId(v.url))) {
+      setSaveError('Each video needs a valid YouTube link.');
       return;
     }
 
@@ -162,7 +193,8 @@ export function ProfileEditor({ slug }: { slug: string }) {
           showIntake,
           showTours,
           showProperties,
-          customLinks: cleaned,
+          customLinks: cleanedLinks,
+          videos: cleanedVideos,
         }),
       });
       if (!res.ok) {
@@ -296,10 +328,7 @@ export function ProfileEditor({ slug }: { slug: string }) {
       </section>
 
       {/* ── Sections ───────────────────────────────────────────────────── */}
-      <section
-        id="sections"
-        className="scroll-mt-24 space-y-4 border-t border-border/60 pt-10"
-      >
+      <section className="space-y-4 border-t border-border/60 pt-10">
         <header className="space-y-1">
           <h2 className="text-base font-semibold">Sections</h2>
           <p className={BODY_MUTED}>What shows on the page, top to bottom.</p>
@@ -329,16 +358,54 @@ export function ProfileEditor({ slug }: { slug: string }) {
         </div>
       </section>
 
+      {/* ── Videos ─────────────────────────────────────────────────────── */}
+      <section className="space-y-4 border-t border-border/60 pt-10">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">Videos</h2>
+          <p className={BODY_MUTED}>
+            Paste a YouTube link — a property tour, a market update — and it
+            shows as a playable thumbnail in a &ldquo;Watch&rdquo; section.
+          </p>
+        </header>
+
+        {videos.length === 0 ? (
+          <p className={CAPTION}>No videos yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {videos.map((video) => (
+              <VideoRow
+                key={video.id}
+                video={video}
+                onChange={(patch) => updateVideo(video.id, patch)}
+                onRemove={() => removeVideo(video.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addVideo}
+          disabled={videos.length >= MAX_VIDEOS}
+        >
+          <Plus size={14} />
+          Add video
+        </Button>
+        {videos.length >= MAX_VIDEOS && (
+          <p className={CAPTION}>You&apos;ve reached the limit of {MAX_VIDEOS} videos.</p>
+        )}
+      </section>
+
       {/* ── Custom links ───────────────────────────────────────────────── */}
-      <section
-        id="links"
-        className="scroll-mt-24 space-y-4 border-t border-border/60 pt-10"
-      >
+      <section className="space-y-4 border-t border-border/60 pt-10">
         <header className="space-y-1">
           <h2 className="text-base font-semibold">Custom links</h2>
           <p className={BODY_MUTED}>
             Anything else worth a tap — your website, a saved-search page, a
-            review profile. Add an image to make a link stand out.
+            review profile. Links show the site&apos;s icon automatically; add
+            your own image to override it.
           </p>
         </header>
 
@@ -379,10 +446,7 @@ export function ProfileEditor({ slug }: { slug: string }) {
           <button
             type="submit"
             disabled={saving}
-            className={cn(
-              PRIMARY_PILL,
-              'disabled:cursor-not-allowed disabled:opacity-60',
-            )}
+            className={cn(PRIMARY_PILL, 'disabled:cursor-not-allowed disabled:opacity-60')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving' : 'Save changes'}
@@ -424,6 +488,69 @@ function ToggleRow({
         </Label>
         <p className={CAPTION}>{help}</p>
       </div>
+    </div>
+  );
+}
+
+function VideoRow({
+  video,
+  onChange,
+  onRemove,
+}: {
+  video: VideoItem;
+  onChange: (patch: Partial<VideoItem>) => void;
+  onRemove: () => void;
+}) {
+  const videoId = parseYouTubeId(video.url);
+  const showError = video.url.trim().length > 0 && !videoId;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-start gap-2">
+        <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-muted/30 text-muted-foreground">
+          {videoId ? (
+            <img
+              src={youTubeThumbnail(videoId)}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Play size={16} />
+          )}
+        </div>
+
+        <div className="flex-1 space-y-2">
+          <Input
+            value={video.url}
+            onChange={(e) => onChange({ url: e.target.value })}
+            placeholder="YouTube link"
+            maxLength={500}
+            inputMode="url"
+            aria-label="YouTube link"
+          />
+          <Input
+            value={video.title}
+            onChange={(e) => onChange({ title: e.target.value })}
+            placeholder="Title (optional)"
+            maxLength={120}
+            aria-label="Video title"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove video"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+      {showError && (
+        <p className="pl-[3.75rem] text-xs text-destructive">
+          That doesn&apos;t look like a YouTube link.
+        </p>
+      )}
     </div>
   );
 }

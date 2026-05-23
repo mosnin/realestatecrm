@@ -225,15 +225,25 @@ def _build_opening_prompt(
     space: Space,
     memory_context: str,
     triggers: list[dict],
+    instruction: str | None = None,
 ) -> str:
     """Frame the autonomous run for Chippi.
 
-    The opening message either lists the triggers to act on or asks for a
-    sweep when nothing specific fired.
+    The opening message either carries a routine's standing instruction,
+    lists the triggers to act on, or asks for a sweep when nothing fired.
     """
     now = datetime.now(timezone.utc).strftime("%A, %B %d, %Y at %H:%M UTC")
 
-    if triggers:
+    if instruction:
+        triggers_block = (
+            "ROUTINE — a standing instruction the realtor saved for Chippi "
+            "to run on a schedule. This run exists to carry it out:\n\n"
+            f'"{instruction}"\n\n'
+            "Do what it asks, now. If it means reaching out to someone, "
+            "DRAFT the message — never send. Finish with log_activity_run "
+            "summarising what the routine did."
+        )
+    elif triggers:
         valid = {
             "new_lead",
             "tour_completed",
@@ -290,12 +300,13 @@ def _build_opening_prompt(
 async def run_agent_for_space(
     space: Space,
     agent_settings: AgentSettings,
+    instruction: str | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
-    Called from Modal `run_now_webhook` (manual "Run now" or trigger-queue
-    drain) and the 4-hour cron sweep. Skips if the agent is disabled or the
-    space's daily token budget is exhausted.
+    Called from Modal `run_now_webhook` (manual "Run now", trigger-queue
+    drain, or a routine) and the 4-hour cron sweep. Skips if the agent is
+    disabled or the space's daily token budget is exhausted.
 
     Parameters
     ----------
@@ -304,6 +315,10 @@ async def run_agent_for_space(
     agent_settings:
         Per-space agent configuration including the enabled flag and the
         daily token budget.
+    instruction:
+        A routine's standing instruction, when this run was fired by the
+        routines cron. When set, the run focuses solely on that instruction
+        and leaves the trigger queue untouched for a trigger-driven run.
     """
     run_id = str(uuid.uuid4())
     started_at = datetime.now(timezone.utc)
@@ -340,14 +355,17 @@ async def run_agent_for_space(
     )
 
     ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
-    triggers = await pop_triggers(space.id)
+    # A routine run is scoped to its instruction — don't drain the trigger
+    # queue out from under a trigger-driven run.
+    triggers = [] if instruction else await pop_triggers(space.id)
     if triggers:
         log.info("triggers_found", count=len(triggers), events=[t.get("event") for t in triggers])
 
-    log.info("agent_run_started", trigger_count=len(triggers))
+    log.info("agent_run_started", trigger_count=len(triggers), routine=bool(instruction))
     await publish_event(
         ctx, "info",
-        f"Starting run for '{space.name}'" + (f" — {len(triggers)} trigger(s)" if triggers else " — sweep"),
+        f"Starting run for '{space.name}'"
+        + (" — routine" if instruction else f" — {len(triggers)} trigger(s)" if triggers else " — sweep"),
         agent_type="chippi",
     )
 
@@ -389,7 +407,7 @@ async def run_agent_for_space(
         workspace_info=workspace_info,
         model=resolve_chat_model(agent_settings.chat_model),
     )
-    prompt = _build_opening_prompt(space, memory_context, triggers)
+    prompt = _build_opening_prompt(space, memory_context, triggers, instruction)
 
     run_config = RunConfig(
         max_turns=settings.coordinator_max_turns,

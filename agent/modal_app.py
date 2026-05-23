@@ -178,6 +178,13 @@ async def run_now_webhook(item: dict) -> dict:
         if not space_id:
             return {"error": "space_id required"}
 
+        # Optional: a routine's standing instruction. When present the run is
+        # scoped to it; otherwise it's a trigger/sweep run.
+        raw_instruction = item.get("instruction")
+        instruction = (
+            raw_instruction.strip()[:600] if isinstance(raw_instruction, str) else ""
+        )
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -195,6 +202,7 @@ async def run_now_webhook(item: dict) -> dict:
         await run_agent_for_space(
             Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
             AgentSettings.model_validate(sr.data),
+            instruction=instruction or None,
         )
         return {"ok": True, "space_id": space_id}
 

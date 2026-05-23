@@ -1,6 +1,6 @@
 /**
  * GET   /api/profile-page — the realtor's public-page config (defaults if unset).
- * PATCH /api/profile-page — update enabled / headline / section toggles / links.
+ * PATCH /api/profile-page — update enabled / headline / section toggles / links / videos.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,10 +9,12 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { parseYouTubeId } from '@/lib/profile-page';
 
 export const runtime = 'nodejs';
 
-const SELECT = 'enabled, headline, showIntake, showTours, showProperties, customLinks';
+const SELECT =
+  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos';
 
 const DEFAULTS = {
   enabled: true,
@@ -20,7 +22,8 @@ const DEFAULTS = {
   showIntake: true,
   showTours: true,
   showProperties: true,
-  customLinks: [] as Array<{ id: string; label: string; url: string }>,
+  customLinks: [] as Array<{ id: string; label: string; url: string; thumbnail: string }>,
+  videos: [] as Array<{ id: string; url: string; title: string }>,
 };
 
 export async function GET() {
@@ -72,6 +75,18 @@ export async function PATCH(req: NextRequest) {
             : '',
       }))
       .filter((l) => l.label && /^https?:\/\//i.test(l.url));
+  }
+  if (Array.isArray(body.videos)) {
+    // Sanitize to [{ id, url, title }] — cap 12, only real YouTube URLs survive.
+    patch.videos = (body.videos as unknown[])
+      .filter((v): v is Record<string, unknown> => Boolean(v) && typeof v === 'object')
+      .slice(0, 12)
+      .map((v) => ({
+        id: typeof v.id === 'string' && v.id ? v.id : crypto.randomUUID(),
+        url: typeof v.url === 'string' ? v.url.trim().slice(0, 500) : '',
+        title: typeof v.title === 'string' ? v.title.trim().slice(0, 120) : '',
+      }))
+      .filter((v) => parseYouTubeId(v.url));
   }
 
   const { data, error } = await supabase

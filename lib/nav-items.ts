@@ -53,6 +53,7 @@ export const realtorNavItems: NavItem[] = [
     badgeKey: 'pendingDrafts',
     children: [
       { href: '/chippi/today', label: 'Full day' },
+      { href: '/routines', label: 'Routines' },
       { href: '/chippi/drafts', label: 'Drafts' },
       { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/memory', label: 'Memory' },
@@ -110,10 +111,6 @@ export const realtorNavItems: NavItem[] = [
     href: '/profile-page',
     label: 'Profile',
     icon: UserCircle,
-    children: [
-      { href: '/profile-page#sections', label: 'Sections' },
-      { href: '/profile-page#links', label: 'Custom links' },
-    ],
   },
   {
     href: '/intake',

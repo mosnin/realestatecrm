@@ -47,6 +47,7 @@ from tools.contacts import create_contact, find_contacts, get_contact_activity, 
 from tools.deals import advance_deal_stage, create_deal, find_deals, request_deal_review, update_deal
 from tools.drafts import draft_message
 from tools.goals import manage_goal
+from tools.routines import manage_routines
 from tools.inbound import process_inbound_message
 from tools.memory_tools import recall_memory, store_memory
 from tools.outcome import outcome
@@ -341,6 +342,8 @@ def make_chippi_agent(
         store_memory,
         # Goals
         manage_goal,
+        # Routines — standing instructions Chippi runs on a schedule
+        manage_routines,
         # Drafts + outcomes
         draft_message,
         outcome,

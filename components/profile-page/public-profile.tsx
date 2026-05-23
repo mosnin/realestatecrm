@@ -1,24 +1,24 @@
 /**
  * The public realtor "link in bio" page rendered at /p/[slug].
  *
- * A stranger taps the realtor's bio link and lands here. The page is one
- * narrow column: who the realtor is, then a short stack of links. The
- * application is the loud one — it's the conversion, the thing that turns
- * a stranger into a tracked lead — so it sits first, in the realtor's
- * accent colour. Everything else recedes to an outline tile.
+ * Layout: a single narrow column. A full-bleed header photo fades into the
+ * page; identity and socials sit just below it. Then clearly separated,
+ * labelled sections — the application (the conversion, in the realtor's
+ * accent colour), tour booking, featured videos, listings, and links.
  *
- * Branding (logo, accent colour, light/dark) is inherited from the same
- * SpaceSetting fields the intake and booking pages use — set once, every
- * public surface matches.
+ * On desktop the column becomes a centred card; on mobile it's full-bleed.
+ * Branding (logo, accent colour, light/dark) is inherited from SpaceSetting
+ * — the same fields the intake and booking pages use.
  *
  * Server component: every element is a link, nothing needs the client.
  */
 
-import { ArrowRight, ArrowUpRight, CalendarCheck, Globe } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowRight, ArrowUpRight, CalendarCheck, Globe, Link2, Play } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { cn, safeHref } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
-import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
+import { parseYouTubeId, youTubeThumbnail, faviconUrl } from '@/lib/profile-page';
 
 export interface PublicProperty {
   id: string;
@@ -28,6 +28,12 @@ export interface PublicProperty {
   listPrice: number | null;
   photos: string[] | null;
   listingUrl: string | null;
+}
+
+interface PublicVideo {
+  id: string;
+  url: string;
+  title?: string;
 }
 
 interface PublicProfileProps {
@@ -44,6 +50,7 @@ interface PublicProfileProps {
   showIntake: boolean;
   showTours: boolean;
   customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
+  videos: PublicVideo[];
   properties: PublicProperty[];
   hidePoweredBy: boolean;
 }
@@ -57,8 +64,16 @@ function formatPrice(value: number | null): string | null {
   }).format(value);
 }
 
-/** Hand-rolled brand marks — lucide dropped brand icons, so the public
- *  surfaces carry their own (same paths the intake/booking shell uses). */
+/** Centred uppercase section heading — the divider between page sections. */
+function SectionHeader({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="text-center text-[13px] font-bold uppercase tracking-[0.12em] text-foreground">
+      {children}
+    </h2>
+  );
+}
+
+/** Hand-rolled brand marks — lucide dropped brand icons. */
 function SocialIcon({ platform }: { platform: string }) {
   const size = 15;
   switch (platform.toLowerCase()) {
@@ -83,6 +98,55 @@ function SocialIcon({ platform }: { platform: string }) {
     default:
       return <Globe size={size} aria-hidden />;
   }
+}
+
+/** The YouTube glyph for the video-card corner badge. */
+function YouTubeMark() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#FF0000"
+        d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"
+      />
+      <path fill="#fff" d="M9.6 15.6 15.8 12 9.6 8.4Z" />
+    </svg>
+  );
+}
+
+function VideoCard({ video }: { video: PublicVideo }) {
+  const videoId = parseYouTubeId(video.url);
+  if (!videoId) return null;
+  return (
+    <a
+      href={safeHref(video.url)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block overflow-hidden rounded-2xl border border-border/70 bg-card transition-colors hover:bg-muted/30"
+    >
+      <div className="relative">
+        <img
+          src={youTubeThumbnail(videoId)}
+          alt={video.title || 'YouTube video'}
+          loading="lazy"
+          decoding="async"
+          className="aspect-video w-full object-cover"
+        />
+        <span className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white">
+          <YouTubeMark />
+        </span>
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 ring-1 ring-white/20 transition-transform duration-150 group-hover:scale-105">
+            <Play size={22} className="ml-0.5 text-white" fill="currentColor" />
+          </span>
+        </span>
+      </div>
+      {video.title && (
+        <div className="px-4 py-3">
+          <p className="truncate text-sm font-medium text-foreground">{video.title}</p>
+        </div>
+      )}
+    </a>
+  );
 }
 
 function PropertyCard({ property }: { property: PublicProperty }) {
@@ -117,14 +181,48 @@ function PropertyCard({ property }: { property: PublicProperty }) {
         href={safeHref(property.listingUrl)}
         target="_blank"
         rel="noopener noreferrer"
-        className="block overflow-hidden rounded-xl border border-border/70 bg-card transition-colors hover:bg-muted/30"
+        className="block overflow-hidden rounded-2xl border border-border/70 bg-card transition-colors hover:bg-muted/30"
       >
         {inner}
       </a>
     );
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-border/70 bg-card">{inner}</div>
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">{inner}</div>
+  );
+}
+
+function LinkCard({
+  link,
+}: {
+  link: { id: string; label: string; url: string; thumbnail?: string };
+}) {
+  // Uploaded image wins; otherwise fall back to the site's favicon.
+  const icon =
+    link.thumbnail && link.thumbnail.trim() ? link.thumbnail : faviconUrl(link.url);
+
+  return (
+    <a
+      href={safeHref(link.url)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center gap-3 rounded-2xl border border-border/70 bg-card px-3.5 py-3 transition-colors hover:bg-muted/30"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-background">
+        {icon ? (
+          <img src={icon} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <Link2 size={16} className="text-muted-foreground" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+        {link.label}
+      </span>
+      <ArrowUpRight
+        size={16}
+        className="shrink-0 text-muted-foreground/40 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+      />
+    </a>
   );
 }
 
@@ -142,172 +240,175 @@ export function PublicProfile({
   showIntake,
   showTours,
   customLinks,
+  videos,
   properties,
   hidePoweredBy,
 }: PublicProfileProps) {
   const socialEntries = Object.entries(socialLinks ?? {}).filter(
     ([, url]) => typeof url === 'string' && url.trim().length > 0,
   );
-  const initial = (businessName || agentName || '?').trim().charAt(0).toUpperCase();
+  const playableVideos = videos.filter((v) => parseYouTubeId(v.url));
   const ctaTextColor = pickContrastColor(accentColor);
 
   return (
-    <div
-      className={cn('min-h-screen bg-background text-foreground', darkMode && 'dark')}
-    >
-      <main className="mx-auto w-full max-w-md px-5 pt-12 pb-16 sm:pt-16">
-        {/* Identity */}
-        <header className="flex flex-col items-center text-center">
-          {agentPhoto ? (
-            <img
-              src={agentPhoto}
-              alt={agentName}
-              width={96}
-              height={96}
-              loading="eager"
-              decoding="async"
-              className="h-24 w-24 rounded-full object-cover ring-1 ring-border/70"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted text-2xl font-semibold text-muted-foreground">
-              {initial}
-            </div>
-          )}
-
-          <h1 className="mt-4">
-            {logoUrl ? (
+    <div className={cn('min-h-screen bg-muted/40', darkMode && 'dark')}>
+      <div className="mx-auto w-full max-w-[480px] bg-background sm:my-8 sm:overflow-hidden sm:rounded-[28px] sm:border sm:border-border/60">
+        {/* ── Header — full-bleed photo fading into the page ─────────────── */}
+        <header>
+          {agentPhoto && (
+            <div className="relative">
               <img
-                src={logoUrl}
-                alt={businessName}
+                src={agentPhoto}
+                alt={agentName}
                 loading="eager"
                 decoding="async"
-                className="mx-auto h-8 max-w-[220px] object-contain"
+                className="aspect-[4/5] w-full object-cover object-top"
               />
-            ) : (
-              <span
-                className="text-2xl tracking-tight text-foreground"
-                style={TITLE_FONT}
-              >
-                {businessName}
-              </span>
+              <div
+                aria-hidden
+                className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent to-background"
+              />
+            </div>
+          )}
+
+          <div
+            className={cn(
+              'relative px-6 text-center',
+              agentPhoto ? '-mt-14' : 'pt-12',
             )}
-          </h1>
-          {agentName && agentName !== businessName && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{agentName}</p>
-          )}
-          {headline && <p className="mt-2 text-sm text-foreground">{headline}</p>}
-          {bio && (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{bio}</p>
-          )}
+          >
+            <h1>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={businessName}
+                  loading="eager"
+                  decoding="async"
+                  className="mx-auto h-9 max-w-[240px] object-contain"
+                />
+              ) : (
+                <span className="text-2xl font-bold tracking-tight text-foreground">
+                  {businessName}
+                </span>
+              )}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">@{slug}</p>
+            {headline && (
+              <p className="mt-2 text-sm text-foreground">{headline}</p>
+            )}
+
+            {socialEntries.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {socialEntries.map(([platform, url]) => (
+                  <a
+                    key={platform}
+                    href={safeHref(url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={platform}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <SocialIcon platform={platform} />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {bio && (
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{bio}</p>
+            )}
+          </div>
         </header>
 
-        {/* Link stack — application first (the conversion, in the realtor's
-            accent colour), then tour, then the realtor's own links. */}
-        <div className="mt-8 space-y-3">
-          {showIntake && (
-            <a
-              href={`/apply/${slug}`}
-              style={{ backgroundColor: accentColor, color: ctaTextColor }}
-              className="group flex items-center gap-3 rounded-xl px-5 py-4 transition-transform duration-150 active:scale-[0.99]"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Start your application</p>
-                <p className="truncate text-xs opacity-75">
-                  A few quick questions about what you&apos;re looking for.
-                </p>
-              </div>
-              <ArrowRight
-                size={18}
-                className="shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
-              />
-            </a>
-          )}
-
-          {showTours && (
-            <a
-              href={`/book/${slug}`}
-              className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4 transition-colors hover:bg-muted/30"
-            >
-              <CalendarCheck size={18} className="shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Book a tour</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  Pick a time that works for you.
-                </p>
-              </div>
-              <ArrowRight
-                size={16}
-                className="shrink-0 text-muted-foreground/40 transition-transform duration-150 group-hover:translate-x-0.5"
-              />
-            </a>
-          )}
-
-          {customLinks.map((link) => (
-            <a
-              key={link.id}
-              href={safeHref(link.url)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4 transition-colors hover:bg-muted/30"
-            >
-              {link.thumbnail && (
-                <img
-                  src={link.thumbnail}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="h-10 w-10 shrink-0 rounded-md object-cover"
-                />
+        {/* ── Body ───────────────────────────────────────────────────────── */}
+        <div className="px-6 pb-10">
+          {/* Primary actions */}
+          {(showIntake || showTours) && (
+            <div className="mt-7 space-y-3">
+              {showIntake && (
+                <a
+                  href={`/apply/${slug}`}
+                  style={{ backgroundColor: accentColor, color: ctaTextColor }}
+                  className="group flex items-center gap-3 rounded-2xl px-5 py-4 transition-transform duration-150 active:scale-[0.99]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">Start your application</p>
+                    <p className="truncate text-xs opacity-75">
+                      A few quick questions about what you&apos;re looking for.
+                    </p>
+                  </div>
+                  <ArrowRight
+                    size={18}
+                    className="shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+                  />
+                </a>
               )}
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                {link.label}
-              </span>
-              <ArrowUpRight
-                size={16}
-                className="shrink-0 text-muted-foreground/40 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-              />
-            </a>
-          ))}
-        </div>
-
-        {/* Featured listings */}
-        {properties.length > 0 && (
-          <section className="mt-10 space-y-3">
-            <p className={SECTION_LABEL}>Listings</p>
-            <div className="space-y-3">
-              {properties.map((p) => (
-                <PropertyCard key={p.id} property={p} />
-              ))}
+              {showTours && (
+                <a
+                  href={`/book/${slug}`}
+                  className="group flex items-center gap-3 rounded-2xl border border-border/70 bg-card px-5 py-4 transition-colors hover:bg-muted/30"
+                >
+                  <CalendarCheck size={18} className="shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">Book a tour</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Pick a time that works for you.
+                    </p>
+                  </div>
+                  <ArrowRight
+                    size={16}
+                    className="shrink-0 text-muted-foreground/40 transition-transform duration-150 group-hover:translate-x-0.5"
+                  />
+                </a>
+              )}
             </div>
-          </section>
-        )}
+          )}
 
-        {/* Socials */}
-        {socialEntries.length > 0 && (
-          <div className="mt-10 flex items-center justify-center gap-2">
-            {socialEntries.map(([platform, url]) => (
-              <a
-                key={platform}
-                href={safeHref(url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={platform}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
-              >
-                <SocialIcon platform={platform} />
-              </a>
-            ))}
-          </div>
-        )}
+          {/* Watch */}
+          {playableVideos.length > 0 && (
+            <section className="mt-10 space-y-4">
+              <SectionHeader>Watch</SectionHeader>
+              <div className="space-y-3">
+                {playableVideos.map((v) => (
+                  <VideoCard key={v.id} video={v} />
+                ))}
+              </div>
+            </section>
+          )}
 
-        {/* Powered by Chippi — free tier only; paid plans are white-label. */}
-        {!hidePoweredBy && (
-          <footer className="mt-12 flex items-center justify-center gap-1.5 opacity-40">
-            <span className="text-[10px] text-muted-foreground">Powered by</span>
-            <BrandLogo className="h-3" />
-          </footer>
-        )}
-      </main>
+          {/* Listings */}
+          {properties.length > 0 && (
+            <section className="mt-10 space-y-4">
+              <SectionHeader>Listings</SectionHeader>
+              <div className="space-y-3">
+                {properties.map((p) => (
+                  <PropertyCard key={p.id} property={p} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Links */}
+          {customLinks.length > 0 && (
+            <section className="mt-10 space-y-4">
+              <SectionHeader>Links</SectionHeader>
+              <div className="space-y-3">
+                {customLinks.map((link) => (
+                  <LinkCard key={link.id} link={link} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Powered by Chippi — free tier only; paid plans are white-label. */}
+          {!hidePoweredBy && (
+            <footer className="mt-12 flex items-center justify-center gap-1.5 opacity-40">
+              <span className="text-[10px] text-muted-foreground">Powered by</span>
+              <BrandLogo className="h-3" />
+            </footer>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -16,7 +16,14 @@ import {
   Plus,
   ImagePlus,
   Search,
+  Slash,
+  MessageCircle,
+  Send,
+  Sunrise,
+  UserPlus,
+  ClipboardCheck,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +33,45 @@ export interface MentionItem {
   label: string;
   subtitle?: string;
 }
+
+/** A skill the realtor can pick from the `/` menu. */
+export interface SkillItem {
+  slug: string;
+  title: string;
+  description: string;
+  /** Composer text; may carry one {placeholder} for the realtor to fill. */
+  prompt: string;
+}
+
+/**
+ * Expand a skill prompt for the composer. A single {placeholder} token, if
+ * present, is unwrapped and its inner text becomes the initial selection so
+ * the realtor types straight over it; with no token the cursor lands at the
+ * end. Exported for unit tests.
+ */
+export function expandSkillPrompt(prompt: string): {
+  text: string;
+  selStart: number;
+  selEnd: number;
+} {
+  const open = prompt.indexOf('{');
+  const close = prompt.indexOf('}');
+  if (open >= 0 && close > open) {
+    const inner = prompt.slice(open + 1, close);
+    const text = prompt.slice(0, open) + inner + prompt.slice(close + 1);
+    return { text, selStart: open, selEnd: open + inner.length };
+  }
+  return { text: prompt, selStart: prompt.length, selEnd: prompt.length };
+}
+
+/** Per-skill menu icons, keyed by slug. Falls back to the Chippi mark. */
+const SKILL_ICONS: Record<string, LucideIcon> = {
+  'my-day': Sunrise,
+  'new-lead': UserPlus,
+  'follow-ups': Send,
+  'meeting-prep': ClipboardCheck,
+  'my-deals': Briefcase,
+};
 
 type Mode = 'draft' | null;
 
@@ -51,6 +97,8 @@ interface ChippiPromptBoxProps {
    * having to lift composer state into the parent.
    */
   prefill?: { text: string; nonce: number };
+  /** Skills offered in the `/` menu. Empty or omitted → no menu. */
+  skills?: SkillItem[];
 }
 
 type UploadedAttachment = {
@@ -132,6 +180,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       className,
       autoFocus = false,
       prefill,
+      skills = [],
     },
     ref,
   ) {
@@ -142,6 +191,14 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const [mentionResults, setMentionResults] = useState<MentionItem[]>([]);
     const [mentionLoading, setMentionLoading] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+    // Slash (skills) menu — opens when the message starts with "/".
+    const [slashOpen, setSlashOpen] = useState(false);
+    const [slashIndex, setSlashIndex] = useState(0);
+    const slashRef = useRef<HTMLDivElement>(null);
+    // Sticky dismissal: Esc closes the menu and keeps it closed until the
+    // "/" token is cleared, so it doesn't reopen on the next keystroke.
+    const slashDismissedRef = useRef(false);
 
     const [mode, setMode] = useState<Mode>(null);
     const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
@@ -173,6 +230,22 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const hasContent = message.trim().length > 0 || hasReadyAttachments;
     const sendDisabled =
       disabled || isLoading || !hasContent || hasUploadingAttachments;
+
+    // Slash menu — the message after "/" is the live filter query.
+    const slashQuery = slashOpen ? message.slice(1).toLowerCase() : '';
+    const filteredSkills =
+      slashOpen && skills.length > 0
+        ? skills.filter(
+            (s) =>
+              !slashQuery ||
+              s.title.toLowerCase().includes(slashQuery) ||
+              s.description.toLowerCase().includes(slashQuery),
+          )
+        : [];
+    const safeSlashIndex =
+      filteredSkills.length === 0
+        ? 0
+        : Math.min(slashIndex, filteredSkills.length - 1);
 
     const activePlaceholder =
       isRecording
@@ -226,6 +299,20 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       document.addEventListener('mousedown', onDown);
       return () => document.removeEventListener('mousedown', onDown);
     }, [mentionOpen]);
+
+    // Close the slash (skills) menu on outside click. Clicks inside the
+    // textarea keep it open — the realtor is still typing the query.
+    useEffect(() => {
+      if (!slashOpen) return;
+      const onDown = (e: MouseEvent) => {
+        const t = e.target as Node;
+        if (!slashRef.current?.contains(t) && t !== textareaRef.current) {
+          setSlashOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', onDown);
+      return () => document.removeEventListener('mousedown', onDown);
+    }, [slashOpen]);
 
     // Close Plus menu on outside click + Escape
     useEffect(() => {
@@ -523,7 +610,66 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       textareaRef.current?.focus();
     }
 
+    function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+      const v = e.target.value;
+      setMessage(v);
+      // A message that begins with "/" and has no space/newline yet is a
+      // skill query. Once it's a real sentence (space) or empty, the menu
+      // closes; clearing the "/" also lifts a prior Esc dismissal.
+      const isSlash = v.startsWith('/') && !v.includes(' ') && !v.includes('\n');
+      if (isSlash && skills.length > 0) {
+        if (!slashDismissedRef.current) {
+          setSlashOpen(true);
+          setSlashIndex(0);
+        }
+      } else {
+        setSlashOpen(false);
+        if (!v.startsWith('/')) slashDismissedRef.current = false;
+      }
+    }
+
+    function selectSkill(skill: SkillItem) {
+      const { text, selStart, selEnd } = expandSkillPrompt(skill.prompt);
+      setMessage(text);
+      setSlashOpen(false);
+      slashDismissedRef.current = false;
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        try {
+          el.setSelectionRange(selStart, selEnd);
+        } catch {
+          /* some browsers throw; harmless */
+        }
+      });
+    }
+
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+      if (slashOpen) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSlashIndex((p) => (p < filteredSkills.length - 1 ? p + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSlashIndex((p) => (p > 0 ? p - 1 : filteredSkills.length - 1));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          // While the menu is open, Enter is for the menu — never sends.
+          e.preventDefault();
+          if (filteredSkills.length > 0) selectSkill(filteredSkills[safeSlashIndex]);
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setSlashOpen(false);
+          slashDismissedRef.current = true;
+          return;
+        }
+      }
       if (mentionOpen) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -932,7 +1078,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               <textarea
                 ref={textareaRef}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={handleChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder={activePlaceholder}
@@ -1125,6 +1271,67 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               {renderRightButton()}
             </div>
           </div>
+
+          {/* Slash (skills) menu — type "/" to open */}
+          {slashOpen && (
+            <div
+              ref={slashRef}
+              role="listbox"
+              aria-label="Skills"
+              className={cn(
+                'absolute left-0 right-0 bottom-full mb-2 z-30',
+                'rounded-xl border border-border/70 bg-popover shadow-lg shadow-foreground/5',
+                'max-h-[320px] overflow-y-auto',
+              )}
+            >
+              <div className="px-3 pt-2.5 pb-1.5 flex items-center gap-2 border-b border-border/60">
+                <Slash size={12} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Skills
+                </span>
+              </div>
+              <div className="py-1">
+                {filteredSkills.length === 0 ? (
+                  <p className="px-3 py-2.5 text-[12px] text-muted-foreground/70">
+                    No skill matches.
+                  </p>
+                ) : (
+                  filteredSkills.map((s, i) => {
+                    const Icon = SKILL_ICONS[s.slug] ?? MessageCircle;
+                    return (
+                      <button
+                        key={s.slug}
+                        type="button"
+                        role="option"
+                        aria-selected={i === safeSlashIndex}
+                        onClick={() => selectSkill(s)}
+                        onMouseEnter={() => setSlashIndex(i)}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-1.5 text-left',
+                          'transition-colors duration-100',
+                          i === safeSlashIndex
+                            ? 'bg-foreground/[0.04]'
+                            : 'hover:bg-foreground/[0.025]',
+                        )}
+                      >
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-foreground/[0.05] text-muted-foreground flex-shrink-0">
+                          <Icon size={12} />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12.5px] font-medium text-foreground truncate leading-tight">
+                            {s.title}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground/80 truncate leading-tight mt-0.5">
+                            {s.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Mention dropdown */}
           {mentionOpen && (

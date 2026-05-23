@@ -5,9 +5,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
-import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
+import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -65,37 +65,11 @@ interface ChippiWorkspaceProps {
    *  has zero active integrations AND Composio is configured. Once they
    *  connect, the OAuth round-trip reloads the page and this flips false. */
   showConnectBanner?: boolean;
+  /** Skills offered in the chat's `/` menu. From loadUserInvocableSkills(). */
+  skills?: SkillItem[];
 }
 
 const MESSAGE_LIMIT = 50;
-
-/** Available slash commands for the autocomplete dropdown. */
-const SLASH_COMMANDS = [
-  {
-    name: '/plan',
-    description: 'Break a complex task into steps',
-    placeholder: '/plan schedule tours for all hot leads this week',
-  },
-] as const;
-
-/**
- * Extract the task description from a `/plan <task>` message.
- * Returns null if the message is not a /plan command.
- */
-function extractPlanTask(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed.toLowerCase().startsWith('/plan')) return null;
-  const task = trimmed.slice('/plan'.length).trim();
-  return task || null;
-}
-
-/**
- * Transform a /plan message into an agent-friendly directive.
- * The directive tells the agent to call create_plan before acting.
- */
-function toPlanDirective(task: string): string {
-  return `[/plan] Before doing anything, call the create_plan tool to break this task into steps. Task: ${task}`;
-}
 
 /**
  * Parse a create_plan tool call result into { task, steps }.
@@ -140,6 +114,7 @@ export function ChippiWorkspace({
   initialInput,
   initialPrefill,
   showConnectBanner = false,
+  skills = [],
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
   const router = useRouter();
@@ -168,30 +143,8 @@ export function ChippiWorkspace({
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
 
-  // Slash-command dropdown state. Opens when the user clicks "/plan" in the
-  // hint strip; closes on outside click, Escape, or after a command is chosen.
-  const [slashOpen, setSlashOpen] = useState(false);
-  const slashRef = useRef<HTMLDivElement>(null);
-
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
-
-  // Close slash dropdown on outside click.
-  useEffect(() => {
-    if (!slashOpen) return;
-    function onDown(e: MouseEvent) {
-      if (!slashRef.current?.contains(e.target as Node)) setSlashOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSlashOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [slashOpen]);
 
   const {
     messages,
@@ -518,14 +471,10 @@ export function ChippiWorkspace({
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
 
-      // Slash-command interception: /plan <task> → planning directive.
-      const planTask = extractPlanTask(text);
-      const finalText = planTask ? toPlanDirective(planTask) : text;
-
       // Record the full text so the retry button can replay it.
-      lastUserMsgRef.current = contextPrefix + finalText;
+      lastUserMsgRef.current = contextPrefix + text;
 
-      await send(contextPrefix + finalText, attachmentIds);
+      await send(contextPrefix + text, attachmentIds);
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;
@@ -804,90 +753,21 @@ export function ChippiWorkspace({
     (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan));
 
   // Reusable input — shared between the empty hero and the docked footer
-  // so the focal point lives wherever it should. Wrapped in a relative
-  // container so the slash-command dropdown can float above it.
+  // so the focal point lives wherever it should. The `/` skills menu lives
+  // inside ChippiPromptBox itself.
   const renderInput = () => (
-    <div className="relative" ref={slashRef}>
-      {/* Slash-command autocomplete dropdown — floats above the input */}
-      {slashOpen && (
-        <div
-          role="listbox"
-          aria-label="Slash commands"
-          className={cn(
-            'absolute left-0 right-0 bottom-full mb-2 z-30',
-            'rounded-xl border border-border/70 bg-popover shadow-lg shadow-foreground/5',
-            'overflow-hidden py-1',
-          )}
-        >
-          {SLASH_COMMANDS.map((cmd) => (
-            <button
-              key={cmd.name}
-              type="button"
-              role="option"
-              aria-selected={false}
-              onClick={() => {
-                setSlashOpen(false);
-                setPrefill({ text: cmd.name + ' ', nonce: Date.now() });
-              }}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 text-left',
-                'hover:bg-foreground/[0.04] transition-colors duration-100',
-              )}
-            >
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground flex-shrink-0">
-                <ListTodo size={13} strokeWidth={1.85} />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-foreground leading-tight">
-                  {cmd.name}
-                </p>
-                <p className="text-[11px] text-muted-foreground/80 leading-tight mt-0.5">
-                  {cmd.description}
-                </p>
-              </div>
-              <span className="text-[10px] text-muted-foreground/50 truncate max-w-[140px] hidden sm:block">
-                {cmd.placeholder}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Slash-command trigger strip — a quiet "/" hint button left of the
-          composer. Tapping it opens the dropdown; the user picks a command
-          and the text is prefilled into the input. */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setSlashOpen((v) => !v)}
-          disabled={isStreaming || pendingApproval !== null}
-          aria-label="Slash commands"
-          aria-expanded={slashOpen}
-          aria-haspopup="listbox"
-          title="/plan and other commands"
-          className={cn(
-            'flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg',
-            'text-[13px] font-mono font-semibold text-muted-foreground/60',
-            'hover:text-foreground hover:bg-foreground/[0.06] transition-colors duration-150',
-            'disabled:opacity-40 disabled:cursor-not-allowed',
-            slashOpen && 'text-foreground bg-foreground/[0.06]',
-          )}
-        >
-          /
-        </button>
-        <div className="flex-1 min-w-0">
-          <ChippiPromptBox
-            placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
-            onSend={handleSend}
-            onMentionSearch={handleMentionSearch}
-            onVoiceStart={() => setVoiceOpen(true)}
-            onAbort={abort}
-            disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
-            isLoading={isStreaming}
-            prefill={prefill ?? undefined}
-          />
-        </div>
-      </div>
+    <div>
+      <ChippiPromptBox
+        placeholder="Message Chippi, or press / for skills…"
+        onSend={handleSend}
+        onMentionSearch={handleMentionSearch}
+        onVoiceStart={() => setVoiceOpen(true)}
+        onAbort={abort}
+        disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
+        isLoading={isStreaming}
+        prefill={prefill ?? undefined}
+        skills={skills}
+      />
       {/* Rate-limit countdown — shown below the composer when the API is
           throttling. Counts down from 60 s and disappears automatically. */}
       {rateLimitSeconds > 0 && (
