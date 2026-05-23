@@ -312,7 +312,7 @@ async def chat_turn(item: dict):
     from security.context import AgentContext
     from chippi import make_chippi_agent
     from config import settings
-    from llm import extract_usage, fallback_models, resolve_chat_model
+    from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
     from tools.base import result_is_ok
 
     agent_settings = AgentSettings.model_validate(sr.data)
@@ -541,7 +541,10 @@ async def chat_turn(item: dict):
         streamed = False
 
         for attempt, model in enumerate(models):
-            chippi.model = model
+            # `model` is a string slug; wrap it in the SDK Model object so the
+            # OpenRouter slug routes via our configured client instead of the
+            # SDK's prefix dispatcher (which raises `Unknown prefix: x-ai`).
+            chippi.model = make_chat_model(model)
             try:
                 result = Runner.run_streamed(
                     chippi, input=input_items, context=ctx, run_config=run_config

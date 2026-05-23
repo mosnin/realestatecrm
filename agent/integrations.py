@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -83,7 +84,11 @@ async def mark_expired_by_toolkit(
                 {
                     "status": "expired",
                     "lastError": reason[:500],
-                    "updatedAt": "now()",
+                    # `'now()'` here was passed as a string literal — the
+                    # underlying asyncpg pool wants a real datetime for
+                    # TIMESTAMPTZ columns, so every mark-expired write was
+                    # silently failing in production.
+                    "updatedAt": datetime.now(timezone.utc),
                 }
             )
             .eq("id", row["id"])

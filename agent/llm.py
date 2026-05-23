@@ -85,6 +85,24 @@ def resolve_chat_model(model: str | None) -> str:
     return DEFAULT_CHAT_MODEL
 
 
+def make_chat_model(name: str):
+    """Wrap a model slug in OpenAIChatCompletionsModel against our LLM client.
+
+    openai-agents resolves a string `model` by prefix: `openai/...` ->
+    Responses API, `anthropic/...` -> Anthropic SDK, and so on. Slugs that
+    don't match a registered prefix (`x-ai/grok-4.3`, `moonshotai/...`,
+    `qwen/...` — every non-OpenAI vendor that OpenRouter exposes) raise
+    `Unknown prefix: <vendor>` before the request ever leaves the box.
+    Building the Model object explicitly bypasses prefix dispatch and routes
+    every chat completion through our configured client — OpenRouter when
+    its key is set, OpenAI direct otherwise. Also forces the Chat
+    Completions endpoint, which is what OpenRouter speaks (it does not
+    implement the Responses API).
+    """
+    from agents import OpenAIChatCompletionsModel
+    return OpenAIChatCompletionsModel(model=name, openai_client=get_llm_client())
+
+
 _configured = False
 
 

@@ -38,7 +38,7 @@ from schemas import AgentSettings, Space
 from security.budget import acquire_run_lock, check_budget, record_usage, release_run_lock
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import extract_usage, fallback_models, resolve_chat_model
+from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
 from tools.streaming import publish_event
 from tools.base import result_is_ok
 from trajectories import normalize_tool_call, record_trajectory
@@ -141,11 +141,18 @@ async def _run_with_fallback(
     # an error must surface, not retry.
     tools_ran = False
     # Try the workspace's picked model first (whatever make_chippi_agent
-    # built the agent with), then the OpenRouter fallback chain.
-    models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
+    # built the agent with), then the OpenRouter fallback chain. The agent
+    # was built with an OpenAIChatCompletionsModel object whose `.model`
+    # attribute holds the original slug — fall back to the agent itself if
+    # something exotic is set so this never crashes on the read.
+    current_name = getattr(agent.model, "model", agent.model)
+    models = [current_name, *(m for m in _FALLBACK_MODELS if m != current_name)]
     for i, model in enumerate(models):
         try:
-            agent.model = model
+            # Wrap in the SDK Model object so vendor-prefixed OpenRouter slugs
+            # (`x-ai/`, `anthropic/`, `moonshotai/`, etc.) route via our client
+            # instead of the SDK's prefix dispatcher.
+            agent.model = make_chat_model(model)
             result = Runner.run_streamed(
                 agent, input=input_data, run_config=run_config, context=context
             )

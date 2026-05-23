@@ -17,7 +17,7 @@ from openai import AsyncOpenAI
 
 from config import settings
 from db import supabase as get_supabase
-from llm import configure_agents_sdk, get_llm_client, openai_model, resolve_chat_model
+from llm import configure_agents_sdk, get_llm_client, make_chat_model, openai_model, resolve_chat_model
 
 logger = structlog.get_logger(__name__)
 
@@ -100,7 +100,7 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
         agent = Agent(
             name=member["name"],
             instructions=system_prompt,
-            model=resolve_chat_model(settings.worker_model),
+            model=make_chat_model(resolve_chat_model(settings.worker_model)),
             model_settings=ModelSettings(max_tokens=2048),
         )
 

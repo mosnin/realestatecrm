@@ -37,7 +37,7 @@ from __future__ import annotations
 import structlog
 from agents import Agent
 
-from llm import configure_agents_sdk, resolve_chat_model
+from llm import configure_agents_sdk, make_chat_model, resolve_chat_model
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
 from tools.docs import recall_docs
@@ -372,7 +372,7 @@ def make_chippi_agent(
     ]
     return Agent[None](
         name="Chippi",
-        model=resolve_chat_model(model),
+        model=make_chat_model(resolve_chat_model(model)),
         instructions=instructions,
         tools=base_tools + (extra_tools or []),
         input_guardrails=[pending_drafts_guardrail],
