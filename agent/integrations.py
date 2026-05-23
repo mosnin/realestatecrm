@@ -27,15 +27,23 @@ on the native catalog. A Composio outage must not take down chat.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 import structlog
 
+from config import settings
 from db import supabase
 
 logger = structlog.get_logger()
+
+# Vercel-proxy timeouts. List is cheap, execute can be slow for actions
+# that themselves call out to slow providers (Gmail attach, Slack history).
+_LIST_TIMEOUT = 30.0
+_EXEC_TIMEOUT = 120.0
 
 
 def composio_configured() -> bool:
@@ -201,112 +209,200 @@ def _wrap_for_logging(tool: Any, *, space_id: str, toolkit: str) -> None:
     tool.on_invoke_tool = logged
 
 
-async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
-    """
-    Fetch the realtor's connected-toolkit tools as agent-ready Tool objects.
+def _proxy_base() -> tuple[str, str] | None:
+    """The (base_url, secret) pair the agent uses to call Vercel internally.
 
-    Returns [] on any failure path so the agent always has SOMETHING to
-    work with. A Composio outage degrades the experience (no integrations
-    that turn) but never takes chat down.
+    Returns None if the proxy is unconfigured or pointed at a local URL —
+    a localhost base would be a deploy misconfig, not something to send
+    integration calls to.
     """
-    if not composio_configured():
-        return []
+    base_url = (settings.app_url or "").rstrip("/")
+    secret = settings.agent_internal_secret
+    if not base_url or not secret:
+        return None
+    if "localhost" in base_url or "127.0.0.1" in base_url:
+        return None
+    return base_url, secret
 
+
+def _build_proxied_function_tool(
+    *,
+    slug: str,
+    name: str,
+    description: str,
+    parameters: dict[str, Any],
+    toolkit: str,
+    space_id: str,
+    user_id: str,
+    base_url: str,
+    secret: str,
+) -> Any:
+    """Wrap one Composio action spec as an openai-agents FunctionTool whose
+    handler POSTs to /api/internal/integrations/execute.
+    """
     try:
-        toolkits = await active_toolkits(space_id, user_id)
-    except Exception as err:  # noqa: BLE001
-        logger.warning(
-            "active_toolkits_lookup_failed",
+        from agents import FunctionTool
+    except ImportError:
+        from agents.tool import FunctionTool  # older SDK path
+
+    async def on_invoke(ctx: Any, args_json: str) -> str:
+        try:
+            arguments = json.loads(args_json) if args_json else {}
+        except Exception as err:
+            return json.dumps({"ok": False, "error": f"bad arguments: {err}"})
+        logger.info(
+            "integration_tool_invoked",
             space_id=space_id,
-            user_id=user_id,
-            error=str(err)[:200],
+            toolkit=toolkit,
+            tool=name,
+            arg_keys=list(arguments.keys()) if isinstance(arguments, dict) else [],
         )
-        return []
+        try:
+            async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT) as client:
+                resp = await client.post(
+                    f"{base_url}/api/internal/integrations/execute",
+                    json={
+                        "spaceId": space_id,
+                        "userId": user_id,
+                        "slug": slug,
+                        "arguments": arguments,
+                    },
+                    headers={"Authorization": f"Bearer {secret}"},
+                )
+        except Exception as err:
+            logger.warning(
+                "integration_tool_request_failed",
+                space_id=space_id,
+                toolkit=toolkit,
+                tool=name,
+                error=str(err)[:300],
+            )
+            return json.dumps({"ok": False, "error": f"{slug} request failed: {err}"})
 
-    if not toolkits:
-        return []
+        body_text = resp.text
+        if resp.status_code >= 500:
+            logger.warning(
+                "integration_tool_proxy_5xx",
+                space_id=space_id,
+                toolkit=toolkit,
+                tool=name,
+                status=resp.status_code,
+                body_preview=body_text[:300],
+            )
+            return json.dumps(
+                {"ok": False, "error": f"{slug} failed ({resp.status_code})"}
+            )
+        # 4xx may be a real auth/argument error — surface the body so the
+        # model can read it and adjust. 2xx already carries {ok,data,error}.
+        return body_text or json.dumps({"ok": True, "data": None})
 
-    # Lazy-import — Composio packages are heavy and we don't want them
-    # loaded for runs that have no integrations.
-    try:
-        from composio import Composio
-        from composio_openai_agents import OpenAIAgentsProvider
-    except ImportError as err:
-        logger.error(
-            "composio_import_failed",
-            error=str(err),
-            hint="ensure composio and composio-openai-agents are in agent/pyproject.toml",
-        )
-        return []
-
-    # to_thread — the Composio client is synchronous; constructing it (and
-    # especially tools.get below) does blocking network I/O that would
-    # otherwise stall the whole event loop for every chat and autonomous run.
-    composio = await asyncio.to_thread(
-        Composio,
-        api_key=os.environ["COMPOSIO_API_KEY"],
-        provider=OpenAIAgentsProvider(),
+    return FunctionTool(
+        name=name,
+        description=description,
+        params_json_schema=parameters,
+        on_invoke_tool=on_invoke,
     )
 
-    # Per-toolkit load so a single dead connection doesn't poison the
-    # batch. Mirrors the TypeScript loop. N is small (typically 2-5
-    # connected apps per realtor).
-    collected: list[Any] = []
-    for toolkit in toolkits:
-        try:
-            # limit=1000 (server max) — without it, Composio's /api/v3/tools
-            # endpoint defaults to 20 items per page and the SDK doesn't
-            # paginate. That cap silently truncated HubSpot to its
-            # alphabetically-first 20 actions (archive/association only),
-            # making the realtor's 100+ enabled slugs invisible to the
-            # agent. Mirrors the same fix on lib/integrations/composio.ts.
-            tools = await asyncio.to_thread(
-                composio.tools.get, user_id, toolkits=[toolkit], limit=1000
-            )
-            if tools:
-                # Wrap each tool's on_invoke_tool to surface inputs/outputs
-                # at info level. Without this, integration tool calls are
-                # invisible in Modal logs and any failure looks like the
-                # model fumbling.
-                for t in tools:
-                    _wrap_for_logging(t, space_id=space_id, toolkit=toolkit)
-                collected.extend(tools)
-        except Exception as err:  # noqa: BLE001
-            if _is_auth_like_error(err):
-                # Await it: a bare asyncio.create_task can be garbage-
-                # collected before it runs, and a short-lived Modal
-                # container may tear down first. This is a rare error
-                # path — the extra single-row write is negligible.
-                await mark_expired_by_toolkit(
-                    space_id, user_id, toolkit, str(err)[:500]
-                )
-                logger.warning(
-                    "integration_auth_failed_marked_expired",
-                    space_id=space_id,
-                    toolkit=toolkit,
-                    error=str(err)[:200],
-                )
-            else:
-                logger.warning(
-                    "integration_tools_load_failed_skipping",
-                    space_id=space_id,
-                    toolkit=toolkit,
-                    error=str(err)[:200],
-                )
-            # In all error cases, drop this toolkit's tools and keep going.
 
-    if collected:
-        logger.info(
-            "integration_tools_loaded",
+async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
+    """Fetch the realtor's Composio tools by proxying through Vercel.
+
+    Direct Composio calls from Modal hit
+    `10401 HTTP_Unauthorized: This API key is not authorized from the
+    current IP address` because Composio's allowlist on our key includes
+    Vercel's range but not Modal's egress IPs. We could ask Composio to
+    open the allowlist, but Modal IPs rotate and that's a treadmill.
+    Routing through Vercel costs one extra hop per tool call and removes
+    the IP coupling entirely. The Composio OAuth handshake runs from
+    Vercel already (lib/integrations/composio.ts), so this just reuses
+    the same auth surface for runtime tool calls.
+
+    Returns [] on any failure — chat must keep working on the native
+    catalog if integrations are unavailable.
+    """
+    proxy = _proxy_base()
+    if proxy is None:
+        logger.warning(
+            "integration_proxy_not_configured",
             space_id=space_id,
             user_id=user_id,
-            toolkit_count=len(toolkits),
-            tool_count=len(collected),
-            toolkits=toolkits,
-            tool_slugs=[getattr(t, "name", "?") for t in collected],
+            hint="set NEXT_PUBLIC_APP_URL and AGENT_INTERNAL_SECRET in the Modal secret",
         )
+        return []
+    base_url, secret = proxy
 
-    return collected
+    try:
+        async with httpx.AsyncClient(timeout=_LIST_TIMEOUT) as client:
+            resp = await client.post(
+                f"{base_url}/api/internal/integrations/tools",
+                json={"spaceId": space_id, "userId": user_id},
+                headers={"Authorization": f"Bearer {secret}"},
+            )
+        if resp.status_code >= 400:
+            logger.warning(
+                "integration_proxy_list_http_error",
+                space_id=space_id,
+                user_id=user_id,
+                status=resp.status_code,
+                body_preview=resp.text[:300],
+            )
+            return []
+        data = resp.json()
+    except Exception as err:
+        logger.warning(
+            "integration_proxy_list_failed",
+            space_id=space_id,
+            user_id=user_id,
+            error=str(err)[:300],
+        )
+        return []
+
+    specs = data.get("tools") or []
+    if not specs:
+        return []
+
+    tools: list[Any] = []
+    for spec in specs:
+        slug = spec.get("slug")
+        if not slug:
+            continue
+        # SDK constrains tool names to lowercase alphanumeric + underscore,
+        # 64 chars max. Slugs from Composio are usually fine but normalize
+        # defensively.
+        raw_name = (spec.get("name") or slug).lower()
+        safe_name = "".join(c if c.isalnum() or c == "_" else "_" for c in raw_name)[:64]
+        if not safe_name:
+            continue
+        try:
+            tools.append(
+                _build_proxied_function_tool(
+                    slug=slug,
+                    name=safe_name,
+                    description=(spec.get("description") or slug)[:1024],
+                    parameters=spec.get("parameters")
+                    or {"type": "object", "properties": {}},
+                    toolkit=spec.get("toolkit") or "",
+                    space_id=space_id,
+                    user_id=user_id,
+                    base_url=base_url,
+                    secret=secret,
+                )
+            )
+        except Exception as err:  # noqa: BLE001
+            logger.warning(
+                "integration_tool_build_failed",
+                slug=slug,
+                error=str(err)[:200],
+            )
+
+    logger.info(
+        "integration_tools_loaded_via_proxy",
+        space_id=space_id,
+        user_id=user_id,
+        tool_count=len(tools),
+        tool_slugs=[getattr(t, "name", "?") for t in tools[:10]],
+    )
+    return tools
 
 
 async def resolve_owner_user_id(space_id: str) -> str | None:

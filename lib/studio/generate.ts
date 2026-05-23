@@ -88,7 +88,15 @@ export async function runStudioGeneration(args: {
   });
   if (genErr) {
     logger.error('[studio.generate] log insert failed', { spaceId: args.spaceId }, genErr);
-    throw new StudioGenerationError('Could not start generation.', 500);
+    // Surface the underlying error so the realtor sees WHAT's wrong instead
+    // of a generic message that requires log access to diagnose. The
+    // common cause is the 20260606000005_studio_tables.sql migration not
+    // being applied — without it the table doesn't exist and we get
+    // `relation "StudioGeneration" does not exist`.
+    throw new StudioGenerationError(
+      `Could not start generation: ${genErr.message ?? 'unknown DB error'}`,
+      500,
+    );
   }
 
   const markFailed = async (message: string): Promise<void> => {

@@ -79,7 +79,10 @@ export async function runStudioEdit(args: {
   });
   if (genErr) {
     logger.error('[studio.edit] log insert failed', { spaceId: args.spaceId }, genErr);
-    throw new StudioGenerationError('Could not start the edit.', 500);
+    throw new StudioGenerationError(
+      `Could not start the edit: ${genErr.message ?? 'unknown DB error'}`,
+      500,
+    );
   }
 
   const markFailed = async (message: string): Promise<void> => {

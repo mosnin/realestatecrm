@@ -576,7 +576,12 @@ async def _run_locked(
         if isinstance(final_output, str):
             final_summary = final_output[:280]
 
-        log.info("agent_run_completed", total_tokens=total_tokens, model_used=chippi.model)
+        # `chippi.model` is an OpenAIChatCompletionsModel object (per the
+        # x-ai/ prefix fix). Pull the slug back out for logging + trajectory
+        # writes — asyncpg can't encode the SDK object into a TEXT column,
+        # so every record_trajectory call silently failed before this fix.
+        model_slug = getattr(chippi.model, "model", str(chippi.model))
+        log.info("agent_run_completed", total_tokens=total_tokens, model_used=model_slug)
 
     except InputGuardrailTripwireTriggered as exc:
         info = exc.guardrail_result.output.output_info or {}
@@ -596,7 +601,7 @@ async def _run_locked(
             started_at=started_at,
             status="guardrail_blocked",
             trigger=(triggers[0] if triggers else None),
-            model=chippi.model,
+            model=model_slug,
             total_tokens=total_tokens,
             tool_calls=trajectory_tool_calls,
             extra={"pending_drafts": pending},
@@ -632,7 +637,7 @@ async def _run_locked(
             started_at=started_at,
             status="error",
             trigger=(triggers[0] if triggers else None),
-            model=chippi.model,
+            model=model_slug,
             total_tokens=total_tokens,
             tool_calls=trajectory_tool_calls,
             extra={"error": str(exc)[:500]},
@@ -670,7 +675,7 @@ async def _run_locked(
         started_at=started_at,
         status="completed",
         trigger=(triggers[0] if triggers else None),
-        model=chippi.model,
+        model=model_slug,
         total_tokens=total_tokens,
         tool_calls=trajectory_tool_calls,
         final_summary=final_summary,
