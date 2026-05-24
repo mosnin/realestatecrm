@@ -15,7 +15,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { uploadObject, getPublicUrl, buildKey } from '@/lib/storage';
+import { uploadObject, buildKey, getSignedDownloadUrl } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
 
 export const runtime = 'nodejs';
@@ -98,8 +98,13 @@ export async function POST(req: NextRequest) {
       key,
       body: buffer,
       contentType: file.type,
-      // Public — the cover is rendered on the unauthenticated /p/[slug] page.
-      isPublic: true,
+      // Stored as private — the public page server-renders a fresh signed
+      // URL on each visit (revalidate=60s makes the round trip cheap, and
+      // signed URLs work regardless of whether the bucket policy allows
+      // anonymous reads). The earlier `isPublic: true` + getPublicUrl()
+      // path produced a static URL that 403'd because the Wasabi bucket
+      // isn't configured for anonymous reads on this account.
+      isPublic: false,
     });
   } catch (err) {
     logger.error(
@@ -110,14 +115,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed.' }, { status: 500 });
   }
 
-  const publicUrl = getPublicUrl(key);
-
+  // Store the STORAGE KEY (not a URL) in coverPhotoUrl. The public page
+  // signs a fresh download URL on each render. The column name keeps its
+  // historical shape — what changes is the value contract: keys that don't
+  // start with `http` are signed on read; any legacy `http(s)://...` value
+  // is rendered verbatim.
   const { error: dbErr } = await supabase
     .from('ProfilePage')
     .upsert(
       {
         spaceId: space.id,
-        coverPhotoUrl: publicUrl,
+        coverPhotoUrl: key,
         updatedAt: new Date().toISOString(),
       },
       { onConflict: 'spaceId' },
@@ -132,7 +140,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Save failed.' }, { status: 500 });
   }
 
-  return NextResponse.json({ url: publicUrl });
+  // Return a fresh signed URL alongside the key — the settings UI shows
+  // the preview immediately without needing a separate fetch. The KEY is
+  // the durable storage value (lives in coverPhotoUrl column); the URL is
+  // a 24h presigned read.
+  let signedUrl: string | null = null;
+  try {
+    signedUrl = await getSignedDownloadUrl(key, 60 * 60 * 24);
+  } catch (err) {
+    logger.warn('[profile-cover] sign just-uploaded failed', {
+      spaceId: space.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return NextResponse.json({ key, url: signedUrl });
 }
 
 export async function DELETE() {

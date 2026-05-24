@@ -53,6 +53,28 @@ function renderMarkdown(content: string, streaming?: boolean): React.ReactNode[]
   while (i < lines.length) {
     const line = lines[i];
 
+    // ── Image: ![alt](url) on its own line ───────────────────────────────
+    // Studio + integration tool results surface generated assets as
+    // markdown image syntax; render them inline so the realtor sees the
+    // image instead of a URL. Image must be the whole line — inline
+    // images mixed with text aren't worth supporting yet.
+    const imageMatch = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line);
+    if (imageMatch) {
+      const alt = imageMatch[1] || 'image';
+      const url = imageMatch[2];
+      nodes.push(
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={key()}
+          src={url}
+          alt={alt}
+          className="my-2 max-w-full rounded-lg border border-border/60"
+        />,
+      );
+      i++;
+      continue;
+    }
+
     // ── Fenced code block ────────────────────────────────────────────────
     if (line.trimStart().startsWith('```')) {
       const codeLines: string[] = [];

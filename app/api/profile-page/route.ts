@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { parseYouTubeId } from '@/lib/profile-page';
 
@@ -40,7 +41,30 @@ export async function GET() {
     .eq('spaceId', space.id)
     .maybeSingle();
 
-  return NextResponse.json({ ...DEFAULTS, ...(data ?? {}) });
+  // coverPhotoUrl is stored as a storage KEY (the bucket isn't anonymously
+  // readable, so signing on read is the live contract). Legacy values that
+  // start with `http(s)://` are URLs and get passed through. Editor UI
+  // displays this value directly, so signing here is the only place that
+  // matters for the preview.
+  const merged: Record<string, unknown> = { ...DEFAULTS, ...(data ?? {}) };
+  if (typeof merged.coverPhotoUrl === 'string' && merged.coverPhotoUrl) {
+    if (!/^https?:\/\//i.test(merged.coverPhotoUrl)) {
+      try {
+        merged.coverPhotoUrl = await getSignedDownloadUrl(
+          merged.coverPhotoUrl,
+          60 * 60 * 24,
+        );
+      } catch (err) {
+        logger.warn('[profile-page GET] sign cover failed', {
+          spaceId: space.id,
+          err: err instanceof Error ? err.message : String(err),
+        });
+        merged.coverPhotoUrl = null;
+      }
+    }
+  }
+
+  return NextResponse.json(merged);
 }
 
 export async function PATCH(req: NextRequest) {
