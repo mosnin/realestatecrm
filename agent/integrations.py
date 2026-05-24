@@ -352,20 +352,28 @@ def _build_proxied_function_tool(
 
 
 async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
-    """Fetch the realtor's Composio tools by proxying through Vercel.
+    """Expose the integration dispatcher (find + call) when the realtor has
+    any active toolkit connected.
 
-    Direct Composio calls from Modal hit
-    `10401 HTTP_Unauthorized: This API key is not authorized from the
-    current IP address` because Composio's allowlist on our key includes
-    Vercel's range but not Modal's egress IPs. We could ask Composio to
-    open the allowlist, but Modal IPs rotate and that's a treadmill.
-    Routing through Vercel costs one extra hop per tool call and removes
-    the IP coupling entirely. The Composio OAuth handshake runs from
-    Vercel already (lib/integrations/composio.ts), so this just reuses
-    the same auth surface for runtime tool calls.
+    The prior approach front-loaded every Composio action into the model's
+    tool list: 500+ function definitions per chat turn for a realtor with
+    Gmail + HubSpot + Slack + Instagram, past xAI's 200-tool ceiling
+    (`Maximum tools limit reached. 520 tools provided but the maximum is
+    200.`) and a brutal token cost on every other provider even for
+    chats that never touch an integration. Dispatcher pattern collapses
+    that to two meta-tools the model only invokes when it actually needs
+    an external system:
 
-    Returns [] on any failure — chat must keep working on the native
-    catalog if integrations are unavailable.
+        find_integration_tool(query)   -> top-N matching action specs
+        call_integration_tool(slug, .) -> executes the chosen action
+
+    Both proxy through Vercel (the same /search and /execute endpoints
+    Composio's per-IP auth allowlists already accept), so Modal's egress
+    IPs never appear in Composio's request log.
+
+    Returns [] when no toolkits are connected (no point loading the
+    dispatcher only for it to find nothing) or when the proxy is
+    misconfigured.
     """
     proxy = _proxy_base()
     if proxy is None:
@@ -376,81 +384,34 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
             hint="set NEXT_PUBLIC_APP_URL and AGENT_INTERNAL_SECRET in the Modal secret",
         )
         return []
-    base_url, secret = proxy
 
+    # Quick connectivity check — the dispatcher is dead weight if the
+    # realtor has zero active toolkits. Cheap read against our own DB.
     try:
-        async with httpx.AsyncClient(timeout=_LIST_TIMEOUT) as client:
-            resp = await client.post(
-                f"{base_url}/api/internal/integrations/tools",
-                json={"spaceId": space_id, "userId": user_id},
-                headers={"Authorization": f"Bearer {secret}"},
-            )
-        if resp.status_code >= 400:
-            logger.warning(
-                "integration_proxy_list_http_error",
-                space_id=space_id,
-                user_id=user_id,
-                status=resp.status_code,
-                body_preview=resp.text[:300],
-            )
-            return []
-        data = resp.json()
-    except Exception as err:
+        toolkits = await active_toolkits(space_id, user_id)
+    except Exception as err:  # noqa: BLE001
         logger.warning(
-            "integration_proxy_list_failed",
+            "integration_dispatcher_active_check_failed",
             space_id=space_id,
             user_id=user_id,
-            error=str(err)[:300],
+            error=str(err)[:200],
         )
         return []
-
-    specs = data.get("tools") or []
-    if not specs:
+    if not toolkits:
         return []
 
-    tools: list[Any] = []
-    seen_names: set[str] = set()
-    for spec in specs:
-        slug = spec.get("slug")
-        if not slug:
-            continue
-        # Build a collision-free name from the slug. xAI's Chat Completions
-        # endpoint hard-fails the whole turn if any two function names match;
-        # OpenAI and Anthropic silently dedup but we can't depend on that.
-        safe_name = _safe_tool_name(slug, spec.get("toolkit") or "")
-        if not safe_name or safe_name in seen_names:
-            continue
-        seen_names.add(safe_name)
-        try:
-            tools.append(
-                _build_proxied_function_tool(
-                    slug=slug,
-                    name=safe_name,
-                    description=(spec.get("description") or slug)[:1024],
-                    parameters=spec.get("parameters")
-                    or {"type": "object", "properties": {}},
-                    toolkit=spec.get("toolkit") or "",
-                    space_id=space_id,
-                    user_id=user_id,
-                    base_url=base_url,
-                    secret=secret,
-                )
-            )
-        except Exception as err:  # noqa: BLE001
-            logger.warning(
-                "integration_tool_build_failed",
-                slug=slug,
-                error=str(err)[:200],
-            )
+    from tools.integrations_dispatcher import (
+        call_integration_tool,
+        find_integration_tool,
+    )
 
     logger.info(
-        "integration_tools_loaded_via_proxy",
+        "integration_dispatcher_enabled",
         space_id=space_id,
         user_id=user_id,
-        tool_count=len(tools),
-        tool_slugs=[getattr(t, "name", "?") for t in tools[:10]],
+        connected_toolkits=toolkits,
     )
-    return tools
+    return [find_integration_tool, call_integration_tool]
 
 
 async def resolve_owner_user_id(space_id: str) -> str | None:
