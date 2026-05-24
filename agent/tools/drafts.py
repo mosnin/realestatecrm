@@ -136,7 +136,12 @@ async def draft_message(
                 guessed_name = local.replace(".", " ").replace("_", " ").replace("-", " ").title()
             else:
                 guessed_name = (clean_phone or "Unknown").strip()
-            now = datetime.now(timezone.utc).isoformat()
+            # The Contact table has DEFAULT now() on createdAt/updatedAt.
+            # Don't pass them from Python — the underlying asyncpg pool
+            # rejects ISO strings for TIMESTAMPTZ columns (`expected a
+            # datetime.date or datetime.datetime instance, got 'str'`),
+            # which broke every auto-stub insert. Let Postgres own the
+            # timestamps.
             stub: dict[str, Any] = {
                 "id": new_id,
                 "spaceId": space_id,
@@ -145,8 +150,6 @@ async def draft_message(
                 "type": "QUALIFICATION",
                 "properties": [],
                 "tags": ["auto-created"],
-                "createdAt": now,
-                "updatedAt": now,
             }
             if clean_email:
                 stub["email"] = clean_email[:320]
