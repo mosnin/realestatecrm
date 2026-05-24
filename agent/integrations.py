@@ -183,6 +183,55 @@ async def _fetch_curated_schemas(
     return data.get("tools") or []
 
 
+def _sanitize_enums_for_xai(node: Any) -> Any:
+    """Strip JSON Schema enums whose string values contain xAI-rejected chars.
+
+    xAI's Chat Completions schema validator currently refuses `/` inside
+    enum string values:
+
+      Error code: 400 - Schema validation failed: [engine_imposed]
+        /properties/hs_legal_basis/enum/0: '/' in 'enum' string value
+        is currently not supported
+
+    HubSpot ships canonical values like `Performance / Contract` for
+    fields like `hs_legal_basis`; Composio surfaces those verbatim and
+    xAI then refuses the entire chat turn before the model sees anything.
+    OpenAI / Anthropic accept them — this is a Grok-specific quirk.
+
+    The cleanest fix is to drop the offending enum constraint and append
+    the valid values to the field's `description`, so the model still
+    knows what to send and the upstream API (HubSpot) revalidates with
+    the canonical strings intact. Recurses into properties, items, the
+    composite keywords (anyOf/oneOf/allOf), and $defs so nested schemas
+    are covered.
+    """
+    if isinstance(node, dict):
+        out: dict[str, Any] = {}
+        for k, v in node.items():
+            if k in ("properties", "patternProperties", "$defs", "definitions") and isinstance(v, dict):
+                out[k] = {sub_k: _sanitize_enums_for_xai(sub_v) for sub_k, sub_v in v.items()}
+            elif k in ("items", "additionalProperties", "not", "if", "then", "else"):
+                out[k] = _sanitize_enums_for_xai(v)
+            elif k in ("anyOf", "oneOf", "allOf") and isinstance(v, list):
+                out[k] = [_sanitize_enums_for_xai(item) for item in v]
+            else:
+                out[k] = v
+        # Decide on THIS node's enum after recursion so children are clean.
+        enum_val = out.get("enum")
+        if isinstance(enum_val, list) and any(
+            isinstance(e, str) and "/" in e for e in enum_val
+        ):
+            valid = ", ".join(str(e) for e in enum_val)
+            desc = str(out.get("description", "") or "")
+            sep = " " if desc and not desc.endswith(" ") else ""
+            out["description"] = f"{desc}{sep}Valid values: {valid}".strip()
+            del out["enum"]
+        return out
+    if isinstance(node, list):
+        return [_sanitize_enums_for_xai(item) for item in node]
+    return node
+
+
 def _build_curated_tool(
     *,
     slug: str,
@@ -259,9 +308,16 @@ def _build_curated_tool(
     # agent-tools.ts) — Composio re-validates server-side anyway, so loose
     # client schemas are safe and avoid spurious validation errors when
     # the model wants to pass a parameter the schema doesn't enumerate.
+    # Run xAI-enum sanitization on the properties before assembling, so any
+    # HubSpot-style `Performance / Contract` enums get demoted to
+    # description hints and don't crash the chat turn at the provider.
+    raw_properties = (parameters or {}).get("properties", {}) or {}
+    sanitized_properties = {
+        k: _sanitize_enums_for_xai(v) for k, v in raw_properties.items()
+    }
     safe_parameters: dict[str, Any] = {
         "type": "object",
-        "properties": (parameters or {}).get("properties", {}) or {},
+        "properties": sanitized_properties,
         "required": (parameters or {}).get("required", []) or [],
         "additionalProperties": True,
     }
