@@ -14,7 +14,15 @@
  */
 
 import type { ReactNode } from 'react';
-import { ArrowRight, ArrowUpRight, CalendarCheck, Globe, Link2, Play } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BadgeCheck,
+  CalendarCheck,
+  Globe,
+  Link2,
+  Play,
+} from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { cn, safeHref } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
@@ -53,8 +61,12 @@ interface PublicProfileProps {
   videos: PublicVideo[];
   /** Realtor-curated hero image. When set it becomes the full-bleed header
    *  and the agent photo demotes to a round avatar centered below. When null,
-   *  the agent photo stretches as the hero (the original behavior). */
+   *  the agent photo stretches as the hero (the original behavior). On
+   *  desktop, this is ALSO the blur source for the page background. */
   coverPhotoUrl: string | null;
+  /** Small blue checkmark next to the realtor's name. Realtor-controlled
+   *  toggle in the editor; defaults to false if the column doesn't exist. */
+  isVerified: boolean;
   properties: PublicProperty[];
   hidePoweredBy: boolean;
 }
@@ -77,7 +89,9 @@ function SectionHeader({ children }: { children: ReactNode }) {
   );
 }
 
-/** Hand-rolled brand marks — lucide dropped brand icons. */
+/** Hand-rolled brand marks — lucide dropped brand icons (and never had
+ *  TikTok / Threads / X). Keeping all platform glyphs in one file so the
+ *  social row stays visually coherent. */
 function SocialIcon({ platform }: { platform: string }) {
   const size = 15;
   switch (platform.toLowerCase()) {
@@ -99,10 +113,79 @@ function SocialIcon({ platform }: { platform: string }) {
           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
         </svg>
       );
+    case 'twitter':
+    case 'x':
+      // The 2023 X mark — replaces the old bird so the icon row matches
+      // what people actually see on Twitter/X today.
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+      );
+    case 'youtube':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+        </svg>
+      );
+    case 'tiktok':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.91a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.34z" />
+        </svg>
+      );
+    case 'threads':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M17.36 11.205c-.085-.04-.171-.08-.258-.118-.151-2.798-1.68-4.4-4.246-4.416h-.035c-1.534 0-2.81.655-3.595 1.846l1.41.967c.587-.89 1.508-1.08 2.186-1.08h.023c.844.005 1.481.25 1.894.728.3.348.5.83.598 1.44-.74-.126-1.54-.165-2.395-.116-2.41.139-3.96 1.544-3.856 3.498.053.991.546 1.844 1.388 2.401.713.472 1.63.702 2.583.65 1.259-.07 2.246-.55 2.935-1.428.523-.666.854-1.529.998-2.617.591.357 1.029.826 1.272 1.39.412.96.436 2.537-.85 3.821-1.126 1.125-2.48 1.612-4.527 1.627-2.27-.017-3.987-.745-5.103-2.163C7.776 16.32 7.227 14.39 7.205 12c.022-2.39.571-4.32 1.633-5.735C9.954 4.847 11.67 4.12 13.94 4.103c2.287.017 4.032.748 5.187 2.171.567.696 1 1.578 1.279 2.607l1.65-.44c-.337-1.273-.866-2.376-1.586-3.265C19.018 3.367 16.802 2.43 13.943 2.41h-.012c-2.852.02-5.057.96-6.553 2.793-1.354 1.65-2.05 3.949-2.075 6.789v.013c.024 2.84.72 5.138 2.075 6.788 1.496 1.833 3.701 2.773 6.553 2.794h.012c2.527-.018 4.292-.677 5.745-2.137 1.913-1.911 1.866-4.317 1.236-5.811-.45-1.077-1.297-1.949-2.443-2.535zm-4.291 3.93c-1.058.058-2.158-.418-2.213-1.444-.04-.762.546-1.612 2.279-1.712.197-.012.39-.018.582-.018.625 0 1.21.06 1.74.176-.197 2.444-1.337 2.937-2.388 2.998z" />
+        </svg>
+      );
+    case 'website':
+    case 'site':
     default:
       return <Globe size={size} aria-hidden />;
   }
 }
+
+/** Closed platform list. The order is the render order in the icon row —
+ *  Instagram first (where realtors live) → Facebook → X → LinkedIn →
+ *  YouTube → TikTok → Threads → "Personal site" last. The editor accepts
+ *  these keys only; the renderer iterates this list (not the entries) so
+ *  the order is stable regardless of object-key insertion. */
+export const SOCIAL_PLATFORMS = [
+  'instagram',
+  'facebook',
+  'twitter',
+  'linkedin',
+  'youtube',
+  'tiktok',
+  'threads',
+  'website',
+] as const;
+
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+
+export const SOCIAL_LABELS: Record<SocialPlatform, string> = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  twitter: 'X (Twitter)',
+  linkedin: 'LinkedIn',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  threads: 'Threads',
+  website: 'Personal site',
+};
+
+export const SOCIAL_PLACEHOLDERS: Record<SocialPlatform, string> = {
+  instagram: 'https://instagram.com/your-handle',
+  facebook: 'https://facebook.com/your-page',
+  twitter: 'https://x.com/your-handle',
+  linkedin: 'https://linkedin.com/in/you',
+  youtube: 'https://youtube.com/@you',
+  tiktok: 'https://tiktok.com/@you',
+  threads: 'https://threads.net/@you',
+  website: 'https://your-site.com',
+};
 
 /** The YouTube glyph for the video-card corner badge. */
 function YouTubeMark() {
@@ -246,18 +329,70 @@ export function PublicProfile({
   customLinks,
   videos,
   coverPhotoUrl,
+  isVerified,
   properties,
   hidePoweredBy,
 }: PublicProfileProps) {
-  const socialEntries = Object.entries(socialLinks ?? {}).filter(
-    ([, url]) => typeof url === 'string' && url.trim().length > 0,
-  );
+  // Render the icon row in canonical platform order (not object-key
+  // insertion order). Anything not in SOCIAL_PLATFORMS is ignored — the
+  // PATCH already enforces a closed set, but the renderer enforces it too
+  // (defence in depth against legacy rows with arbitrary keys).
+  const socialEntries = (SOCIAL_PLATFORMS as readonly string[])
+    .map((platform) => {
+      const raw = socialLinks?.[platform];
+      const url = typeof raw === 'string' ? raw.trim() : '';
+      return url ? { platform, url } : null;
+    })
+    .filter((e): e is { platform: string; url: string } => e !== null);
   const playableVideos = videos.filter((v) => parseYouTubeId(v.url));
   const ctaTextColor = pickContrastColor(accentColor);
 
+  // Pick the best image for the desktop blur fill: realtor-curated cover
+  // wins; otherwise the realtor's face; otherwise null (we fall through to
+  // a neutral gradient). Mobile ignores this — a heavy blur on a phone is
+  // expensive and the background fights the card on a small screen.
+  const blurSource = coverPhotoUrl || agentPhoto || null;
+
   return (
-    <div className={cn('min-h-screen bg-muted/40', darkMode && 'dark')}>
-      <div className="mx-auto w-full max-w-[480px] bg-background sm:my-8 sm:overflow-hidden sm:rounded-[28px] sm:border sm:border-border/60">
+    <div
+      className={cn(
+        'relative min-h-screen bg-muted/40',
+        darkMode && 'dark',
+      )}
+    >
+      {/* ── Desktop blur background ─────────────────────────────────────────
+          On sm+ the page is a centred card floating over a heavy-blurred
+          image fill. The card vocabulary doesn't change — only what's
+          behind it. Mobile gets nothing extra (the card already takes the
+          full viewport; the blur would be invisible underneath and
+          expensive). When neither cover nor face is set we ship a neutral
+          gradient so the desktop canvas never reads as a flat white wall.
+          ───────────────────────────────────────────────────────────────── */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 hidden sm:block"
+      >
+        {blurSource ? (
+          <>
+            <img
+              src={blurSource}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="h-full w-full scale-110 object-cover blur-[48px]"
+            />
+            {/* Darkening overlay so the card readout stays legible against
+                any image — bright photos, busy patterns, anything. The 50%
+                stop is a compromise between "still visibly the photo" and
+                "card text stays calm". */}
+            <div className="absolute inset-0 bg-black/45" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60" />
+        )}
+      </div>
+
+      <div className="relative mx-auto w-full max-w-[480px] bg-background sm:my-8 sm:overflow-hidden sm:rounded-[28px] sm:border sm:border-border/60">
         {/* ── Header ──────────────────────────────────────────────────────
             Two shapes:
             (a) Cover photo set → cover is the full-bleed hero (16:9) and
@@ -326,8 +461,22 @@ export function PublicProfile({
                   className="mx-auto h-9 max-w-[240px] object-contain"
                 />
               ) : (
-                <span className="text-2xl font-bold tracking-tight text-foreground">
+                // Serif Times — the brand's quiet flourish, scoped to the
+                // name line only (the handle and bio stay sans). Inline
+                // BadgeCheck sits on the name's mid-line when verified;
+                // it's the focal moment of the header.
+                <span
+                  className="inline-flex items-center justify-center gap-1.5 text-[28px] leading-tight tracking-tight text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
                   {businessName}
+                  {isVerified && (
+                    <BadgeCheck
+                      size={18}
+                      aria-label="Verified"
+                      className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+                    />
+                  )}
                 </span>
               )}
             </h1>
@@ -338,14 +487,14 @@ export function PublicProfile({
 
             {socialEntries.length > 0 && (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                {socialEntries.map(([platform, url]) => (
+                {socialEntries.map(({ platform, url }) => (
                   <a
                     key={platform}
                     href={safeHref(url)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={platform}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    aria-label={SOCIAL_LABELS[platform as SocialPlatform] ?? platform}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground/80 transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
                   >
                     <SocialIcon platform={platform} />
                   </a>

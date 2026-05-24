@@ -11,11 +11,18 @@ import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { parseYouTubeId } from '@/lib/profile-page';
+import { SOCIAL_PLATFORMS, type SocialPlatform } from '@/components/profile-page/public-profile';
 
 export const runtime = 'nodejs';
 
 const SELECT =
   'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl';
+
+// Brand identity bits (verified badge, social handles) live on SpaceSetting
+// rather than ProfilePage because they're inherited across every public
+// surface the realtor owns — the public page, the application, the booking
+// page all read these. The PATCH below threads them through.
+const SETTINGS_SELECT = 'isVerified, socialLinks';
 
 const DEFAULTS = {
   enabled: true,
@@ -26,6 +33,8 @@ const DEFAULTS = {
   customLinks: [] as Array<{ id: string; label: string; url: string; thumbnail: string }>,
   videos: [] as Array<{ id: string; url: string; title: string }>,
   coverPhotoUrl: null as string | null,
+  isVerified: false,
+  socialLinks: {} as Partial<Record<SocialPlatform, string>>,
 };
 
 export async function GET() {
@@ -35,18 +44,38 @@ export async function GET() {
   const space = await getSpaceForUser(authResult.userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data } = await supabase
-    .from('ProfilePage')
-    .select(SELECT)
-    .eq('spaceId', space.id)
-    .maybeSingle();
+  const [{ data }, { data: settingsRow }] = await Promise.all([
+    supabase.from('ProfilePage').select(SELECT).eq('spaceId', space.id).maybeSingle(),
+    supabase
+      .from('SpaceSetting')
+      .select(SETTINGS_SELECT)
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+  ]);
+
+  // Sanitize socialLinks read from the DB. Older rows may carry arbitrary
+  // platform keys (the original shape was Record<string,string>); the
+  // editor only edits the closed set, so we drop anything outside it on
+  // the way out so the UI's view of the data matches what it can write
+  // back.
+  const rawSocial = (settingsRow?.socialLinks ?? {}) as Record<string, unknown>;
+  const cleanSocial: Partial<Record<SocialPlatform, string>> = {};
+  for (const platform of SOCIAL_PLATFORMS) {
+    const v = rawSocial[platform];
+    if (typeof v === 'string' && v.trim()) cleanSocial[platform] = v.trim();
+  }
 
   // coverPhotoUrl is stored as a storage KEY (the bucket isn't anonymously
   // readable, so signing on read is the live contract). Legacy values that
   // start with `http(s)://` are URLs and get passed through. Editor UI
   // displays this value directly, so signing here is the only place that
   // matters for the preview.
-  const merged: Record<string, unknown> = { ...DEFAULTS, ...(data ?? {}) };
+  const merged: Record<string, unknown> = {
+    ...DEFAULTS,
+    ...(data ?? {}),
+    isVerified: settingsRow?.isVerified === true,
+    socialLinks: cleanSocial,
+  };
   if (typeof merged.coverPhotoUrl === 'string' && merged.coverPhotoUrl) {
     if (!/^https?:\/\//i.test(merged.coverPhotoUrl)) {
       try {
@@ -125,5 +154,73 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // socialLinks + isVerified live on SpaceSetting (they're brand-level —
+  // every public surface the realtor owns reads from there). Build a
+  // separate settings patch and apply it if anything came through.
+  const settingsPatch: Record<string, unknown> = {};
+
+  if (typeof body.isVerified === 'boolean') {
+    settingsPatch.isVerified = body.isVerified;
+  }
+
+  if (body.socialLinks && typeof body.socialLinks === 'object' && !Array.isArray(body.socialLinks)) {
+    // Closed platform set — anything outside SOCIAL_PLATFORMS is dropped.
+    // Each value must be a string http(s) URL; non-URL strings are
+    // silently dropped so we never persist an unclickable link. Empty
+    // strings remove the platform.
+    const incoming = body.socialLinks as Record<string, unknown>;
+    const cleaned: Partial<Record<SocialPlatform, string>> = {};
+    for (const platform of SOCIAL_PLATFORMS) {
+      const raw = incoming[platform];
+      if (typeof raw !== 'string') continue;
+      const trimmed = raw.trim().slice(0, 500);
+      if (!trimmed) continue; // empty = unset, leave it out
+      if (!/^https?:\/\//i.test(trimmed)) continue;
+      cleaned[platform] = trimmed;
+    }
+    settingsPatch.socialLinks = cleaned;
+  }
+
+  let settingsRow: { isVerified: boolean; socialLinks: Record<string, string> } | null = null;
+  if (Object.keys(settingsPatch).length > 0) {
+    // Upsert keyed on spaceId — when the row doesn't exist yet, the unique
+    // constraint on spaceId picks it up and we synthesise the required PK.
+    const { data: upserted, error: settingsError } = await supabase
+      .from('SpaceSetting')
+      .upsert(
+        { id: crypto.randomUUID(), spaceId: space.id, ...settingsPatch },
+        { onConflict: 'spaceId' },
+      )
+      .select(SETTINGS_SELECT)
+      .single();
+
+    if (settingsError) {
+      logger.error('[profile-page] settings update failed', { spaceId: space.id }, settingsError);
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    }
+    settingsRow = upserted as unknown as typeof settingsRow;
+  } else {
+    const { data: existing } = await supabase
+      .from('SpaceSetting')
+      .select(SETTINGS_SELECT)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    settingsRow = existing as unknown as typeof settingsRow;
+  }
+
+  // Mirror the GET shape so the editor's applyConfig() can re-hydrate
+  // straight from the PATCH response.
+  const settingsRowAny = settingsRow as { isVerified?: boolean; socialLinks?: unknown } | null;
+  const rawSocial = (settingsRowAny?.socialLinks ?? {}) as Record<string, unknown>;
+  const cleanSocial: Partial<Record<SocialPlatform, string>> = {};
+  for (const platform of SOCIAL_PLATFORMS) {
+    const v = rawSocial[platform];
+    if (typeof v === 'string' && v.trim()) cleanSocial[platform] = v.trim();
+  }
+
+  return NextResponse.json({
+    ...data,
+    isVerified: settingsRowAny?.isVerified === true,
+    socialLinks: cleanSocial,
+  });
 }

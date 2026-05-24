@@ -91,7 +91,7 @@ export default async function PublicRealtorPage({
     supabase
       .from('SpaceSetting')
       .select(
-        'businessName, logoUrl, realtorPhotoUrl, bio, socialLinks, intakeAccentColor, intakeDarkMode',
+        'businessName, logoUrl, realtorPhotoUrl, bio, socialLinks, intakeAccentColor, intakeDarkMode, isVerified',
       )
       .eq('spaceId', space.id)
       .maybeSingle(),
@@ -159,6 +159,7 @@ export default async function PublicRealtorPage({
       customLinks={Array.isArray(cfg.customLinks) ? cfg.customLinks : []}
       videos={Array.isArray(cfg.videos) ? cfg.videos : []}
       coverPhotoUrl={coverPhotoUrl}
+      isVerified={settings?.isVerified === true}
       properties={properties}
       hidePoweredBy={hidePoweredBy}
     />

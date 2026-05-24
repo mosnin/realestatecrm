@@ -22,7 +22,26 @@ import {
   Check,
   ImagePlus,
   Play,
+  GripVertical,
 } from 'lucide-react';
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -30,6 +49,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { parseYouTubeId, youTubeThumbnail } from '@/lib/profile-page';
 import { BODY_MUTED, CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import {
+  SOCIAL_PLATFORMS,
+  SOCIAL_LABELS,
+  SOCIAL_PLACEHOLDERS,
+  type SocialPlatform,
+} from '@/components/profile-page/public-profile';
 
 interface CustomLink {
   id: string;
@@ -61,6 +86,8 @@ export function ProfileEditor({ slug }: { slug: string }) {
   const [showIntake, setShowIntake] = useState(true);
   const [showTours, setShowTours] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<Partial<Record<SocialPlatform, string>>>({});
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   // Cover photo is owned by its dedicated endpoint — updated independently
@@ -107,6 +134,19 @@ export function ProfileEditor({ slug }: { slug: string }) {
     setShowIntake(data.showIntake !== false);
     setShowTours(data.showTours !== false);
     setShowProperties(data.showProperties !== false);
+    setIsVerified(data.isVerified === true);
+    {
+      const raw =
+        data.socialLinks && typeof data.socialLinks === 'object' && !Array.isArray(data.socialLinks)
+          ? (data.socialLinks as Record<string, unknown>)
+          : {};
+      const next: Partial<Record<SocialPlatform, string>> = {};
+      for (const p of SOCIAL_PLATFORMS) {
+        const v = raw[p];
+        if (typeof v === 'string') next[p] = v;
+      }
+      setSocialLinks(next);
+    }
     setCustomLinks(
       Array.isArray(data.customLinks)
         ? (data.customLinks as Partial<CustomLink>[]).map((l) => ({
@@ -200,6 +240,29 @@ export function ProfileEditor({ slug }: { slug: string }) {
     );
   }
 
+  // Drag-to-reorder for custom links. The array order is the render order
+  // on the public page, so reordering here is the whole feature — Save
+  // changes persists. PointerSensor handles mouse + pen, TouchSensor
+  // handles mobile (a 200ms hold so the realtor can still scroll); 5px
+  // activation distance on the pointer keeps small fidget clicks from
+  // starting a drag accidentally.
+  const linkSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleLinkDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setCustomLinks((links) => {
+      const oldIndex = links.findIndex((l) => l.id === active.id);
+      const newIndex = links.findIndex((l) => l.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return links;
+      return arrayMove(links, oldIndex, newIndex);
+    });
+  }
+
   function updateVideo(id: string, patch: Partial<VideoItem>) {
     setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
@@ -246,6 +309,20 @@ export function ProfileEditor({ slug }: { slug: string }) {
       return;
     }
 
+    // Trim and validate social links — empty values are dropped (= unset
+    // on the server). Anything non-empty must be a real http(s) URL so we
+    // never persist an unclickable link.
+    const cleanedSocial: Partial<Record<SocialPlatform, string>> = {};
+    for (const p of SOCIAL_PLATFORMS) {
+      const v = (socialLinks[p] ?? '').trim();
+      if (!v) continue;
+      if (!/^https?:\/\//i.test(v)) {
+        setSaveError(`${SOCIAL_LABELS[p]} link needs to start with http:// or https://.`);
+        return;
+      }
+      cleanedSocial[p] = v;
+    }
+
     setSaving(true);
     try {
       const res = await fetch('/api/profile-page', {
@@ -257,6 +334,8 @@ export function ProfileEditor({ slug }: { slug: string }) {
           showIntake,
           showTours,
           showProperties,
+          isVerified,
+          socialLinks: cleanedSocial,
           customLinks: cleanedLinks,
           videos: cleanedVideos,
         }),
@@ -435,6 +514,50 @@ export function ProfileEditor({ slug }: { slug: string }) {
         {coverError && <p className="text-xs text-destructive">{coverError}</p>}
       </section>
 
+      {/* ── Identity ──────────────────────────────────────────────────────
+          Two identity bits beyond name/photo (those live in workspace
+          settings — see the link from the Headline section): the
+          verified badge and the social-link icon row. Both render on the
+          public page directly below the realtor's name. ─────────────── */}
+      <section className="space-y-6 border-t border-border/60 pt-10">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">Identity</h2>
+          <p className={BODY_MUTED}>
+            What sits with your name at the top of the page.
+          </p>
+        </header>
+
+        <ToggleRow
+          id="isVerified"
+          checked={isVerified}
+          onChange={setIsVerified}
+          label="Verified badge"
+          help="A small blue checkmark next to your name — a quiet trust signal for visitors."
+        />
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-[12.5px] font-medium text-foreground">Social links</p>
+            <p className={CAPTION}>
+              Add what you use. Empty fields are hidden — only the platforms with links show on
+              your page.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {SOCIAL_PLATFORMS.map((platform) => (
+              <SocialRow
+                key={platform}
+                platform={platform}
+                value={socialLinks[platform] ?? ''}
+                onChange={(value) =>
+                  setSocialLinks((prev) => ({ ...prev, [platform]: value }))
+                }
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Headline ───────────────────────────────────────────────────── */}
       <section className="space-y-4 border-t border-border/60 pt-10">
         <header className="space-y-1">
@@ -554,16 +677,27 @@ export function ProfileEditor({ slug }: { slug: string }) {
         {customLinks.length === 0 ? (
           <p className={CAPTION}>No custom links yet.</p>
         ) : (
-          <div className="space-y-3">
-            {customLinks.map((link) => (
-              <LinkRow
-                key={link.id}
-                link={link}
-                onChange={(patch) => updateLink(link.id, patch)}
-                onRemove={() => removeLink(link.id)}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={linkSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleLinkDragEnd}
+          >
+            <SortableContext
+              items={customLinks.map((l) => l.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {customLinks.map((link) => (
+                  <SortableLinkRow
+                    key={link.id}
+                    link={link}
+                    onChange={(patch) => updateLink(link.id, patch)}
+                    onRemove={() => removeLink(link.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
 
         <Button
@@ -697,14 +831,48 @@ function VideoRow({
   );
 }
 
+/** Sortable wrapper around <LinkRow>. The drag handle lives at the left
+ *  of the row; useSortable wires up keyboard + pointer + touch. The
+ *  transform is applied with CSS.Transform so the dragged row stays in
+ *  layout while shifting visually. */
+function SortableLinkRow(props: {
+  link: CustomLink;
+  onChange: (patch: Partial<CustomLink>) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: props.link.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <LinkRow
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        isDragging={isDragging}
+      />
+    </div>
+  );
+}
+
 function LinkRow({
   link,
   onChange,
   onRemove,
+  dragHandleProps,
+  isDragging,
 }: {
   link: CustomLink;
   onChange: (patch: Partial<CustomLink>) => void;
   onRemove: () => void;
+  /** Spread on the drag handle button. When omitted, no handle renders. */
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
+  isDragging?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -739,8 +907,27 @@ function LinkRow({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className={cn('group space-y-1.5', isDragging && 'cursor-grabbing')}>
       <div className="flex items-start gap-2">
+        {/* Drag handle — opacity reveals on hover (desktop), always
+            visible on touch (the @media query keeps the handle from
+            getting "stuck visible" after a desktop hover and matches the
+            restraint guidance in STYLESHEET.md). */}
+        {dragHandleProps && (
+          <button
+            type="button"
+            aria-label="Reorder link"
+            className={cn(
+              'mt-[1.0625rem] flex h-5 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/40 transition-opacity duration-150',
+              'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
+              isDragging && 'cursor-grabbing opacity-100',
+            )}
+            {...dragHandleProps}
+          >
+            <GripVertical size={14} />
+          </button>
+        )}
+
         {/* Thumbnail */}
         <button
           type="button"
@@ -795,7 +982,14 @@ function LinkRow({
       </div>
 
       {(link.thumbnail || uploadError) && (
-        <div className="flex items-center gap-3 pl-[3.75rem]">
+        <div
+          className={cn(
+            'flex items-center gap-3',
+            // Match the thumbnail offset; bump it when the drag handle
+            // is in front so the helper text aligns under the inputs.
+            dragHandleProps ? 'pl-[5.5rem]' : 'pl-[3.75rem]',
+          )}
+        >
           {link.thumbnail && (
             <button
               type="button"
@@ -808,6 +1002,40 @@ function LinkRow({
           {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/** A single social-link input row in the editor. The platform's icon is
+ *  intentionally not shown here — the row reads cleaner as a labeled
+ *  input; the icon shows up where it matters, on the public page. */
+function SocialRow({
+  platform,
+  value,
+  onChange,
+}: {
+  platform: SocialPlatform;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const id = `social-${platform}`;
+  return (
+    <div className="flex items-center gap-3">
+      <Label
+        htmlFor={id}
+        className="w-[6.5rem] shrink-0 text-[12.5px] font-medium text-foreground"
+      >
+        {SOCIAL_LABELS[platform]}
+      </Label>
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={SOCIAL_PLACEHOLDERS[platform]}
+        maxLength={500}
+        inputMode="url"
+        aria-label={SOCIAL_LABELS[platform]}
+      />
     </div>
   );
 }
