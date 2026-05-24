@@ -167,6 +167,61 @@ class CallRecord:
         return f"CallRecord({self.tool}, {self.args})"
 
 
+def _build_synthetic_curated_tools(connected_toolkits: list[str]) -> list:
+    """Build the curated FunctionTools the realtor would see in prod.
+
+    Real prod (integrations.load_integration_tools) fetches each action's
+    JSON schema from Composio via HTTP. For routing assertions we only
+    need the tool's *name* to be visible to the model — the actual
+    schema can be a permissive empty-object since the eval stub captures
+    whatever args the model passes without validating them.
+
+    Names go through the same `_safe_tool_name` as prod so the names a
+    case asserts on (gmail_send_email, googlecalendar_events_list, …) match
+    exactly what prod's loader would produce.
+    """
+    try:
+        from agents import FunctionTool
+    except ImportError:  # older SDK path
+        from agents.tool import FunctionTool
+
+    from integrations import _safe_tool_name  # type: ignore
+    from integrations_curated import curated_slugs_for
+
+    permissive_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": True,
+    }
+    tools: list = []
+    seen_names: set[str] = set()
+    for toolkit in connected_toolkits:
+        for slug in curated_slugs_for(toolkit):
+            name = _safe_tool_name(slug, toolkit)
+            if name in seen_names:
+                continue
+            seen_names.add(name)
+
+            # The on_invoke_tool we attach here is a temporary placeholder
+            # — the global _patch_tools_to_capture pass below replaces it
+            # with the capturing stub. We just need the FunctionTool to
+            # exist so the model sees the name + schema.
+            async def _placeholder(_ctx, _args_json: str) -> str:
+                return "{}"
+
+            tools.append(
+                FunctionTool(
+                    name=name,
+                    description=f"[curated stub] {slug} via {toolkit}.",
+                    params_json_schema=permissive_schema,
+                    on_invoke_tool=_placeholder,
+                    strict_json_schema=False,
+                )
+            )
+    return tools
+
+
 def _patch_tools_to_capture(agent, captured: list[CallRecord]) -> None:
     """Replace each FunctionTool.on_invoke_tool with a capturing stub.
 
@@ -219,15 +274,22 @@ async def run_case(case: dict[str, Any], model: str | None) -> tuple[bool, str, 
         "- Include the intake link in any contact-facing draft where it makes sense."
     )
 
-    # When the case wires up toolkits, present the dispatcher tools so the
-    # model has the option (the routing prompt expects them to exist).
+    # When the case wires up toolkits, synthesize the SAME tool surface the
+    # prod loader (integrations.load_integration_tools) would build: the
+    # curated FunctionTools for each toolkit's top-N actions PLUS the
+    # find/call dispatcher fallback. We skip the HTTP schema fetch — for
+    # routing assertions we only need the tool NAME to be visible to the
+    # model; the JSON schema can be a permissive empty-object.
     extra_tools: list = []
     if connected:
         from tools.integrations_dispatcher import (
             call_integration_tool,
             find_integration_tool,
         )
-        extra_tools = [find_integration_tool, call_integration_tool]
+        extra_tools = _build_synthetic_curated_tools(connected) + [
+            find_integration_tool,
+            call_integration_tool,
+        ]
 
     chippi = make_chippi_agent(
         workspace_info=workspace_info,
@@ -283,6 +345,18 @@ def _score_case(
     for required in expected.get("tool_calls_must_include", []):
         if required not in seen_set:
             failures.append(f"missing required call: {required}")
+
+    # tool_calls_must_include_any_of is a disjunction — at least one tool
+    # from each named group must fire. Useful when the architecture allows
+    # multiple valid routings for the same intent (e.g. a curated named
+    # tool vs the fallback dispatcher).
+    for group in expected.get("tool_calls_must_include_any_of", []):
+        if not isinstance(group, list) or not group:
+            continue
+        if not any(name in seen_set for name in group):
+            failures.append(
+                f"missing required call: none of {group} fired"
+            )
 
     for forbidden in expected.get("tool_calls_must_not_include", []):
         if forbidden in seen_set:

@@ -60,8 +60,16 @@ supposed to always run.
 
 The runner builds a real Chippi agent — same `make_chippi_agent` call as
 `modal_app.chat_turn` — with the case's `connected_toolkits` injected into
-`workspace_info`. The model sees the full tool catalog (native + dispatcher
-when toolkits are connected) and the real CHIPPI_INSTRUCTIONS prompt.
+`workspace_info`. The model sees the full tool catalog (native tools + the
+curated FunctionTools per connected toolkit + the dispatcher fallback) and
+the real CHIPPI_INSTRUCTIONS prompt.
+
+The curated tools (e.g. `gmail_send_email`, `googlecalendar_events_list`)
+are synthesized locally from `integrations_curated.CURATED_ACTIONS` —
+prod's loader fetches each action's JSON schema from Composio via HTTP,
+the eval skips the fetch and gives the tools a permissive empty-object
+schema. For routing assertions we only care that the model sees the right
+*name* in its tool list.
 
 Then, before `Runner.run`, every `FunctionTool.on_invoke_tool` gets replaced
 with a capturing stub that:
@@ -132,6 +140,11 @@ Field reference (also in `cases.json` under `_field_help`):
 - `must_query_match` — for `find_integration_tool` (or any tool with a
   `query` arg), the query string (lowercased) must contain at least one
   of the listed substrings on at least one call.
+- `tool_calls_must_include_any_of` — disjunction. A list of lists; each
+  inner list is a group, at least one tool from each group must fire.
+  Use this when multiple routings are valid (e.g. the curated
+  `gmail_send_email` OR the `find_integration_tool` fallback both work
+  for "send a Gmail").
 - `max_tool_calls` — cap on total calls. Catches loops and over-eager
   dispatch storms.
 
