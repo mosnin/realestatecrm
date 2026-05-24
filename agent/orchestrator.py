@@ -457,7 +457,19 @@ async def _run_locked(
         space_memories, max_chars=settings.memory_chars_budget
     )
 
-    ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
+    # Resolve the workspace owner's Clerk userId now — needed both for the
+    # AgentContext (so the integration dispatcher tools know whose Composio
+    # entity to call against) and again later when loading those tools.
+    # Cheap read; cache it.
+    from integrations import load_integration_tools, resolve_owner_user_id
+    owner_clerk_id = await resolve_owner_user_id(space.id) or ""
+
+    ctx = AgentContext.from_settings(
+        agent_settings,
+        run_id=run_id,
+        space_name=space.name,
+        user_id=owner_clerk_id,
+    )
     # A routine run is scoped to its instruction — don't drain the trigger
     # queue out from under a trigger-driven run.
     triggers = [] if instruction else await pop_triggers(space.id)
@@ -482,9 +494,6 @@ async def _run_locked(
     # Empty list when owner has no integrations or Composio is down.
     integration_tools: list = []
     try:
-        from integrations import load_integration_tools, resolve_owner_user_id
-
-        owner_clerk_id = await resolve_owner_user_id(space.id)
         if owner_clerk_id:
             integration_tools = await load_integration_tools(space.id, owner_clerk_id)
     except Exception as ie:  # noqa: BLE001

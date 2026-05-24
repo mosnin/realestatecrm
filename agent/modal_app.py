@@ -333,6 +333,7 @@ async def chat_turn(item: dict):
         agent_settings,
         run_id=conversation_id or f"chat-{uuid.uuid4()}",
         space_name=space.name,
+        user_id=user_id,
     )
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────

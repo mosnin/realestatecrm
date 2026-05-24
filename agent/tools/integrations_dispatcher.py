@@ -88,13 +88,20 @@ async def find_integration_tool(
     clean_query = (query or "").strip()
     safe_limit = max(1, min(30, int(limit) if limit else 10))
 
+    user_id = getattr(ctx.context, "user_id", "")
+    if not user_id:
+        return json.dumps({
+            "tools": [],
+            "error": "no realtor identity on this run — integrations unavailable",
+        })
+
     try:
         async with httpx.AsyncClient(timeout=_SEARCH_TIMEOUT) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/integrations/search",
                 json={
                     "spaceId": ctx.context.space_id,
-                    "userId": ctx.context.user_id,
+                    "userId": user_id,
                     "query": clean_query,
                     "limit": safe_limit,
                 },
@@ -175,6 +182,13 @@ async def call_integration_tool(
     except Exception as err:
         return json.dumps({"ok": False, "error": f"bad arguments JSON: {err}"})
 
+    user_id = getattr(ctx.context, "user_id", "")
+    if not user_id:
+        return json.dumps({
+            "ok": False,
+            "error": "no realtor identity on this run — integrations unavailable",
+        })
+
     logger.info(
         "call_integration_tool_invoked",
         space_id=ctx.context.space_id,
@@ -188,7 +202,7 @@ async def call_integration_tool(
                 f"{base_url}/api/internal/integrations/execute",
                 json={
                     "spaceId": ctx.context.space_id,
-                    "userId": ctx.context.user_id,
+                    "userId": user_id,
                     "slug": clean_slug,
                     "arguments": arguments,
                 },

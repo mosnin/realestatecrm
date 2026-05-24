@@ -23,6 +23,15 @@ class AgentContext:
     space_name: str
     daily_token_budget: int
     run_id: str
+    # Clerk userId for the realtor this run is acting on behalf of.
+    # Chat turns pass it from the request body; autonomous runs derive it
+    # from the workspace owner via resolve_owner_user_id. Used by the
+    # integration dispatcher tools to scope Composio calls to the right
+    # entity. Empty string when no realtor identity is available (older
+    # Next.js deploy, or an autonomous run whose owner chain is broken) —
+    # the dispatcher checks for this and degrades to "no integrations
+    # available" rather than calling Composio with a bad id.
+    user_id: str = field(default="", compare=False)
 
     # Tokens consumed so far this run (mutable — updated after each LLM call)
     tokens_used: int = field(default=0, compare=False)
@@ -32,11 +41,18 @@ class AgentContext:
     current_agent_type: str = field(default="chippi", compare=False)
 
     @classmethod
-    def from_settings(cls, settings: AgentSettings, run_id: str, space_name: str) -> "AgentContext":
+    def from_settings(
+        cls,
+        settings: AgentSettings,
+        run_id: str,
+        space_name: str,
+        user_id: str = "",
+    ) -> "AgentContext":
         return cls(
             space_id=settings.space_id,
             space_name=space_name,
             daily_token_budget=settings.daily_token_budget,
             run_id=run_id,
+            user_id=user_id,
         )
 
