@@ -186,12 +186,16 @@ export async function executeToolForEntity(args: {
   return composio.tools.execute(args.slug, {
     userId: args.entityId,
     arguments: args.arguments,
-    // Composio's tool-version handshake: without this flag, the SDK auto-
-    // resolves to 'latest' and then throws ComposioToolVersionRequiredError
-    // because manual `tools.execute()` calls are supposed to pin a concrete
-    // version. We don't pin versions anywhere — every tool is fetched fresh
-    // via getRawComposioTools, so latest is what we want. The flag tells
-    // the SDK we accept that surface change risk.
+    // Composio's tool-version handshake: without this flag the SDK throws
+    // ComposioToolVersionRequiredError on every manual execute() call,
+    // demanding a pinned `toolkitVersions` at construction. Our safety
+    // story isn't "latest is always safe" — Composio's parameter schemas
+    // drift between versions. The actual invariant is that the agent's
+    // dispatcher fetches the action schema (find_integration_tool →
+    // /api/internal/integrations/search) IMMEDIATELY before calling it
+    // (call_integration_tool → here), so the schema the model reads and
+    // the call it makes use the same snapshot. The flag opts into that
+    // adjacency guarantee rather than into permanent skew.
     dangerouslySkipVersionCheck: true,
   });
 }

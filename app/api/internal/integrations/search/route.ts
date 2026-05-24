@@ -119,27 +119,19 @@ export async function POST(req: NextRequest) {
 
   const all = perToolkit.flat().filter((x) => x.tool.slug);
 
-  // Score each tool against the query. The ranker is deliberately simple:
-  // token-presence + query-expanded synonyms. The earlier version layered
-  // a static verb-priority over the query match, which over-weighted any
-  // slug that happened to contain a high-priority verb regardless of
-  // whether it was relevant — "read recent emails" surfaced
-  // `SLACK_SET_READ_CURSOR_IN_A_CONVERSATION` (matched `set` AND `read`)
-  // ahead of `GMAIL_FETCH_EMAILS` (only matched `emails`). Now the ranker
-  // just measures intent overlap.
+  // Score each tool against the query — token-presence on slug / name /
+  // description, weighted by where the hit landed. The prior version
+  // layered a hand-curated verb-synonym map (read↔fetch↔list, etc.) on
+  // top; the audit caught it for what it was — keyword expansion that
+  // covered just enough cases to be load-bearing and just few enough to
+  // break on every unmapped verb ("check", "reply"). Real semantic
+  // search against Composio tool embeddings is the right fix; tracked
+  // as Phase 4 follow-up. Until then, trust the model to retry
+  // find_integration_tool with better keywords if the first pass
+  // returns nothing useful — the dispatcher already cost a turn, one
+  // more is cheap.
   const q = query.toLowerCase();
   const qTokens = q.split(/\s+/).filter(Boolean);
-  // Expand each query token with common synonyms so a search for "read"
-  // also boosts slugs containing "fetch", "list", "get", "view", etc.
-  // Composio's APP_VERB_NOUN convention means the verb is the high-signal
-  // segment; if the realtor's word matches a verb synonym we want a hit.
-  const expandedTokens = new Set<string>();
-  for (const tok of qTokens) {
-    expandedTokens.add(tok);
-    for (const syn of QUERY_SYNONYMS[tok] ?? []) {
-      expandedTokens.add(syn);
-    }
-  }
   const scored = all.map(({ tool, toolkit }) => {
     let score = 0;
     if (q) {
@@ -152,19 +144,11 @@ export async function POST(req: NextRequest) {
       if (name.includes(q)) score += 150;
       if (tk.includes(q)) score += 80;
       if (desc.includes(q)) score += 40;
-      // Per-token (expanded) — slug match dominates, then name, then desc.
-      // We boost expanded tokens slightly less than the original tokens so
-      // a slug with the exact word still beats a slug with a synonym.
+      // Per-token — slug match dominates, then name, then description.
       for (const tok of qTokens) {
         if (slug.includes(tok)) score += 60;
         if (name.includes(tok)) score += 40;
         if (desc.includes(tok)) score += 20;
-      }
-      for (const tok of expandedTokens) {
-        if (qTokens.includes(tok)) continue; // already scored
-        if (slug.includes(tok)) score += 35;
-        if (name.includes(tok)) score += 20;
-        if (desc.includes(tok)) score += 8;
       }
     }
     return { tool, toolkit, score };
@@ -182,38 +166,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ tools: top });
 }
 
-// Query-expansion synonyms. Each user-facing verb (the way a realtor
-// would phrase a request) maps to the verbs Composio actually uses in
-// its slug catalog. Bi-directional within each cluster — searching
-// "fetch" also finds "read" tools. Tuned for the toolkits Chippi
-// actually integrates with (Gmail, HubSpot, Slack, LinkedIn, Calendar).
-const QUERY_SYNONYMS: Record<string, string[]> = {
-  // Inbound
-  read: ['fetch', 'list', 'get', 'view', 'search'],
-  fetch: ['read', 'list', 'get', 'view'],
-  list: ['fetch', 'get', 'read', 'view'],
-  get: ['fetch', 'list', 'read', 'retrieve'],
-  view: ['read', 'fetch', 'get', 'list'],
-  search: ['find', 'query', 'list', 'fetch'],
-  find: ['search', 'list', 'fetch'],
-  // Outbound
-  send: ['post', 'publish', 'create', 'deliver'],
-  post: ['send', 'publish', 'create'],
-  publish: ['post', 'send'],
-  message: ['email', 'dm', 'chat', 'thread'],
-  email: ['message', 'mail', 'inbox', 'thread'],
-  inbox: ['email', 'mail', 'messages'],
-  // Mutations
-  create: ['add', 'new', 'insert'],
-  add: ['create', 'insert'],
-  update: ['edit', 'modify', 'patch'],
-  edit: ['update', 'modify'],
-  delete: ['remove', 'archive'],
-  remove: ['delete', 'archive'],
-  // Domain
-  contact: ['lead', 'person', 'customer'],
-  lead: ['contact', 'prospect'],
-  meeting: ['event', 'calendar', 'appointment'],
-  event: ['meeting', 'calendar'],
-  channel: ['conversation', 'room'],
-};

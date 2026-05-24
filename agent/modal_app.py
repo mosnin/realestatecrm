@@ -491,7 +491,7 @@ async def chat_turn(item: dict):
         tracing_disabled=bool(settings.openrouter_api_key),
         model_settings=ModelSettings(
             truncation="auto",
-            reasoning=Reasoning(effort="high"),
+            reasoning=Reasoning(effort="medium"),
         ),
     )
 
