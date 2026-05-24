@@ -798,3 +798,29 @@
 @media (prefers-reduced-motion: reduce) {
   .chippi-cursor { animation: none; opacity: 1; }
 }
+
+/* ── Chippi embed mode ─────────────────────────────────────────────────────
+ * When a dashboard page renders inside the Chippi RightPanel iframe it
+ * loads with `?embed=1`. The EmbedDetector component (mounted in
+ * app/s/[slug]/layout.tsx) sets `data-chippi-embed="true"` on <html>.
+ * The outer Chippi already owns the sidebar, header, and chat input — so
+ * the iframe must render ONLY the page content. Hide every chrome layer
+ * the iframe shouldn't show. Normal page visits (no `?embed=1`) are
+ * unaffected — the attribute is never set, the rules never match. */
+[data-chippi-embed='true'] [data-dashboard-sidebar],
+[data-chippi-embed='true'] [data-dashboard-header],
+[data-chippi-embed='true'] [data-dashboard-mobile-nav],
+[data-chippi-embed='true'] [data-page-chat-input],
+[data-chippi-embed='true'] [data-platform-banner] {
+  display: none !important;
+}
+/* Sidebar/header collapse means the content column shouldn't carry the
+ * extra bottom padding the ChippiBar used to reserve. Tighten it. The
+ * dashboard-content/dashboard-footer-wrap classes are set in LayoutShell. */
+[data-chippi-embed='true'] .dashboard-content {
+  padding-bottom: 1rem !important;
+}
+[data-chippi-embed='true'] .dashboard-footer-wrap {
+  display: none !important;
+}
+

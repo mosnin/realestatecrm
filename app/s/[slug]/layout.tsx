@@ -13,6 +13,7 @@ import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { ChippiActivityToast } from '@/components/chippi/chippi-activity-toast';
+import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 
 
@@ -245,6 +246,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
+          sidebar/header/chat-bar via CSS. Mount near the root so the
+          flag is set before any layout reads it. */}
+      <EmbedDetector />
       <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />

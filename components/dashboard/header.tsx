@@ -99,7 +99,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
   }, [pathname]);
 
   return (
-    <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
+    <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
             state, not a bare SVG. Radix's Trigger wraps whatever child you
