@@ -119,12 +119,29 @@ export async function POST(req: NextRequest) {
 
   const all = perToolkit.flat().filter((x) => x.tool.slug);
 
-  // Score each tool against the query. Substring matches on slug, name,
-  // and description; toolkit-name match boosts the relevance.
+  // Score each tool against the query. The ranker is deliberately simple:
+  // token-presence + query-expanded synonyms. The earlier version layered
+  // a static verb-priority over the query match, which over-weighted any
+  // slug that happened to contain a high-priority verb regardless of
+  // whether it was relevant — "read recent emails" surfaced
+  // `SLACK_SET_READ_CURSOR_IN_A_CONVERSATION` (matched `set` AND `read`)
+  // ahead of `GMAIL_FETCH_EMAILS` (only matched `emails`). Now the ranker
+  // just measures intent overlap.
   const q = query.toLowerCase();
   const qTokens = q.split(/\s+/).filter(Boolean);
+  // Expand each query token with common synonyms so a search for "read"
+  // also boosts slugs containing "fetch", "list", "get", "view", etc.
+  // Composio's APP_VERB_NOUN convention means the verb is the high-signal
+  // segment; if the realtor's word matches a verb synonym we want a hit.
+  const expandedTokens = new Set<string>();
+  for (const tok of qTokens) {
+    expandedTokens.add(tok);
+    for (const syn of QUERY_SYNONYMS[tok] ?? []) {
+      expandedTokens.add(syn);
+    }
+  }
   const scored = all.map(({ tool, toolkit }) => {
-    let score = scoreActionPriority(tool.slug);
+    let score = 0;
     if (q) {
       const slug = tool.slug.toLowerCase();
       const name = (tool.name || '').toLowerCase();
@@ -135,12 +152,19 @@ export async function POST(req: NextRequest) {
       if (name.includes(q)) score += 150;
       if (tk.includes(q)) score += 80;
       if (desc.includes(q)) score += 40;
-      // Per-token bonus — handles multi-word queries like "send email" hitting
-      // both `send` and `email` in slug.
+      // Per-token (expanded) — slug match dominates, then name, then desc.
+      // We boost expanded tokens slightly less than the original tokens so
+      // a slug with the exact word still beats a slug with a synonym.
       for (const tok of qTokens) {
-        if (slug.includes(tok)) score += 30;
+        if (slug.includes(tok)) score += 60;
+        if (name.includes(tok)) score += 40;
+        if (desc.includes(tok)) score += 20;
+      }
+      for (const tok of expandedTokens) {
+        if (qTokens.includes(tok)) continue; // already scored
+        if (slug.includes(tok)) score += 35;
         if (name.includes(tok)) score += 20;
-        if (desc.includes(tok)) score += 10;
+        if (desc.includes(tok)) score += 8;
       }
     }
     return { tool, toolkit, score };
@@ -158,25 +182,38 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ tools: top });
 }
 
-// Verb-relevance scoring — when the query is empty (or weak) the natural
-// language hits get tied, and we want common verbs (send, read, list, etc.)
-// to win over long-tail admin (batch, association).
-const VERB_SCORES: Array<{ pattern: RegExp; score: number }> = [
-  { pattern: /(^|_)(send|reply|post|publish)(_|$)/, score: 50 },
-  { pattern: /(^|_)(draft|compose)(_|$)/, score: 45 },
-  { pattern: /(^|_)(read|fetch|get|list|search|find|view)(_|$)/, score: 40 },
-  { pattern: /(^|_)(create|add|insert)(_|$)/, score: 30 },
-  { pattern: /(^|_)(update|edit|patch|modify|set)(_|$)/, score: 25 },
-  { pattern: /(^|_)(delete|remove|archive)(_|$)/, score: 15 },
-  { pattern: /(^|_)(batch|bulk)(_|$)/, score: -10 },
-  { pattern: /(^|_)(association|associations)(_|$)/, score: -15 },
-];
-
-function scoreActionPriority(slug: string): number {
-  const s = slug.toLowerCase();
-  let total = 0;
-  for (const { pattern, score } of VERB_SCORES) {
-    if (pattern.test(s)) total += score;
-  }
-  return total;
-}
+// Query-expansion synonyms. Each user-facing verb (the way a realtor
+// would phrase a request) maps to the verbs Composio actually uses in
+// its slug catalog. Bi-directional within each cluster — searching
+// "fetch" also finds "read" tools. Tuned for the toolkits Chippi
+// actually integrates with (Gmail, HubSpot, Slack, LinkedIn, Calendar).
+const QUERY_SYNONYMS: Record<string, string[]> = {
+  // Inbound
+  read: ['fetch', 'list', 'get', 'view', 'search'],
+  fetch: ['read', 'list', 'get', 'view'],
+  list: ['fetch', 'get', 'read', 'view'],
+  get: ['fetch', 'list', 'read', 'retrieve'],
+  view: ['read', 'fetch', 'get', 'list'],
+  search: ['find', 'query', 'list', 'fetch'],
+  find: ['search', 'list', 'fetch'],
+  // Outbound
+  send: ['post', 'publish', 'create', 'deliver'],
+  post: ['send', 'publish', 'create'],
+  publish: ['post', 'send'],
+  message: ['email', 'dm', 'chat', 'thread'],
+  email: ['message', 'mail', 'inbox', 'thread'],
+  inbox: ['email', 'mail', 'messages'],
+  // Mutations
+  create: ['add', 'new', 'insert'],
+  add: ['create', 'insert'],
+  update: ['edit', 'modify', 'patch'],
+  edit: ['update', 'modify'],
+  delete: ['remove', 'archive'],
+  remove: ['delete', 'archive'],
+  // Domain
+  contact: ['lead', 'person', 'customer'],
+  lead: ['contact', 'prospect'],
+  meeting: ['event', 'calendar', 'appointment'],
+  event: ['meeting', 'calendar'],
+  channel: ['conversation', 'room'],
+};

@@ -82,27 +82,80 @@ export async function POST(req: NextRequest) {
       arguments: args,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    // Composio throws `ComposioError` which carries way more than `.message`:
+    //   - .code        (e.g. 'TOOL_VERSION_REQUIRED', 'CONNECTION_NOT_FOUND')
+    //   - .statusCode  (HTTP)
+    //   - .errorId     (Composio's internal id for the error class)
+    //   - .cause       (the raw API body — { error: { code, message,
+    //                   request_id, slug, suggested_fix } })
+    //   - .possibleFixes (pre-baked actionable hints, e.g. "set
+    //                   version: 'latest' or dangerouslySkipVersionCheck")
+    // Flattening to .message strips every clue the model would need to
+    // self-correct. Surface the lot — the agent gets the actionable hint,
+    // the realtor gets the request_id for Composio support.
+    const e = err as {
+      message?: string;
+      code?: string;
+      statusCode?: number;
+      errorId?: string;
+      cause?: unknown;
+      possibleFixes?: string[];
+    };
+    const causeBody =
+      e.cause && typeof e.cause === 'object' ? (e.cause as Record<string, unknown>) : undefined;
+    const requestId = (causeBody as { error?: { request_id?: string } } | undefined)?.error
+      ?.request_id;
     logger.warn('[integrations.execute] tool execution threw', {
       spaceId,
       userId,
       slug,
-      err: msg,
+      err: e.message,
+      code: e.code,
+      statusCode: e.statusCode,
+      errorId: e.errorId,
+      requestId,
+      possibleFixes: e.possibleFixes,
+      cause: causeBody,
     });
     return NextResponse.json(
-      { ok: false, error: `${slug} failed: ${msg.slice(0, 500)}` },
-      { status: 200 }, // 200 + ok:false so the agent can surface a clean error to the model
+      {
+        ok: false,
+        error: `Composio error: ${slug} — ${e.message ?? 'unknown'}`,
+        composio: {
+          code: e.code,
+          statusCode: e.statusCode,
+          errorId: e.errorId,
+          requestId,
+          possibleFixes: e.possibleFixes,
+        },
+      },
+      { status: 200 }, // 200 + ok:false so the agent surfaces a clean error to the model
     );
   }
 
-  // Composio's ToolExecuteResponse shape: { successful, error, data, ... }
-  // Normalize to { ok, data, error } before returning.
-  const r = (result || {}) as { successful?: boolean; error?: unknown; data?: unknown };
+  // Composio's ToolExecuteResponse: { successful, error, data, logId,
+  // sessionInfo: { requestId } }. Normalize to {ok, data, error, composio}
+  // and KEEP the requestId so the realtor (and Chippi) can mention it if
+  // they need to file a support ticket.
+  const r = (result || {}) as {
+    successful?: boolean;
+    error?: unknown;
+    data?: unknown;
+    logId?: string;
+    sessionInfo?: { requestId?: string };
+  };
   const ok = r.successful !== false;
-  const errMsg = r.error ? String(r.error).slice(0, 500) : undefined;
+  const errMsg = r.error
+    ? typeof r.error === 'string'
+      ? r.error
+      : JSON.stringify(r.error)
+    : undefined;
   return NextResponse.json({
     ok,
-    data: r.data ?? result,
-    error: ok ? undefined : errMsg || `${slug} failed`,
+    data: r.data ?? (ok ? result : undefined),
+    error: ok ? undefined : `Composio error: ${slug} — ${errMsg ?? 'failed'}`,
+    composio: ok
+      ? undefined
+      : { logId: r.logId, requestId: r.sessionInfo?.requestId },
   });
 }

@@ -186,5 +186,12 @@ export async function executeToolForEntity(args: {
   return composio.tools.execute(args.slug, {
     userId: args.entityId,
     arguments: args.arguments,
+    // Composio's tool-version handshake: without this flag, the SDK auto-
+    // resolves to 'latest' and then throws ComposioToolVersionRequiredError
+    // because manual `tools.execute()` calls are supposed to pin a concrete
+    // version. We don't pin versions anywhere — every tool is fetched fresh
+    // via getRawComposioTools, so latest is what we want. The flag tells
+    // the SDK we accept that surface change risk.
+    dangerouslySkipVersionCheck: true,
   });
 }

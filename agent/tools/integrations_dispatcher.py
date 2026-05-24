@@ -219,7 +219,14 @@ async def call_integration_tool(
 
     body_text = resp.text
     if resp.status_code >= 500:
-        return json.dumps(
-            {"ok": False, "error": f"{clean_slug} failed ({resp.status_code})"}
+        # Don't swallow the body on 5xx — the route's error envelope (with
+        # Composio's code/statusCode/possibleFixes/requestId) is the model's
+        # only chance to self-correct or surface the right thing to the
+        # realtor. Empty body is the only case where we synthesize.
+        return body_text or json.dumps(
+            {
+                "ok": False,
+                "error": f"Composio proxy returned {resp.status_code} with empty body for {clean_slug}",
+            }
         )
     return body_text or json.dumps({"ok": True, "data": None})
