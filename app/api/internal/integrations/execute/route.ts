@@ -2,10 +2,10 @@
  * POST /api/internal/integrations/execute — internal endpoint for the
  * Chippi agent (Modal/Python). Authed by AGENT_INTERNAL_SECRET.
  *
- * Executes ONE Composio action by slug for a (spaceId, userId). Paired
- * with /api/internal/integrations/tools — same reason both exist:
- * Composio's IP allowlist accepts Vercel and rejects Modal, so the agent
- * proxies every Composio touch through Next.js.
+ * Executes ONE Composio action by slug for a (spaceId, userId). This
+ * endpoint exists because Composio's IP allowlist accepts Vercel and
+ * rejects Modal — every Composio touch from the agent has to proxy
+ * through Next.js or it 401s on the first call after deploy.
  *
  * Response shape: { ok: boolean, data?: unknown, error?: string }.
  * Mirrors the ResultOut shape the rest of the codebase uses; the Python
