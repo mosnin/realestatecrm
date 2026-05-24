@@ -11,7 +11,6 @@ import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
-import { AgentStatusBar } from '@/components/agent/agent-status-bar';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { ChippiActivityToast } from '@/components/chippi/chippi-activity-toast';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
@@ -250,7 +249,6 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
-        <AgentStatusBar slug={slug} />
         <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>
           {children}
         </LayoutShell>
