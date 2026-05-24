@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "node --test scripts/*.test.mjs",
-    "eval": "RUN_EVALS=1 vitest run tests/evals/"
+    "eval": "RUN_EVALS=1 vitest run tests/evals/",
+    "agent:eval": "python3 tests/agent-eval/run.py"
   },
   "dependencies": {
     "@amplitude/unified": "^1.0.5",

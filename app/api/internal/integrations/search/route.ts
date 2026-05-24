@@ -12,7 +12,15 @@
  * (find → execute) keeps the model's working set small and lets it
  * fetch the exact tool it needs only when it needs it.
  *
- * Body: { spaceId, userId, query, limit? }
+ * Two call shapes:
+ *  1. { spaceId, userId, query, limit? }  — natural-language search
+ *     (the runtime path; dispatcher's find_integration_tool uses this).
+ *  2. { spaceId, userId, slugs: string[] } — exact-slug fetch, bypasses
+ *     scoring and returns the schemas for the given slugs IFF the slug's
+ *     toolkit is active for this (spaceId, userId). The agent loader uses
+ *     this at build time to pre-fetch schemas for the curated top-N
+ *     actions per connected toolkit (see agent/integrations_curated.py),
+ *     so common calls skip the dispatcher's two-hop round trip.
  * Returns: { tools: [{slug, name, description, parameters, toolkit}] }
  */
 
@@ -52,7 +60,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ tools: [] });
   }
 
-  let body: { spaceId?: unknown; userId?: unknown; query?: unknown; limit?: unknown };
+  let body: {
+    spaceId?: unknown;
+    userId?: unknown;
+    query?: unknown;
+    limit?: unknown;
+    slugs?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -64,6 +78,13 @@ export async function POST(req: NextRequest) {
   const query = typeof body.query === 'string' ? body.query.trim() : '';
   const limitRaw = typeof body.limit === 'number' ? body.limit : DEFAULT_LIMIT;
   const limit = Math.max(1, Math.min(MAX_LIMIT, Math.floor(limitRaw)));
+  // Exact-slug fetch path — bypass scoring entirely. Empty/missing array
+  // falls through to the natural-language search path.
+  const slugFilter = Array.isArray(body.slugs)
+    ? (body.slugs
+        .filter((s): s is string => typeof s === 'string' && s.length > 0)
+        .slice(0, 200))
+    : [];
   if (!spaceId || !userId) {
     return NextResponse.json({ error: 'spaceId and userId are required' }, { status: 400 });
   }
@@ -118,6 +139,30 @@ export async function POST(req: NextRequest) {
   );
 
   const all = perToolkit.flat().filter((x) => x.tool.slug);
+
+  // Exact-slug fetch — agent build-time path for the curated allowlist.
+  // Filter `all` by the requested slug set, return verbatim (no scoring,
+  // no ranking), preserving the order the caller asked for so the agent's
+  // tool list comes back in the curated-list order it expects.
+  if (slugFilter.length > 0) {
+    const wanted = new Set(slugFilter.map((s) => s.toUpperCase()));
+    const bySlug = new Map<string, { tool: RawComposioTool; toolkit: string }>();
+    for (const entry of all) {
+      const key = entry.tool.slug.toUpperCase();
+      if (wanted.has(key) && !bySlug.has(key)) bySlug.set(key, entry);
+    }
+    const ordered = slugFilter
+      .map((s) => bySlug.get(s.toUpperCase()))
+      .filter((x): x is { tool: RawComposioTool; toolkit: string } => Boolean(x))
+      .map(({ tool, toolkit }) => ({
+        slug: tool.slug,
+        name: (tool.name || tool.slug).slice(0, 64),
+        description: (tool.description || tool.slug).slice(0, 1024),
+        parameters: tool.inputParameters || { type: 'object', properties: {} },
+        toolkit,
+      }));
+    return NextResponse.json({ tools: ordered });
+  }
 
   // Score each tool against the query — token-presence on slug / name /
   // description, weighted by where the hit landed. The prior version
