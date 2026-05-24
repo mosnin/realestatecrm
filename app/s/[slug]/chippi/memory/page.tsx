@@ -14,6 +14,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { MemoryList } from '@/components/chippi/memory-list';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,17 +40,14 @@ export default async function ChippiMemoryPage({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24">
-        <header className="mb-8">
-          <h1
-            className="text-2xl sm:text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            What I remember
+      <div className={`w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 ${SECTION_RHYTHM}`}>
+        <header className="space-y-1.5">
+          <p className={BODY_MUTED}>Memory.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            What Chippi remembers
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Facts, preferences, and observations I&apos;ve picked up while working with you.
-            Delete anything you want me to forget.
+          <p className={BODY_MUTED}>
+            Facts, preferences, and observations Chippi has picked up while working with you. Delete anything you want forgotten.
           </p>
         </header>
         <MemoryList />

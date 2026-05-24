@@ -23,6 +23,7 @@ import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
 import { TodayFocus } from '@/components/chippi/today-focus';
 import { WhatsComing } from '@/components/chippi/whats-coming';
 import { WhatIDid } from '@/components/chippi/what-i-did';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,17 @@ export default async function ChippiTodayPage({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-8 sm:space-y-10">
+      <div className={`w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 ${SECTION_RHYTHM}`}>
+        <header className="space-y-1.5">
+          <p className={BODY_MUTED}>Full day.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            Your day at a glance
+          </h1>
+          <p className={BODY_MUTED}>
+            The morning story, your drafts, what&apos;s coming next — one scroll.
+          </p>
+        </header>
+
         <MorningStory slug={slug} />
 
         {draftCount > 0 && (

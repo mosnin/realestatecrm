@@ -14,6 +14,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,16 +40,14 @@ export default async function ChippiDraftsPage({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24">
-        <header className="mb-8 sm:mb-10">
-          <h1
-            className="text-[2rem] sm:text-[2.5rem] tracking-tight leading-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Drafts
+      <div className={`w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 ${SECTION_RHYTHM}`}>
+        <header className="space-y-1.5">
+          <p className={BODY_MUTED}>Drafts.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            What Chippi drafted for you
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-md">
-            What Chippi drafted for you. Approve, edit, or skip — nothing leaves without your sign-off.
+          <p className={BODY_MUTED}>
+            Approve, edit, or skip — nothing leaves without your sign-off.
           </p>
         </header>
         <AgentDraftInbox slug={slug} />

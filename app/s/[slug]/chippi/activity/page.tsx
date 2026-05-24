@@ -1,13 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ActivityFeed } from '@/components/chippi/activity-feed';
-import { PageTitle } from '@/components/ui/page-title';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
-export const metadata = { title: 'What I did — Chippi' };
+export const metadata = { title: 'Activity — Chippi' };
 
 export default async function ChippiActivityPage({
   params,
@@ -31,19 +29,20 @@ export default async function ChippiActivityPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 py-2">
-      <Link
-        href={`/s/${slug}/chippi`}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={12} />
-        Back to Chippi
-      </Link>
-      <PageTitle label="Chippi." subtitle="Every action Chippi has taken — with reasoning. Undo anything reversible.">
-        What I did
-      </PageTitle>
+    <div className="h-full overflow-y-auto">
+      <div className={`w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 ${SECTION_RHYTHM}`}>
+        <header className="space-y-1.5">
+          <p className={BODY_MUTED}>Activity.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            What Chippi did
+          </h1>
+          <p className={BODY_MUTED}>
+            Every action Chippi has taken — with reasoning. Undo anything reversible.
+          </p>
+        </header>
 
-      <ActivityFeed slug={slug} />
+        <ActivityFeed slug={slug} />
+      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
-import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 
 export async function generateMetadata({
@@ -61,7 +61,7 @@ export default async function IntegrationsPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className={PAGE_RHYTHM}>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Integrations.</p>
         <h1 className={H1} style={TITLE_FONT}>
