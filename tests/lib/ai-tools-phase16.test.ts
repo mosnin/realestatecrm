@@ -59,7 +59,7 @@ vi.mock('@/lib/supabase', () => {
 const { composeQuickDraftMock } = vi.hoisted(() => ({
   composeQuickDraftMock: vi.fn(),
 }));
-vi.mock('@/app/api/agent/quick-draft/route', () => ({
+vi.mock('@/lib/agent/quick-draft', () => ({
   composeQuickDraft: composeQuickDraftMock,
 }));
 
