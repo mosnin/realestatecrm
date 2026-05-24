@@ -63,6 +63,12 @@ export function ProfileEditor({ slug }: { slug: string }) {
   const [showProperties, setShowProperties] = useState(true);
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
+  // Cover photo is owned by its dedicated endpoint — updated independently
+  // of the rest of the form (no "Save changes" required).
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverError, setCoverError] = useState('');
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -120,6 +126,64 @@ export function ProfileEditor({ slug }: { slug: string }) {
           }))
         : [],
     );
+    setCoverPhotoUrl(
+      typeof data.coverPhotoUrl === 'string' && data.coverPhotoUrl ? data.coverPhotoUrl : null,
+    );
+  }
+
+  async function handleCoverFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the realtor re-pick the same file
+    if (!file) return;
+
+    // Client-side check is a UX convenience — the server check is authoritative.
+    if (file.size > 5 * 1024 * 1024) {
+      setCoverError('Image must be 5 MB or smaller.');
+      return;
+    }
+    if (!/^image\//.test(file.type)) {
+      setCoverError('Pick an image file (PNG, JPEG, or WebP).');
+      return;
+    }
+
+    setCoverError('');
+    setCoverUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/profile-page/cover-photo', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCoverError(data.error || 'Upload failed.');
+        return;
+      }
+      setCoverPhotoUrl(typeof data.url === 'string' ? data.url : null);
+    } catch {
+      setCoverError('Upload failed.');
+    } finally {
+      setCoverUploading(false);
+    }
+  }
+
+  async function handleCoverRemove() {
+    setCoverError('');
+    setCoverUploading(true);
+    try {
+      const res = await fetch('/api/profile-page/cover-photo', { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setCoverError(data.error || 'Could not remove cover.');
+        return;
+      }
+      setCoverPhotoUrl(null);
+    } catch {
+      setCoverError('Could not remove cover.');
+    } finally {
+      setCoverUploading(false);
+    }
   }
 
   function updateLink(id: string, patch: Partial<CustomLink>) {
@@ -291,6 +355,84 @@ export function ProfileEditor({ slug }: { slug: string }) {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* ── Cover photo ───────────────────────────────────────────────── */}
+      <section className="space-y-4 border-t border-border/60 pt-10">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">Cover photo</h2>
+          <p className={BODY_MUTED}>
+            A wide image at the top of your page. Leave it blank to use your
+            profile photo as the header.
+          </p>
+        </header>
+
+        {coverPhotoUrl ? (
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
+              <img
+                src={coverPhotoUrl}
+                alt="Cover photo"
+                className="aspect-[16/9] w-full object-cover"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => coverFileRef.current?.click()}
+                disabled={coverUploading}
+              >
+                {coverUploading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ImagePlus size={14} />
+                )}
+                Replace
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCoverRemove}
+                disabled={coverUploading}
+              >
+                <Trash2 size={14} />
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => coverFileRef.current?.click()}
+              disabled={coverUploading}
+              className="flex aspect-[16/9] w-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/20 text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {coverUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <ImagePlus size={16} />
+                  Upload cover photo
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        <input
+          ref={coverFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleCoverFile}
+        />
+
+        <p className={CAPTION}>PNG, JPEG, or WebP. Up to 5 MB. Wide format works best.</p>
+        {coverError && <p className="text-xs text-destructive">{coverError}</p>}
       </section>
 
       {/* ── Headline ───────────────────────────────────────────────────── */}

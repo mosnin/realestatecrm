@@ -51,6 +51,10 @@ interface PublicProfileProps {
   showTours: boolean;
   customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
   videos: PublicVideo[];
+  /** Realtor-curated hero image. When set it becomes the full-bleed header
+   *  and the agent photo demotes to a round avatar centered below. When null,
+   *  the agent photo stretches as the hero (the original behavior). */
+  coverPhotoUrl: string | null;
   properties: PublicProperty[];
   hidePoweredBy: boolean;
 }
@@ -241,6 +245,7 @@ export function PublicProfile({
   showTours,
   customLinks,
   videos,
+  coverPhotoUrl,
   properties,
   hidePoweredBy,
 }: PublicProfileProps) {
@@ -253,30 +258,64 @@ export function PublicProfile({
   return (
     <div className={cn('min-h-screen bg-muted/40', darkMode && 'dark')}>
       <div className="mx-auto w-full max-w-[480px] bg-background sm:my-8 sm:overflow-hidden sm:rounded-[28px] sm:border sm:border-border/60">
-        {/* ── Header — full-bleed photo fading into the page ─────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────────
+            Two shapes:
+            (a) Cover photo set → cover is the full-bleed hero (16:9) and
+                the agent photo becomes a round avatar that overlaps it.
+            (b) No cover → the agent photo stretches as the hero (original
+                behavior). ─────────────────────────────────────────────── */}
         <header>
-          {agentPhoto && (
+          {coverPhotoUrl ? (
             <div className="relative">
               <img
-                src={agentPhoto}
-                alt={agentName}
+                src={coverPhotoUrl}
+                alt=""
                 loading="eager"
                 decoding="async"
-                className="aspect-[4/5] w-full object-cover object-top"
+                className="aspect-[16/9] w-full object-cover"
               />
               <div
                 aria-hidden
-                className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent to-background"
+                className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-b from-transparent to-background"
               />
             </div>
+          ) : (
+            agentPhoto && (
+              <div className="relative">
+                <img
+                  src={agentPhoto}
+                  alt={agentName}
+                  loading="eager"
+                  decoding="async"
+                  className="aspect-[4/5] w-full object-cover object-top"
+                />
+                <div
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent to-background"
+                />
+              </div>
+            )
           )}
 
           <div
             className={cn(
               'relative px-6 text-center',
-              agentPhoto ? '-mt-14' : 'pt-12',
+              coverPhotoUrl ? '-mt-12' : agentPhoto ? '-mt-14' : 'pt-12',
             )}
           >
+            {/* When a cover is set, the face becomes a round avatar — the
+                "who" — sitting on top of the hero. The 4px background-coloured
+                ring carries the lift against any cover; no shadow needed. */}
+            {coverPhotoUrl && agentPhoto && (
+              <img
+                src={agentPhoto}
+                alt={agentName}
+                loading="eager"
+                decoding="async"
+                className="mx-auto mb-4 h-24 w-24 rounded-full border-4 border-background object-cover object-top"
+              />
+            )}
+
             <h1>
               {logoUrl ? (
                 <img

@@ -14,7 +14,7 @@ import { parseYouTubeId } from '@/lib/profile-page';
 export const runtime = 'nodejs';
 
 const SELECT =
-  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos';
+  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl';
 
 const DEFAULTS = {
   enabled: true,
@@ -24,6 +24,7 @@ const DEFAULTS = {
   showProperties: true,
   customLinks: [] as Array<{ id: string; label: string; url: string; thumbnail: string }>,
   videos: [] as Array<{ id: string; url: string; title: string }>,
+  coverPhotoUrl: null as string | null,
 };
 
 export async function GET() {

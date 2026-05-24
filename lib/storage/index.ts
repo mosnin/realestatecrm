@@ -16,6 +16,7 @@
  *   property-photos/{spaceId}/{propertyId}/{uuid}-{filename}
  *   onboarding/{userId}/{uuid}-{filename}
  *   studio/{spaceId}/{uuid}-{filename}          — Studio-generated media
+ *   profile-cover/{spaceId}/{uuid}-{filename}   — realtor's public-page cover photo
  *
  * Public vs signed: feature attachments stay PRIVATE — we serve them via
  * `getSignedUrl()` with a short TTL. Property photos and avatars can be
@@ -184,6 +185,7 @@ export const STORAGE_PREFIXES = {
   propertyPhotos: 'property-photos',
   onboarding: 'onboarding',
   studio: 'studio',
+  profileCover: 'profile-cover',
 } as const;
 
 /** Convenient key builder. Pass the prefix + the suffix segments and get a
