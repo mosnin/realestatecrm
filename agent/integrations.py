@@ -225,6 +225,53 @@ def _proxy_base() -> tuple[str, str] | None:
     return base_url, secret
 
 
+# Native tool names that ship on every Chippi agent (chippi.py:make_chippi_agent).
+# Integration tool names that collide with these get a toolkit prefix added
+# defensively. The xAI Chat Completions endpoint rejects the entire request
+# with `Duplicate function definition` when two functions share a name —
+# OpenAI / Anthropic silently dedup but Grok is strict. The user-visible
+# symptom is a chat that says "integrations connected" then fails on the
+# next turn with a 400 from the model provider.
+_NATIVE_TOOL_NAMES = frozenset({
+    "create_contact", "find_contacts", "get_contact_activity", "update_contact",
+    "create_deal", "find_deals", "update_deal", "advance_deal_stage", "request_deal_review",
+    "book_tour", "route_lead", "add_property", "send_property_packet",
+    "recall_memory", "store_memory", "manage_goal", "manage_routines",
+    "draft_message", "outcome", "analyze_portfolio", "generate_priority_list",
+    "process_inbound_message", "read_attachment", "ask_realtor",
+    "log_activity_run", "recall_docs", "create_plan",
+    "get_intake_form", "add_intake_question", "remove_intake_question",
+    "update_intake_question", "save_intake_form",
+    "generate_studio_image", "edit_studio_image",
+})
+
+
+def _safe_tool_name(slug: str, toolkit: str) -> str:
+    """Build a unique-per-process function name from a Composio tool spec.
+
+    Composio slugs are uppercase + underscore (`GMAIL_SEND_EMAIL`,
+    `HUBSPOT_CRM_CREATE_CONTACT`). Lowercasing usually keeps them unique
+    against our native tools — but a Composio `Create Contact` name path
+    or a toolkit that ships a bare verb (`create_contact`) collides with
+    our native `create_contact` tool. The xAI Chat Completions API
+    refuses any request whose function list has duplicate names.
+    Defensively prefix with the toolkit slug whenever the base would
+    collide, and replace any non-[a-z0-9_] characters so the name stays
+    valid for every provider.
+    """
+    raw = (slug or "").lower()
+    cleaned = "".join(c if c.isalnum() or c == "_" else "_" for c in raw)
+    tk = (toolkit or "").lower().strip("_")
+    # Force a toolkit prefix whenever the cleaned base would collide with
+    # a native tool. If the slug already starts with the toolkit, no extra
+    # prefix is added (Composio slugs usually do, so this is a no-op).
+    if cleaned in _NATIVE_TOOL_NAMES and tk and not cleaned.startswith(f"{tk}_"):
+        cleaned = f"{tk}_{cleaned}"
+    if not cleaned:
+        cleaned = f"{tk}_unnamed" if tk else "unnamed_tool"
+    return cleaned[:64]
+
+
 def _build_proxied_function_tool(
     *,
     slug: str,
@@ -362,17 +409,18 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
         return []
 
     tools: list[Any] = []
+    seen_names: set[str] = set()
     for spec in specs:
         slug = spec.get("slug")
         if not slug:
             continue
-        # SDK constrains tool names to lowercase alphanumeric + underscore,
-        # 64 chars max. Slugs from Composio are usually fine but normalize
-        # defensively.
-        raw_name = (spec.get("name") or slug).lower()
-        safe_name = "".join(c if c.isalnum() or c == "_" else "_" for c in raw_name)[:64]
-        if not safe_name:
+        # Build a collision-free name from the slug. xAI's Chat Completions
+        # endpoint hard-fails the whole turn if any two function names match;
+        # OpenAI and Anthropic silently dedup but we can't depend on that.
+        safe_name = _safe_tool_name(slug, spec.get("toolkit") or "")
+        if not safe_name or safe_name in seen_names:
             continue
+        seen_names.add(safe_name)
         try:
             tools.append(
                 _build_proxied_function_tool(
