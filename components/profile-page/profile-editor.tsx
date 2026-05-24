@@ -96,6 +96,13 @@ export function ProfileEditor({ slug }: { slug: string }) {
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState('');
   const coverFileRef = useRef<HTMLInputElement>(null);
+  // Profile photo — separate from the dashboard's realtorPhotoUrl. Owned by
+  // a dedicated endpoint so the realtor can swap their public-page face
+  // without disturbing the dashboard chrome / intake / booking photo.
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
+  const [profilePhotoError, setProfilePhotoError] = useState('');
+  const profilePhotoFileRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -169,6 +176,11 @@ export function ProfileEditor({ slug }: { slug: string }) {
     setCoverPhotoUrl(
       typeof data.coverPhotoUrl === 'string' && data.coverPhotoUrl ? data.coverPhotoUrl : null,
     );
+    setProfilePhotoUrl(
+      typeof data.profilePhotoUrl === 'string' && data.profilePhotoUrl
+        ? data.profilePhotoUrl
+        : null,
+    );
   }
 
   async function handleCoverFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -223,6 +235,58 @@ export function ProfileEditor({ slug }: { slug: string }) {
       setCoverError('Could not remove cover.');
     } finally {
       setCoverUploading(false);
+    }
+  }
+
+  async function handleProfilePhotoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setProfilePhotoError('Image must be 5 MB or smaller.');
+      return;
+    }
+    if (!/^image\//.test(file.type)) {
+      setProfilePhotoError('Pick an image file (PNG, JPEG, or WebP).');
+      return;
+    }
+    setProfilePhotoError('');
+    setProfilePhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/profile-page/profile-photo', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProfilePhotoError(data.error || 'Upload failed.');
+        return;
+      }
+      setProfilePhotoUrl(typeof data.url === 'string' ? data.url : null);
+    } catch {
+      setProfilePhotoError('Upload failed.');
+    } finally {
+      setProfilePhotoUploading(false);
+    }
+  }
+
+  async function handleProfilePhotoRemove() {
+    setProfilePhotoError('');
+    setProfilePhotoUploading(true);
+    try {
+      const res = await fetch('/api/profile-page/profile-photo', { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setProfilePhotoError(data.error || 'Could not remove photo.');
+        return;
+      }
+      setProfilePhotoUrl(null);
+    } catch {
+      setProfilePhotoError('Could not remove photo.');
+    } finally {
+      setProfilePhotoUploading(false);
     }
   }
 
@@ -434,6 +498,88 @@ export function ProfileEditor({ slug }: { slug: string }) {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* ── Profile photo ─────────────────────────────────────────────────
+          Distinct from the dashboard's realtor photo (settings → workspace).
+          Pick the face you want THE PUBLIC PAGE to show without changing the
+          one your intake form, booking page, and internal chrome use. When
+          unset, the public page falls back to the workspace photo so legacy
+          realtors keep working. ─────────────────────────────────────────── */}
+      <section className="space-y-4 border-t border-border/60 pt-10">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">Profile photo</h2>
+          <p className={BODY_MUTED}>
+            The face on your public page. Separate from your workspace
+            photo so you can swap one without changing the other.
+          </p>
+        </header>
+
+        {profilePhotoUrl ? (
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-full border border-border/70 bg-muted/20 w-32 h-32">
+              <img
+                src={profilePhotoUrl}
+                alt="Profile photo"
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => profilePhotoFileRef.current?.click()}
+                disabled={profilePhotoUploading}
+              >
+                {profilePhotoUploading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ImagePlus size={14} />
+                )}
+                Replace
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleProfilePhotoRemove}
+                disabled={profilePhotoUploading}
+              >
+                <Trash2 size={14} />
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => profilePhotoFileRef.current?.click()}
+              disabled={profilePhotoUploading}
+              className="flex h-32 w-32 items-center justify-center rounded-full border border-dashed border-border/70 bg-muted/20 text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {profilePhotoUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <ImagePlus size={18} />
+              )}
+            </button>
+          </div>
+        )}
+
+        <input
+          ref={profilePhotoFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleProfilePhotoFile}
+        />
+
+        <p className={CAPTION}>PNG, JPEG, or WebP. Up to 5 MB. Square crop looks best.</p>
+        {profilePhotoError && (
+          <p className="text-xs text-destructive">{profilePhotoError}</p>
+        )}
       </section>
 
       {/* ── Cover photo ───────────────────────────────────────────────── */}

@@ -77,6 +77,7 @@ interface ProfileConfig {
   customLinks: Array<{ id: string; label: string; url: string; thumbnail?: string }>;
   videos: Array<{ id: string; url: string; title?: string }>;
   coverPhotoUrl: string | null;
+  profilePhotoUrl: string | null;
 }
 
 const DEFAULT_CONFIG: ProfileConfig = {
@@ -88,6 +89,7 @@ const DEFAULT_CONFIG: ProfileConfig = {
   customLinks: [],
   videos: [],
   coverPhotoUrl: null,
+  profilePhotoUrl: null,
 };
 
 export default async function PublicRealtorPage({
@@ -114,7 +116,7 @@ export default async function PublicRealtorPage({
     supabase
       .from('ProfilePage')
       .select(
-        'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl',
+        'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl',
       )
       .eq('spaceId', space.id)
       .maybeSingle(),
@@ -142,15 +144,20 @@ export default async function PublicRealtorPage({
 
   const businessName = settings?.businessName || space.name;
 
-  // Resolve photo URLs in parallel — cover + realtor + Clerk-fallback.
-  // Each resolveStoredPhoto signs a 24h URL when the value is a storage
-  // key; passes through if it's already a URL. clerkImageUrlFor only fires
-  // if we have no other photo to fall back to.
-  const [coverPhotoUrl, realtorPhotoFromStorage] = await Promise.all([
+  // Resolve photo URLs in parallel. Two distinct face slots now:
+  //   - profilePhotoUrl on ProfilePage  → public-page-specific portrait the
+  //                                        realtor picked deliberately for /p/[slug]
+  //   - realtorPhotoUrl on SpaceSetting → the dashboard / intake / booking face
+  // Public page prefers the ProfilePage one when set. If unset, fall through
+  // to the existing chain (realtorPhotoUrl → User.avatar → Clerk imageUrl)
+  // so legacy realtors who haven't picked a separate photo still see something.
+  const [coverPhotoUrl, profilePagePhoto, realtorPhotoFromStorage] = await Promise.all([
     resolveStoredPhoto(cfg.coverPhotoUrl),
+    resolveStoredPhoto(cfg.profilePhotoUrl),
     resolveStoredPhoto(settings?.realtorPhotoUrl ?? owner?.avatar ?? null),
   ]);
   const agentPhoto =
+    profilePagePhoto ??
     realtorPhotoFromStorage ??
     (await clerkImageUrlFor((owner as { clerkId?: string | null } | null)?.clerkId));
 

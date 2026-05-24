@@ -186,6 +186,7 @@ export const STORAGE_PREFIXES = {
   onboarding: 'onboarding',
   studio: 'studio',
   profileCover: 'profile-cover',
+  profilePhoto: 'profile-photo',
 } as const;
 
 /** Convenient key builder. Pass the prefix + the suffix segments and get a

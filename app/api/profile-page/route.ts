@@ -16,7 +16,7 @@ import { SOCIAL_PLATFORMS, type SocialPlatform } from '@/components/profile-page
 export const runtime = 'nodejs';
 
 const SELECT =
-  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl';
+  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl';
 
 // Brand identity bits (verified badge, social handles) live on SpaceSetting
 // rather than ProfilePage because they're inherited across every public
@@ -33,9 +33,25 @@ const DEFAULTS = {
   customLinks: [] as Array<{ id: string; label: string; url: string; thumbnail: string }>,
   videos: [] as Array<{ id: string; url: string; title: string }>,
   coverPhotoUrl: null as string | null,
+  profilePhotoUrl: null as string | null,
   isVerified: false,
   socialLinks: {} as Partial<Record<SocialPlatform, string>>,
 };
+
+/** Sign a stored photo KEY for the editor preview (24h TTL — way longer than
+ *  the editor's actual session). Legacy `http(s)://` values pass through
+ *  verbatim. Returns null on signing failure so the UI shows the empty state
+ *  instead of a broken image.
+ */
+async function signStoredPhoto(value: unknown): Promise<string | null> {
+  if (typeof value !== 'string' || !value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return await getSignedDownloadUrl(value, 60 * 60 * 24);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -76,22 +92,14 @@ export async function GET() {
     isVerified: settingsRow?.isVerified === true,
     socialLinks: cleanSocial,
   };
-  if (typeof merged.coverPhotoUrl === 'string' && merged.coverPhotoUrl) {
-    if (!/^https?:\/\//i.test(merged.coverPhotoUrl)) {
-      try {
-        merged.coverPhotoUrl = await getSignedDownloadUrl(
-          merged.coverPhotoUrl,
-          60 * 60 * 24,
-        );
-      } catch (err) {
-        logger.warn('[profile-page GET] sign cover failed', {
-          spaceId: space.id,
-          err: err instanceof Error ? err.message : String(err),
-        });
-        merged.coverPhotoUrl = null;
-      }
-    }
-  }
+  // Both photos use the same private-store + sign-on-read contract. Sign
+  // both in parallel so the editor preview never sees a raw storage key.
+  const [signedCover, signedProfile] = await Promise.all([
+    signStoredPhoto(merged.coverPhotoUrl),
+    signStoredPhoto(merged.profilePhotoUrl),
+  ]);
+  merged.coverPhotoUrl = signedCover;
+  merged.profilePhotoUrl = signedProfile;
 
   return NextResponse.json(merged);
 }
