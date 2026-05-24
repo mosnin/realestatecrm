@@ -7,12 +7,24 @@
  * render lives in <PublicProfile/>.
  */
 
+import type { Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { PublicProfile, type PublicProperty } from '@/components/profile-page/public-profile';
+
+/** viewport-fit=cover lets the page draw under the iOS notch / status-bar area
+ *  instead of leaving a body-coloured strip above it. On the /p/[slug] page
+ *  the cover photo is the first DOM element, so with this set the photo is
+ *  truly flush with the top of the viewport on iOS — no white gap above it.
+ *  Non-iOS browsers ignore this; it's a free fix everywhere else. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 /** Cover photo & realtor photo are stored as object KEYS in our buckets
  *  (the bucket isn't anonymously readable). Sign a 24h URL for render —

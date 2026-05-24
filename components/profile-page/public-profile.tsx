@@ -20,6 +20,7 @@ import {
   BadgeCheck,
   CalendarCheck,
   Globe,
+  Home,
   Link2,
   Play,
 } from 'lucide-react';
@@ -236,6 +237,11 @@ function VideoCard({ video }: { video: PublicVideo }) {
   );
 }
 
+/** A single property card inside the carousel. Image-led; fixed width so
+ *  the carousel hints a peek of the next card at the right edge on mobile.
+ *  When a property has no photo we render a tasteful muted placeholder
+ *  (Home glyph) rather than a broken-image gap. The whole card is a link
+ *  when `listingUrl` is set; otherwise it's a static surface. */
 function PropertyCard({ property }: { property: PublicProperty }) {
   const cover = property.photos?.[0] ?? null;
   const locality = [property.city, property.stateRegion].filter(Boolean).join(', ');
@@ -243,14 +249,21 @@ function PropertyCard({ property }: { property: PublicProperty }) {
 
   const inner = (
     <>
-      {cover && (
+      {cover ? (
         <img
           src={cover}
           alt={property.address}
           loading="lazy"
           decoding="async"
-          className="aspect-[3/2] w-full object-cover"
+          className="aspect-[16/9] w-full object-cover"
         />
+      ) : (
+        <div
+          aria-hidden
+          className="flex aspect-[16/9] w-full items-center justify-center bg-muted"
+        >
+          <Home size={28} className="text-muted-foreground/60" />
+        </div>
       )}
       <div className="px-4 py-3">
         <p className="truncate text-sm font-medium text-foreground">{property.address}</p>
@@ -262,21 +275,28 @@ function PropertyCard({ property }: { property: PublicProperty }) {
     </>
   );
 
+  // The shared classes describe the carousel slide itself — fixed width so
+  // ~1.7 cards are visible on a 390px phone (hints horizontal swipe), the
+  // canonical card border/radius vocabulary, and `sm:hover:-translate-y-0.5`
+  // so it lifts on desktop only (mobile gets no hover state). `snap-start`
+  // pairs with the scroller's `snap-x mandatory` to lock each card into
+  // place as the realtor swipes.
+  const slideClass =
+    'block w-[260px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/70 bg-card sm:transition-transform sm:duration-150 sm:hover:-translate-y-0.5';
+
   if (property.listingUrl) {
     return (
       <a
         href={safeHref(property.listingUrl)}
         target="_blank"
         rel="noopener noreferrer"
-        className="block overflow-hidden rounded-2xl border border-border/70 bg-card transition-colors hover:bg-muted/30"
+        className={slideClass}
       >
         {inner}
       </a>
     );
   }
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">{inner}</div>
-  );
+  return <div className={slideClass}>{inner}</div>;
 }
 
 function LinkCard({
@@ -564,11 +584,21 @@ export function PublicProfile({
             </section>
           )}
 
-          {/* Listings */}
+          {/* Listings — horizontal carousel.
+              The scroller breaks out of the page's px-6 with `-mx-6 px-6` so
+              cards align with the page padding but can scroll past it; the
+              trailing card sits flush with the edge instead of clipping at
+              the page padding. `snap-x mandatory` + `snap-start` on each
+              card locks the card to the left edge as the realtor swipes.
+              `no-scrollbar` hides the scrollbar — the peek of the next card
+              is the affordance, not chrome. */}
           {properties.length > 0 && (
             <section className="mt-10 space-y-4">
               <SectionHeader>Listings</SectionHeader>
-              <div className="space-y-3">
+              <div
+                className="-mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2 no-scrollbar"
+                style={{ scrollPaddingLeft: '1.5rem', scrollPaddingRight: '1.5rem' }}
+              >
                 {properties.map((p) => (
                   <PropertyCard key={p.id} property={p} />
                 ))}
