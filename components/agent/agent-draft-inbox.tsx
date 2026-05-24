@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
-  Loader2, RefreshCw, Pencil, Copy, Check,
+  Loader2, RefreshCw, Pencil, Copy, Check, CheckSquare,
   AlertTriangle, Send, TriangleAlert, MessageCircle, Paperclip,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -80,11 +80,15 @@ const AUTO_SEND_TICK_MS = 250;
 function DraftRow({
   draft,
   slug,
+  selected,
+  onToggleSelect,
   onAction,
   onCelebrationDone,
 }: {
   draft: AgentDraft;
   slug: string;
+  selected: boolean;
+  onToggleSelect: () => void;
   onAction: (id: string, status: 'approved' | 'dismissed', content?: string) => Promise<DeliveryResult | null>;
   /** Called once the row's celebration dwell has finished — parent removes the row then. */
   onCelebrationDone: (id: string) => void;
@@ -227,8 +231,18 @@ function DraftRow({
 
   return (
     <article className="group/row py-5 first:pt-0 last:pb-0">
-      {/* Meta line: contact · channel · confidence · time */}
+      {/* Meta line: checkbox · contact · channel · confidence · time */}
       <div className="flex items-center gap-3 text-sm">
+        {/* Quiet checkbox — invisible until row hover or selected. Matches the
+            contact-table pattern: shouldn't shout, but stays put when active. */}
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          aria-label={`Select draft for ${draft.Contact?.name ?? 'unknown contact'}`}
+          className="rounded border-border cursor-pointer flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity data-[checked=true]:opacity-100"
+          data-checked={selected}
+        />
         {draft.Contact ? (
           <Link
             href={`/s/${slug}/contacts/${draft.Contact.id}`}
@@ -561,6 +575,10 @@ export function AgentDraftInbox({ slug }: Props) {
   const [approvingAll, setApprovingAll] = useState(false);
   const [deliveryFeedback, setDeliveryFeedback] = useState<DeliveryFeedback | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Per-row selection. Set<draftId> so toggling stays O(1) and the parent
+  // doesn't care about row order. Cleared on Esc and after a batch action.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchApproving, setBatchApproving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -577,6 +595,49 @@ export function AgentDraftInbox({ slug }: Props) {
     const timer = setInterval(() => { void load(); }, 30_000);
     return () => clearInterval(timer);
   }, [load]);
+
+  // Esc clears the selection — same shortcut the contacts table uses, keeps
+  // muscle memory consistent across the app.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelectedIds(new Set());
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Drop selected ids that no longer correspond to a visible draft (e.g.
+  // refresh removed them) so the sticky bar never claims phantom selections.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const valid = new Set(drafts.map((d) => d.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [drafts]);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === drafts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(drafts.map((d) => d.id)));
+    }
+  }
 
   function showFeedback(contactName: string | null, result: DeliveryResult) {
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
@@ -666,6 +727,83 @@ export function AgentDraftInbox({ slug }: Props) {
     }
   }
 
+  async function batchApprove() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setBatchApproving(true);
+
+    // Optimistic UI — remove the selected rows immediately so the inbox
+    // feels like it cleared the queue in one tap. Failed items are restored
+    // below from the per-item results.
+    const snapshot = drafts.filter((d) => selectedIds.has(d.id));
+    setDrafts((prev) => prev.filter((d) => !selectedIds.has(d.id)));
+
+    try {
+      const res = await fetch('/api/agent/drafts/batch-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftIds: ids }),
+      });
+
+      if (!res.ok) {
+        // Whole-batch failure (auth, rate limit, validation) — restore the
+        // rows and surface a single error. The realtor can try again.
+        setDrafts((prev) => {
+          const have = new Set(prev.map((d) => d.id));
+          return [...snapshot.filter((d) => !have.has(d.id)), ...prev];
+        });
+        if (res.status === 429) {
+          toast.error("That's a lot of approvals. Give it an hour, then try again.");
+        } else {
+          toast.error("Couldn't approve those drafts. Try again.");
+        }
+        return;
+      }
+
+      const data = (await res.json()) as {
+        results: Array<{ draftId: string; ok: boolean; error?: string }>;
+      };
+
+      const failed = data.results.filter((r) => !r.ok);
+      const succeeded = data.results.length - failed.length;
+
+      // Restore any drafts that failed so the realtor can retry them in
+      // place. Successful ones stay removed.
+      if (failed.length) {
+        const failedIds = new Set(failed.map((r) => r.draftId));
+        const toRestore = snapshot.filter((d) => failedIds.has(d.id));
+        setDrafts((prev) => {
+          const have = new Set(prev.map((d) => d.id));
+          return [...toRestore.filter((d) => !have.has(d.id)), ...prev];
+        });
+      }
+
+      if (failed.length === 0) {
+        toast.success(
+          succeeded === 1 ? '1 draft approved.' : `${succeeded} drafts approved.`,
+        );
+      } else if (succeeded === 0) {
+        toast.error(
+          failed.length === 1
+            ? "1 draft got stuck. Try it again."
+            : `${failed.length} drafts got stuck. Try those again.`,
+        );
+      } else {
+        toast.success(`${succeeded} approved, ${failed.length} got stuck.`);
+      }
+    } catch {
+      // Network blip — restore the snapshot and let the realtor retry.
+      setDrafts((prev) => {
+        const have = new Set(prev.map((d) => d.id));
+        return [...snapshot.filter((d) => !have.has(d.id)), ...prev];
+      });
+      toast.error("I lost the connection. Try again.");
+    } finally {
+      setSelectedIds(new Set());
+      setBatchApproving(false);
+    }
+  }
+
   return (
     <section>
       {/* Section header — typography driven, no card chrome */}
@@ -680,16 +818,25 @@ export function AgentDraftInbox({ slug }: Props) {
         )}
         <div className="ml-auto flex items-center gap-2">
           {!loading && drafts.length > 1 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-              onClick={approveAll}
-              disabled={approvingAll}
-            >
-              {approvingAll ? <Loader2 size={11} className="animate-spin" /> : null}
-              Approve all
-            </Button>
+            <>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 h-7 rounded"
+              >
+                {selectedIds.size === drafts.length ? 'Clear' : 'Select all'}
+              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                onClick={approveAll}
+                disabled={approvingAll}
+              >
+                {approvingAll ? <Loader2 size={11} className="animate-spin" /> : null}
+                Approve all
+              </Button>
+            </>
           )}
           <button
             onClick={load}
@@ -736,12 +883,48 @@ export function AgentDraftInbox({ slug }: Props) {
               <DraftRow
                 draft={draft}
                 slug={slug}
+                selected={selectedIds.has(draft.id)}
+                onToggleSelect={() => toggleSelect(draft.id)}
                 onAction={handleAction}
                 onCelebrationDone={handleCelebrationDone}
               />
             </StaggerItem>
           ))}
         </StaggerList>
+      )}
+
+      {/* Sticky bulk-action bar — appears only when ≥1 draft is selected.
+          Same paper-flat surface vocabulary as the contacts table bar. */}
+      {selectedIds.size > 0 && (
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto mt-3 w-fit z-30 flex items-center gap-2 rounded-lg border border-border bg-card px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
+          <CheckSquare size={14} className="text-foreground" />
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="h-4 w-px bg-border mx-1" />
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={batchApprove}
+            disabled={batchApproving}
+          >
+            {batchApproving ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Send size={12} />
+            )}
+            Approve {selectedIds.size} draft{selectedIds.size === 1 ? '' : 's'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={batchApproving}
+          >
+            Cancel
+          </Button>
+        </div>
       )}
     </section>
   );
