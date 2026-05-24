@@ -500,10 +500,15 @@ async def chat_turn(item: dict):
     # (older Next.js deploy) or no integrations configured. Best-effort:
     # a Composio outage degrades to native-tool-only chat, doesn't 500.
     integration_tools: list = []
+    connected_toolkits: list[str] = []
     if user_id:
         try:
-            from integrations import load_integration_tools
+            from integrations import active_toolkits, load_integration_tools
 
+            # Pull the toolkit list up so we can both surface it to the
+            # model (workspace_info below) and use it to gate the
+            # dispatcher tools.
+            connected_toolkits = await active_toolkits(space_id, user_id)
             integration_tools = await load_integration_tools(space_id, user_id)
         except Exception as ie:  # noqa: BLE001
             logger.warning(
@@ -522,10 +527,21 @@ async def chat_turn(item: dict):
     if "localhost" in _app_url or "127.0.0.1" in _app_url:
         _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    # Tell the model which integrations the realtor actually has connected
+    # so it can route by name — "check my google calendar" maps to a
+    # connected `googlecalendar` toolkit, "send a slack DM" maps to `slack`.
+    # Without this, the model would have to first call find_integration_tool
+    # to discover what exists, wasting a turn.
+    _toolkit_line = (
+        f"- Connected integrations: {', '.join(sorted(connected_toolkits))}\n"
+        if connected_toolkits
+        else "- Connected integrations: (none)\n"
+    )
     workspace_info: str | None = (
         "# Your workspace\n"
         f"- Workspace: {space.name} (slug: {space.slug})\n"
         f"- Intake link (share with new leads): {intake_url}\n"
+        + _toolkit_line +
         "- Include the intake link in any contact-facing draft where it"
         " makes sense — when reaching out to a fresh lead, when asking a"
         " prospect to qualify, when nudging someone who never finished"
