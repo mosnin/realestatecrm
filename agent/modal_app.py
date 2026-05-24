@@ -277,8 +277,15 @@ async def chat_turn(item: dict):
     import json
     import os
     import sys
+    import time
     import uuid
     from typing import Any
+
+    # Wall-clock anchor for the per-turn latency log emitted at end-of-stream.
+    # Powers the curated-vs-dispatcher latency comparison in
+    # docs/integrations-perf-measurement.md — without this log line the
+    # measurement plan has nothing to bucket on.
+    _turn_started_at = time.monotonic()
 
     sys.path.insert(0, "/app")
 
@@ -591,6 +598,17 @@ async def chat_turn(item: dict):
                 )
                 done = json.dumps({"type": "done", "final_text": final_text})
                 yield f"data: {done}\n\n"
+
+                # End-of-turn latency anchor for the curated-vs-dispatcher
+                # comparison (docs/integrations-perf-measurement.md). Logged
+                # after the `done` frame so a slow telemetry write doesn't
+                # delay the realtor's last token.
+                logger.info(
+                    "chat_turn_finished",
+                    space_id=space_id,
+                    model=model,
+                    turn_latency_ms=int((time.monotonic() - _turn_started_at) * 1000),
+                )
 
                 # Record this turn's token cost for the Usage page. Best-effort:
                 # a telemetry failure must never surface as a chat error.
