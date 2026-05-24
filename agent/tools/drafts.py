@@ -73,7 +73,13 @@ async def draft_message(
     from the last 48h, returns it instead of creating a duplicate.
 
     Returns: { "action": "drafted" | "deduped", "draftId": "...",
-              "contactId": "...", "autoCreatedContact": bool? }
+              "contactId": "...", "channel": "...",
+              "autoCreatedContact": bool?, "nextStep": "..." }
+
+    `nextStep` is a one-sentence, realtor-facing line the model should
+    quote or paraphrase in its reply so the trust boundary stays visible:
+    something was drafted, it's awaiting approval, and if a contact was
+    auto-stubbed the realtor is told.
     """
     space_id = ctx.context.space_id
 
@@ -186,6 +192,10 @@ async def draft_message(
             "contactId": contact_id,
             "channel": channel,
             "note": "A pending draft for this contact already exists from the last 48h.",
+            "nextStep": (
+                f"Already had a pending draft for {contact_name} from the last 48h — "
+                "open your inbox to send or edit it."
+            ),
         }
 
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
@@ -230,83 +240,19 @@ async def draft_message(
         pass
 
     created = result.data[0] if result.data else draft
+    if auto_created:
+        next_step = (
+            "Drafted — review and approve in your inbox to send. "
+            f"(Auto-created a contact stub for {contact_name} since they "
+            "weren't in your CRM yet — edit the name in Contacts if you'd like.)"
+        )
+    else:
+        next_step = "Drafted — review and approve in your inbox to send. I never send for you without approval."
     return {
         "action": "drafted",
         "draftId": created.get("id", ""),
         "contactId": contact_id,
         "channel": channel,
         "autoCreatedContact": auto_created,
-    }
-
-    # ── Dedup: existing pending draft for same contact+channel in window ──
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=_DEDUPE_WINDOW_HOURS)).isoformat()
-    existing = await (
-        db.table("AgentDraft")
-        .select("id,channel,content,createdAt")
-        .eq("spaceId", space_id)
-        .eq("contactId", contact_id)
-        .eq("channel", channel)
-        .eq("status", "pending")
-        .gte("createdAt", cutoff)
-        .order("createdAt", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if existing.data:
-        prior = existing.data[0]
-        return {
-            "action": "deduped",
-            "draftId": prior["id"],
-            "contactId": contact_id,
-            "channel": channel,
-            "note": "A pending draft for this contact already exists from the last 48h.",
-        }
-
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-    draft = {
-        "id": str(uuid.uuid4()),
-        "spaceId": space_id,
-        "contactId": contact_id,
-        "dealId": deal_id,
-        "channel": channel,
-        "subject": subject,
-        "content": content,
-        "reasoning": reasoning,
-        "priority": max(0, min(100, priority)),
-        "status": "pending",
-        "expiresAt": expires_at,
-    }
-
-    try:
-        result = await with_retry(lambda: db.table("AgentDraft").insert(draft).execute())
-    except Exception as e:
-        agent_err = from_exception(e)
-        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
-
-    await publish_event(
-        ctx.context,
-        "draft",
-        f"Draft {channel.upper()} for {contact_name} — awaiting your approval",
-        metadata={"contactId": contact_id, "channel": channel},
-    )
-
-    try:
-        await persist_log(
-            ctx.context,
-            action_type="message_drafted",
-            outcome="queued_for_approval",
-            reasoning=f"{channel}: {reasoning[:200]}",
-            contact_id=contact_id,
-            deal_id=deal_id,
-        )
-    except Exception:
-        # The AgentDraft row already committed — logging is best-effort.
-        pass
-
-    created = result.data[0] if result.data else draft
-    return {
-        "action": "drafted",
-        "draftId": created.get("id", ""),
-        "contactId": contact_id,
-        "channel": channel,
+        "nextStep": next_step,
     }
