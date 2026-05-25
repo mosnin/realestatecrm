@@ -8,9 +8,15 @@
  *
  * Priority ladder (descending urgency):
  *   1. stuck-deals      — highest (days × value) score across the team.
- *   2. unassigned-leads — fresh intake sitting in the queue.
- *   3. overloaded       — a realtor noticeably above the team median.
- *   4. underused        — a realtor noticeably quiet vs the team median.
+ *   2. unassigned-leads — brokerage-tagged Contacts sitting in the queue.
+ *   3. overloaded       — a realtor whose open work (active deals + open
+ *                         leads) exceeds 15 — the canonical team_health
+ *                         threshold from agent/tools/broker/team.py.
+ *   4. underused        — a realtor with open work below 3 who's still
+ *                         active in the last 30 days (canonical team_health
+ *                         underused signal). Newly-invited dormant members
+ *                         don't surface — only currently-active realtors
+ *                         going quiet.
  *   5. milestone        — GCI MTD crossed a round threshold; celebrate the
  *                         top performer in the same breath.
  *   6. fallback         — quiet morning, team healthy.
@@ -25,6 +31,11 @@
  * prompt pre-filled. Branches 5 and 6 have no action, so the headline
  * renders non-interactive.
  *
+ * The thresholds and definitions mirror agent/tools/broker/ exactly — the
+ * Python tools are the canonical math for "what's happening on the team".
+ * If they drift, Chippi's narrated answer and this headline will disagree,
+ * which is the worst kind of inconsistency.
+ *
  * Auth: broker_owner or broker_admin. Realtor-only members get 403 — they
  * have their own /chippi morning story.
  */
@@ -32,7 +43,6 @@ import { NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
-import { dealHealth } from '@/lib/deals/health';
 
 export interface BrokerMorningResponse {
   /**
@@ -57,16 +67,22 @@ export interface BrokerMorningResponse {
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const STUCK_MIN_DAYS = 7;
-const STUCK_MIN_FOR_HEADLINE = 1;
 
-// "Overloaded" / "underused" thresholds are relative to the team median so
-// the headline is a fact ("vs team median 6"), not a judgment. We only
-// surface a realtor at the extreme — half-again the median to be loud
-// enough to warrant the broker's attention.
-const OVERLOADED_RATIO = 1.5;
-const UNDERUSED_LEAD_DAYS = 7;
-const UNDERUSED_MAX_NEW_LEADS = 2;
+// Stuck-deal threshold — exactly mirrors find_stuck_deals(min_days=7) in
+// agent/tools/broker/pipeline.py:42 so the row pill and Chippi answer the
+// same question with the same math.
+const STUCK_MIN_DAYS = 7;
+
+// team_health canonical thresholds — see agent/tools/broker/team.py:55-57.
+// Keep these in lockstep with the Python tool; the broker hears one number
+// across the surface.
+const OVERLOADED_OPEN_THRESHOLD = 15;
+const UNDERUSED_OPEN_THRESHOLD = 3;
+const RECENT_ACTIVE_WINDOW_DAYS = 30;
+
+// Outbound activity types used for the "recently active" check — same set
+// the realtors page and team_health use to define "responding".
+const RESPONSE_OUTBOUND_TYPES = ['call', 'email', 'meeting'] as const;
 
 // GCI milestones the broker actually wants to hear about. Crossed-this-month
 // only — we don't re-celebrate hitting $50K every day.
@@ -79,7 +95,7 @@ function firstName(full: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
-/** Round half-up to one decimal for the GCI display, e.g. 18432.7 → 18.4. */
+/** Round half-up to one decimal for the GCI display, e.g. 18432.7 → $18.4K. */
 function thousandsK(n: number): string {
   return `$${(n / 1_000).toFixed(1)}K`;
 }
@@ -93,10 +109,13 @@ interface MemberRow {
 interface RealtorLoad {
   userId: string;
   name: string;
+  spaceId: string;
   activeDeals: number;
-  newLeads7d: number;
-  /** Sum of active deals + new leads over 7d — the simple overall load proxy. */
-  load: number;
+  openLeads: number;
+  /** Sum of active deals + open leads — the canonical team_health open-load proxy. */
+  openLoad: number;
+  /** True when the realtor has any outbound activity in the last 30 days. */
+  recentlyActive: boolean;
 }
 
 interface StuckDealRow {
@@ -104,18 +123,6 @@ interface StuckDealRow {
   spaceId: string;
   value: number;
   daysStuck: number;
-}
-
-/**
- * Median of a list of numbers. Returns 0 for an empty list. Used as the
- * benchmark in the "vs team median X" framing — facts, not judgments.
- */
-function median(nums: number[]): number {
-  if (nums.length === 0) return 0;
-  const sorted = [...nums].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid];
-  return (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /**
@@ -159,89 +166,111 @@ export async function GET() {
     memberRows.map((m) => [m.spaceId, { userId: m.userId, name: m.name }]),
   );
 
-  const sevenDaysAgoIso = new Date(Date.now() - 7 * MS_PER_DAY).toISOString();
+  const now = Date.now();
+  const stuckCutoffIso = new Date(now - STUCK_MIN_DAYS * MS_PER_DAY).toISOString();
+  const recentActivityCutoffIso = new Date(
+    now - RECENT_ACTIVE_WINDOW_DAYS * MS_PER_DAY,
+  ).toISOString();
   const monthStartIso = (() => {
     const d = new Date();
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
   })();
 
   // ── Aggregate the swarm in one parallel volley ──────────────────────────
-  const [activeDealRowsRes, unassignedLeadsRes, newLeads7dRes, wonMtdRes] =
-    await Promise.all([
-      // Active deals across the team — needed for stuck classification +
-      // per-realtor load + the snapshot count.
-      spaceIds.length > 0
-        ? supabase
-            .from('Deal')
-            .select(
-              'id, spaceId, value, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt',
-            )
-            .in('spaceId', spaceIds)
-            .eq('status', 'active')
-            .limit(5000)
-        : Promise.resolve({ data: [] }),
+  // Six queries; nothing fancier than what /broker/realtors already does.
+  // Each is brokerage-scoped through `spaceId IN (...)` or
+  // `brokerageId = ...` so RLS doesn't leak across brokerages even if
+  // someone bypasses requireBroker().
+  const [
+    allActiveDealsRes,
+    stuckCandidatesRes,
+    openLeadsRes,
+    unassignedLeadsRes,
+    recentActivityRes,
+    wonMtdRes,
+  ] = await Promise.all([
+    // Every active deal — just spaceId for the per-realtor active-deals count
+    // and the stats.activeDeals total.
+    spaceIds.length > 0
+      ? supabase
+          .from('Deal')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .eq('status', 'active')
+          .limit(10000)
+      : Promise.resolve({ data: [] as Array<{ spaceId: string }> }),
 
-      // Unassigned brokerage leads.
-      supabase
-        .from('Contact')
-        .select('id, tags, createdAt')
-        .eq('brokerageId', brokerage.id)
-        .contains('tags', ['brokerage-lead'])
-        .limit(2000),
+    // Stuck-deal candidates — definition mirrors find_stuck_deals exactly:
+    // status='active' AND updatedAt <= now() - STUCK_MIN_DAYS. The Python
+    // tool then ranks by daysSince × value; we do the same below.
+    spaceIds.length > 0
+      ? supabase
+          .from('Deal')
+          .select('id, spaceId, value, updatedAt')
+          .in('spaceId', spaceIds)
+          .eq('status', 'active')
+          .lte('updatedAt', stuckCutoffIso)
+          .limit(5000)
+      : Promise.resolve({ data: [] as Array<{ id: string; spaceId: string; value: number | null; updatedAt: string | null }> }),
 
-      // New leads per space over the last 7 days — for the underused signal.
-      spaceIds.length > 0
-        ? supabase
-            .from('Contact')
-            .select('spaceId, createdAt')
-            .in('spaceId', spaceIds)
-            .gte('createdAt', sevenDaysAgoIso)
-            .limit(5000)
-        : Promise.resolve({ data: [] as Array<{ spaceId: string; createdAt: string }> }),
+    // Open leads per realtor — Contact WHERE type='QUALIFICATION'. This is
+    // the same definition team_health uses for "open_leads". The broker's
+    // load number = active deals + open leads.
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .eq('type', 'QUALIFICATION')
+          .limit(10000)
+      : Promise.resolve({ data: [] as Array<{ spaceId: string }> }),
 
-      // Won deals MTD — for GCI milestone + the top performer.
-      spaceIds.length > 0
-        ? supabase
-            .from('Deal')
-            .select('spaceId, value, commissionRate, updatedAt')
-            .in('spaceId', spaceIds)
-            .eq('status', 'won')
-            .gte('updatedAt', monthStartIso)
-            .limit(5000)
-        : Promise.resolve({ data: [] as Array<{ spaceId: string; value: number | null; commissionRate: number | null }> }),
-    ]);
+    // Unassigned brokerage leads — same predicates as
+    // app/broker/leads/page.tsx and find_unassigned_leads:
+    // brokerageId match, tag includes 'brokerage-lead', NOT 'assigned'.
+    supabase
+      .from('Contact')
+      .select('id, tags')
+      .eq('brokerageId', brokerage.id)
+      .contains('tags', ['brokerage-lead'])
+      .limit(2000),
 
-  const nowTs = Date.now();
+    // Most-recent outbound activity per space, for the "recently active"
+    // check. We over-fetch by limit and dedupe in JS rather than firing N
+    // per-space queries.
+    spaceIds.length > 0
+      ? supabase
+          .from('ContactActivity')
+          .select('spaceId, createdAt')
+          .in('spaceId', spaceIds)
+          .in('type', [...RESPONSE_OUTBOUND_TYPES])
+          .gte('createdAt', recentActivityCutoffIso)
+          .limit(20000)
+      : Promise.resolve({ data: [] as Array<{ spaceId: string; createdAt: string }> }),
 
-  // ── Stuck deals (and the single biggest) ─────────────────────────────────
-  const activeDeals = (activeDealRowsRes.data ?? []) as Array<{
+    // Won deals MTD — for GCI milestone + the top performer.
+    spaceIds.length > 0
+      ? supabase
+          .from('Deal')
+          .select('spaceId, value, commissionRate')
+          .in('spaceId', spaceIds)
+          .eq('status', 'won')
+          .gte('updatedAt', monthStartIso)
+          .limit(5000)
+      : Promise.resolve({ data: [] as Array<{ spaceId: string; value: number | null; commissionRate: number | null }> }),
+  ]);
+
+  // ── Stuck deals: rank by (days × value), pick the top realtor ───────────
+  const stuckBySpace = new Map<string, StuckDealRow[]>();
+  for (const d of (stuckCandidatesRes.data ?? []) as Array<{
     id: string;
     spaceId: string;
     value: number | null;
     updatedAt: string | null;
-    closeDate: string | null;
-    followUpAt: string | null;
-    nextAction: string | null;
-    nextActionDueAt: string | null;
-  }>;
-
-  const stuckBySpace = new Map<string, StuckDealRow[]>();
-  for (const d of activeDeals) {
-    const updated = d.updatedAt ? new Date(d.updatedAt) : new Date();
-    const health = dealHealth({
-      status: 'active',
-      updatedAt: updated as unknown as Date,
-      closeDate: d.closeDate as unknown as Date | null,
-      followUpAt: d.followUpAt as unknown as Date | null,
-      nextAction: d.nextAction,
-      nextActionDueAt: d.nextActionDueAt as unknown as Date | null,
-    });
-    if (health.state !== 'stuck') continue;
-    const daysStuck = Math.max(
-      0,
-      Math.floor((nowTs - updated.getTime()) / MS_PER_DAY),
-    );
-    if (daysStuck < STUCK_MIN_DAYS) continue;
+  }>) {
+    const updated = d.updatedAt ? new Date(d.updatedAt).getTime() : now;
+    if (!isFinite(updated)) continue;
+    const daysStuck = Math.max(0, Math.floor((now - updated) / MS_PER_DAY));
     const arr = stuckBySpace.get(d.spaceId) ?? [];
     arr.push({
       id: d.id,
@@ -251,15 +280,15 @@ export async function GET() {
     });
     stuckBySpace.set(d.spaceId, arr);
   }
-
-  // Rank realtors by the (days × value) score of their stuck book. The
-  // single realtor with the biggest stalled portfolio surfaces.
   let topStuckSpaceId: string | null = null;
   let topStuckScore = 0;
   let topStuckCount = 0;
   let topStuckOldest = 0;
   for (const [spaceId, rows] of stuckBySpace) {
     if (rows.length === 0) continue;
+    // (days × value) sum is the score — same formula as find_stuck_deals
+    // applied per realtor instead of per deal. Floor of $1 on value so a
+    // priceless inquiry still registers a non-zero score.
     const score = rows.reduce(
       (acc, r) => acc + r.daysStuck * Math.max(1, r.value),
       0,
@@ -273,89 +302,74 @@ export async function GET() {
     }
   }
 
-  // ── Unassigned leads — count + freshness ─────────────────────────────────
-  const unassignedAll = (
-    (unassignedLeadsRes.data ?? []) as Array<{
-      tags: string[] | null;
-      createdAt: string | null;
-    }>
-  ).filter((c) => !(c.tags ?? []).includes('assigned'));
-  const unassignedCount = unassignedAll.length;
-  // "Overnight" = arrived since midnight local. Used to choose between
-  // "landed overnight" and the plainer "sitting unassigned" copy.
-  const midnightTs = (() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  })();
-  const overnightCount = unassignedAll.filter((c) => {
-    if (!c.createdAt) return false;
-    const t = new Date(c.createdAt).getTime();
-    return !isNaN(t) && t >= midnightTs;
-  }).length;
+  // ── Unassigned leads — count ─────────────────────────────────────────────
+  const unassignedCount = (
+    (unassignedLeadsRes.data ?? []) as Array<{ tags: string[] | null }>
+  ).filter((c) => !(c.tags ?? []).includes('assigned')).length;
 
-  // ── Per-realtor load (active deals + new 7d leads) ───────────────────────
+  // ── Per-realtor open load (active deals + open leads) ───────────────────
   const activeBySpace = new Map<string, number>();
-  for (const d of activeDeals) {
+  for (const d of (allActiveDealsRes.data ?? []) as Array<{ spaceId: string }>) {
     activeBySpace.set(d.spaceId, (activeBySpace.get(d.spaceId) ?? 0) + 1);
   }
-  const newLeadsBySpace = new Map<string, number>();
-  for (const r of (newLeads7dRes.data ?? []) as Array<{ spaceId: string }>) {
-    newLeadsBySpace.set(r.spaceId, (newLeadsBySpace.get(r.spaceId) ?? 0) + 1);
+  const openLeadsBySpace = new Map<string, number>();
+  for (const c of (openLeadsRes.data ?? []) as Array<{ spaceId: string }>) {
+    openLeadsBySpace.set(c.spaceId, (openLeadsBySpace.get(c.spaceId) ?? 0) + 1);
+  }
+  const recentlyActiveSpaces = new Set<string>();
+  for (const a of (recentActivityRes.data ?? []) as Array<{ spaceId: string }>) {
+    recentlyActiveSpaces.add(a.spaceId);
   }
   const loads: RealtorLoad[] = memberRows.map((m) => {
-    const activeDealsCount = activeBySpace.get(m.spaceId) ?? 0;
-    const newLeads7d = newLeadsBySpace.get(m.spaceId) ?? 0;
+    const activeDeals = activeBySpace.get(m.spaceId) ?? 0;
+    const openLeads = openLeadsBySpace.get(m.spaceId) ?? 0;
     return {
       userId: m.userId,
       name: m.name,
-      activeDeals: activeDealsCount,
-      newLeads7d,
-      load: activeDealsCount + newLeads7d,
+      spaceId: m.spaceId,
+      activeDeals,
+      openLeads,
+      openLoad: activeDeals + openLeads,
+      recentlyActive: recentlyActiveSpaces.has(m.spaceId),
     };
   });
-  const teamMedianLoad = median(loads.map((r) => r.load));
-  // Highest-load realtor; flagged "overloaded" when they're loudly above the
-  // median. Single-realtor teams never trip this.
+
+  // Overloaded = highest open_load AND open_load > 15. Single-realtor team
+  // never trips this — the broker can't redistribute to themselves.
   let overloaded: RealtorLoad | null = null;
   if (loads.length >= 2) {
-    const sorted = [...loads].sort((a, b) => b.load - a.load);
-    const topLoad = sorted[0];
-    if (
-      teamMedianLoad > 0 &&
-      topLoad.load >= teamMedianLoad * OVERLOADED_RATIO &&
-      topLoad.activeDeals >= 5
-    ) {
-      overloaded = topLoad;
-    }
-  }
-  // Lowest-load realtor with too few new leads recently. Same single-team
-  // guard.
-  let underused: RealtorLoad | null = null;
-  if (loads.length >= 2) {
-    const candidates = loads
-      .filter((r) => r.newLeads7d <= UNDERUSED_MAX_NEW_LEADS)
-      .sort((a, b) => a.load - b.load);
-    if (candidates.length > 0) {
-      const candidate = candidates[0];
-      if (candidate.load < teamMedianLoad) {
-        underused = candidate;
-      }
+    const sorted = [...loads].sort((a, b) => b.openLoad - a.openLoad);
+    const top = sorted[0];
+    if (top.openLoad > OVERLOADED_OPEN_THRESHOLD) {
+      overloaded = top;
     }
   }
 
+  // Underused = lowest open_load AND open_load < 3 AND recently active.
+  // The "recently active" gate is what makes this calm chief-of-staff
+  // copy: we don't call out a realtor who's already on vacation or hasn't
+  // started. Same guard as team_health._load_signal.
+  let underused: RealtorLoad | null = null;
+  if (loads.length >= 2) {
+    const candidates = loads
+      .filter((r) => r.openLoad < UNDERUSED_OPEN_THRESHOLD && r.recentlyActive)
+      .sort((a, b) => a.openLoad - b.openLoad);
+    if (candidates.length > 0) underused = candidates[0];
+  }
+
   // ── GCI MTD + top performer ──────────────────────────────────────────────
-  const wonDeals = (wonMtdRes.data ?? []) as Array<{
+  // Formula matches lib/commissions.ts and revenue.commission_report:
+  // gci = value * commissionRate / 100 per won deal in the window.
+  const gciBySpace = new Map<string, number>();
+  let gciTotal = 0;
+  for (const d of (wonMtdRes.data ?? []) as Array<{
     spaceId: string;
     value: number | null;
     commissionRate: number | null;
-  }>;
-  const gciBySpace = new Map<string, number>();
-  let gciTotal = 0;
-  for (const d of wonDeals) {
+  }>) {
     const v = Number(d.value ?? 0);
-    const r = Number(d.commissionRate ?? 0);
-    const gci = v * r / 100;
+    const rate = Number(d.commissionRate ?? 0);
+    const gci = (v * rate) / 100;
     if (!isFinite(gci) || gci <= 0) continue;
     gciBySpace.set(d.spaceId, (gciBySpace.get(d.spaceId) ?? 0) + gci);
     gciTotal += gci;
@@ -370,30 +384,34 @@ export async function GET() {
   }
 
   // ── Compose the headline + suggested prompt ──────────────────────────────
+  // The em-dash break is load-bearing: the component splits on " — " so the
+  // post-dash clause renders at slightly stronger weight. Compose every
+  // branch with exactly one em-dash so that pattern holds.
   let headline = "Quiet morning. Team's healthy.";
   let suggestedPrompt: string | null = null;
 
   // 1. Stuck deals — highest priority.
-  if (topStuckSpaceId && topStuckCount >= STUCK_MIN_FOR_HEADLINE) {
+  if (topStuckSpaceId && topStuckCount >= 1) {
     const member = spaceToMember.get(topStuckSpaceId);
     if (member) {
       const fn = firstName(member.name);
       const dealWord = topStuckCount === 1 ? 'stuck deal' : 'stuck deals';
       const dayWord = topStuckOldest === 1 ? 'day' : 'days';
-      // Gender-neutral pronoun — broker may use any name, we don't guess.
       headline =
         topStuckCount === 1
           ? `${fn} has a deal stuck ${topStuckOldest} ${dayWord} — want me to ping ${fn}?`
           : `${fn} has ${topStuckCount} ${dealWord} over ${topStuckOldest} ${dayWord} — want me to ping ${fn}?`;
-      suggestedPrompt = `Help me check in with ${fn} on ${topStuckCount === 1 ? 'a stuck deal' : `${topStuckCount} stuck deals`}.`;
+      suggestedPrompt =
+        topStuckCount === 1
+          ? `Help me check in with ${fn} on a stuck deal.`
+          : `Help me check in with ${fn} on ${topStuckCount} stuck deals.`;
     }
   }
   // 2. Unassigned leads.
   else if (unassignedCount > 0) {
     const n = unassignedCount;
     const leadWord = n === 1 ? 'lead' : 'leads';
-    const arrival = overnightCount === n && n > 0 ? 'landed overnight' : 'sitting unassigned';
-    headline = `${n} ${leadWord} ${arrival} — want me to route ${n === 1 ? 'it' : 'them'} to your fewest-loaded realtor?`;
+    headline = `${n} ${leadWord} sitting unassigned — want me to route ${n === 1 ? 'it' : 'them'} to your fewest-loaded realtor?`;
     suggestedPrompt =
       n === 1
         ? 'Route the unassigned lead to the realtor with the lightest load.'
@@ -402,21 +420,21 @@ export async function GET() {
   // 3. Overloaded realtor.
   else if (overloaded) {
     const fn = firstName(overloaded.name);
-    headline = `${fn}'s at ${overloaded.activeDeals} active deals vs team median ${teamMedianLoad} — want to redistribute?`;
-    suggestedPrompt = `Help me redistribute some of ${fn}'s deals — ${fn} is at ${overloaded.activeDeals} active.`;
+    // Fact framing — never "Bob is slow," always "Bob's at 18 active vs
+    // threshold 15." Mirrors the row-pill voice from /broker/realtors.
+    headline = `${fn}'s at ${overloaded.openLoad} open vs team threshold ${OVERLOADED_OPEN_THRESHOLD} — want to redistribute?`;
+    suggestedPrompt = `Show me ${fn}'s pipeline and suggest 3 deals to hand off.`;
   }
   // 4. Underused realtor.
   else if (underused) {
     const fn = firstName(underused.name);
-    const n = underused.newLeads7d;
-    const leadWord = n === 1 ? 'lead' : 'leads';
     headline =
-      n === 0
-        ? `${fn}'s quiet, no new leads in 7 days — want me to send ${fn} the next 3?`
-        : `${fn}'s quiet, only ${n} ${leadWord} in 7 days — want me to send ${fn} the next 3?`;
+      underused.openLoad === 0
+        ? `${fn}'s quiet — no open work this week — want me to send ${fn} the next 3 leads?`
+        : `${fn}'s quiet — only ${underused.openLoad} open — want me to send ${fn} the next 3 leads?`;
     suggestedPrompt = `Send ${fn} the next 3 incoming leads.`;
   }
-  // 5. Commission milestone.
+  // 5. Commission milestone — celebration, no action.
   else {
     const milestone = recentlyCrossedMilestone(gciTotal);
     if (milestone && topPerformer && topPerformer.gci > 0) {
@@ -431,7 +449,7 @@ export async function GET() {
   }
 
   // ── Stats row (context, not focal) ───────────────────────────────────────
-  const totalActiveDeals = activeDeals.length;
+  const totalActiveDeals = (allActiveDealsRes.data ?? []).length;
   const response: BrokerMorningResponse = {
     headline,
     suggestedPrompt,

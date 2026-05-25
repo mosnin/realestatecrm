@@ -77,7 +77,7 @@ export function BrokerMorningStory() {
     return (
       <div className="space-y-4">
         <h1
-          className="text-3xl tracking-tight text-foreground leading-tight"
+          className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           &nbsp;
@@ -125,7 +125,7 @@ export function BrokerMorningStory() {
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'text-3xl tracking-tight leading-tight block text-left',
+            'text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight block text-left',
             'text-foreground hover:opacity-80 transition-opacity cursor-pointer',
           )}
           style={{ fontFamily: 'var(--font-title)' }}
@@ -138,7 +138,7 @@ export function BrokerMorningStory() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="text-3xl tracking-tight leading-tight text-foreground"
+          className="text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           {headlineNode}
