@@ -50,7 +50,7 @@ def _proxy_base() -> tuple[str, str] | None:
     return base_url, secret
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @rate_limited(max_calls=60, window_seconds=3600)
 async def find_integration_tool(
     ctx: RunContextWrapper[AgentContext],
@@ -136,7 +136,7 @@ async def find_integration_tool(
     return json.dumps({"tools": tools})
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @rate_limited(max_calls=300, window_seconds=3600)
 async def call_integration_tool(
     ctx: RunContextWrapper[AgentContext],

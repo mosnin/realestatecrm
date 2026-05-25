@@ -19,7 +19,7 @@ from security.context import AgentContext
 from tools.streaming import publish_event
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def generate_priority_list(
     ctx: RunContextWrapper[AgentContext],
     top_n: int = 5,

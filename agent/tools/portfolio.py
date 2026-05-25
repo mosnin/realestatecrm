@@ -13,7 +13,7 @@ from memory.store import save_memory
 from security.context import AgentContext
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def analyze_portfolio(
     ctx: RunContextWrapper[AgentContext],
 ) -> dict[str, Any]:

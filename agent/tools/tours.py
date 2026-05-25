@@ -32,7 +32,7 @@ def _parse_iso(value: str) -> datetime | None:
         return None
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def book_tour(
     ctx: RunContextWrapper[AgentContext],

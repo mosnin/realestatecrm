@@ -30,7 +30,7 @@ VALID_STATUSES = {"active", "completed", "cancelled", "paused"}
 VALID_ACTIONS = {"list", "create", "update_status"}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def manage_goal(
     ctx: RunContextWrapper[AgentContext],

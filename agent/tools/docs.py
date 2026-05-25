@@ -15,7 +15,7 @@ from db import supabase
 from security.context import AgentContext
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def recall_docs(
     ctx: RunContextWrapper[AgentContext],
     query: str,

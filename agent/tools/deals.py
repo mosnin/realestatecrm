@@ -24,7 +24,7 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     return value
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def find_deals(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str | None = None,
@@ -96,7 +96,7 @@ async def find_deals(
     return result.data or []
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def update_deal(
     ctx: RunContextWrapper[AgentContext],
@@ -210,7 +210,7 @@ async def update_deal(
     return {"ok": True, "dealId": deal_id, "changes": summary_parts or ["no-op"]}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def advance_deal_stage(
     ctx: RunContextWrapper[AgentContext],
@@ -358,7 +358,7 @@ async def advance_deal_stage(
     }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def create_deal(
     ctx: RunContextWrapper[AgentContext],
@@ -556,7 +556,7 @@ async def create_deal(
     }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def request_deal_review(
     ctx: RunContextWrapper[AgentContext],

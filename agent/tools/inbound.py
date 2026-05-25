@@ -21,7 +21,7 @@ from tools.base import idempotent_tool
 from tools.streaming import publish_event
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def process_inbound_message(
     ctx: RunContextWrapper[AgentContext],

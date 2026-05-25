@@ -24,7 +24,7 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     return value
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def find_contacts(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str | None = None,
@@ -105,7 +105,7 @@ async def find_contacts(
     return result.data or []
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def get_contact_activity(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
@@ -130,7 +130,7 @@ async def get_contact_activity(
     return rows
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def create_contact(
     ctx: RunContextWrapper[AgentContext],
@@ -235,7 +235,7 @@ async def create_contact(
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def update_contact(
     ctx: RunContextWrapper[AgentContext],

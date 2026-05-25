@@ -21,7 +21,7 @@ from tools.base import rate_limited
 _TIMEOUT = 300.0
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @rate_limited(max_calls=20, window_seconds=3600)
 async def generate_studio_image(
     ctx: RunContextWrapper[AgentContext],
@@ -94,7 +94,7 @@ async def generate_studio_image(
     }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @rate_limited(max_calls=20, window_seconds=3600)
 async def edit_studio_image(
     ctx: RunContextWrapper[AgentContext],

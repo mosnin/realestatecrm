@@ -186,7 +186,7 @@ def _rebuild_positions(items: list[dict[str, Any]]) -> None:
 # Tools
 # ---------------------------------------------------------------------------
 
-@function_tool
+@function_tool(strict_mode=False)
 async def get_intake_form(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
@@ -209,7 +209,7 @@ async def get_intake_form(
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def add_intake_question(
     ctx: RunContextWrapper[AgentContext],
@@ -339,7 +339,7 @@ async def add_intake_question(
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def remove_intake_question(
     ctx: RunContextWrapper[AgentContext],
@@ -417,7 +417,7 @@ async def remove_intake_question(
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def update_intake_question(
     ctx: RunContextWrapper[AgentContext],
@@ -556,7 +556,7 @@ async def update_intake_question(
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def save_intake_form(
     ctx: RunContextWrapper[AgentContext],
