@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
+import { SECTION_LABEL } from '@/lib/typography';
 
 type MemoryType = 'fact' | 'preference' | 'observation' | 'reminder';
 type EntityType = 'contact' | 'deal' | 'space' | null;
@@ -142,7 +143,7 @@ export function MemoryList() {
           <section key={section.key}>
             <div className="flex items-baseline justify-between pb-3 border-b border-border/60 mb-4">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">{section.label}</h2>
+                <h2 className={SECTION_LABEL}>{section.label}</h2>
                 <p className="text-[11px] text-muted-foreground mt-0.5">{section.sub}</p>
               </div>
               <span className="text-[11px] text-muted-foreground tabular-nums">

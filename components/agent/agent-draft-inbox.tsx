@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { SECTION_LABEL } from '@/lib/typography';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
@@ -808,7 +809,7 @@ export function AgentDraftInbox({ slug }: Props) {
     <section>
       {/* Section header — typography driven, no card chrome */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
+        <h2 className={SECTION_LABEL}>
           Drafts I made
         </h2>
         {!loading && drafts.length > 0 && (

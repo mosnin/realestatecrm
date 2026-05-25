@@ -7,6 +7,7 @@ import { Calendar, Clock, MapPin, Phone, Mail, ChevronRight } from 'lucide-react
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
+import { SECTION_LABEL } from '@/lib/typography';
 
 interface FollowUpDue {
   id: string;
@@ -83,7 +84,7 @@ export function WhatsComing({ slug }: { slug: string }) {
   return (
     <section>
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <h2 className={SECTION_LABEL}>
           What&apos;s coming
         </h2>
         {!loading && total > 0 && (

@@ -9,6 +9,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
+import { SECTION_LABEL } from '@/lib/typography';
 
 interface ActivityEntry {
   id: string;
@@ -96,7 +97,7 @@ export function WhatIDid({ slug }: { slug: string }) {
   return (
     <section>
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <h2 className={SECTION_LABEL}>
           What I did
         </h2>
         {!loading && entries.length > 0 && (

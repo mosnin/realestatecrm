@@ -14,7 +14,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { MemoryList } from '@/components/chippi/memory-list';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,19 +39,12 @@ export default async function ChippiMemoryPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className={`w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 ${SECTION_RHYTHM}`}>
-        <header className="space-y-1.5">
-          <p className={BODY_MUTED}>Memory.</p>
-          <h1 className={H1} style={TITLE_FONT}>
-            What Chippi remembers
-          </h1>
-          <p className={BODY_MUTED}>
-            Facts, preferences, and observations Chippi has picked up while working with you. Delete anything you want forgotten.
-          </p>
-        </header>
-        <MemoryList />
-      </div>
-    </div>
+    <ChippiPageShell
+      greeting="Memory."
+      title="What Chippi remembers"
+      subtitle="Facts, preferences, and observations Chippi has picked up while working with you. Delete anything you want forgotten."
+    >
+      <MemoryList />
+    </ChippiPageShell>
   );
 }
