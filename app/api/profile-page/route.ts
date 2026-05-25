@@ -16,13 +16,22 @@ import { SOCIAL_PLATFORMS, type SocialPlatform } from '@/components/profile-page
 export const runtime = 'nodejs';
 
 const SELECT =
-  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl';
+  'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl, featuredPropertyIds';
 
 // Brand identity bits (verified badge, social handles) live on SpaceSetting
 // rather than ProfilePage because they're inherited across every public
 // surface the realtor owns — the public page, the application, the booking
 // page all read these. The PATCH below threads them through.
 const SETTINGS_SELECT = 'isVerified, socialLinks';
+
+// The picker only needs to render — full property pages live elsewhere.
+// We cap the list at 50 so the editor stays snappy; if a realtor truly has
+// more, the picker isn't the right tool for the long tail.
+const AVAILABLE_PROPERTIES_CAP = 50;
+
+// Cap the realtor's curated set at 12 — enough for a carousel without
+// drowning the page. Matches the editor's own UI cap.
+const FEATURED_CAP = 12;
 
 const DEFAULTS = {
   enabled: true,
@@ -34,9 +43,19 @@ const DEFAULTS = {
   videos: [] as Array<{ id: string; url: string; title: string }>,
   coverPhotoUrl: null as string | null,
   profilePhotoUrl: null as string | null,
+  featuredPropertyIds: [] as string[],
   isVerified: false,
   socialLinks: {} as Partial<Record<SocialPlatform, string>>,
 };
+
+interface AvailableProperty {
+  id: string;
+  address: string;
+  city: string | null;
+  stateRegion: string | null;
+  listPrice: number | null;
+  photo: string | null;
+}
 
 /** Sign a stored photo KEY for the editor preview (24h TTL — way longer than
  *  the editor's actual session). Legacy `http(s)://` values pass through
@@ -60,13 +79,24 @@ export async function GET() {
   const space = await getSpaceForUser(authResult.userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const [{ data }, { data: settingsRow }] = await Promise.all([
+  const [{ data }, { data: settingsRow }, { data: propertyRows }] = await Promise.all([
     supabase.from('ProfilePage').select(SELECT).eq('spaceId', space.id).maybeSingle(),
     supabase
       .from('SpaceSetting')
       .select(SETTINGS_SELECT)
       .eq('spaceId', space.id)
       .maybeSingle(),
+    // The picker shows every active listing in the space. Capped at 50 —
+    // beyond that the realtor isn't picking from a list any more, they're
+    // hunting, and that belongs in the listings management surface, not
+    // here.
+    supabase
+      .from('Property')
+      .select('id, address, city, stateRegion, listPrice, photos')
+      .eq('spaceId', space.id)
+      .eq('listingStatus', 'active')
+      .order('updatedAt', { ascending: false })
+      .limit(AVAILABLE_PROPERTIES_CAP),
   ]);
 
   // Sanitize socialLinks read from the DB. Older rows may carry arbitrary
@@ -100,6 +130,26 @@ export async function GET() {
   ]);
   merged.coverPhotoUrl = signedCover;
   merged.profilePhotoUrl = signedProfile;
+
+  // Property photos are stored as a JSONB array of URLs (see the Property
+  // migration comment). For the picker we only need the first one — the
+  // public page's carousel uses the same shape.
+  const availableProperties: AvailableProperty[] = ((propertyRows ?? []) as Array<{
+    id: string;
+    address: string;
+    city: string | null;
+    stateRegion: string | null;
+    listPrice: number | null;
+    photos: unknown;
+  }>).map((row) => ({
+    id: row.id,
+    address: row.address,
+    city: row.city ?? null,
+    stateRegion: row.stateRegion ?? null,
+    listPrice: row.listPrice ?? null,
+    photo: Array.isArray(row.photos) && typeof row.photos[0] === 'string' ? row.photos[0] : null,
+  }));
+  merged.availableProperties = availableProperties;
 
   return NextResponse.json(merged);
 }
@@ -149,6 +199,33 @@ export async function PATCH(req: NextRequest) {
         title: typeof v.title === 'string' ? v.title.trim().slice(0, 120) : '',
       }))
       .filter((v) => parseYouTubeId(v.url));
+  }
+
+  // featuredPropertyIds: validate each id belongs to the space and is an
+  // active listing. Unknown / stale ids are dropped silently rather than
+  // 400-ing the whole save — the editor's set can drift when a property
+  // gets deleted or marked sold, and the user shouldn't be punished for
+  // that. Cap at FEATURED_CAP. Order is preserved (array order = render
+  // order on the public page).
+  if (Array.isArray(body.featuredPropertyIds)) {
+    const raw = (body.featuredPropertyIds as unknown[])
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .slice(0, FEATURED_CAP);
+
+    if (raw.length === 0) {
+      patch.featuredPropertyIds = [];
+    } else {
+      const { data: validRows } = await supabase
+        .from('Property')
+        .select('id')
+        .eq('spaceId', space.id)
+        .eq('listingStatus', 'active')
+        .in('id', raw);
+      const valid = new Set((validRows ?? []).map((r: { id: string }) => r.id));
+      // Preserve the realtor's submitted order — `.in()` returns rows in
+      // whatever order Postgres feels like.
+      patch.featuredPropertyIds = raw.filter((id) => valid.has(id));
+    }
   }
 
   const { data, error } = await supabase

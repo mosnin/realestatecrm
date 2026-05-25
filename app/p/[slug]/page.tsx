@@ -78,6 +78,9 @@ interface ProfileConfig {
   videos: Array<{ id: string; url: string; title?: string }>;
   coverPhotoUrl: string | null;
   profilePhotoUrl: string | null;
+  /** Realtor-curated featured listings, in render order. Empty array falls
+   *  back to the legacy auto-top-6-recent logic. */
+  featuredPropertyIds: string[];
 }
 
 const DEFAULT_CONFIG: ProfileConfig = {
@@ -90,6 +93,7 @@ const DEFAULT_CONFIG: ProfileConfig = {
   videos: [],
   coverPhotoUrl: null,
   profilePhotoUrl: null,
+  featuredPropertyIds: [],
 };
 
 export default async function PublicRealtorPage({
@@ -116,7 +120,7 @@ export default async function PublicRealtorPage({
     supabase
       .from('ProfilePage')
       .select(
-        'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl',
+        'enabled, headline, showIntake, showTours, showProperties, customLinks, videos, coverPhotoUrl, profilePhotoUrl, featuredPropertyIds',
       )
       .eq('spaceId', space.id)
       .maybeSingle(),
@@ -129,14 +133,38 @@ export default async function PublicRealtorPage({
 
   let properties: PublicProperty[] = [];
   if (cfg.showProperties) {
-    const { data } = await supabase
-      .from('Property')
-      .select('id, address, city, stateRegion, listPrice, photos, listingUrl')
-      .eq('spaceId', space.id)
-      .eq('listingStatus', 'active')
-      .order('updatedAt', { ascending: false })
-      .limit(6);
-    properties = ((data ?? []) as PublicProperty[]);
+    const featuredIds = Array.isArray(cfg.featuredPropertyIds)
+      ? cfg.featuredPropertyIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+
+    if (featuredIds.length > 0) {
+      // Realtor-curated set. Postgres `.in()` doesn't preserve order — fetch
+      // the rows then reorder in JS to match the realtor's chosen sequence.
+      // Stale ids (deleted listings, listings flipped off `active`) silently
+      // drop out — same forgiving contract as the PATCH validator.
+      const { data } = await supabase
+        .from('Property')
+        .select('id, address, city, stateRegion, listPrice, photos, listingUrl')
+        .eq('spaceId', space.id)
+        .eq('listingStatus', 'active')
+        .in('id', featuredIds);
+      const byId = new Map((data ?? []).map((p) => [p.id, p as PublicProperty]));
+      properties = featuredIds
+        .map((id) => byId.get(id))
+        .filter((p): p is PublicProperty => Boolean(p));
+    } else {
+      // Legacy fallback: the realtor hasn't curated yet, so show the six
+      // most-recently-updated active listings. Same query as before this
+      // feature shipped — no behaviour change for un-curated pages.
+      const { data } = await supabase
+        .from('Property')
+        .select('id, address, city, stateRegion, listPrice, photos, listingUrl')
+        .eq('spaceId', space.id)
+        .eq('listingStatus', 'active')
+        .order('updatedAt', { ascending: false })
+        .limit(6);
+      properties = ((data ?? []) as PublicProperty[]);
+    }
   }
 
   const subStatus = space.stripeSubscriptionStatus;
