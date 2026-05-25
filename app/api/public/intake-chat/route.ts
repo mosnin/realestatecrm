@@ -220,7 +220,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const { allowed } = await checkRateLimit(`intake-chat:rl:${ip}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: 'Too many requests. Try again in a bit.' },
       { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': '3600' } },
     );
   }
@@ -390,7 +390,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const apiErr = err as { status?: number; message?: string };
     logger.error('[intake-chat] OpenAI stream creation failed', { spaceId: space.id, status: apiErr?.status }, err);
     return NextResponse.json(
-      { error: 'AI service error. Please try again.' },
+      { error: "AI service is taking a breather — usually temporary." },
       { status: 500, headers: CORS_HEADERS },
     );
   }

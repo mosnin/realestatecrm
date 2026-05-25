@@ -282,6 +282,6 @@ export async function POST(req: NextRequest) {
       brokerageId: brokerage.id,
       error,
     });
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

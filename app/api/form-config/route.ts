@@ -79,7 +79,7 @@ export async function PUT(req: NextRequest) {
   const { allowed } = await checkRateLimit(`form-config:put:${userId}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many form updates. Please try again later.' },
+      { error: 'Too many form updates. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

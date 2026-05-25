@@ -175,7 +175,7 @@ export async function PATCH(req: NextRequest) {
     .eq('slug', slug);
   if (spaceError) {
     console.error('[PATCH /api/spaces] Space lookup error:', spaceError);
-    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
   }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -225,7 +225,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
       console.error('[PATCH /api/spaces] Space update error:', updateError);
-      return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+      return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
     }
     updatedRows = data!;
   } else {
@@ -307,7 +307,7 @@ export async function PATCH(req: NextRequest) {
     .select();
   if (settingsError) {
     console.error('[PATCH /api/spaces] Settings upsert error:', settingsError);
-    return NextResponse.json({ error: 'Failed to save settings. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't save settings — usually temporary." }, { status: 500 });
   }
 
   // Update Redis cache
@@ -348,7 +348,7 @@ export async function DELETE(req: NextRequest) {
     .eq('slug', slug);
   if (spaceError) {
     console.error('[DELETE /api/spaces] Space lookup error:', spaceError);
-    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
   }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -378,7 +378,7 @@ export async function DELETE(req: NextRequest) {
     .eq('slug', slug);
   if (deleteError) {
     console.error('[DELETE /api/spaces] Delete error:', deleteError);
-    return NextResponse.json({ error: 'Failed to delete workspace. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't delete workspace — usually temporary." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   );
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many scoring model generations. Please try again later.' },
+      { error: 'Too many scoring runs. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   );
   if (!ipAllowed) {
     return NextResponse.json(
-      { error: 'Too many events. Please try again later.' },
+      { error: 'Too many events. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
   );
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many events. Please try again later.' },
+      { error: 'Too many events. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

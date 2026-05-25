@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`apply-brokerage:rl:${ip}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many submissions. Please try again later.' },
+      { error: 'Too many submissions. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -772,6 +772,6 @@ export async function POST(req: NextRequest) {
     logger.error('[apply/brokerage] unhandled submission failure', {
       brokerageId: rawBrokerageId,
     }, error);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

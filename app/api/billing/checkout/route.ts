@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     if (stripeQueryErr) {
       console.error('[checkout] Stripe column query failed:', stripeQueryErr.message, stripeQueryErr.code);
-      return NextResponse.json({ error: 'Failed to check subscription status. Please try again.' }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't check subscription status — usually temporary." }, { status: 500 });
     }
 
     // Block if user already has an active or trialing subscription
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error('[checkout] FAILED:', err.message, err.stack?.slice(0, 200));
-    return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Checkout didn't go through — usually temporary." }, { status: 500 });
   }
 }
 
@@ -205,7 +205,7 @@ async function handleBrokerageCheckout(
       brokerageQueryErr?.code,
     );
     return NextResponse.json(
-      { error: 'Failed to load brokerage. Please try again.' },
+      { error: "Couldn't load brokerage — usually temporary." },
       { status: 500 },
     );
   }
@@ -314,6 +314,6 @@ async function handleBrokerageCheckout(
       err?.message,
       err?.stack?.slice(0, 200),
     );
-    return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Checkout didn't go through — usually temporary." }, { status: 500 });
   }
 }

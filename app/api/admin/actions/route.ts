@@ -619,7 +619,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[admin-action] failed', { action, error: err });
     return NextResponse.json(
-      { error: 'Server error. Please try again.' },
+      { error: "Server hiccup — usually temporary." },
       { status: 500 }
     );
   }
