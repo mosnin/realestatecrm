@@ -40,6 +40,20 @@ class AgentContext:
     # don't have to special-case the single-agent world.
     current_agent_type: str = field(default="chippi", compare=False)
 
+    # ── Broker-mode fields (Chippi-for-Brokers) ──────────────────────────
+    # Populated ONLY when the chat turn was initiated by a broker via
+    # /api/ai/broker-task. Empty for every realtor chat or autonomous run.
+    # Read by `tools/broker/_guards.py:require_broker_role` (defense layer
+    # 3) before any broker tool executes. Carrying these on AgentContext
+    # — not as tool arguments — preserves the same invariant space_id has:
+    # an identity claim from the LLM cannot escalate the run's scope.
+    brokerage_id: str = field(default="", compare=False)
+    # broker_role is the calling user's BrokerageMembership.role at the
+    # moment the API gate fired. Expected values: 'broker_owner',
+    # 'broker_admin', or '' (not a broker). require_broker_role refuses
+    # anything not in the first two.
+    broker_role: str = field(default="", compare=False)
+
     @classmethod
     def from_settings(
         cls,
@@ -47,6 +61,8 @@ class AgentContext:
         run_id: str,
         space_name: str,
         user_id: str = "",
+        brokerage_id: str = "",
+        broker_role: str = "",
     ) -> "AgentContext":
         return cls(
             space_id=settings.space_id,
@@ -54,5 +70,7 @@ class AgentContext:
             daily_token_budget=settings.daily_token_budget,
             run_id=run_id,
             user_id=user_id,
+            brokerage_id=brokerage_id,
+            broker_role=broker_role,
         )
 

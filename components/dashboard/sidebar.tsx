@@ -83,11 +83,19 @@ const brokerAdminNavSections = [
   {
     label: '',
     items: [
+      // Chippi-for-Brokers Phase 1 — pinned at the top, mirroring the
+      // realtor sidebar's top-pinned Chippi entry. Same icon (chip avatar
+      // is rendered by the broker nav via FlatNavItem; MessageCircle is the
+      // fallback used elsewhere in the broker nav). The existing
+      // /broker/agent-activity entry was previously also labelled "Chippi"
+      // — that one is the activity feed, not the chat surface; renamed
+      // to "Agent activity" below to avoid two nav rows with the same name.
+      { href: '/broker/chippi', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Agent activity', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },

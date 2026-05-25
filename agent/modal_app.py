@@ -322,6 +322,28 @@ async def chat_turn(item: dict):
     attachments = item.get("attachments") or []
     conversation_id = item.get("conversation_id") or ""
 
+    # ── Mode dispatch — realtor (default) vs. broker ────────────────────
+    # The Next.js layer sends `mode: 'realtor' | 'broker'` so this function
+    # picks the right agent (different system prompt + different tool set)
+    # without forking the SSE plumbing. Realtor stays the historical
+    # default — older Next.js deploys that don't send `mode` keep working.
+    #
+    # Broker mode also carries `brokerage_id` + `broker_role` from the
+    # API-gate's `resolveBrokerContext()`. These flow into AgentContext
+    # so the per-tool guard (`tools/broker/_guards.py:require_broker_role`,
+    # defense layer 3) can refuse a call whose context isn't broker-shaped.
+    raw_mode = item.get("mode")
+    mode = (raw_mode or "realtor").strip().lower() if isinstance(raw_mode, str) else "realtor"
+    if mode not in ("realtor", "broker"):
+        mode = "realtor"
+    brokerage_id = (item.get("brokerage_id") or "").strip() if isinstance(item.get("brokerage_id"), str) else ""
+    broker_role = (item.get("broker_role") or "").strip().lower() if isinstance(item.get("broker_role"), str) else ""
+    # Broker mode must arrive with both context fields. The Next.js API
+    # gate is the single point that should ever produce them; missing
+    # either is a wiring bug, not a recoverable state.
+    if mode == "broker" and (not brokerage_id or broker_role not in ("broker_owner", "broker_admin")):
+        return {"error": "broker mode requires brokerage_id and a broker role"}
+
     from db import supabase
     db = await supabase()
 
@@ -339,6 +361,7 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
+    from chippi_broker import make_broker_agent
     from config import settings
     from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
     from tools.base import result_is_ok
@@ -352,6 +375,8 @@ async def chat_turn(item: dict):
         run_id=conversation_id or f"chat-{uuid.uuid4()}",
         space_name=space.name,
         user_id=user_id,
+        brokerage_id=brokerage_id,
+        broker_role=broker_role,
     )
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────
@@ -517,9 +542,14 @@ async def chat_turn(item: dict):
     # etc.) before building the agent. Empty list when user_id is missing
     # (older Next.js deploy) or no integrations configured. Best-effort:
     # a Composio outage degrades to native-tool-only chat, doesn't 500.
+    #
+    # Broker mode skips this entirely — the broker chat surface is the
+    # chief-of-staff agent and does not draft on a realtor's behalf from
+    # the broker's chat. Cross-realtor outreach is mediated by dedicated
+    # broker tools (Phase 3), not by Composio-loaded realtor connections.
     integration_tools: list = []
     connected_toolkits: list[str] = []
-    if user_id:
+    if mode == "realtor" and user_id:
         try:
             from integrations import active_toolkits, load_integration_tools
 
@@ -568,11 +598,23 @@ async def chat_turn(item: dict):
 
     async def event_stream():
         try:
-            chippi = make_chippi_agent(
-                extra_tools=integration_tools,
-                workspace_info=workspace_info,
-                model=resolved_model,
-            )
+            # ── Tool registry selection — Phase 2/3 plug into BROKER_TOOLS ──
+            # Phase 2 (read tools) and Phase 3 (write tools) for the broker
+            # variant only need to append entries to
+            # `agent/tools/broker.BROKER_TOOLS` — `make_broker_agent` reads
+            # the list at agent-build time. No edit to this dispatch needed
+            # when Phase 2 lands.
+            if mode == "broker":
+                chippi = make_broker_agent(
+                    workspace_info=workspace_info,
+                    model=resolved_model,
+                )
+            else:
+                chippi = make_chippi_agent(
+                    extra_tools=integration_tools,
+                    workspace_info=workspace_info,
+                    model=resolved_model,
+                )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
             yield f"data: {err}\n\n"
