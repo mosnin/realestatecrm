@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
+import { SECTION_LABEL } from '@/lib/typography';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
@@ -338,9 +339,7 @@ export default async function BrokerOverviewPage() {
       {/* The swarm — your team today */}
       <section>
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-            Your team
-          </h2>
+          <h2 className={SECTION_LABEL}>Your team</h2>
           {activeMembers > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">{activeMembers}</span>
           )}

@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
 export const metadata: Metadata = { title: 'Leads — Broker Dashboard' };
@@ -264,13 +265,12 @@ export default async function BrokerLeadsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className={H1} style={TITLE_FONT}>
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Leads.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
           Leads
         </h1>
-        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
-          {subtitle}
-        </p>
+        <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>
 
       <BrokerLeadsClient

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 
 export const metadata: Metadata = { title: 'Conversion Analytics — Broker Dashboard' };
@@ -113,12 +115,15 @@ export default async function BrokerAnalyticsPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Conversion Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Per-agent conversion funnel &middot; {brokerage.name}
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Analytics.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          Conversion analytics
+        </h1>
+        <p className={cn(BODY_MUTED)}>
+          Funnel and conversion over the last 30 days.
         </p>
-      </div>
+      </header>
 
       <AnalyticsClient agents={agentData} />
     </div>

@@ -13,6 +13,8 @@ import {
   Megaphone,
 } from 'lucide-react';
 import Link from 'next/link';
+import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
 
 type MemberDashboardProps = {
@@ -220,53 +222,30 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
         <p className="text-sm text-muted-foreground">{`${brokerage.name} \u00B7 Realtor`}</p>
       </div>
 
-      {/* ── Stats row ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Stats row — hairline-divider snapshot, mirrors deal-quick-panel.
+          Foreground for values, muted for labels. Icons stay for scanning
+          but render muted; no colored backgrounds. ── */}
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
         {[
-          {
-            label: 'Leads assigned',
-            value: assignedCount,
-            icon: PhoneIncoming,
-            color: assignedCount > 0 ? 'text-violet-600 dark:text-violet-400' : '',
-            bg: 'bg-violet-500/10',
-          },
-          {
-            label: 'Leads contacted',
-            value: contactedCount,
-            icon: PhoneOutgoing,
-            color: contactedCount > 0 ? 'text-blue-600 dark:text-blue-400' : '',
-            bg: 'bg-blue-500/10',
-          },
-          {
-            label: 'Active deals',
-            value: activeDealsCount,
-            icon: Briefcase,
-            color: activeDealsCount > 0 ? 'text-cyan-600 dark:text-cyan-400' : '',
-            bg: 'bg-cyan-500/10',
-          },
-          {
-            label: 'Deals closed',
-            value: wonDealsCount,
-            icon: CheckCircle2,
-            color: wonDealsCount > 0 ? 'text-emerald-600 dark:text-emerald-400' : '',
-            bg: 'bg-emerald-500/10',
-          },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <Card key={label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? bg : 'bg-muted'}`}>
-                  <Icon size={16} className={color || 'text-muted-foreground'} />
-                </div>
-              </div>
-              <p className={`text-2xl font-bold tabular-nums leading-tight ${color || 'text-foreground'}`}>
-                {value}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-tight">{label}</p>
-            </CardContent>
-          </Card>
+          { label: 'Leads assigned', value: assignedCount, icon: PhoneIncoming },
+          { label: 'Leads contacted', value: contactedCount, icon: PhoneOutgoing },
+          { label: 'Active deals', value: activeDealsCount, icon: Briefcase },
+          { label: 'Deals closed', value: wonDealsCount, icon: CheckCircle2 },
+        ].map(({ label, value, icon: Icon }) => (
+          <div key={label} className="bg-background px-4 py-4">
+            <p className={cn(SECTION_LABEL, 'flex items-center gap-1.5')}>
+              <Icon size={11} className="text-muted-foreground" aria-hidden />
+              {label}
+            </p>
+            <p
+              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+              style={TITLE_FONT}
+            >
+              {value}
+            </p>
+          </div>
         ))}
-      </div>
+      </section>
 
       {/* ── Two-column layout: Recent leads + Overdue follow-ups ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -295,37 +274,34 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <div className="divide-y divide-border">
-                {recentLeads.map((lead) => (
+            <ul className="divide-y divide-border/60">
+              {recentLeads.map((lead) => (
+                <li key={lead.id}>
                   <Link
-                    key={lead.id}
                     href={spaceSlug ? `/s/${spaceSlug}/leads/${lead.id}` : '#'}
-                    className="block"
+                    className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
                   >
-                    <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-primary">
-                          {(lead.name ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </span>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {(lead.name ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{lead.name}</p>
+                        {getScoreBadge(lead.scoreLabel, lead.leadScore)}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{lead.name}</p>
-                          {getScoreBadge(lead.scoreLabel, lead.leadScore)}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {[lead.phone, lead.email].filter(Boolean).join(' \u00B7 ')}
-                        </p>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground flex-shrink-0">
-                        {new Date(lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[lead.phone, lead.email].filter(Boolean).join(' \u00B7 ')}
                       </p>
                     </div>
+                    <p className="text-[11px] text-muted-foreground flex-shrink-0">
+                      {new Date(lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
                   </Link>
-                ))}
-              </div>
-            </Card>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
