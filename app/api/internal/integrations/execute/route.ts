@@ -154,10 +154,61 @@ export async function POST(req: NextRequest) {
       ? r.error
       : JSON.stringify(r.error)
     : undefined;
+
+  // Slack `channel_not_found` happens when the realtor names a channel the
+  // workspace doesn't have. The default behaviour (model retries with a
+  // different channel) silently picks one — we never want that. List the
+  // workspace's channels, find the closest match, and surface a "did you
+  // mean" so the realtor (or Chippi) can pick the real one explicitly.
+  let finalError = ok ? undefined : `Composio error: ${slug} — ${errMsg ?? 'failed'}`;
+  if (!ok && slug === 'SLACK_SEND_MESSAGE' && errMsg && /channel[_\s]?not[_\s]?found/i.test(errMsg)) {
+    const requested = typeof (args as Record<string, unknown>).channel === 'string'
+      ? ((args as Record<string, unknown>).channel as string)
+      : '';
+    let suggestion = '';
+    try {
+      const channelsResp = await executeToolForEntity({
+        entityId: userId,
+        slug: 'SLACK_LIST_ALL_CHANNELS',
+        arguments: { limit: 100 },
+      });
+      // Composio returns the slack response as { data: { channels: [{name, id, ...}] } }
+      // or nested under data.data depending on the toolkit version — handle both.
+      const wrapper = (channelsResp ?? {}) as { data?: unknown };
+      const inner = (wrapper.data ?? {}) as { channels?: unknown; data?: { channels?: unknown } };
+      const channels = (Array.isArray(inner.channels)
+        ? inner.channels
+        : Array.isArray(inner.data?.channels)
+          ? inner.data!.channels
+          : []) as Array<{ name?: unknown }>;
+      const names = channels
+        .map((c) => (typeof c?.name === 'string' ? c.name : ''))
+        .filter((n) => n.length > 0);
+      if (names.length > 0) {
+        const want = requested.toLowerCase().replace(/^#/, '');
+        // Cheap prefix/substring match — Levenshtein adds a dependency for
+        // the same realtor-readable outcome on 99% of typos.
+        const close = names.find((n) => n.toLowerCase() === want)
+          ?? names.find((n) => n.toLowerCase().startsWith(want))
+          ?? names.find((n) => n.toLowerCase().includes(want));
+        if (close && requested) {
+          suggestion = ` Did you mean #${close}?`;
+        } else {
+          const list = names.slice(0, 6).map((n) => `#${n}`).join(', ');
+          suggestion = ` Channels in this workspace: ${list}.`;
+        }
+      }
+    } catch {
+      // Channel list fetch failed — surface the original error verbatim.
+    }
+    const reqLabel = requested ? `#${requested.replace(/^#/, '')}` : 'channel';
+    finalError = `Channel ${reqLabel} not found.${suggestion}`;
+  }
+
   return NextResponse.json({
     ok,
     data: r.data ?? (ok ? result : undefined),
-    error: ok ? undefined : `Composio error: ${slug} — ${errMsg ?? 'failed'}`,
+    error: finalError,
     composio: ok
       ? undefined
       : { logId: r.logId, requestId: r.sessionInfo?.requestId },
