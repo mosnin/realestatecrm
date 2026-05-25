@@ -165,6 +165,20 @@ export default async function PublicRealtorPage({
         .limit(6);
       properties = ((data ?? []) as PublicProperty[]);
     }
+
+    // Sign each property's first photo. Same contract as the cover/agent
+    // photos: values are stored as private storage KEYS (the Wasabi bucket
+    // isn't anonymously readable, so even a `getPublicUrl()` link 403s).
+    // The carousel only reads `photos[0]`, so we rewrite the array to a
+    // single-element list holding the signed URL — keeps the type stable
+    // and avoids signing photos the UI will never render.
+    properties = await Promise.all(
+      properties.map(async (p) => {
+        const first = Array.isArray(p.photos) ? p.photos[0] : null;
+        const signed = await resolveStoredPhoto(first);
+        return { ...p, photos: signed ? [signed] : null };
+      }),
+    );
   }
 
   const subStatus = space.stripeSubscriptionStatus;
