@@ -57,11 +57,8 @@ export function UsageSection() {
   const pct = data ? Math.max(0, Math.min(100, Math.round(data.pct))) : 0;
 
   return (
-    <div className="space-y-5">
-      <header className="space-y-1">
-        <h2 className="text-base font-semibold">Usage</h2>
-        <p className={BODY_MUTED}>How much of Chippi&apos;s daily budget is spent.</p>
-      </header>
+    <div className="space-y-4">
+      <p className={BODY_MUTED}>How much of Chippi&apos;s daily budget is spent.</p>
 
       {state === 'loading' && <p className={CAPTION}>Checking usage…</p>}
 

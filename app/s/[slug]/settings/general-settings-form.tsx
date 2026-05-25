@@ -5,8 +5,19 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Space } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   BODY_MUTED,
   CAPTION,
@@ -16,22 +27,25 @@ import {
 
 interface GeneralSettingsFormProps {
   space: Space;
-  settings: {
-    phoneNumber?: string | null;
-  } | null;
 }
 
+/**
+ * Danger zone — delete the entire workspace. Typed-confirmation modal so a
+ * misclick can't destroy the space. The button alone is too cheap to trust;
+ * the realtor has to type the name back to prove intent. Matches the
+ * AlertDialog pattern from components/deals/deal-delete-button.tsx.
+ */
 export function DangerZone({ space }: { space: Space }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete() {
-    if (
-      !confirm(
-        `Delete "${space.name}"? Every client, deal, and note goes with it. I can't bring it back.`,
-      )
-    )
-      return;
+  const nameMatches = confirmText.trim() === space.name.trim();
+
+  async function handleDelete(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    if (!nameMatches) return;
     setDeleting(true);
     try {
       const res = await fetch('/api/spaces', {
@@ -41,46 +55,88 @@ export function DangerZone({ space }: { space: Space }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || "Couldn't delete the workspace. Try again.");
+        toast.error(data.error || "Couldn't delete the workspace. Try again.");
+        setDeleting(false);
         return;
       }
+      setOpen(false);
       router.push('/');
     } catch {
-      alert("I lost the connection. Check it and try again.");
-    } finally {
+      toast.error('Lost the connection. Check it and try again.');
       setDeleting(false);
     }
   }
 
   return (
-    <div className="space-y-3">
-      <p className={BODY_MUTED}>
-        Deleting your space is permanent. Every client, deal, and note goes with it. I can&apos;t bring it back.
-      </p>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={deleting}
-        className={cn(
-          'inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-medium',
-          'bg-destructive text-white hover:bg-destructive/90 active:scale-[0.98] transition-all duration-150',
-          'disabled:opacity-60 disabled:cursor-not-allowed',
-        )}
-      >
-        {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {deleting ? 'Deleting' : 'Delete space'}
-      </button>
-    </div>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (deleting) return;
+        setOpen(next);
+        if (!next) setConfirmText('');
+      }}
+    >
+      <div className="space-y-3">
+        <p className={BODY_MUTED}>
+          Deleting your space is permanent. Every client, deal, and note goes
+          with it. I can&apos;t bring it back.
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={deleting}
+          className={cn(
+            'inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-medium',
+            'bg-destructive text-white hover:bg-destructive/90 active:scale-[0.98] transition-all duration-150',
+            'disabled:opacity-60 disabled:cursor-not-allowed',
+          )}
+        >
+          Delete space
+        </button>
+      </div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete &ldquo;{space.name}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Every client, deal, note, and integration goes with it. This cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-space-name" className="text-[12.5px] font-medium text-foreground">
+            Type the workspace name to confirm
+          </Label>
+          <Input
+            id="confirm-space-name"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={space.name}
+            autoComplete="off"
+            disabled={deleting}
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={deleting || !nameMatches}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {deleting && <Loader2 className="size-4 animate-spin" />}
+            {deleting ? 'Deleting' : 'Delete workspace'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
-export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProps) {
+export function GeneralSettingsForm({ space }: GeneralSettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(space.name);
   const [newSlug, setNewSlug] = useState(space.slug);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -131,7 +187,6 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
           slug: space.slug,
           newSlug: slugChanged ? newSlug : undefined,
           name,
-          phoneNumber,
         }),
       });
       if (!res.ok) {
@@ -192,18 +247,6 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
             )}
           </div>
           <p className={CAPTION}>Your intake link: chippi.com/apply/{newSlug}</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="number" className="text-[12.5px] font-medium text-foreground">
-            Phone number
-          </Label>
-          <Input
-            id="number"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="(555) 123-4567"
-          />
-          <p className={CAPTION}>Used for SMS notifications and shown on tour booking pages.</p>
         </div>
       </div>
 

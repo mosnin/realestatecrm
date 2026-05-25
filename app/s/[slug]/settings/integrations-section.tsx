@@ -24,7 +24,7 @@ type McpKey = {
   createdAt: string;
 };
 
-interface IntegrationsSectionProps {
+interface McpSectionProps {
   slug: string;
 }
 
@@ -67,10 +67,12 @@ function CredentialRow({
 }
 
 /**
- * MCP keys + message templates. Both folded inline because they're each one
- * short surface and the realtor visits them rarely. Two sections, no tabs.
+ * McpSection — MCP endpoint + API keys. The developer-side of "Chippi can be
+ * driven from external clients (Claude Desktop, Cursor, Windsurf)." Lives in
+ * the Developer tab. Message templates and OAuth Connected Apps are separate
+ * surfaces and have their own components below / elsewhere.
  */
-export function IntegrationsSection({ slug }: IntegrationsSectionProps) {
+export function McpSection({ slug }: McpSectionProps) {
   const MCP_ENDPOINT = 'https://my.usechippi.com/api/mcp';
 
   // ── MCP state ──────────────────────────────────────────────────────────
@@ -89,9 +91,6 @@ export function IntegrationsSection({ slug }: IntegrationsSectionProps) {
   const [mcpDeletingId, setMcpDeletingId] = useState<string | null>(null);
   const [mcpShowSecrets, setMcpShowSecrets] = useState(false);
 
-  // ── Templates state ────────────────────────────────────────────────────
-  const [templates, setTemplates] = useState<MessageTemplate[] | null>(null);
-
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/mcp-keys?slug=${encodeURIComponent(slug)}`)
@@ -100,13 +99,6 @@ export function IntegrationsSection({ slug }: IntegrationsSectionProps) {
       .catch(() => setMcpKeys([]))
       .finally(() => setMcpKeysLoading(false));
   }, [slug]);
-
-  useEffect(() => {
-    fetch('/api/message-templates')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setTemplates(Array.isArray(data) ? data : data.templates ?? []))
-      .catch(() => setTemplates([]));
-  }, []);
 
   async function handleCreateMcpKey() {
     if (!mcpNewKeyName.trim()) return;
@@ -372,23 +364,38 @@ export function IntegrationsSection({ slug }: IntegrationsSectionProps) {
         )}
       </div>
 
-      {/* Message templates */}
-      <div
-        id="templates"
-        className="space-y-4 pt-6 border-t border-border/60 scroll-mt-24"
-      >
-        <p className={SECTION_LABEL}>Message templates</p>
-        <p className={BODY_MUTED}>
-          Canned SMS, email, and note bodies you can fire per deal or contact. Use{' '}
-          <code className="text-xs bg-foreground/[0.06] px-1 rounded">{'{{variable}}'}</code>{' '}
-          placeholders to personalize.
-        </p>
-        {templates === null ? (
-          <div className="h-40 bg-foreground/[0.04] rounded-md animate-pulse" />
-        ) : (
-          <TemplatesEditor initial={templates} />
-        )}
-      </div>
+    </div>
+  );
+}
+
+/**
+ * TemplatesSection — canned SMS / email / note bodies. Lives in the
+ * Connections tab next to Connected Apps because templates and integrations
+ * are both "what Chippi sends through" — they share a mental model with the
+ * realtor.
+ */
+export function TemplatesSection() {
+  const [templates, setTemplates] = useState<MessageTemplate[] | null>(null);
+
+  useEffect(() => {
+    fetch('/api/message-templates')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setTemplates(Array.isArray(data) ? data : data.templates ?? []))
+      .catch(() => setTemplates([]));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <p className={BODY_MUTED}>
+        Canned SMS, email, and note bodies you can fire per deal or contact. Use{' '}
+        <code className="text-xs bg-foreground/[0.06] px-1 rounded">{'{{variable}}'}</code>{' '}
+        placeholders to personalize.
+      </p>
+      {templates === null ? (
+        <div className="h-40 bg-foreground/[0.04] rounded-md animate-pulse" />
+      ) : (
+        <TemplatesEditor initial={templates} />
+      )}
     </div>
   );
 }
