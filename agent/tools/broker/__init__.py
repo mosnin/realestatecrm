@@ -5,34 +5,46 @@ agent's `agent/chippi.py:make_chippi_agent` toolbelt. Where the realtor side
 acts on a single workspace's CRM, the broker side reads across the whole
 brokerage's swarm of realtor spaces.
 
-Phase 1 of Chippi-for-Brokers (this file's state) ships ZERO tools. The point
-of Phase 1 is wiring: a broker chat surface → this registry → broker system
-prompt → permission gates. Phase 2 (read tools — team health, lead pipeline,
-response times) and Phase 3 (write tools — set_routing_rule, offboard_member,
-adjust_split) append to `BROKER_TOOLS` from their own module files in this
-package.
+Phase 1 (commit 3dbdc54) shipped this registry empty — the point was wiring:
+broker chat surface → registry → broker system prompt → permission gates.
 
-To add a broker tool in Phase 2/3:
-  1. Create `agent/tools/broker/<name>.py` with one or more `@function_tool`
-     decorated coroutines. Each handler MUST call `require_broker_role(ctx)`
-     from `agent/tools/broker/_guards.py` BEFORE doing any DB work — that is
-     the third layer of the defense-in-depth permission gate. A tool that
-     skips it is a leak.
-  2. Import the new tool here and append to `BROKER_TOOLS` below.
+Phase 2 (this commit) lands the seven read tools:
+  - team_health, realtor_performance, read_realtor_morning_story (team.py)
+  - find_stuck_deals, find_unassigned_leads (pipeline.py)
+  - commission_report (revenue.py)
+  - audit_response_times (performance.py)
 
-The agent runtime (`agent/chippi_broker.py:make_broker_agent`) reads this
-list at agent-build time, exactly mirroring how `agent/chippi.py` reads its
-own native tool imports for the realtor agent.
+Phase 3 (next) will add write tools — reassign_lead, flag_deal_for_broker_review,
+adjust_split, etc. — by importing them here and extending BROKER_TOOLS the
+same way Phase 2 does.
+
+Adding a new broker tool:
+  1. Create or open `agent/tools/broker/<group>.py` and add a coroutine
+     decorated with `@function_tool`. Its first line MUST be
+     `require_broker_role(ctx)` (defense layer 3 — see `_guards.py`).
+  2. Collect tools in a module-level list (e.g. `TEAM_TOOLS`).
+  3. Import that list here and extend BROKER_TOOLS with it.
+
+The agent runtime (`agent/chippi_broker.py:make_broker_agent`) reads
+BROKER_TOOLS at agent-build time, exactly mirroring how `agent/chippi.py`
+reads its own native tool imports for the realtor agent.
 """
 
 from __future__ import annotations
 
-# Phase 2/3 tools land in this list. Empty in Phase 1 by design.
-#
-# NOTE on shape: each entry must be a callable decorated with `function_tool`
-# from the OpenAI Agents SDK — the same shape as `tools/contacts.py:find_contacts`
-# et al on the realtor side. See `agent/tools/broker/_guards.py` for the
-# per-handler permission check every entry MUST wrap its handler body in.
+from .performance import PERFORMANCE_TOOLS
+from .pipeline import PIPELINE_TOOLS
+from .revenue import REVENUE_TOOLS
+from .team import TEAM_TOOLS
+
+# Each entry must be a callable decorated with `function_tool` from the
+# OpenAI Agents SDK — same shape as `tools/contacts.py:find_contacts` et al
+# on the realtor side. See `agent/tools/broker/_guards.py` for the per-handler
+# permission check every entry MUST wrap its handler body in.
 BROKER_TOOLS: list = []
+BROKER_TOOLS.extend(TEAM_TOOLS)
+BROKER_TOOLS.extend(PIPELINE_TOOLS)
+BROKER_TOOLS.extend(REVENUE_TOOLS)
+BROKER_TOOLS.extend(PERFORMANCE_TOOLS)
 
 __all__ = ["BROKER_TOOLS"]
