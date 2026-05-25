@@ -30,13 +30,18 @@ import {
 import { cn } from '@/lib/utils';
 import { CAPTION, PRIMARY_PILL } from '@/lib/typography';
 
-type Cadence = 'hourly' | 'daily' | 'weekdays';
+type Cadence = 'hourly' | 'daily' | 'weekdays' | 'monthly' | 'custom';
+type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 interface Routine {
   id: string;
   instruction: string;
   cadence: Cadence;
   hour: number;
+  /** Set when cadence === 'monthly' (1-28). Null otherwise. */
+  dayOfMonth: number | null;
+  /** Set when cadence === 'custom'. Null otherwise. */
+  daysOfWeek: Weekday[] | null;
   enabled: boolean;
   lastRunAt: string | null;
   lastRunStatus: 'ok' | 'error' | null;
@@ -48,13 +53,39 @@ interface ComposerValue {
   instruction: string;
   cadence: Cadence;
   hour: number;
+  dayOfMonth: number | null;
+  daysOfWeek: Weekday[] | null;
 }
 
 const CADENCE_OPTIONS: { value: Cadence; label: string }[] = [
   { value: 'hourly', label: 'Hourly' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekdays', label: 'Weekdays' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'custom', label: 'Custom' },
 ];
+
+const WEEKDAY_OPTIONS: { value: Weekday; label: string }[] = [
+  { value: 'mon', label: 'M' },
+  { value: 'tue', label: 'T' },
+  { value: 'wed', label: 'W' },
+  { value: 'thu', label: 'T' },
+  { value: 'fri', label: 'F' },
+  { value: 'sat', label: 'S' },
+  { value: 'sun', label: 'S' },
+];
+
+const WEEKDAY_LONG: Record<Weekday, string> = {
+  mon: 'Mon',
+  tue: 'Tue',
+  wed: 'Wed',
+  thu: 'Thu',
+  fri: 'Fri',
+  sat: 'Sat',
+  sun: 'Sun',
+};
+
+const MAX_DAY_OF_MONTH = 28;
 
 const MIN_INSTRUCTION = 10;
 
@@ -75,10 +106,37 @@ function localHourLabel(utcHour: number): string {
   return _todayAtUtcHour(utcHour).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function scheduleLabel(cadence: Cadence, hour: number): string {
+function scheduleLabel(
+  cadence: Cadence,
+  hour: number,
+  dayOfMonth: number | null,
+  daysOfWeek: Weekday[] | null,
+): string {
   if (cadence === 'hourly') return 'Every hour';
-  const base = cadence === 'weekdays' ? 'Every weekday' : 'Every day';
-  return `${base} at ${localHourLabel(hour)}`;
+  const at = ` at ${localHourLabel(hour)}`;
+  if (cadence === 'weekdays') return `Every weekday${at}`;
+  if (cadence === 'monthly') {
+    const d = dayOfMonth ?? 1;
+    const suffix = ordinalSuffix(d);
+    return `The ${d}${suffix} of each month${at}`;
+  }
+  if (cadence === 'custom') {
+    const days = daysOfWeek && daysOfWeek.length > 0 ? daysOfWeek : null;
+    if (!days) return `Custom${at}`;
+    const names = days.map((d) => WEEKDAY_LONG[d]).join(', ');
+    return `${names}${at}`;
+  }
+  return `Every day${at}`;
+}
+
+function ordinalSuffix(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return 'th';
+  const mod10 = n % 10;
+  if (mod10 === 1) return 'st';
+  if (mod10 === 2) return 'nd';
+  if (mod10 === 3) return 'rd';
+  return 'th';
 }
 
 /** The UTC hour that lands at 9:00 local *today* — a sane "morning" default. */
@@ -367,6 +425,8 @@ function RoutineCard({
             instruction: routine.instruction,
             cadence: routine.cadence,
             hour: routine.hour,
+            dayOfMonth: routine.dayOfMonth,
+            daysOfWeek: routine.daysOfWeek,
           }}
           onSave={onSave}
           onCancel={onCancelEdit}
@@ -406,7 +466,7 @@ function RoutineCard({
       <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <Repeat2 size={13} />
-          {scheduleLabel(routine.cadence, routine.hour)}
+          {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
         </span>
         <span aria-hidden>·</span>
         <span
@@ -513,8 +573,20 @@ function RoutineComposer({
   const [instruction, setInstruction] = useState(initial?.instruction ?? '');
   const [cadence, setCadence] = useState<Cadence>(initial?.cadence ?? 'daily');
   const [hour, setHour] = useState<number>(initial?.hour ?? defaultUtcHour());
+  const [dayOfMonth, setDayOfMonth] = useState<number>(initial?.dayOfMonth ?? 1);
+  const [daysOfWeek, setDaysOfWeek] = useState<Weekday[]>(initial?.daysOfWeek ?? ['mon']);
   const [error, setError] = useState('');
   const hours = useMemo(() => hourOptions(), []);
+  const dayOfMonthOptions = useMemo(
+    () => Array.from({ length: MAX_DAY_OF_MONTH }, (_, i) => i + 1),
+    [],
+  );
+
+  function toggleDay(day: Weekday) {
+    setDaysOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+    );
+  }
 
   function submit() {
     const text = instruction.trim();
@@ -522,8 +594,18 @@ function RoutineComposer({
       setError('Write a full sentence — what should Chippi do?');
       return;
     }
+    if (cadence === 'custom' && daysOfWeek.length === 0) {
+      setError('Pick at least one day.');
+      return;
+    }
     setError('');
-    onSave({ instruction: text, cadence, hour });
+    onSave({
+      instruction: text,
+      cadence,
+      hour,
+      dayOfMonth: cadence === 'monthly' ? dayOfMonth : null,
+      daysOfWeek: cadence === 'custom' ? daysOfWeek : null,
+    });
   }
 
   return (
@@ -546,27 +628,82 @@ function RoutineComposer({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-        <span className="text-muted-foreground">Run this</span>
-        <div className="inline-flex rounded-md border border-border/60 p-0.5">
-          {CADENCE_OPTIONS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setCadence(c.value)}
-              className={cn(
-                'rounded-[5px] px-2.5 py-1 font-medium transition-colors',
-                cadence === c.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
+      <div className="space-y-2.5 text-[12.5px]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground">Run this</span>
+          <div className="inline-flex flex-wrap rounded-md border border-border/60 p-0.5">
+            {CADENCE_OPTIONS.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setCadence(c.value)}
+                className={cn(
+                  'rounded-[5px] px-2.5 py-1 font-medium transition-colors',
+                  cadence === c.value
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
         </div>
+
         {cadence !== 'hourly' && (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
+            {cadence === 'monthly' && (
+              <>
+                <span className="text-muted-foreground">On the</span>
+                <Select
+                  value={String(dayOfMonth)}
+                  onValueChange={(v) => setDayOfMonth(Number(v))}
+                >
+                  <SelectTrigger className="h-8 w-[5.5rem]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dayOfMonthOptions.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                        {ordinalSuffix(d)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {cadence === 'custom' && (
+              <div
+                className="inline-flex rounded-md border border-border/60 p-0.5"
+                role="group"
+                aria-label="Days of the week"
+              >
+                {WEEKDAY_OPTIONS.map((d, i) => {
+                  const selected = daysOfWeek.includes(d.value);
+                  return (
+                    <button
+                      key={`${d.value}-${i}`}
+                      type="button"
+                      onClick={() => toggleDay(d.value)}
+                      aria-pressed={selected}
+                      aria-label={WEEKDAY_LONG[d.value]}
+                      title={WEEKDAY_LONG[d.value]}
+                      className={cn(
+                        'inline-flex h-7 w-7 items-center justify-center rounded-[5px] font-medium transition-colors',
+                        selected
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <span className="text-muted-foreground">at</span>
             <Select value={String(hour)} onValueChange={(v) => setHour(Number(v))}>
               <SelectTrigger className="h-8 w-[7.5rem]">
@@ -580,7 +717,7 @@ function RoutineComposer({
                 ))}
               </SelectContent>
             </Select>
-          </>
+          </div>
         )}
       </div>
 

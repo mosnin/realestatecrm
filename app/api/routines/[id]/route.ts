@@ -12,18 +12,43 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
-import { fireRoutineRun, ROUTINE_CADENCES } from '@/lib/routines';
+import {
+  fireRoutineRun,
+  ROUTINE_CADENCES,
+  ROUTINE_WEEKDAYS,
+  ROUTINE_MAX_DAY_OF_MONTH,
+  type RoutineWeekday,
+} from '@/lib/routines';
 
 export const runtime = 'nodejs';
 
 const SELECT =
-  'id, instruction, cadence, hour, enabled, lastRunAt, lastRunStatus, nextRunAt, createdAt';
+  'id, instruction, cadence, hour, dayOfMonth, daysOfWeek, enabled, lastRunAt, lastRunStatus, nextRunAt, createdAt';
 
 const MAX_INSTRUCTION = 600;
 const MIN_INSTRUCTION = 10;
 
 function isCadence(v: unknown): v is (typeof ROUTINE_CADENCES)[number] {
   return typeof v === 'string' && (ROUTINE_CADENCES as readonly string[]).includes(v);
+}
+
+function isWeekday(v: unknown): v is RoutineWeekday {
+  return typeof v === 'string' && (ROUTINE_WEEKDAYS as readonly string[]).includes(v);
+}
+
+function sanitiseDaysOfWeek(v: unknown): RoutineWeekday[] | null {
+  if (!Array.isArray(v)) return null;
+  const set = new Set<RoutineWeekday>();
+  for (const d of v) if (isWeekday(d)) set.add(d);
+  if (set.size === 0) return null;
+  return ROUTINE_WEEKDAYS.filter((d) => set.has(d));
+}
+
+function sanitiseDayOfMonth(v: unknown): number | null {
+  if (typeof v !== 'number') return null;
+  const n = Math.floor(v);
+  if (n < 1 || n > ROUTINE_MAX_DAY_OF_MONTH) return null;
+  return n;
 }
 
 export async function PATCH(
@@ -55,6 +80,25 @@ export async function PATCH(
   if (typeof body.hour === 'number') {
     const hour = Math.floor(body.hour);
     if (hour >= 0 && hour <= 23) patch.hour = hour;
+  }
+  // dayOfMonth and daysOfWeek are cadence-specific. When the caller picks a
+  // new cadence in the same PATCH, blank out the OTHER cadence's field — a
+  // routine that flips weekdays → monthly shouldn't keep a stale daysOfWeek
+  // sitting in the row for the trigger to ignore.
+  const nextCadence = isCadence(body.cadence) ? body.cadence : undefined;
+  if ('dayOfMonth' in body) {
+    const d = sanitiseDayOfMonth(body.dayOfMonth);
+    if (d !== null) patch.dayOfMonth = d;
+  }
+  if ('daysOfWeek' in body) {
+    const days = sanitiseDaysOfWeek(body.daysOfWeek);
+    if (days) patch.daysOfWeek = days;
+  }
+  if (nextCadence === 'monthly') patch.daysOfWeek = null;
+  if (nextCadence === 'custom') patch.dayOfMonth = null;
+  if (nextCadence && nextCadence !== 'monthly' && nextCadence !== 'custom') {
+    patch.dayOfMonth = null;
+    patch.daysOfWeek = null;
   }
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
 

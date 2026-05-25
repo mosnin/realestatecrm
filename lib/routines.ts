@@ -13,8 +13,26 @@ const DISPATCH_TIMEOUT_MS = 12_000;
 
 export type RoutineRunStatus = 'ok' | 'error';
 
-export const ROUTINE_CADENCES = ['hourly', 'daily', 'weekdays'] as const;
+export const ROUTINE_CADENCES = [
+  'hourly',
+  'daily',
+  'weekdays',
+  'monthly',
+  'custom',
+] as const;
 export type RoutineCadence = (typeof ROUTINE_CADENCES)[number];
+
+/**
+ * Lowercase day codes used by the 'custom' cadence — stored as a text[] in the
+ * DB and as a string[] over the wire. ISO weekday convention (Mon=1) is too
+ * cute when the API also handles a Sunday-based JS dow elsewhere; codes are
+ * unambiguous and survive a serializer round-trip.
+ */
+export const ROUTINE_WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+export type RoutineWeekday = (typeof ROUTINE_WEEKDAYS)[number];
+
+/** Cap day-of-month at 28 — Feb has 28 every year, so the routine never skips a month. */
+export const ROUTINE_MAX_DAY_OF_MONTH = 28;
 
 export async function fireRoutineRun(
   spaceId: string,
