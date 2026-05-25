@@ -31,6 +31,11 @@ interface PipelineSummaryProps {
    *  deleted, status changed). Forces this stat strip to re-fetch so the
    *  KPI numbers don't go stale right after the realtor adds a deal. */
   refreshKey?: number;
+  /** Server-pre-fetched stages for this pipeline. Lets the first paint
+   *  carry real KPI numbers instead of zeros that animate up after the
+   *  client round-trip. The component still re-fetches on `refreshKey`
+   *  bumps so post-mutation updates keep flowing. */
+  initialStages?: StageWithDeals[];
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
@@ -66,9 +71,13 @@ export function PipelineSummary({
   onFocusChange,
   onAddDeal,
   refreshKey = 0,
+  initialStages,
 }: PipelineSummaryProps) {
-  const [stages, setStages] = useState<StageWithDeals[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stages, setStages] = useState<StageWithDeals[]>(initialStages ?? []);
+  // When the server pre-fetched stages, the first paint is already truthful
+  // and we don't need a skeleton. Without initialStages, the strip starts in
+  // a quiet loading state.
+  const [loading, setLoading] = useState(!initialStages);
 
   const load = useCallback(async () => {
     try {
@@ -91,7 +100,17 @@ export function PipelineSummary({
   // Supabase realtime here would coalesce with the kanban's Deal channel —
   // either component's unmount would tear down the other's subscription —
   // so a parent-driven counter is the safer signal.
+  //
+  // When `initialStages` is provided AND we haven't yet seen a refresh
+  // signal (refreshKey === 0) the server payload is the freshest data we
+  // have, so we skip the initial fetch entirely. Subsequent bumps still
+  // trigger a re-fetch.
+  const hasInitialServerData = Boolean(initialStages);
   useEffect(() => {
+    if (hasInitialServerData && refreshKey === 0) {
+      // Server gave us data on the first render; no need to round-trip.
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -101,7 +120,7 @@ export function PipelineSummary({
     return () => {
       cancelled = true;
     };
-  }, [load, refreshKey]);
+  }, [load, refreshKey, hasInitialServerData]);
 
   const stats: PipelineStats = useMemo(() => {
     const allDeals = stages.flatMap((s) => s.deals ?? []);

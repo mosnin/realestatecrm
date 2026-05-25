@@ -7,7 +7,7 @@ export default function AnalyticsError({ reset }: { error: Error; reset: () => v
         className="text-3xl tracking-tight text-foreground"
         style={{ fontFamily: 'var(--font-title)' }}
       >
-        Couldn't load analytics
+        Couldn&apos;t load analytics
       </p>
       <p className="text-sm text-muted-foreground">Usually temporary.</p>
       <button
