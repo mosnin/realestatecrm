@@ -952,32 +952,20 @@ function RealtorNav({
         collapsed ? 'px-1' : 'px-3',
       )}
     >
-      {/* Two-mode sidebar: on /chippi the main destinations (People, Deals,
-          Calendar…) cross-fade out and the realtor's conversation history
-          slides in their place — Chippi becomes the room the realtor is
-          IN, not a tab in a list. Off Chippi, the reverse: main links
-          slide back, conversations fade away. The Chippi nav item itself
-          (aiItems) stays pinned at the top regardless so the realtor
-          always has the door back into the agent. Settings stays pinned
-          at the bottom. */}
+      {/* Two-mode sidebar: on /chippi the conversation history slides in
+          below the main nav. The main destinations (People, Deals,
+          Calendar…) stay visible the whole time — the realtor must always
+          have a door out of Chippi, not just a door in. The Chippi nav
+          item itself stays pinned at the top regardless so the door in is
+          always there too. Settings stays pinned at the bottom. */}
       <div>
         <div className="space-y-0.5">
           {/* Always visible — top-pinned AI items (Chippi + future AI rows) */}
           {aiItems.map(renderItem)}
-          <AnimatePresence initial={false} mode="wait">
-            {!onChippi && (
-              <motion.div
-                key="main-links"
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -6 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="space-y-0.5"
-              >
-                {mainItems.map(renderItem)}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Main destinations — visible on every route. Hiding them on
+              /chippi (the original cross-fade design) left the realtor
+              stranded with no navigation out. */}
+          {mainItems.map(renderItem)}
         </div>
       </div>
 

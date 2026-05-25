@@ -1,10 +1,17 @@
 /**
  * GET /api/agent/usage
  *
- * Returns today's token usage for the space. Sums AgentTask rows so the
- * display matches what the chat path actually enforces against — Redis
- * is only written by the autonomous Python orchestrator, so a chat-heavy
- * user would see 0% even after burning through real tokens.
+ * Returns today's token usage for the space. Two write paths feed this:
+ *   - Chat turns insert ChatUsage rows (agent/ledger.py → record_chat_usage,
+ *     and lib/usage/record-chat-usage.ts on the TS side). Sum
+ *     promptTokens + completionTokens for today.
+ *   - Autonomous runs (cron / routines) call agent/security/budget.py
+ *     → record_usage, which only writes to Upstash Redis at the key
+ *     `agent:budget:{spaceId}:{YYYY-MM-DD}`. Read that too.
+ *
+ * Sum them. Earlier this route read only Redis (missed the chat path) and
+ * then briefly read AgentTask.inputTokens/outputTokens (never populated).
+ * ChatUsage + Redis is the actual source of truth.
  */
 
 import { NextResponse } from 'next/server';
@@ -21,17 +28,42 @@ export async function GET() {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const todayUtc = new Date().toISOString().slice(0, 10);
-  const { data: usageRows } = await supabase
-    .from('AgentTask')
-    .select('inputTokens, outputTokens')
+
+  // Chat path — ChatUsage rows from today.
+  const { data: chatRows } = await supabase
+    .from('ChatUsage')
+    .select('promptTokens, completionTokens')
     .eq('spaceId', space.id)
     .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
 
-  const used = (usageRows ?? []).reduce(
-    (sum: number, row: { inputTokens: number | null; outputTokens: number | null }) =>
-      sum + (row.inputTokens ?? 0) + (row.outputTokens ?? 0),
+  const chatTokens = (chatRows ?? []).reduce(
+    (sum: number, row: { promptTokens: number | null; completionTokens: number | null }) =>
+      sum + (row.promptTokens ?? 0) + (row.completionTokens ?? 0),
     0,
   );
+
+  // Autonomous path — Upstash Redis counter the Python orchestrator
+  // increments. Failure here is silently ignored (chat tokens alone are
+  // still a useful answer for the realtor).
+  let autonomousTokens = 0;
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  if (kvUrl && kvToken) {
+    try {
+      const key = `agent:budget:${space.id}:${todayUtc}`;
+      const res = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${kvToken}` },
+      });
+      if (res.ok) {
+        const { result } = (await res.json()) as { result: string | null };
+        autonomousTokens = result ? parseInt(result, 10) : 0;
+      }
+    } catch {
+      // Best-effort — keep chat tokens.
+    }
+  }
+
+  const used = chatTokens + autonomousTokens;
 
   const { data: agentSettings } = await supabase
     .from('AgentSettings')
