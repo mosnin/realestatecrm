@@ -24,7 +24,7 @@ export function RemoveMemberButton({ membershipId, memberName }: RemoveMemberBut
         alert(data.error ?? 'Failed to remove member.');
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setConfirming(false);

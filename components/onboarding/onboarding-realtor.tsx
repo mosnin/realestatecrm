@@ -248,7 +248,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       setSubmitting(false);
       goNext();
     } catch {
-      setError("Couldn't save that. Please try again.");
+      setError("Couldn't save that — usually temporary.");
       setSubmitting(false);
     }
   }, [role, tenure, zipCode, businessName, slug, slugState, name, goNext]);
@@ -312,7 +312,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       toast.success("You're in. Chippi is ready.");
       router.push(`/s/${slug}/chippi`);
     } catch {
-      setError("Couldn't finish setup. Please try again.");
+      setError("Couldn't finish setup — usually temporary.");
       setSubmitting(false);
     }
   }, [saveProfilePartial, slug, router, role, businessName]);

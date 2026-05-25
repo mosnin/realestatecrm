@@ -142,7 +142,7 @@ export function OnboardingQuick({ defaultName }: Props) {
         toast.success("You're in. Here's your workspace.");
         router.push(`/s/${slug}/chippi`);
       } catch {
-        setSubmitError("Couldn't finish setup. Please try again.");
+        setSubmitError("Couldn't finish setup — usually temporary.");
         setSubmitting(false);
       }
     },

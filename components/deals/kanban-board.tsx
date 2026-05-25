@@ -401,7 +401,7 @@ export function KanbanBoard({
   const { confirm, ConfirmDialog } = useConfirm();
 
   // Won / Lost reason dialog (triggered from card quick-action buttons)
-  const WON_REASONS = ['Full price offer', 'Great negotiation', 'Client referral', 'Other'] as const;
+  const WON_REASONS = ['Full price offer', 'Strong negotiation', 'Client referral', 'Other'] as const;
   const LOST_REASONS = ['Price too high', 'Chose another agent', 'Deal fell through', 'Financing issue', 'Other'] as const;
 
   const [wonLostDialog, setWonLostDialog] = useState<{

@@ -38,7 +38,7 @@ export function ChangeRoleButton({ membershipId, currentRole, memberName }: Chan
         alert(data.error ?? 'Failed to change role.');
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setOpen(false);
