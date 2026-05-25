@@ -11,6 +11,7 @@ import {
   ExternalLink,
   MessageCircle,
   Calendar,
+  ChevronDown,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -131,7 +132,7 @@ export default async function ClientDetailPage({
       {/* Headline — name is the page. The next four lines tell the realtor
           everything they need to know in three seconds: who, how warm, how
           quiet, what just happened, what to do next. */}
-      <header className="space-y-2">
+      <header className="space-y-2 mb-6 pb-4 border-b border-border/60">
         <Link
           href={`/s/${slug}/contacts`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -214,8 +215,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Activity timeline</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4">
           <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
@@ -233,8 +237,11 @@ export default async function ClientDetailPage({
               <MessageCircle size={13} className="text-orange-500 dark:text-orange-400" />
               Lead score
             </span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <div className="mt-4 space-y-4">
             <div className="flex items-baseline gap-3 flex-wrap">
@@ -292,9 +299,12 @@ export default async function ClientDetailPage({
       {hasOpenDeals && (
         <details open className="group border-t border-border/60 pt-4">
           <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
-            <span>Active deals ({contact.dealContacts.length})</span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span>Active deals (<span className="tabular-nums">{contact.dealContacts.length}</span>)</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <ul className="mt-4 divide-y divide-border/60">
             {contact.dealContacts.map(({ deal }) => (
@@ -340,8 +350,11 @@ export default async function ClientDetailPage({
                 </span>
               )}
             </span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <div className="mt-4 space-y-4">
             <div className="flex items-center justify-end">
@@ -382,8 +395,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Pipeline stage</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4 overflow-x-auto pb-1">
           <div className="min-w-max">
@@ -397,8 +413,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Follow-up &amp; lifecycle</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4 space-y-4">
           <ContactFollowUpField

@@ -87,7 +87,7 @@ export function ContactActionPills({
             type="button"
             onClick={() => handleTap(a)}
             className={cn(
-              'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
+              'inline-flex items-center h-9 rounded-md px-4 text-sm transition-colors',
               i === 0
                 ? 'border border-border/70 bg-foreground text-background hover:bg-foreground/90'
                 : 'border border-border/70 bg-background text-foreground hover:bg-muted/40',
@@ -104,7 +104,7 @@ export function ContactActionPills({
         <Link
           href={`/s/${slug}/chippi/log?personId=${contactId}`}
           className={cn(
-            'inline-flex items-center gap-1.5 h-9 rounded-full px-4 text-sm transition-colors',
+            'inline-flex items-center gap-1.5 h-9 rounded-md px-4 text-sm transition-colors',
             'border border-border/70 bg-background text-foreground hover:bg-muted/40',
           )}
         >
