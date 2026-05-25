@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { formatCurrency } from '@/lib/formatting';
+import { PropertyStatusBadge } from '@/components/properties/property-status-badge';
 
 interface Props {
   dealId: string;
@@ -73,7 +74,11 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
           <div className="w-10 h-10 rounded-md bg-muted flex-shrink-0 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {linked.photos[0] ? (
-              <img src={linked.photos[0]} alt="" className="w-full h-full object-cover" />
+              <img
+                src={linked.photos[0]}
+                alt={formatPropertyAddress(linked)}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                 <Building2 size={14} />
@@ -93,6 +98,9 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            <div className="mt-1">
+              <PropertyStatusBadge status={linked.listingStatus} />
+            </div>
           </div>
           <button
             type="button"
