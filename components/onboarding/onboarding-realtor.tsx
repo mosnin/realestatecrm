@@ -254,11 +254,54 @@ export function OnboardingRealtor({ defaultName }: Props) {
   }, [role, tenure, zipCode, businessName, slug, slugState, name, goNext]);
 
   // Stage 6 → final save + complete.
+  //
+  // Brokerage owners take a different terminal step. The quick path had been
+  // offering "brokerage_owner" as a role but then completing as `accountType:
+  // 'realtor'` and routing to /s/{slug}/chippi — silently dropping the user
+  // who said they ran a brokerage onto the solo-realtor dashboard, with no
+  // Brokerage row ever created. Now: when role is brokerage_owner, complete
+  // as `accountType: 'both'`, call /api/broker/create with the workspace
+  // business name, link the new Space to the new Brokerage, and route to
+  // /broker. Mirrors the broker-with-workspace branch in onboarding-flow.tsx.
   const handleFinish = useCallback(async () => {
     setSubmitting(true);
     setError(null);
     try {
       await saveProfilePartial();
+
+      if (role === 'brokerage_owner') {
+        const completeRes = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'complete', accountType: 'both' }),
+        });
+        if (!completeRes.ok) throw new Error('complete');
+
+        const brokerRes = await fetch('/api/broker/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: businessName.trim() }),
+        });
+        if (!brokerRes.ok) throw new Error('broker_create');
+        const brokerData = (await brokerRes.json().catch(() => ({}))) as {
+          brokerage?: { id?: string };
+        };
+        const newBrokerageId = brokerData.brokerage?.id;
+        if (newBrokerageId) {
+          // Best-effort link — failure here doesn't block the redirect; the
+          // brokerage exists and the user is a broker_owner either way.
+          await fetch('/api/spaces', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug, brokerageId: newBrokerageId }),
+          }).catch(() => undefined);
+        }
+
+        toast.success("Brokerage created. Chippi is ready.");
+        router.push('/broker');
+        return;
+      }
+
       const completeRes = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -272,7 +315,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       setError("Couldn't finish setup. Please try again.");
       setSubmitting(false);
     }
-  }, [saveProfilePartial, slug, router]);
+  }, [saveProfilePartial, slug, router, role, businessName]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 

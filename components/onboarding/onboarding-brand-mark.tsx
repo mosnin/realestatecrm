@@ -1,30 +1,28 @@
 'use client';
 
 /**
- * Small stylised brand mark for the onboarding hero. A clean rounded-diamond
- * with a single brand-orange gradient — no inner gloss, no drop shadow. Reads
- * as flat ink on the warm paper canvas. Sized for the focal moment (~48px).
+ * The brand mark on the onboarding hero. Previously a custom rounded-diamond
+ * SVG, which the user (correctly) flagged as a "weird shape" that didn't
+ * belong on the front door of the product. Now renders the actual Chippi
+ * logo so the moment the realtor lands on setup, they see the same identity
+ * that lives in the sidebar, the public profile, and every other surface.
  */
+import { BrandLogo } from '@/components/brand-logo';
+
 export function OnboardingBrandMark({ size = 48 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 56 56"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="chippi-brand-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FFB056" />
-          <stop offset="100%" stopColor="#F97316" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M28 6 L46 18 V38 L28 50 L10 38 V18 Z"
-        fill="url(#chippi-brand-grad)"
-      />
-    </svg>
-  );
+  // BrandLogo is height-driven via Tailwind. Map common sizes; default 48 →
+  // h-12. For other sizes fall back to inline style on the wrapping span.
+  const heightClass =
+    size === 20
+      ? 'h-5'
+      : size === 24
+        ? 'h-6'
+        : size === 32
+          ? 'h-8'
+          : size === 48
+            ? 'h-12'
+            : size === 64
+              ? 'h-16'
+              : 'h-12';
+  return <BrandLogo className={heightClass} alt="Chippi" />;
 }
