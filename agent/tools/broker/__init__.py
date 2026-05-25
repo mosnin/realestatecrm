@@ -14,9 +14,11 @@ Phase 2 (this commit) lands the seven read tools:
   - commission_report (revenue.py)
   - audit_response_times (performance.py)
 
-Phase 3 (next) will add write tools — reassign_lead, flag_deal_for_broker_review,
-adjust_split, etc. — by importing them here and extending BROKER_TOOLS the
-same way Phase 2 does.
+Phase 3 (commit 32eadb5) lands the six write tools:
+  - reassign_lead, flag_deal_for_broker_review (actions.py)
+  - send_team_announcement (actions.py)
+  - change_member_role, offboard_member (actions.py — both with confirmation gates)
+  - set_routing_rule (actions.py — needs migration 20260607000010)
 
 Adding a new broker tool:
   1. Create or open `agent/tools/broker/<group>.py` and add a coroutine
@@ -32,6 +34,7 @@ reads its own native tool imports for the realtor agent.
 
 from __future__ import annotations
 
+from .actions import WRITE_TOOLS
 from .performance import PERFORMANCE_TOOLS
 from .pipeline import PIPELINE_TOOLS
 from .revenue import REVENUE_TOOLS
@@ -46,5 +49,6 @@ BROKER_TOOLS.extend(TEAM_TOOLS)
 BROKER_TOOLS.extend(PIPELINE_TOOLS)
 BROKER_TOOLS.extend(REVENUE_TOOLS)
 BROKER_TOOLS.extend(PERFORMANCE_TOOLS)
+BROKER_TOOLS.extend(WRITE_TOOLS)
 
 __all__ = ["BROKER_TOOLS"]
