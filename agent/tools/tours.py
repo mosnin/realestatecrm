@@ -19,6 +19,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools._calendar_mirror import mirror_tour_to_calendar
 from tools.activities import persist_log
 from tools.base import idempotent_tool
 from tools.streaming import publish_event
@@ -111,6 +112,15 @@ async def book_tour(
         result = await db.table("Tour").insert(tour_row).execute()
     except Exception as exc:  # surface DB error to the agent
         return {"error": f"tour insert failed: {exc}"}
+
+    # Best-effort mirror into Chippi's CalendarEvent — /calendar reads it.
+    try:
+        await mirror_tour_to_calendar(
+            space_id=space_id, tour_id=tour_id, guest_name=guest_name,
+            starts_at=starts, property_address=property_address, notes=notes,
+        )
+    except Exception:
+        pass
 
     # Activity timeline entry for the contact
     summary_addr = f" at {property_address}" if property_address else ""
