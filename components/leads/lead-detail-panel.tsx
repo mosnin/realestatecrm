@@ -91,11 +91,16 @@ export function LeadDetailPanel({
   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
   const rawBudget = app?.monthlyRent ?? lead.budget;
+  // Rentals quote monthly; buyers/sellers quote a purchase price. The /mo
+  // suffix is correct for rental only — buyers see the unadorned number.
+  const isRental = lead.leadType === 'rental';
   const budgetDisplay =
     typeof rawBudget === 'string'
       ? rawBudget
       : rawBudget != null
-      ? `${formatMoney(rawBudget)}/mo`
+      ? isRental
+        ? `${formatMoney(rawBudget)}/mo`
+        : formatMoney(rawBudget)
       : null;
   const incomeDisplay =
     typeof app?.monthlyGrossIncome === 'string'

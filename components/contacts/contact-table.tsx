@@ -1005,7 +1005,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                       {contact.budget != null && (
                         <span className="inline-flex items-center gap-1 tabular-nums">
                           <Wallet size={10} className="flex-shrink-0" />
-                          {formatCurrency(contact.budget)}/mo
+                          {formatCurrency(contact.budget)}{contact.leadType === 'rental' ? '/mo' : ''}
                         </span>
                       )}
                     </div>
@@ -1232,7 +1232,7 @@ function ContactCard({
           {contact.budget != null && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Wallet size={10} className="flex-shrink-0" />
-              <span>{formatCurrency(contact.budget)}/mo</span>
+              <span>{formatCurrency(contact.budget)}{contact.leadType === 'rental' ? '/mo' : ''}</span>
             </div>
           )}
           {contact.preferences && (
