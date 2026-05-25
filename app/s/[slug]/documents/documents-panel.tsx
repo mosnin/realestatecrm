@@ -250,7 +250,10 @@ export function DocumentsPanel() {
             placeholder="Write or paste your document here…"
           />
         ) : (
-          <div className="rounded-xl border border-border/70 bg-card px-3.5 py-3 min-h-[60vh]">
+          // Read mode tinted bg-muted/10 — distinct from the bg-card edit
+          // surface so the realtor can tell at a glance whether they're
+          // viewing or editing.
+          <div className="rounded-xl border border-border/70 bg-muted/10 px-3.5 py-3 min-h-[60vh]">
             {/* Sanitized HTML — see sanitizedHtml memo above. */}
             <article
               className="prose prose-sm dark:prose-invert max-w-none prose-a:text-foreground prose-a:underline"

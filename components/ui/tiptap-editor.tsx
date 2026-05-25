@@ -28,6 +28,11 @@
  *     vocabulary as the rest of the dashboard.
  *   - Radius: `rounded-md` on toolbar buttons (canonical control radius),
  *     `rounded-xl` on the editor frame (canonical content radius).
+ *   - Mobile: only Bold/Italic/Link/Undo stay inline; the rest tuck behind
+ *     a More button so the toolbar stops pushing the document below the
+ *     fold on a phone.
+ *   - Read mode (`disabled={true}`) tints the body `bg-muted/10` so the
+ *     realtor can tell at a glance whether they're viewing or editing.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -52,6 +57,8 @@ import {
   Code2,
   Link as LinkIcon,
   Unlink,
+  Undo2,
+  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -143,8 +150,10 @@ export function TiptapEditor({
   return (
     <div
       className={cn(
-        'rounded-xl border border-border/70 bg-card overflow-hidden',
-        disabled && 'opacity-60',
+        'rounded-xl border border-border/70 overflow-hidden',
+        // Read mode: subtle muted tint so the realtor can tell at a glance
+        // whether they're viewing or editing. Edit mode: paper-flat card.
+        disabled ? 'bg-muted/10' : 'bg-card',
         className,
       )}
     >
@@ -156,7 +165,9 @@ export function TiptapEditor({
 
 /** Hand-rolled toolbar — kept in this file so the editor ships as a
  *  single unit. The icons + button density match the existing dashboard
- *  toolbars (chip-prompt-box, kanban filter row). */
+ *  toolbars (chip-prompt-box, kanban filter row). On mobile, only the
+ *  four most-used actions (bold, italic, link, undo) stay inline; the
+ *  rest tuck behind a More button. */
 function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
   // The toolbar re-renders on every editor transaction so active-state
   // marks (e.g. cursor inside <strong>) stay in sync. Cheap — TipTap is
@@ -175,6 +186,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
 
   return (
     <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border/60 bg-muted/30 flex-wrap">
+      {/* Inline on every breakpoint — the four most-used actions. */}
       <Btn
         active={editor.isActive('bold')}
         onClick={() => editor.chain().focus().toggleBold().run()}
@@ -191,7 +203,10 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
       >
         <Italic size={14} />
       </Btn>
+
+      {/* sm+ — the rest of the formatting row. Hidden on phones. */}
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('underline')}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         title="Underline (Ctrl/Cmd+U)"
@@ -200,6 +215,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <UnderlineIcon size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('strike')}
         onClick={() => editor.chain().focus().toggleStrike().run()}
         title="Strikethrough"
@@ -208,9 +224,10 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Strikethrough size={14} />
       </Btn>
 
-      <Divider />
+      <Divider className="hidden sm:inline-block" />
 
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('heading', { level: 1 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         title="Heading 1"
@@ -219,6 +236,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Heading1 size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('heading', { level: 2 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         title="Heading 2"
@@ -227,6 +245,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Heading2 size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('heading', { level: 3 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         title="Heading 3"
@@ -235,9 +254,10 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Heading3 size={14} />
       </Btn>
 
-      <Divider />
+      <Divider className="hidden sm:inline-block" />
 
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('bulletList')}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         title="Bullet list"
@@ -246,6 +266,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <List size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('orderedList')}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         title="Numbered list"
@@ -254,6 +275,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <ListOrdered size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('blockquote')}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         title="Blockquote"
@@ -262,9 +284,10 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Quote size={14} />
       </Btn>
 
-      <Divider />
+      <Divider className="hidden sm:inline-block" />
 
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('code')}
         onClick={() => editor.chain().focus().toggleCode().run()}
         title="Inline code"
@@ -273,6 +296,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Code size={14} />
       </Btn>
       <Btn
+        className="hidden sm:inline-flex"
         active={editor.isActive('codeBlock')}
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         title="Code block"
@@ -281,7 +305,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         <Code2 size={14} />
       </Btn>
 
-      <Divider />
+      <Divider className="hidden sm:inline-block" />
 
       <LinkButton editor={editor} disabled={disabled} />
       {editor.isActive('link') && (
@@ -293,7 +317,152 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
           <Unlink size={14} />
         </Btn>
       )}
+
+      <Btn
+        onClick={() => editor.chain().focus().undo().run()}
+        title="Undo (Ctrl/Cmd+Z)"
+        disabled={disabled || !editor.can().undo()}
+      >
+        <Undo2 size={14} />
+      </Btn>
+
+      {/* Overflow — mobile-only. Pushes itself to the right edge of the
+          row so the inline buttons still cluster on the left. */}
+      <OverflowMenu editor={editor} disabled={disabled} className="sm:hidden ml-auto" />
     </div>
+  );
+}
+
+/** Mobile overflow popover. Hand-rolled to stay consistent with
+ *  LinkButton — this file deliberately avoids shadcn dropdowns so the
+ *  toolbar doesn't drag in third-party chrome. */
+function OverflowMenu({
+  editor,
+  disabled,
+  className,
+}: {
+  editor: Editor;
+  disabled: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Close on outside click — same pattern as the LinkButton popover below.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-overflow-root]')) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  // Close the popover after a toolbar click — feels more like a phone
+  // toolbar than a sticky panel.
+  const act = (fn: () => void) => () => {
+    fn();
+    setOpen(false);
+  };
+
+  return (
+    <span className={cn('relative', className)} data-overflow-root>
+      <Btn
+        onClick={() => setOpen((v) => !v)}
+        title="More formatting"
+        disabled={disabled}
+        active={open}
+      >
+        <MoreHorizontal size={14} />
+      </Btn>
+      {open && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute top-full right-0 mt-1 z-10 flex flex-wrap items-center gap-0.5 rounded-xl border border-border/70 bg-card p-1.5 shadow-lg w-[200px]"
+        >
+          <Btn
+            active={editor.isActive('underline')}
+            onClick={act(() => editor.chain().focus().toggleUnderline().run())}
+            title="Underline"
+            disabled={disabled}
+          >
+            <UnderlineIcon size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('strike')}
+            onClick={act(() => editor.chain().focus().toggleStrike().run())}
+            title="Strikethrough"
+            disabled={disabled}
+          >
+            <Strikethrough size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('heading', { level: 1 })}
+            onClick={act(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
+            title="Heading 1"
+            disabled={disabled}
+          >
+            <Heading1 size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('heading', { level: 2 })}
+            onClick={act(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
+            title="Heading 2"
+            disabled={disabled}
+          >
+            <Heading2 size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('heading', { level: 3 })}
+            onClick={act(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
+            title="Heading 3"
+            disabled={disabled}
+          >
+            <Heading3 size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('bulletList')}
+            onClick={act(() => editor.chain().focus().toggleBulletList().run())}
+            title="Bullet list"
+            disabled={disabled}
+          >
+            <List size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('orderedList')}
+            onClick={act(() => editor.chain().focus().toggleOrderedList().run())}
+            title="Numbered list"
+            disabled={disabled}
+          >
+            <ListOrdered size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('blockquote')}
+            onClick={act(() => editor.chain().focus().toggleBlockquote().run())}
+            title="Blockquote"
+            disabled={disabled}
+          >
+            <Quote size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('code')}
+            onClick={act(() => editor.chain().focus().toggleCode().run())}
+            title="Inline code"
+            disabled={disabled}
+          >
+            <Code size={14} />
+          </Btn>
+          <Btn
+            active={editor.isActive('codeBlock')}
+            onClick={act(() => editor.chain().focus().toggleCodeBlock().run())}
+            title="Code block"
+            disabled={disabled}
+          >
+            <Code2 size={14} />
+          </Btn>
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -303,12 +472,15 @@ function Btn({
   title,
   children,
   disabled,
+  className,
 }: {
   active?: boolean;
   onClick: () => void;
   title: string;
   children: React.ReactNode;
   disabled?: boolean;
+  /** Optional class — used to hide non-essential buttons on mobile. */
+  className?: string;
 }) {
   return (
     <button
@@ -326,6 +498,7 @@ function Btn({
         'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
         active && 'bg-foreground/[0.06] text-foreground',
         disabled && 'opacity-40 cursor-not-allowed',
+        className,
       )}
     >
       {children}
@@ -333,8 +506,8 @@ function Btn({
   );
 }
 
-function Divider() {
-  return <span className="w-px h-5 bg-border/60 mx-1" aria-hidden />;
+function Divider({ className }: { className?: string }) {
+  return <span className={cn('w-px h-5 bg-border/60 mx-1', className)} aria-hidden />;
 }
 
 function LinkButton({ editor, disabled }: { editor: Editor; disabled: boolean }) {

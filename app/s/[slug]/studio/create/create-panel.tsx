@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ImagePlus, AlertCircle } from 'lucide-react';
+import { ImagePlus, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +20,7 @@ import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 import { GeneratingState } from '@/components/studio/generating-state';
+import { toastLoading, toastSuccess, toastError } from '@/lib/toast-helpers';
 
 interface GenerateResult {
   url: string;
@@ -95,6 +96,13 @@ export function CreatePanel() {
     if (prompt.trim().length === 0 || generating) return;
     setGenerating(true);
     setError(null);
+    // Visible affordance — a 5-10s silent wait reads as broken. The toast
+    // outlives the in-page spinner if the realtor scrolls or switches tabs.
+    const kind = STUDIO_MODELS[model]?.kind === 'video' ? 'video' : 'image';
+    const toastId = toastLoading(
+      kind === 'video' ? 'Generating your video…' : 'Generating your image…',
+      'studio-generate',
+    );
     try {
       const res = await fetch('/api/studio/generate', {
         method: 'POST',
@@ -115,8 +123,11 @@ export function CreatePanel() {
         fileId: body.fileId,
         kind: body.kind === 'video' ? 'video' : 'image',
       });
+      toastSuccess(body.kind === 'video' ? 'Video ready.' : 'Image ready.', toastId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed. Please try again.');
+      const message = e instanceof Error ? e.message : 'Generation failed. Please try again.';
+      setError(message);
+      toastError(message, toastId);
     } finally {
       setGenerating(false);
     }
@@ -164,7 +175,14 @@ export function CreatePanel() {
             })}
           </div>
           <Button onClick={() => void handleGenerate()} disabled={!canGenerate}>
-            {generating ? 'Generating…' : 'Generate'}
+            {generating ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Generating…
+              </>
+            ) : (
+              'Generate'
+            )}
           </Button>
         </div>
       </div>
