@@ -65,7 +65,7 @@ export async function POST(
   const { allowed: ipAllowed } = await checkRateLimit(`portal:tour-respond:ip:${ip}`, 30, 3600);
   if (!ipAllowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: 'Too many requests. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

@@ -116,7 +116,7 @@ export function CreatePanel() {
         error?: string;
       };
       if (!res.ok || !body.url || !body.fileId) {
-        throw new Error(body.error || 'Generation failed. Please try again.');
+        throw new Error(body.error || "Generation didn't go through — usually temporary.");
       }
       setResult({
         url: body.url,
@@ -125,7 +125,7 @@ export function CreatePanel() {
       });
       toastSuccess(body.kind === 'video' ? 'Video ready.' : 'Image ready.', toastId);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Generation failed. Please try again.';
+      const message = e instanceof Error ? e.message : "Generation didn't go through — usually temporary.";
       setError(message);
       toastError(message, toastId);
     } finally {

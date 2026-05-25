@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     await uploadObject({ key: sourceKey, body: sourceBuffer, contentType: file.type, isPublic: false });
   } catch (err) {
     logger.error('[studio.edit] source upload failed', { spaceId: space.id }, err as Error);
-    return NextResponse.json({ error: 'Could not start the edit. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't start the edit — usually temporary." }, { status: 500 });
   }
 
   const { error: srcErr } = await supabase.from('File').insert({
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   if (srcErr) {
     await deleteObject(sourceKey).catch(() => undefined);
     logger.error('[studio.edit] source insert failed', { spaceId: space.id }, srcErr);
-    return NextResponse.json({ error: 'Could not start the edit. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't start the edit — usually temporary." }, { status: 500 });
   }
 
   try {
@@ -126,6 +126,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof StudioGenerationError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    return NextResponse.json({ error: 'The edit failed. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Edit didn't go through — usually temporary." }, { status: 500 });
   }
 }

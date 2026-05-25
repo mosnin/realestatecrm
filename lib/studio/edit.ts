@@ -106,7 +106,7 @@ export async function runStudioEdit(args: {
   } catch (err) {
     logger.error('[studio.edit] fal failed', { spaceId: args.spaceId, model: tool.id }, err as Error);
     await markFailed('Edit failed');
-    throw new StudioGenerationError('The edit failed. Please try again.', 502);
+    throw new StudioGenerationError("Edit didn't go through — usually temporary.", 502);
   }
 
   let buffer: Buffer;
@@ -119,7 +119,7 @@ export async function runStudioEdit(args: {
   } catch (err) {
     logger.error('[studio.edit] result fetch failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not retrieve the edited image.');
-    throw new StudioGenerationError('The edit failed. Please try again.', 502);
+    throw new StudioGenerationError("Edit didn't go through — usually temporary.", 502);
   }
 
   const fileId = crypto.randomUUID();
@@ -136,7 +136,7 @@ export async function runStudioEdit(args: {
   } catch (err) {
     logger.error('[studio.edit] upload failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not store the edited image.');
-    throw new StudioGenerationError('The edit failed. Please try again.', 500);
+    throw new StudioGenerationError("Edit didn't go through — usually temporary.", 500);
   }
 
   const { error: fileErr } = await supabase.from('File').insert({
@@ -154,7 +154,7 @@ export async function runStudioEdit(args: {
     await deleteObject(storageKey).catch(() => undefined);
     logger.error('[studio.edit] file insert failed', { spaceId: args.spaceId }, fileErr);
     await markFailed('Could not record the edited image.');
-    throw new StudioGenerationError('The edit failed. Please try again.', 500);
+    throw new StudioGenerationError("Edit didn't go through — usually temporary.", 500);
   }
 
   await supabase

@@ -22,7 +22,7 @@ export function RevokeInviteButton({ invitationId }: RevokeInviteButtonProps) {
         alert(data.error ?? 'Failed to cancel invitation.');
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
     }

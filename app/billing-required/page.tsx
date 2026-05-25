@@ -69,7 +69,7 @@ function BillingRequiredContent() {
         setLoading(false);
       }
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError("That didn't go through — usually temporary.");
       setLoading(false);
     }
   }
@@ -91,7 +91,7 @@ function BillingRequiredContent() {
         setLoading(false);
       }
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError("That didn't go through — usually temporary.");
       setLoading(false);
     }
   }

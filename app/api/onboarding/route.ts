@@ -422,7 +422,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
         }
         console.error('[onboarding] Space insert failed:', spaceInsertErr);
-        return NextResponse.json({ error: 'Failed to create workspace. Please try again.' }, { status: 500 });
+        return NextResponse.json({ error: "Couldn't create workspace — usually temporary." }, { status: 500 });
       }
 
       // 2. Create SpaceSetting
@@ -669,6 +669,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err) {
     console.error('[onboarding POST] action:', action, err);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

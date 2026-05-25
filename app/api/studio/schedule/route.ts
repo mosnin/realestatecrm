@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       await uploadObject({ key: storageKey, body: buffer, contentType: file.type, isPublic: false });
     } catch (err) {
       logger.error('[studio.schedule] upload failed', { spaceId: space.id }, err as Error);
-      return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't schedule the post — usually temporary." }, { status: 500 });
     }
 
     const { error: fileErr } = await supabase.from('File').insert({
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
     if (fileErr) {
       await deleteObject(storageKey).catch(() => undefined);
       logger.error('[studio.schedule] file insert failed', { spaceId: space.id }, fileErr);
-      return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't schedule the post — usually temporary." }, { status: 500 });
     }
   }
 
@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
     .single();
   if (postErr) {
     logger.error('[studio.schedule] post insert failed', { spaceId: space.id }, postErr);
-    return NextResponse.json({ error: 'Could not schedule the post. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't schedule the post — usually temporary." }, { status: 500 });
   }
 
   // Hand the post to Inngest — a delayed event fires the publish at the
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
       .update({ status: 'failed', updatedAt: new Date().toISOString() })
       .eq('id', post.id);
     return NextResponse.json(
-      { error: 'Could not schedule the post. Please try again.' },
+      { error: "Couldn't schedule the post — usually temporary." },
       { status: 500 },
     );
   }

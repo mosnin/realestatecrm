@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const { allowed } = await checkRateLimit(`portal:get:${ip}`, 20, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: 'Too many requests. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

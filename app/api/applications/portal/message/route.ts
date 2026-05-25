@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   const { allowed: ipAllowed } = await checkRateLimit(`portal:msg:ip:${ip}`, 30, 3600);
   if (!ipAllowed) {
     return NextResponse.json(
-      { error: 'Too many messages. Please try again later.' },
+      { error: 'Too many messages. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`portal:msg:${tokenKey}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many messages. Please try again later.' },
+      { error: 'Too many messages. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

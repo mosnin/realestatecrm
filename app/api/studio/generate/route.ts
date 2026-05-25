@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     return NextResponse.json(
-      { error: 'Generation failed. Please try again.' },
+      { error: "Generation didn't go through — usually temporary." },
       { status: 500 },
     );
   }

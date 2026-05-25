@@ -124,7 +124,7 @@ export async function runStudioGeneration(args: {
       err as Error,
     );
     await markFailed('Generation failed');
-    throw new StudioGenerationError('Generation failed. Please try again.', 502);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 502);
   }
 
   // ── Copy the bytes out of fal's temporary URL into our own storage ──────
@@ -138,7 +138,7 @@ export async function runStudioGeneration(args: {
   } catch (err) {
     logger.error('[studio.generate] asset fetch failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not retrieve the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 502);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 502);
   }
 
   // ── Store as a File ─────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ export async function runStudioGeneration(args: {
   } catch (err) {
     logger.error('[studio.generate] upload failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not store the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 500);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
   const { error: fileErr } = await supabase.from('File').insert({
@@ -177,7 +177,7 @@ export async function runStudioGeneration(args: {
     await deleteObject(storageKey).catch(() => undefined);
     logger.error('[studio.generate] file insert failed', { spaceId: args.spaceId }, fileErr);
     await markFailed('Could not record the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 500);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
   await supabase

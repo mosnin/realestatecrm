@@ -114,11 +114,11 @@ export function EditPanel() {
         error?: string;
       };
       if (!res.ok || !body.url || !body.fileId) {
-        throw new Error(body.error || 'The edit failed. Please try again.');
+        throw new Error(body.error || "Edit didn't go through — usually temporary.");
       }
       setResult({ url: body.url, fileId: body.fileId });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'The edit failed. Please try again.');
+      setError(e instanceof Error ? e.message : "Edit didn't go through — usually temporary.");
     } finally {
       setProcessing(false);
     }
