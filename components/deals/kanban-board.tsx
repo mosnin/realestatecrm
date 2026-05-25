@@ -189,6 +189,10 @@ interface KanbanBoardProps {
   /** Search query from the page toolbar. The board does the actual
    *  filtering. */
   searchQuery: string;
+  /** Fires after the board fetches fresh data following a mutation (deal
+   *  created, deleted, status-changed, dragged, advanced). Parent uses this
+   *  to keep the sibling `PipelineSummary` in sync. */
+  onDataChanged?: () => void;
 }
 
 export function KanbanBoard({
@@ -197,6 +201,7 @@ export function KanbanBoard({
   boardStatus,
   focus,
   searchQuery,
+  onDataChanged,
 }: KanbanBoardProps) {
   const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
@@ -268,10 +273,20 @@ export function KanbanBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  // Initial mount fetch doesn't need to fire `onDataChanged` — the sibling
+  // stat strip already loads itself on mount. Subsequent fetches are
+  // mutation-driven and should kick the strip to resync so KPIs don't go
+  // stale right after a deal is created.
+  const hasFetchedRef = useRef(false);
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`);
     if (res.ok) setStages(await res.json());
-  }, [slug, pipelineId]);
+    if (hasFetchedRef.current) {
+      onDataChanged?.();
+    } else {
+      hasFetchedRef.current = true;
+    }
+  }, [slug, pipelineId, onDataChanged]);
 
   useEffect(() => {
     fetchData();

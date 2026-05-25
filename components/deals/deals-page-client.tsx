@@ -45,6 +45,10 @@ export function DealsPageClient({ slug }: { slug: string }) {
   // and focus chip share one row. Used to be in the kanban — but having three
   // separate rows of chrome was the whole problem.
   const [searchQuery, setSearchQuery] = useState('');
+  // Bumped by the kanban after every mutation refetch so the stat strip
+  // (`PipelineSummary`) re-fetches in lockstep. Without this the strip would
+  // still say "0 active deals" right after the realtor created one.
+  const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
 
   // Load pipelines (triggers bootstrap if this is the first visit)
   useEffect(() => {
@@ -151,6 +155,7 @@ export function DealsPageClient({ slug }: { slug: string }) {
           focus={focus}
           onFocusChange={setFocus}
           onAddDeal={handleAddDeal}
+          refreshKey={summaryRefreshKey}
         />
       )}
 
@@ -253,6 +258,7 @@ export function DealsPageClient({ slug }: { slug: string }) {
           boardStatus={boardStatus}
           focus={focus}
           searchQuery={searchQuery}
+          onDataChanged={() => setSummaryRefreshKey((k) => k + 1)}
         />
       )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
@@ -27,6 +27,10 @@ interface PipelineSummaryProps {
   onFocusChange: (next: BoardFocus) => void;
   /** Called from the narration line when the page is empty. */
   onAddDeal: () => void;
+  /** Bumped by the parent after the kanban refetches (deal created,
+   *  deleted, status changed). Forces this stat strip to re-fetch so the
+   *  KPI numbers don't go stale right after the realtor adds a deal. */
+  refreshKey?: number;
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
@@ -61,35 +65,43 @@ export function PipelineSummary({
   focus,
   onFocusChange,
   onAddDeal,
+  refreshKey = 0,
 }: PipelineSummaryProps) {
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
+      );
+      if (!res.ok) {
+        setStages([]);
+        return;
+      }
+      const data: StageWithDeals[] = await res.json();
+      setStages(Array.isArray(data) ? data : []);
+    } catch {
+      setStages([]);
+    }
+  }, [slug, pipelineId]);
+
+  // Re-fetch on initial mount and whenever the parent bumps refreshKey (the
+  // kanban below bumps it after every mutation). Subscribing directly to
+  // Supabase realtime here would coalesce with the kanban's Deal channel —
+  // either component's unmount would tear down the other's subscription —
+  // so a parent-driven counter is the safer signal.
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    (async () => {
       setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
-        );
-        if (!res.ok) {
-          if (!cancelled) setStages([]);
-          return;
-        }
-        const data: StageWithDeals[] = await res.json();
-        if (!cancelled) setStages(Array.isArray(data) ? data : []);
-      } catch {
-        if (!cancelled) setStages([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
+      await load();
+      if (!cancelled) setLoading(false);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [slug, pipelineId]);
+  }, [load, refreshKey]);
 
   const stats: PipelineStats = useMemo(() => {
     const allDeals = stages.flatMap((s) => s.deals ?? []);
