@@ -22,12 +22,12 @@ import {
   Music,
   Upload,
   Trash2,
-  Download,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatBytes, type FileCategory } from '@/lib/storage/limits';
+import { FilePreviewModal, type PreviewableFile } from './file-preview-modal';
 
 interface FileRow {
   id: string;
@@ -40,6 +40,11 @@ interface FileRow {
   /** Where the file came from. 'chat' rows are read-only here; manage them
    *  by removing the attachment inside the Chippi conversation. */
   source: 'file' | 'chat';
+  /** Inline-renderable URL for thumbnails. Set by the GET /api/files
+   *  endpoint for images + videos (signed for private files; public for
+   *  chat attachments + public files). `null` for types we don't preview
+   *  in the card (PDFs, audio, "other") — the card shows an icon. */
+  previewUrl: string | null;
 }
 
 interface Quota {
@@ -76,6 +81,7 @@ export function FilesPanel() {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<FileRow | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -140,7 +146,7 @@ export function FilesPanel() {
   );
 
   const onDelete = useCallback(
-    async (file: FileRow) => {
+    async (file: FileRow | PreviewableFile) => {
       const endpoint =
         file.source === 'chat'
           ? `/api/ai/attachments?id=${encodeURIComponent(file.id)}`
@@ -150,20 +156,6 @@ export function FilesPanel() {
     },
     [refresh],
   );
-
-  const onDownload = useCallback(async (file: FileRow) => {
-    // Chat attachments are already public — fetch the row to get the URL.
-    // Files use a signed-URL endpoint that returns a 5-min download link.
-    const endpoint =
-      file.source === 'chat'
-        ? `/api/ai/attachments?id=${encodeURIComponent(file.id)}`
-        : `/api/files/${file.id}`;
-    const res = await fetch(endpoint);
-    if (!res.ok) return;
-    const body = (await res.json()) as { url?: string; publicUrl?: string };
-    const url = body.url ?? body.publicUrl;
-    if (url) window.open(url, '_blank', 'noopener');
-  }, []);
 
   const visibleFiles = useMemo(() => {
     if (tab === 'all') return files;
@@ -300,10 +292,21 @@ export function FilesPanel() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visibleFiles.map((file) => (
-            <FileCard key={file.id} file={file} onDelete={onDelete} onDownload={onDownload} />
+            <FileCard
+              key={file.id}
+              file={file}
+              onDelete={onDelete}
+              onOpen={() => setPreview(file)}
+            />
           ))}
         </div>
       )}
+
+      <FilePreviewModal
+        file={preview}
+        onClose={() => setPreview(null)}
+        onDelete={onDelete}
+      />
     </div>
   );
 }
@@ -311,48 +314,77 @@ export function FilesPanel() {
 function FileCard({
   file,
   onDelete,
-  onDownload,
+  onOpen,
 }: {
   file: FileRow;
   onDelete: (file: FileRow) => void;
-  onDownload: (file: FileRow) => void;
+  onOpen: () => void;
 }) {
   const Icon = CATEGORY_ICON[file.category];
+  const isImage = file.mimeType.startsWith('image/') && !!file.previewUrl;
+  const isVideo = file.mimeType.startsWith('video/') && !!file.previewUrl;
+
   return (
-    <div className="group relative rounded-xl border border-border/60 bg-card overflow-hidden hover:border-border transition-colors">
-      <div className="aspect-square bg-muted/30 flex items-center justify-center">
-        <Icon className="w-8 h-8 text-muted-foreground/60" />
-      </div>
-      <div className="p-2.5 space-y-0.5">
-        <p className="text-[12px] font-medium text-foreground truncate" title={file.name}>
-          {file.name}
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10.5px] text-muted-foreground tabular-nums">
-            {formatBytes(file.sizeBytes)}
-          </p>
-          {file.source === 'chat' && (
-            <span
-              title="Uploaded inside a Chippi conversation"
-              className="text-[9px] uppercase tracking-wider font-medium px-1.5 py-px rounded-full bg-foreground/[0.06] text-foreground/55"
-            >
-              Chat
-            </span>
+    <div
+      className="group relative rounded-xl border border-border/60 bg-card overflow-hidden hover:border-border transition-colors"
+    >
+      {/* The thumbnail itself is the click target so the realtor doesn't
+       *  have to hunt for a button. The action overlay (Delete) sits on
+       *  top with stopPropagation so it never opens the preview. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        title={`Open ${file.name}`}
+        className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+      >
+        <div className="aspect-square bg-muted/30 flex items-center justify-center overflow-hidden">
+          {isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={file.previewUrl as string}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : isVideo ? (
+            // <video preload="metadata"> pulls just enough of the file to
+            // render the first frame as a poster — no streaming the whole
+            // mp4 to draw a thumbnail.
+            <video
+              src={file.previewUrl as string}
+              preload="metadata"
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Icon className="w-8 h-8 text-muted-foreground/60" />
           )}
         </div>
-      </div>
+        <div className="p-2.5 space-y-0.5">
+          <p className="text-[12px] font-medium text-foreground truncate" title={file.name}>
+            {file.name}
+          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10.5px] text-muted-foreground tabular-nums">
+              {formatBytes(file.sizeBytes)}
+            </p>
+            {file.source === 'chat' && (
+              <span
+                title="Uploaded inside a Chippi conversation"
+                className="text-[9px] uppercase tracking-wider font-medium px-1.5 py-px rounded-full bg-foreground/[0.06] text-foreground/55"
+              >
+                Chat
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
-          onClick={() => onDownload(file)}
-          title="Download"
-          className="w-7 h-7 rounded-md bg-background/90 backdrop-blur-sm text-foreground/70 hover:text-foreground flex items-center justify-center border border-border/60"
-        >
-          <Download size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             if (confirm(`Delete "${file.name}"?`)) onDelete(file);
           }}
           title="Delete"
