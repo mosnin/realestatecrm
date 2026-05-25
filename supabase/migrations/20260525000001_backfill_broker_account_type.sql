@@ -20,19 +20,34 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- AIUserProfile is keyed on spaceId (one row per Space, not per User), so
--- bridge through Space.ownerId to reach the User. EXISTS keeps the query
--- semantics clean and avoids any Cartesian risk if a user owns multiple
--- spaces (only the first match is needed).
-UPDATE "User" u
-SET "accountType" = 'both'
-WHERE u."accountType" = 'realtor'
-  AND EXISTS (
-    SELECT 1
-    FROM "Space" s
-    JOIN "AIUserProfile" p ON p."spaceId" = s.id
-    WHERE s."ownerId" = u.id
-      AND p.role = 'brokerage_owner'
-  );
+-- bridge through Space.ownerId to reach the User.
+--
+-- Defensive wrapper: `AIUserProfile.role` is added by an earlier migration
+-- (20260514000001_realtor_onboarding_profile.sql). On databases that
+-- haven't run that one yet, the column doesn't exist and a bare query
+-- against `p.role` errors with 42703. Guard with information_schema so
+-- this migration is safe to run on any schema state — if the role column
+-- isn't there, pass 1 has nothing to backfill anyway and silently skips.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'AIUserProfile'
+      AND column_name = 'role'
+  ) THEN
+    UPDATE "User" u
+    SET "accountType" = 'both'
+    WHERE u."accountType" = 'realtor'
+      AND EXISTS (
+        SELECT 1
+        FROM "Space" s
+        JOIN "AIUserProfile" p ON p."spaceId" = s.id
+        WHERE s."ownerId" = u.id
+          AND p.role = 'brokerage_owner'
+      );
+  END IF;
+END $$;
 
 -- Also catch the inverse: users who ALREADY own a Brokerage but whose
 -- User row never had accountType updated (covers race conditions or
