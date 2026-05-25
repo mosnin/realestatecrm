@@ -75,6 +75,7 @@ export interface IntegrationApp {
  * route and the catalog can't drift.
  */
 export const COMING_SOON_TOOLKITS = new Set<string>([
+  'follow_up_boss',
   'compass',
   'boomtown',
   'kvcore',
@@ -147,7 +148,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
 
   // ── Real estate ──────────────────────────────────────────────────────
   // Slugs are snake_case to match Composio's catalog convention.
-  { toolkit: 'follow_up_boss', name: 'Follow-up Boss', blurb: 'Limited — connect and write, list endpoints coming soon.', category: 'real-estate', promoted: true },
+  { toolkit: 'follow_up_boss', name: 'Follow-up Boss', blurb: 'Sync your Follow-up Boss pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
   { toolkit: 'compass', name: 'Compass', blurb: 'Sync your Compass pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
   { toolkit: 'boomtown', name: 'BoomTown', blurb: 'Pull BoomTown leads into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },
   { toolkit: 'kvcore', name: 'kvCORE', blurb: 'Pull kvCORE leads and tasks into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },

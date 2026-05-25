@@ -111,9 +111,11 @@ function makeRequest(toolkit: string) {
 }
 
 describe('POST /api/integrations/connect/[toolkit] — coming-soon slugs', () => {
-  // Real-estate-niche apps without a Composio toolkit yet. Follow-up Boss
-  // graduated out of this set once Composio provisioned its toolkit.
-  const PLACEHOLDERS = ['compass', 'boomtown', 'kvcore', 'real_geeks'];
+  // Real-estate-niche apps without a working Composio toolkit yet. Follow-up
+  // Boss is gated here defensively — Composio lists the toolkit but the
+  // endpoints aren't wired through, so a routine using FUB would error
+  // silently. Keep it on the list until the FUB path is end-to-end live.
+  const PLACEHOLDERS = ['follow_up_boss', 'compass', 'boomtown', 'kvcore', 'real_geeks'];
 
   it('the COMING_SOON_TOOLKITS set covers every placeholder slug we promise', () => {
     for (const slug of PLACEHOLDERS) {
