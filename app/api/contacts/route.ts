@@ -113,6 +113,27 @@ export async function POST(req: NextRequest) {
   const notesVal = notes ? String(notes).trim().slice(0, 5000) : null;
   const preferencesVal = preferences ? String(preferences).trim().slice(0, 5000) : null;
 
+  // Dedupe by email (case-insensitive) within this space. The intake flow
+  // and CSV imports occasionally re-create the same person — better to
+  // hand back the existing record than make the realtor merge later.
+  // No new DB constraint: case-mismatched emails would be rejected by a
+  // unique index, which may not be desired across all data.
+  if (emailVal) {
+    const { data: existing, error: dupErr } = await supabase
+      .from('Contact')
+      .select('id')
+      .eq('spaceId', space.id)
+      .ilike('email', emailVal)
+      .limit(1)
+      .maybeSingle();
+    if (!dupErr && existing) {
+      return NextResponse.json(
+        { id: existing.id, duplicate: true },
+        { status: 200 },
+      );
+    }
+  }
+
   const propsVal = Array.isArray(properties)
     ? properties
         .filter((p: unknown): p is string => typeof p === 'string')

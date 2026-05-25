@@ -479,6 +479,32 @@ export async function POST(req: NextRequest) {
       logger.warn('[apply] idempotency lock unavailable; using DB fallback', { spaceId: space.id }, error);
     }
 
+    // Same-email dedupe across all time (case-insensitive). Submitting the
+     // same email twice always returns the existing contact — different name,
+     // different phone, days later, it doesn't matter. The 5-minute name+phone
+     // window below catches the "double-tap submit" case for emailless flows.
+     if (contactEmail) {
+      const { data: emailMatches, error: emailDupErr } = await supabase
+        .from('Contact')
+        .select('id, applicationRef')
+        .eq('spaceId', space.id)
+        .ilike('email', contactEmail)
+        .contains('tags', ['application-link'])
+        .order('createdAt', { ascending: false })
+        .limit(1);
+      if (!emailDupErr && emailMatches && emailMatches.length > 0) {
+        const match = emailMatches[0] as { id: string; applicationRef: string | null };
+        return NextResponse.json(
+          {
+            success: true,
+            id: match.id,
+            applicationRef: match.applicationRef ?? undefined,
+          },
+          { status: 200 },
+        );
+      }
+    }
+
     // Expanded window: 5 minutes (was 2 minutes)
     const duplicateCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: existingRecentLeads, error: dupError } = await supabase
