@@ -158,18 +158,33 @@ export default async function SettingsPage({
 
       {/* Tab nav — horizontal-scroll on mobile, fits comfortably on desktop.
           Active tab uses the foreground underline rule from STYLESHEET; the
-          rest stay muted. No pill chrome — paper-flat. */}
-      <nav className="border-b border-border/60" aria-label="Settings sections">
-        <div className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide">
+          rest stay muted. No pill chrome — paper-flat.
+
+          Mobile affordances: `snap-x` so tabs lock cleanly into view when
+          scrubbed, and edge gradient masks that fade tabs off the side so
+          the user sees there's more to the right (or left). Same gradient
+          pattern the chat composer uses (`from-background to-transparent`),
+          just rotated for horizontal scroll. */}
+      <nav
+        className="relative border-b border-border/60"
+        aria-label="Settings sections"
+      >
+        <div
+          role="tablist"
+          aria-label="Settings sections"
+          className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide snap-x snap-proximity"
+        >
           {TABS.map((t) => {
             const isActiveTab = t.id === activeTab;
             return (
               <Link
                 key={t.id}
                 href={`/s/${slug}/settings?tab=${t.id}`}
+                role="tab"
                 aria-current={isActiveTab ? 'page' : undefined}
+                aria-selected={isActiveTab}
                 className={cn(
-                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap',
+                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap snap-start',
                   'border-b-2 -mb-px transition-colors duration-150',
                   isActiveTab
                     ? 'border-foreground text-foreground font-medium'
@@ -181,6 +196,17 @@ export default async function SettingsPage({
             );
           })}
         </div>
+        {/* Edge fade masks — signal "there's more off-screen" on mobile.
+            Always-on, faint; pointer-events-none so they never eat taps.
+            Hidden on md and up where the row fits without scrolling. */}
+        <div
+          aria-hidden
+          className="md:hidden pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
+        />
+        <div
+          aria-hidden
+          className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+        />
       </nav>
 
       {/* Active-tab content. Each tab is a focused stack of related sections;

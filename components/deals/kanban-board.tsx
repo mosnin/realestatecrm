@@ -155,6 +155,195 @@ function formatCurrency(n: number | null) {
 }
 
 /**
+ * Mobile kanban — one stage column visible at a time, swipe between them.
+ * The stage-pill row at the top doubles as the page indicator: the pill of
+ * the column currently in view is filled; tapping a pill scrolls the matching
+ * column into view.
+ *
+ * Implementation notes:
+ * - `snap-x snap-mandatory` on the scroller + `snap-center` on each panel
+ *   pins each stage cleanly when the user releases mid-swipe.
+ * - `IntersectionObserver` keeps the active pill in sync with the scrolled
+ *   column without needing a scroll listener and per-frame math.
+ * - We deliberately do not enable @dnd-kit on mobile — drag-to-reorder across
+ *   columns doesn't fit a one-column-at-a-time viewport. Stage changes happen
+ *   through the slide-over panel.
+ */
+function MobileKanban({
+  stages,
+  onOpenDeal,
+  formatCurrency: formatCurrencyProp,
+}: {
+  stages: { id: string; name: string; color: string; deals: Array<{ id: string; title: string; address: string | null; value: number | null }> }[];
+  onOpenDeal: (dealId: string) => void;
+  formatCurrency: (n: number | null) => string | null;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const panelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [activeStageId, setActiveStageId] = useState<string | null>(stages[0]?.id ?? null);
+
+  // Keep activeStageId valid if the stage set changes (e.g. filters narrow
+  // the visible list). Without this we'd hold a stale id and no pill would
+  // light up.
+  useEffect(() => {
+    if (stages.length === 0) {
+      setActiveStageId(null);
+      return;
+    }
+    if (!stages.some((s) => s.id === activeStageId)) {
+      setActiveStageId(stages[0].id);
+    }
+  }, [stages, activeStageId]);
+
+  // Observe which panel is centered in the scroller; that's the active stage.
+  useEffect(() => {
+    const root = scrollerRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the most-visible entry above the 0.5 threshold.
+        const best = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (best) {
+          const id = (best.target as HTMLElement).dataset.stageId;
+          if (id) setActiveStageId(id);
+        }
+      },
+      { root, threshold: [0.5, 0.75, 1] },
+    );
+    panelRefs.current.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [stages]);
+
+  function scrollToStage(stageId: string) {
+    const el = panelRefs.current.get(stageId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      setActiveStageId(stageId);
+    }
+  }
+
+  if (stages.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Stage pill nav — horizontal scroll, active pill filled.
+          aria-tabs pattern so each pill announces the column it controls. */}
+      <div
+        role="tablist"
+        aria-label="Pipeline stages"
+        className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1"
+      >
+        {stages.map((stage) => {
+          const isActive = stage.id === activeStageId;
+          return (
+            <button
+              key={stage.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`mobile-kanban-panel-${stage.id}`}
+              onClick={() => scrollToStage(stage.id)}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium whitespace-nowrap transition-colors duration-150 flex-shrink-0',
+                isActive
+                  ? 'bg-foreground text-background'
+                  : 'bg-muted/50 text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: stage.color }}
+                aria-hidden
+              />
+              <span>{stage.name}</span>
+              <span className="tabular-nums opacity-70">{stage.deals.length}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Snap scroller — one full-width panel per stage. */}
+      <div
+        ref={scrollerRef}
+        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 gap-4 pb-2"
+      >
+        {stages.map((stage) => (
+          <div
+            key={stage.id}
+            ref={(el) => {
+              if (el) panelRefs.current.set(stage.id, el);
+              else panelRefs.current.delete(stage.id);
+            }}
+            data-stage-id={stage.id}
+            id={`mobile-kanban-panel-${stage.id}`}
+            role="tabpanel"
+            aria-label={stage.name}
+            className="snap-center snap-always flex-shrink-0 w-full rounded-xl border border-border/70 bg-background overflow-hidden"
+          >
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-foreground/[0.02] border-b border-border/70">
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: stage.color }}
+                aria-hidden
+              />
+              <span className="text-sm font-semibold text-foreground truncate">
+                {stage.name}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums ml-auto">
+                {stage.deals.length}
+              </span>
+            </div>
+            {stage.deals.length === 0 ? (
+              <div className="px-3 py-8 text-center">
+                <p className="text-xs text-muted-foreground">Nothing in this stage yet.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/70">
+                {stage.deals.map((deal) => (
+                  <button
+                    key={deal.id}
+                    type="button"
+                    onClick={() => onOpenDeal(deal.id)}
+                    className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-foreground/[0.04] transition-colors duration-150"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate text-foreground">
+                        {deal.title}
+                      </p>
+                      {deal.address && (
+                        <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                          <MapPin size={10} />
+                          {deal.address}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {deal.value != null && (
+                        <span
+                          className="text-sm tabular-nums text-foreground"
+                          style={TITLE_FONT}
+                        >
+                          {formatCurrencyProp(deal.value)}
+                        </span>
+                      )}
+                      <ArrowRight size={12} className="text-muted-foreground/50" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Pulls a human-readable error message from a failed API response.
  * Routes in this app return `{ error: string }` on non-2xx. Falls back to
  * the HTTP status text, then a generic label, if the body is empty/malformed.
@@ -871,51 +1060,16 @@ export function KanbanBoard({
       {/* Toolbar (search + focus chip + status toggle) is now part of the
           page chrome above. The board renders just the board. */}
 
-      {/* Mobile stacked view — paper-flat hairline rows. */}
-        <div className="md:hidden space-y-4">
-          {filteredStages.map((stage) => (
-            <div key={stage.id} className="rounded-xl border border-border/70 bg-background overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-foreground/[0.02] border-b border-border/70">
-                <span className="text-sm font-semibold text-foreground">{stage.name}</span>
-                <span className="text-[11px] text-muted-foreground tabular-nums ml-auto">{stage.deals.length}</span>
-              </div>
-              {stage.deals.length === 0 ? (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">Nothing in this stage yet.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/70">
-                  {stage.deals.map((deal) => (
-                    <div
-                      key={deal.id}
-                      className="flex items-center gap-3 px-3 py-3 hover:bg-foreground/[0.04] transition-colors duration-150 cursor-pointer"
-                      onClick={() => setPanelDealId(deal.id)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-foreground">{deal.title}</p>
-                        {deal.address && (
-                          <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                            <MapPin size={10} />{deal.address}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {deal.value != null && (
-                          <span
-                            className="text-sm tabular-nums text-foreground"
-                            style={TITLE_FONT}
-                          >
-                            {formatCurrency(deal.value)}
-                          </span>
-                        )}
-                        <ArrowRight size={12} className="text-muted-foreground/50" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Mobile view — one stage column at a time with horizontal snap.
+          The stage-pill nav above doubles as the page indicator. Tap a pill
+          to jump, swipe to scrub. No more 60px columns, no more endless
+          vertical scroll across five stacked sections. */}
+        <div className="md:hidden">
+          <MobileKanban
+            stages={filteredStages}
+            onOpenDeal={(dealId) => setPanelDealId(dealId)}
+            formatCurrency={formatCurrency}
+          />
         </div>
         {/* Desktop kanban view */}
         <div className="hidden md:block overflow-x-auto pb-4">

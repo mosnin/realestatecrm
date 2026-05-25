@@ -383,32 +383,32 @@ export default async function BrokerOverviewPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="font-medium text-foreground truncate">{name}</span>
-                        <span className="text-[11px] text-muted-foreground">{role}</span>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{role}</span>
                         {!onboard && (
-                          <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                          <span className="text-[11px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
                             invited — not joined
                           </span>
                         )}
                       </div>
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
                         {deals.count > 0 && (
-                          <span className="inline-flex items-center gap-1 tabular-nums">
+                          <span className="inline-flex items-center gap-1 tabular-nums whitespace-nowrap">
                             <Briefcase size={10} />
                             {deals.count} deal{deals.count === 1 ? '' : 's'} · ${formatCompact(deals.value)}
                           </span>
                         )}
                         {apps > 0 && (
-                          <span className="tabular-nums">
+                          <span className="tabular-nums whitespace-nowrap">
                             {apps} application{apps === 1 ? '' : 's'}
                           </span>
                         )}
                         {leads > 0 && (
-                          <span className="tabular-nums">
+                          <span className="tabular-nums whitespace-nowrap">
                             {leads} new lead{leads === 1 ? '' : 's'}
                           </span>
                         )}
                         {drafts > 0 && (
-                          <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 tabular-nums font-medium">
+                          <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 tabular-nums font-medium whitespace-nowrap">
                             <Inbox size={10} />
                             {drafts} draft{drafts === 1 ? '' : 's'} pending
                           </span>
