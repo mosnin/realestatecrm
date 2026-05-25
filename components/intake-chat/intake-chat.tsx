@@ -466,6 +466,26 @@ export function IntakeChat({
   // from the realtor's hero or the question itself.
   const showChippiIntro = phase === 'asking' && answeredCount === 0;
 
+  // End-of-flow transition: when the application is submitted, the chat
+  // history, progress bar, and Chippi intro all disappear and the success
+  // card takes over the full surface. Anything else stacks confirmation
+  // below the last question — which reads as "you submitted, here's a
+  // receipt below your conversation" instead of "you're done, well done."
+  if (phase === 'done') {
+    return (
+      <div className="space-y-8">
+        <IntakeChatSuccess
+          businessName={businessName}
+          agentPhoto={agentPhoto}
+          applicationRef={applicationRef}
+          thankYouTitle={customization.thankYouTitle}
+          thankYouMessage={customization.thankYouMessage}
+          accentColor={customization.accentColor}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {showProgress && (
@@ -523,17 +543,6 @@ export function IntakeChat({
             setSubmitError(null);
             void submit();
           }}
-        />
-      )}
-
-      {phase === 'done' && (
-        <IntakeChatSuccess
-          businessName={businessName}
-          agentPhoto={agentPhoto}
-          applicationRef={applicationRef}
-          thankYouTitle={customization.thankYouTitle}
-          thankYouMessage={customization.thankYouMessage}
-          accentColor={customization.accentColor}
         />
       )}
 

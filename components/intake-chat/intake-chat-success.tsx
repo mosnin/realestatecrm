@@ -60,15 +60,17 @@ export function IntakeChatSuccess({
         </p>
       </motion.div>
 
-      {/* Application ref */}
+      {/* Application ref — 6 chars uppercase. A 64-char hex dump means
+          nothing to an applicant; a short code is something they can quote
+          on a phone call if the realtor asks for it. */}
       {applicationRef && (
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: DURATION_BASE }}
-          className="text-[11px] tabular-nums text-muted-foreground"
+          className="text-[11px] tabular-nums text-muted-foreground/80"
         >
-          Your reference: {applicationRef}
+          Reference {applicationRef.replace(/-/g, '').slice(0, 6).toUpperCase()}
         </motion.p>
       )}
     </motion.div>
