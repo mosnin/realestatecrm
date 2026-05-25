@@ -1,13 +1,21 @@
-"""Draft message tool — Chippi never sends, only drafts.
+"""Draft message tool — and the explicit-send escape hatches.
 
-Every contact-facing message lands in the realtor's approval inbox as an
-AgentDraft. The realtor approves before anything ships. There is no "send"
-mode, no autonomy override, no confidence gate. One trust boundary.
+draft_message is the DEFAULT outreach path: every contact-facing message
+lands in the realtor's approval inbox as an AgentDraft, and the realtor
+approves before anything ships. Routines and autonomous runs always
+draft — the trust boundary.
 
-The tool auto-dedupes: if a draft for the same contact + channel was created
-in the last 48 hours and is still pending, the existing draft is returned
-instead of a new one. Prevents the agent from burying the realtor in copies
-when it loops.
+send_email_now / send_sms_now are the EXPLICIT-INTENT escape hatches: when
+the realtor uses imperative verbs ("send", "fire off", "shoot them"),
+those tools dispatch immediately through the existing /api/agent/send
+delivery path (Resend for email, Telnyx for SMS) and log a ContactActivity
+row instead of creating a draft. No AgentDraft row, no approval step.
+The realtor is in control — they asked, we ship.
+
+draft_message auto-dedupes: if a draft for the same contact + channel was
+created in the last 48 hours and is still pending, the existing draft is
+returned instead of a new one. Prevents the agent from burying the realtor
+in copies when it loops.
 """
 
 from __future__ import annotations
@@ -16,17 +24,22 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 from agents import RunContextWrapper, function_tool
 
+from config import settings
 from db import supabase
 from errors import from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
-from tools.base import idempotent_tool, with_retry
+from tools.base import idempotent_tool, rate_limited, with_retry
 from tools.streaming import publish_event
 
 _VALID_CHANNELS = {"sms", "email", "note"}
 _DEDUPE_WINDOW_HOURS = 48
+# Send-now delivery proxy timeout — must comfortably cover Resend / Telnyx
+# round trips with retries. Matches the integrations dispatcher exec timeout.
+_SEND_NOW_TIMEOUT = 60.0
 
 
 @function_tool(strict_mode=False)
@@ -255,4 +268,408 @@ async def draft_message(
         "channel": channel,
         "autoCreatedContact": auto_created,
         "nextStep": next_step,
+    }
+
+
+# ── Send-now escape hatches ─────────────────────────────────────────────
+# draft_message is the DEFAULT. send_email_now and send_sms_now are the
+# explicit-intent paths the agent reaches for only when the realtor used
+# imperative verbs ("send", "fire off", "shoot them"). Both skip the
+# AgentDraft pipeline entirely and dispatch through /api/agent/send, which
+# already handles transport (Resend for email, Telnyx for SMS), contact
+# ownership validation, and ContactActivity logging.
+#
+# Shared invariants:
+#   - Resolve recipient via contact_id OR recipient_email/phone (same
+#     resolution rules as draft_message, including auto-stub creation).
+#   - Never create an AgentDraft row.
+#   - publish_event so the realtor sees the send land in the activity feed.
+#   - persist_log with action_type='message_sent', outcome='completed'
+#     so the broker rollup sees a real send, not a draft.
+
+
+async def _resolve_or_stub_contact(
+    *,
+    db: Any,
+    space_id: str,
+    contact_id: str | None,
+    recipient_email: str | None,
+    recipient_phone: str | None,
+) -> tuple[str | None, str | None, bool, dict | None]:
+    """Resolve a contact_id (validating ownership) or auto-create a stub.
+
+    Returns (contact_id, contact_name, auto_created, error_dict_or_None).
+    Mirrors the resolution logic inside draft_message — keeps the trust
+    contract identical between the draft path and the send-now path
+    (auto-stubbing the contact so the activity row has somewhere to live).
+    """
+    if contact_id:
+        check = await (
+            db.table("Contact")
+            .select("id,name,email,phone")
+            .eq("id", contact_id)
+            .eq("spaceId", space_id)
+            .maybe_single()
+            .execute()
+        )
+        if not check.data:
+            agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+            return None, None, False, {
+                "error": agent_err.message,
+                "code": agent_err.code,
+                "retryable": agent_err.retryable,
+            }
+        return contact_id, check.data.get("name", "contact"), False, None
+
+    clean_email = (recipient_email or "").strip().lower() or None
+    clean_phone = (recipient_phone or "").strip() or None
+    lookup = db.table("Contact").select("id,name,email,phone").eq("spaceId", space_id)
+    if clean_email:
+        lookup = lookup.ilike("email", clean_email)
+    elif clean_phone:
+        lookup = lookup.eq("phone", clean_phone)
+    found = await lookup.limit(1).maybe_single().execute()
+    if found and found.data:
+        return found.data["id"], found.data.get("name", "contact"), False, None
+
+    new_id = str(uuid.uuid4())
+    if clean_email:
+        local = clean_email.split("@", 1)[0]
+        guessed_name = local.replace(".", " ").replace("_", " ").replace("-", " ").title()
+    else:
+        guessed_name = (clean_phone or "Unknown").strip()
+    stub: dict[str, Any] = {
+        "id": new_id,
+        "spaceId": space_id,
+        "name": guessed_name[:200] or "Unknown",
+        "leadType": "buyer",
+        "type": "QUALIFICATION",
+        "properties": [],
+        "tags": ["auto-created"],
+    }
+    if clean_email:
+        stub["email"] = clean_email[:320]
+    if clean_phone:
+        stub["phone"] = clean_phone[:40]
+    try:
+        await db.table("Contact").insert(stub).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return None, None, False, {
+            "error": f"auto-create contact failed: {agent_err.message}",
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    return new_id, stub["name"], True, None
+
+
+def _send_now_proxy() -> tuple[str, str] | None:
+    """Resolve the (app_url, secret) pair the /api/agent/send proxy needs.
+
+    Mirrors the dispatcher's guard: a localhost app_url means the Modal
+    secret wasn't set, and we must not pretend to send through it.
+    Returns None when the proxy isn't configured.
+    """
+    base_url = (settings.app_url or "").rstrip("/")
+    secret = settings.agent_internal_secret
+    if not base_url or not secret:
+        return None
+    if "localhost" in base_url or "127.0.0.1" in base_url:
+        return None
+    return base_url, secret
+
+
+async def _dispatch_send_now(
+    *,
+    space_id: str,
+    run_id: str,
+    contact_id: str,
+    channel: str,
+    content: str,
+    subject: str | None,
+) -> dict[str, Any]:
+    """POST to /api/agent/send and unwrap the response into a tool result.
+
+    Returns either {ok: True, deliveredTo: ...} on success or
+    {error: "...", code: "...", retryable: bool} on any failure mode the
+    proxy reports. Network errors are surfaced as retryable; HTTP 4xx is
+    surfaced as non-retryable (bad payload, missing contact field, etc.).
+    """
+    proxy = _send_now_proxy()
+    if proxy is None:
+        return {
+            "error": "Send-now proxy is not configured. Reconnect your account in Settings or use draft mode instead.",
+            "code": "PROXY_UNCONFIGURED",
+            "retryable": False,
+        }
+    base_url, secret = proxy
+
+    payload: dict[str, Any] = {
+        "contactId": contact_id,
+        "spaceId": space_id,
+        "channel": channel,
+        "content": content,
+        "runId": run_id,
+    }
+    if subject is not None:
+        payload["subject"] = subject
+
+    try:
+        async with httpx.AsyncClient(timeout=_SEND_NOW_TIMEOUT) as client:
+            resp = await client.post(
+                f"{base_url}/api/agent/send",
+                json=payload,
+                headers={"Authorization": f"Bearer {secret}"},
+            )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "error": f"Delivery request failed: {exc}",
+            "code": "NETWORK_ERROR",
+            "retryable": True,
+        }
+
+    try:
+        body = resp.json()
+    except Exception:
+        body = {}
+
+    if resp.status_code >= 500:
+        return {
+            "error": body.get("error") or f"Delivery service returned {resp.status_code}.",
+            "code": "DELIVERY_5XX",
+            "retryable": True,
+        }
+    if resp.status_code >= 400:
+        return {
+            "error": body.get("error") or f"Delivery rejected ({resp.status_code}).",
+            "code": "DELIVERY_4XX",
+            "retryable": False,
+        }
+    return {"ok": True, "deliveredTo": body.get("deliveredTo")}
+
+
+def _short_preview(text: str, limit: int = 60) -> str:
+    """Compact one-line preview for the summary field. Strips newlines."""
+    cleaned = " ".join((text or "").split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return f"{cleaned[: limit - 1].rstrip()}…"
+
+
+@function_tool(strict_mode=False)
+@rate_limited(max_calls=10, window_seconds=3600)
+async def send_email_now(
+    ctx: RunContextWrapper[AgentContext],
+    content: str,
+    subject: str,
+    reasoning: str,
+    contact_id: str | None = None,
+    recipient_email: str | None = None,
+    deal_id: str | None = None,
+) -> dict[str, Any]:
+    """Send an email RIGHT NOW — no draft, no approval step.
+
+    Use ONLY when the realtor used an imperative send verb ("send Alice
+    the welcome email", "fire off a reply to John", "ship it"). For any
+    routine, suggestion, or autonomous turn, use draft_message instead so
+    the realtor approves before it goes out. The default is always draft;
+    this tool is the exception path for explicit human intent.
+
+    Identify the recipient one of two ways (same shape as draft_message):
+      contact_id        — when you already have it from find_contacts.
+      recipient_email   — when the realtor typed a raw address. The tool
+                          looks up the contact in the space; if none, it
+                          auto-creates a minimal stub so the activity
+                          row has somewhere to land.
+
+    Required:
+      content   — the message body, verbatim, as the realtor wants it sent.
+      subject   — required for email. Single line; no newlines.
+      reasoning — why this immediate send was warranted (audit trail).
+
+    Returns: { ok: True, action: 'sent', channel: 'email', contactId,
+              deliveredTo, autoCreatedContact, summary }
+
+    On failure returns { error, code, retryable } — the model should surface
+    the error to the realtor in plain English; do NOT silently retry with
+    different args.
+    """
+    space_id = ctx.context.space_id
+    if not subject or not subject.strip():
+        return {
+            "error": "subject is required for send_email_now",
+            "code": "MISSING_SUBJECT",
+            "retryable": False,
+        }
+    if not content or not content.strip():
+        return {
+            "error": "content is required for send_email_now",
+            "code": "MISSING_CONTENT",
+            "retryable": False,
+        }
+    if not contact_id and not recipient_email:
+        return {
+            "error": "Provide one of: contact_id, recipient_email",
+            "code": "MISSING_RECIPIENT",
+            "retryable": False,
+        }
+
+    db = await supabase()
+    resolved_id, contact_name, auto_created, err = await _resolve_or_stub_contact(
+        db=db,
+        space_id=space_id,
+        contact_id=contact_id,
+        recipient_email=recipient_email,
+        recipient_phone=None,
+    )
+    if err is not None or not resolved_id:
+        return err or {"error": "Recipient resolution failed", "code": "UNKNOWN", "retryable": False}
+
+    send_result = await _dispatch_send_now(
+        space_id=space_id,
+        run_id=ctx.context.run_id,
+        contact_id=resolved_id,
+        channel="email",
+        content=content,
+        subject=subject.strip(),
+    )
+    if "error" in send_result:
+        return send_result
+
+    delivered_to = send_result.get("deliveredTo")
+    preview = _short_preview(content, 60)
+    summary = (
+        f"Sent to {contact_name}: \"{preview}\""
+        if contact_name
+        else f"Sent: \"{preview}\""
+    )
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Email sent to {contact_name or delivered_to or 'recipient'}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"contactId": resolved_id, "channel": "email", "subject": subject.strip()[:120]},
+    )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="message_sent",
+            outcome="completed",
+            reasoning=f"email send-now: {reasoning[:200]}",
+            contact_id=resolved_id,
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "action": "sent",
+        "channel": "email",
+        "contactId": resolved_id,
+        "deliveredTo": delivered_to,
+        "autoCreatedContact": auto_created,
+        "summary": summary,
+    }
+
+
+@function_tool(strict_mode=False)
+@rate_limited(max_calls=5, window_seconds=3600)
+async def send_sms_now(
+    ctx: RunContextWrapper[AgentContext],
+    content: str,
+    reasoning: str,
+    contact_id: str | None = None,
+    recipient_phone: str | None = None,
+    deal_id: str | None = None,
+) -> dict[str, Any]:
+    """Send an SMS RIGHT NOW — no draft, no approval step.
+
+    Same rule as send_email_now: only when the realtor used an imperative
+    send verb. Routines and autonomous turns must use draft_message.
+
+    Identify the recipient one of two ways:
+      contact_id      — when you already have it.
+      recipient_phone — when the realtor named a phone number.
+
+    Keep content under 160 chars where possible — Telnyx will fragment
+    longer messages and the recipient sees them as separate texts.
+
+    Returns: { ok: True, action: 'sent', channel: 'sms', contactId,
+              deliveredTo, autoCreatedContact, summary }
+    """
+    space_id = ctx.context.space_id
+    if not content or not content.strip():
+        return {
+            "error": "content is required for send_sms_now",
+            "code": "MISSING_CONTENT",
+            "retryable": False,
+        }
+    if not contact_id and not recipient_phone:
+        return {
+            "error": "Provide one of: contact_id, recipient_phone",
+            "code": "MISSING_RECIPIENT",
+            "retryable": False,
+        }
+
+    db = await supabase()
+    resolved_id, contact_name, auto_created, err = await _resolve_or_stub_contact(
+        db=db,
+        space_id=space_id,
+        contact_id=contact_id,
+        recipient_email=None,
+        recipient_phone=recipient_phone,
+    )
+    if err is not None or not resolved_id:
+        return err or {"error": "Recipient resolution failed", "code": "UNKNOWN", "retryable": False}
+
+    send_result = await _dispatch_send_now(
+        space_id=space_id,
+        run_id=ctx.context.run_id,
+        contact_id=resolved_id,
+        channel="sms",
+        content=content,
+        subject=None,
+    )
+    if "error" in send_result:
+        return send_result
+
+    delivered_to = send_result.get("deliveredTo")
+    preview = _short_preview(content, 60)
+    summary = (
+        f"Texted {contact_name}: \"{preview}\""
+        if contact_name
+        else f"Texted: \"{preview}\""
+    )
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"SMS sent to {contact_name or delivered_to or 'recipient'}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"contactId": resolved_id, "channel": "sms"},
+    )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="message_sent",
+            outcome="completed",
+            reasoning=f"sms send-now: {reasoning[:200]}",
+            contact_id=resolved_id,
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "action": "sent",
+        "channel": "sms",
+        "contactId": resolved_id,
+        "deliveredTo": delivered_to,
+        "autoCreatedContact": auto_created,
+        "summary": summary,
     }

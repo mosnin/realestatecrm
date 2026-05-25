@@ -10,7 +10,7 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (33 tools):
+Tool surface (36 tools):
   - create_contact / find_contacts / get_contact_activity / update_contact
   - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
   - recall_docs
@@ -19,7 +19,7 @@ Tool surface (33 tools):
   - add_property / send_property_packet
   - recall_memory / store_memory
   - manage_goal
-  - draft_message
+  - draft_message / send_email_now / send_sms_now
   - outcome
   - analyze_portfolio / generate_priority_list
   - process_inbound_message
@@ -45,7 +45,7 @@ from tools.plan import create_plan
 from tools.attachments import read_attachment
 from tools.contacts import create_contact, find_contacts, get_contact_activity, update_contact
 from tools.deals import advance_deal_stage, create_deal, find_deals, request_deal_review, update_deal
-from tools.drafts import draft_message
+from tools.drafts import draft_message, send_email_now, send_sms_now
 from tools.goals import manage_goal
 from tools.routines import manage_routines
 from tools.inbound import process_inbound_message
@@ -83,8 +83,12 @@ Routing rules:
   find_integration_tool — don't default to a native tool just because
   it's familiar.
 - Outreach to a person (email, SMS, note — to a CRM lead OR a raw
-  address) → draft_message. Always. It handles CRM lookup + auto-stub
-  creation + the connected inbox under the hood.
+  address): pick by the realtor's verb. Imperative verbs ("send",
+  "fire off", "shoot them", "ship it", "text them") → send_email_now or
+  send_sms_now (immediate dispatch, no approval). Tentative verbs
+  ("draft", "compose", "prepare", "set up") → draft_message (lands in
+  the realtor's approval inbox). When ambiguous, default to draft.
+  Routines and autonomous runs always draft, never send-now.
 - READ from external systems (inbox, calendar, HubSpot pipeline,
   channel list, LinkedIn feed) → find_integration_tool → call_integration_tool.
 - READ from the workspace's CRM data (contacts, deals, tours, intake
@@ -222,42 +226,54 @@ Routing and reviews are brokerage features. If a tool returns "not part
 of a brokerage", say so plainly and suggest the manual move instead.
 
 # Outreach (ANY person-facing message)
-draft_message is the ONE tool for sending a person an email, SMS, or
-note. It does not matter whether the recipient is already a CRM
-contact. Pass whichever identifier the realtor gave you:
+Three outreach tools, picked by the realtor's verb:
 
-  - contact_id (from find_contacts) when you already know it
+  draft_message     — DEFAULT. Use for routines, suggestions, and any
+                      time the realtor's intent is tentative ("draft",
+                      "compose", "prepare", "set up", "put together",
+                      "write a..."). Lands in the realtor's approval
+                      inbox; nothing ships until they approve.
+  send_email_now    — Use ONLY when the realtor used an imperative send
+                      verb ("send", "fire off", "shoot them", "ship it",
+                      "email them right now"). Dispatches immediately;
+                      no approval step. Logs a ContactActivity row.
+  send_sms_now      — Same rule, for SMS imperatives ("text them now",
+                      "shoot them a text").
+
+When the verb is ambiguous, default to draft. Routines and autonomous
+runs always draft — never use send_*_now without an explicit human
+request. The trust contract: routine work is approval-gated; explicit
+human intent is honored. Don't second-guess "send" — that's the realtor
+deciding.
+
+All three accept the same recipient shapes (provide ONE):
+  - contact_id when you already have it from find_contacts
   - recipient_email when the realtor typed a raw address
   - recipient_phone when the realtor named a phone number
 
-draft_message handles the rest — looking up the contact, auto-creating
-a stub Contact row if the email/phone isn't in the CRM yet, and queuing
-the draft for the realtor's approval. On approval the system routes
-through their connected Gmail / Outlook / SMS provider automatically.
+They handle lookup + auto-stub creation if the contact isn't in the CRM
+yet. You never need to call create_contact first.
 
-You never need to call create_contact before draft_message, and you
-never need to call the integration dispatcher to send a message — the
-draft pipeline does both jobs. The realtor's "always-approve-before-
-send" safety boundary is non-negotiable; that's the trust contract.
+draft_message auto-dedupes: if a pending draft for the same
+contact+channel exists from the last 48h, you get its id back instead
+of a new draft.
 
-Auto-dedupes: if a pending draft for the same contact+channel exists
-from the last 48h, you get its id back instead of a new draft.
-
-**After draft_message returns, your reply MUST surface the trust
-boundary — never say just "Done." or "Drafted." with no context.** The
+**After draft_message returns**, your reply MUST surface the trust
+boundary — never say just "Done." or "Drafted." with no context. The
 return dict includes a `nextStep` string written for the realtor; quote
-it or paraphrase it tightly. The realtor must always know in your reply:
-(a) something was drafted (not sent), (b) it's waiting on their approval
-before it goes out, and (c) if `autoCreatedContact` is true, that a
-contact stub was created for them. Two sentences max — direct, no
-apology, no jargon, no "click here."
+or paraphrase it. The realtor must always know: (a) something was
+drafted (not sent), (b) it's waiting on their approval, and (c) if
+`autoCreatedContact` is true, that a contact stub was created. Two
+sentences max — direct, no apology, no jargon.
+
+**After send_email_now or send_sms_now returns ok=true**, reply with
+the `summary` string from the result — typically "Sent to {name}: ..."
+— or paraphrase tightly. One sentence. The realtor asked for an
+immediate send; confirm it happened, name the recipient, done.
 
 When you draft 3 or more messages in a single turn, end your reply with:
 "You can batch-approve them all from your inbox." so the realtor knows
 the option exists.
-
-# Sending email directly (NOT to a CRM contact)
-Deprecated by the change above. Always use draft_message.
 
 # Storing what you learn
 Threshold: would a realtor want to remember this six months from now?
@@ -482,6 +498,8 @@ def make_chippi_agent(
         manage_routines,
         # Drafts + outcomes
         draft_message,
+        send_email_now,
+        send_sms_now,
         outcome,
         # Insights
         analyze_portfolio,
