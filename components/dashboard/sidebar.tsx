@@ -1265,7 +1265,7 @@ function RealtorSidebarShell({
   displayName: string;
   imageUrl?: string | null;
 }) {
-  const { collapsed } = useSidebarCollapsed();
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   return (
     <aside
@@ -1290,15 +1290,28 @@ function RealtorSidebarShell({
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Brand mark — small, monochrome, sets identity without dominating.
-            In collapsed mode the BrandLogo is already an icon-tight mark; we
-            just center it on the rail. */}
+            In collapsed mode the BrandLogo doubles as the expand affordance:
+            tapping the mark flips the rail open. The EdgeCollapseHandle is
+            a thin slice on the right edge; the logo is the big, obvious
+            target you'd reach for anyway. */}
         <div
           className={cn(
             'pt-5 pb-3',
             collapsed ? 'flex justify-center px-2' : 'px-4',
           )}
         >
-          <BrandLogo className="h-5" alt="Chippi" />
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label="Expand sidebar"
+              className="flex items-center justify-center w-10 h-10 rounded-md transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            >
+              <BrandLogo className="h-5" alt="Chippi" />
+            </button>
+          ) : (
+            <BrandLogo className="h-5" alt="Chippi" />
+          )}
         </div>
 
         {/* Workspace identity (with switcher when there's somewhere to go) */}
