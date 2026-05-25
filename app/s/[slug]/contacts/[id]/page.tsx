@@ -11,7 +11,6 @@ import {
   ExternalLink,
   MessageCircle,
   Calendar,
-  Mic,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -26,12 +25,12 @@ import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
+import { ContactActionPills } from '@/components/contacts/contact-action-pills';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
 import {
   buildPeopleDetailActions,
-  type PeopleDetailAction,
   type PersonStateForActions,
 } from '@/lib/people-detail-actions';
 
@@ -159,26 +158,17 @@ export default async function ClientDetailPage({
       </header>
 
       {/* Action pills — same vocabulary as the morning home's compose
-          actions. State picks them; the realtor doesn't. The "Log a tour"
-          pill is always present (it's a doorway, not a state-driven verb)
-          and uses the same outline shape as a secondary action so it reads
-          as a peer to "Schedule a tour" / "Send a check-in" without
-          competing for the primary slot. */}
-      <div className="flex flex-wrap gap-2">
-        {actions.map((a, i) => (
-          <ActionPill key={a.id} action={a} primary={i === 0} />
-        ))}
-        <Link
-          href={`/s/${slug}/chippi/log?personId=${contact.id}`}
-          className={cn(
-            'inline-flex items-center gap-1.5 h-9 rounded-full px-4 text-sm transition-colors',
-            'border border-border/70 bg-background text-foreground hover:bg-muted/40',
-          )}
-        >
-          <Mic size={13} />
-          Log a tour
-        </Link>
-      </div>
+          actions. State picks them; the realtor doesn't. Tap a verb pill
+          and the inline draft surface opens beneath; the realtor reviews,
+          edits, sends without leaving the page. "Log a tour" stays a Link
+          to the dedicated recording flow. */}
+      <ContactActionPills
+        slug={slug}
+        contactId={contact.id}
+        contactName={contact.name}
+        actions={actions}
+      />
+
 
       {/* Quick contact bar — email/phone/address inline, applicant portal
           tucked in. Hairline on the page, not a card. */}
@@ -432,27 +422,6 @@ export default async function ClientDetailPage({
         </div>
       </details>
     </div>
-  );
-}
-
-// ── Action pills ────────────────────────────────────────────────────
-
-function ActionPill({ action, primary }: { action: PeopleDetailAction; primary: boolean }) {
-  // The first pill is the primary verb (foreground bg), the rest are
-  // outlined. Matches the morning home's compose-vs-navigate vocabulary.
-  return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
-        primary
-          ? 'border border-border/70 bg-foreground text-background hover:bg-foreground/90'
-          : 'border border-border/70 bg-background text-foreground hover:bg-muted/40',
-      )}
-      data-intent={action.intent}
-    >
-      {action.label}
-    </button>
   );
 }
 
