@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Clock, UserPlus, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,12 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
   const [snooze, setSnooze] = useState(initialSnoozedUntil ? new Date(initialSnoozedUntil).toISOString().slice(0, 10) : '');
   const [savingSource, setSavingSource] = useState(false);
   const [savingSnooze, setSavingSnooze] = useState(false);
+  // "Snoozed until <localized date>" depends on `new Date()` (live "is it
+  // still in the future?") and on the runtime's locale. Server is UTC/en-US,
+  // the user's browser may be neither — defer to after mount so the first
+  // paint stays identical to the SSR output.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   async function saveSource() {
     if (source.trim() === savedSource.trim()) return;
@@ -59,7 +65,7 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
     }
   }
 
-  const isSnoozed = snooze && new Date(snooze) > new Date();
+  const isSnoozed = mounted && snooze && new Date(snooze) > new Date();
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
