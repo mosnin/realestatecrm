@@ -11,7 +11,9 @@ import { PipelineTabs } from './pipeline-tabs';
 import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED, QUIET_LINK } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
-import type { Pipeline } from '@/lib/types';
+import type { Pipeline, DealStage, Deal } from '@/lib/types';
+
+type StageWithDeals = DealStage & { deals: Deal[] };
 
 /** What's visible on the board. Two states. Default 'active'. */
 export type BoardStatus = 'active' | 'closed';
@@ -29,11 +31,31 @@ const STATUS_TABS: ReadonlyArray<{ key: BoardStatus; label: string }> = [
   { key: 'closed', label: 'Closed' },
 ];
 
-export function DealsPageClient({ slug }: { slug: string }) {
+interface DealsPageClientProps {
+  slug: string;
+  /** Pipelines pre-fetched on the server. Empty means first visit — the
+   *  client will hit /api/pipelines which will bootstrap defaults. */
+  initialPipelines?: Pipeline[];
+  /** First pipeline's stages-with-deals, pre-computed server-side so
+   *  KPI counters don't flash zero before the client round-trip. */
+  initialStages?: StageWithDeals[];
+  /** ID of the pipeline whose stages we pre-loaded. The client may
+   *  override this with a localStorage pick after mount. */
+  initialPipelineId?: string | null;
+}
+
+export function DealsPageClient({
+  slug,
+  initialPipelines = [],
+  initialStages = [],
+  initialPipelineId = null,
+}: DealsPageClientProps) {
   const router = useRouter();
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [activePipelineId, setActivePipelineId] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [pipelines, setPipelines] = useState<Pipeline[]>(initialPipelines);
+  const [activePipelineId, setActivePipelineId] = useState<string>(initialPipelineId ?? '');
+  // Skip the client bootstrap if the server already gave us pipelines —
+  // showing a skeleton would be a lie when the data is already in hand.
+  const [loading, setLoading] = useState(initialPipelines.length === 0);
 
   // Board filters live up here so the stat strip and the kanban share state.
   // The narration sentence and the stat cells double as filter triggers — when
@@ -50,10 +72,30 @@ export function DealsPageClient({ slug }: { slug: string }) {
   // still say "0 active deals" right after the realtor created one.
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
 
-  // Load pipelines (triggers bootstrap if this is the first visit)
+  // Load pipelines (triggers bootstrap if this is the first visit).
+  // When the server already gave us pipelines we still want to restore the
+  // last-active pipeline from localStorage on mount, but we skip the API
+  // round-trip — pipelines barely change between renders, and the server's
+  // payload is good for the realtor's first paint.
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
+
+    // Fast path: server already shipped pipelines. Just sync the active
+    // selection from localStorage if there is one.
+    if (initialPipelines.length > 0) {
+      try {
+        const stored = localStorage.getItem(`chippi:deals:pipeline:${slug}`);
+        const found = stored ? initialPipelines.find((p) => p.id === stored) : null;
+        if (found && found.id !== activePipelineId) {
+          setActivePipelineId(found.id);
+        }
+      } catch {
+        // storage disabled — keep whatever the server picked
+      }
+      return;
+    }
+
     async function load() {
       setLoading(true);
       try {
@@ -82,6 +124,7 @@ export function DealsPageClient({ slug }: { slug: string }) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   // Persist active pipeline selection
@@ -156,6 +199,11 @@ export function DealsPageClient({ slug }: { slug: string }) {
           onFocusChange={setFocus}
           onAddDeal={handleAddDeal}
           refreshKey={summaryRefreshKey}
+          // Hand the server-fetched stages to the summary only when the
+          // displayed pipeline matches what we pre-loaded. Once the realtor
+          // picks a different pipeline the prop falls through to undefined
+          // and the summary falls back to its client fetch.
+          initialStages={activePipelineId === initialPipelineId ? initialStages : undefined}
         />
       )}
 
