@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
@@ -883,6 +884,11 @@ function RealtorNav({
     (item) => !item.isAI && item.href !== '/settings',
   );
 
+  // Route IS the signal for which nav mode this sidebar is in. On
+  // /chippi/* the main links cross-fade out and the conversation history
+  // slides in their place; off Chippi, the reverse.
+  const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
+
   const getBadge = (item: NavItem): React.ReactNode => {
     if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
       return (
@@ -946,13 +952,32 @@ function RealtorNav({
         collapsed ? 'px-1' : 'px-3',
       )}
     >
-      {/* Primary nav — daily destinations. AI item rides up top via the
-          existing renderItem treatment; no section label needed when there
-          are only a handful of primaries. */}
+      {/* Two-mode sidebar: on /chippi the main destinations (People, Deals,
+          Calendar…) cross-fade out and the realtor's conversation history
+          slides in their place — Chippi becomes the room the realtor is
+          IN, not a tab in a list. Off Chippi, the reverse: main links
+          slide back, conversations fade away. The Chippi nav item itself
+          (aiItems) stays pinned at the top regardless so the realtor
+          always has the door back into the agent. Settings stays pinned
+          at the bottom. */}
       <div>
         <div className="space-y-0.5">
+          {/* Always visible — top-pinned AI items (Chippi + future AI rows) */}
           {aiItems.map(renderItem)}
-          {mainItems.map(renderItem)}
+          <AnimatePresence initial={false} mode="wait">
+            {!onChippi && (
+              <motion.div
+                key="main-links"
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="space-y-0.5"
+              >
+                {mainItems.map(renderItem)}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -965,45 +990,44 @@ function RealtorNav({
               future secondary nav without re-plumbing the layout.
           The previous Chats/Pages tab toggle was ceremony — Pages was
           empty so flipping to it dead-ended. Removed. */}
-      {(() => {
-        const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
-        const hasMore = realtorMoreNavItems.length > 0;
-        if (!onChippi && !hasMore) return null;
-        return (
-          <div>
+      <AnimatePresence initial={false} mode="wait">
+        {onChippi && (
+          <motion.div
+            key="chippi-history"
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 6 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             {collapsed ? (
               <>
-                {onChippi && (
-                  <>
-                    <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
-                    <CollapsedTooltip enabled label="Conversations">
-                      <Link
-                        href={`/s/${slug}/chippi?view=history`}
-                        aria-label="Conversation history"
-                        className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
-                      >
-                        <History size={15} strokeWidth={1.75} />
-                      </Link>
-                    </CollapsedTooltip>
-                  </>
-                )}
-                {hasMore && (
-                  <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
-                )}
+                <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+                <CollapsedTooltip enabled label="Conversations">
+                  <Link
+                    href={`/s/${slug}/chippi?view=history`}
+                    aria-label="Conversation history"
+                    className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
+                  >
+                    <History size={15} strokeWidth={1.75} />
+                  </Link>
+                </CollapsedTooltip>
               </>
             ) : (
-              <>
-                {onChippi && <SidebarConversations slug={slug} />}
-                {hasMore && (
-                  <div className={cn('space-y-0.5', onChippi && 'mt-4')}>
-                    {realtorMoreNavItems.map(renderItem)}
-                  </div>
-                )}
-              </>
+              <SidebarConversations slug={slug} />
             )}
-          </div>
-        );
-      })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* realtorMoreNavItems — the secondary slot for non-Chippi pages.
+          Empty today; kept so future additions don't require a layout
+          replumb. Only renders when the array has items AND we're not on
+          Chippi (the Chippi state owns this region). */}
+      {realtorMoreNavItems.length > 0 && !onChippi && (
+        <div>
+          <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+        </div>
+      )}
 
       {/* Settings — collapsible, pinned at bottom of scroll area */}
       <div className="pt-1">
