@@ -4,19 +4,38 @@
  * LibraryPanel — /s/[slug]/studio/library. A gallery of the realtor's past
  * Studio generations, newest first.
  *
- * Paginated 60-at-a-time. Each tile has a delete affordance — Studio is where
- * the asset was made, so Studio is where the realtor curates it. Videos show
- * a poster (the metadata frame) with a play overlay; clicking opens in a new
- * tab so the native controls bar never eats the thumbnail.
+ * Paginated 60-at-a-time. Each tile carries an overflow menu with the four
+ * canonical actions: Duplicate (re-render in Create with the same prompt),
+ * Schedule (queue a post from this asset), Edit (open in Edit), Delete
+ * (confirm-via-toast so the destructive default isn't a modal). Videos
+ * show a poster (the metadata frame) with a play overlay; clicking opens
+ * in a new tab so the native controls bar never eats the thumbnail.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ImagePlus, Trash2, Play } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ImagePlus,
+  Trash2,
+  Play,
+  MoreHorizontal,
+  Copy,
+  CalendarClock,
+  Pencil,
+  Plus,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { BODY_MUTED, CAPTION } from '@/lib/typography';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { BODY_MUTED, CAPTION, PRIMARY_PILL } from '@/lib/typography';
 
 interface LibraryItem {
   id: string;
@@ -34,6 +53,10 @@ interface LibraryResponse {
 }
 
 export function LibraryPanel() {
+  const params = useParams<{ slug: string }>();
+  const slug = params?.slug;
+  const router = useRouter();
+
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -82,11 +105,34 @@ export function LibraryPanel() {
     }
   }
 
-  async function handleDelete(fileId: string) {
+  // Destructive but recoverable — a sonner toast with an inline confirm
+  // beats a blocking modal for a single asset. Optimistic remove from the
+  // grid happens only after the realtor confirms in the toast.
+  function handleDeleteRequest(item: LibraryItem) {
     if (deletingId) return;
-    if (!window.confirm('Delete this asset? This cannot be undone.')) return;
+    const toastId = `delete-${item.fileId}`;
+    toast(
+      item.kind === 'video' ? 'Delete this video?' : 'Delete this image?',
+      {
+        id: toastId,
+        description: 'This cannot be undone.',
+        duration: 8000,
+        action: {
+          label: 'Delete',
+          onClick: () => void performDelete(item.fileId, toastId),
+        },
+        cancel: {
+          label: 'Cancel',
+          onClick: () => toast.dismiss(toastId),
+        },
+      },
+    );
+  }
+
+  async function performDelete(fileId: string, toastId: string) {
     setDeletingId(fileId);
     setError(null);
+    toast.dismiss(toastId);
     try {
       const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -94,11 +140,32 @@ export function LibraryPanel() {
         throw new Error(body.error || 'Could not delete.');
       }
       setItems((prev) => prev.filter((i) => i.fileId !== fileId));
+      toast.success('Deleted.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete.');
+      const message = e instanceof Error ? e.message : 'Could not delete.';
+      setError(message);
+      toast.error(message);
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function handleDuplicate(item: LibraryItem) {
+    if (!slug) return;
+    const qs = new URLSearchParams();
+    if (item.prompt) qs.set('prompt', item.prompt);
+    if (item.model) qs.set('model', item.model);
+    router.push(`/s/${slug}/studio/create?${qs.toString()}`);
+  }
+
+  function handleSchedule(item: LibraryItem) {
+    if (!slug) return;
+    router.push(`/s/${slug}/studio/schedule?fileId=${item.fileId}`);
+  }
+
+  function handleEdit(item: LibraryItem) {
+    if (!slug) return;
+    router.push(`/s/${slug}/studio/edit?fileId=${item.fileId}`);
   }
 
   if (loading) {
@@ -117,17 +184,41 @@ export function LibraryPanel() {
         icon={ImagePlus}
         title="Nothing in your library yet."
         description="Images and video you generate in Studio collect here."
+        action={
+          slug
+            ? { label: 'Create something', href: `/s/${slug}/studio/create` }
+            : undefined
+        }
       />
     );
   }
 
   return (
     <div className="space-y-4">
+      {/* Header CTA — the realtor's eye lands here after scanning past
+          work; the primary action sits inline so "make another one" is
+          one click from any tile. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className={BODY_MUTED}>
+          {items.length} {items.length === 1 ? 'asset' : 'assets'}
+        </p>
+        {slug && (
+          <Link
+            href={`/s/${slug}/studio/create`}
+            className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5')}
+          >
+            <Plus size={14} aria-hidden />
+            New image
+          </Link>
+        )}
+      </div>
+
       {error && (
         <p className="text-[12.5px] text-rose-700 dark:text-rose-400 text-center">
           {error}
         </p>
       )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {items.map((item) => (
           <div
@@ -152,7 +243,10 @@ export function LibraryPanel() {
                       className="w-full h-full object-cover pointer-events-none"
                     />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <Play className="w-8 h-8 text-white drop-shadow-md" fill="currentColor" />
+                      <Play
+                        className="w-8 h-8 text-white drop-shadow-md"
+                        fill="currentColor"
+                      />
                     </span>
                   </a>
                 ) : (
@@ -164,16 +258,48 @@ export function LibraryPanel() {
                   />
                 )
               ) : null}
-              <button
-                type="button"
-                onClick={() => void handleDelete(item.fileId)}
-                disabled={deletingId === item.fileId}
-                aria-label="Delete asset"
-                title="Delete"
-                className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-black/70 transition-opacity disabled:opacity-50 flex items-center justify-center"
-              >
-                <Trash2 size={13} />
-              </button>
+
+              {/* Overflow menu — hover-revealed on desktop, always-tappable
+                  on touch (focus-visible keeps it accessible). Houses the
+                  four canonical actions so a tile is a real working
+                  surface, not just a thumbnail-with-trash. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Asset actions"
+                    disabled={deletingId === item.fileId}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-black/70 transition-opacity disabled:opacity-50 flex items-center justify-center"
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => handleDuplicate(item)}>
+                    <Copy />
+                    <span>Duplicate</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleSchedule(item)}>
+                    <CalendarClock />
+                    <span>Schedule</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => handleEdit(item)}
+                    disabled={item.kind === 'video'}
+                  >
+                    <Pencil />
+                    <span>Edit</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => handleDeleteRequest(item)}
+                    disabled={deletingId === item.fileId}
+                  >
+                    <Trash2 />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="px-2.5 py-2 space-y-1.5">
               {item.prompt && (
@@ -181,12 +307,6 @@ export function LibraryPanel() {
                   {item.prompt}
                 </p>
               )}
-              <Link
-                href={`../schedule?fileId=${item.fileId}`}
-                className="inline-block text-[11.5px] font-medium text-foreground hover:underline underline-offset-2"
-              >
-                Schedule →
-              </Link>
             </div>
           </div>
         ))}

@@ -28,9 +28,20 @@ interface GenerateResult {
   kind: 'image' | 'video';
 }
 
-export function CreatePanel() {
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<string>(DEFAULT_IMAGE_MODEL);
+export function CreatePanel({
+  initialPrompt,
+  initialModel,
+}: {
+  initialPrompt?: string;
+  initialModel?: string;
+} = {}) {
+  // Duplicate flow: the realtor opened this panel from a Library tile and
+  // wants to re-render the same prompt. We seed state from the URL params
+  // so the form is pre-filled and a single click re-runs the generation.
+  const [prompt, setPrompt] = useState(initialPrompt ?? '');
+  const [model, setModel] = useState<string>(
+    initialModel && STUDIO_MODELS[initialModel] ? initialModel : DEFAULT_IMAGE_MODEL,
+  );
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState<string | null>(null);

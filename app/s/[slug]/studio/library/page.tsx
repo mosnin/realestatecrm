@@ -22,7 +22,9 @@ export default async function StudioLibraryPage({
         <h1 className={H1} style={TITLE_FONT}>
           Library
         </h1>
-        <p className={BODY_MUTED}>Everything you have made in Studio.</p>
+        <p className={BODY_MUTED}>
+          Re-use, duplicate, schedule from past work.
+        </p>
       </header>
       <LibraryPanel />
     </div>

@@ -8,10 +8,16 @@ export const dynamic = 'force-dynamic';
 
 export default async function StudioEditPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  // `fileId` comes from the Library "Edit" affordance — the panel hydrates
+  // the source picker from this id so the realtor doesn't have to
+  // re-upload an asset that already lives in their files.
+  searchParams: Promise<{ fileId?: string }>;
 }) {
   const { slug } = await params;
+  const { fileId } = await searchParams;
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -23,10 +29,12 @@ export default async function StudioEditPage({
           Edit
         </h1>
         <p className={BODY_MUTED}>
-          Upscale, clean up backgrounds, and restyle any image.
+          Upscale, clean up backgrounds, restyle an image.
         </p>
       </header>
-      <EditPanel />
+      <EditPanel
+        initialFileId={typeof fileId === 'string' ? fileId : undefined}
+      />
     </div>
   );
 }
