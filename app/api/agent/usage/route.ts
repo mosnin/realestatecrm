@@ -1,9 +1,10 @@
 /**
  * GET /api/agent/usage
  *
- * Returns today's token usage for the space from Upstash Redis.
- * Used by the settings panel to show the realtor how much of their
- * daily budget has been consumed.
+ * Returns today's token usage for the space. Sums AgentTask rows so the
+ * display matches what the chat path actually enforces against — Redis
+ * is only written by the autonomous Python orchestrator, so a chat-heavy
+ * user would see 0% even after burning through real tokens.
  */
 
 import { NextResponse } from 'next/server';
@@ -19,28 +20,19 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const { data: usageRows } = await supabase
+    .from('AgentTask')
+    .select('inputTokens, outputTokens')
+    .eq('spaceId', space.id)
+    .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
 
-  let used = 0;
+  const used = (usageRows ?? []).reduce(
+    (sum: number, row: { inputTokens: number | null; outputTokens: number | null }) =>
+      sum + (row.inputTokens ?? 0) + (row.outputTokens ?? 0),
+    0,
+  );
 
-  if (kvUrl && kvToken) {
-    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const key = `agent:budget:${space.id}:${date}`;
-    try {
-      const res = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, {
-        headers: { Authorization: `Bearer ${kvToken}` },
-      });
-      if (res.ok) {
-        const { result } = await res.json() as { result: string | null };
-        used = result ? parseInt(result, 10) : 0;
-      }
-    } catch {
-      // Redis unavailable — return 0
-    }
-  }
-
-  // Also grab the configured daily limit from AgentSettings
   const { data: agentSettings } = await supabase
     .from('AgentSettings')
     .select('dailyTokenBudget')
