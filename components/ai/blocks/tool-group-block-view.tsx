@@ -142,16 +142,43 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
   const nestedTools = useMemo(() => blocks.map(toNestedTool), [blocks]);
 
   const anyLive = blocks.some((b) => liveCallIds?.has(b.callId));
-  const state = anyLive ? 'pending' : 'completed';
 
-  // Pending headline reads as an active verb so the shimmer feels alive —
-  // the existing thinking-indicator pattern. Completed is calm and final.
-  const completeLabel = 'Task completed';
+  // Honest outcome accounting: a group only "completed" if every member
+  // tool actually reported ok. A failed tool is not a finished task —
+  // claiming otherwise is the bug we're fixing. Denied / skipped members
+  // don't count as failures (the user opted out), so they ride the
+  // success path with the same calm copy.
+  const failures = blocks.filter((b) => b.status === 'error');
+  const anyFailed = failures.length > 0;
+  const allFailed = !anyLive && failures.length === blocks.length;
+
+  const state = anyLive ? 'pending' : 'completed';
   const shimmerLabel = inferShimmerLabel(blocks);
 
-  // Rich result cards — only completed tools with a known display shape.
-  // Rendered below the collapsed header so the realtor sees the answer
-  // without needing to click expand.
+  // Header label maps to outcome. Mixed runs ("3 of 4 tools failed") still
+  // need to read as failure — partial truth isn't truth here. When the
+  // whole group fails we'd ideally swap to a destructive-tinted row;
+  // ToolGroup doesn't expose tint slots, so we surface the failure inline
+  // via the failure summary row below and keep the count in the header.
+  const completeLabel = !anyFailed
+    ? 'Task completed'
+    : allFailed
+      ? blocks.length === 1
+        ? 'Task failed'
+        : 'Tasks failed'
+      : `Task completed with ${failures.length} ${failures.length === 1 ? 'failure' : 'failures'}`;
+
+  // First failure's error string is the most useful breadcrumb — surface it
+  // truncated so the realtor sees WHY without expanding. Empty result.error
+  // falls back to the summary (handlers sometimes put the reason there).
+  const firstFailure = failures[0];
+  const failureMessage = firstFailure
+    ? truncate(firstFailure.result?.error ?? firstFailure.result?.summary ?? 'No error message was returned.', 160)
+    : null;
+
+  // Rich result cards — only OK-completed tools with a known display shape.
+  // Failed tools never render rich data even if `data` is present, because
+  // the data is by definition stale/wrong when ok=false.
   const richCards = blocks
     .map((b) => {
       const node = richResultFor(b, onUserIntent);
@@ -172,9 +199,24 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
         showElapsed={false}
         maxVisibleTools={5}
       />
+      {!anyLive && anyFailed && failureMessage && (
+        <p
+          role="status"
+          className="pl-5 text-[12px] leading-snug text-rose-700 dark:text-rose-400"
+        >
+          {failureMessage}
+        </p>
+      )}
       {richCards.length > 0 && <div className="space-y-2">{richCards}</div>}
     </div>
   );
+}
+
+/** Inline truncate — keeps the failure line short enough to fit the
+ *  transcript column without horizontal scroll. */
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 /** Pick a shimmer label that matches what the group is actually doing.

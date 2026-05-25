@@ -90,6 +90,13 @@ function friendlyName(name: string): string {
     .join(' ');
 }
 
+/** Keep failure messages short enough to fit the transcript column. The full
+ *  text stays in the expandable detail pane. */
+function truncateErrorMessage(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
 /**
  * Produce a short prose hint from the tool args that a realtor can read at
  * a glance. UUID fields (contactId, dealId) are meaningless to realtors so
@@ -254,6 +261,15 @@ export function ToolCallBlockView({
       ? block.result.summary
       : null;
 
+  // Inline error breadcrumb. On failure the realtor needs to know WHY without
+  // hunting for the expand chevron — same honesty pass as the group view.
+  // Truncated to keep the transcript scannable; the full text remains in the
+  // expandable details pane.
+  const inlineError =
+    status === 'error' && (block.result?.error || block.result?.summary)
+      ? truncateErrorMessage(block.result?.error ?? block.result?.summary ?? '', 160)
+      : null;
+
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
@@ -349,6 +365,18 @@ export function ToolCallBlockView({
       {inlineSummary && !expanded && (
         <p className="text-[12px] text-muted-foreground/80 mt-1 px-1 leading-snug">
           {inlineSummary}
+        </p>
+      )}
+
+      {/* Inline error breadcrumb for failed tools. Surfaced without an
+          expand-click so the realtor can't miss it. Tone token matches
+          STYLESHEET.md status-pill failed tone. */}
+      {inlineError && !expanded && (
+        <p
+          role="status"
+          className="text-[12px] text-rose-700 dark:text-rose-400 mt-1 px-1 leading-snug"
+        >
+          {inlineError}
         </p>
       )}
 

@@ -116,6 +116,16 @@ function truncate(s: string | null | undefined, max = 200): string {
   return s.slice(0, max) + '…';
 }
 
+/** snake_case tool name → readable label. Mirrors the agent step timeline
+ *  so realtor-facing chrome reads the same on every surface. */
+function humanizeStepName(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return 'Step';
+  const spaced = trimmed.replace(/_/g, ' ').trim();
+  if (!spaced) return 'Step';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function AgentTaskDetailPage({
@@ -275,7 +285,7 @@ export default async function AgentTaskDetailPage({
                         <Wrench size={12} className="flex-shrink-0 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium text-foreground">
-                        {step.toolName}
+                        {humanizeStepName(step.toolName)}
                       </span>
                     </div>
 

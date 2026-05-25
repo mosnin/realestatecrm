@@ -29,10 +29,12 @@ interface ActivityEntry {
 // Action type → user-facing verb + icon. Anything not in the map gets a
 // generic neutral row so the feed never looks broken.
 const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
-  send_sms: { verb: 'sent SMS to', icon: MessageSquare },
-  send_email: { verb: 'sent email to', icon: Mail },
+  send_sms: { verb: 'sent an SMS to', icon: MessageSquare },
+  send_email: { verb: 'sent an email to', icon: Mail },
   log_note: { verb: 'logged a note about', icon: StickyNote },
   create_draft_message: { verb: 'drafted a message for', icon: MessageSquare },
+  message_drafted: { verb: 'drafted a message for', icon: MessageSquare },
+  packet_drafted: { verb: 'drafted a property packet for', icon: MessageSquare },
   set_contact_follow_up: { verb: 'scheduled a follow-up with', icon: Bell },
   set_deal_follow_up: { verb: 'scheduled a deal follow-up on', icon: Bell },
   log_agent_observation: { verb: 'noted something about', icon: Brain },
@@ -41,15 +43,17 @@ const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
   update_lead_score: { verb: 'updated the score for', icon: Activity },
   update_deal_probability: { verb: 'updated the probability on', icon: Activity },
   create_follow_up_reminder: { verb: 'set a reminder for', icon: Bell },
+  task_completed: { verb: 'marked a task done for', icon: CheckCircle2 },
 };
 
 function metaFor(actionType: string): { verb: string; icon: LucideIcon } {
-  return (
-    ACTION_META[actionType] ?? {
-      verb: actionType.replace(/_/g, ' '),
-      icon: CheckCircle2,
-    }
-  );
+  const hit = ACTION_META[actionType];
+  if (hit) return hit;
+  const phrase = actionType.replace(/_/g, ' ').trim();
+  return {
+    verb: phrase ? `ran ${phrase} on` : 'logged an action for',
+    icon: CheckCircle2,
+  };
 }
 
 /**

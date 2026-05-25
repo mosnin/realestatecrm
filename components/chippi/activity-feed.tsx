@@ -29,12 +29,12 @@ interface ActivityEntry {
 }
 
 const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
-  send_sms: { verb: 'sent SMS to', icon: MessageSquare },
-  send_email: { verb: 'sent email to', icon: Mail },
+  send_sms: { verb: 'sent an SMS to', icon: MessageSquare },
+  send_email: { verb: 'sent an email to', icon: Mail },
   log_note: { verb: 'logged a note about', icon: StickyNote },
   create_draft_message: { verb: 'drafted a message for', icon: MessageSquare },
   message_drafted: { verb: 'drafted a message for', icon: MessageSquare },
-  packet_drafted: { verb: 'drafted a packet share for', icon: Paperclip },
+  packet_drafted: { verb: 'drafted a property packet for', icon: Paperclip },
   set_contact_follow_up: { verb: 'scheduled a follow-up with', icon: Bell },
   set_deal_follow_up: { verb: 'scheduled a deal follow-up on', icon: Bell },
   log_agent_observation: { verb: 'noted something about', icon: Brain },
@@ -49,15 +49,24 @@ const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
   review_requested: { verb: 'flagged a deal for your broker:', icon: Flag },
   lead_routed_out: { verb: 'routed a contact to a teammate:', icon: ArrowRightLeft },
   lead_routed_in: { verb: 'received a contact from a teammate:', icon: ArrowRightLeft },
+  // Task lifecycle (logged when a realtor pauses/resumes/cancels/completes
+  // a Chippi task). Phrased so the "I <verb> <target>" template still reads.
+  task_completed: { verb: 'marked a task done for', icon: CheckCircle2 },
+  task_paused: { verb: 'paused a task for', icon: CheckCircle2 },
+  task_cancelled: { verb: 'cancelled a task for', icon: CheckCircle2 },
+  task_resumed: { verb: 'resumed a task for', icon: CheckCircle2 },
 };
 
 function metaFor(actionType: string): { verb: string; icon: LucideIcon } {
-  return (
-    ACTION_META[actionType] ?? {
-      verb: actionType.replace(/_/g, ' '),
-      icon: CheckCircle2,
-    }
-  );
+  const hit = ACTION_META[actionType];
+  if (hit) return hit;
+  // Fallback: turn "do_something_useful" → "did something useful for". Not
+  // perfect, but it never leaks raw snake_case into the feed.
+  const phrase = actionType.replace(/_/g, ' ').trim();
+  return {
+    verb: phrase ? `ran ${phrase} on` : 'logged an action for',
+    icon: CheckCircle2,
+  };
 }
 
 const OUTCOME_META: Record<
