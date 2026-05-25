@@ -82,7 +82,7 @@ export const realtorNavItems: NavItem[] = [
     icon: Building2,
     badgeKey: 'properties',
     children: [
-      { href: '/deals/new', label: 'Add property' },
+      { href: '/properties/new', label: 'Add property' },
       { href: '/properties/commissions', label: 'Commissions' },
     ],
   },

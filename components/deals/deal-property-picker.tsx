@@ -18,8 +18,9 @@ interface Props {
 
 /**
  * Compact property picker for the deal sidebar. Live search against
- * /api/properties, debounced. Properties are created via the deal-create
- * wizard — no inline-create here, no escape-hatch link to a deleted index.
+ * /api/properties, debounced. Properties have their own create flow at
+ * /s/[slug]/properties/new — pickers stay focused on search. When no
+ * match exists, the empty state links out to the create page.
  */
 export function DealPropertyPicker({ dealId, slug, initial }: Props) {
   const [linked, setLinked] = useState<Property | null>(initial);
@@ -143,9 +144,29 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
 
           {results.length === 0 && !searching && (
             <p className="text-[11px] text-muted-foreground">
-              {query.trim().length > 0
-                ? 'No matches. Properties get added when you create a deal.'
-                : 'Type to search. Properties get added when you create a deal.'}
+              {query.trim().length > 0 ? (
+                <>
+                  No matches.{' '}
+                  <Link
+                    href={`/s/${slug}/properties/new`}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    Add it as a listing
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  Type to search, or{' '}
+                  <Link
+                    href={`/s/${slug}/properties/new`}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    add a new listing
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           )}
 

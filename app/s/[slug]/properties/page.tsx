@@ -1,12 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { Building2 } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { formatCurrency } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
-import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX, PRIMARY_PILL } from '@/lib/typography';
 import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { PropertyStatusBadge } from '@/components/properties/property-status-badge';
@@ -63,17 +63,27 @@ export default async function PropertiesPage({
   return (
     <div className={cn('space-y-6', PAGE_MAX)}>
       {/* Page header — status-sentence pattern: muted greeting → serif h1
-          → one-sentence status. */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Properties.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          All properties
-        </h1>
-        <p className={cn(BODY_MUTED)}>
-          {properties.length === 0
-            ? 'No properties yet.'
-            : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
-        </p>
+          → one-sentence status. Add-listing CTA sits inline; primary
+          action lives where the realtor's eye lands after the title. */}
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5 min-w-0">
+          <p className={cn(BODY_MUTED)}>Properties.</p>
+          <h1 className={cn(H1)} style={TITLE_FONT}>
+            All properties
+          </h1>
+          <p className={cn(BODY_MUTED)}>
+            {properties.length === 0
+              ? 'No properties yet.'
+              : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
+          </p>
+        </div>
+        <Link
+          href={`/s/${slug}/properties/new`}
+          className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5 flex-shrink-0')}
+        >
+          <Plus size={14} aria-hidden />
+          Add property
+        </Link>
       </header>
 
       {/* Empty state — calm fact, not a directive. */}
@@ -82,8 +92,15 @@ export default async function PropertiesPage({
           <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-sm text-foreground">Quiet — no properties yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
-            Properties show up here once you create a deal.
+            Add your first listing to start the register.
           </p>
+          <Link
+            href={`/s/${slug}/properties/new`}
+            className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5 mt-4')}
+          >
+            <Plus size={14} aria-hidden />
+            Add property
+          </Link>
         </div>
       ) : (
         /* divide-y row list — mirrors the deal-property-picker pattern.
