@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, PanelRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +34,12 @@ import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -814,6 +820,34 @@ export function ChippiWorkspace({
       {/* Floating control cluster — top-right, no top bar chrome */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
         <ApprovalsPill />
+        {/* Prominent split-view affordance — discoverable icon+label sibling
+            to the icon-only `SplitPanelToggle` further down the cluster. The
+            small toggle was invisible on busy screens; this one carries text
+            so a first-time realtor sees they can chat alongside a deal/contact.
+            Hidden once `isSplit === true` (they're already in split) and on
+            mobile (split panel is md-and-up only). */}
+        {!isSplit && (
+          <div className="hidden md:flex mr-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleSplit}
+                    aria-label="Open Chippi beside this page"
+                    className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  >
+                    <PanelRight size={13} />
+                    <span>Open beside</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Open Chippi beside this page so you can chat without leaving.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
         {messages.length >= MESSAGE_LIMIT * 0.8 && (
           <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
             {messages.length}/{MESSAGE_LIMIT}
