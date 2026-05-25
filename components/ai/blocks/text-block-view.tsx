@@ -42,8 +42,44 @@ function renderInline(text: string, keyOffset = 0): React.ReactNode[] {
   return parts;
 }
 
+/**
+ * Detect a text block that is nothing but a raw JSON object / array — usually
+ * a tool-call argument blob the model leaked into its assistant text instead
+ * of emitting via the proper tool_call channel. The renderer drops these so
+ * the realtor doesn't see raw SDK plumbing in the chat. We only strip when
+ * the ENTIRE message is JSON (with optional surrounding whitespace) — JSON
+ * snippets inside prose still render verbatim.
+ */
+function isRawJsonLeak(content: string): boolean {
+  const trimmed = content.trim();
+  if (trimmed.length < 4) return false;
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  if (!((first === '{' && last === '}') || (first === '[' && last === ']'))) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    // Only strip object/array payloads. Bare strings / numbers / booleans
+    // wrapped in brackets are exotic and worth surfacing literally.
+    return typeof parsed === 'object' && parsed !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Parse the full content string into React block-level nodes. */
 function renderMarkdown(content: string, streaming?: boolean): React.ReactNode[] {
+  // Drop pure-JSON leaks — usually a tool-call args blob the model emitted
+  // as assistant text instead of through the tool_call channel. See
+  // `isRawJsonLeak`. Partial JSON (still streaming, braces unbalanced)
+  // falls through and renders — `JSON.parse` fails until it closes; once
+  // it closes, the next render strips it. The flash is the price of
+  // honoring tokens-in-flight; the alternative is to gate on `streaming`
+  // and leak the final result.
+  if (isRawJsonLeak(content)) {
+    return [];
+  }
   const nodes: React.ReactNode[] = [];
   const lines = content.split('\n');
   let i = 0;
@@ -132,15 +168,31 @@ function renderMarkdown(content: string, streaming?: boolean): React.ReactNode[]
     }
 
     // ── Unordered list ───────────────────────────────────────────────────
+    // Tolerate blank lines between bullets — the agent often emits markdown
+    // with one-line gaps and we want a SINGLE <ul>, not several one-item
+    // lists rendered as separate hairline blocks.
     if (/^[-*] /.test(line)) {
       const items: React.ReactNode[] = [];
-      while (i < lines.length && /^[-*] /.test(lines[i])) {
-        items.push(
-          <li key={key()} className="text-sm text-foreground">
-            {renderInline(lines[i].slice(2))}
-          </li>,
-        );
-        i++;
+      while (i < lines.length) {
+        const cur = lines[i];
+        if (/^[-*] /.test(cur)) {
+          items.push(
+            <li key={key()} className="text-sm text-foreground">
+              {renderInline(cur.slice(2))}
+            </li>,
+          );
+          i++;
+          continue;
+        }
+        if (cur.trim() === '') {
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === '') j++;
+          if (j < lines.length && /^[-*] /.test(lines[j])) {
+            i = j;
+            continue;
+          }
+        }
+        break;
       }
       nodes.push(
         <ul key={key()} className="list-disc pl-4 space-y-0.5 my-1">
@@ -151,19 +203,43 @@ function renderMarkdown(content: string, streaming?: boolean): React.ReactNode[]
     }
 
     // ── Ordered list ─────────────────────────────────────────────────────
-    if (/^\d+\. /.test(line)) {
+    // Two corrections vs the previous version:
+    //   1. Tolerate blank lines between items. Without this, "1. foo\n\n
+    //      2. bar\n\n3. baz" rendered as THREE <ol>s of one item each, and
+    //      browsers reset the counter on every <ol> → "1.", "1.", "1.".
+    //   2. Honor the first item's number via the `start` attribute so a
+    //      list that begins at "3." renders 3, 4, 5 — not 1, 2, 3.
+    const olStartMatch = /^(\d+)\. /.exec(line);
+    if (olStartMatch) {
+      const startNum = parseInt(olStartMatch[1], 10);
       const items: React.ReactNode[] = [];
-      while (i < lines.length && /^\d+\. /.test(lines[i])) {
-        const text = lines[i].replace(/^\d+\. /, '');
-        items.push(
-          <li key={key()} className="text-sm text-foreground">
-            {renderInline(text)}
-          </li>,
-        );
-        i++;
+      while (i < lines.length) {
+        const cur = lines[i];
+        if (/^\d+\. /.test(cur)) {
+          items.push(
+            <li key={key()} className="text-sm text-foreground">
+              {renderInline(cur.replace(/^\d+\. /, ''))}
+            </li>,
+          );
+          i++;
+          continue;
+        }
+        if (cur.trim() === '') {
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === '') j++;
+          if (j < lines.length && /^\d+\. /.test(lines[j])) {
+            i = j;
+            continue;
+          }
+        }
+        break;
       }
       nodes.push(
-        <ol key={key()} className="list-decimal pl-4 space-y-0.5 my-1">
+        <ol
+          key={key()}
+          start={Number.isFinite(startNum) && startNum > 0 ? startNum : undefined}
+          className="list-decimal pl-4 space-y-0.5 my-1"
+        >
           {items}
         </ol>,
       );

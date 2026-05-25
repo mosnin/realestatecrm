@@ -984,15 +984,21 @@ export function ChippiWorkspace({
         </div>
       ) : (
         <>
-          <AnimatePresence mode="popLayout">
-            {isEmpty && (
-              <motion.div
-                key="chippi-hero"
-                exit={{ opacity: 0, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } }}
-                className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
-              >
-                <div className="w-full max-w-2xl">
-                  <motion.h1
+          {/* Empty-state hero. Previously wrapped in AnimatePresence with
+              `mode="popLayout"` and a shared `layoutId="chippi-composer"`
+              between the centered composer and the docked composer below.
+              popLayout keeps the exiting motion.div mounted for the duration
+              of the exit animation, so the realtor briefly had TWO textareas
+              in the DOM whenever `isEmpty` flipped false. Simplest fix:
+              render the two composers mutually exclusively, no AnimatePresence,
+              no shared layoutId. The morph animation is gone; only-one-
+              textarea is back. */}
+          {isEmpty && (
+            <div
+              className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
+            >
+              <div className="w-full max-w-2xl">
+                <motion.h1
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: greeting ? 1 : 0, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
@@ -1018,17 +1024,10 @@ export function ChippiWorkspace({
                       <span className="text-foreground/70">Activity</span> from the sidebar.
                     </motion.p>
                   )}
-                  <motion.div
-                    layoutId="chippi-composer"
-                    layout
-                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  >
-                    {renderInput()}
-                  </motion.div>
+                  {renderInput()}
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
 
           {!isEmpty && (
             <>
@@ -1219,13 +1218,13 @@ export function ChippiWorkspace({
               composer's right-slot (Send → Stop swap) so the abort affordance
               sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
-          {/* Docked input. Shares `layoutId="chippi-composer"` with the
-              empty-state hero composer so framer-motion animates the
-              transition from centered → docked when the first message ships. */}
-          <motion.div
-            layoutId="chippi-composer"
-            layout
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          {/* Docked input — pinned to the bottom of the active thread.
+              Previously a `motion.div` with `layoutId="chippi-composer"`
+              shared with the empty-state hero composer above. The shared
+              layoutId + popLayout AnimatePresence combo briefly mounted
+              both composers (= two textareas in the DOM). Plain <div>
+              keeps only one composer alive at a time. */}
+          <div
             className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
           >
             {atLimit ? (
@@ -1251,7 +1250,7 @@ export function ChippiWorkspace({
             ) : (
               renderInput()
             )}
-          </motion.div>
+          </div>
             </>
           )}
         </>
