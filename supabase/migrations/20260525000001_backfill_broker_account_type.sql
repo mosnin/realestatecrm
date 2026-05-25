@@ -19,12 +19,20 @@
 -- /brokerage page will be open to them as the self-serve upgrade path.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- AIUserProfile is keyed on spaceId (one row per Space, not per User), so
+-- bridge through Space.ownerId to reach the User. EXISTS keeps the query
+-- semantics clean and avoids any Cartesian risk if a user owns multiple
+-- spaces (only the first match is needed).
 UPDATE "User" u
 SET "accountType" = 'both'
-FROM "AIUserProfile" p
-WHERE p."userId" = u.id
-  AND p.role = 'brokerage_owner'
-  AND u."accountType" = 'realtor';
+WHERE u."accountType" = 'realtor'
+  AND EXISTS (
+    SELECT 1
+    FROM "Space" s
+    JOIN "AIUserProfile" p ON p."spaceId" = s.id
+    WHERE s."ownerId" = u.id
+      AND p.role = 'brokerage_owner'
+  );
 
 -- Also catch the inverse: users who ALREADY own a Brokerage but whose
 -- User row never had accountType updated (covers race conditions or
