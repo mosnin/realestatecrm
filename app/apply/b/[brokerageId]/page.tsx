@@ -214,10 +214,12 @@ export default async function BrokerageApplyPage({
 
   return (
     <IntakeChatShell
+      businessName={businessName}
       agentName={agentName}
       agentPhoto={agentPhoto}
-      secondaryLabel={null}
-      accentColor={customization.accentColor}
+      coverPhotoUrl={null}
+      logoUrl={logoUrl}
+      isVerified={false}
       privacyPolicyUrl={customization.privacyPolicyUrl}
       hidePoweredBy={hidePoweredBy}
       footerLinks={customization.footerLinks}

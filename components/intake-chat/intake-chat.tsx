@@ -46,12 +46,12 @@ import {
   DEFAULT_RENTAL_FORM_CONFIG,
   DEFAULT_BUYER_FORM_CONFIG,
 } from '@/lib/form-builder';
+import { TITLE_FONT } from '@/lib/typography';
 import {
   AlertCircle,
   ArrowUp,
   Check,
   Loader2,
-  MessageCircle,
 } from 'lucide-react';
 import type { IntakeFormConfig, FormQuestion } from '@/lib/types';
 
@@ -294,17 +294,15 @@ export function IntakeChat({
   const askedRef = useRef<Set<string>>(new Set());
   const submitFiredRef = useRef(false);
 
-  // Append an assistant turn for each new current question. No greeting
-  // turn — the first question IS the opening. Filler greetings ("Hi, a
-  // few quick questions") waste a turn and feel like a bot, not a person.
+  // Reset pending input state whenever the active question changes.
+  // The active question's label is rendered by CurrentQuestion (in serif
+  // Times — the focal moment per question). Past questions live in
+  // `turns` and read as quiet history; commitAnswer pushes the previous
+  // active question into `turns` as the lead advances.
   useEffect(() => {
     if (!currentQuestion) return;
     if (askedRef.current.has(currentQuestion.id)) return;
     askedRef.current.add(currentQuestion.id);
-    setTurns((prev) => [
-      ...prev,
-      { id: `ask:${currentQuestion.id}`, role: 'assistant', text: currentQuestion.label },
-    ]);
     setPendingValue(currentQuestion.type === 'multi_select' ? [] : '');
     setPendingError(null);
   }, [currentQuestion]);
@@ -328,6 +326,11 @@ export function IntakeChat({
   }, [turns, currentQuestion, phase]);
 
   // Commit a single answer and advance.
+  //
+  // On commit we push BOTH the question (as a past assistant turn) and
+  // the answer (as a user turn) into history. The active question is the
+  // focal serif moment; once answered, it recedes into muted history so
+  // the eye stays on whatever comes next.
   const commitAnswer = useCallback(
     (question: FormQuestion, value: string | string[]) => {
       const error = validateQuestion(question, value);
@@ -341,6 +344,11 @@ export function IntakeChat({
       setTurns((prev) => [
         ...prev,
         {
+          id: `ask:${question.id}`,
+          role: 'assistant',
+          text: question.label,
+        },
+        {
           id: `ans:${question.id}`,
           role: 'user',
           text: formatAnswerText(question, value),
@@ -353,10 +361,20 @@ export function IntakeChat({
     [],
   );
 
-  // Skip an optional question with no user-visible bubble. Silently
-  // advances — feels right for "rather not answer".
+  // Skip an optional question with no user-visible bubble. The question
+  // itself still moves into history so the conversation doesn't appear
+  // to skip mid-thread — silent advance for the answer, quiet retention
+  // for the ask.
   const skipOptional = useCallback((question: FormQuestion) => {
     if (question.required) return;
+    setTurns((prev) => [
+      ...prev,
+      {
+        id: `ask:${question.id}`,
+        role: 'assistant',
+        text: question.label,
+      },
+    ]);
     setAnswers((prev) => ({ ...prev, [question.id]: '' }));
     setPendingValue('');
     setPendingError(null);
@@ -413,17 +431,8 @@ export function IntakeChat({
     }
   }
 
-  // Avatar repetition rule: show the realtor's avatar on the FIRST
-  // assistant turn only. The shell header already establishes who's
-  // speaking; repeating the same purple circle on every question reads
-  // as decoration, not identity. Subsequent assistant turns keep the
-  // indent so the conversational column stays aligned.
-  let firstAssistantSeen = false;
-
   // Progress: count of visible questions vs how many the lead has
-  // answered (or actively skipped). Stays at top-right so the lead
-  // always has an answer to "how much longer is this?" without breaking
-  // the chat rhythm.
+  // answered (or actively skipped).
   //
   // Dual-config wrinkle: while the lead-type question is unanswered the
   // questionList is just `[LEAD_TYPE_QUESTION]`, which renders as
@@ -446,33 +455,35 @@ export function IntakeChat({
   const showProgress =
     phase === 'asking' && totalQuestions > 0 && answeredCount < totalQuestions;
 
+  // Past assistant turns (everything except the live one) read as quiet
+  // muted text; the active question gets the focal serif treatment in
+  // CurrentQuestion. Past user turns stay as accent-tinted bubbles —
+  // they ARE the lead's answers in the lead's voice.
+  //
+  // The Chippi intro shows ONCE, before the first question is answered.
+  // Calm, single-sentence chief-of-staff voice (STYLESHEET.md → Voice).
+  // It establishes who's running the conversation without stealing focus
+  // from the realtor's hero or the question itself.
+  const showChippiIntro = phase === 'asking' && answeredCount === 0;
+
   return (
     <div className="space-y-8">
       {showProgress && (
-        <div className="flex items-center justify-end -mb-4 pt-1">
-          <p
-            className="text-[11px] tabular-nums text-muted-foreground/70"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            Question {answeredCount + 1} of {totalQuestions}
-          </p>
-        </div>
+        <ProgressBar
+          answered={answeredCount}
+          total={totalQuestions}
+          accentColor={customization.accentColor}
+        />
+      )}
+
+      {showChippiIntro && (
+        <ChippiIntro agentName={agentName} />
       )}
 
       {turns.map((turn) => {
         if (turn.role === 'assistant') {
-          const showAvatar = !firstAssistantSeen;
-          firstAssistantSeen = true;
           return (
-            <AssistantTurn
-              key={turn.id}
-              text={turn.text}
-              agentPhoto={agentPhoto}
-              agentName={agentName}
-              accentColor={customization.accentColor}
-              showAvatar={showAvatar}
-            />
+            <PastAssistantTurn key={turn.id} text={turn.text} />
           );
         }
         return (
@@ -534,92 +545,106 @@ export function IntakeChat({
 // Alias preserved so existing imports don't break.
 export { IntakeChat as IntakeChatView };
 
-// ─── Turn renderers ──────────────────────────────────────────────────────────
+// ─── Progress + turn renderers ───────────────────────────────────────────────
 
-function AssistantAvatar({
-  agentPhoto,
-  agentName,
+/**
+ * Slim segmented progress bar that lives between the realtor hero and the
+ * conversation. One segment per visible question; segments before the
+ * cursor fill with the realtor's accent color, the live segment animates
+ * to half-opacity, the rest stay muted.
+ *
+ * Why bars (and not "Question 3 of 14" text)? Because applicants don't
+ * read counters — they feel them. A bar fills as you go. The brain
+ * registers "almost done" without parsing a fraction. The accessible
+ * fraction is still announced via aria-valuetext.
+ */
+function ProgressBar({
+  answered,
+  total,
   accentColor,
 }: {
-  agentPhoto?: string | null;
-  agentName?: string;
+  answered: number;
+  total: number;
   accentColor: string;
 }) {
-  if (agentPhoto) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={agentPhoto}
-        alt={agentName ?? 'Realtor'}
-        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-      />
-    );
-  }
-  const initials =
-    (agentName ?? '')
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase() ?? '')
-      .join('') || '';
-  if (initials) {
-    return (
-      <span
-        aria-hidden
-        className="w-7 h-7 rounded-full flex-shrink-0 inline-flex items-center justify-center text-[10px] font-semibold text-white select-none"
-        style={{ backgroundColor: accentColor }}
-      >
-        {initials}
-      </span>
-    );
-  }
+  // Clamp to a max of ~16 segments — past that the eye stops counting
+  // individuals and the bar reads as a continuous fill, which is fine.
+  const segments = Math.min(total, 16);
+  const filled = Math.round((answered / Math.max(total, 1)) * segments);
   return (
-    <span
-      aria-hidden
-      className="w-7 h-7 rounded-full flex-shrink-0 inline-flex items-center justify-center bg-foreground/[0.06]"
+    <div
+      role="progressbar"
+      aria-valuenow={answered}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuetext={`Question ${Math.min(answered + 1, total)} of ${total}`}
+      className="flex items-center gap-1 -mt-2"
     >
-      <MessageCircle className="w-3 h-3 text-muted-foreground" />
-    </span>
+      {Array.from({ length: segments }).map((_, i) => {
+        const isFilled = i < filled;
+        const isCurrent = i === filled;
+        return (
+          <span
+            key={i}
+            aria-hidden
+            className={cn(
+              'h-[3px] flex-1 rounded-full transition-colors duration-300',
+              !isFilled && !isCurrent && 'bg-foreground/[0.08]',
+            )}
+            style={
+              isFilled
+                ? { backgroundColor: accentColor }
+                : isCurrent
+                  ? { backgroundColor: withAlpha(accentColor, 0.4) }
+                  : undefined
+            }
+          />
+        );
+      })}
+    </div>
   );
 }
 
-function AssistantTurn({
-  text,
-  agentPhoto,
-  agentName,
-  accentColor,
-  showAvatar,
-}: {
-  text: string;
-  agentPhoto?: string | null;
-  agentName?: string;
-  accentColor: string;
-  /** True on the first assistant turn only. Subsequent turns render an
-   *  avatar-sized spacer so the column stays aligned without repeating
-   *  the speaker's identity decor. */
-  showAvatar: boolean;
-}) {
+/**
+ * Chippi's calm intro — shown once, before the lead has answered any
+ * questions. Chief-of-staff voice (STYLESHEET.md → Voice): one sentence,
+ * period, no exclamation marks, no "Welcome!" / "Get started!". It names
+ * Chippi and the realtor in one breath so the applicant knows who's
+ * actually doing the work and who they're applying to.
+ *
+ * Visually it's a small inline caption — text-xs muted, no chrome, no
+ * pill. It belongs to the conversation's quiet preamble, not to a CTA.
+ */
+function ChippiIntro({ agentName }: { agentName: string }) {
   return (
-    <motion.div
+    <motion.p
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: 0.05 }}
+      className="text-xs text-muted-foreground leading-relaxed"
+    >
+      Hi — I&rsquo;m Chippi. I work with {agentName}. A few quick questions
+      and they&rsquo;ll know exactly what to send you.
+    </motion.p>
+  );
+}
+
+/**
+ * A past assistant question — the lead has already answered it. Reads as
+ * quiet history: muted text, no avatar, no serif. The visible focal
+ * moment belongs to the CURRENT question (rendered separately in
+ * CurrentQuestion with serif Times).
+ */
+function PastAssistantTurn({ text }: { text: string }) {
+  return (
+    <motion.p
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="flex items-start gap-3"
-      aria-live="polite"
+      className="text-[15px] leading-snug text-muted-foreground whitespace-pre-wrap"
     >
-      {showAvatar ? (
-        <AssistantAvatar
-          agentPhoto={agentPhoto}
-          agentName={agentName}
-          accentColor={accentColor}
-        />
-      ) : (
-        <span aria-hidden className="w-7 h-7 flex-shrink-0" />
-      )}
-      <p className="text-[17px] sm:text-lg text-foreground leading-snug font-medium pt-0.5 whitespace-pre-wrap">
-        {text}
-      </p>
-    </motion.div>
+      {text}
+    </motion.p>
   );
 }
 
@@ -670,26 +695,40 @@ function CurrentQuestion({
   error,
   accentColor,
 }: CurrentQuestionProps) {
-  // Description (if any) reads as a soft secondary line under the
-  // assistant's question. Subtle — the realtor's voice carries the ask.
-  const descriptionRow = question.description ? (
-    <p className="pl-10 -mt-3 text-sm text-muted-foreground max-w-[36rem]">
-      {question.description}
-    </p>
-  ) : null;
-
-  // The input lives in its own row, indented to align with the assistant
-  // message's content gutter (left of the avatar gutter so it reads as a
-  // reply zone, not a nested form).
+  // The active question is the page's one focal element. Serif Times,
+  // tight tracking, generous breathing room above the input. Mirrors the
+  // page-title pattern used everywhere else in Chippi (STYLESHEET.md →
+  // "The status-sentence pattern" and `H1` in lib/typography.ts).
+  //
+  // Description, when present, reads as a quiet helper line under the
+  // serif headline — sans, muted, max-width-bounded so it doesn't sprawl.
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      key={question.id}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="space-y-3"
+      className="space-y-5"
+      aria-live="polite"
     >
-      {descriptionRow}
-      <div className="pl-10 pr-1">
+      <div className="space-y-2 max-w-md">
+        <h2
+          className="text-2xl sm:text-[26px] tracking-tight leading-snug text-foreground whitespace-pre-wrap"
+          style={TITLE_FONT}
+        >
+          {question.label}
+          {question.required && (
+            <span aria-hidden className="text-muted-foreground/40"> </span>
+          )}
+        </h2>
+        {question.description && (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {question.description}
+          </p>
+        )}
+      </div>
+
+      <div className="max-w-md">
         {renderInputForQuestion({
           question,
           value,
@@ -702,13 +741,13 @@ function CurrentQuestion({
           <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>
         )}
         {!question.required && question.type !== 'checkbox' && (
-          <div className="mt-2 flex justify-end">
+          <div className="mt-3 flex justify-start">
             <button
               type="button"
               onClick={onSkip}
               className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors"
             >
-              Skip
+              Skip this
             </button>
           </div>
         )}
@@ -1198,18 +1237,13 @@ function SubmittingTurn({ accentColor }: { accentColor: string }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="flex items-start gap-3"
+      className="flex items-center gap-2.5"
     >
-      <span
-        aria-hidden
-        className="w-7 h-7 rounded-full flex-shrink-0 inline-flex items-center justify-center"
-        style={{ backgroundColor: accentColor }}
-      >
-        <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-      </span>
-      <p className="text-[17px] sm:text-lg text-muted-foreground pt-0.5">
-        Sending your answers…
-      </p>
+      <Loader2
+        className="w-4 h-4 animate-spin"
+        style={{ color: accentColor }}
+      />
+      <p className="text-sm text-muted-foreground">Sending your answers.</p>
     </motion.div>
   );
 }
@@ -1228,25 +1262,21 @@ function ErrorTurn({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="flex items-start gap-3"
+      className="space-y-3"
+      role="alert"
     >
-      <span
-        aria-hidden
-        className="w-7 h-7 rounded-full flex-shrink-0 inline-flex items-center justify-center bg-rose-500/15"
-      >
-        <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-      </span>
-      <div className="space-y-2 pt-0.5">
-        <p className="text-[15px] text-foreground">{message}</p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-full px-3.5 h-8 text-xs font-semibold border border-border/70 hover:bg-muted/40 transition-colors"
-          style={{ borderColor: accentColor, color: accentColor }}
-        >
-          Try again
-        </button>
+      <div className="flex items-start gap-2.5 text-sm text-foreground">
+        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+        <p>{message}</p>
       </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded-full px-3.5 h-8 text-xs font-medium border transition-colors hover:bg-foreground/[0.04]"
+        style={{ borderColor: withAlpha(accentColor, 0.5), color: accentColor }}
+      >
+        Try again
+      </button>
     </motion.div>
   );
 }
