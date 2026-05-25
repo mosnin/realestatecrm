@@ -741,14 +741,31 @@ export function ContactTable({ slug }: ContactTableProps) {
             );
           })}
           <div className="ml-auto text-xs text-muted-foreground">
-            {tagFilter ? `${visibleContacts.length} of ` : ''}
-            <span
-              className="text-base tabular-nums text-foreground"
-              style={{ fontFamily: 'var(--font-title)' }}
-            >
-              {contacts.length}
-            </span>{' '}
-            total
+            {/* Any client-side narrowing (tag filter, lead-type chip) makes the
+                full list count misleading. Surface the visible count as the
+                primary number when a filter is active so "5 total" can't
+                contradict "3 rows showing". */}
+            {(tagFilter || leadTypeFilter !== 'all') && visibleContacts.length !== contacts.length ? (
+              <>
+                <span
+                  className="text-base tabular-nums text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {visibleContacts.length}
+                </span>{' '}
+                of {contacts.length} shown
+              </>
+            ) : (
+              <>
+                <span
+                  className="text-base tabular-nums text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {contacts.length}
+                </span>{' '}
+                total
+              </>
+            )}
           </div>
         </div>
       )}
