@@ -44,6 +44,7 @@ import {
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
@@ -480,18 +481,11 @@ export async function POST(req: NextRequest) {
     const dailyTokenBudget: number =
       (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
 
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const { data: usageRows } = await supabase
-      .from('AgentTask')
-      .select('inputTokens, outputTokens')
-      .eq('spaceId', ctx.space.id)
-      .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
-
-    const todayTokens = (usageRows ?? []).reduce(
-      (sum: number, row: { inputTokens: number | null; outputTokens: number | null }) =>
-        sum + (row.inputTokens ?? 0) + (row.outputTokens ?? 0),
-      0,
-    );
+    // Previously this read AgentTask.inputTokens/outputTokens — columns no
+    // code writes — so the enforcement silently passed every time. Route
+    // through the shared helper that sums ChatUsage rows + the autonomous
+    // Redis counter, matching the Settings display.
+    const { total: todayTokens } = await getTodayTokenUsage(ctx.space.id);
 
     if (todayTokens >= dailyTokenBudget) {
       logger.warn('[ai/task] daily token budget exceeded', {
