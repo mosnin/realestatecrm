@@ -656,7 +656,7 @@ export async function POST(req: NextRequest) {
       scoringStatus: 'failed',
       leadScore: null,
       scoreLabel: 'unscored',
-      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+      scoreSummary: 'Scoring unavailable right now. Lead saved.',
       scoreDetails: null,
     };
 
@@ -710,7 +710,7 @@ export async function POST(req: NextRequest) {
             scoringStatus: 'failed',
             leadScore: null,
             scoreLabel: 'unscored',
-            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+            scoreSummary: 'Scoring unavailable right now. Lead saved.',
             updatedAt: new Date().toISOString(),
           })
           .eq('id', contact.id);

@@ -424,9 +424,24 @@ export function IntakeChat({
   // answered (or actively skipped). Stays at top-right so the lead
   // always has an answer to "how much longer is this?" without breaking
   // the chat rhythm.
-  const totalQuestions = questionList.filter((q) =>
+  //
+  // Dual-config wrinkle: while the lead-type question is unanswered the
+  // questionList is just `[LEAD_TYPE_QUESTION]`, which renders as
+  // "Question 1 of 1" — false advertising. Project the total from the
+  // larger of the two configs (rental vs buyer) so the lead sees an
+  // honest upper bound until they pick a path. Once they pick, the live
+  // total kicks in from the active config.
+  const liveTotal = questionList.filter((q) =>
     evaluateVisibility(q.visibleWhen, answers),
   ).length;
+  const projectedDualTotal =
+    hasDual && leadType === null
+      ? 1 + Math.max(
+          flattenQuestions(effectiveRental).filter((q) => !q.visibleWhen).length,
+          flattenQuestions(effectiveBuyer).filter((q) => !q.visibleWhen).length,
+        )
+      : 0;
+  const totalQuestions = Math.max(liveTotal, projectedDualTotal);
   const answeredCount = Object.keys(answers).length;
   const showProgress =
     phase === 'asking' && totalQuestions > 0 && answeredCount < totalQuestions;
