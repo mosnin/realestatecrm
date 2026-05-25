@@ -121,7 +121,7 @@ export function ComposeEmailDialog({ contactId, contactName, contactEmail }: Com
             </div>
 
             {status === 'error' && (
-              <p className="text-xs text-destructive">That didn't go through.</p>
+              <p className="text-xs text-destructive">That didn&apos;t go through.</p>
             )}
             {status === 'sent' && (
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Sent.</p>
