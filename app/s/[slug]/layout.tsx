@@ -12,7 +12,6 @@ import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
-import { ChippiActivityToast } from '@/components/chippi/chippi-activity-toast';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 
@@ -260,7 +259,6 @@ export default async function DashboardLayout({
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
       <ChippiBar slug={slug} />
-      <ChippiActivityToast />
       <CommandPalette slug={slug} />
     </div>
   );
