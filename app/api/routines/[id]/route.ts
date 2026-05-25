@@ -135,8 +135,11 @@ export async function POST(
     .eq('id', id)
     .eq('spaceId', space.id);
 
+  // Pass the caller's own Clerk userId — this is "Run now" from the realtor's
+  // own session, so they're the entity whose Composio connections we use.
+  // Mirrors the cron path which threads the owner's clerkId in the same way.
   after(async () => {
-    const status = await fireRoutineRun(space.id, routine.instruction);
+    const status = await fireRoutineRun(space.id, routine.instruction, authResult.userId);
     if (status === 'error') {
       await supabase
         .from('Routine')

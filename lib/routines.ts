@@ -19,6 +19,7 @@ export type RoutineCadence = (typeof ROUTINE_CADENCES)[number];
 export async function fireRoutineRun(
   spaceId: string,
   instruction: string,
+  userId?: string,
 ): Promise<RoutineRunStatus> {
   // Read env at call time, not module load — see /api/cron/agent-sweep for why.
   const url = process.env.MODAL_WEBHOOK_URL ?? '';
@@ -31,13 +32,21 @@ export async function fireRoutineRun(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
   try {
+    // user_id is the workspace owner's Clerk userId — the entity whose
+    // Composio connections (Gmail, Slack, Sheets, Calendar) the autonomous
+    // run uses. The Modal orchestrator can resolve it server-side too, but
+    // passing it explicitly from the cron is cheaper and removes the silent-
+    // failure path where the server-side lookup returns null and the routine
+    // runs with no integration tools.
+    const body: Record<string, unknown> = { space_id: spaceId, secret, instruction };
+    if (userId) body.user_id = userId;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${secret}`,
       },
-      body: JSON.stringify({ space_id: spaceId, secret, instruction }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     return res.ok ? 'ok' : 'error';

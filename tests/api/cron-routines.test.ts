@@ -122,18 +122,36 @@ interface DueRoutine {
   instruction: string;
 }
 
-/** Queue: due routines, active spaces, then one stamp result per runnable. */
+/** Queue: due routines, spaces (with ownerId+sub status), users (owner→clerkId),
+ *  then one stamp result per runnable. */
 function queueTick(opts: {
   due: DueRoutine[];
   activeSpaceIds: string[];
+  ownersBySpace?: Record<string, string>;
+  clerkIdByOwner?: Record<string, string>;
   runnableCount?: number;
 }) {
   const stamps = opts.runnableCount ?? opts.due.length;
-  supabaseQueue = [
+  const spaceRows = opts.due.map((r) => ({
+    id: r.spaceId,
+    ownerId: opts.ownersBySpace?.[r.spaceId] ?? null,
+    stripeSubscriptionStatus: opts.activeSpaceIds.includes(r.spaceId) ? 'active' : 'cancelled',
+  }));
+  const ownerIds = Object.values(opts.ownersBySpace ?? {});
+  const userRows = ownerIds.map((id) => ({ id, clerkId: opts.clerkIdByOwner?.[id] ?? null }));
+  const queue: Terminal[] = [
     { data: opts.due, error: null },
-    { data: opts.activeSpaceIds.map((id) => ({ id })), error: null },
-    ...Array.from({ length: stamps }, () => ({ data: null, error: null }) as Terminal),
+    { data: spaceRows, error: null },
   ];
+  // The User lookup only runs when at least one space has an ownerId; mirror
+  // the route's branch so we don't queue a phantom response.
+  if (ownerIds.length > 0) {
+    queue.push({ data: userRows, error: null });
+  }
+  for (let i = 0; i < stamps; i++) {
+    queue.push({ data: null, error: null });
+  }
+  supabaseQueue = queue;
 }
 
 beforeEach(() => {
@@ -226,6 +244,8 @@ describe('GET /api/cron/routines', () => {
     expect(body.skipped).toBe(0);
 
     expect(modalCalls).toHaveLength(1);
+    // user_id is only added when the owner's clerkId resolved — left absent
+    // here so the cron body matches the original contract.
     expect(modalCalls[0].body).toEqual({
       space_id: 's1',
       secret: 'agent-secret',
@@ -240,6 +260,24 @@ describe('GET /api/cron/routines', () => {
     const updateArgs = stamp!.chain.find(([m]) => m === 'update')![1][0] as Record<string, unknown>;
     expect(updateArgs.lastRunStatus).toBe('ok');
     expect(typeof updateArgs.lastRunAt).toBe('string');
+  });
+
+  it('threads the owner Clerk userId into the Modal payload when known', async () => {
+    queueTick({
+      due: [{ id: 'r1', spaceId: 's1', instruction: 'do the thing' }],
+      activeSpaceIds: ['s1'],
+      ownersBySpace: { s1: 'owner-db-1' },
+      clerkIdByOwner: { 'owner-db-1': 'user_clerk_abc' },
+    });
+
+    const res = await invoke('Bearer test-secret');
+    expect(res.status).toBe(200);
+    expect(modalCalls).toHaveLength(1);
+    expect(modalCalls[0].body).toMatchObject({
+      space_id: 's1',
+      user_id: 'user_clerk_abc',
+      instruction: 'do the thing',
+    });
   });
 
   it('a due routine whose space has no live subscription is skipped — no Modal call', async () => {

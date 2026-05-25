@@ -379,6 +379,7 @@ async def run_agent_for_space(
     space: Space,
     agent_settings: AgentSettings,
     instruction: str | None = None,
+    owner_clerk_id: str | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
@@ -397,6 +398,11 @@ async def run_agent_for_space(
         A routine's standing instruction, when this run was fired by the
         routines cron. When set, the run focuses solely on that instruction
         and leaves the trigger queue untouched for a trigger-driven run.
+    owner_clerk_id:
+        Pre-resolved workspace owner Clerk userId. When set, the run uses
+        this directly instead of doing a Space → User lookup — saves the
+        roundtrip and removes the silent-null path where integrations
+        would otherwise fail to load.
     """
     # Respect the on/off switch. The realtor can pause Chippi from the
     # header; an autonomous run must honour that.
@@ -415,7 +421,7 @@ async def run_agent_for_space(
         logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
         return
     try:
-        await _run_locked(space, agent_settings, run_id, instruction)
+        await _run_locked(space, agent_settings, run_id, instruction, owner_clerk_id)
     finally:
         await release_run_lock(space.id, run_id)
 
@@ -425,6 +431,7 @@ async def _run_locked(
     agent_settings: AgentSettings,
     run_id: str,
     instruction: str | None,
+    owner_clerk_id: str | None = None,
 ) -> None:
     """Execute one autonomous run with the per-space run lock held.
 
@@ -460,9 +467,11 @@ async def _run_locked(
     # Resolve the workspace owner's Clerk userId now — needed both for the
     # AgentContext (so the integration dispatcher tools know whose Composio
     # entity to call against) and again later when loading those tools.
-    # Cheap read; cache it.
+    # The cron path (`/api/cron/routines`) and any caller that already knows
+    # the owner can pass it pre-resolved; everyone else does the lookup here.
     from integrations import load_integration_tools, resolve_owner_user_id
-    owner_clerk_id = await resolve_owner_user_id(space.id) or ""
+    if not owner_clerk_id:
+        owner_clerk_id = await resolve_owner_user_id(space.id) or ""
 
     ctx = AgentContext.from_settings(
         agent_settings,

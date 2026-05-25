@@ -70,17 +70,45 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 2. Keep only routines in spaces with a live subscription ────────────
+  //
+  // While we're loading spaces, pull ownerId too — we'll resolve each owner's
+  // Clerk userId and pass it to Modal so the autonomous run loads Composio
+  // tools for the right entity. (The Modal side can resolve this itself but
+  // a silent null breaks integrations; passing it explicitly removes that.)
   const spaceIds = [...new Set(due.map((r) => r.spaceId))];
   const { data: spaceRows, error: spaceErr } = await supabase
     .from('Space')
-    .select('id')
-    .in('id', spaceIds)
-    .in('stripeSubscriptionStatus', ['active', 'trialing']);
+    .select('id, ownerId, stripeSubscriptionStatus')
+    .in('id', spaceIds);
   if (spaceErr) {
     console.error('[cron/routines] Failed to load spaces', spaceErr);
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
   }
-  const activeSpaces = new Set((spaceRows ?? []).map((s) => s.id as string));
+  const activeSpaceRows = (spaceRows ?? []).filter((s) =>
+    ['active', 'trialing'].includes(s.stripeSubscriptionStatus as string),
+  );
+  const activeSpaces = new Set(activeSpaceRows.map((s) => s.id as string));
+  const ownerIdsBySpace = new Map<string, string>();
+  for (const s of activeSpaceRows) {
+    if (s.ownerId) ownerIdsBySpace.set(s.id as string, s.ownerId as string);
+  }
+
+  // Single batch lookup: owner DB ids → Clerk userIds.
+  const clerkIdByOwner = new Map<string, string>();
+  const ownerIds = [...new Set(ownerIdsBySpace.values())];
+  if (ownerIds.length > 0) {
+    const { data: userRows, error: userErr } = await supabase
+      .from('User')
+      .select('id, clerkId')
+      .in('id', ownerIds);
+    if (userErr) {
+      console.warn('[cron/routines] Failed to load owners — running without userId', userErr);
+    } else {
+      for (const u of userRows ?? []) {
+        if (u.clerkId) clerkIdByOwner.set(u.id as string, u.clerkId as string);
+      }
+    }
+  }
 
   const runnable = due.filter((r) => activeSpaces.has(r.spaceId));
   const skippedInactive = due.length - runnable.length;
@@ -93,9 +121,11 @@ export async function GET(req: NextRequest) {
   async function worker() {
     while (cursor < runnable.length) {
       const routine = runnable[cursor++];
+      const ownerId = ownerIdsBySpace.get(routine.spaceId);
+      const ownerClerkId = ownerId ? clerkIdByOwner.get(ownerId) : undefined;
       let status: 'ok' | 'error';
       try {
-        status = await fireRoutineRun(routine.spaceId, routine.instruction);
+        status = await fireRoutineRun(routine.spaceId, routine.instruction, ownerClerkId);
       } catch (err) {
         console.error('[cron/routines] dispatch threw', { id: routine.id }, err);
         status = 'error';

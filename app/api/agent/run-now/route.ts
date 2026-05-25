@@ -86,11 +86,18 @@ export async function POST() {
   // Fast path — fire the Modal webhook so the run starts now instead of at the
   // next heartbeat. Fire-and-forget (a Modal run takes minutes); a rejection
   // is harmless because the trigger above is already durably queued.
+  // user_id is the caller's Clerk userId — the entity whose Composio
+  // connections the autonomous run uses. Passing it explicitly removes the
+  // silent-null path on the Modal side.
   if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     fetch(MODAL_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ space_id: space.id, secret: AGENT_INTERNAL_SECRET }),
+      body: JSON.stringify({
+        space_id: space.id,
+        secret: AGENT_INTERNAL_SECRET,
+        user_id: userId,
+      }),
     }).catch((err) => {
       console.error('[agent/run-now] Modal webhook background error', err);
     });

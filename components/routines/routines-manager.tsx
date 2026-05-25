@@ -59,10 +59,20 @@ const CADENCE_OPTIONS: { value: Cadence; label: string }[] = [
 const MIN_INSTRUCTION = 10;
 
 // ── Time helpers — UTC hour in storage, local time on screen ─────────────────
+//
+// Reference date is *today*, not a fixed Jan-2020. Anchoring on a winter date
+// inside a DST timezone (EST/EDT, BST/GMT, etc.) drifts the conversion by an
+// hour for half the year — picking "9 AM" in May ends up firing at 10 AM.
+// Using today's date binds the conversion to whichever DST regime the user
+// is in right now, which is the only one they care about when they save.
+
+function _todayAtUtcHour(utcHour: number): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour, 0, 0));
+}
 
 function localHourLabel(utcHour: number): string {
-  const d = new Date(Date.UTC(2020, 0, 1, utcHour, 0, 0));
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return _todayAtUtcHour(utcHour).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 function scheduleLabel(cadence: Cadence, hour: number): string {
@@ -71,10 +81,10 @@ function scheduleLabel(cadence: Cadence, hour: number): string {
   return `${base} at ${localHourLabel(hour)}`;
 }
 
-/** The UTC hour that lands at 9:00 local — a sane "morning" default. */
+/** The UTC hour that lands at 9:00 local *today* — a sane "morning" default. */
 function defaultUtcHour(): number {
   for (let u = 0; u < 24; u++) {
-    if (new Date(Date.UTC(2020, 0, 1, u)).getHours() === 9) return u;
+    if (_todayAtUtcHour(u).getHours() === 9) return u;
   }
   return 13;
 }
@@ -82,7 +92,7 @@ function defaultUtcHour(): number {
 /** 24 hour options, valued by UTC hour, labelled + ordered by local time. */
 function hourOptions(): { value: number; label: string }[] {
   return Array.from({ length: 24 }, (_, u) => {
-    const d = new Date(Date.UTC(2020, 0, 1, u));
+    const d = _todayAtUtcHour(u);
     return { value: u, label: localHourLabel(u), sortKey: d.getHours() * 60 + d.getMinutes() };
   })
     .sort((a, b) => a.sortKey - b.sortKey)

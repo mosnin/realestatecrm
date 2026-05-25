@@ -199,6 +199,16 @@ async def run_now_webhook(item: dict) -> dict:
             raw_instruction.strip()[:600] if isinstance(raw_instruction, str) else ""
         )
 
+        # Optional: workspace owner's Clerk userId, pre-resolved by the
+        # caller (e.g. /api/cron/routines). Passing it here skips the
+        # Modal-side Space → User lookup and avoids the silent-null path
+        # where integrations fail to load. Falls back to server-side
+        # resolution when absent.
+        raw_user_id = item.get("user_id")
+        user_id = (
+            raw_user_id.strip() if isinstance(raw_user_id, str) else ""
+        )
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -217,6 +227,7 @@ async def run_now_webhook(item: dict) -> dict:
             Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
             AgentSettings.model_validate(sr.data),
             instruction=instruction or None,
+            owner_clerk_id=user_id or None,
         )
         return {"ok": True, "space_id": space_id}
 
