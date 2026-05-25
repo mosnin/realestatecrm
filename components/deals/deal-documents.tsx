@@ -2,8 +2,27 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Upload, FileText, Download, Trash2, Loader2, ArrowUpFromLine } from 'lucide-react';
+import {
+  Upload,
+  FileText,
+  Download,
+  Trash2,
+  Loader2,
+  ArrowUpFromLine,
+  Image as ImageIcon,
+  Film,
+  Music,
+  Paperclip,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   DEAL_DOCUMENT_KINDS,
   defaultDocumentKind,
@@ -35,6 +54,7 @@ export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocume
     (a, b) => orderedKinds.indexOf(a.value) - orderedKinds.indexOf(b.value),
   );
   const [dragging, setDragging] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -154,6 +174,15 @@ export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocume
               <Upload size={12} />
               Choose file
             </button>
+            <button
+              type="button"
+              onClick={() => setAttachOpen(true)}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background text-xs font-medium text-foreground px-3 py-1.5 hover:bg-muted/40 transition-colors disabled:opacity-50"
+            >
+              <Paperclip size={12} />
+              Attach from files
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -168,6 +197,15 @@ export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocume
           </div>
         </div>
       </div>
+
+      <AttachFromFilesDialog
+        open={attachOpen}
+        onOpenChange={setAttachOpen}
+        dealId={dealId}
+        defaultKind={defaultDocumentKind(pipelineType)}
+        sortedKinds={sortedKinds}
+        onAttached={(attached) => setDocs((prev) => [...attached, ...prev])}
+      />
 
       {/* Document list */}
       {loading && docs.length === 0 ? (
@@ -213,5 +251,228 @@ export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocume
         </ul>
       )}
     </div>
+  );
+}
+
+/* ─── Attach-from-files dialog ─────────────────────────────────────────── */
+
+interface FileListRow {
+  id: string;
+  name: string;
+  mimeType: string;
+  category: 'image' | 'document' | 'video' | 'audio' | 'other';
+  sizeBytes: number;
+  isPublic: boolean;
+  createdAt: string;
+  source: 'file' | 'chat';
+  previewUrl: string | null;
+}
+
+interface AttachDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  dealId: string;
+  defaultKind: DealDocumentKind;
+  sortedKinds: typeof DEAL_DOCUMENT_KINDS;
+  onAttached: (docs: DealDocument[]) => void;
+}
+
+const CATEGORY_FALLBACK_ICON = {
+  image: ImageIcon,
+  video: Film,
+  audio: Music,
+  document: FileText,
+  other: FileText,
+} as const;
+
+function AttachFromFilesDialog({
+  open,
+  onOpenChange,
+  dealId,
+  defaultKind,
+  sortedKinds,
+  onAttached,
+}: AttachDialogProps) {
+  const [files, setFiles] = useState<FileListRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [kind, setKind] = useState<DealDocumentKind>(defaultKind);
+  const [attaching, setAttaching] = useState(false);
+
+  // Refetch on each open so the list reflects anything the realtor added
+  // in the meantime. Chat-attachment rows aren't attachable (they're
+  // conversation ephemera with their own retention rules) so we skip them.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setFiles(null);
+    setError(null);
+    setSelected(new Set());
+    setKind(defaultKind);
+    (async () => {
+      try {
+        const res = await fetch('/api/files');
+        if (!res.ok) throw new Error('Failed to load files');
+        const data = (await res.json()) as { files: FileListRow[] };
+        if (cancelled) return;
+        setFiles((data.files ?? []).filter((f) => f.source === 'file'));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, defaultKind]);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleAttach() {
+    if (selected.size === 0) return;
+    setAttaching(true);
+    try {
+      const res = await fetch(`/api/deals/${dealId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: Array.from(selected), kind }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Couldn't attach those files. Try again.");
+        return;
+      }
+      const attached: DealDocument[] = await res.json();
+      onAttached(attached);
+      toast.success(
+        attached.length === 1 ? 'Attached 1 file.' : `Attached ${attached.length} files.`,
+      );
+      onOpenChange(false);
+    } catch {
+      toast.error("Couldn't attach those files. Try again.");
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Attach from files</DialogTitle>
+          <DialogDescription>
+            Reference an existing file without re-uploading it. You can reclassify each one after.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground" htmlFor="attach-kind">
+              Document type
+            </label>
+            <select
+              id="attach-kind"
+              value={kind}
+              onChange={(e) => setKind(e.target.value as DealDocumentKind)}
+              className="text-xs border border-border rounded px-2 py-1.5 bg-card"
+              disabled={attaching}
+            >
+              {sortedKinds.map((k) => (
+                <option key={k.value} value={k.value}>{k.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {selected.size} selected
+          </p>
+        </div>
+
+        <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-border/70">
+          {error ? (
+            <p className="text-sm text-destructive px-4 py-6 text-center">{error}</p>
+          ) : files === null ? (
+            <p className="text-sm text-muted-foreground px-4 py-6 text-center">One moment.</p>
+          ) : files.length === 0 ? (
+            <p className="text-sm text-muted-foreground px-4 py-6 text-center">
+              Nothing in your files yet. Upload something first.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {files.map((f) => {
+                const isSelected = selected.has(f.id);
+                const Icon = CATEGORY_FALLBACK_ICON[f.category] ?? FileText;
+                return (
+                  <li key={f.id}>
+                    <label
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors',
+                        isSelected ? 'bg-muted/50' : 'hover:bg-muted/30',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggle(f.id)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      <div className="flex-shrink-0 w-10 h-10 rounded-md bg-muted/40 overflow-hidden flex items-center justify-center">
+                        {f.previewUrl && f.category === 'image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={f.previewUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Icon size={16} className="text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{f.name}</p>
+                        <p className="text-[11px] text-muted-foreground tabular-nums">
+                          {formatFileSize(f.sizeBytes)}
+                          {' · '}
+                          {new Date(f.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            disabled={attaching}
+            className="inline-flex items-center justify-center h-9 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleAttach}
+            disabled={attaching || selected.size === 0}
+            className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md bg-foreground text-background px-4 text-sm font-medium disabled:opacity-50"
+          >
+            {attaching ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+            Attach{selected.size > 0 ? ` ${selected.size}` : ''}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

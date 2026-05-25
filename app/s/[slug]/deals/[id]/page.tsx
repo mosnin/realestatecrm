@@ -24,6 +24,7 @@ import { DealPropertyPicker } from '@/components/deals/deal-property-picker';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { FlagForReviewButton } from '@/components/deals/flag-for-review-button';
+import { DealTabStrip, isDealTabKey, type DealTabKey } from '@/components/deals/deal-tab-strip';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
@@ -39,7 +40,10 @@ export default async function DealDetailPage({
 }) {
   const { slug, id } = await params;
   const { tab } = await searchParams;
-  const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'documents' || tab === 'milestones' ? tab : 'overview';
+  // URL contract matches People detail: `?tab=<key>`, default `activity`. The
+  // realtor moves between People and Deals all day; the chrome — and the URL
+  // shape — needs to read the same on both sides.
+  const activeTab: DealTabKey = isDealTabKey(tab) ? tab : 'activity';
 
   // Middleware only requires login; ownership of /s/[slug] is enforced here.
   // Without this, a logged-in realtor could read another realtor's deal data
@@ -320,11 +324,9 @@ export default async function DealDetailPage({
             {/* Property link */}
             <DealPropertyPicker dealId={id} slug={slug} initial={linkedProperty} />
 
-            {/* People */}
-            <div>
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">People</p>
-              <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
-            </div>
+            {/* Contacts moved into their own tab to mirror the People detail's
+                "Linked deals" tab — keeps the sidebar focused on the
+                primary control surface (stage / status / value / dates). */}
 
             {/* Timestamps */}
             <div className="pt-2 border-t border-border space-y-1">
@@ -347,62 +349,64 @@ export default async function DealDetailPage({
             </div>
           </aside>
 
-          {/* RIGHT MAIN — URL-driven tabs */}
-          <main className="p-5 min-h-[400px]">
-            {/* Tab nav */}
-            <div className="flex gap-0 border-b border-border mb-5 -mx-5 px-5">
-              {(
-                [
-                  ['overview', 'Overview'],
-                  ['checklist', 'Closing checklist'],
-                  ['documents', 'Documents'],
-                  ['activity', 'Activity'],
-                ] as [string, string][]
-              ).map(([key, label]) => (
-                <Link
-                  key={key}
-                  href={`/s/${slug}/deals/${id}?tab=${key}`}
-                  className={cn(
-                    'px-3 pb-3 text-sm font-medium border-b-2 transition-colors mr-1',
-                    activeTab === key
-                      ? 'border-foreground text-foreground'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
+          {/* RIGHT MAIN — URL-driven tabs that mirror the People detail
+              page. Same `?tab=` contract, same border-b-2 active underline,
+              same default (`activity`). The realtor switches between People
+              and Deals all day; the chrome reads identically by design. */}
+          <main className="p-5 min-h-[400px] space-y-5">
 
-            {/* Tab content */}
-            {activeTab === 'overview' && (
+            {/* Next action — the "what's next" focal line, hoisted above
+                the tab strip with the rest of the deal's primary control
+                surface (stage / status / value / follow-up live in the
+                sidebar; next-action lives here so it sits at the top of
+                the realtor's reading order). */}
+            <DealNextActionField
+              dealId={id}
+              initialAction={nextAction}
+              initialDueAt={nextActionDueAt}
+            />
+
+            {/* Tab strip — near-copy of `ContactTabStrip` in
+                `app/s/[slug]/contacts/[id]/detail-client.tsx`. Consolidating
+                them into one shared `<DetailTabStrip>` is a deliberate
+                follow-up; doing it now would refactor the contact one
+                mid-ship. */}
+            <DealTabStrip baseHref={`/s/${slug}/deals/${id}`} />
+
+            {/* Tab content. Each tab owns a slice of what used to live in
+                the old Overview / Checklist / Documents / Activity layout —
+                now reordered to match the People detail's general-to-
+                specific flow (Activity first, then the artefacts). */}
+            {activeTab === 'activity' && (
               <div className="space-y-5">
-                <DealNextActionField
-                  dealId={id}
-                  initialAction={nextAction}
-                  initialDueAt={nextActionDueAt}
-                />
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Title</p>
-                  <DealInlineField
-                    dealId={id}
-                    field="title"
-                    value={title}
-                    type="text"
-                    label="Title"
-                    placeholder="Deal title"
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Address</p>
-                  <DealInlineField
-                    dealId={id}
-                    field="address"
-                    value={address}
-                    type="text"
-                    label="Address"
-                    placeholder="Not set"
-                  />
+                {/* Deal metadata — title / address / notes used to live in
+                    the old Overview tab. They're settings on this record,
+                    not "activity", but the realtor wants them visible
+                    while logging notes. Park them at the top of Activity
+                    rather than spin up a sixth tab for two text fields. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Title</p>
+                    <DealInlineField
+                      dealId={id}
+                      field="title"
+                      value={title}
+                      type="text"
+                      label="Title"
+                      placeholder="Deal title"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Address</p>
+                    <DealInlineField
+                      dealId={id}
+                      field="address"
+                      value={address}
+                      type="text"
+                      label="Address"
+                      placeholder="Not set"
+                    />
+                  </div>
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Notes</p>
@@ -415,35 +419,38 @@ export default async function DealDetailPage({
                     placeholder="Add notes or description…"
                   />
                 </div>
-                <DealCommissionSplits
+
+                <DealDetailClient
                   dealId={id}
-                  dealValue={value}
-                  dealCommissionRate={commissionRate}
+                  slug={slug}
+                  initialActivities={activities}
                 />
+
                 <AgentDealPanel dealId={id} slug={slug} dealTitle={title} />
               </div>
-            )}
-
-            {activeTab === 'activity' && (
-              <DealDetailClient
-                dealId={id}
-                slug={slug}
-                initialActivities={activities}
-              />
-            )}
-
-            {activeTab === 'checklist' && (
-              <DealChecklist dealId={id} initial={checklist} />
             )}
 
             {activeTab === 'documents' && (
               <DealDocuments dealId={id} initial={documents} pipelineType={pipelineType} />
             )}
 
-            {/* Legacy milestones tab kept reachable via explicit ?tab=milestones
-                for any pre-existing bookmarks; no longer in the tab bar. */}
-            {activeTab === 'milestones' && (
-              <DealMilestones dealId={id} initialMilestones={milestones} />
+            {activeTab === 'contacts' && (
+              <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
+            )}
+
+            {activeTab === 'commission' && (
+              <DealCommissionSplits
+                dealId={id}
+                dealValue={value}
+                dealCommissionRate={commissionRate}
+              />
+            )}
+
+            {activeTab === 'tasks' && (
+              <div className="space-y-6">
+                <DealChecklist dealId={id} initial={checklist} />
+                <DealMilestones dealId={id} initialMilestones={milestones} />
+              </div>
             )}
           </main>
         </div>

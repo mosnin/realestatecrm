@@ -74,9 +74,17 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
   }
 
-  await deleteObject(ctx.doc.storagePath).catch((err) => {
-    logger.warn('[deals/docs] storage cleanup failed', { dealId: id, docId, path: ctx.doc.storagePath }, err);
-  });
+  // Skip the object unlink for files attached from the Files library —
+  // those storage objects are owned by the File row, not by this
+  // DealDocument. The path prefix is the discriminator (deal-documents/...
+  // belongs to us; files/... belongs to the File table).
+  const storagePath = ctx.doc.storagePath as string;
+  const ownsStorage = storagePath.startsWith('deal-documents/');
+  if (ownsStorage) {
+    await deleteObject(storagePath).catch((err) => {
+      logger.warn('[deals/docs] storage cleanup failed', { dealId: id, docId, path: storagePath }, err);
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }
