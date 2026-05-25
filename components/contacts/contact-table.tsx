@@ -37,6 +37,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Mic,
 } from 'lucide-react';
 import { BODY_MUTED, TITLE_FONT, QUIET_LINK, PRIMARY_PILL } from '@/lib/typography';
 
@@ -416,17 +417,40 @@ export function ContactTable({ slug }: ContactTableProps) {
   const fullIntakeUrl = buildIntakeUrl(slug);
   const intakeUrlWithoutProtocol = fullIntakeUrl.replace(/^https?:\/\//, '');
 
+  // Status sentence — counts from the data already loaded. Calm voice, comma-
+  // separated facts. STYLESHEET.md "status-sentence pattern": muted greeting,
+  // serif h1, one-sentence status — every page wears the same shape.
+  const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
+  const awaitingCount = contacts.filter((c) => c.followUpAt).length;
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const newThisWeekCount = contacts.filter(
+    (c) => new Date(c.createdAt).getTime() >= weekAgo,
+  ).length;
+  const statusSentence = (() => {
+    if (loading) return 'Loading.';
+    if (contacts.length === 0) return 'No one in your book yet.';
+    const parts: string[] = [];
+    if (hotCount > 0) parts.push(`${hotCount} hot ${hotCount === 1 ? 'lead' : 'leads'}`);
+    if (awaitingCount > 0) parts.push(`${awaitingCount} awaiting follow-up`);
+    if (newThisWeekCount > 0) parts.push(`${newThisWeekCount} new this week`);
+    if (parts.length === 0) return `${contacts.length} ${contacts.length === 1 ? 'person' : 'people'} in your book.`;
+    return parts.join(' · ') + '.';
+  })();
+
   return (
     <div className="space-y-4">
-      {/* Page header — H1 + primary CTA cluster. The voice lives on /chippi
-          home; this surface is utility chrome — search, filters, list. */}
-      <header className="mb-6 space-y-2">
+      {/* Page header — canonical three-line pattern: muted greeting, serif
+          Times h1, one-sentence status. Every surface in the product wears
+          this shape (STYLESHEET.md — "status-sentence pattern"). Action
+          cluster sits on the right of the h1 row. */}
+      <header className="mb-6 space-y-1.5">
+        <p className="text-sm text-muted-foreground">People.</p>
         <div className="flex items-end justify-between gap-4">
           <h1
             className="text-3xl tracking-tight text-foreground"
             style={{ fontFamily: 'var(--font-title)' }}
           >
-            People
+            Your relationships
           </h1>
           <div className="flex flex-col items-end gap-1">
             {/* The conversation is the front door. Saying it out loud is
@@ -447,6 +471,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             </button>
           </div>
         </div>
+        <p className="text-sm text-muted-foreground">{statusSentence}</p>
       </header>
 
       {/* Filter chip row + toolbar */}
@@ -893,133 +918,155 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* ── List view ── */}
+      {/* ── List view — divide-y row list ──
+          STYLESHEET.md "Surfaces / Tables": if a cell is a sentence, divide-y
+          rows. The card chrome that used to wrap each row was paying no rent;
+          a hairline divider does the structural work without the visual cost.
+          The bulk-select checkbox stays — it just moves from a card to a row,
+          same affordance, lower weight. */}
       {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-4 py-3 w-8">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === visibleContacts.length && visibleContacts.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-border cursor-pointer"
-                    />
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Contact</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Budget</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Preferences</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Follow-up</th>
-                  <th className="px-4 py-3 w-20" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {visibleContacts.map((contact, idx) => {
-                  const stage = STAGES.find((s) => s.key === contact.type)!;
-                  const isSelected = selectedIds.has(contact.id);
-                  // Cap stagger to first 10 rows — past that, no entrance.
-                  const delay = idx < 10 ? idx * 0.04 : 0;
-                  return (
-                    <motion.tr
-                      key={contact.id}
-                      initial={idx < 10 ? { opacity: 0, y: 4 } : false}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
-                      className={cn(
-                        'group hover:bg-muted/30 hover:scale-[1.005] transition-[colors,transform] duration-150',
-                        isSelected && 'bg-primary/5',
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelect(contact.id)}
-                          className="rounded border-border cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                            {getInitials(contact.name)}
-                          </div>
-                          <div className="min-w-0">
-                            <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors block">
-                              {contact.name}
-                            </Link>
-                            <LeadScoreBar score={contact.leadScore ?? null} />
-                            <ContactAgentContext contactId={contact.id} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5', stage.className)}>
-                          {stage.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <div className="space-y-0.5">
-                          {contact.email && (
-                            <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
-                              <Mail size={10} className="flex-shrink-0" />
-                              {contact.email}
-                            </a>
-                          )}
-                          {contact.phone && (
-                            <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                              <Phone size={10} className="flex-shrink-0" />
-                              {contact.phone}
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
-                        {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
-                        {contact.preferences ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        {contact.followUpAt ? (
-                          <span className={cn(
-                            'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
-                            new Date(contact.followUpAt) < new Date()
-                              ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          )}>
-                            <CalendarDays size={10} />
-                            {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                          <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                            <Pencil size={13} />
-                          </button>
-                          <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="space-y-2">
+          {/* Tiny header row — Select-all + label, font-semibold so the
+              "Name" anchor reads loud enough for the scan. STYLESHEET.md
+              Visual hierarchy: section labels should anchor the columns. */}
+          <div className="flex items-center gap-3 px-4 pb-2 border-b border-border/60">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === visibleContacts.length && visibleContacts.length > 0}
+              onChange={toggleSelectAll}
+              aria-label="Select all"
+              className="rounded border-border cursor-pointer flex-shrink-0"
+            />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Name
+            </span>
+            <span className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:inline">
+              Activity
+            </span>
           </div>
+          <ul className="divide-y divide-border/60">
+            {visibleContacts.map((contact, idx) => {
+              const stage = STAGES.find((s) => s.key === contact.type)!;
+              const isSelected = selectedIds.has(contact.id);
+              // Cap stagger to first 10 rows — past that, no entrance.
+              const delay = idx < 10 ? idx * 0.04 : 0;
+              const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
+              const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
+              return (
+                <motion.li
+                  key={contact.id}
+                  initial={idx < 10 ? { opacity: 0, y: 4 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
+                  className={cn(
+                    'group flex items-center gap-3 px-4 py-3 transition-colors',
+                    isSelected ? 'bg-muted/40' : 'hover:bg-muted/30',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(contact.id)}
+                    aria-label={`Select ${contact.name}`}
+                    className="rounded border-border cursor-pointer flex-shrink-0"
+                  />
+                  {/* Avatar — chrome, not focal. Muted bg/text so the name
+                      pulls the eye instead. */}
+                  <div className="w-7 h-7 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    {getInitials(contact.name)}
+                  </div>
+                  {/* Name + sentence-shaped secondary line */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link
+                        href={`/s/${slug}/contacts/${contact.id}`}
+                        className="text-sm font-medium text-foreground hover:underline truncate"
+                      >
+                        {contact.name}
+                      </Link>
+                      <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0', stage.className)}>
+                        {stage.label}
+                      </span>
+                      <LeadScoreBar score={contact.leadScore ?? null} />
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                      {contact.email && (
+                        <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate max-w-[200px]">
+                          <Mail size={10} className="flex-shrink-0" />
+                          <span className="truncate">{contact.email}</span>
+                        </a>
+                      )}
+                      {contact.phone && (
+                        <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                          <Phone size={10} className="flex-shrink-0" />
+                          {contact.phone}
+                        </a>
+                      )}
+                      {contact.budget != null && (
+                        <span className="inline-flex items-center gap-1 tabular-nums">
+                          <Wallet size={10} className="flex-shrink-0" />
+                          {formatCurrency(contact.budget)}/mo
+                        </span>
+                      )}
+                    </div>
+                    <ContactAgentContext contactId={contact.id} />
+                  </div>
+                  {/* Right metadata — last-activity / follow-up — plus
+                      hover-reveal row actions. */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {followUpDate && (
+                      <span
+                        className={cn(
+                          'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
+                          followUpOverdue
+                            ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
+                            : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+                        )}
+                      >
+                        <CalendarDays size={10} />
+                        {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Log a note — one-click activity log via Chippi. */}
+                      <Link
+                        href={`/s/${slug}/chippi/log?personId=${contact.id}`}
+                        aria-label={`Log a note for ${contact.name}`}
+                        title="Log a note"
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <Mic size={13} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setEditContact(contact)}
+                        aria-label={`Edit ${contact.name}`}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(contact.id)}
+                        aria-label={`Delete ${contact.name}`}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
-      {/* Bulk action bar */}
+      {/* Bulk action bar — paper-flat. A hairline border separates it from
+          the row list above; no shadow lift. STYLESHEET.md "Shadows": product
+          surfaces use a hairline border, not a drop shadow. */}
       {selectedIds.size > 0 && (
-        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border/70 border-t border-t-border/60 bg-card px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -1126,8 +1173,8 @@ function ContactCard({
 }) {
   return (
     <div className={cn(
-      'group rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
-      selected ? 'border-primary/40 bg-primary/5' : 'border-border',
+      'group rounded-lg border bg-card overflow-hidden transition-colors duration-150 hover:bg-muted/30',
+      selected ? 'border-border bg-muted/40' : 'border-border/70',
     )}>
       <div className="px-4 py-3">
         {/* Header */}
@@ -1142,7 +1189,7 @@ function ContactCard({
               className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity data-[checked=true]:opacity-100"
               data-checked={selected}
             />
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
               {getInitials(contact.name)}
             </div>
             <div className="min-w-0">
