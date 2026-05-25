@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -104,28 +105,19 @@ export default async function AgentTasksPage({
   const taskList = (tasks ?? []) as AgentTask[];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
-      {/* Header */}
-      <header className="space-y-1">
+    <ChippiPageShell
+      greeting="Tasks."
+      title="Agent Tasks"
+      subtitle="Long-running goals Chippi is working on."
+    >
+      {/* Back-link + cross-link sit inside children so the shell header stays pure. */}
+      <div className="flex items-center justify-between">
         <Link
           href={`/s/${slug}/chippi`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={12} /> Chippi
         </Link>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Agent Tasks
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Long-running goals Chippi is working on
-        </p>
-      </header>
-
-      {/* Pending approvals link */}
-      <div className="flex items-center justify-end">
         <Link
           href={`/s/${slug}/chippi/approvals`}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -175,6 +167,6 @@ export default async function AgentTasksPage({
           })}
         </ul>
       )}
-    </div>
+    </ChippiPageShell>
   );
 }

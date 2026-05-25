@@ -26,7 +26,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 
 export async function generateMetadata({
@@ -61,18 +61,12 @@ export default async function IntegrationsPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Integrations.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Connected apps
-        </h1>
-        <p className={BODY_MUTED}>
-          Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap.
-        </p>
-      </header>
-
+    <ChippiPageShell
+      greeting="Integrations."
+      title="Connected apps"
+      subtitle="Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap."
+    >
       <ConnectedAppsSection />
-    </div>
+    </ChippiPageShell>
   );
 }
