@@ -117,7 +117,7 @@ export default async function BrokerBillingPage() {
             Unable to load billing information
           </p>
           <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1 max-w-[320px] mx-auto">
-            We couldn&apos;t retrieve your subscription details from Stripe. Please try again later or contact support if the issue persists.
+            Couldn&apos;t reach Stripe — usually temporary. Try again in a bit, or contact support if it sticks.
           </p>
         </div>
       </div>

@@ -160,7 +160,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
         setFormError('Failed to delete property');
       }
     } catch {
-      setFormError('Network error. Please try again.');
+      setFormError("Couldn't reach the server — usually temporary.");
     } finally {
       setDeletingId(null);
     }
@@ -183,7 +183,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
         setFormError('Failed to update property status');
       }
     } catch {
-      setFormError('Network error. Please try again.');
+      setFormError("Couldn't reach the server — usually temporary.");
     } finally {
       setTogglingId(null);
     }

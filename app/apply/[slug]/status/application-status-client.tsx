@@ -228,7 +228,7 @@ export function ApplicationStatusClient({
         setSendError('Too many messages. Please wait before sending again.');
       } else {
         const errData = await res.json().catch(() => null);
-        setSendError(errData?.error ?? 'Failed to send message. Please try again.');
+        setSendError(errData?.error ?? "Message didn't go through — usually temporary.");
       }
     } catch {
       setSendError('Failed to send message. Please check your connection.');
@@ -761,12 +761,12 @@ function YourToursPanel({
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error ?? 'Could not send your response. Please try again.');
+        setError(data?.error ?? "Response didn't go through — usually temporary.");
         return;
       }
       onResponded();
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setPending(null);
     }
@@ -920,7 +920,7 @@ function TourRequestPanel({
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setSubmitError(data?.error ?? 'Could not send your request. Please try again.');
+        setSubmitError(data?.error ?? "Request didn't go through — usually temporary.");
         return;
       }
       // Reset + collapse
@@ -931,7 +931,7 @@ function TourRequestPanel({
       setConfirmed(true);
       onSubmitted();
     } catch {
-      setSubmitError('Network error. Please try again.');
+      setSubmitError("Couldn't reach the server — usually temporary.");
     } finally {
       setSubmitting(false);
     }

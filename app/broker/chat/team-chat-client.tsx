@@ -458,7 +458,7 @@ export function TeamChatClient({
     } catch {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
-        content: 'Failed to execute command. Please try again.',
+        content: "That command didn't run — usually temporary.",
         senderName: 'Chippi Bot',
         senderId: 'bot',
         createdAt: new Date().toISOString(),

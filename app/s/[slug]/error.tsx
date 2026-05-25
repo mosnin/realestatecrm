@@ -12,7 +12,7 @@ export default function WorkspaceError({
       <div className="text-center space-y-4 p-8 max-w-sm">
         <h2 className="text-lg font-semibold">Something went wrong</h2>
         <p className="text-sm text-muted-foreground">
-          {error.message || 'An unexpected error occurred. Please try again.'}
+          {error.message || "Something glitched — usually temporary."}
         </p>
         <button
           onClick={reset}

@@ -86,10 +86,10 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
         setStatus('cancelled');
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to cancel. Please try again.');
+        setError(data.error || "Cancel didn't go through — usually temporary.");
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setConfirmOpen(false);
