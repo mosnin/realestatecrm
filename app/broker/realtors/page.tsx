@@ -21,9 +21,19 @@ export default async function BrokerRealtorsPage() {
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  // Pull only what the table actually shows: people on file + deals (count + value).
-  // The old 4-stat summary cards and lead/hot-lead columns were chrome — cut.
-  const [contactRows, dealRows] = await Promise.all([
+  // 7-day response-time window. Mirrors agent/tools/broker/performance.py
+  // (which uses 30 days for the deeper Chippi audit); the inline row pill
+  // wants a fresher, shorter window — what's happening THIS week. Same
+  // outbound activity types (call/email/meeting) so the two surfaces don't
+  // disagree about what "responding" means.
+  const RESPONSE_WINDOW_DAYS = 7;
+  const RESPONSE_OUTBOUND_TYPES = ['call', 'email', 'meeting'] as const;
+  const responseSince = new Date(Date.now() - RESPONSE_WINDOW_DAYS * 24 * 3600 * 1000).toISOString();
+
+  // Pull only what the table actually shows: people on file + deals (count + value)
+  // + recent contacts in the response-time window + their first outbound activity.
+  // The recent-contact + activity queries feed the inline response-time pill.
+  const [contactRows, dealRows, recentContactRows] = await Promise.all([
     spaceIds.length > 0
       ? supabase
           .from('Contact')
@@ -41,7 +51,77 @@ export default async function BrokerRealtorsPage() {
           .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('id, spaceId, createdAt')
+          .in('spaceId', spaceIds)
+          .gte('createdAt', responseSince)
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
   ]);
+
+  // First outbound activity per contact in the window. One query against
+  // ContactActivity instead of N per-space queries — the broker page already
+  // has the contact ids in hand.
+  const recentContactIds = (recentContactRows as { id: string }[]).map((c) => c.id);
+  const activityRows = recentContactIds.length > 0
+    ? (await supabase
+        .from('ContactActivity')
+        .select('contactId, createdAt, type')
+        .in('contactId', recentContactIds)
+        .in('type', [...RESPONSE_OUTBOUND_TYPES])
+        .limit(20000)
+        .then((r) => r.data ?? [])) as { contactId: string; createdAt: string; type: string }[]
+    : [];
+
+  // First outbound timestamp per contact (only the earliest counts — that's
+  // the "first response").
+  const firstOutboundByContact = new Map<string, number>();
+  for (const a of activityRows) {
+    const ts = new Date(a.createdAt).getTime();
+    if (Number.isNaN(ts)) continue;
+    const prev = firstOutboundByContact.get(a.contactId);
+    if (prev === undefined || ts < prev) {
+      firstOutboundByContact.set(a.contactId, ts);
+    }
+  }
+
+  // Per-space response-hour samples. Negative deltas (clock skew or
+  // back-dated activity) are dropped — same defensive filter the Python
+  // tool applies.
+  const samplesBySpace = new Map<string, number[]>();
+  for (const c of recentContactRows as { id: string; spaceId: string; createdAt: string }[]) {
+    const first = firstOutboundByContact.get(c.id);
+    if (first === undefined) continue;
+    const created = new Date(c.createdAt).getTime();
+    if (Number.isNaN(created)) continue;
+    const hours = (first - created) / 3_600_000;
+    if (hours < 0) continue;
+    if (!samplesBySpace.has(c.spaceId)) samplesBySpace.set(c.spaceId, []);
+    samplesBySpace.get(c.spaceId)!.push(hours);
+  }
+
+  // Team median across ALL response samples — same definition as the Chippi
+  // audit tool. Median (not mean) so a single 200-hour outlier doesn't drag
+  // the threshold.
+  const allSamples = ([] as number[]).concat(...samplesBySpace.values()).sort((a, b) => a - b);
+  const teamMedianHours = allSamples.length > 0
+    ? allSamples[Math.floor(allSamples.length / 2)]
+    : null;
+
+  // Band multipliers — match agent/tools/broker/performance.py:48-49 so
+  // Chippi's narrative answer ("Alice is slow") and the row pill agree.
+  const FAST_MULTIPLIER = 0.5;
+  const SLOW_MULTIPLIER = 2.0;
+  function bandFor(avgHours: number | null): RealtorRow['responseBand'] {
+    if (avgHours === null) return 'no_data';
+    if (teamMedianHours === null) return 'no_data';
+    if (avgHours <= teamMedianHours * FAST_MULTIPLIER) return 'fast';
+    if (avgHours >= teamMedianHours * SLOW_MULTIPLIER) return 'slow';
+    return 'on_pace';
+  }
 
   const peopleBySpace = (contactRows as { spaceId: string }[]).reduce<Record<string, number>>(
     (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; },
@@ -61,6 +141,10 @@ export default async function BrokerRealtorsPage() {
 
   const realtors: RealtorRow[] = members.map((m) => {
     const sid = m.Space?.id ?? null;
+    const samples = sid ? samplesBySpace.get(sid) ?? [] : [];
+    const avgHours = samples.length > 0
+      ? samples.reduce((a, b) => a + b, 0) / samples.length
+      : null;
     return {
       membershipId: m.id,
       userId: m.userId,
@@ -72,6 +156,8 @@ export default async function BrokerRealtorsPage() {
       people:   sid ? (peopleBySpace[sid] ?? 0) : 0,
       deals:    sid ? (dealsBySpace[sid]?.count ?? 0) : 0,
       pipeline: sid ? (dealsBySpace[sid]?.value ?? 0) : 0,
+      responseAvgHours: avgHours === null ? null : Math.round(avgHours * 10) / 10,
+      responseBand: bandFor(avgHours),
     };
   });
 

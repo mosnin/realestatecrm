@@ -35,9 +35,15 @@ const CONV_TITLE_PREFIX = '[BROKER_CHIPPI]';
 export default async function BrokerChippiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ conversationId?: string }>;
+  searchParams: Promise<{ conversationId?: string; prompt?: string }>;
 }) {
-  const { conversationId: urlConversationId } = await searchParams;
+  const { conversationId: urlConversationId, prompt: urlPrompt } = await searchParams;
+  // `?prompt=` pre-fills the composer (broker reads it, edits if they want, then
+  // hits send). Same plumbing the realtor surface uses via `?prefill=`; named
+  // `prompt` here because the broker entry points (realtor-row affordances,
+  // stuck-deal "Audit this") read more naturally as "ask Chippi this prompt".
+  const initialPrefill =
+    typeof urlPrompt === 'string' && urlPrompt.trim().length > 0 ? urlPrompt : undefined;
 
   // Route guard. `getBrokerMemberContext` returns null for: not signed in,
   // not a brokerage member, offboarded. We additionally reject
@@ -103,6 +109,7 @@ export default async function BrokerChippiPage({
         initialMessages={initialMessages}
         initialConversations={conversations}
         initialConversationId={initialConversationId}
+        initialPrefill={initialPrefill}
       />
     </div>
   );
