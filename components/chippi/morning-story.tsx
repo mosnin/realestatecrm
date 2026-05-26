@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { SECTION_LABEL } from '@/lib/typography';
 import type { MorningResponse, MorningSummary } from '@/app/api/agent/morning/route';
 import { composeMorningStory, countMorningCandidates } from '@/lib/morning-story';
 import { buildMorningActions, type MorningAction } from './morning-actions';
@@ -106,24 +108,38 @@ export function MorningStory({ slug, isFresh = false }: Props) {
     };
   }, [open]);
 
-  // While loading, render a non-breaking space to hold the layout without
-  // showing placeholder copy. On error or missing data, show a Chippi-voiced
-  // fallback — never leave the line blank.
+  // Section frame matching WhatIDid / TodayFocus / GoalsPanel — same
+  // SECTION_LABEL header + divide-y row vocabulary, so the morning story
+  // sits as one more list among the day's sections rather than as a
+  // separate hero treatment.
+  function Frame({ children }: { children: ReactNode }) {
+    return (
+      <section>
+        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+          <h2 className={SECTION_LABEL}>What&apos;s new</h2>
+        </div>
+        <div className="divide-y divide-border/60">{children}</div>
+      </section>
+    );
+  }
+
   if (loadState === 'loading') {
     return (
-      <p className="text-base text-foreground leading-relaxed">
-        &nbsp;
-      </p>
+      <Frame>
+        <div className="flex items-center gap-3 py-3">
+          <div className="w-7 h-7 rounded-full bg-muted/40 animate-pulse" />
+          <div className="flex-1 h-4 rounded bg-muted/30 animate-pulse" />
+        </div>
+      </Frame>
     );
   }
 
   if (!summary) {
-    // API failed or returned an error — show a calm fallback in body style.
     const displaySentence = getFallback(loadState, isFresh);
     return (
-      <p className="text-base text-foreground leading-relaxed">
-        {displaySentence}
-      </p>
+      <Frame>
+        <p className="py-3 text-sm text-foreground">{displaySentence}</p>
+      </Frame>
     );
   }
 
@@ -164,62 +180,70 @@ export function MorningStory({ slug, isFresh = false }: Props) {
     setActiveCompose(null);
   }
 
+  // Row treatment: small emerald check icon (matches WhatIDid's
+  // success rows) + the morning sentence as body copy. Interactive
+  // variant wraps the whole row in a button that expands the action
+  // sheet below; non-interactive variant is a plain row.
+  const rowInner = (
+    <div className="flex items-start gap-3 py-3">
+      <span
+        aria-hidden
+        className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"
+      >
+        <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+      </span>
+      <span className="flex-1 text-sm text-foreground leading-relaxed">
+        {displaySentence}
+      </span>
+    </div>
+  );
+
   return (
     <div ref={containerRef} className="relative">
-      {/*
-        "Next" pill — cycles to the next-best subject so a queue of 47 hot
-        leads doesn't show the same face every morning. Right-aligned,
-        tertiary text style (matches the kbd hints in the command palette).
-        Only renders when there's actually a next subject; once exhausted,
-        the pill disappears — no greyed-out, no "no more" copy. Resets on
-        page load, no persistence — tomorrow morning is a new morning.
-      */}
-      {hasNext && (
-        <button
-          type="button"
-          onClick={handleNext}
-          className={cn(
-            'absolute top-0 right-0 inline-flex items-center h-7 px-2 rounded-full',
-            'text-[11px] text-muted-foreground hover:text-foreground transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+      <section>
+        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+          <h2 className={SECTION_LABEL}>What&apos;s new</h2>
+          {hasNext && (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="ml-auto inline-flex items-center h-7 px-2 rounded-full text-[11px] text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              aria-label="Show next subject"
+            >
+              Next →
+            </button>
           )}
-          aria-label="Show next subject"
-        >
-          Next →
-        </button>
-      )}
+        </div>
 
-      {isInteractive ? (
-        <motion.button
-          type="button"
-          onClick={() => {
-            setOpen((v) => !v);
-            setActiveCompose(null);
-          }}
-          aria-expanded={open}
-          key={displaySentence}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className={cn(
-            'block text-left w-full',
-            'text-base text-foreground leading-relaxed',
-            'hover:opacity-80 transition-opacity cursor-pointer',
+        <div className="divide-y divide-border/60">
+          {isInteractive ? (
+            <motion.button
+              type="button"
+              onClick={() => {
+                setOpen((v) => !v);
+                setActiveCompose(null);
+              }}
+              aria-expanded={open}
+              key={displaySentence}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+              className="block w-full text-left hover:bg-muted/30 transition-colors cursor-pointer rounded-md -mx-2 px-2"
+            >
+              {rowInner}
+            </motion.button>
+          ) : (
+            <motion.div
+              key={displaySentence}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+            >
+              {rowInner}
+            </motion.div>
           )}
-        >
-          {displaySentence}
-        </motion.button>
-      ) : (
-        <motion.p
-          key={displaySentence}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="text-base text-foreground leading-relaxed"
-        >
-          {displaySentence}
-        </motion.p>
-      )}
+        </div>
+      </section>
 
       <AnimatePresence initial={false}>
         {open && isInteractive && (
