@@ -10,7 +10,18 @@ import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+
+/** viewport-fit=cover lets the page draw under the iOS notch / status-bar
+ *  area instead of leaving a body-coloured strip above the cover photo.
+ *  Same treatment /p/[slug] uses — the intake is the realtor's storefront,
+ *  it should feel flush to the device. Non-iOS browsers ignore this; free
+ *  fix everywhere else. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 /** Mirror of /p/[slug]: photos are stored as private object KEYS, so sign
  *  a 24h URL for render. Legacy http(s) values pass through verbatim. */
@@ -274,6 +285,7 @@ export default async function PublicApplyPage({
         coverPhotoUrl={coverPhotoUrl}
         logoUrl={logoUrl}
         isVerified={isVerified}
+        profileHref={`/p/${slug}`}
         accentColor={customization.accentColor}
         privacyPolicyUrl={customization.privacyPolicyUrl}
         termsUrl={`/apply/${slug}/terms`}

@@ -1,7 +1,17 @@
 import { notFound } from 'next/navigation';
+import type { Viewport } from 'next';
 import { supabase } from '@/lib/supabase';
 import { TourManageClient } from './tour-manage-client';
 import { PublicPageMinimalShell } from '@/components/public-page-shell';
+
+/** viewport-fit=cover so the tour page sits flush under the iOS notch,
+ *  matching the public profile + intake form treatment. No body-coloured
+ *  strip above whatever the shell renders at the top. Non-iOS ignores. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export default async function TourManagePage({
   params,

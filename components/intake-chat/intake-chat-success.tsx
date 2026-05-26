@@ -1,7 +1,8 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT, DURATION_BASE } from '@/lib/motion';
 
@@ -12,6 +13,11 @@ export interface IntakeChatSuccessProps {
   thankYouTitle?: string | null;
   thankYouMessage?: string | null;
   accentColor?: string;
+  /** When set, the success card renders a quiet "See {businessName}'s
+   *  page" link out to the public profile (typically /p/[slug]). Gives
+   *  the applicant somewhere to go after submission instead of dead-
+   *  ending on the thank-you. */
+  profileHref?: string | null;
 }
 
 export function IntakeChatSuccess({
@@ -19,6 +25,7 @@ export function IntakeChatSuccess({
   applicationRef,
   thankYouTitle,
   thankYouMessage,
+  profileHref,
 }: IntakeChatSuccessProps) {
   return (
     <motion.div
@@ -72,6 +79,25 @@ export function IntakeChatSuccess({
         >
           Reference {applicationRef.replace(/-/g, '').slice(0, 6).toUpperCase()}
         </motion.p>
+      )}
+
+      {/* Dead-end escape — the applicant has somewhere to go after
+          submitting. Calm secondary link, never competes with the
+          headline. */}
+      {profileHref && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: DURATION_BASE }}
+        >
+          <Link
+            href={profileHref}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            See {businessName}&apos;s page
+            <ArrowRight size={14} aria-hidden />
+          </Link>
+        </motion.div>
       )}
     </motion.div>
   );

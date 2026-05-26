@@ -376,7 +376,13 @@ export function PublicProfile({
   return (
     <div
       className={cn(
-        'relative min-h-screen bg-muted/40',
+        // On iOS the page draws under the notch (viewportFit: 'cover');
+        // bg-muted/40 here means any safe-area strip ABOVE the card
+        // renders as a visible gray band. Use bg-background on mobile so
+        // the area behind the notch is the same color as the card —
+        // visually flush. Desktop still gets the muted canvas behind the
+        // floating card.
+        'relative min-h-screen bg-background sm:bg-muted/40',
         darkMode && 'dark',
       )}
     >

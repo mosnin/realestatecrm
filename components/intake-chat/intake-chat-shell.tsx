@@ -53,6 +53,11 @@ export interface IntakeChatShellProps {
   logoUrl?: string | null;
   /** Drives the blue-check next to the business name. */
   isVerified?: boolean;
+  /** When set, the realtor identity in the header becomes a Link to this
+   *  href — typically the public profile at /p/[slug]. Lets applicants
+   *  step over to learn more about the realtor without abandoning the
+   *  intake flow. Null/undefined → identity renders non-interactive. */
+  profileHref?: string | null;
   accentColor?: string;
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
@@ -127,6 +132,7 @@ function RealtorIdentity({
   coverPhotoUrl,
   logoUrl,
   isVerified,
+  profileHref,
 }: {
   businessName: string;
   agentName: string;
@@ -134,6 +140,10 @@ function RealtorIdentity({
   coverPhotoUrl?: string | null;
   logoUrl?: string | null;
   isVerified?: boolean;
+  /** When provided, the business name / logo becomes a quiet Link to the
+   *  realtor's public page. Gives applicants a way to learn more about
+   *  who they're applying with without abandoning the chat. */
+  profileHref?: string | null;
 }) {
   const initials = deriveInitials(businessName || agentName);
   const showSecondary =
@@ -147,7 +157,14 @@ function RealtorIdentity({
           bottom-gradient mask blends into the page so the avatar appears
           to float out of it without a hard edge. */}
       {coverPhotoUrl && (
-        <div className="relative -mx-5 sm:-mx-8 mb-[-2.75rem] h-24 sm:h-28 overflow-hidden">
+        // The negative top margin (-mt-5 sm:-mt-6) cancels the header
+        // container's pt-5 sm:pt-6 so the cover band sits flush against
+        // the top of the page — no body-coloured strip above it on iOS
+        // even when the safe-area drops content below the notch. The
+        // image grows in height a touch on mobile (h-28) so the extra
+        // vertical real estate goes INTO the brand frame, not into empty
+        // space above it.
+        <div className="relative -mx-5 sm:-mx-8 -mt-5 sm:-mt-6 mb-[-2.75rem] h-28 sm:h-32 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={coverPhotoUrl}
@@ -197,35 +214,51 @@ function RealtorIdentity({
       </div>
 
       {/* Business name — the focal serif moment. Logo, if uploaded,
-          substitutes for the typed name (single source of identity). */}
+          substitutes for the typed name (single source of identity).
+          The whole identity block wraps in a Link to /p/[slug] when a
+          profileHref is provided so applicants can step over to the
+          realtor's public page without breaking the intake flow. */}
       <div className="mt-3 sm:mt-4">
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logoUrl}
-            alt={businessName}
-            loading="eager"
-            decoding="async"
-            className="mx-auto h-8 sm:h-9 max-w-[220px] object-contain"
-          />
-        ) : (
-          <h1
-            className={cn(
-              'inline-flex items-center justify-center gap-1.5',
-              'text-[22px] sm:text-2xl leading-tight tracking-tight text-foreground',
-            )}
-            style={TITLE_FONT}
-          >
-            {businessName}
-            {isVerified && (
-              <BadgeCheck
-                size={16}
-                aria-label="Verified"
-                className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
-              />
-            )}
-          </h1>
-        )}
+        {(() => {
+          const identityNode = logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={businessName}
+              loading="eager"
+              decoding="async"
+              className="mx-auto h-8 sm:h-9 max-w-[220px] object-contain"
+            />
+          ) : (
+            <h1
+              className={cn(
+                'inline-flex items-center justify-center gap-1.5',
+                'text-[22px] sm:text-2xl leading-tight tracking-tight text-foreground',
+              )}
+              style={TITLE_FONT}
+            >
+              {businessName}
+              {isVerified && (
+                <BadgeCheck
+                  size={16}
+                  aria-label="Verified"
+                  className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+                />
+              )}
+            </h1>
+          );
+          return profileHref ? (
+            <Link
+              href={profileHref}
+              className="inline-block transition-opacity hover:opacity-80"
+              aria-label={`View ${businessName}'s page`}
+            >
+              {identityNode}
+            </Link>
+          ) : (
+            identityNode
+          );
+        })()}
 
         {showSecondary && (
           <p className="mt-1 text-[12px] sm:text-[13px] text-muted-foreground">
@@ -244,6 +277,7 @@ export function IntakeChatShell({
   coverPhotoUrl,
   logoUrl,
   isVerified,
+  profileHref,
   privacyPolicyUrl,
   termsUrl,
   hidePoweredBy,
@@ -290,6 +324,7 @@ export function IntakeChatShell({
             coverPhotoUrl={coverPhotoUrl}
             logoUrl={logoUrl}
             isVerified={isVerified}
+            profileHref={profileHref}
           />
         </div>
       </motion.header>

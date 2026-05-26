@@ -481,6 +481,7 @@ export function IntakeChat({
           thankYouTitle={customization.thankYouTitle}
           thankYouMessage={customization.thankYouMessage}
           accentColor={customization.accentColor}
+          profileHref={`/p/${slug}`}
         />
       </div>
     );
