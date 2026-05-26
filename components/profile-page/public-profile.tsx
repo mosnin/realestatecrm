@@ -25,6 +25,7 @@ import {
   Play,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
+import { PublicSurfaceFrame } from '@/components/public-surface-frame';
 import { cn, safeHref } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { parseYouTubeId, youTubeThumbnail, faviconUrl } from '@/lib/profile-page';
@@ -374,51 +375,8 @@ export function PublicProfile({
   const blurSource = coverPhotoUrl || agentPhoto || null;
 
   return (
-    <div
-      className={cn(
-        // On iOS the page draws under the notch (viewportFit: 'cover');
-        // bg-muted/40 here means any safe-area strip ABOVE the card
-        // renders as a visible gray band. Use bg-background on mobile so
-        // the area behind the notch is the same color as the card —
-        // visually flush. Desktop still gets the muted canvas behind the
-        // floating card.
-        'relative min-h-screen bg-background sm:bg-muted/40',
-        darkMode && 'dark',
-      )}
-    >
-      {/* ── Desktop blur background ─────────────────────────────────────────
-          On sm+ the page is a centred card floating over a heavy-blurred
-          image fill. The card vocabulary doesn't change — only what's
-          behind it. Mobile gets nothing extra (the card already takes the
-          full viewport; the blur would be invisible underneath and
-          expensive). When neither cover nor face is set we ship a neutral
-          gradient so the desktop canvas never reads as a flat white wall.
-          ───────────────────────────────────────────────────────────────── */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 hidden sm:block"
-      >
-        {blurSource ? (
-          <>
-            <img
-              src={blurSource}
-              alt=""
-              loading="eager"
-              decoding="async"
-              className="h-full w-full scale-110 object-cover blur-[48px]"
-            />
-            {/* Darkening overlay so the card readout stays legible against
-                any image — bright photos, busy patterns, anything. The 50%
-                stop is a compromise between "still visibly the photo" and
-                "card text stays calm". */}
-            <div className="absolute inset-0 bg-black/45" />
-          </>
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60" />
-        )}
-      </div>
-
-      <div className="relative mx-auto w-full max-w-[480px] bg-background sm:my-8 sm:overflow-hidden sm:rounded-[28px] sm:border sm:border-border/60">
+    <PublicSurfaceFrame blurSource={blurSource} darkMode={darkMode}>
+      <>
         {/* ── Header ──────────────────────────────────────────────────────
             Two shapes:
             (a) Cover photo set → cover is the full-bleed hero (16:9) and
@@ -632,7 +590,7 @@ export function PublicProfile({
             </footer>
           )}
         </div>
-      </div>
-    </div>
+      </>
+    </PublicSurfaceFrame>
   );
 }

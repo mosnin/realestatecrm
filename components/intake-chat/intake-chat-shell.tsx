@@ -296,7 +296,39 @@ export function IntakeChatShell({
   );
 
   return (
-    <div className="relative h-dvh min-h-[600px] flex flex-col text-foreground overflow-hidden bg-background">
+    // Outer canvas. On mobile the chat fills the viewport edge-to-edge.
+    // On sm+ the chat becomes a centred card on a blurred image fill —
+    // same family as /p/[slug] and /book/[slug] so all three applicant-
+    // facing surfaces share one product aesthetic.
+    <div className="relative min-h-dvh bg-background sm:bg-muted/40 text-foreground">
+      {/* Desktop blur canvas — only sm+. Cover photo blurred behind the
+          card; 45% darken so the chat stays legible. Mobile skips this
+          (no card frame on mobile means the blur would be invisible). */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 hidden sm:block"
+      >
+        {coverPhotoUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverPhotoUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="h-full w-full scale-110 object-cover blur-[48px]"
+            />
+            <div className="absolute inset-0 bg-black/45" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60" />
+        )}
+      </div>
+
+      {/* The chat card. Full-screen on mobile, centred 540-wide card on
+          sm+ with rounded corners and a hairline border — matches the
+          public profile / booking shell vocabulary. */}
+      <div className="relative mx-auto h-dvh min-h-[600px] flex flex-col w-full sm:max-w-[540px] sm:my-8 sm:h-[calc(100dvh-4rem)] sm:rounded-[28px] sm:border sm:border-border/60 sm:overflow-hidden sm:shadow-2xl sm:shadow-black/10 bg-background overflow-hidden">
       {/* Paper texture — 1px dot grid at ultra-low opacity. Reads as paper,
           not screen. Sits beneath everything, never interactive. */}
       <div
@@ -410,6 +442,7 @@ export function IntakeChatShell({
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { BrandLogo } from '@/components/brand-logo';
+import { PublicSurfaceFrame } from '@/components/public-surface-frame';
 import { safeHref } from '@/lib/utils';
 import { BODY_MUTED, TITLE_FONT } from '@/lib/typography';
 
@@ -27,6 +28,13 @@ interface PublicPageShellProps {
   /** Hide the "Powered by Chippi" mark — set on paid tiers (white-label). */
   hidePoweredBy?: boolean;
   customization?: ShellCustomization;
+  /** Cover photo for the desktop blur canvas — matches the public profile /
+   *  intake / tour family aesthetic. Falls back to agentPhoto, then to a
+   *  neutral gradient. Mobile ignores. */
+  coverPhotoUrl?: string | null;
+  /** When set, the realtor's brand at the top deep-links to /p/[slug] so
+   *  the applicant has somewhere to land after submission. */
+  profileHref?: string | null;
   children: React.ReactNode;
 }
 
@@ -75,16 +83,29 @@ export function PublicPageShell({
   agentPresenceLabel = 'with',
   hidePoweredBy = false,
   customization,
+  coverPhotoUrl,
+  profileHref,
   children,
 }: PublicPageShellProps) {
   const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
-  const darkClass = customization?.darkMode ? 'dark' : '';
   const accentColor = customization?.accentColor || '#ff964f';
   const hasSocial = customization?.socialLinks && Object.values(customization.socialLinks).some((v) => typeof v === 'string' && v.trim().length > 0);
 
+  // Pull the blur source the same way the public profile does: cover photo
+  // wins, agent face fills in, null falls through to the frame's neutral
+  // gradient. Same identity material across /p, /apply, /book, /tour.
+  const blurSource = coverPhotoUrl || agentPhoto || null;
+
   return (
+    <PublicSurfaceFrame
+      blurSource={blurSource}
+      darkMode={Boolean(customization?.darkMode)}
+      maxWidthClass="max-w-[540px]"
+      clipContent={false}
+      className={`${fontClass}`.trim()}
+    >
     <div
-      className={`min-h-screen bg-background text-foreground ${fontClass} ${darkClass}`.trim()}
+      className="text-foreground"
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
       {/* ── Sticky hairline header ───────────────────────────────────────── */}
@@ -209,6 +230,7 @@ export function PublicPageShell({
         </footer>
       </main>
     </div>
+    </PublicSurfaceFrame>
   );
 }
 
@@ -219,36 +241,48 @@ export function PublicPageMinimalShell({
   logoUrl,
   businessName,
   hidePoweredBy = false,
+  coverPhotoUrl,
+  agentPhoto,
   children,
 }: {
   logoUrl?: string | null;
   businessName: string;
   /** Hide the "Powered by Chippi" mark — set on paid tiers (white-label). */
   hidePoweredBy?: boolean;
+  /** Cover photo for desktop blur — same family as /p, /apply, /book. */
+  coverPhotoUrl?: string | null;
+  agentPhoto?: string | null;
   children: React.ReactNode;
 }) {
+  const blurSource = coverPhotoUrl || agentPhoto || null;
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/70">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {logoUrl ? (
-              <img src={logoUrl} alt={businessName} className="h-5 object-contain" />
-            ) : (
-              <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
+    <PublicSurfaceFrame
+      blurSource={blurSource}
+      maxWidthClass="max-w-[540px]"
+      clipContent={false}
+    >
+      <div className="min-h-[640px] sm:min-h-0 sm:h-[calc(100dvh-4rem)] bg-background text-foreground flex flex-col">
+        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/70">
+          <div className="px-4 py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt={businessName} className="h-5 object-contain" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
+              )}
+            </div>
+            {!hidePoweredBy && (
+              <div className="flex items-center gap-1 flex-shrink-0 opacity-30">
+                <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
+                <BrandLogo className="h-3.5" />
+              </div>
             )}
           </div>
-          {!hidePoweredBy && (
-            <div className="flex items-center gap-1 flex-shrink-0 opacity-30">
-              <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
-              <BrandLogo className="h-3.5" />
-            </div>
-          )}
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          {children}
         </div>
-      </header>
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-        {children}
       </div>
-    </div>
+    </PublicSurfaceFrame>
   );
 }
