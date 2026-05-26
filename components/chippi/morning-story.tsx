@@ -108,28 +108,22 @@ export function MorningStory({ slug, isFresh = false }: Props) {
 
   // While loading, render a non-breaking space to hold the layout without
   // showing placeholder copy. On error or missing data, show a Chippi-voiced
-  // fallback — never leave the H1 blank.
+  // fallback — never leave the line blank.
   if (loadState === 'loading') {
     return (
-      <h1
-        className="text-xl sm:text-2xl tracking-tight text-foreground leading-snug text-center"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className="text-base text-foreground leading-relaxed">
         &nbsp;
-      </h1>
+      </p>
     );
   }
 
   if (!summary) {
-    // API failed or returned an error — show a calm fallback in the same style.
+    // API failed or returned an error — show a calm fallback in body style.
     const displaySentence = getFallback(loadState, isFresh);
     return (
-      <h1
-        className="text-xl sm:text-2xl tracking-tight text-foreground leading-snug text-center"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className="text-base text-foreground leading-relaxed">
         {displaySentence}
-      </h1>
+      </p>
     );
   }
 
@@ -208,24 +202,23 @@ export function MorningStory({ slug, isFresh = false }: Props) {
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'text-xl sm:text-2xl tracking-tight leading-snug text-center block mx-auto',
-            'text-foreground hover:opacity-80 transition-opacity cursor-pointer',
+            'block text-left w-full',
+            'text-base text-foreground leading-relaxed',
+            'hover:opacity-80 transition-opacity cursor-pointer',
           )}
-          style={{ fontFamily: 'var(--font-title)' }}
         >
           {displaySentence}
         </motion.button>
       ) : (
-        <motion.h1
+        <motion.p
           key={displaySentence}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="text-xl sm:text-2xl tracking-tight leading-snug text-center block mx-auto text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
+          className="text-base text-foreground leading-relaxed"
         >
           {displaySentence}
-        </motion.h1>
+        </motion.p>
       )}
 
       <AnimatePresence initial={false}>
