@@ -30,7 +30,13 @@ export function LayoutShell({ slug, children, liveNotifications }: LayoutShellPr
 
   return (
     <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
-      <div className="dashboard-content w-full max-w-[1500px] mx-auto flex-1 min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-40 md:pb-24">
+      {/* Content takes natural height (no flex-1). Short pages no longer
+          stretch the content div leaving a giant white gap above the
+          footer — the form ends, the footer sits right below it. The
+          ChippiBar overlays the bottom 80-100px of the viewport; pb-28
+          on the content gives it just enough clearance without padding
+          the page out to 160px. */}
+      <div className="dashboard-content w-full max-w-[1500px] mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28">
         {liveNotifications}
         <PageTransition>{children}</PageTransition>
       </div>

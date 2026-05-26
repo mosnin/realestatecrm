@@ -112,7 +112,7 @@ export function MorningStory({ slug, isFresh = false }: Props) {
   if (loadState === 'loading') {
     return (
       <h1
-        className="text-2xl sm:text-3xl tracking-tight text-foreground leading-snug text-center"
+        className="text-xl sm:text-2xl tracking-tight text-foreground leading-snug text-center"
         style={{ fontFamily: 'var(--font-title)' }}
       >
         &nbsp;
@@ -125,7 +125,7 @@ export function MorningStory({ slug, isFresh = false }: Props) {
     const displaySentence = getFallback(loadState, isFresh);
     return (
       <h1
-        className="text-2xl sm:text-3xl tracking-tight text-foreground leading-snug text-center"
+        className="text-xl sm:text-2xl tracking-tight text-foreground leading-snug text-center"
         style={{ fontFamily: 'var(--font-title)' }}
       >
         {displaySentence}
@@ -208,7 +208,7 @@ export function MorningStory({ slug, isFresh = false }: Props) {
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'text-2xl sm:text-3xl tracking-tight leading-snug text-center block mx-auto',
+            'text-xl sm:text-2xl tracking-tight leading-snug text-center block mx-auto',
             'text-foreground hover:opacity-80 transition-opacity cursor-pointer',
           )}
           style={{ fontFamily: 'var(--font-title)' }}
@@ -221,7 +221,7 @@ export function MorningStory({ slug, isFresh = false }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="text-2xl sm:text-3xl tracking-tight leading-snug text-center block mx-auto text-foreground"
+          className="text-xl sm:text-2xl tracking-tight leading-snug text-center block mx-auto text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           {displaySentence}
