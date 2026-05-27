@@ -5,6 +5,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { deleteObjectsBestEffort } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -419,12 +421,42 @@ export async function DELETE(
 
   const deal = dealRows[0];
 
+  // Capture document storage keys BEFORE deleting the Deal — the FK
+  // cascade removes DealDocument rows the moment the Deal is gone, but
+  // Wasabi objects don't cascade. Offer letters, purchase agreements,
+  // closing disclosures persist forever in cloud storage otherwise.
+  const { data: docRows } = await supabase
+    .from('DealDocument')
+    .select('storagePath')
+    .eq('dealId', id)
+    .eq('spaceId', space.id);
+  const docKeys = (docRows ?? [])
+    .map((r) => (r as { storagePath: string }).storagePath)
+    .filter((k): k is string => Boolean(k));
+
   const { error: deleteError } = await supabase
     .from('Deal')
     .delete()
     .eq('id', id)
     .eq('spaceId', space.id);
   if (deleteError) throw deleteError;
+
+  // Fire-and-forget the Wasabi cleanup. The DB delete already committed;
+  // a Wasabi failure here orphans the object, which the nightly storage
+  // sweeper catches. Never block the response on the remote bucket.
+  if (docKeys.length > 0) {
+    void deleteObjectsBestEffort(docKeys).then((res) => {
+      if (res.failed.length > 0) {
+        logger.warn('[deals/DELETE] some doc objects failed to delete', {
+          dealId: id,
+          spaceId: space.id,
+          okCount: res.ok,
+          failedCount: res.failed.length,
+        });
+      }
+    });
+  }
+
   deleteDealVector(deal.spaceId, id).catch(console.error);
   void audit({
     actorClerkId: userId,
@@ -433,7 +465,7 @@ export async function DELETE(
     resourceId: id,
     spaceId: space.id,
     req: _req,
-    metadata: { title: deal.title },
+    metadata: { title: deal.title, docCount: docKeys.length },
   });
 
   return NextResponse.json({ success: true });
