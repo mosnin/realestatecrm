@@ -445,9 +445,14 @@ export function IntakeChat({
   ).length;
   const projectedDualTotal =
     hasDual && leadType === null
-      ? 1 + Math.max(
-          flattenQuestions(effectiveRental).filter((q) => !q.visibleWhen).length,
-          flattenQuestions(effectiveBuyer).filter((q) => !q.visibleWhen).length,
+      ? // Upper-bound projection so the lead sees an honest "1 of N" before
+        // they pick rental/buyer. Count ALL questions in the larger form,
+        // not just unconditional ones — a conditional question still fires
+        // when its trigger answer comes in, and a form that says "1 of 5"
+        // and then keeps going past 5 reads as a lie.
+        1 + Math.max(
+          flattenQuestions(effectiveRental).length,
+          flattenQuestions(effectiveBuyer).length,
         )
       : 0;
   const totalQuestions = Math.max(liveTotal, projectedDualTotal);
