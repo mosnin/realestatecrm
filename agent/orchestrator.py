@@ -582,6 +582,13 @@ async def _run_locked(
             )
         )
 
+    # Initialize before the try so exception handlers (and the success-path
+    # log on line 602) can reference it without raising NameError. If
+    # _run_with_fallback or extract_usage throws before line 601's
+    # reassignment fires, the trajectory write at 622 / 658 would otherwise
+    # blow up — losing the run's audit trail on the very failure that
+    # mattered most.
+    model_slug = "unknown"
     try:
         # Run with automatic fallback through cheaper models on a 429.
         # Streaming mode so on_event fires per tool call / result.

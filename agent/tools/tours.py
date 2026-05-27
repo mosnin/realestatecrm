@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import structlog
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
@@ -23,6 +24,8 @@ from tools._calendar_mirror import mirror_tour_to_calendar
 from tools.activities import persist_log
 from tools.base import idempotent_tool
 from tools.streaming import publish_event
+
+log = structlog.get_logger(__name__)
 
 
 def _parse_iso(value: str) -> datetime | None:
@@ -114,13 +117,22 @@ async def book_tour(
         return {"error": f"tour insert failed: {exc}"}
 
     # Best-effort mirror into Chippi's CalendarEvent — /calendar reads it.
+    # The helper already swallows its own DB errors and logs them; this
+    # outer guard catches anything that fails *before* its inner try (e.g.
+    # a datetime conversion bug). Log at warning so we don't go blind on
+    # the seam between booking and the day view.
     try:
         await mirror_tour_to_calendar(
             space_id=space_id, tour_id=tour_id, guest_name=guest_name,
             starts_at=starts, property_address=property_address, notes=notes,
         )
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 — best-effort mirror
+        log.warning(
+            "tour_calendar_mirror_outer_failed",
+            space_id=space_id,
+            tour_id=tour_id,
+            error=str(exc)[:300],
+        )
 
     # Activity timeline entry for the contact
     summary_addr = f" at {property_address}" if property_address else ""

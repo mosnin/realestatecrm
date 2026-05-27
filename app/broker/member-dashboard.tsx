@@ -73,6 +73,21 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   const spaceId = space.id;
   const spaceSlug = space.slug;
 
+  // Resolve the brokerage's admin/owner spaces FIRST so the announcement
+  // query can be scoped server-side. Previously this lookup ran after the
+  // Promise.all and the announcement query pulled every [ANN] note in the
+  // database, then JS-filtered. That's a tenant-boundary leak AND O(global)
+  // rows over the wire.
+  const brokerMembers = await getBrokerageMembers(brokerage.id);
+  const brokerSpaceIds = Array.from(
+    new Set(
+      brokerMembers
+        .filter((m) => m.role === 'broker_owner' || m.role === 'broker_admin')
+        .map((m) => m.Space?.id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
   // ── Fetch stats in parallel ──
   const now = new Date().toISOString();
 
@@ -139,13 +154,18 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
           .order('followUpAt', { ascending: true })
           .limit(10)
       : Promise.resolve({ data: [] }),
-    // Announcements from broker's space (Notes with title starting with [ANN])
-    supabase
-      .from('Note')
-      .select('id, title, content, createdAt, spaceId')
-      .ilike('title', '[ANN]%')
-      .order('createdAt', { ascending: false })
-      .limit(20),
+    // Announcements from broker's space (Notes with title starting with [ANN]).
+    // Scoped server-side via `.in('spaceId', ...)` — never pull other tenants'
+    // notes over the wire just to filter them out here.
+    brokerSpaceIds.length > 0
+      ? supabase
+          .from('Note')
+          .select('id, title, content, createdAt, spaceId')
+          .ilike('title', '[ANN]%')
+          .in('spaceId', brokerSpaceIds)
+          .order('createdAt', { ascending: false })
+          .limit(3)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const assignedCount = assignedLeadsRes.count ?? 0;
@@ -171,25 +191,14 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
     followUpAt: string;
   }>;
 
-  // Filter announcements — find broker's space IDs to only show brokerage-related notes
-  // We look up spaces belonging to brokerage members with admin/owner roles
-  const brokerMembers = await getBrokerageMembers(brokerage.id);
-  const brokerSpaceIds = new Set(
-    brokerMembers
-      .filter((m) => m.role === 'broker_owner' || m.role === 'broker_admin')
-      .map((m) => m.Space?.id)
-      .filter(Boolean)
-  );
-
-  const announcements = ((announcementsRes.data ?? []) as Array<{
+  // Announcements are already server-scoped to brokerSpaceIds and limit(3).
+  const announcements = (announcementsRes.data ?? []) as Array<{
     id: string;
     title: string;
     content: string;
     createdAt: string;
     spaceId: string;
-  }>)
-    .filter((n) => brokerSpaceIds.has(n.spaceId))
-    .slice(0, 3);
+  }>;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
