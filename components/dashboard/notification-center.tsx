@@ -41,7 +41,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'text-muted-foreground',
 };
 
-export function NotificationCenter({ slug }: { slug: string }) {
+export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -66,23 +66,33 @@ export function NotificationCenter({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [loadNotifications]);
 
-  // Realtime: refetch notifications when Contact or Tour changes
+  // Realtime: refetch notifications when this space's Contact or Tour
+  // rows change. The channel name includes spaceId so two tabs of the
+  // same workspace each get their own channel (Supabase rejects
+  // duplicate channel names on the same client) and the postgres_changes
+  // filter is the defense-in-depth belt next to the RLS predicate — if
+  // RLS is ever relaxed accidentally, the filter still scopes us.
   useEffect(() => {
+    if (!spaceId) return; // No spaceId yet — skip Realtime, polling carries us.
     const supabase = getSupabaseBrowser();
     if (!supabase) return;
 
     const channel = supabase
-      .channel('notification-center')
-      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'Contact' }, () => {
-        loadNotifications();
-      })
-      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'Tour' }, () => {
-        loadNotifications();
-      })
+      .channel(`notification-center:${spaceId}`)
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'Contact', filter: `spaceId=eq.${spaceId}` },
+        () => { loadNotifications(); },
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'Tour', filter: `spaceId=eq.${spaceId}` },
+        () => { loadNotifications(); },
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [loadNotifications]);
+  }, [loadNotifications, spaceId]);
 
   // Close on escape
   useEffect(() => {

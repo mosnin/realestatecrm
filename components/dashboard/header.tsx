@@ -74,6 +74,10 @@ const brokerMobileNavSections = [
 
 interface HeaderProps {
   slug: string;
+  /** Owning Space.id — threaded through to NotificationCenter so its
+   *  Realtime subscriptions can filter by spaceId. Without this, a
+   *  permissive RLS regression would deliver cross-tenant rows. */
+  spaceId?: string;
   spaceName: string;
   title: string;
   isBroker?: boolean;
@@ -82,7 +86,7 @@ interface HeaderProps {
   brokerageRole?: string | null;
 }
 
-export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
+export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
   const [mobileShowPages, setMobileShowPages] = useState(false);
@@ -564,7 +568,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
       <div className="flex items-center gap-0.5">
         {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
-        {slug && <NotificationCenter slug={slug} />}
+        {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
         {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
         <button
