@@ -18,12 +18,12 @@ Six tools that let the broker actually ACT through Chippi, not just see:
   offboard_member          — highest-friction. broker_owner only; mirrors the
                              offboard_brokerage_member RPC the /api route
                              uses. Two-step confirmation.
-  set_routing_rule         — set Brokerage.leadRoutingRule to one of
-                             manual / round_robin / fewest_active. The
-                             ENFORCEMENT (pick-on-arrival in the lead
-                             pipeline) is intentionally OUT OF SCOPE; a
-                             follow-up change in the lead-creation path picks
-                             this column up. Flagged in the Phase 3 report.
+  set_routing_rule         — set Brokerage.assignmentMethod (and the
+                             autoAssignEnabled kill switch) to one of
+                             manual / round_robin / score_based. The
+                             enforcement engine lives in
+                             lib/brokerage-routing.ts; this tool just
+                             writes the columns it reads.
 
 Every tool:
   1. Calls require_broker_role(ctx) on its FIRST line (defense layer 3).
@@ -1061,51 +1061,60 @@ async def offboard_member(
 # ── 6. set_routing_rule ─────────────────────────────────────────────────────
 
 
-_VALID_ROUTING: frozenset[str] = frozenset({"manual", "round_robin", "fewest_active"})
+# Matches the AssignmentMethod union in lib/brokerage-routing.ts and the
+# values the engine's loadBrokerageRoutingConfig actually accepts. Anything
+# else falls back to 'manual' on read, so writing it would silently disable
+# auto-routing — guard against that here.
+_VALID_ROUTING: frozenset[str] = frozenset({"manual", "round_robin", "score_based"})
 
 
 @function_tool(strict_mode=False)
 async def set_routing_rule(
     ctx: RunContextWrapper[AgentContext],
-    strategy: Literal["manual", "round_robin", "fewest_active"],
+    strategy: Literal["manual", "round_robin", "score_based"],
 ) -> dict[str, Any]:
     """Set the brokerage-wide default routing strategy for new unassigned
     leads.
 
     strategy:
-      'manual'        — every new lead waits for a broker to assign it
-                        (the current default; what existing brokerages do).
-      'round_robin'   — new leads cycle through the team in member-creation
-                        order, one per realtor.
-      'fewest_active' — new leads go to whoever has the lightest open load
-                        (active_deals + open_leads) at intake time.
+      'manual'       — every new lead waits for a broker to assign it
+                       (autoAssignEnabled=false; the current default).
+      'round_robin'  — new leads cycle through eligible realtors in order,
+                       one per realtor (autoAssignEnabled=true).
+      'score_based'  — new leads route to the highest-scoring eligible
+                       realtor at intake time (autoAssignEnabled=true).
 
     Use when the broker says "auto-route my leads round-robin", "send
-    everything to whoever is least busy", or "stop auto-routing".
+    everything to my top performer", or "stop auto-routing".
 
-    Important: this tool sets the column. The actual enforcement (picking
-    a realtor on every new-lead arrival) is OUT OF SCOPE for Phase 3 and
-    will land as a separate change in the lead-creation pipeline.
+    Writes the two columns the routing engine in lib/brokerage-routing.ts
+    actually reads: autoAssignEnabled (kill switch) and assignmentMethod
+    (the strategy). Enforcement on lead arrival is already wired through
+    the engine — this tool flips the switch.
     """
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
     if strategy not in _VALID_ROUTING:
-        return {"ok": False, "summary": "Strategy must be manual, round_robin, or fewest_active."}
+        return {"ok": False, "summary": "Strategy must be manual, round_robin, or score_based."}
 
     db = await supabase()
 
-    # ── Confirm brokerage scope (and the column exists in this deploy) ─
+    # ── Confirm brokerage scope (and read the engine-relevant columns) ─
     bk_res = await (
         db.table("Brokerage")
-        .select("id,name,leadRoutingRule")
+        .select("id,name,autoAssignEnabled,assignmentMethod")
         .eq("id", brokerage_id)
         .maybe_single()
         .execute()
     )
     if not bk_res.data:
         return {"ok": False, "summary": "Brokerage row missing — couldn't set the rule."}
-    previous = bk_res.data.get("leadRoutingRule") or "manual"
+    # Engine treats anything other than 'round_robin' / 'score_based' as
+    # 'manual'; mirror that here so previous-vs-new comparisons match what
+    # the engine sees, not the raw column.
+    raw_prev = bk_res.data.get("assignmentMethod")
+    previous = raw_prev if raw_prev in {"round_robin", "score_based"} else "manual"
 
     if previous == strategy:
         return {
@@ -1115,10 +1124,17 @@ async def set_routing_rule(
         }
 
     # ── Apply ──────────────────────────────────────────────────────────
+    # autoAssignEnabled is the kill switch the engine checks first; if it's
+    # false, assignmentMethod is ignored and every lead falls back to the
+    # broker-owner space. Tie the two columns together so the tool's
+    # contract ("auto-route round-robin") actually takes effect.
     try:
         await (
             db.table("Brokerage")
-            .update({"leadRoutingRule": strategy})
+            .update({
+                "assignmentMethod": strategy,
+                "autoAssignEnabled": strategy != "manual",
+            })
             .eq("id", brokerage_id)
             .execute()
         )

@@ -653,7 +653,14 @@ async def test_set_routing_rule_writes_audit(fake_db: _FakeSupabase) -> None:
     fake_db.set_for(
         "Brokerage",
         "select",
-        _FakeResult(data={"id": "bk_a", "name": "Apex", "leadRoutingRule": "manual"}),
+        _FakeResult(
+            data={
+                "id": "bk_a",
+                "name": "Apex",
+                "autoAssignEnabled": False,
+                "assignmentMethod": "manual",
+            }
+        ),
     )
 
     tool = _tool_by_name("set_routing_rule")
@@ -664,6 +671,12 @@ async def test_set_routing_rule_writes_audit(fake_db: _FakeSupabase) -> None:
     assert len(audits) == 1
     assert audits[0]["payload"]["resource"] == "Brokerage"
     assert audits[0]["payload"]["metadata"]["operation"] == "set_routing_rule"
+    # Engine reads assignmentMethod + autoAssignEnabled — confirm both moved.
+    updates = [c for c in fake_db.log if c["table"] == "Brokerage" and c["op"] == "update"]
+    assert len(updates) == 1
+    payload = updates[0]["payload"]
+    assert payload["assignmentMethod"] == "round_robin"
+    assert payload["autoAssignEnabled"] is True
 
 
 # ── 6. broker_admin can only move realtor_member ⇄ realtor_member ───────────
@@ -746,17 +759,26 @@ async def test_offboard_member_admin_refused(fake_db: _FakeSupabase) -> None:
 
 @pytest.mark.asyncio
 async def test_set_routing_rule_rejects_invalid_strategy(fake_db: _FakeSupabase) -> None:
-    """Anything outside {manual, round_robin, fewest_active} is refused."""
+    """Anything outside {manual, round_robin, score_based} is refused.
+
+    The Literal annotation on the tool parameter is enforced by the
+    openai-agents SDK before our body runs — invalid input raises
+    ModelBehaviorError, never reaches our `_VALID_ROUTING` check, and
+    never touches the DB. The runtime check inside the tool is a
+    belt-and-suspenders guard for callers (and the future shape of
+    strict_mode); the SDK does the work.
+    """
+    from agents.exceptions import ModelBehaviorError
+
     tool = _tool_by_name("set_routing_rule")
     ctx = _ctx(broker_role="broker_owner")
-    res = await _invoke(tool, ctx, {"strategy": "lol_not_a_strategy"})
-    assert res["ok"] is False
-    assert "manual" in res["summary"].lower()
+    with pytest.raises(ModelBehaviorError):
+        await _invoke(tool, ctx, {"strategy": "lol_not_a_strategy"})
     # No UPDATE attempted.
     assert not any(c["table"] == "Brokerage" and c["op"] == "update" for c in fake_db.log)
 
 
-@pytest.mark.parametrize("strategy", ["manual", "round_robin", "fewest_active"])
+@pytest.mark.parametrize("strategy", ["manual", "round_robin", "score_based"])
 @pytest.mark.asyncio
 async def test_set_routing_rule_accepts_valid_enum(
     fake_db: _FakeSupabase, strategy: str
@@ -765,7 +787,14 @@ async def test_set_routing_rule_accepts_valid_enum(
     fake_db.set_for(
         "Brokerage",
         "select",
-        _FakeResult(data={"id": "bk_a", "name": "Apex", "leadRoutingRule": "manual"}),
+        _FakeResult(
+            data={
+                "id": "bk_a",
+                "name": "Apex",
+                "autoAssignEnabled": False,
+                "assignmentMethod": "manual",
+            }
+        ),
     )
     tool = _tool_by_name("set_routing_rule")
     ctx = _ctx(broker_role="broker_owner")
@@ -777,7 +806,11 @@ async def test_set_routing_rule_accepts_valid_enum(
     else:
         assert res["ok"] is True
         assert res["newStrategy"] == strategy
-        assert any(c["table"] == "Brokerage" and c["op"] == "update" for c in fake_db.log)
+        updates = [c for c in fake_db.log if c["table"] == "Brokerage" and c["op"] == "update"]
+        assert len(updates) == 1
+        payload = updates[0]["payload"]
+        assert payload["assignmentMethod"] == strategy
+        assert payload["autoAssignEnabled"] is True
 
 
 # ── Sanity: BROKER_TOOLS has all 13 tools registered ────────────────────────
