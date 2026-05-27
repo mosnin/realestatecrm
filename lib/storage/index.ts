@@ -29,6 +29,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   CopyObjectCommand,
+  ListObjectsV2Command,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -164,6 +165,48 @@ export async function deleteObject(key: string): Promise<void> {
   const client = getWasabiClient();
   const bucket = getWasabiBucket();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+/**
+ * List objects under a key prefix. Used by the storage-gc sweeper to diff
+ * the bucket against DB-tracked storage keys. Capped at `maxKeys` per
+ * page (S3 max is 1000); resumes with `continuationToken` for the next page.
+ *
+ * Returns object keys + their last-modified timestamps so the sweeper can
+ * skip very-recent uploads (sub-minute) — a race window where the DB row
+ * insert is still pending and a delete would be a self-inflicted orphan.
+ */
+export async function listObjectsByPrefix(args: {
+  prefix: string;
+  maxKeys?: number;
+  continuationToken?: string;
+}): Promise<{
+  keys: { key: string; lastModified: Date | null; size: number }[];
+  nextToken: string | null;
+  isTruncated: boolean;
+}> {
+  const client = getWasabiClient();
+  const bucket = getWasabiBucket();
+  const res = await client.send(
+    new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: args.prefix,
+      MaxKeys: args.maxKeys ?? 1000,
+      ContinuationToken: args.continuationToken,
+    }),
+  );
+  const keys = (res.Contents ?? [])
+    .map((obj) => ({
+      key: obj.Key ?? '',
+      lastModified: obj.LastModified ?? null,
+      size: obj.Size ?? 0,
+    }))
+    .filter((k) => k.key.length > 0);
+  return {
+    keys,
+    nextToken: res.NextContinuationToken ?? null,
+    isTruncated: Boolean(res.IsTruncated),
+  };
 }
 
 /**
