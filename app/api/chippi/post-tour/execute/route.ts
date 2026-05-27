@@ -15,7 +15,11 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { executeTool } from '@/lib/ai-tools/execute';
-import { POST_TOUR_TOOL_ALLOWLIST, doneVerbForToolkit } from '@/lib/chippi/post-tour';
+import {
+  POST_TOUR_TOOL_ALLOWLIST,
+  POST_TOUR_INTEGRATION_SLUG_ALLOWLIST,
+  doneVerbForToolkit,
+} from '@/lib/chippi/post-tour';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { composioConfigured, executeToolForEntity } from '@/lib/integrations/composio';
 import { logger } from '@/lib/logger';
@@ -70,9 +74,13 @@ export async function POST(req: NextRequest) {
 
   // Sanitize the input. Native tools must be on the post-tour allowlist;
   // integration tools must reference a toolkit the realtor has actually
-  // connected. Anything else is dropped — this route is not a generic
-  // tool runner.
+  // connected AND their slug must be on the integration-slug allowlist.
+  // This route is a post-tour orchestrator, not a generic Composio
+  // passthrough — `GMAIL_TRASH_EMAIL` and friends have no business here.
   const nativeAllow = new Set(POST_TOUR_TOOL_ALLOWLIST as readonly string[]);
+  const integrationSlugAllow = new Set(
+    POST_TOUR_INTEGRATION_SLUG_ALLOWLIST as readonly string[],
+  );
   const connectedToolkits = composioConfigured()
     ? new Set(await activeToolkits({ spaceId: space.id, userId }))
     : new Set<string>();
@@ -91,11 +99,13 @@ export async function POST(req: NextRequest) {
     } else if (
       typeof integrationToolkit === 'string' &&
       integrationToolkit &&
-      connectedToolkits.has(integrationToolkit)
+      connectedToolkits.has(integrationToolkit) &&
+      integrationSlugAllow.has(tool)
     ) {
-      // Integration proposal — accept only if the realtor still has that
-      // toolkit connected at execute time. A revoke between propose and
-      // execute should NOT silently re-fall-back to a native draft.
+      // Integration proposal — accept only if (1) the realtor still has
+      // that toolkit connected at execute time and (2) the slug is one
+      // we explicitly support. A revoke between propose and execute, or a
+      // model that drifted to an unsupported verb, both get dropped here.
       proposals.push({
         tool,
         args: (args as Record<string, unknown>) ?? {},

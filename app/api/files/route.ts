@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
     })(),
     supabase
       .from('Attachment')
-      .select('id, filename, mimeType, sizeBytes, publicUrl, createdAt')
+      .select('id, filename, mimeType, sizeBytes, storagePath, createdAt')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(500),
@@ -174,29 +174,45 @@ export async function GET(req: NextRequest) {
     }),
   );
 
-  // Chat attachments are public-served (the chat-attachments/ prefix is
-  // covered by the bucket policy) and always have a mime — categorize on
-  // the fly. Apply the same category filter the File query used.
-  const chatRows: ListedFile[] = ((attachmentRes.data ?? []) as Array<{
+  // Chat attachments live in the private chat-attachments/ prefix and
+  // require a signed URL to read. Sign previewable rows in parallel here,
+  // same pattern as the File-table rows above, so the cards render inline
+  // without a second client round-trip.
+  const chatRowsRaw = (attachmentRes.data ?? []) as Array<{
     id: string;
     filename: string;
     mimeType: string;
     sizeBytes: number | null;
-    publicUrl: string | null;
+    storagePath: string;
     createdAt: string;
-  }>)
-    .map((r) => ({
-      id: r.id,
-      name: r.filename,
-      mimeType: r.mimeType,
-      category: deriveCategory(r.mimeType),
-      sizeBytes: Number(r.sizeBytes ?? 0),
-      isPublic: true,
-      createdAt: r.createdAt,
-      source: 'chat' as const,
-      previewUrl: isPreviewable(r.mimeType) ? r.publicUrl ?? null : null,
-    }))
-    .filter((r) => !category || r.category === category);
+  }>;
+  const chatRows: ListedFile[] = (
+    await Promise.all(
+      chatRowsRaw.map(async (r) => {
+        let previewUrl: string | null = null;
+        if (isPreviewable(r.mimeType) && r.storagePath) {
+          try {
+            previewUrl = await getSignedDownloadUrl(r.storagePath, PREVIEW_TTL_SECONDS);
+          } catch (err) {
+            logger.warn('[files] chat-attachment sign failed', { id: r.id }, err as Error);
+          }
+        }
+        return {
+          id: r.id,
+          name: r.filename,
+          mimeType: r.mimeType,
+          category: deriveCategory(r.mimeType),
+          sizeBytes: Number(r.sizeBytes ?? 0),
+          // chat attachments are private now; report that to the UI so it
+          // doesn't suggest public-link affordances on the card.
+          isPublic: false,
+          createdAt: r.createdAt,
+          source: 'chat' as const,
+          previewUrl,
+        };
+      }),
+    )
+  ).filter((r) => !category || r.category === category);
 
   const merged = [...fileRows, ...chatRows].sort((a, b) =>
     a.createdAt < b.createdAt ? 1 : -1,

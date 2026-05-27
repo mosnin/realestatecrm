@@ -3,15 +3,16 @@
  * DELETE /api/ai/attachments?id=... — remove a chat attachment.
  *
  * The realtor drops a file into the prompt box; the client posts it here, we
- * stash it in Supabase Storage, persist a row in `Attachment`, and hand the id
- * back. /api/ai/task hydrates the row and forwards it to the sandbox runner so
- * the cowork agent can read it via the `read_attachment` tool.
+ * stash it in Wasabi (private), persist a row in `Attachment`, and hand the
+ * id back. /api/ai/task hydrates the row and mints a fresh signed URL for the
+ * Modal runner each turn; the file-preview UI calls /api/files which mints
+ * its own short-lived signed URL on read.
  *
- * Bucket access model: the `chat-attachments` bucket is PUBLIC, matching the
- * branding bucket. Access control is the unguessable storagePath
- * (`<spaceId>/<uuid>-<filename>`) — this is the same trade-off /api/upload
- * already makes for branding assets, and avoids the operational cost of
- * minting signed URLs for every agent tool call.
+ * Bucket access model: `chat-attachments` is PRIVATE. We previously uploaded
+ * with `isPublic: true` and handed out the public URL, which meant any leaked
+ * URL was a permanent read on the attachment (a buyer's bank statement, a
+ * listing photo with home address EXIF, etc.). PII does not get to live behind
+ * unguessable URLs in 2026. Read access now requires a signed URL.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,7 +22,13 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
-import { uploadObject, deleteObject, getPublicUrl, buildKey } from '@/lib/storage';
+import { uploadObject, deleteObject, getSignedDownloadUrl, buildKey } from '@/lib/storage';
+
+/** TTL for the URL returned on POST. The chat UI uses it for the inline
+ *  preview the moment the upload completes; 20 minutes is long enough for
+ *  the realtor to keep editing the message and short enough that the URL
+ *  isn't useful as a leaked artefact. */
+const POST_RESPONSE_URL_TTL_SECONDS = 60 * 20;
 
 export const runtime = 'nodejs';
 
@@ -160,7 +167,9 @@ export async function POST(req: NextRequest) {
       key: storagePath,
       body: buffer,
       contentType: mimeType,
-      isPublic: true,
+      // Private bucket — read access requires a signed URL. See the file
+      // header for why we don't trust unguessable keys with PII anymore.
+      isPublic: false,
     });
   } catch (uploadError) {
     logger.error('[ai/attachments] storage upload failed', { spaceId: space.id }, uploadError as Error);
@@ -170,7 +179,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const publicUrl = getPublicUrl(storagePath);
+  // Sign a short-lived URL so the realtor's inline preview renders. The
+  // DB column is left as-is for backward compatibility (older rows still
+  // carry a full public URL; new rows get the signed URL value, which
+  // expires — readers must mint fresh URLs via /api/files or /api/ai/task).
+  let previewUrl: string;
+  try {
+    previewUrl = await getSignedDownloadUrl(storagePath, POST_RESPONSE_URL_TTL_SECONDS);
+  } catch (signError) {
+    logger.error('[ai/attachments] sign-url failed', { spaceId: space.id }, signError as Error);
+    await deleteObject(storagePath).catch(() => {});
+    return NextResponse.json(
+      { error: 'Could not generate preview URL' },
+      { status: 500 },
+    );
+  }
 
   const isImage = mimeType.startsWith('image/');
   // Images go straight to the model via vision — no extraction needed. Anything
@@ -186,7 +209,10 @@ export async function POST(req: NextRequest) {
     mimeType,
     sizeBytes: file.size,
     storagePath,
-    publicUrl,
+    // Stored value isn't used as a long-lived URL anymore — readers always
+    // re-sign from storagePath. Keeping the column populated avoids schema
+    // changes and keeps the migration path open for a follow-up drop.
+    publicUrl: '',
     extractionStatus,
   });
   if (insertError) {
@@ -204,7 +230,7 @@ export async function POST(req: NextRequest) {
     filename: sanitized,
     mimeType,
     sizeBytes: file.size,
-    publicUrl,
+    publicUrl: previewUrl,
     isImage,
     extractionStatus,
   });

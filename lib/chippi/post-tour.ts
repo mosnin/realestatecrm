@@ -51,6 +51,26 @@ export const POST_TOUR_TOOL_ALLOWLIST = [
 export type PostTourToolName = (typeof POST_TOUR_TOOL_ALLOWLIST)[number];
 
 /**
+ * Composio slug allowlist for integration tools the post-tour proposer is
+ * permitted to emit. The proposer can technically return any slug from a
+ * connected toolkit's catalog (Gmail alone has ~40), but the only ones the
+ * system prompt teaches it to use are the "send/schedule" verbs below.
+ *
+ * Enforced at execute time so a hand-crafted POST to
+ * `/api/chippi/post-tour/execute` with `tool: "GMAIL_TRASH_EMAIL"` (or any
+ * other Composio Gmail/Calendar slug) is rejected — the endpoint is a
+ * post-tour orchestrator, not a generic Composio passthrough. Tightening
+ * here also limits blast radius if the model drifts.
+ */
+export const POST_TOUR_INTEGRATION_SLUG_ALLOWLIST = [
+  'GMAIL_SEND_EMAIL',
+  'GOOGLECALENDAR_CREATE_EVENT',
+] as const;
+
+export type PostTourIntegrationSlug =
+  (typeof POST_TOUR_INTEGRATION_SLUG_ALLOWLIST)[number];
+
+/**
  * A Composio tool the realtor's connected accounts expose. We pull this
  * straight from `loadToolsForEntity` and re-shape into the minimal pair
  * (slug, description, toolkit) the orchestrator needs to know about.

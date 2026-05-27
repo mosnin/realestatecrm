@@ -268,6 +268,27 @@ export interface SendEmailFromCRMParams {
   attachments?: SendEmailAttachment[];
 }
 
+/**
+ * Send an email through the CRM's "from" identity. THROWS on Resend rejection
+ * or network failure so callers can distinguish "delivered" from "the
+ * provider said no". Previously this returned `Promise<void>` and swallowed
+ * every failure, which meant /api/agent/send reported `success: true` for
+ * emails Resend rejected — realtors were told their messages went out when
+ * they didn't. That's fiduciary harm.
+ *
+ * Misconfiguration (no RESEND_API_KEY in dev) is the one exception: we log
+ * and return without throwing so local dev doesn't blow up. Production
+ * always has the key set; if it's missing in prod, the warn log surfaces it.
+ */
+export class EmailSendError extends Error {
+  readonly cause?: unknown;
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'EmailSendError';
+    this.cause = cause;
+  }
+}
+
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
@@ -296,8 +317,9 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
 </html>`;
 
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  let result: Awaited<ReturnType<typeof resend.emails.send>>;
   try {
-    const result = await resend.emails.send({
+    result = await resend.emails.send({
       from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
       replyTo: replyTo ?? undefined,
@@ -311,14 +333,24 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
           }))
         : undefined,
     });
-    if (result.error) {
-      logger.error('[email] CRM email: Resend API error', { to: toEmail, resendError: result.error });
-    } else {
-      logger.info('[email] CRM email sent', { to: toEmail, messageId: result.data?.id });
-    }
   } catch (err) {
-    logger.error('[email] CRM email failed', { to: toEmail }, err);
+    logger.error('[email] CRM email transport failed', { to: toEmail }, err);
+    throw new EmailSendError(
+      err instanceof Error ? err.message : 'Email transport failed',
+      err,
+    );
   }
+
+  if (result.error) {
+    logger.error('[email] CRM email: Resend API error', { to: toEmail, resendError: result.error });
+    const errMessage =
+      typeof result.error === 'object' && result.error && 'message' in result.error
+        ? String((result.error as { message: unknown }).message)
+        : 'Resend rejected the send';
+    throw new EmailSendError(errMessage, result.error);
+  }
+
+  logger.info('[email] CRM email sent', { to: toEmail, messageId: result.data?.id });
 }
 
 export interface NewDealEmailParams {
