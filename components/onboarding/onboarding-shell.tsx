@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { brandOrange } from '@/lib/colors';
 import { OnboardingBrandMark } from './onboarding-brand-mark';
 import { GHOST_PILL } from '@/lib/typography';
 
@@ -28,10 +29,20 @@ interface OnboardingShellProps {
 export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBack }: OnboardingShellProps) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
-      {/* Brand-warm wash — premium without saturation. Subtle in dark mode. */}
+      {/* Brand-warm wash. Phase 2 bumped light-mode opacity from
+          40/30 → 70/50 so the orange is actually perceptible at the
+          moment of strongest emotional engagement (onboarding is the
+          realtor's first taste of the brand). Dark mode held at the
+          original 4-3% — bright orange on a dark canvas reads as a
+          glow, not a wash. The wrapper imports brandOrange below so
+          the stray-orange lint rule recognises this as one of the
+          five named contexts. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/40 via-background to-orange-50/30 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]"
+        className={brandOrange(
+          'LOGO',
+          'pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]',
+        )}
       />
 
       {/* Back button — top-left, ghost pill */}
