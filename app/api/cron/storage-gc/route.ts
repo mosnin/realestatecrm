@@ -173,6 +173,39 @@ const PREFIX_SPECS: PrefixSpec[] = [
       );
     },
   },
+  {
+    // Branding assets uploaded via /api/upload — logo, realtor photo,
+    // favicon. SpaceSetting columns store full public URLs; we map each
+    // back to a key via publicUrlToKey and intersect with the
+    // candidates the sweeper just listed.
+    //
+    // Also covers /api/upload/onboarding pre-space uploads — those
+    // start under onboarding/{userId}/ and are orphaned at the point
+    // the realtor abandons onboarding or replaces the file before
+    // committing it to a SpaceSetting column. Either way, the active
+    // SpaceSetting reference is the only thing that should survive.
+    prefix: STORAGE_PREFIXES.onboarding,
+    label: 'onboarding',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('SpaceSetting')
+        .select('logoUrl, realtorPhotoUrl, intakeFaviconUrl')
+        .limit(5000);
+      const referenced = new Set<string>();
+      for (const row of (data ?? []) as {
+        logoUrl: string | null;
+        realtorPhotoUrl: string | null;
+        intakeFaviconUrl: string | null;
+      }[]) {
+        for (const url of [row.logoUrl, row.realtorPhotoUrl, row.intakeFaviconUrl]) {
+          if (!url) continue;
+          const key = publicUrlToKey(url);
+          if (key) referenced.add(key);
+        }
+      }
+      return new Set(candidates.filter((k) => referenced.has(k)));
+    },
+  },
 ];
 
 interface SweepResult {
