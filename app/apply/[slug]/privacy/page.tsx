@@ -2,28 +2,43 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
+import DOMPurify from 'isomorphic-dompurify';
 import Link from 'next/link';
 
-/** Strip dangerous HTML elements and attributes to prevent XSS */
+/**
+ * Sanitize the realtor's stored privacy policy HTML before rendering.
+ *
+ * The realtor authors this content in their settings (rich-text editor in
+ * dashboard → settings → legal). It's then displayed to APPLICANTS when
+ * they click "Privacy Policy" in the intake flow. A compromised realtor
+ * account, or any code path that mistakenly accepts unsanitized HTML on
+ * write, could plant stored XSS that fires on every applicant's browser.
+ *
+ * Previous implementation was a hand-rolled regex stripper that missed
+ * common bypasses: <style>, <base>, data: URLs, SVG vectors, and mutation
+ * XSS via malformed nesting (`<scr<script>ipt>` style). DOMPurify parses
+ * the HTML into a real DOM tree and walks it with an allowlist — the
+ * battle-tested way to handle this.
+ */
 function sanitizeHtml(html: string): string {
-  let sanitized = html;
-  // Remove <script> tags and their contents
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  // Remove <iframe>, <object>, <embed>, <form> tags and their contents
-  sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
-  sanitized = sanitized.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
-  sanitized = sanitized.replace(/<embed\b[^>]*\/?>/gi, '');
-  sanitized = sanitized.replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '');
-  // Remove self-closing / unclosed versions of dangerous tags
-  sanitized = sanitized.replace(/<script\b[^>]*\/?>/gi, '');
-  sanitized = sanitized.replace(/<iframe\b[^>]*\/?>/gi, '');
-  sanitized = sanitized.replace(/<object\b[^>]*\/?>/gi, '');
-  sanitized = sanitized.replace(/<form\b[^>]*\/?>/gi, '');
-  // Remove event handler attributes (on*)
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-  // Remove javascript: URLs in any attribute
-  sanitized = sanitized.replace(/javascript\s*:/gi, '');
-  return sanitized;
+  return DOMPurify.sanitize(html, {
+    // Allow only the tags a typical privacy policy needs. No <style>,
+    // <script>, <iframe>, <object>, <embed>, <form>, <base>, <svg> —
+    // all known XSS surfaces. <a> is allowed but rendered with
+    // safe-by-default rel and target via DOMPurify hooks below.
+    ALLOWED_TAGS: [
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'p', 'br', 'hr',
+      'strong', 'em', 'b', 'i', 'u', 's',
+      'ul', 'ol', 'li',
+      'a', 'blockquote', 'code', 'pre',
+      'span', 'div',
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+    // Only allow http(s) and mailto: in URLs. Blocks javascript:,
+    // data:, vbscript:, and anything else.
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|\/(?!\/))/i,
+  });
 }
 
 export const revalidate = 300; // Cache 5 minutes

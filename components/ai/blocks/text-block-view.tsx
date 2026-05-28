@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, safeImageSrc } from '@/lib/utils';
 import type { TextBlock } from '@/lib/ai-tools/blocks';
 
 /** Render inline spans: `**bold**`, `*italic*`, and `` `code` ``. */
@@ -94,19 +94,26 @@ function renderMarkdown(content: string, streaming?: boolean): React.ReactNode[]
     // markdown image syntax; render them inline so the realtor sees the
     // image instead of a URL. Image must be the whole line — inline
     // images mixed with text aren't worth supporting yet.
+    //
+    // safeImageSrc rejects javascript: / data: schemes so a prompt-
+    // injected `![x](javascript:alert(1))` won't even make it into a
+    // src attribute. Modern browsers already refuse to execute those
+    // in <img src>, but the belt is cheap.
     const imageMatch = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line);
     if (imageMatch) {
-      const alt = imageMatch[1] || 'image';
-      const url = imageMatch[2];
-      nodes.push(
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={key()}
-          src={url}
-          alt={alt}
-          className="my-2 max-w-full rounded-lg border border-border/60"
-        />,
-      );
+      const safeSrc = safeImageSrc(imageMatch[2]);
+      if (safeSrc) {
+        const alt = imageMatch[1] || 'image';
+        nodes.push(
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={key()}
+            src={safeSrc}
+            alt={alt}
+            className="my-2 max-w-full rounded-lg border border-border/60"
+          />,
+        );
+      }
       i++;
       continue;
     }
