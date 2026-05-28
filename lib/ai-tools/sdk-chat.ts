@@ -44,6 +44,22 @@ import { logger } from '@/lib/logger';
 const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
+ * Cap on generated output tokens per turn.
+ *
+ * OpenRouter (and OpenAI direct) pre-charge against credit balance based
+ * on MAX possible output, not actual usage. With maxTokens unset,
+ * providers reserve the model's full ceiling (currently 65,536 for most
+ * modern models). A realtor with modest credit can't make a single call
+ * because the pre-charge alone exceeds it — exact symptom: HTTP 402
+ * "requested up to 65536 tokens, but can only afford X."
+ *
+ * 4096 is ~4× the typical Chippi turn (~1k tokens) — headroom for
+ * long-form drafts (offer letters, post-tour packets) while keeping the
+ * pre-charge low enough that everyday usage stays under a cent per turn.
+ */
+const DEFAULT_MAX_TOKENS = 4_096;
+
+/**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
  * to spelunk the catalog can't run our token bill into the ground. 15
@@ -104,6 +120,7 @@ export function buildChatAgent(
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
     tools: [...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
     model: opts.model ?? DEFAULT_MODEL,
+    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
   });
 }
 

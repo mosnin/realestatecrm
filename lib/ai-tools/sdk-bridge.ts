@@ -41,6 +41,10 @@ import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
 const DEFAULT_MODEL = 'gpt-5-mini';
 
+/** See sdk-chat.ts DEFAULT_MAX_TOKENS for the rationale. Same value here
+ *  so a refactor doesn't silently let the bridge revert to 65k pre-charge. */
+const DEFAULT_MAX_TOKENS = 4_096;
+
 /**
  * Convert one of our tools into an SDK `FunctionTool`.
  *
@@ -302,6 +306,7 @@ export async function runAgent({ systemPrompt, input, tools, ctx, model = DEFAUL
     instructions: systemPrompt,
     tools: tools.map((t) => toSdkTool(t, ctx)),
     model,
+    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
   });
   return run(agent, input);
 }

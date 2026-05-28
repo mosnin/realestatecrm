@@ -59,6 +59,11 @@ import type { ToolContext, ToolDefinition } from '../types';
 
 const DEFAULT_MODEL = 'gpt-5-mini';
 
+/** See sdk-chat.ts DEFAULT_MAX_TOKENS for the rationale. Same default
+ *  so skill turns share the chat turn's cheap pre-charge floor. A skill
+ *  that needs more can override via its frontmatter (future). */
+const DEFAULT_MAX_TOKENS = 4_096;
+
 interface SkillFrontmatter {
   name: string;
   description: string;
@@ -261,5 +266,6 @@ export function buildSkillAgent(
     instructions: def.body,
     tools,
     model: opts.model ?? def.frontmatter.model ?? DEFAULT_MODEL,
+    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
   });
 }
