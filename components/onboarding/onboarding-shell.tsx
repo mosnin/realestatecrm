@@ -17,6 +17,13 @@ interface OnboardingShellProps {
   children: React.ReactNode;
   /** Optional back handler — rendered as a subtle top-left affordance. */
   onBack?: () => void;
+  /**
+   * Hide the progress dots for "bookend" stages — the welcome cover
+   * and the final reveal. A book cover isn't page 1, and the payoff
+   * screen shouldn't read as "8 of 9." Defaults to false so the
+   * legacy flow is unaffected.
+   */
+  hideProgress?: boolean;
 }
 
 /**
@@ -26,7 +33,7 @@ interface OnboardingShellProps {
  * but never saturated. The wash is barely-there in dark mode. Step content
  * fades in via AnimatePresence; progress dots track placement.
  */
-export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBack }: OnboardingShellProps) {
+export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBack, hideProgress }: OnboardingShellProps) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
       {/* Brand-warm wash. Phase 2 bumped light-mode opacity from
@@ -75,7 +82,7 @@ export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBa
       </div>
 
       {/* Progress dots */}
-      {totalSteps > 1 && (
+      {totalSteps > 1 && !hideProgress && (
         <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5">
           {Array.from({ length: totalSteps }).map((_, i) => {
             const complete = i < stepIndex;
