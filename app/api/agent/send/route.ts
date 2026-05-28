@@ -8,11 +8,15 @@
  * create_draft_message instead and this endpoint is never reached.
  *
  * Security model (matches /api/agent/rescore-contact):
- *   - Bearer AGENT_INTERNAL_SECRET header required
+ *   - Bearer AGENT_INTERNAL_SECRET header required.
  *   - spaceId is validated from the request body against the DB — the agent
- *     injects its own spaceId from AgentContext, never from LLM output
- *   - contactId is validated to belong to the spaceId before sending
- *   - Rate-limiting is handled upstream in the Python outreach tool
+ *     injects its own spaceId from AgentContext, never from LLM output.
+ *   - contactId is validated to belong to the spaceId before sending.
+ *   - Per-space rate limit: 30 sends per 5 minutes. The Python outreach tool
+ *     also throttles itself, but that limiter lives in agent process memory —
+ *     a buggy or restarted Modal container could blow past it. The server-
+ *     side cap turns a runaway agent into "the next 27 sends fail" instead
+ *     of "the realtor's whole contact list gets spammed at 03:00."
  */
 
 import crypto from 'crypto';
@@ -20,10 +24,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendEmailFromCRM } from '@/lib/email';
 import { sendSMS } from '@/lib/sms';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
 const VALID_CHANNELS = new Set(['email', 'sms']);
+
+/** Per-space cap on autonomous sends. 30 in 5min covers any realistic burst
+ *  (a multi-action post-tour batch, a multi-stage drip resuming) while
+ *  shutting down a runaway agent before it can burn through a contact
+ *  list. Email + SMS share the same bucket — the rate limit is about the
+ *  realtor's contacts, not the underlying transport. */
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_SECONDS = 5 * 60;
 
 export async function POST(req: NextRequest) {
   if (!AGENT_INTERNAL_SECRET) {
@@ -56,6 +70,22 @@ export async function POST(req: NextRequest) {
 
   if (channel === 'email' && !subject) {
     return NextResponse.json({ error: 'subject required for email channel' }, { status: 400 });
+  }
+
+  // Per-space rate limit. Bucketed by spaceId so a single misbehaving
+  // tenant's agent can't starve other tenants' sends. Modal's in-process
+  // limiter is the upstream throttle; this is the server-side safety net.
+  const { allowed } = await checkRateLimit(
+    `agent-send:${spaceId}`,
+    RATE_LIMIT_MAX,
+    RATE_LIMIT_WINDOW_SECONDS,
+  );
+  if (!allowed) {
+    logger.warn('[agent/send] rate limit hit', { spaceId, channel, runId });
+    return NextResponse.json(
+      { error: 'Rate limit: too many autonomous sends in this window' },
+      { status: 429 },
+    );
   }
 
   // Validate contact belongs to this space — the spaceId check is the

@@ -2,7 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendFollowUpDigest } from '@/lib/email';
 import { sendSMS, followUpReminderSMS } from '@/lib/sms';
+import { Redis } from '@upstash/redis';
 
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL ?? '',
+  token: process.env.KV_REST_API_TOKEN ?? '',
+});
+
+/**
+ * GET /api/cron/follow-up-reminders
+ *
+ * Daily at 9 AM UTC. Emails + texts realtors a digest of contacts whose
+ * followUpAt has come due in the last 24 hours.
+ *
+ * Idempotency: a SETNX day-lock prevents a duplicate cron invocation
+ * (Vercel retry, manual re-trigger) from double-blasting every realtor
+ * with two identical "you have 3 follow-ups today" notifications.
+ */
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
@@ -12,6 +28,16 @@ export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Day-level idempotency. The realtor schedule revolves around days,
+  // so locking by UTC date is the right granularity. 25h TTL absorbs
+  // any clock skew or DST edge case without going stale.
+  const today = new Date().toISOString().slice(0, 10);
+  const lockKey = `cron-lock:follow-up-reminders:${today}`;
+  const claimed = await redis.set(lockKey, '1', { nx: true, ex: 25 * 60 * 60 });
+  if (claimed !== 'OK') {
+    return NextResponse.json({ ok: true, skipped: 'already_ran_today', date: today });
   }
 
   const now = new Date();
