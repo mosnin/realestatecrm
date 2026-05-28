@@ -100,7 +100,7 @@ If a feature looks like it needs a new dep, the bar is high — it almost never 
 |---|---|
 | Default button background | `bg-foreground` (black) — **never** brand |
 | Page background | `bg-background` |
-| Card / row hover | `hover:bg-muted/30` (or `bg-foreground/[0.04]` for ghost buttons — same family) |
+| Card / row hover | `hover:bg-foreground/[0.04]` (preferred; matches the ghost-button vocabulary). `hover:bg-muted/30` is a legacy alias still in use across older surfaces — both legal, but new code should reach for `bg-foreground/[0.04]` because it lands tactile in light mode where muted/30 nearly disappears. |
 | Hairline divider / border | `border-border/60` between sections, `border-border/70` on cards |
 | Empty-state container | `bg-muted/20` + `border-dashed border-border/70` + `rounded-xl` |
 | Section heading text | `text-muted-foreground` |
@@ -108,17 +108,24 @@ If a feature looks like it needs a new dep, the bar is high — it almost never 
 
 ### The brand orange rule
 
-Brand orange (`--brand`, `text-orange-500`, `text-orange-600 dark:text-orange-400`) lives in **only these places**:
+Brand orange (`--brand`, `text-orange-500`, `text-orange-600 dark:text-orange-400`) lives in **only these five places**:
 
-1. The logo.
-2. The Chippi avatar / chip widget.
-3. `AgentGeneratedBadge` and similar "this came from Chippi" cues.
-4. Agent-output activity bars and progress fills.
-5. The lead-warm tier (mustard, not orange — but conceptually related).
+| Context (constant in `lib/colors.ts`) | Where |
+|---|---|
+| `LOGO` | The logo + wordmark |
+| `CHIPPI_AVATAR` | The chip widget representing Chippi in composer, header, toast |
+| `AGENT_BADGE` | Authorship pill on AgentDraft rows, conversation messages, activity rows |
+| `ACTIVITY_BAR` | Progress fill on autonomous-run activity bars and in-flight indicators |
+| `LEAD_WARM` | Lead-warm tier indicator (mustard, not orange — but conceptually adjacent) |
 
 It does **not** appear on default buttons, primary CTAs, links, focus rings,
 nav, or "active" indicators. Those are all foreground (black/white). If you
 catch yourself reaching for orange on a non-Chippi element, that's the bug.
+
+The five contexts are codified as `BRAND_ORANGE_CONTEXTS` in `lib/colors.ts`,
+along with a `brandOrange()` wrapper for tagging deliberate usage. Adding a
+sixth context requires deleting one of the existing five — discipline lives
+in the constraint, not in this paragraph.
 
 ---
 
@@ -301,9 +308,11 @@ introduce a third.
 **Paper-flat is the rule.** The redesign deliberately removed shadows from
 buttons, inputs, cards, and the outline button variant. If you find yourself
 reaching for a `shadow-*` class on a product surface, the answer is almost
-always no — use a hairline border instead.
+always no — use a hairline border instead. On a *selected* state, use a
+`ring-2 ring-foreground/10 ring-offset-2` ring instead of `shadow-sm` —
+same lift signal without breaking the paper feel.
 
-Shadows live in exactly four places:
+Shadows live in exactly four places at the system level:
 
 | Where | Class | Why |
 |---|---|---|
@@ -317,6 +326,14 @@ Marketing pages (`app/features/*`, `components/ui/hero-section-1.tsx`,
 `shadow-2xl`. **The product does not.** When working in `app/s/[slug]/*`,
 `app/broker/*`, or any dashboard component, leave shadows in the marketing
 layer and use borders instead.
+
+### Enforcement
+
+`tests/style/no-shadow-on-product-chrome.test.ts` fails CI when a
+shadow class appears in a strict directory outside the allowlist.
+The strict directory list grows one at a time as we audit + clean
+surfaces — promoting a directory is a one-way door. The file's
+`STRICT_DIRS_TODO` list shows the migration backlog.
 
 ---
 
@@ -865,10 +882,12 @@ app/globals.css                  Theme tokens, CSS variables, Clerk overrides
 lib/typography.ts                Type scale, spacing rhythm, primary pill, ghost pill
 lib/motion.ts                    Eases, durations, stagger + dialog variants
 lib/color.ts                     pickContrastColor() helper
+lib/colors.ts                    BRAND_ORANGE_CONTEXTS — the five places orange is allowed
 components/ui/button.tsx         The only canonical button
 components/ui/empty-state.tsx    Empty-state component (use it)
 components/motion/stagger-list.tsx   StaggerList + StaggerItem (use them)
 components/agent/agent-generated-badge.tsx   Chippi-stamp on agent-authored content
+tests/style/no-shadow-on-product-chrome.test.ts   CI enforcement of the paper-flat rule
 ```
 
 If you find a screen doing something this file doesn't sanction, the screen
