@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
+import { checkStudioSpendBudget } from '@/lib/studio/spend';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
 
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest) {
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Too many Studio edits for this workspace. Try again in an hour.' },
+      { status: 429 },
+    );
+  }
+
+  // Daily spend cap — shared budget with the realtor-facing routes.
+  const budget = await checkStudioSpendBudget(spaceId);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      { error: `Daily generation cap reached ($${budget.spentUsd.toFixed(2)} / $${budget.capUsd.toFixed(2)}).` },
       { status: 429 },
     );
   }

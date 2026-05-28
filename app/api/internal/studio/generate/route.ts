@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioGeneration, StudioGenerationError } from '@/lib/studio/generate';
+import { checkStudioSpendBudget } from '@/lib/studio/spend';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -48,6 +49,17 @@ export async function POST(req: NextRequest) {
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Too many Studio generations for this workspace. Try again in an hour.' },
+      { status: 429 },
+    );
+  }
+
+  // Daily spend cap — shared with the realtor-facing route. If the agent
+  // path and human path both burn budget, this catches the combined total
+  // before fal.ai is called.
+  const budget = await checkStudioSpendBudget(spaceId);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      { error: `Daily generation cap reached ($${budget.spentUsd.toFixed(2)} / $${budget.capUsd.toFixed(2)}).` },
       { status: 429 },
     );
   }

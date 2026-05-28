@@ -12,6 +12,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioGeneration, StudioGenerationError } from '@/lib/studio/generate';
+import { checkStudioSpendBudget } from '@/lib/studio/spend';
 
 export const runtime = 'nodejs';
 // Video models run for a few minutes — give the request room.
@@ -39,6 +40,21 @@ export async function POST(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many generations. Try again in a little while.' },
+      { status: 429 },
+    );
+  }
+
+  // Per-space daily spend cap. The per-user rate limit bounds throughput
+  // (60/hr) but not cost — a runaway loop at the most expensive model
+  // could burn $720/day before anyone noticed. This catches the
+  // compromised-account and runaway-agent paths before fal.ai is
+  // called. Tunable via STUDIO_DAILY_SPEND_CAP_USD env, default $50.
+  const budget = await checkStudioSpendBudget(space.id);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      {
+        error: `Daily generation limit reached ($${budget.spentUsd.toFixed(2)} / $${budget.capUsd.toFixed(2)}). Resets in 24 hours, or contact support to raise the cap.`,
+      },
       { status: 429 },
     );
   }

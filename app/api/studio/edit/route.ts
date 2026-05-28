@@ -20,6 +20,7 @@ import { falConfigured } from '@/lib/studio/fal';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
+import { checkStudioSpendBudget } from '@/lib/studio/spend';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -46,6 +47,19 @@ export async function POST(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many edits. Try again in a little while.' },
+      { status: 429 },
+    );
+  }
+
+  // Per-space daily spend cap. Shared budget with /api/studio/generate
+  // — both routes deduct from the same StudioGeneration table, so
+  // checkStudioSpendBudget reflects the realtor's total day's burn.
+  const budget = await checkStudioSpendBudget(space.id);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      {
+        error: `Daily generation limit reached ($${budget.spentUsd.toFixed(2)} / $${budget.capUsd.toFixed(2)}). Resets in 24 hours, or contact support to raise the cap.`,
+      },
       { status: 429 },
     );
   }
