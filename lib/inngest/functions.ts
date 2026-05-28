@@ -14,6 +14,13 @@ import { inngest } from './client';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { publishToPlatform } from '@/lib/studio/publish';
+import { findByComposioId } from '@/lib/integrations/connections';
+import {
+  dispatchTrigger,
+  findByComposioTriggerId,
+  stampFired,
+} from '@/lib/integrations/triggers';
+import { logger } from '@/lib/logger';
 
 interface LoadedPost {
   status: string;
@@ -137,5 +144,111 @@ export const publishScheduledPost = inngest.createFunction(
     });
 
     return { postId, posted: anyOk, results };
+  },
+);
+
+/**
+ * handleComposioTrigger — receives `composio/trigger.received` events from
+ * the /api/webhooks/composio receiver. The receiver has already verified
+ * the HMAC signature, deduped the delivery, and rate-capped the source;
+ * this function's job is to:
+ *
+ *   1. Resolve the IntegrationConnection (by composioConnectionId) and
+ *      IntegrationTrigger (by composioTriggerId) so we can act on the
+ *      realtor's space/user. If either is missing or non-active, drop.
+ *   2. Hand off to `dispatchTrigger`, which routes the event to one of
+ *      DRAFT (autonomous Modal run), NOTICE (activity card — Phase 4),
+ *      DATA_SYNC (direct DB write — Phase 4).
+ *   3. Stamp `lastFiredAt` on the trigger row so the health endpoint can
+ *      surface stale registrations.
+ *
+ * Inngest retries on a thrown error. The downstream paths (`fireRoutineRun`
+ * etc.) are idempotent on (space, instruction) by design — a retry that
+ * re-fires Modal would at worst produce a duplicate draft, which the
+ * realtor can dismiss. We accept that risk over the alternative of
+ * eating the error and losing the event.
+ */
+export const handleComposioTrigger = inngest.createFunction(
+  {
+    id: 'composio-handle-trigger',
+    triggers: [{ event: 'composio/trigger.received' }],
+  },
+  async ({ event, step }) => {
+    const data = event.data as {
+      deliveryId: string;
+      triggerSlug: string;
+      toolkitSlug: string;
+      composioConnectionId: string;
+      composioTriggerId: string;
+      userId: string;
+      payload: Record<string, unknown>;
+    };
+
+    // 1. Resolve the connection. If it's gone (mid-disconnect) or non-active,
+    //    drop the event. The receiver already verified the signature so we
+    //    know the delivery is authentic — we just no longer care about it.
+    const connection = await step.run('resolve-connection', async () => {
+      return findByComposioId(data.composioConnectionId);
+    });
+    if (!connection) {
+      logger.info('[composio.trigger] no IntegrationConnection — dropping', {
+        composioConnectionId: data.composioConnectionId,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'no_connection' };
+    }
+    if (connection.status !== 'active') {
+      logger.info('[composio.trigger] connection not active — dropping', {
+        connectionId: connection.id,
+        status: connection.status,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'connection_inactive' };
+    }
+
+    // 2. Resolve the trigger row. Missing = stale registration (Composio
+    //    sent for a trigger we don't track) — drop silently. Paused =
+    //    realtor turned it off; the receiver doesn't know that, the
+    //    handler does.
+    const triggerRow = await step.run('resolve-trigger', async () => {
+      return findByComposioTriggerId(data.composioTriggerId);
+    });
+    if (!triggerRow) {
+      logger.info('[composio.trigger] no IntegrationTrigger — dropping', {
+        composioTriggerId: data.composioTriggerId,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'no_trigger' };
+    }
+    if (triggerRow.status !== 'active') {
+      logger.info('[composio.trigger] trigger paused — dropping', {
+        triggerRowId: triggerRow.id,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'trigger_paused' };
+    }
+
+    // 3. Dispatch. The dispatcher is the single place that decides DRAFT
+    //    vs NOTICE vs DATA_SYNC vs no-op based on the slug.
+    const result = await step.run('dispatch', async () => {
+      return dispatchTrigger({
+        triggerSlug: data.triggerSlug,
+        connection,
+        payload: data.payload,
+      });
+    });
+
+    // 4. Stamp lastFiredAt only on a real dispatch — a no-op shouldn't
+    //    look like a successful fire on the health endpoint.
+    if (result.dispatched !== 'noop') {
+      await step.run('stamp-fired', () => stampFired(triggerRow.id));
+    }
+
+    return {
+      deliveryId: data.deliveryId,
+      triggerSlug: data.triggerSlug,
+      connectionId: connection.id,
+      ...result,
+    };
   },
 );

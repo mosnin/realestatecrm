@@ -53,6 +53,18 @@ vi.mock('@/lib/integrations/composio', () => ({
   deleteConnection: composioDeleteMock,
 }));
 
+// ── Triggers mock — revoke now cleans up trigger subscriptions before ─
+// flipping the connection. This test file owns the connections contract,
+// not the triggers one, so we stub deleteForConnection to a no-op and
+// let `tests/lib/integrations-triggers.test.ts` own the trigger-cleanup
+// behaviour in isolation.
+const { deleteForConnectionMock } = vi.hoisted(() => ({
+  deleteForConnectionMock: vi.fn(async () => undefined),
+}));
+vi.mock('@/lib/integrations/triggers', () => ({
+  deleteForConnection: deleteForConnectionMock,
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
