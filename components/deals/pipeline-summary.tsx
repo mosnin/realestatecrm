@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
@@ -27,6 +27,15 @@ interface PipelineSummaryProps {
   onFocusChange: (next: BoardFocus) => void;
   /** Called from the narration line when the page is empty. */
   onAddDeal: () => void;
+  /** Bumped by the parent after the kanban refetches (deal created,
+   *  deleted, status changed). Forces this stat strip to re-fetch so the
+   *  KPI numbers don't go stale right after the realtor adds a deal. */
+  refreshKey?: number;
+  /** Server-pre-fetched stages for this pipeline. Lets the first paint
+   *  carry real KPI numbers instead of zeros that animate up after the
+   *  client round-trip. The component still re-fetches on `refreshKey`
+   *  bumps so post-mutation updates keep flowing. */
+  initialStages?: StageWithDeals[];
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
@@ -61,35 +70,57 @@ export function PipelineSummary({
   focus,
   onFocusChange,
   onAddDeal,
+  refreshKey = 0,
+  initialStages,
 }: PipelineSummaryProps) {
-  const [stages, setStages] = useState<StageWithDeals[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stages, setStages] = useState<StageWithDeals[]>(initialStages ?? []);
+  // When the server pre-fetched stages, the first paint is already truthful
+  // and we don't need a skeleton. Without initialStages, the strip starts in
+  // a quiet loading state.
+  const [loading, setLoading] = useState(!initialStages);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
-        );
-        if (!res.ok) {
-          if (!cancelled) setStages([]);
-          return;
-        }
-        const data: StageWithDeals[] = await res.json();
-        if (!cancelled) setStages(Array.isArray(data) ? data : []);
-      } catch {
-        if (!cancelled) setStages([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
+      );
+      if (!res.ok) {
+        setStages([]);
+        return;
       }
+      const data: StageWithDeals[] = await res.json();
+      setStages(Array.isArray(data) ? data : []);
+    } catch {
+      setStages([]);
     }
-    load();
+  }, [slug, pipelineId]);
+
+  // Re-fetch on initial mount and whenever the parent bumps refreshKey (the
+  // kanban below bumps it after every mutation). Subscribing directly to
+  // Supabase realtime here would coalesce with the kanban's Deal channel —
+  // either component's unmount would tear down the other's subscription —
+  // so a parent-driven counter is the safer signal.
+  //
+  // When `initialStages` is provided AND we haven't yet seen a refresh
+  // signal (refreshKey === 0) the server payload is the freshest data we
+  // have, so we skip the initial fetch entirely. Subsequent bumps still
+  // trigger a re-fetch.
+  const hasInitialServerData = Boolean(initialStages);
+  useEffect(() => {
+    if (hasInitialServerData && refreshKey === 0) {
+      // Server gave us data on the first render; no need to round-trip.
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      await load();
+      if (!cancelled) setLoading(false);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [slug, pipelineId]);
+  }, [load, refreshKey, hasInitialServerData]);
 
   const stats: PipelineStats = useMemo(() => {
     const allDeals = stages.flatMap((s) => s.deals ?? []);

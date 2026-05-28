@@ -116,7 +116,7 @@ export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
         alert(data.error ?? 'Failed to create API key.');
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setCreating(false);
     }
@@ -143,7 +143,7 @@ export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
         alert(data.error ?? 'Failed to delete key.');
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setDeletingId(null);
     }

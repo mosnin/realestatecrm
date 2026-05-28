@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { getSignedDownloadUrl } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import { IntakeChat } from '@/components/intake-chat/intake-chat';
@@ -8,7 +10,34 @@ import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+
+/** viewport-fit=cover lets the page draw under the iOS notch / status-bar
+ *  area instead of leaving a body-coloured strip above the cover photo.
+ *  Same treatment /p/[slug] uses — the intake is the realtor's storefront,
+ *  it should feel flush to the device. Non-iOS browsers ignore this; free
+ *  fix everywhere else. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
+/** Mirror of /p/[slug]: photos are stored as private object KEYS, so sign
+ *  a 24h URL for render. Legacy http(s) values pass through verbatim. */
+async function resolveStoredPhoto(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return await getSignedDownloadUrl(value, 60 * 60 * 24);
+  } catch (err) {
+    logger.warn('[apply/[slug]] signed url failed', {
+      keyPreview: value.slice(0, 60),
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
 
 // Do not cache this page.
 // Intake form customization should appear immediately after save, and stale
@@ -51,11 +80,13 @@ export default async function PublicApplyPage({
   if (!space) notFound();
 
   // Parallel queries — both depend on space but run simultaneously
-  // Use two queries: one for core fields (always exist), one for customization (may not exist yet)
-  const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
+  // Use two queries: one for core fields (always exist), one for customization (may not exist yet).
+  // ProfilePage is read so the intake hero can reach for the same cover photo
+  // the public /p/[slug] surface already renders — single source of identity material.
+  const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }, { data: profileRow }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, privacyPolicyHtml')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, privacyPolicyHtml, isVerified')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -76,6 +107,11 @@ export default async function PublicApplyPage({
       .from('User')
       .select('name, avatar, clerkId')
       .eq('id', space.ownerId)
+      .maybeSingle(),
+    supabase
+      .from('ProfilePage')
+      .select('coverPhotoUrl, profilePhotoUrl')
+      .eq('spaceId', space.id)
       .maybeSingle(),
   ]);
 
@@ -112,15 +148,24 @@ export default async function PublicApplyPage({
     rentalFormConfig: import('@/lib/types').IntakeFormConfig | null;
     buyerFormConfig: import('@/lib/types').IntakeFormConfig | null;
     trackingPixels: TrackingPixelsType | null;
+    isVerified: boolean | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Application';
   const pageIntro = settings?.intakePageIntro || "Share your preferences and we'll follow up with next steps.";
   const businessName = settings?.businessName || space.name;
   const agentName = ownerData?.name || businessName;
+  const isVerified = settings?.isVerified === true;
 
-  // Get agent photo: SpaceSetting > User.avatar > Clerk profile photo
-  let agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
+  // Photo resolution chain (matches /p/[slug] so identity is consistent across surfaces):
+  //   profilePhotoUrl (ProfilePage) → realtorPhotoUrl (SpaceSetting) → User.avatar → Clerk imageUrl.
+  // Storage values may be private object keys — sign them in parallel.
+  const [profilePagePhoto, realtorPhotoFromStorage, coverPhotoUrl] = await Promise.all([
+    resolveStoredPhoto(profileRow?.profilePhotoUrl ?? null),
+    resolveStoredPhoto(settings?.realtorPhotoUrl ?? ownerData?.avatar ?? null),
+    resolveStoredPhoto(profileRow?.coverPhotoUrl ?? null),
+  ]);
+  let agentPhoto: string | null = profilePagePhoto ?? realtorPhotoFromStorage ?? null;
   if (!agentPhoto && ownerData?.clerkId) {
     try {
       const clerk = await clerkClient();
@@ -234,9 +279,13 @@ export default async function PublicApplyPage({
       {isPreview && <PreviewBridge />}
       <TrackingPixels pixels={trackingPixels} />
       <IntakeChatShell
+        businessName={businessName}
         agentName={agentName}
         agentPhoto={agentPhoto}
-        secondaryLabel={businessName !== agentName ? businessName : null}
+        coverPhotoUrl={coverPhotoUrl}
+        logoUrl={logoUrl}
+        isVerified={isVerified}
+        profileHref={`/p/${slug}`}
         accentColor={customization.accentColor}
         privacyPolicyUrl={customization.privacyPolicyUrl}
         termsUrl={`/apply/${slug}/terms`}

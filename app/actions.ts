@@ -1,7 +1,6 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { redis } from '@/lib/redis';
 import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { getSpaceForUser } from '@/lib/space';
@@ -26,7 +25,6 @@ export async function deleteSlugAction(
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) return { error: 'Forbidden' };
 
-  await redis.del(`slug:${slug}`).catch(() => null);
   const { error: deleteError } = await supabase.from('Space').delete().eq('slug', slug);
   if (deleteError) return { error: 'Failed to delete space' };
   revalidatePath('/admin');

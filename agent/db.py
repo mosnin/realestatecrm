@@ -25,12 +25,45 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Any, Iterable
 
 import asyncpg
 
 from config import settings
+
+
+# Recognises ISO-8601 datetime strings the agent tools produce via
+# `datetime.isoformat()`. Tolerates trailing 'Z' and explicit offsets.
+# Date-only ('YYYY-MM-DD') is *not* coerced — asyncpg accepts those for
+# `date` columns directly via the str adapter.
+_ISO_DT_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$"
+)
+
+
+def _coerce_param(value: Any) -> Any:
+    """Convert ISO-8601 datetime strings to real `datetime` objects.
+
+    asyncpg refuses to bind a `str` to a `timestamp`/`timestamptz` parameter
+    — it raises "expected a datetime.date or datetime.datetime instance,
+    got 'str'". The agent tools historically called `.isoformat()` before
+    handing the value back to the query builder; coerce here so callers
+    don't each have to remember the rule.
+    """
+    if isinstance(value, str) and _ISO_DT_RE.match(value):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            # Naive datetimes are treated as UTC — same convention every
+            # tool already follows when parsing inbound ISO strings.
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            return value
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -296,19 +329,19 @@ class QueryBuilder:
         if op == "is":
             if f.value is None or (isinstance(f.value, str) and f.value.lower() == "null"):
                 return f"{col} IS NULL", idx
-            params.append(f.value)
+            params.append(_coerce_param(f.value))
             return f"{col} IS NOT DISTINCT FROM ${idx}", idx + 1
         if op == "is_not":
             if f.value is None or (isinstance(f.value, str) and f.value.lower() == "null"):
                 return f"{col} IS NOT NULL", idx
-            params.append(f.value)
+            params.append(_coerce_param(f.value))
             return f"{col} IS DISTINCT FROM ${idx}", idx + 1
         if op == "in":
             if not f.value:
                 return "FALSE", idx
             placeholders = []
             for v in f.value:
-                params.append(v)
+                params.append(_coerce_param(v))
                 placeholders.append(f"${idx}")
                 idx += 1
             return f"{col} IN ({', '.join(placeholders)})", idx
@@ -318,7 +351,7 @@ class QueryBuilder:
         }.get(op)
         if sql_op is None:
             raise ValueError(f"Unsupported filter op: {op}")
-        params.append(f.value)
+        params.append(_coerce_param(f.value))
         return f"{col} {sql_op} ${idx}", idx + 1
 
     # ── execute paths ──────────────────────────────────────────────────
@@ -376,7 +409,7 @@ class QueryBuilder:
         for row in rows:
             placeholders = []
             for c in cols:
-                params.append(row.get(c))
+                params.append(_coerce_param(row.get(c)))
                 placeholders.append(f"${len(params)}")
             value_clauses.append("(" + ", ".join(placeholders) + ")")
 
@@ -395,7 +428,7 @@ class QueryBuilder:
         params: list[Any] = []
         set_parts = []
         for k, v in self._payload.items():
-            params.append(v)
+            params.append(_coerce_param(v))
             set_parts.append(f'"{k}" = ${len(params)}')
 
         where_sql, _ = self._build_where(params, len(params) + 1)
@@ -451,7 +484,7 @@ class QueryBuilder:
         for row in rows:
             placeholders = []
             for c in cols:
-                params.append(row.get(c))
+                params.append(_coerce_param(row.get(c)))
                 placeholders.append(f"${len(params)}")
             value_clauses.append("(" + ", ".join(placeholders) + ")")
 
@@ -497,7 +530,7 @@ class _RpcCall:
         keys = list(self.params.keys())
         if keys:
             arg_sql = ", ".join(f'"{k}" => ${i + 1}' for i, k in enumerate(keys))
-            values = [self.params[k] for k in keys]
+            values = [_coerce_param(self.params[k]) for k in keys]
         else:
             arg_sql = ""
             values = []

@@ -76,8 +76,18 @@ image = (
         # release. openai-agents is pre-1.0 — translate() matches its event
         # class names by name — so it is held to the 0.0.x line. Keep these
         # in sync with agent/pyproject.toml.
+        #
+        # openai is capped below 1.97 — at 1.97 the SDK made `logprobs`
+        # required on ResponseTextDeltaEvent. openai-agents 0.0.x streams
+        # chat-completions chunks from non-OpenAI providers (OpenRouter)
+        # WITHOUT logprobs, so a chat turn dies with
+        # `1 validation error for ResponseTextDeltaEvent / logprobs /
+        # Field required` before the first token reaches the client.
+        # Upstream fixes shipped in openai-python (PR #2500) and
+        # openai-agents 0.2.x (PR #1246); neither is in the version line
+        # we're pinned to. Stay below the openai schema change.
         "openai-agents>=0.0.15,<0.1",
-        "openai>=1.75.0,<2",
+        "openai>=1.75.0,<1.97",
         "asyncpg>=0.30.0,<1",
         "pydantic>=2.11.0,<3",
         "pydantic-settings>=2.9.0,<3",
@@ -189,6 +199,16 @@ async def run_now_webhook(item: dict) -> dict:
             raw_instruction.strip()[:600] if isinstance(raw_instruction, str) else ""
         )
 
+        # Optional: workspace owner's Clerk userId, pre-resolved by the
+        # caller (e.g. /api/cron/routines). Passing it here skips the
+        # Modal-side Space → User lookup and avoids the silent-null path
+        # where integrations fail to load. Falls back to server-side
+        # resolution when absent.
+        raw_user_id = item.get("user_id")
+        user_id = (
+            raw_user_id.strip() if isinstance(raw_user_id, str) else ""
+        )
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -207,6 +227,7 @@ async def run_now_webhook(item: dict) -> dict:
             Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
             AgentSettings.model_validate(sr.data),
             instruction=instruction or None,
+            owner_clerk_id=user_id or None,
         )
         return {"ok": True, "space_id": space_id}
 
@@ -267,8 +288,15 @@ async def chat_turn(item: dict):
     import json
     import os
     import sys
+    import time
     import uuid
     from typing import Any
+
+    # Wall-clock anchor for the per-turn latency log emitted at end-of-stream.
+    # Powers the curated-vs-dispatcher latency comparison in
+    # docs/integrations-perf-measurement.md — without this log line the
+    # measurement plan has nothing to bucket on.
+    _turn_started_at = time.monotonic()
 
     sys.path.insert(0, "/app")
 
@@ -294,6 +322,28 @@ async def chat_turn(item: dict):
     attachments = item.get("attachments") or []
     conversation_id = item.get("conversation_id") or ""
 
+    # ── Mode dispatch — realtor (default) vs. broker ────────────────────
+    # The Next.js layer sends `mode: 'realtor' | 'broker'` so this function
+    # picks the right agent (different system prompt + different tool set)
+    # without forking the SSE plumbing. Realtor stays the historical
+    # default — older Next.js deploys that don't send `mode` keep working.
+    #
+    # Broker mode also carries `brokerage_id` + `broker_role` from the
+    # API-gate's `resolveBrokerContext()`. These flow into AgentContext
+    # so the per-tool guard (`tools/broker/_guards.py:require_broker_role`,
+    # defense layer 3) can refuse a call whose context isn't broker-shaped.
+    raw_mode = item.get("mode")
+    mode = (raw_mode or "realtor").strip().lower() if isinstance(raw_mode, str) else "realtor"
+    if mode not in ("realtor", "broker"):
+        mode = "realtor"
+    brokerage_id = (item.get("brokerage_id") or "").strip() if isinstance(item.get("brokerage_id"), str) else ""
+    broker_role = (item.get("broker_role") or "").strip().lower() if isinstance(item.get("broker_role"), str) else ""
+    # Broker mode must arrive with both context fields. The Next.js API
+    # gate is the single point that should ever produce them; missing
+    # either is a wiring bug, not a recoverable state.
+    if mode == "broker" and (not brokerage_id or broker_role not in ("broker_owner", "broker_admin")):
+        return {"error": "broker mode requires brokerage_id and a broker role"}
+
     from db import supabase
     db = await supabase()
 
@@ -311,8 +361,9 @@ async def chat_turn(item: dict):
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
+    from chippi_broker import make_broker_agent
     from config import settings
-    from llm import extract_usage, fallback_models, resolve_chat_model
+    from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
     from tools.base import result_is_ok
 
     agent_settings = AgentSettings.model_validate(sr.data)
@@ -323,6 +374,9 @@ async def chat_turn(item: dict):
         agent_settings,
         run_id=conversation_id or f"chat-{uuid.uuid4()}",
         space_name=space.name,
+        user_id=user_id,
+        brokerage_id=brokerage_id,
+        broker_role=broker_role,
     )
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────
@@ -488,11 +542,21 @@ async def chat_turn(item: dict):
     # etc.) before building the agent. Empty list when user_id is missing
     # (older Next.js deploy) or no integrations configured. Best-effort:
     # a Composio outage degrades to native-tool-only chat, doesn't 500.
+    #
+    # Broker mode skips this entirely — the broker chat surface is the
+    # chief-of-staff agent and does not draft on a realtor's behalf from
+    # the broker's chat. Cross-realtor outreach is mediated by dedicated
+    # broker tools (Phase 3), not by Composio-loaded realtor connections.
     integration_tools: list = []
-    if user_id:
+    connected_toolkits: list[str] = []
+    if mode == "realtor" and user_id:
         try:
-            from integrations import load_integration_tools
+            from integrations import active_toolkits, load_integration_tools
 
+            # Pull the toolkit list up so we can both surface it to the
+            # model (workspace_info below) and use it to gate the
+            # dispatcher tools.
+            connected_toolkits = await active_toolkits(space_id, user_id)
             integration_tools = await load_integration_tools(space_id, user_id)
         except Exception as ie:  # noqa: BLE001
             logger.warning(
@@ -511,10 +575,21 @@ async def chat_turn(item: dict):
     if "localhost" in _app_url or "127.0.0.1" in _app_url:
         _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
+    # Tell the model which integrations the realtor actually has connected
+    # so it can route by name — "check my google calendar" maps to a
+    # connected `googlecalendar` toolkit, "send a slack DM" maps to `slack`.
+    # Without this, the model would have to first call find_integration_tool
+    # to discover what exists, wasting a turn.
+    _toolkit_line = (
+        f"- Connected integrations: {', '.join(sorted(connected_toolkits))}\n"
+        if connected_toolkits
+        else "- Connected integrations: (none)\n"
+    )
     workspace_info: str | None = (
         "# Your workspace\n"
         f"- Workspace: {space.name} (slug: {space.slug})\n"
         f"- Intake link (share with new leads): {intake_url}\n"
+        + _toolkit_line +
         "- Include the intake link in any contact-facing draft where it"
         " makes sense — when reaching out to a fresh lead, when asking a"
         " prospect to qualify, when nudging someone who never finished"
@@ -523,11 +598,23 @@ async def chat_turn(item: dict):
 
     async def event_stream():
         try:
-            chippi = make_chippi_agent(
-                extra_tools=integration_tools,
-                workspace_info=workspace_info,
-                model=resolved_model,
-            )
+            # ── Tool registry selection — Phase 2/3 plug into BROKER_TOOLS ──
+            # Phase 2 (read tools) and Phase 3 (write tools) for the broker
+            # variant only need to append entries to
+            # `agent/tools/broker.BROKER_TOOLS` — `make_broker_agent` reads
+            # the list at agent-build time. No edit to this dispatch needed
+            # when Phase 2 lands.
+            if mode == "broker":
+                chippi = make_broker_agent(
+                    workspace_info=workspace_info,
+                    model=resolved_model,
+                )
+            else:
+                chippi = make_chippi_agent(
+                    extra_tools=integration_tools,
+                    workspace_info=workspace_info,
+                    model=resolved_model,
+                )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
             yield f"data: {err}\n\n"
@@ -541,7 +628,10 @@ async def chat_turn(item: dict):
         streamed = False
 
         for attempt, model in enumerate(models):
-            chippi.model = model
+            # `model` is a string slug; wrap it in the SDK Model object so the
+            # OpenRouter slug routes via our configured client instead of the
+            # SDK's prefix dispatcher (which raises `Unknown prefix: x-ai`).
+            chippi.model = make_chat_model(model)
             try:
                 result = Runner.run_streamed(
                     chippi, input=input_items, context=ctx, run_config=run_config
@@ -561,6 +651,17 @@ async def chat_turn(item: dict):
                 )
                 done = json.dumps({"type": "done", "final_text": final_text})
                 yield f"data: {done}\n\n"
+
+                # End-of-turn latency anchor for the curated-vs-dispatcher
+                # comparison (docs/integrations-perf-measurement.md). Logged
+                # after the `done` frame so a slow telemetry write doesn't
+                # delay the realtor's last token.
+                logger.info(
+                    "chat_turn_finished",
+                    space_id=space_id,
+                    model=model,
+                    turn_latency_ms=int((time.monotonic() - _turn_started_at) * 1000),
+                )
 
                 # Record this turn's token cost for the Usage page. Best-effort:
                 # a telemetry failure must never surface as a chat error.

@@ -31,7 +31,7 @@ class PlanStep(BaseModel):
     description: str = ""
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def create_plan(
     ctx: RunContextWrapper[AgentContext],
     task: str,

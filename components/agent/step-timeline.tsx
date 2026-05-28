@@ -34,6 +34,17 @@ function truncate(str: string | undefined, max: number): string {
   return str.length <= max ? str : `${str.slice(0, max)}…`;
 }
 
+/** snake_case tool/step name → readable label. The step timeline renders the
+ *  same names the model sees ("send_email", "schedule_tour"), and dumping
+ *  raw snake_case into chrome makes the page read like a backend log. */
+function humanizeStepName(name: string): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return 'Step';
+  const spaced = trimmed.replace(/_/g, ' ').trim();
+  if (!spaced) return 'Step';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 function StepIcon({ stepType }: { stepType: string }) {
   if (stepType === 'tool_call') return <Wrench size={13} />;
   if (stepType === 'llm_call') return <MessageCircle size={13} />;
@@ -61,7 +72,7 @@ function StatusDot({ status }: { status: string }) {
 function StepRow({ step }: { step: Step }) {
   const [expanded, setExpanded] = useState(false);
   const duration = getDuration(step.startedAt, step.completedAt);
-  const label = step.toolName ?? step.stepType;
+  const label = humanizeStepName(step.toolName ?? step.stepType);
   const inputPreview = truncate(step.inputSummary, 80);
 
   return (

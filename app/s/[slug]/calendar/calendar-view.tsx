@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo, FormEvent } from 'react';
+import { useState, useMemo, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { H1, H2, H3, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
 import { cn } from '@/lib/utils';
 
@@ -207,7 +210,29 @@ export function CalendarView({
   const today = new Date();
   const todayKey = toDateKey(today);
 
-  const [view, setView] = useState<ViewMode>('month');
+  // View is mirrored in `?view=` so the realtor can bookmark a preferred
+  // window (a buyer's agent doing 20+ tours/week lives in week view; an
+  // open-house weekend lives in day view). The URL is the source of truth
+  // on first paint; subsequent changes write back via replaceState so we
+  // don't add navigation entries.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlView = searchParams.get('view');
+  const initialView: ViewMode =
+    urlView === 'day' || urlView === 'week' ? urlView : 'month';
+  const [view, setView] = useState<ViewMode>(initialView);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === 'month') {
+      params.delete('view');
+    } else {
+      params.set('view', view);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentDate, setCurrentDate] = useState(today);
@@ -906,21 +931,42 @@ export function CalendarView({
         ))}
       </div>
 
-      {/* View mode tabs */}
-      <div className="flex items-center gap-1 border-b border-border">
-        {(['month', 'week', 'day'] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setView(mode)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              view === mode
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
-            }`}
-          >
-            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-          </button>
-        ))}
+      {/* View mode segmented control — same `motion.layoutId` sliding-pill
+          pattern as the documents-panel ModeToggle and the auth role
+          switcher. The active pill slides between positions instead of
+          fading; the chrome reads as one product. */}
+      <div
+        role="tablist"
+        aria-label="Calendar view"
+        className="relative inline-flex items-center gap-0.5 rounded-full bg-foreground/[0.04] p-1"
+      >
+        {(['day', 'week', 'month'] as const).map((mode) => {
+          const active = view === mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setView(mode)}
+              className={cn(
+                'relative z-10 inline-flex items-center justify-center rounded-full px-4 h-7 text-[12.5px] font-medium transition-colors',
+                active
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {active && (
+                <motion.span
+                  layoutId="calendar-view-pill"
+                  className="absolute inset-0 z-[-1] rounded-full bg-background border border-border/70"
+                  transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Navigation */}

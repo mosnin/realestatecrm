@@ -62,6 +62,42 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 });
   }
 
+  // Record the removal in the deny-list so the removed agent can't silently
+  // rejoin via the still-circulating join code. ON CONFLICT DO NOTHING via
+  // upsert so re-removal doesn't error if the row already exists (defensive
+  // for any race or replay path). Re-hire still works through an explicit
+  // /api/invitations/[token] acceptance — that route doesn't consult this
+  // table. A broker can rescind by deleting the row.
+  //
+  // Look up the actor's User.id so removedById is the DB id, not the Clerk
+  // id. clerkId may be null in edge cases (auth() succeeded for ctx but the
+  // separate auth() call above returned null) — log + skip the attribution
+  // field rather than failing the removal.
+  let actorDbId: string | null = null;
+  if (clerkId) {
+    const { data: actorUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('clerkId', clerkId)
+      .maybeSingle();
+    actorDbId = (actorUser as { id?: string } | null)?.id ?? null;
+  }
+  const { error: removalErr } = await supabase
+    .from('BrokerageRemoval')
+    .upsert(
+      {
+        brokerageId: ctx.brokerage.id,
+        userId: membership.userId,
+        removedById: actorDbId,
+      },
+      { onConflict: 'brokerageId,userId' },
+    );
+  if (removalErr) {
+    // Non-fatal: the membership is already deleted, so the visible
+    // outcome the broker requested is done. Log so we can chase it.
+    console.error('[broker/members/delete] removal deny-list insert failed', removalErr);
+  }
+
   // Best-effort: unlink their Space from this brokerage
   await supabase
     .from('Space')

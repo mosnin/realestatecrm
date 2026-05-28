@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const { data: contacts } = await supabase
     .from('Contact')
-    .select('id, name, email, phone, budget, leadScore, scoreLabel, scoreSummary, applicationData, applicationStatus, createdAt')
+    .select('id, name, email, phone, budget, leadType, leadScore, scoreLabel, scoreSummary, applicationData, applicationStatus, createdAt')
     .eq('spaceId', auth.space.id)
     .in('id', ids);
 

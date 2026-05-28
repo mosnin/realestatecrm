@@ -23,7 +23,7 @@ export default async function StudioBrandPage({
           Brand
         </h1>
         <p className={BODY_MUTED}>
-          The look and voice Studio uses for everything it makes.
+          Logo, colors, fonts — applied to every generation.
         </p>
       </header>
       <BrandPanel />

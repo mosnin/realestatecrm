@@ -13,10 +13,16 @@ interface RightPanelProps {
   className?: string;
 }
 
+// `?embed=1` flips the dashboard layout into chrome-stripped mode so the
+// iframe shows ONLY the page content (the People list, Deals kanban,
+// Properties grid) — no nested sidebar, no nested header, no nested chat
+// bar. The outer Chippi already owns all of those. See `EmbedDetector`
+// in app/s/[slug]/layout.tsx and the `[data-chippi-embed='true']` rules
+// in app/globals.css.
 const TAB_PATHS: Record<RightPanelProps['activeTab'], (slug: string) => string> = {
-  people: (slug) => `/s/${slug}/contacts`,
-  deals: (slug) => `/s/${slug}/deals`,
-  properties: (slug) => `/s/${slug}/properties`,
+  people: (slug) => `/s/${slug}/contacts?embed=1`,
+  deals: (slug) => `/s/${slug}/deals?embed=1`,
+  properties: (slug) => `/s/${slug}/properties?embed=1`,
 };
 
 const TAB_LABELS: Record<RightPanelProps['activeTab'], string> = {

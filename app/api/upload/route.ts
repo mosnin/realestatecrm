@@ -4,7 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
-import { uploadObject, getPublicUrl, buildKey } from '@/lib/storage';
+import { uploadObject, getPublicUrl, buildKey, deleteObject, publicUrlToKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
 
@@ -85,7 +85,13 @@ export async function POST(req: NextRequest) {
     }
     const publicUrl = getPublicUrl(key);
 
-    // Auto-save to SpaceSetting based on type
+    // Auto-save to SpaceSetting based on type. Capture the previous URL
+    // FIRST so we can clean up the prior storage object — without this,
+    // every logo/photo/favicon swap leaked 2 MB into permanent Wasabi
+    // storage with no DB pointer back. link-thumb has no DB write here
+    // (the caller persists it), so its old objects aren't reachable
+    // from this route — the storage-gc cron would need to know about
+    // them, which is out of scope for this fix.
     const fieldMap: Record<string, string> = {
       logo: 'logoUrl',
       photo: 'realtorPhotoUrl',
@@ -93,9 +99,33 @@ export async function POST(req: NextRequest) {
     };
     const field = fieldMap[type];
     if (field) {
+      const { data: existing } = await supabase
+        .from('SpaceSetting')
+        .select(field)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      const previousValue = (existing as Record<string, string | null> | null)?.[field] ?? null;
+
       await supabase
         .from('SpaceSetting')
         .upsert({ spaceId: space.id, [field]: publicUrl }, { onConflict: 'spaceId' });
+
+      // Fire-and-forget the previous object cleanup. publicUrlToKey
+      // returns null for URLs that don't match our bucket shape (e.g.
+      // a Clerk-hosted URL or an external CDN someone pasted in) —
+      // we skip those rather than guess.
+      if (previousValue) {
+        const previousKey = publicUrlToKey(previousValue);
+        if (previousKey) {
+          void deleteObject(previousKey).catch((err) =>
+            console.warn('[upload] previous object delete failed', {
+              spaceId: space.id,
+              field,
+              err: err instanceof Error ? err.message : String(err),
+            }),
+          );
+        }
+      }
     }
 
     return NextResponse.json({ url: publicUrl });

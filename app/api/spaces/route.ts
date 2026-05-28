@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
 import crypto from 'crypto';
 import { audit } from '@/lib/audit';
@@ -175,7 +174,7 @@ export async function PATCH(req: NextRequest) {
     .eq('slug', slug);
   if (spaceError) {
     console.error('[PATCH /api/spaces] Space lookup error:', spaceError);
-    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
   }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -225,7 +224,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
       console.error('[PATCH /api/spaces] Space update error:', updateError);
-      return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+      return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
     }
     updatedRows = data!;
   } else {
@@ -307,21 +306,10 @@ export async function PATCH(req: NextRequest) {
     .select();
   if (settingsError) {
     console.error('[PATCH /api/spaces] Settings upsert error:', settingsError);
-    return NextResponse.json({ error: 'Failed to save settings. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't save settings — usually temporary." }, { status: 500 });
   }
 
-  // Update Redis cache
   const updatedSpace = updatedRows![0];
-  const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
-  if (existing) {
-    // If slug changed, delete old key and set new one
-    if (updatedSpace.slug !== slug) {
-      await redis.del(`slug:${slug}`).catch(() => null);
-      await redis.set(`slug:${updatedSpace.slug}`, { ...existing, slug: updatedSpace.slug, emoji: updatedSpace.emoji }).catch(() => null);
-    } else {
-      await redis.set(`slug:${slug}`, { ...existing, emoji }).catch(() => null);
-    }
-  }
 
   void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Space', resourceId: space.id, spaceId: space.id, req, metadata: updatedSpace.slug !== slug ? { oldSlug: slug, newSlug: updatedSpace.slug } : undefined });
 
@@ -348,7 +336,7 @@ export async function DELETE(req: NextRequest) {
     .eq('slug', slug);
   if (spaceError) {
     console.error('[DELETE /api/spaces] Space lookup error:', spaceError);
-    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Database hiccup — usually temporary." }, { status: 500 });
   }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -358,8 +346,6 @@ export async function DELETE(req: NextRequest) {
   if (!userSpace || space.id !== userSpace.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  await redis.del(`slug:${slug}`).catch(() => null);
 
   // Audit BEFORE delete so we still have the spaceId in the log
   void audit({
@@ -378,7 +364,7 @@ export async function DELETE(req: NextRequest) {
     .eq('slug', slug);
   if (deleteError) {
     console.error('[DELETE /api/spaces] Delete error:', deleteError);
-    return NextResponse.json({ error: 'Failed to delete workspace. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't delete workspace — usually temporary." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

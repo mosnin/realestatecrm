@@ -11,6 +11,7 @@ interface CompareContact {
   email: string | null;
   phone: string | null;
   budget: number | null;
+  leadType: 'rental' | 'buyer' | 'seller' | null;
   leadScore: number | null;
   scoreLabel: string | null;
   scoreSummary: string | null;
@@ -25,10 +26,12 @@ interface ApplicationCompareProps {
   onClose: () => void;
 }
 
-const COMPARE_FIELDS: Array<{ key: string; label: string; format?: (v: any) => string }> = [
+const COMPARE_FIELDS: Array<{ key: string; label: string; format?: (v: any, c?: CompareContact) => string }> = [
   { key: 'leadScore', label: 'Lead Score', format: (v) => v != null ? `${Math.round(v)}/100` : '—' },
   { key: 'scoreLabel', label: 'Tier', format: (v) => v || '—' },
-  { key: 'budget', label: 'Budget', format: (v) => v != null ? `$${Number(v).toLocaleString()}/mo` : '—' },
+  // Rentals quote monthly; buyers/sellers quote a purchase price. Per-row
+  // leadType decides whether to append /mo.
+  { key: 'budget', label: 'Budget', format: (v, c) => v != null ? `$${Number(v).toLocaleString()}${c?.leadType === 'rental' ? '/mo' : ''}` : '—' },
   { key: 'applicationStatus', label: 'Status', format: (v) => v || 'received' },
 ];
 
@@ -105,7 +108,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                   <td className="px-4 py-2 text-xs text-muted-foreground sticky left-0 bg-card">{field.label}</td>
                   {contacts.map((c) => {
                     const val = (c as any)[field.key];
-                    const display = field.format ? field.format(val) : (val ?? '—');
+                    const display = field.format ? field.format(val, c) : (val ?? '—');
                     const isFlag = field.key === 'scoreLabel';
                     return (
                       <td key={c.id} className="px-4 py-2">

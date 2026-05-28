@@ -11,9 +11,8 @@ import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
-import { AgentStatusBar } from '@/components/agent/agent-status-bar';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
-import { ChippiActivityToast } from '@/components/chippi/chippi-activity-toast';
+import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 
 
@@ -246,18 +245,20 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
+          sidebar/header/chat-bar via CSS. Mount near the root so the
+          flag is set before any layout reads it. */}
+      <EmbedDetector />
       <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
-        <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
-        <AgentStatusBar slug={slug} />
+        <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>
           {children}
         </LayoutShell>
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
       <ChippiBar slug={slug} />
-      <ChippiActivityToast />
       <CommandPalette slug={slug} />
     </div>
   );

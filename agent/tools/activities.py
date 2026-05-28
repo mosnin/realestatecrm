@@ -60,7 +60,7 @@ async def persist_log(
     return entry_id
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def log_activity_run(
     ctx: RunContextWrapper[AgentContext],
     action_type: str,

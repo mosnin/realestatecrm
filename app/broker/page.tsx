@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
+import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
@@ -129,6 +130,68 @@ export default async function BrokerOverviewPage() {
     ]);
 
   const draftStats = aggregateDraftStats((draftStatsRows ?? []) as DraftStatsRow[]);
+
+  // Commission KPI — GCI = value * commissionRate / 100 on won deals whose
+  // updatedAt falls in the window. Mirrors `agent/tools/broker/revenue.py`
+  // (the documented closedAt proxy is updatedAt on status='won' rows).
+  const nowDate = new Date();
+  const mtdStart = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1));
+  const ytdStart = new Date(Date.UTC(nowDate.getUTCFullYear(), 0, 1));
+
+  const wonYtdRowsRes =
+    spaceIds.length > 0
+      ? await supabase
+          .from('Deal')
+          .select('spaceId, value, commissionRate, updatedAt')
+          .in('spaceId', spaceIds)
+          .eq('status', 'won')
+          .gte('updatedAt', ytdStart.toISOString())
+          .limit(10000)
+      : { data: [] as Array<{ spaceId: string; value: number | null; commissionRate: number | null; updatedAt: string }> };
+
+  const wonYtdRows = (wonYtdRowsRes.data ?? []) as Array<{
+    spaceId: string;
+    value: number | null;
+    commissionRate: number | null;
+    updatedAt: string;
+  }>;
+
+  let mtdCommission = 0;
+  let ytdCommission = 0;
+  let mtdDealsClosed = 0;
+  const mtdBySpace: Record<string, number> = {};
+  const mtdStartMs = mtdStart.getTime();
+  for (const d of wonYtdRows) {
+    const gci =
+      d.value != null && d.commissionRate != null ? (d.value * d.commissionRate) / 100 : 0;
+    ytdCommission += gci;
+    const updatedMs = new Date(d.updatedAt).getTime();
+    if (updatedMs >= mtdStartMs) {
+      mtdCommission += gci;
+      mtdDealsClosed += 1;
+      if (gci > 0) {
+        mtdBySpace[d.spaceId] = (mtdBySpace[d.spaceId] ?? 0) + gci;
+      }
+    }
+  }
+
+  // Top realtor MTD — owner name keyed off the spaceId → space.ownerId map
+  // from the `members` rows we already fetched. We only label the cell when
+  // someone actually earned non-zero GCI this month.
+  let topRealtorMtd: { name: string; amount: number } | null = null;
+  let topSpaceId: string | null = null;
+  let topAmount = 0;
+  for (const [sId, amt] of Object.entries(mtdBySpace)) {
+    if (amt > topAmount) {
+      topAmount = amt;
+      topSpaceId = sId;
+    }
+  }
+  if (topSpaceId) {
+    const owner = members.find((m) => m.Space?.id === topSpaceId);
+    const name = owner?.User?.name?.split(' ')[0] ?? owner?.User?.name ?? 'Realtor';
+    topRealtorMtd = { name, amount: topAmount };
+  }
 
   const [applicationRows, leadRows] = await Promise.all([
     spaceIds.length > 0
@@ -294,6 +357,70 @@ export default async function BrokerOverviewPage() {
         </div>
       </section>
 
+      {/* Commission — money is the loudest signal. Hairline-divider grid
+          mirrors deal-quick-panel.tsx's snapshot vocabulary. Section header
+          drills into /broker/commissions for the per-deal breakdown. */}
+      <section>
+        <Link
+          href="/broker/commissions"
+          className="group/commission flex items-center gap-3 pb-3 border-b border-border/60"
+        >
+          <h2 className={SECTION_LABEL}>Commission</h2>
+          <ArrowRight
+            size={11}
+            className="text-muted-foreground/40 group-hover/commission:text-muted-foreground transition-colors"
+          />
+        </Link>
+        <div className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70 mt-4">
+          <div className="bg-background p-4">
+            <p className={SECTION_LABEL}>MTD commission</p>
+            <p
+              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+              style={TITLE_FONT}
+            >
+              {formatCompact(mtdCommission)}
+            </p>
+          </div>
+          <div className="bg-background p-4">
+            <p className={SECTION_LABEL}>YTD commission</p>
+            <p
+              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+              style={TITLE_FONT}
+            >
+              {formatCompact(ytdCommission)}
+            </p>
+          </div>
+          <div className="bg-background p-4">
+            <p className={SECTION_LABEL}>Top realtor (MTD)</p>
+            <p
+              className="text-2xl tracking-tight mt-1.5 text-foreground truncate"
+              style={TITLE_FONT}
+            >
+              {topRealtorMtd ? topRealtorMtd.name : <span className="text-muted-foreground">—</span>}
+            </p>
+            {topRealtorMtd && (
+              <p className="text-[11px] text-muted-foreground tabular-nums mt-1">
+                {formatCompact(topRealtorMtd.amount)}
+              </p>
+            )}
+          </div>
+          <div className="bg-background p-4">
+            <p className={SECTION_LABEL}>Deals closed MTD</p>
+            <p
+              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+              style={TITLE_FONT}
+            >
+              {mtdDealsClosed}
+            </p>
+          </div>
+        </div>
+        {mtdCommission === 0 && (
+          <p className="text-[13px] text-muted-foreground mt-3">
+            Quiet — no deals closed this month yet.
+          </p>
+        )}
+      </section>
+
       {/* Pending invitations — only when there are some */}
       {pendingInvitations.length > 0 && (
         <section>
@@ -338,9 +465,7 @@ export default async function BrokerOverviewPage() {
       {/* The swarm — your team today */}
       <section>
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-            Your team
-          </h2>
+          <h2 className={SECTION_LABEL}>Your team</h2>
           {activeMembers > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">{activeMembers}</span>
           )}
@@ -383,32 +508,32 @@ export default async function BrokerOverviewPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="font-medium text-foreground truncate">{name}</span>
-                        <span className="text-[11px] text-muted-foreground">{role}</span>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{role}</span>
                         {!onboard && (
-                          <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                          <span className="text-[11px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
                             invited — not joined
                           </span>
                         )}
                       </div>
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
                         {deals.count > 0 && (
-                          <span className="inline-flex items-center gap-1 tabular-nums">
+                          <span className="inline-flex items-center gap-1 tabular-nums whitespace-nowrap">
                             <Briefcase size={10} />
                             {deals.count} deal{deals.count === 1 ? '' : 's'} · ${formatCompact(deals.value)}
                           </span>
                         )}
                         {apps > 0 && (
-                          <span className="tabular-nums">
+                          <span className="tabular-nums whitespace-nowrap">
                             {apps} application{apps === 1 ? '' : 's'}
                           </span>
                         )}
                         {leads > 0 && (
-                          <span className="tabular-nums">
+                          <span className="tabular-nums whitespace-nowrap">
                             {leads} new lead{leads === 1 ? '' : 's'}
                           </span>
                         )}
                         {drafts > 0 && (
-                          <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 tabular-nums font-medium">
+                          <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 tabular-nums font-medium whitespace-nowrap">
                             <Inbox size={10} />
                             {drafts} draft{drafts === 1 ? '' : 's'} pending
                           </span>

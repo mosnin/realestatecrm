@@ -246,8 +246,26 @@ export async function setStatus(args: {
   }
 }
 
-/** Revoke at Composio AND mark our row revoked. Idempotent. */
+/** Revoke at Composio AND mark our row revoked. Idempotent.
+ *
+ * Order matters:
+ *   1. Trigger subscriptions go FIRST — otherwise Composio keeps
+ *      delivering webhooks for a connection we no longer track, the
+ *      receiver finds no IntegrationTrigger row, and the deliveries
+ *      become permanent noise (plus billable on Composio's side).
+ *   2. Then the connection itself.
+ *   3. Then our row status.
+ *
+ * The trigger cleanup is its own best-effort path — a Composio outage
+ * deleting one trigger doesn't block deleting the connection. Triggers
+ * we can't delete now will become orphans on Composio's side, but
+ * disconnect on our side still completes.
+ */
 export async function revoke(row: IntegrationConnectionRow): Promise<void> {
+  // Lazy import — connections.ts ← triggers.ts ← connections.ts (via the
+  // IntegrationConnectionRow type re-export) would otherwise be a cycle.
+  const { deleteForConnection } = await import('./triggers');
+  await deleteForConnection(row.id);
   await composioDelete(row.composioConnectionId);
   await setStatus({ id: row.id, status: 'revoked' });
 }

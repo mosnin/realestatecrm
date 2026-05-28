@@ -16,6 +16,7 @@
  *   property-photos/{spaceId}/{propertyId}/{uuid}-{filename}
  *   onboarding/{userId}/{uuid}-{filename}
  *   studio/{spaceId}/{uuid}-{filename}          — Studio-generated media
+ *   profile-cover/{spaceId}/{uuid}-{filename}   — realtor's public-page cover photo
  *
  * Public vs signed: feature attachments stay PRIVATE — we serve them via
  * `getSignedUrl()` with a short TTL. Property photos and avatars can be
@@ -28,6 +29,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   CopyObjectCommand,
+  ListObjectsV2Command,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -165,6 +167,110 @@ export async function deleteObject(key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
+/**
+ * List objects under a key prefix. Used by the storage-gc sweeper to diff
+ * the bucket against DB-tracked storage keys. Capped at `maxKeys` per
+ * page (S3 max is 1000); resumes with `continuationToken` for the next page.
+ *
+ * Returns object keys + their last-modified timestamps so the sweeper can
+ * skip very-recent uploads (sub-minute) — a race window where the DB row
+ * insert is still pending and a delete would be a self-inflicted orphan.
+ */
+export async function listObjectsByPrefix(args: {
+  prefix: string;
+  maxKeys?: number;
+  continuationToken?: string;
+}): Promise<{
+  keys: { key: string; lastModified: Date | null; size: number }[];
+  nextToken: string | null;
+  isTruncated: boolean;
+}> {
+  const client = getWasabiClient();
+  const bucket = getWasabiBucket();
+  const res = await client.send(
+    new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: args.prefix,
+      MaxKeys: args.maxKeys ?? 1000,
+      ContinuationToken: args.continuationToken,
+    }),
+  );
+  const keys = (res.Contents ?? [])
+    .map((obj) => ({
+      key: obj.Key ?? '',
+      lastModified: obj.LastModified ?? null,
+      size: obj.Size ?? 0,
+    }))
+    .filter((k) => k.key.length > 0);
+  return {
+    keys,
+    nextToken: res.NextContinuationToken ?? null,
+    isTruncated: Boolean(res.IsTruncated),
+  };
+}
+
+/**
+ * Best-effort batch delete. Fires every delete in parallel and swallows
+ * individual failures (logged via the caller, not here — this module
+ * doesn't import a logger). Returns the count that succeeded; the
+ * caller can compare against `keys.length` to detect partial failures.
+ *
+ * Used by entity-DELETE handlers to drop Wasabi objects when the
+ * underlying row is removed. A failure here orphans an object — the
+ * nightly storage-gc cron will catch it on the next sweep.
+ */
+export async function deleteObjectsBestEffort(keys: string[]): Promise<{
+  ok: number;
+  failed: { key: string; error: unknown }[];
+}> {
+  if (keys.length === 0) return { ok: 0, failed: [] };
+  const results = await Promise.allSettled(keys.map((k) => deleteObject(k)));
+  const failed: { key: string; error: unknown }[] = [];
+  let ok = 0;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') ok += 1;
+    else failed.push({ key: keys[i], error: r.reason });
+  });
+  return { ok, failed };
+}
+
+/**
+ * Reverse `getPublicUrl` — given a stored public photo URL, return the
+ * object key (e.g. `property-photos/sp_x/prop_y/uuid-name.jpg`). Returns
+ * null if the URL doesn't match our bucket's public shape, which makes the
+ * caller skip the delete instead of guessing.
+ *
+ * Used by Property DELETE: the `photos` column is a JSONB array of public
+ * URLs (legacy schema), and we need to map each one back to a key so we
+ * can clean up Wasabi when the row is removed.
+ */
+export function publicUrlToKey(url: string): string | null {
+  const customBase = process.env.WASABI_PUBLIC_BASE_URL;
+  const endpoint = process.env.WASABI_ENDPOINT ?? '';
+  const bucket = getWasabiBucket();
+
+  const candidates: string[] = [];
+  if (customBase) candidates.push(customBase.replace(/\/$/, ''));
+  if (endpoint) candidates.push(`${endpoint.replace(/\/$/, '')}/${bucket}`);
+
+  for (const base of candidates) {
+    if (!base) continue;
+    if (url.startsWith(`${base}/`)) {
+      const rest = url.slice(base.length + 1);
+      try {
+        // Decode each path segment — `getPublicUrl` percent-encodes them.
+        return rest
+          .split('/')
+          .map((seg) => decodeURIComponent(seg))
+          .join('/');
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 /** Encode each path segment without touching slashes (S3 treats them as
  *  hierarchy separators in the URL). */
 function encodeKey(key: string): string {
@@ -184,6 +290,8 @@ export const STORAGE_PREFIXES = {
   propertyPhotos: 'property-photos',
   onboarding: 'onboarding',
   studio: 'studio',
+  profileCover: 'profile-cover',
+  profilePhoto: 'profile-photo',
 } as const;
 
 /** Convenient key builder. Pass the prefix + the suffix segments and get a

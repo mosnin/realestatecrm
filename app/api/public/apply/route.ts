@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`apply:rl:${ip}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many submissions. Please try again later.' },
+      { error: 'Too many submissions. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -479,6 +479,32 @@ export async function POST(req: NextRequest) {
       logger.warn('[apply] idempotency lock unavailable; using DB fallback', { spaceId: space.id }, error);
     }
 
+    // Same-email dedupe across all time (case-insensitive). Submitting the
+     // same email twice always returns the existing contact — different name,
+     // different phone, days later, it doesn't matter. The 5-minute name+phone
+     // window below catches the "double-tap submit" case for emailless flows.
+     if (contactEmail) {
+      const { data: emailMatches, error: emailDupErr } = await supabase
+        .from('Contact')
+        .select('id, applicationRef')
+        .eq('spaceId', space.id)
+        .ilike('email', contactEmail)
+        .contains('tags', ['application-link'])
+        .order('createdAt', { ascending: false })
+        .limit(1);
+      if (!emailDupErr && emailMatches && emailMatches.length > 0) {
+        const match = emailMatches[0] as { id: string; applicationRef: string | null };
+        return NextResponse.json(
+          {
+            success: true,
+            id: match.id,
+            applicationRef: match.applicationRef ?? undefined,
+          },
+          { status: 200 },
+        );
+      }
+    }
+
     // Expanded window: 5 minutes (was 2 minutes)
     const duplicateCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: existingRecentLeads, error: dupError } = await supabase
@@ -624,7 +650,7 @@ export async function POST(req: NextRequest) {
       scoringStatus: 'failed',
       leadScore: null,
       scoreLabel: 'unscored',
-      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+      scoreSummary: 'Scoring unavailable right now. Lead saved.',
       scoreDetails: null,
     };
 
@@ -675,7 +701,7 @@ export async function POST(req: NextRequest) {
             scoringStatus: 'failed',
             leadScore: null,
             scoreLabel: 'unscored',
-            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+            scoreSummary: 'Scoring unavailable right now. Lead saved.',
             updatedAt: new Date().toISOString(),
           })
           .eq('id', contact.id);
@@ -743,6 +769,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     logger.error('[apply] unhandled submission failure', { slug: rawSlug }, error);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

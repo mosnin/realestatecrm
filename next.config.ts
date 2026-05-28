@@ -37,6 +37,13 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // jsdom (via isomorphic-dompurify on the server) ships a runtime CSS
+  // file. Webpack bundling rewrites the relative path so the file can't
+  // be found at request time, crashing /apply/[slug]/privacy's page-data
+  // collection with ENOENT default-stylesheet.css. Excluding the package
+  // makes Next.js require() it from node_modules instead, with intact
+  // relative paths.
+  serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
   async headers() {
     return [
       {

@@ -172,7 +172,7 @@ async def _persist_extraction(
         pass
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def read_attachment(
     ctx: RunContextWrapper[AgentContext],
     attachment_id: str,

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { deleteObjectsBestEffort, publicUrlToKey } from '@/lib/storage';
 import { _sanitisePropertyBody as sanitise } from '@/app/api/properties/route';
 
 async function resolve(userId: string, id: string) {
@@ -97,6 +98,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const ctx = await resolve(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  // `photos` is a JSONB array of public URLs (legacy schema decision).
+  // Reverse each URL back to a Wasabi key so we can clean up the bucket
+  // when the row is removed — otherwise listing photos for sold properties
+  // survive forever in storage, EXIF and all.
+  const rawPhotos = (ctx.property as { photos?: unknown }).photos;
+  const photoUrls = Array.isArray(rawPhotos)
+    ? rawPhotos.filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
+  const photoKeys = photoUrls
+    .map((u) => publicUrlToKey(u))
+    .filter((k): k is string => Boolean(k));
+
   // Linked deals/tours get ON DELETE SET NULL'd — the link vanishes, the
   // deal/tour survives with its string address intact.
   const { error } = await supabase
@@ -109,5 +122,21 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     logger.error('[properties/DELETE] failed', { propertyId: id }, error);
     return NextResponse.json({ error: 'Failed to delete property' }, { status: 500 });
   }
+
+  // Fire-and-forget the photo cleanup. Storage failure here orphans the
+  // object; the nightly storage-gc sweeper catches it on its next pass.
+  if (photoKeys.length > 0) {
+    void deleteObjectsBestEffort(photoKeys).then((res) => {
+      if (res.failed.length > 0) {
+        logger.warn('[properties/DELETE] some photos failed to delete', {
+          propertyId: id,
+          spaceId: ctx.space.id,
+          okCount: res.ok,
+          failedCount: res.failed.length,
+        });
+      }
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }

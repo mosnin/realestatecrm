@@ -45,7 +45,7 @@ function CreateForm() {
         setError(data.error ?? 'Failed to create brokerage.');
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ function JoinForm() {
         setError(data.error ?? 'Failed to join brokerage.');
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
     }

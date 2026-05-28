@@ -8,10 +8,16 @@ export const dynamic = 'force-dynamic';
 
 export default async function StudioCreatePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  // `prompt` + `model` come from the Library "Duplicate" affordance — the
+  // realtor lands here with the form already filled so the next attempt
+  // is a one-button re-render.
+  searchParams: Promise<{ prompt?: string; model?: string }>;
 }) {
   const { slug } = await params;
+  const { prompt, model } = await searchParams;
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -22,11 +28,12 @@ export default async function StudioCreatePage({
         <h1 className={H1} style={TITLE_FONT}>
           Create
         </h1>
-        <p className={BODY_MUTED}>
-          Generate images for your listings and your personal brand.
-        </p>
+        <p className={BODY_MUTED}>AI-generate listing images.</p>
       </header>
-      <CreatePanel />
+      <CreatePanel
+        initialPrompt={typeof prompt === 'string' ? prompt : undefined}
+        initialModel={typeof model === 'string' ? model : undefined}
+      />
     </div>
   );
 }

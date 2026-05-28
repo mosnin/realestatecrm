@@ -38,7 +38,7 @@ from schemas import AgentSettings, Space
 from security.budget import acquire_run_lock, check_budget, record_usage, release_run_lock
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import extract_usage, fallback_models, resolve_chat_model
+from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
 from tools.streaming import publish_event
 from tools.base import result_is_ok
 from trajectories import normalize_tool_call, record_trajectory
@@ -141,11 +141,18 @@ async def _run_with_fallback(
     # an error must surface, not retry.
     tools_ran = False
     # Try the workspace's picked model first (whatever make_chippi_agent
-    # built the agent with), then the OpenRouter fallback chain.
-    models = [agent.model, *(m for m in _FALLBACK_MODELS if m != agent.model)]
+    # built the agent with), then the OpenRouter fallback chain. The agent
+    # was built with an OpenAIChatCompletionsModel object whose `.model`
+    # attribute holds the original slug — fall back to the agent itself if
+    # something exotic is set so this never crashes on the read.
+    current_name = getattr(agent.model, "model", agent.model)
+    models = [current_name, *(m for m in _FALLBACK_MODELS if m != current_name)]
     for i, model in enumerate(models):
         try:
-            agent.model = model
+            # Wrap in the SDK Model object so vendor-prefixed OpenRouter slugs
+            # (`x-ai/`, `anthropic/`, `moonshotai/`, etc.) route via our client
+            # instead of the SDK's prefix dispatcher.
+            agent.model = make_chat_model(model)
             result = Runner.run_streamed(
                 agent, input=input_data, run_config=run_config, context=context
             )
@@ -372,6 +379,7 @@ async def run_agent_for_space(
     space: Space,
     agent_settings: AgentSettings,
     instruction: str | None = None,
+    owner_clerk_id: str | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
@@ -390,6 +398,11 @@ async def run_agent_for_space(
         A routine's standing instruction, when this run was fired by the
         routines cron. When set, the run focuses solely on that instruction
         and leaves the trigger queue untouched for a trigger-driven run.
+    owner_clerk_id:
+        Pre-resolved workspace owner Clerk userId. When set, the run uses
+        this directly instead of doing a Space → User lookup — saves the
+        roundtrip and removes the silent-null path where integrations
+        would otherwise fail to load.
     """
     # Respect the on/off switch. The realtor can pause Chippi from the
     # header; an autonomous run must honour that.
@@ -408,7 +421,7 @@ async def run_agent_for_space(
         logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
         return
     try:
-        await _run_locked(space, agent_settings, run_id, instruction)
+        await _run_locked(space, agent_settings, run_id, instruction, owner_clerk_id)
     finally:
         await release_run_lock(space.id, run_id)
 
@@ -418,6 +431,7 @@ async def _run_locked(
     agent_settings: AgentSettings,
     run_id: str,
     instruction: str | None,
+    owner_clerk_id: str | None = None,
 ) -> None:
     """Execute one autonomous run with the per-space run lock held.
 
@@ -450,7 +464,21 @@ async def _run_locked(
         space_memories, max_chars=settings.memory_chars_budget
     )
 
-    ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
+    # Resolve the workspace owner's Clerk userId now — needed both for the
+    # AgentContext (so the integration dispatcher tools know whose Composio
+    # entity to call against) and again later when loading those tools.
+    # The cron path (`/api/cron/routines`) and any caller that already knows
+    # the owner can pass it pre-resolved; everyone else does the lookup here.
+    from integrations import load_integration_tools, resolve_owner_user_id
+    if not owner_clerk_id:
+        owner_clerk_id = await resolve_owner_user_id(space.id) or ""
+
+    ctx = AgentContext.from_settings(
+        agent_settings,
+        run_id=run_id,
+        space_name=space.name,
+        user_id=owner_clerk_id,
+    )
     # A routine run is scoped to its instruction — don't drain the trigger
     # queue out from under a trigger-driven run.
     triggers = [] if instruction else await pop_triggers(space.id)
@@ -475,9 +503,6 @@ async def _run_locked(
     # Empty list when owner has no integrations or Composio is down.
     integration_tools: list = []
     try:
-        from integrations import load_integration_tools, resolve_owner_user_id
-
-        owner_clerk_id = await resolve_owner_user_id(space.id)
         if owner_clerk_id:
             integration_tools = await load_integration_tools(space.id, owner_clerk_id)
     except Exception as ie:  # noqa: BLE001
@@ -557,6 +582,13 @@ async def _run_locked(
             )
         )
 
+    # Initialize before the try so exception handlers (and the success-path
+    # log on line 602) can reference it without raising NameError. If
+    # _run_with_fallback or extract_usage throws before line 601's
+    # reassignment fires, the trajectory write at 622 / 658 would otherwise
+    # blow up — losing the run's audit trail on the very failure that
+    # mattered most.
+    model_slug = "unknown"
     try:
         # Run with automatic fallback through cheaper models on a 429.
         # Streaming mode so on_event fires per tool call / result.
@@ -569,7 +601,12 @@ async def _run_locked(
         if isinstance(final_output, str):
             final_summary = final_output[:280]
 
-        log.info("agent_run_completed", total_tokens=total_tokens, model_used=chippi.model)
+        # `chippi.model` is an OpenAIChatCompletionsModel object (per the
+        # x-ai/ prefix fix). Pull the slug back out for logging + trajectory
+        # writes — asyncpg can't encode the SDK object into a TEXT column,
+        # so every record_trajectory call silently failed before this fix.
+        model_slug = getattr(chippi.model, "model", str(chippi.model))
+        log.info("agent_run_completed", total_tokens=total_tokens, model_used=model_slug)
 
     except InputGuardrailTripwireTriggered as exc:
         info = exc.guardrail_result.output.output_info or {}
@@ -589,7 +626,7 @@ async def _run_locked(
             started_at=started_at,
             status="guardrail_blocked",
             trigger=(triggers[0] if triggers else None),
-            model=chippi.model,
+            model=model_slug,
             total_tokens=total_tokens,
             tool_calls=trajectory_tool_calls,
             extra={"pending_drafts": pending},
@@ -625,7 +662,7 @@ async def _run_locked(
             started_at=started_at,
             status="error",
             trigger=(triggers[0] if triggers else None),
-            model=chippi.model,
+            model=model_slug,
             total_tokens=total_tokens,
             tool_calls=trajectory_tool_calls,
             extra={"error": str(exc)[:500]},
@@ -663,7 +700,7 @@ async def _run_locked(
         started_at=started_at,
         status="completed",
         trigger=(triggers[0] if triggers else None),
-        model=chippi.model,
+        model=model_slug,
         total_tokens=total_tokens,
         tool_calls=trajectory_tool_calls,
         final_summary=final_summary,

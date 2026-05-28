@@ -159,7 +159,7 @@ export default function BrokerFormBuilderPage() {
         buyerSavedRef.current = JSON.stringify(currentConfig);
       }
 
-      toast.success(`Brokerage ${activeLeadType === 'rental' ? 'rental' : 'buyer'} form saved successfully.`);
+      toast.success(`Brokerage ${activeLeadType === 'rental' ? 'rental' : 'buyer'} form saved.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {

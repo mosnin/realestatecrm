@@ -4,12 +4,19 @@
  * DocumentsPanel — list + editor for the realtor's own documents.
  *
  * A document is a file the realtor authored in-app. Two modes, swapped in
- * place (no routing): a divide-y list of documents, and a plain editor for
+ * place (no routing): a divide-y list of documents, and an editor for
  * one. Chippi can read and attach these, but the realtor is always the
  * author — nothing here is machine-written.
+ *
+ * The editor is TipTap (ProseMirror-based, ~80kb gzip) — code-split via
+ * next/dynamic so the home page never pays for it. The editor's HTML
+ * output is sanitized through DOMPurify before render in Preview mode
+ * (defense in depth — TipTap's serializer is well-formed but a future
+ * caller might pre-seed the content field from somewhere we don't trust).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   FileText,
   Plus,
@@ -17,7 +24,29 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
+  Eye,
+  Pencil,
 } from 'lucide-react';
+import DOMPurify from 'isomorphic-dompurify';
+import { motion } from 'framer-motion';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { cn } from '@/lib/utils';
+
+// next/dynamic with ssr:false — TipTap reaches for browser APIs (window,
+// the DOM selection API) on instantiation. Loading it client-side also
+// keeps the ~80kb bundle out of every other route.
+const TiptapEditor = dynamic(
+  () => import('@/components/ui/tiptap-editor').then((m) => m.TiptapEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-border/70 bg-card min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">
+        <Loader2 className="animate-spin mr-2" size={14} />
+        Loading editor…
+      </div>
+    ),
+  },
+);
 
 interface DocRow {
   id: string;
@@ -31,6 +60,8 @@ interface Draft {
   title: string;
   content: string;
 }
+
+type EditorMode = 'edit' | 'preview';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -48,6 +79,10 @@ export function DocumentsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<'list' | 'edit'>('list');
   const [draft, setDraft] = useState<Draft | null>(null);
+  // Edit/Preview toggle inside the document editor — preview by default
+  // for existing docs (the realtor opens to read), edit by default for
+  // new ones (the realtor opens to write).
+  const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [saving, setSaving] = useState(false);
   const [opening, setOpening] = useState(false);
 
@@ -72,6 +107,7 @@ export function DocumentsPanel() {
   const openNew = useCallback(() => {
     setError(null);
     setDraft({ title: '', content: '' });
+    setEditorMode('edit'); // new doc → straight to writing
     setMode('edit');
   }, []);
 
@@ -83,6 +119,7 @@ export function DocumentsPanel() {
       if (!res.ok) throw new Error('Failed to open document');
       const data = await res.json();
       setDraft({ id: data.id, title: data.title ?? '', content: data.content ?? '' });
+      setEditorMode('preview'); // existing doc → opens read-only
       setMode('edit');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open document');
@@ -143,11 +180,20 @@ export function DocumentsPanel() {
     [refresh, backToList],
   );
 
+  // Sanitize the HTML content before rendering inside Preview. TipTap's
+  // own serializer is well-formed but the content field can in theory be
+  // seeded from external sources (paste, API import, future Chippi
+  // export) — sanitize defensively.
+  const sanitizedHtml = useMemo(
+    () => (draft ? DOMPurify.sanitize(draft.content ?? '') : ''),
+    [draft],
+  );
+
   // ── Editor ────────────────────────────────────────────────────────────────
   if (mode === 'edit' && draft) {
     return (
       <div className="space-y-5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <button
             type="button"
             onClick={backToList}
@@ -157,6 +203,11 @@ export function DocumentsPanel() {
             All documents
           </button>
           <div className="flex items-center gap-2">
+            <ModeToggle
+              mode={editorMode}
+              onChange={setEditorMode}
+              disabled={!draft.title && !draft.content}
+            />
             {draft.id && (
               <button
                 type="button"
@@ -188,15 +239,29 @@ export function DocumentsPanel() {
           placeholder="Document title"
           aria-label="Document title"
           maxLength={200}
+          readOnly={editorMode === 'preview'}
           className="w-full bg-transparent text-xl font-semibold text-foreground placeholder:text-muted-foreground/60 outline-none"
         />
-        <textarea
-          value={draft.content}
-          onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-          placeholder="Write or paste your document here…"
-          aria-label="Document content"
-          className="w-full min-h-[60vh] rounded-md border border-input bg-transparent px-3.5 py-3 text-base sm:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/70 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background transition-colors resize-y"
-        />
+
+        {editorMode === 'edit' ? (
+          <TiptapEditor
+            value={draft.content}
+            onChange={(html) => setDraft({ ...draft, content: html })}
+            placeholder="Write or paste your document here…"
+          />
+        ) : (
+          // Read mode tinted bg-muted/10 — distinct from the bg-card edit
+          // surface so the realtor can tell at a glance whether they're
+          // viewing or editing.
+          <div className="rounded-xl border border-border/70 bg-muted/10 px-3.5 py-3 min-h-[60vh]">
+            {/* Sanitized HTML — see sanitizedHtml memo above. */}
+            <article
+              className="prose prose-sm dark:prose-invert max-w-none prose-a:text-foreground prose-a:underline"
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml || emptyDocPlaceholder() }}
+            />
+          </div>
+        )}
+
         <p className="text-[11px] text-muted-foreground">
           Saved to your documents. Chippi can read it and attach it to a deal — it won&apos;t change your wording.
         </p>
@@ -276,6 +341,58 @@ export function DocumentsPanel() {
   );
 }
 
+/** Edit/Preview segmented control. Same `motion.layoutId` trick the
+ *  stylesheet calls out for tab strips — the active pill slides between
+ *  positions instead of fading. */
+function ModeToggle({
+  mode,
+  onChange,
+  disabled,
+}: {
+  mode: EditorMode;
+  onChange: (m: EditorMode) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'relative inline-flex items-center gap-0.5 rounded-full bg-foreground/[0.04] p-1',
+        disabled && 'opacity-50',
+      )}
+      role="tablist"
+      aria-label="Document mode"
+    >
+      {(['edit', 'preview'] as const).map((m) => {
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            disabled={disabled}
+            onClick={() => onChange(m)}
+            className={cn(
+              'relative z-10 inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[12.5px] font-medium transition-colors',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {m === 'edit' ? <Pencil size={12} /> : <Eye size={12} />}
+            {m === 'edit' ? 'Edit' : 'Preview'}
+            {active && (
+              <motion.span
+                layoutId="document-mode-pill"
+                className="absolute inset-0 z-[-1] rounded-full bg-background border border-border/70"
+                transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ErrorBanner({
   message,
   onDismiss,
@@ -296,4 +413,11 @@ function ErrorBanner({
       </button>
     </div>
   );
+}
+
+/** When the realtor lands in Preview mode with empty content, show a calm
+ *  fact instead of a blank rectangle. Matches the empty-state vocabulary
+ *  from the stylesheet. */
+function emptyDocPlaceholder(): string {
+  return '<p class="text-muted-foreground">This document is empty. Switch to Edit to start writing.</p>';
 }

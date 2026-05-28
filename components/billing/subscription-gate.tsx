@@ -45,7 +45,7 @@ export function SubscriptionGate({
         setLoading(false);
       }
     } catch {
-      alert('Something went wrong. Please try again.');
+      alert("That didn't go through — usually temporary.");
       setLoading(false);
     }
   }

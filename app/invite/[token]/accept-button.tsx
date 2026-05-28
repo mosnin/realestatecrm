@@ -28,7 +28,7 @@ export function AcceptButton({ token }: AcceptButtonProps) {
         setError(data.error ?? 'Something went wrong.');
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
     }

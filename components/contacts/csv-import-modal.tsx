@@ -172,10 +172,10 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
         onImported(data.created);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? 'Import failed. Please try again.');
+        setError(data.error ?? "Import didn't go through — usually temporary.");
       }
     } catch {
-      setError('Import failed. Please try again.');
+      setError("Import didn't go through — usually temporary.");
     } finally {
       setImporting(false);
     }

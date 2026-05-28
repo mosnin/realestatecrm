@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { deleteGoogleEvent } from '@/lib/gcal-helpers';
 
 async function resolveTour(userId: string, tourId: string) {
   const { data: tour, error } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
@@ -123,6 +124,10 @@ export async function PATCH(
     .from('Tour')
     .update(update)
     .eq('id', id)
+    // resolveTour proved space ownership at read time; scope the write
+    // by spaceId too so a between-check-and-write reassignment can't
+    // cross-tenant the row.
+    .eq('spaceId', ctx.space.id)
     .select()
     .single();
   if (error) throw error;
@@ -195,6 +200,32 @@ export async function PATCH(
     }
   }
 
+  // Tour was cancelled — drop the mirrored Google Calendar event so the
+  // realtor's calendar doesn't keep a ghost slot for an appointment that
+  // isn't happening. Fire-and-forget: the DB is the source of truth and
+  // we already responded to the client; a GCal hiccup orphans the event
+  // and lib/gcal-helpers logs it for ops to chase manually.
+  if (
+    body.status === 'cancelled' &&
+    ctx.tour.status !== 'cancelled' &&
+    ctx.tour.googleEventId
+  ) {
+    void deleteGoogleEvent({
+      spaceId: ctx.space.id,
+      googleEventId: ctx.tour.googleEventId as string,
+    }).then(async (ok) => {
+      if (ok) {
+        // Clear the stale id so a re-sync doesn't try to update a
+        // deleted event. Best-effort — orphaned id is survivable.
+        await supabase
+          .from('Tour')
+          .update({ googleEventId: null })
+          .eq('id', id)
+          .eq('spaceId', ctx.space.id);
+      }
+    });
+  }
+
   return NextResponse.json(data);
 }
 
@@ -210,8 +241,24 @@ export async function DELETE(
   const ctx = await resolveTour(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase.from('Tour').delete().eq('id', id);
+  // Capture the GCal mirror id before the delete — once the row is
+  // gone we can't look it up, and the realtor's calendar would keep
+  // a ghost slot indefinitely.
+  const googleEventId = ctx.tour.googleEventId as string | null | undefined;
+
+  const { error } = await supabase
+    .from('Tour')
+    .delete()
+    .eq('id', id)
+    // Scope by spaceId so the delete can't cross-tenant on reassignment.
+    .eq('spaceId', ctx.space.id);
   if (error) throw error;
+
+  // Fire-and-forget the GCal cleanup. The DB has already committed; a
+  // GCal failure orphans the event and lib/gcal-helpers logs it.
+  if (googleEventId) {
+    void deleteGoogleEvent({ spaceId: ctx.space.id, googleEventId });
+  }
 
   return NextResponse.json({ success: true });
 }

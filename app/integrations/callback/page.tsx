@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { getComposio } from '@/lib/integrations/composio';
 import { upsertByComposioId, findActive, revoke } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
+import { registerForConnection } from '@/lib/integrations/triggers';
 import { logger } from '@/lib/logger';
 
 export default async function IntegrationsCallback({
@@ -161,6 +162,28 @@ export default async function IntegrationsCallback({
     toolkit,
     spaceId: space.id,
   });
+
+  // Register curated triggers for this toolkit. Best-effort: a failure
+  // here logs but does NOT fail the OAuth completion. The realtor sees
+  // the integration as connected; missing triggers surface via the
+  // health endpoint and recover on reconnect.
+  try {
+    const result = await registerForConnection({ connection: inserted });
+    if (result.failed > 0) {
+      logger.warn('[integrations.callback] some triggers failed to register', {
+        toolkit,
+        connectionId: inserted.id,
+        registered: result.registered,
+        failed: result.failed,
+      });
+    }
+  } catch (err) {
+    logger.error(
+      '[integrations.callback] trigger registration threw',
+      { toolkit, connectionId: inserted.id },
+      err,
+    );
+  }
 
   // Status from Composio: 'ACTIVE' is the green path. Anything else, we
   // mark it failed but keep the row so the realtor sees something

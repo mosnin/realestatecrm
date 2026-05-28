@@ -15,14 +15,17 @@ import type { DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 
-const ACTIVITY_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
-  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
-  email: { label: 'Email', icon: Mail, color: 'text-violet-500 dark:text-violet-400' },
-  meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
-  follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
-  stage_change: { label: 'Stage changed', icon: Activity, color: 'text-indigo-500 dark:text-indigo-400' },
-  status_change: { label: 'Status changed', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
+// One muted neutral for every activity icon. Differentiation is the icon
+// shape — not color. Brand orange is sacred (logo, Chippi cues, agent
+// output, lead-warm) and does not appear on generic timeline chrome.
+const ACTIVITY_META: Record<string, { label: string; icon: React.ElementType }> = {
+  note: { label: 'Note', icon: FileText },
+  call: { label: 'Call', icon: PhoneCall },
+  email: { label: 'Email', icon: Mail },
+  meeting: { label: 'Meeting', icon: Users },
+  follow_up: { label: 'Follow-up', icon: Clock },
+  stage_change: { label: 'Stage changed', icon: Activity },
+  status_change: { label: 'Status changed', icon: CheckCircle2 },
 };
 
 const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
@@ -82,7 +85,7 @@ export function DealDetailClient({ dealId, slug: _slug, initialActivities }: Pro
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card px-5 py-4">
+    <div className="rounded-xl border border-border/70 bg-card px-5 py-4">
       <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
         <Activity size={14} className="text-muted-foreground" />
         Activity
@@ -147,7 +150,7 @@ export function DealDetailClient({ dealId, slug: _slug, initialActivities }: Pro
 
             return (
               <div key={activity.id} className="flex gap-3">
-                <div className={cn('flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5', meta.color)}>
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center mt-0.5">
                   <Icon size={13} />
                 </div>
                 <div className="flex-1 min-w-0">

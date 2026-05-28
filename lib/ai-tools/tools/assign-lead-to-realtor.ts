@@ -121,10 +121,20 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
       reason: args.why,
     });
 
-    const { error: updateErr } = await supabase
+    // Scope the UPDATE by the specific ownership leg we just proved at
+    // L98 — either the contact lives in the broker's own space, or it's
+    // linked to a brokerage the caller administers. The read-then-write
+    // pattern is safe only if the write carries the same scope; a
+    // concurrent broker-merge or reassign-elsewhere could otherwise let
+    // the UPDATE land on a row that has since moved out of scope.
+    const updateBuilder = supabase
       .from('Contact')
       .update({ applicationStatusNote: meta, updatedAt: now })
       .eq('id', c.id);
+    const scopedUpdate = c.spaceId === ctx.space.id
+      ? updateBuilder.eq('spaceId', ctx.space.id)
+      : updateBuilder.eq('brokerageId', brokerageId);
+    const { error: updateErr } = await scopedUpdate;
     if (updateErr) {
       logger.error('[tools.assign_lead] update failed', { contactId: c.id }, updateErr);
       return { summary: `Reassignment failed: ${updateErr.message}`, display: 'error' };

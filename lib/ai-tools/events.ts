@@ -175,7 +175,8 @@ export interface ErrorEvent extends BaseEvent {
     | 'tool_failure'
     | 'budget_exhausted'
     | 'guardrail'
-    | 'network';
+    | 'network'
+    | 'persistence';
 }
 
 // ── Wire format ────────────────────────────────────────────────────────────

@@ -90,7 +90,7 @@ export function AuthorizeClient({
               <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="space-y-1.5">
-              <h1 className="text-lg font-semibold">Successfully Connected</h1>
+              <h1 className="text-lg font-semibold">Connected.</h1>
               <p className="text-sm text-muted-foreground">
                 Claude now has read-only access to your <span className="font-medium text-foreground">{spaceName}</span> workspace.
               </p>

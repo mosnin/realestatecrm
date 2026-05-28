@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ImagePlus, AlertCircle } from 'lucide-react';
+import { ImagePlus, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +20,7 @@ import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 import { GeneratingState } from '@/components/studio/generating-state';
+import { toastLoading, toastSuccess, toastError } from '@/lib/toast-helpers';
 
 interface GenerateResult {
   url: string;
@@ -27,9 +28,20 @@ interface GenerateResult {
   kind: 'image' | 'video';
 }
 
-export function CreatePanel() {
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<string>(DEFAULT_IMAGE_MODEL);
+export function CreatePanel({
+  initialPrompt,
+  initialModel,
+}: {
+  initialPrompt?: string;
+  initialModel?: string;
+} = {}) {
+  // Duplicate flow: the realtor opened this panel from a Library tile and
+  // wants to re-render the same prompt. We seed state from the URL params
+  // so the form is pre-filled and a single click re-runs the generation.
+  const [prompt, setPrompt] = useState(initialPrompt ?? '');
+  const [model, setModel] = useState<string>(
+    initialModel && STUDIO_MODELS[initialModel] ? initialModel : DEFAULT_IMAGE_MODEL,
+  );
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +107,13 @@ export function CreatePanel() {
     if (prompt.trim().length === 0 || generating) return;
     setGenerating(true);
     setError(null);
+    // Visible affordance — a 5-10s silent wait reads as broken. The toast
+    // outlives the in-page spinner if the realtor scrolls or switches tabs.
+    const kind = STUDIO_MODELS[model]?.kind === 'video' ? 'video' : 'image';
+    const toastId = toastLoading(
+      kind === 'video' ? 'Generating your video…' : 'Generating your image…',
+      'studio-generate',
+    );
     try {
       const res = await fetch('/api/studio/generate', {
         method: 'POST',
@@ -108,15 +127,18 @@ export function CreatePanel() {
         error?: string;
       };
       if (!res.ok || !body.url || !body.fileId) {
-        throw new Error(body.error || 'Generation failed. Please try again.');
+        throw new Error(body.error || "Generation didn't go through — usually temporary.");
       }
       setResult({
         url: body.url,
         fileId: body.fileId,
         kind: body.kind === 'video' ? 'video' : 'image',
       });
+      toastSuccess(body.kind === 'video' ? 'Video ready.' : 'Image ready.', toastId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed. Please try again.');
+      const message = e instanceof Error ? e.message : "Generation didn't go through — usually temporary.";
+      setError(message);
+      toastError(message, toastId);
     } finally {
       setGenerating(false);
     }
@@ -164,7 +186,14 @@ export function CreatePanel() {
             })}
           </div>
           <Button onClick={() => void handleGenerate()} disabled={!canGenerate}>
-            {generating ? 'Generating…' : 'Generate'}
+            {generating ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Generating…
+              </>
+            ) : (
+              'Generate'
+            )}
           </Button>
         </div>
       </div>

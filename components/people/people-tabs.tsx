@@ -39,7 +39,7 @@ export function PeopleTabs({ slug, newCount }: { slug: string; newCount?: number
           >
             {tab.label}
             {tab.label === 'New' && newCount && newCount > 0 ? (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-semibold text-muted-foreground">
                 {newCount}
               </span>
             ) : null}

@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { Property, PropertyListingStatus, PropertyType } from '@/lib/types';
 import { PROPERTY_LISTING_STATUS_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/properties';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
 type FormValues = Partial<Property>;
 
@@ -16,9 +20,15 @@ interface Props {
 }
 
 /**
- * Shared create/edit form. Keeps the field set small on purpose — a realtor
- * adding a property in the middle of their day shouldn't have to fill 20
- * boxes. Everything except address is optional.
+ * Shared property create/edit form. Field set is intentionally small — a
+ * realtor adding a property in the middle of their day shouldn't have to
+ * fill twenty boxes. Everything except address is optional.
+ *
+ * All inputs are the canonical <Input> / <Textarea> primitives so the form
+ * inherits the product's paper-flat polish (no shadow, 2px focus ring,
+ * quieter placeholder, 150ms transitions). The status/type pickers are
+ * still native <select> for keyboard-first speed; they're styled with the
+ * same chain as Input so the row visually aligns.
  */
 export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, submitLabel = 'Save' }: Props) {
   const [v, setV] = useState<FormValues>({
@@ -53,49 +63,67 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
     });
   }
 
+  // Native <select> styled to match <Input> — same height, border, radius,
+  // padding, focus ring. Keeps the form a single visual row when the type
+  // and status sit next to bed/bath number fields.
+  const selectClasses = cn(
+    'flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base transition-colors duration-150 outline-none md:text-sm',
+    'dark:bg-input/30',
+    'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+  );
+
   return (
     <form onSubmit={submit} className="space-y-4">
       {/* Address row */}
       <div className="grid grid-cols-[1fr_120px] gap-2">
         <Field label="Address" required>
-          <input
+          <Input
             type="text"
             required
             value={v.address ?? ''}
             onChange={(e) => set('address', e.target.value)}
             placeholder="123 Main St"
-            className="input"
           />
         </Field>
         <Field label="Unit">
-          <input
+          <Input
             type="text"
             value={v.unitNumber ?? ''}
             onChange={(e) => set('unitNumber', e.target.value)}
             placeholder="4B"
-            className="input"
           />
         </Field>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
         <Field label="City">
-          <input type="text" value={v.city ?? ''} onChange={(e) => set('city', e.target.value)} className="input" />
+          <Input type="text" value={v.city ?? ''} onChange={(e) => set('city', e.target.value)} />
         </Field>
         <Field label="State">
-          <input type="text" value={v.stateRegion ?? ''} onChange={(e) => set('stateRegion', e.target.value)} className="input" />
+          <Input type="text" value={v.stateRegion ?? ''} onChange={(e) => set('stateRegion', e.target.value)} />
         </Field>
         <Field label="ZIP">
-          <input type="text" value={v.postalCode ?? ''} onChange={(e) => set('postalCode', e.target.value)} className="input" />
+          <Input type="text" value={v.postalCode ?? ''} onChange={(e) => set('postalCode', e.target.value)} />
         </Field>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Field label="MLS #">
-          <input type="text" value={v.mlsNumber ?? ''} onChange={(e) => set('mlsNumber', e.target.value)} placeholder="Unique per space" className="input" />
+          <Input
+            type="text"
+            value={v.mlsNumber ?? ''}
+            onChange={(e) => set('mlsNumber', e.target.value)}
+            placeholder="Unique per space"
+          />
         </Field>
         <Field label="Listing URL">
-          <input type="url" value={v.listingUrl ?? ''} onChange={(e) => set('listingUrl', e.target.value)} placeholder="https://…" className="input" />
+          <Input
+            type="url"
+            value={v.listingUrl ?? ''}
+            onChange={(e) => set('listingUrl', e.target.value)}
+            placeholder="https://…"
+          />
         </Field>
       </div>
 
@@ -104,7 +132,7 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
           <select
             value={v.propertyType ?? ''}
             onChange={(e) => set('propertyType', (e.target.value || null) as PropertyType | null)}
-            className="input"
+            className={selectClasses}
           >
             <option value="">—</option>
             {PROPERTY_TYPE_OPTIONS.map((o) => (
@@ -116,7 +144,7 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
           <select
             value={v.listingStatus ?? 'active'}
             onChange={(e) => set('listingStatus', e.target.value as PropertyListingStatus)}
-            className="input"
+            className={selectClasses}
           >
             {PROPERTY_LISTING_STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -124,70 +152,80 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
           </select>
         </Field>
         <Field label="Beds">
-          <input type="number" step="0.5" min="0" value={v.beds ?? ''} onChange={(e) => set('beds', e.target.value === '' ? null : Number(e.target.value))} className="input" />
+          <Input
+            type="number"
+            step="0.5"
+            min="0"
+            value={v.beds ?? ''}
+            onChange={(e) => set('beds', e.target.value === '' ? null : Number(e.target.value))}
+          />
         </Field>
         <Field label="Baths">
-          <input type="number" step="0.5" min="0" value={v.baths ?? ''} onChange={(e) => set('baths', e.target.value === '' ? null : Number(e.target.value))} className="input" />
+          <Input
+            type="number"
+            step="0.5"
+            min="0"
+            value={v.baths ?? ''}
+            onChange={(e) => set('baths', e.target.value === '' ? null : Number(e.target.value))}
+          />
         </Field>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
         <Field label="Sq ft">
-          <input type="number" min="0" value={v.squareFeet ?? ''} onChange={(e) => set('squareFeet', e.target.value === '' ? null : Number(e.target.value))} className="input" />
+          <Input
+            type="number"
+            min="0"
+            value={v.squareFeet ?? ''}
+            onChange={(e) => set('squareFeet', e.target.value === '' ? null : Number(e.target.value))}
+          />
         </Field>
         <Field label="Year built">
-          <input type="number" min="1600" max="2200" value={v.yearBuilt ?? ''} onChange={(e) => set('yearBuilt', e.target.value === '' ? null : Number(e.target.value))} className="input" />
+          <Input
+            type="number"
+            min="1600"
+            max="2200"
+            value={v.yearBuilt ?? ''}
+            onChange={(e) => set('yearBuilt', e.target.value === '' ? null : Number(e.target.value))}
+          />
         </Field>
         <Field label="List price">
-          <input type="number" min="0" step="1000" value={v.listPrice ?? ''} onChange={(e) => set('listPrice', e.target.value === '' ? null : Number(e.target.value))} className="input" />
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            value={v.listPrice ?? ''}
+            onChange={(e) => set('listPrice', e.target.value === '' ? null : Number(e.target.value))}
+          />
         </Field>
       </div>
 
       <Field label="Notes">
-        <textarea
+        <Textarea
           value={v.notes ?? ''}
           onChange={(e) => set('notes', e.target.value)}
           rows={3}
           placeholder="Anything buyers or co-agents should know."
-          className="input resize-y"
         />
       </Field>
 
-      <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-        <button type="button" onClick={onCancel} className="text-xs font-semibold text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md">
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-md bg-foreground text-background px-3 py-1.5 disabled:opacity-50"
-        >
-          {submitting && <Loader2 size={12} className="animate-spin" />}
+        </Button>
+        <Button type="submit" size="sm" disabled={submitting}>
+          {submitting && <Loader2 className="animate-spin" />}
           {submitLabel}
-        </button>
+        </Button>
       </div>
-
-      {/* Local styles: shared input class so we don't restate the tailwind chain. */}
-      <style jsx>{`
-        .input {
-          width: 100%;
-          background: transparent;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          padding: 6px 8px;
-          font-size: 13px;
-          outline: none;
-        }
-        .input:focus { border-color: var(--foreground); }
-      `}</style>
     </form>
   );
 }
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+    <label className="block space-y-1.5">
+      <span className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}{required ? ' *' : ''}
       </span>
       {children}

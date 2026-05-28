@@ -8,53 +8,83 @@ import { ProfileSection } from './profile-section';
 import { NotificationsSection } from './notifications-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
-import { IntegrationsSection } from './integrations-section';
+import { McpSection, TemplatesSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { ChatModelPicker } from '@/components/agent/chat-model-picker';
-import { MemoryFeed } from '@/components/chippi/memory-feed';
 import { UsageSection } from '@/components/settings/usage-section';
 import { cn } from '@/lib/utils';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H1,
-  H2,
   TITLE_FONT,
   BODY_MUTED,
   PRIMARY_PILL,
+  SECTION_LABEL,
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
 
 /**
- * Settings — tabbed. Five buckets the realtor can hold in their head:
- *   Workspace  — name/brand/legal/danger
- *   Profile    — who you are + how Chippi knows you
- *   Memory     — what Chippi remembers about your book
- *   Notifications — what reaches your phone
- *   Apps       — Composio integrations + API keys + message templates
- *   Usage      — what Chippi has cost you (autonomous agent runs)
+ * Settings — five task-grouped tabs the realtor can hold in their head:
  *
- * Tab state is a query param (`?tab=...`) so the URL is shareable, the
- * sub-route redirects still resolve cleanly, and back-button history
- * works. Each render hydrates only the section(s) for the active tab —
- * cheaper than the old single-scroll page that hydrated all nine
- * sections every load.
+ *   Workspace    space name + slug + danger zone
+ *   You          profile + bio + AI personalization + chat model
+ *   Connections  OAuth apps + message templates (everywhere Chippi acts through)
+ *   Privacy      notifications + legal + compliance + fair-housing notice
+ *   Developer    MCP + API keys + usage (per-tool cost breakdown)
+ *
+ * The old six-tab grouping was by feature bucket (Workspace / Profile / Memory
+ * / Notifications / Apps / Usage). Realtors don't think in feature buckets;
+ * they think in tasks. Memory was cut — /chippi/memory already gives the
+ * realtor everything they need; a duplicate Settings tab was debug surface
+ * masquerading as configuration.
+ *
+ * Tab state lives in `?tab=...` so the URL stays shareable, sub-route
+ * redirects resolve cleanly, and back-button history works. Each render
+ * hydrates only the active tab's sections — the old single-scroll page
+ * hydrated nine sections per load and most of them were never read.
  */
 
 const TABS = [
   { id: 'workspace', label: 'Workspace' },
-  { id: 'profile', label: 'Profile' },
-  { id: 'memory', label: 'Memory' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'apps', label: 'Apps' },
-  { id: 'usage', label: 'Usage' },
+  { id: 'you', label: 'You' },
+  { id: 'connections', label: 'Connections' },
+  { id: 'privacy', label: 'Privacy' },
+  { id: 'developer', label: 'Developer' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
 
 function isValidTab(v: string | undefined | null): v is TabId {
   return typeof v === 'string' && TABS.some((t) => t.id === v);
+}
+
+/**
+ * Map legacy tab IDs onto the new structure. Memory becomes a redirect to its
+ * real surface at /chippi/memory; the rest fold onto the closest equivalent.
+ * Anything unrecognized falls through to the default tab.
+ */
+function resolveLegacyTab(
+  raw: string | undefined,
+  slug: string,
+): { kind: 'redirect'; to: string } | { kind: 'tab'; id: TabId } | null {
+  if (!raw) return null;
+  if (isValidTab(raw)) return { kind: 'tab', id: raw };
+  switch (raw) {
+    case 'profile':
+      return { kind: 'redirect', to: `/s/${slug}/settings?tab=you` };
+    case 'apps':
+      return { kind: 'redirect', to: `/s/${slug}/settings?tab=connections` };
+    case 'notifications':
+      return { kind: 'redirect', to: `/s/${slug}/settings?tab=privacy` };
+    case 'usage':
+      return { kind: 'redirect', to: `/s/${slug}/settings?tab=developer` };
+    case 'memory':
+      return { kind: 'redirect', to: `/s/${slug}/chippi/memory` };
+    default:
+      return null;
+  }
 }
 
 export default async function SettingsPage({
@@ -71,7 +101,13 @@ export default async function SettingsPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const activeTab: TabId = isValidTab(sp.tab) ? sp.tab : 'workspace';
+
+  // Resolve legacy tab IDs first — anyone hitting an old bookmark gets routed
+  // to the new home (or to /chippi/memory for the removed Memory tab) before
+  // any DB work runs.
+  const legacy = resolveLegacyTab(sp.tab, slug);
+  if (legacy?.kind === 'redirect') redirect(legacy.to);
+  const activeTab: TabId = legacy?.kind === 'tab' ? legacy.id : 'workspace';
 
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
@@ -93,7 +129,9 @@ export default async function SettingsPage({
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center space-y-3 p-8">
-          <h2 className={H2}>Something went wrong</h2>
+          <h2 className="text-xl tracking-tight font-semibold text-foreground">
+            Something went wrong
+          </h2>
           <p className={BODY_MUTED}>
             I couldn&apos;t load your settings. Usually temporary.
           </p>
@@ -105,8 +143,7 @@ export default async function SettingsPage({
     );
   }
 
-  // Subscription status drives the narration line under the H1. Same
-  // narrator the old single-page version used; preserved verbatim.
+  // Subscription status drives the narration line under the H1.
   const subStatus =
     (space as { stripeSubscriptionStatus?: string }).stripeSubscriptionStatus ?? 'inactive';
   const periodEnd = (space as { stripePeriodEnd?: string }).stripePeriodEnd;
@@ -156,20 +193,29 @@ export default async function SettingsPage({
         </p>
       </header>
 
-      {/* Tab nav — horizontal-scroll on mobile, fits comfortably on desktop.
-          Active tab uses the foreground underline rule from STYLESHEET; the
-          rest stay muted. No pill chrome — paper-flat. */}
-      <nav className="border-b border-border/60" aria-label="Settings sections">
-        <div className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide">
+      {/* Tab nav — horizontal scroll on mobile, fits comfortably on desktop.
+          Active tab uses the foreground underline rule from STYLESHEET;
+          the rest stay muted. Paper-flat, no pill chrome. */}
+      <nav
+        className="relative border-b border-border/60"
+        aria-label="Settings sections"
+      >
+        <div
+          role="tablist"
+          aria-label="Settings sections"
+          className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide snap-x snap-proximity"
+        >
           {TABS.map((t) => {
             const isActiveTab = t.id === activeTab;
             return (
               <Link
                 key={t.id}
                 href={`/s/${slug}/settings?tab=${t.id}`}
+                role="tab"
                 aria-current={isActiveTab ? 'page' : undefined}
+                aria-selected={isActiveTab}
                 className={cn(
-                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap',
+                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap snap-start',
                   'border-b-2 -mb-px transition-colors duration-150',
                   isActiveTab
                     ? 'border-foreground text-foreground font-medium'
@@ -181,134 +227,84 @@ export default async function SettingsPage({
             );
           })}
         </div>
+        {/* Edge fade masks — signal "there's more off-screen" on mobile. */}
+        <div
+          aria-hidden
+          className="md:hidden pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
+        />
+        <div
+          aria-hidden
+          className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+        />
       </nav>
 
-      {/* Active-tab content. Each tab is a focused stack of related sections;
-          no cross-tab dependencies, so render order is just visual rhythm. */}
+      {/* Workspace — space name, slug, and danger zone. Nothing else; this
+          tab is identity, not configuration. */}
       {activeTab === 'workspace' && (
         <div className="space-y-12">
           <section className="space-y-5">
-            <GeneralSettingsForm space={space} settings={settings} />
-          </section>
-          <section
-            id="legal"
-            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-          >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">Legal</h2>
-              <p className="text-sm text-muted-foreground">
-                The privacy policy URL applicants see on your intake form.
-              </p>
-            </header>
-            <LegalSettingsForm
-              slug={space.slug}
-              privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
-            />
-          </section>
-          <section
-            id="trust-signals"
-            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-          >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">Compliance &amp; trust signals</h2>
-              <p className="text-sm text-muted-foreground">
-                Optional. License number, Fair Housing notice, and Equal Housing
-                mark — shown in your intake-form footer.
-              </p>
-            </header>
-            <IntakeTrustSignalsForm
-              slug={space.slug}
-              licenseNumber={settings?.intakeLicenseNumber ?? ''}
-              fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
-              showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
-            />
+            <p className={SECTION_LABEL}>Workspace</p>
+            <GeneralSettingsForm space={space} />
           </section>
           <section className="space-y-5 pt-10 border-t border-border/60">
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
-              <p className="text-sm text-muted-foreground">
-                Irreversible. Don&apos;t click these unless you mean it.
-              </p>
-            </header>
+            <p className={cn(SECTION_LABEL, 'text-destructive/80')}>Danger zone</p>
             <DangerZone space={space} />
           </section>
         </div>
       )}
 
-      {activeTab === 'profile' && (
+      {/* You — profile photo, bio, AI personalization, chat model. Everything
+          that shapes how Chippi sees the realtor and how the realtor shows
+          up to leads. Memory is intentionally absent; /chippi/memory is its
+          real surface. */}
+      {activeTab === 'you' && (
         <div className="space-y-12">
           <section className="space-y-5">
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">Your profile</h2>
-              <p className="text-sm text-muted-foreground">
-                The face and voice your leads see on intake forms, tour
-                pages, and packets.
-              </p>
-            </header>
+            <p className={SECTION_LABEL}>Your profile</p>
+            <p className={BODY_MUTED}>
+              The face and voice your leads see on intake forms, tour pages,
+              and packets.
+            </p>
             <ProfileSection slug={space.slug} />
           </section>
           <section
             id="ai-profile"
             className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
           >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">AI personalization</h2>
-              <p className="text-sm text-muted-foreground">
-                Tell Chippi about you so responses feel tailored, not generic.
-              </p>
-            </header>
+            <p className={SECTION_LABEL}>AI personalization</p>
+            <p className={BODY_MUTED}>
+              Tell Chippi about you so responses feel tailored, not generic.
+            </p>
             <AIProfileForm slug={slug} spaceId={space.id} />
           </section>
           <section
             id="chat-model"
             className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
           >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">Chippi&apos;s model</h2>
-              <p className="text-sm text-muted-foreground">
-                The model Chippi thinks with — in chat and when it works on
-                its own. The default suits almost everyone; switch it only
-                if you have a reason to.
-              </p>
-            </header>
+            <p className={SECTION_LABEL}>Chippi&apos;s model</p>
+            <p className={BODY_MUTED}>
+              The model Chippi thinks with — in chat and when it works on its
+              own. The default suits almost everyone; switch it only if you
+              have a reason to.
+            </p>
             <ChatModelPicker />
           </section>
         </div>
       )}
 
-      {activeTab === 'memory' && (
-        <section id="memory" className="space-y-5">
-          <header className="space-y-1">
-            <h2 className="text-base font-semibold">What Chippi remembers</h2>
-            <p className="text-sm text-muted-foreground">
-              Everything I&apos;ve learned about you, your contacts, and your
-              deals. Delete anything I got wrong — I&apos;ll re-learn it if
-              it comes up again.
-            </p>
-          </header>
-          <MemoryFeed slug={slug} />
-        </section>
-      )}
-
-      {activeTab === 'notifications' && (
-        <section id="notifications" className="space-y-5">
-          <NotificationsSection slug={space.slug} />
-        </section>
-      )}
-
-      {activeTab === 'apps' && (
+      {/* Connections — every place Chippi acts on the realtor's behalf.
+          OAuth integrations and reusable templates live together because
+          the realtor thinks of them as the same thing: "what Chippi sends
+          through." MCP and API keys are developer-flavored and live in
+          Developer instead. */}
+      {activeTab === 'connections' && (
         <div className="space-y-12">
-          <section
-            id="integrations"
-            className="space-y-5"
-          >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">Connected apps</h2>
-              <p className="text-sm text-muted-foreground">
-                Connect Gmail, Outlook, Slack, HubSpot, and the rest so
-                Chippi can act on your behalf through your own accounts.
-              </p>
-            </header>
+          <section id="integrations" className="space-y-5">
+            <p className={SECTION_LABEL}>Connected apps</p>
+            <p className={BODY_MUTED}>
+              Gmail, Outlook, Slack, HubSpot, and the rest. Connect them so
+              Chippi can act on your behalf through your own accounts.
+            </p>
             <ConnectedAppsSection
               callbackResult={
                 sp.integration === 'connected' || sp.integration === 'failed'
@@ -322,25 +318,70 @@ export default async function SettingsPage({
             />
           </section>
           <section
-            id="api-keys"
+            id="templates"
             className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
           >
-            <header className="space-y-1">
-              <h2 className="text-base font-semibold">API keys &amp; templates</h2>
-              <p className="text-sm text-muted-foreground">
-                MCP keys for Claude.ai and other agent surfaces, plus the
-                message templates Chippi can paste from.
-              </p>
-            </header>
-            <IntegrationsSection slug={space.slug} />
+            <p className={SECTION_LABEL}>Message templates</p>
+            <TemplatesSection />
           </section>
         </div>
       )}
 
-      {activeTab === 'usage' && (
-        <section id="usage">
-          <UsageSection />
-        </section>
+      {/* Privacy — notifications, legal URL, license, fair-housing notice.
+          Everything compliance-flavored and everything that determines what
+          reaches the realtor. */}
+      {activeTab === 'privacy' && (
+        <div className="space-y-12">
+          <section id="notifications" className="space-y-5">
+            <p className={SECTION_LABEL}>Notifications</p>
+            <NotificationsSection slug={space.slug} />
+          </section>
+          <section
+            id="legal"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Legal</p>
+            <LegalSettingsForm
+              slug={space.slug}
+              privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
+            />
+          </section>
+          <section
+            id="trust-signals"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Compliance &amp; trust signals</p>
+            <p className={BODY_MUTED}>
+              Optional. License number, Fair Housing notice, and Equal Housing
+              mark — shown in your intake-form footer.
+            </p>
+            <IntakeTrustSignalsForm
+              slug={space.slug}
+              licenseNumber={settings?.intakeLicenseNumber ?? ''}
+              fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
+              showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
+            />
+          </section>
+        </div>
+      )}
+
+      {/* Developer — MCP, API keys, and usage. Anything programmatic or
+          cost-attribution flavored lives here so the realtor side stays
+          calm. */}
+      {activeTab === 'developer' && (
+        <div className="space-y-12">
+          <section id="mcp" className="space-y-5">
+            <p className={SECTION_LABEL}>MCP &amp; API keys</p>
+            <McpSection slug={space.slug} />
+          </section>
+          <section
+            id="usage"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Usage</p>
+            <UsageSection />
+          </section>
+        </div>
       )}
     </div>
   );

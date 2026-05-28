@@ -14,6 +14,24 @@ import { inngest } from './client';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { publishToPlatform } from '@/lib/studio/publish';
+import { findByComposioId } from '@/lib/integrations/connections';
+import {
+  dispatchTrigger,
+  findByComposioTriggerId,
+  stampFired,
+} from '@/lib/integrations/triggers';
+import { redis } from '@/lib/redis';
+import { logger } from '@/lib/logger';
+
+// Per-space daily ceiling on trigger-initiated dispatches. The receiver
+// already enforces a per-(connection, slug) hourly cap; this one is the
+// total dollar floor. 100/day is conservative: a Modal autonomous run
+// is the costliest dispatch path and a single space accumulating 100 of
+// them in a day already implies something noisy worth investigating.
+// Above the cap → log + drop. The realtor noticing "Chippi got quiet"
+// is a better failure mode than a runaway bill.
+const SPACE_DAILY_CAP = 100;
+const DAY_SECONDS = 24 * 60 * 60;
 
 interface LoadedPost {
   status: string;
@@ -81,14 +99,25 @@ export const publishScheduledPost = inngest.createFunction(
       return { failed: 'missing image' };
     }
 
-    // Claim it so a duplicate event can't double-publish.
-    await step.run('claim', async () => {
-      await supabase
+    // Claim it so a duplicate event can't double-publish. Compare-and-swap
+    // on `status='scheduled'` — Inngest is at-least-once, so two concurrent
+    // deliveries can both read the row at 'scheduled', and without the CAS
+    // both would update to 'publishing' and post twice. If the CAS returns
+    // no row, another worker already claimed it; bail.
+    const claim = await step.run('claim', async () => {
+      const { data: claimedRow, error: claimErr } = await supabase
         .from('StudioPost')
         .update({ status: 'publishing', updatedAt: new Date().toISOString() })
-        .eq('id', postId);
-      return { done: true };
+        .eq('id', postId)
+        .eq('status', 'scheduled')
+        .select('id')
+        .maybeSingle();
+      if (claimErr) throw claimErr;
+      return { claimed: claimedRow !== null };
     });
+    if (!claim.claimed) {
+      return { skipped: 'already claimed by another worker' };
+    }
 
     const imageUrl = await step.run('sign-image', () =>
       getSignedDownloadUrl(post.storageKey as string, 3600),
@@ -126,5 +155,134 @@ export const publishScheduledPost = inngest.createFunction(
     });
 
     return { postId, posted: anyOk, results };
+  },
+);
+
+/**
+ * handleComposioTrigger — receives `composio/trigger.received` events from
+ * the /api/webhooks/composio receiver. The receiver has already verified
+ * the HMAC signature, deduped the delivery, and rate-capped the source;
+ * this function's job is to:
+ *
+ *   1. Resolve the IntegrationConnection (by composioConnectionId) and
+ *      IntegrationTrigger (by composioTriggerId) so we can act on the
+ *      realtor's space/user. If either is missing or non-active, drop.
+ *   2. Hand off to `dispatchTrigger`, which routes the event to one of
+ *      DRAFT (autonomous Modal run), NOTICE (activity card — Phase 4),
+ *      DATA_SYNC (direct DB write — Phase 4).
+ *   3. Stamp `lastFiredAt` on the trigger row so the health endpoint can
+ *      surface stale registrations.
+ *
+ * Inngest retries on a thrown error. The downstream paths (`fireRoutineRun`
+ * etc.) are idempotent on (space, instruction) by design — a retry that
+ * re-fires Modal would at worst produce a duplicate draft, which the
+ * realtor can dismiss. We accept that risk over the alternative of
+ * eating the error and losing the event.
+ */
+export const handleComposioTrigger = inngest.createFunction(
+  {
+    id: 'composio-handle-trigger',
+    triggers: [{ event: 'composio/trigger.received' }],
+  },
+  async ({ event, step }) => {
+    const data = event.data as {
+      deliveryId: string;
+      triggerSlug: string;
+      toolkitSlug: string;
+      composioConnectionId: string;
+      composioTriggerId: string;
+      userId: string;
+      payload: Record<string, unknown>;
+    };
+
+    // 1. Resolve the connection. If it's gone (mid-disconnect) or non-active,
+    //    drop the event. The receiver already verified the signature so we
+    //    know the delivery is authentic — we just no longer care about it.
+    const connection = await step.run('resolve-connection', async () => {
+      return findByComposioId(data.composioConnectionId);
+    });
+    if (!connection) {
+      logger.info('[composio.trigger] no IntegrationConnection — dropping', {
+        composioConnectionId: data.composioConnectionId,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'no_connection' };
+    }
+    if (connection.status !== 'active') {
+      logger.info('[composio.trigger] connection not active — dropping', {
+        connectionId: connection.id,
+        status: connection.status,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'connection_inactive' };
+    }
+
+    // 2. Resolve the trigger row. Missing = stale registration (Composio
+    //    sent for a trigger we don't track) — drop silently. Paused =
+    //    realtor turned it off; the receiver doesn't know that, the
+    //    handler does.
+    const triggerRow = await step.run('resolve-trigger', async () => {
+      return findByComposioTriggerId(data.composioTriggerId);
+    });
+    if (!triggerRow) {
+      logger.info('[composio.trigger] no IntegrationTrigger — dropping', {
+        composioTriggerId: data.composioTriggerId,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'no_trigger' };
+    }
+    if (triggerRow.status !== 'active') {
+      logger.info('[composio.trigger] trigger paused — dropping', {
+        triggerRowId: triggerRow.id,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'trigger_paused' };
+    }
+
+    // 3. Per-space daily cap. The receiver's per-(connection, slug)
+    //    hourly cap is finer-grained but lets a realtor with five
+    //    connected apps each at 60/hr accumulate 300+ Modal runs in a
+    //    day. This is the absolute ceiling per space.
+    const dayBucket = Math.floor(Date.now() / 1000 / DAY_SECONDS);
+    const dailyKey = `composio:trigger:space-daily:${connection.spaceId}:${dayBucket}`;
+    const dailyCount = await step.run('daily-cap-check', async () => {
+      const c = (await redis.incr(dailyKey)) as number;
+      if (c === 1) {
+        await redis.expire(dailyKey, DAY_SECONDS);
+      }
+      return c;
+    });
+    if (dailyCount > SPACE_DAILY_CAP) {
+      logger.warn('[composio.trigger] space daily cap exceeded — dropping', {
+        spaceId: connection.spaceId,
+        triggerSlug: data.triggerSlug,
+        count: dailyCount,
+        cap: SPACE_DAILY_CAP,
+      });
+      return { dispatched: 'noop', reason: 'space_daily_cap' };
+    }
+
+    // 4. Dispatch. The dispatcher is the single place that decides DRAFT
+    //    vs NOTICE vs DATA_SYNC vs no-op based on the slug.
+    const result = await step.run('dispatch', async () => {
+      return dispatchTrigger({
+        triggerSlug: data.triggerSlug,
+        connection,
+        payload: data.payload,
+      });
+    });
+
+    // 4. Stamp lastFiredAt only on a real dispatch — a no-op shouldn't
+    //    look like a successful fire on the health endpoint.
+    if (result.dispatched !== 'noop') {
+      await step.run('stamp-fired', () => stampFired(triggerRow.id));
+    }
+
+    return {
+      deliveryId: data.deliveryId,
+      triggerSlug: data.triggerSlug,
+      connectionId: connection.id,
+      ...result,
+    };
   },
 );

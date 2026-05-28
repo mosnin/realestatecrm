@@ -88,7 +88,15 @@ export async function runStudioGeneration(args: {
   });
   if (genErr) {
     logger.error('[studio.generate] log insert failed', { spaceId: args.spaceId }, genErr);
-    throw new StudioGenerationError('Could not start generation.', 500);
+    // Surface the underlying error so the realtor sees WHAT's wrong instead
+    // of a generic message that requires log access to diagnose. The
+    // common cause is the 20260606000005_studio_tables.sql migration not
+    // being applied — without it the table doesn't exist and we get
+    // `relation "StudioGeneration" does not exist`.
+    throw new StudioGenerationError(
+      `Could not start generation: ${genErr.message ?? 'unknown DB error'}`,
+      500,
+    );
   }
 
   const markFailed = async (message: string): Promise<void> => {
@@ -116,7 +124,7 @@ export async function runStudioGeneration(args: {
       err as Error,
     );
     await markFailed('Generation failed');
-    throw new StudioGenerationError('Generation failed. Please try again.', 502);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 502);
   }
 
   // ── Copy the bytes out of fal's temporary URL into our own storage ──────
@@ -130,7 +138,7 @@ export async function runStudioGeneration(args: {
   } catch (err) {
     logger.error('[studio.generate] asset fetch failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not retrieve the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 502);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 502);
   }
 
   // ── Store as a File ─────────────────────────────────────────────────────
@@ -151,7 +159,7 @@ export async function runStudioGeneration(args: {
   } catch (err) {
     logger.error('[studio.generate] upload failed', { spaceId: args.spaceId }, err as Error);
     await markFailed('Could not store the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 500);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
   const { error: fileErr } = await supabase.from('File').insert({
@@ -169,7 +177,7 @@ export async function runStudioGeneration(args: {
     await deleteObject(storageKey).catch(() => undefined);
     logger.error('[studio.generate] file insert failed', { spaceId: args.spaceId }, fileErr);
     await markFailed('Could not record the generated asset.');
-    throw new StudioGenerationError('Generation failed. Please try again.', 500);
+    throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
   await supabase

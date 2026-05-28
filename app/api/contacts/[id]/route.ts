@@ -4,6 +4,8 @@ import { syncContact, deleteContactVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { deleteObjectsBestEffort } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 import type { Contact } from '@/lib/types';
 
 export async function GET(
@@ -197,6 +199,12 @@ export async function PATCH(
       .from('Contact')
       .update(updates)
       .eq('id', id)
+      // Scope by spaceId too — the existence check above proved the row
+      // is in this space NOW, but between check and write the row could
+      // theoretically be reassigned (admin tool, future cross-space
+      // merge). Adding the scope makes the write a CAS on space ownership
+      // — TOCTOU-safe.
+      .eq('spaceId', space.id)
       .select()
       .single();
     if (updateError) {
@@ -239,6 +247,20 @@ export async function DELETE(
 
   const contact = contactRows[0];
 
+  // Capture document storage keys BEFORE deleting the Contact — the FK
+  // cascade removes ContactDocument rows from the DB the moment the
+  // Contact row is gone, and we can't look them up afterwards. Wasabi
+  // objects don't cascade, so we orphan PII (signed buyer applications,
+  // bank statements, ID scans) forever unless we drop them here.
+  const { data: docRows } = await supabase
+    .from('ContactDocument')
+    .select('storageKey')
+    .eq('contactId', id)
+    .eq('spaceId', space.id);
+  const docKeys = (docRows ?? [])
+    .map((r) => (r as { storageKey: string }).storageKey)
+    .filter((k): k is string => Boolean(k));
+
   const { error: deleteError } = await supabase
     .from('Contact')
     .delete()
@@ -248,6 +270,23 @@ export async function DELETE(
     console.error('[contacts/DELETE] delete error:', deleteError);
     return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
   }
+
+  // Fire-and-forget the Wasabi cleanup — the row's already gone, the
+  // worst case is a few orphan objects the nightly storage-gc sweeper
+  // catches. Don't block the response on remote storage latency.
+  if (docKeys.length > 0) {
+    void deleteObjectsBestEffort(docKeys).then((res) => {
+      if (res.failed.length > 0) {
+        logger.warn('[contacts/DELETE] some doc objects failed to delete', {
+          contactId: id,
+          spaceId: space.id,
+          okCount: res.ok,
+          failedCount: res.failed.length,
+        });
+      }
+    });
+  }
+
   deleteContactVector(contact.spaceId, id).catch(console.error);
   void audit({
     actorClerkId: userId,
@@ -256,7 +295,7 @@ export async function DELETE(
     resourceId: id,
     spaceId: space.id,
     req: _req,
-    metadata: { name: contact.name, email: contact.email },
+    metadata: { name: contact.name, email: contact.email, docCount: docKeys.length },
   });
 
   return NextResponse.json({ success: true });

@@ -1,15 +1,16 @@
 /**
  * GET /api/agent/usage
  *
- * Returns today's token usage for the space from Upstash Redis.
- * Used by the settings panel to show the realtor how much of their
- * daily budget has been consumed.
+ * Returns today's token usage for the space. Reads the shared helper
+ * `lib/usage/today-token-usage.ts` so display and chat-budget
+ * enforcement (which routes through the same helper) cannot drift apart.
  */
 
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -19,28 +20,8 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
+  const { total: used } = await getTodayTokenUsage(space.id);
 
-  let used = 0;
-
-  if (kvUrl && kvToken) {
-    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const key = `agent:budget:${space.id}:${date}`;
-    try {
-      const res = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, {
-        headers: { Authorization: `Bearer ${kvToken}` },
-      });
-      if (res.ok) {
-        const { result } = await res.json() as { result: string | null };
-        used = result ? parseInt(result, 10) : 0;
-      }
-    } catch {
-      // Redis unavailable — return 0
-    }
-  }
-
-  // Also grab the configured daily limit from AgentSettings
   const { data: agentSettings } = await supabase
     .from('AgentSettings')
     .select('dailyTokenBudget')

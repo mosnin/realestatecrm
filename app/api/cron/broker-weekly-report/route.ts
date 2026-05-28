@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/redis';
 
 /**
  * GET /api/cron/broker-weekly-report
  *
  * Runs every Monday at 9 AM. Compiles a weekly activity report for each
  * active brokerage and emails it to the broker owner.
+ *
+ * Idempotency: a SETNX day-lock prevents the same Monday from broadcasting
+ * twice if the cron is re-triggered (manual hit, accidental Vercel double-
+ * fire, cold-start race). Without it, every broker gets the report twice.
  */
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -16,6 +21,16 @@ export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Day-level idempotency lock. Key is UTC YYYY-MM-DD because that's how
+  // Vercel cron expressions evaluate; the lock lifetime is 25 hours so it
+  // covers the Monday window plus a buffer for DST and clock skew.
+  const today = new Date().toISOString().slice(0, 10);
+  const lockKey = `cron-lock:broker-weekly-report:${today}`;
+  const claimed = await redis.set(lockKey, '1', { nx: true, ex: 25 * 60 * 60 });
+  if (claimed !== 'OK') {
+    return NextResponse.json({ ok: true, skipped: 'already_ran_today', date: today });
   }
 
   const now = new Date();

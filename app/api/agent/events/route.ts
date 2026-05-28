@@ -7,21 +7,32 @@
  *
  * Secured with AGENT_INTERNAL_SECRET — fails loudly if secret is not set
  * in production so misconfiguration is caught at startup, not at runtime.
+ *
+ * The bearer secret authenticates the *caller* but not the *payload*: a
+ * compromised or buggy Modal worker could publish events under any
+ * spaceId/runId pair. We bind the first observed (runId, spaceId) pair
+ * for a run in Redis so subsequent writers can't redirect a stream
+ * mid-flight — a session started for space A can't suddenly publish
+ * into space B's SSE channel just by knowing its runId.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL ?? '',
-  token: process.env.KV_REST_API_TOKEN ?? '',
-});
+import { redis } from '@/lib/redis';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const VALID_TYPES = new Set(['info', 'action', 'draft', 'complete', 'error', 'warning']);
 
+/** Per-run space binding TTL — matches the events list TTL (2h). The run
+ *  itself can't reasonably live longer than this; if it does, the binding
+ *  expires and the next event will rebind. */
+const RUN_BINDING_TTL_SECONDS = 7_200;
+
 function eventKey(spaceId: string, runId: string): string {
   return `agent:stream:${spaceId}:${runId}`;
+}
+
+function runBindingKey(runId: string): string {
+  return `agent:runspace:${runId}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -46,6 +57,32 @@ export async function POST(req: NextRequest) {
   // Sanitise event type — reject unknown types rather than forwarding them
   if (!VALID_TYPES.has(type)) {
     return NextResponse.json({ error: 'Invalid event type' }, { status: 400 });
+  }
+
+  // ── Bind runId → spaceId on first write, enforce on every subsequent
+  // write. SET NX is atomic — the first caller wins and any later caller
+  // claiming a different spaceId is rejected with 403. We don't trust the
+  // Bearer secret alone to authenticate the *payload*: a single compromised
+  // or buggy worker shouldn't be able to redirect another tenant's stream.
+  const bindingKey = runBindingKey(runId);
+  const claimed = await redis.set(bindingKey, spaceId, {
+    nx: true,
+    ex: RUN_BINDING_TTL_SECONDS,
+  });
+  if (claimed !== 'OK') {
+    // Key already existed — must match what's there.
+    const bound = await redis.get<string>(bindingKey);
+    if (bound && bound !== spaceId) {
+      console.error('[agent/events] spaceId mismatch on bound run', {
+        runId,
+        boundSpaceId: bound,
+        claimedSpaceId: spaceId,
+      });
+      return NextResponse.json(
+        { error: 'runId is bound to a different space' },
+        { status: 403 },
+      );
+    }
   }
 
   const event = JSON.stringify({

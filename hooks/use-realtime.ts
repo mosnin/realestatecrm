@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -40,6 +40,10 @@ export function useRealtime<T extends Record<string, unknown> = Record<string, u
   const channelRef = useRef<RealtimeChannel | null>(null);
   const callbackRef = useRef(onEvent);
   callbackRef.current = onEvent;
+  // Per-instance id so two components on the same page can subscribe to the
+  // same (table, event, filter) tuple without colliding on a channel name.
+  // Supabase requires channel names be unique per client.
+  const instanceId = useId();
 
   useEffect(() => {
     if (!enabled) return;
@@ -47,7 +51,7 @@ export function useRealtime<T extends Record<string, unknown> = Record<string, u
     const supabase = getSupabaseBrowser();
     if (!supabase) return;
 
-    const channelName = `realtime:${table}:${event}:${filter ?? 'all'}`;
+    const channelName = `realtime:${table}:${event}:${filter ?? 'all'}:${instanceId}`;
 
     const config: Record<string, unknown> = {
       event,
@@ -73,5 +77,5 @@ export function useRealtime<T extends Record<string, unknown> = Record<string, u
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [table, event, filter, enabled]);
+  }, [table, event, filter, enabled, instanceId]);
 }

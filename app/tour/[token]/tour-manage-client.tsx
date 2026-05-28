@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, ArrowRight } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,9 @@ interface TourManageClientProps {
   token: string;
   businessName: string;
   bookingSlug: string;
+  /** Link back to the realtor's public page — calm secondary affordance
+   *  on the post-action states so the applicant has somewhere to go. */
+  profileHref?: string | null;
 }
 
 // Sanctioned status tones — pulled from the design language. Default is the
@@ -61,7 +65,7 @@ const STATUS_TONE: Record<string, { label: string; className: string }> = {
   },
 };
 
-export function TourManageClient({ tour, token, businessName, bookingSlug }: TourManageClientProps) {
+export function TourManageClient({ tour, token, businessName, bookingSlug, profileHref }: TourManageClientProps) {
   const [status, setStatus] = useState(tour.status);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -86,10 +90,10 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
         setStatus('cancelled');
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to cancel. Please try again.');
+        setError(data.error || "Cancel didn't go through — usually temporary.");
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setConfirmOpen(false);
@@ -133,6 +137,17 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
               >
                 Book a new tour
               </a>
+            </div>
+          )}
+          {profileHref && (
+            <div className="pt-1">
+              <Link
+                href={profileHref}
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                See {businessName}&apos;s page
+                <ArrowRight size={14} aria-hidden />
+              </Link>
             </div>
           )}
         </div>

@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest) {
   );
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many scoring saves. Please try again later.' },
+      { error: 'Too many scoring saves. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

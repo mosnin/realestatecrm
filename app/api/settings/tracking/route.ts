@@ -216,7 +216,7 @@ export async function PUT(req: NextRequest) {
   const { allowed } = await checkRateLimit(`tracking:put:${userId}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many updates. Please try again later.' },
+      { error: 'Too many updates. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }

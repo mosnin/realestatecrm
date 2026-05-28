@@ -17,7 +17,13 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import { uploadObject, deleteObject, buildKey, getPublicUrl } from '@/lib/storage';
+import {
+  uploadObject,
+  deleteObject,
+  buildKey,
+  getPublicUrl,
+  getSignedDownloadUrl,
+} from '@/lib/storage';
 import {
   validateUpload,
   quotaForPlan,
@@ -77,7 +83,7 @@ export async function GET(req: NextRequest) {
     (() => {
       let q = supabase
         .from('File')
-        .select('id, name, mimeType, category, sizeBytes, isPublic, createdAt')
+        .select('id, name, mimeType, category, sizeBytes, isPublic, storageKey, createdAt')
         .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
         .limit(500);
@@ -86,7 +92,7 @@ export async function GET(req: NextRequest) {
     })(),
     supabase
       .from('Attachment')
-      .select('id, filename, mimeType, sizeBytes, createdAt')
+      .select('id, filename, mimeType, sizeBytes, storagePath, createdAt')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(500),
@@ -106,40 +112,107 @@ export async function GET(req: NextRequest) {
     isPublic: boolean;
     createdAt: string;
     source: 'file' | 'chat';
+    /** Renderable URL for thumbnails / previews. Signed (~20 min TTL) for
+     *  private files; public URL for chat attachments. `null` for types we
+     *  don't preview inline (PDFs, "other") — the card renders an icon
+     *  instead. */
+    previewUrl: string | null;
   };
 
-  const fileRows: ListedFile[] = (fileRes.data ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    mimeType: r.mimeType,
-    category: r.category,
-    sizeBytes: Number(r.sizeBytes ?? 0),
-    isPublic: Boolean(r.isPublic),
-    createdAt: r.createdAt,
-    source: 'file',
-  }));
+  /** Image + video files get an inline-rendered preview in the card. Audio
+   *  and PDFs ship an icon today — auto-loading audio metadata to draw
+   *  waveforms is overkill; PDF-to-image rendering needs a server pipeline. */
+  const isPreviewable = (mime: string): boolean =>
+    mime.startsWith('image/') || mime.startsWith('video/');
 
-  // Chat attachments are public-served (the chat-attachments/ prefix is
-  // covered by the bucket policy) and always have a mime — categorize on
-  // the fly. Apply the same category filter the File query used.
-  const chatRows: ListedFile[] = ((attachmentRes.data ?? []) as Array<{
+  // 20-minute signing window — the Files page isn't held open for hours.
+  // Long enough that a slow scroll won't expire mid-render; short enough
+  // that a leaked URL is bounded.
+  const PREVIEW_TTL_SECONDS = 60 * 20;
+
+  const fileRowsRaw = (fileRes.data ?? []) as Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    category: string;
+    sizeBytes: number | null;
+    isPublic: boolean | null;
+    storageKey: string;
+    createdAt: string;
+  }>;
+
+  // Sign all previewable private files in parallel — one round-trip to the
+  // signer instead of one per card on the client.
+  const fileRows: ListedFile[] = await Promise.all(
+    fileRowsRaw.map(async (r) => {
+      let previewUrl: string | null = null;
+      if (isPreviewable(r.mimeType)) {
+        if (r.isPublic) {
+          previewUrl = getPublicUrl(r.storageKey);
+        } else {
+          try {
+            previewUrl = await getSignedDownloadUrl(r.storageKey, PREVIEW_TTL_SECONDS);
+          } catch (err) {
+            // A single signing failure shouldn't poison the whole list —
+            // fall back to the icon for this row.
+            logger.warn('[files] preview sign failed', { id: r.id }, err as Error);
+            previewUrl = null;
+          }
+        }
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        mimeType: r.mimeType,
+        category: r.category,
+        sizeBytes: Number(r.sizeBytes ?? 0),
+        isPublic: Boolean(r.isPublic),
+        createdAt: r.createdAt,
+        source: 'file' as const,
+        previewUrl,
+      };
+    }),
+  );
+
+  // Chat attachments live in the private chat-attachments/ prefix and
+  // require a signed URL to read. Sign previewable rows in parallel here,
+  // same pattern as the File-table rows above, so the cards render inline
+  // without a second client round-trip.
+  const chatRowsRaw = (attachmentRes.data ?? []) as Array<{
     id: string;
     filename: string;
     mimeType: string;
     sizeBytes: number | null;
+    storagePath: string;
     createdAt: string;
-  }>)
-    .map((r) => ({
-      id: r.id,
-      name: r.filename,
-      mimeType: r.mimeType,
-      category: deriveCategory(r.mimeType),
-      sizeBytes: Number(r.sizeBytes ?? 0),
-      isPublic: true,
-      createdAt: r.createdAt,
-      source: 'chat' as const,
-    }))
-    .filter((r) => !category || r.category === category);
+  }>;
+  const chatRows: ListedFile[] = (
+    await Promise.all(
+      chatRowsRaw.map(async (r) => {
+        let previewUrl: string | null = null;
+        if (isPreviewable(r.mimeType) && r.storagePath) {
+          try {
+            previewUrl = await getSignedDownloadUrl(r.storagePath, PREVIEW_TTL_SECONDS);
+          } catch (err) {
+            logger.warn('[files] chat-attachment sign failed', { id: r.id }, err as Error);
+          }
+        }
+        return {
+          id: r.id,
+          name: r.filename,
+          mimeType: r.mimeType,
+          category: deriveCategory(r.mimeType),
+          sizeBytes: Number(r.sizeBytes ?? 0),
+          // chat attachments are private now; report that to the UI so it
+          // doesn't suggest public-link affordances on the card.
+          isPublic: false,
+          createdAt: r.createdAt,
+          source: 'chat' as const,
+          previewUrl,
+        };
+      }),
+    )
+  ).filter((r) => !category || r.category === category);
 
   const merged = [...fileRows, ...chatRows].sort((a, b) =>
     a.createdAt < b.createdAt ? 1 : -1,

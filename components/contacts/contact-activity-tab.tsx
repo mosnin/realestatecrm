@@ -29,17 +29,18 @@ type TimelineEntry = {
 const TYPE_META = ACTIVITY_META;
 const ACTIVITY_TYPES: ManualActivityType[] = ['note', 'call', 'email', 'meeting', 'follow_up'];
 
-// Meta for system/tour/deal events
+// Meta for system/tour/deal events. One muted neutral for every icon —
+// the icon shape carries the meaning. Mirrors ACTIVITY_META discipline.
 const SYSTEM_META: Record<string, { label: string; icon: typeof CalendarDays; color: string }> = {
-  tour_scheduled: { label: 'Tour scheduled', icon: CalendarDays, color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10' },
-  tour_confirmed: { label: 'Tour confirmed', icon: CalendarDays, color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' },
-  tour_completed: { label: 'Tour completed', icon: CalendarDays, color: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-500/10' },
-  tour_cancelled: { label: 'Tour cancelled', icon: CalendarDays, color: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/10' },
-  tour_no_show: { label: 'No-show', icon: CalendarDays, color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  deal_created: { label: 'Deal created', icon: Briefcase, color: 'text-muted-foreground bg-muted' },
-  contact_created: { label: 'Contact added', icon: UserPlus, color: 'text-muted-foreground bg-muted' },
-  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'text-muted-foreground bg-muted' },
-  status_change: { label: 'Status change', icon: FileText, color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' },
+  tour_scheduled: { label: 'Tour scheduled', icon: CalendarDays, color: 'bg-muted text-muted-foreground' },
+  tour_confirmed: { label: 'Tour confirmed', icon: CalendarDays, color: 'bg-muted text-muted-foreground' },
+  tour_completed: { label: 'Tour completed', icon: CalendarDays, color: 'bg-muted text-muted-foreground' },
+  tour_cancelled: { label: 'Tour cancelled', icon: CalendarDays, color: 'bg-muted text-muted-foreground' },
+  tour_no_show: { label: 'No-show', icon: CalendarDays, color: 'bg-muted text-muted-foreground' },
+  deal_created: { label: 'Deal created', icon: Briefcase, color: 'bg-muted text-muted-foreground' },
+  contact_created: { label: 'Contact added', icon: UserPlus, color: 'bg-muted text-muted-foreground' },
+  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'bg-muted text-muted-foreground' },
+  status_change: { label: 'Status change', icon: FileText, color: 'bg-muted text-muted-foreground' },
 };
 
 function getEntryMeta(entry: TimelineEntry) {
@@ -168,7 +169,9 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
                 onClick={() => setType(t)}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                  type === t ? meta.color : 'text-muted-foreground bg-muted hover:text-foreground',
+                  type === t
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon size={11} />

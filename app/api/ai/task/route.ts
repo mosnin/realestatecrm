@@ -44,6 +44,13 @@ import {
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
+import { getSignedDownloadUrl } from '@/lib/storage';
+
+/** TTL for attachment URLs forwarded to Modal. The agent reads them within
+ *  seconds of receiving the task; 30 minutes is plenty of headroom and short
+ *  enough that a leaked task payload can't be replayed against the assets. */
+const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
@@ -157,7 +164,7 @@ async function hydrateAttachments(
   try {
     const { data, error } = await supabase
       .from('Attachment')
-      .select('id, filename, "mimeType", "extractedText", "publicUrl", "extractionStatus"')
+      .select('id, filename, "mimeType", "extractedText", "storagePath", "extractionStatus"')
       .in('id', ids)
       .eq('spaceId', spaceId);
     if (error) {
@@ -169,16 +176,38 @@ async function hydrateAttachments(
       filename: string;
       mimeType: string;
       extractedText: string | null;
-      publicUrl: string;
+      storagePath: string | null;
       extractionStatus: string;
     }>;
-    return rows.map((r) => ({
-      id: r.id,
-      filename: r.filename,
-      mime_type: r.mimeType,
-      extracted_text: r.extractedText,
-      public_url: r.publicUrl,
-    }));
+    // Mint a fresh signed URL per attachment for this task. Each task is a
+    // single agent turn — short-lived URLs are correct here. A signing
+    // failure for one row drops that row's URL but doesn't poison the rest.
+    return Promise.all(
+      rows.map(async (r) => {
+        let signedUrl = '';
+        if (r.storagePath) {
+          try {
+            signedUrl = await getSignedDownloadUrl(
+              r.storagePath,
+              ATTACHMENT_HYDRATE_TTL_SECONDS,
+            );
+          } catch (signErr) {
+            logger.warn(
+              '[ai/task] attachment sign failed',
+              { spaceId, attachmentId: r.id },
+              signErr,
+            );
+          }
+        }
+        return {
+          id: r.id,
+          filename: r.filename,
+          mime_type: r.mimeType,
+          extracted_text: r.extractedText,
+          public_url: signedUrl,
+        };
+      }),
+    );
   } catch (err) {
     logger.warn('[ai/task] attachment hydrate threw — continuing empty', { spaceId }, err);
     return [];
@@ -480,18 +509,11 @@ export async function POST(req: NextRequest) {
     const dailyTokenBudget: number =
       (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
 
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const { data: usageRows } = await supabase
-      .from('AgentTask')
-      .select('inputTokens, outputTokens')
-      .eq('spaceId', ctx.space.id)
-      .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
-
-    const todayTokens = (usageRows ?? []).reduce(
-      (sum: number, row: { inputTokens: number | null; outputTokens: number | null }) =>
-        sum + (row.inputTokens ?? 0) + (row.outputTokens ?? 0),
-      0,
-    );
+    // Previously this read AgentTask.inputTokens/outputTokens — columns no
+    // code writes — so the enforcement silently passed every time. Route
+    // through the shared helper that sums ChatUsage rows + the autonomous
+    // Redis counter, matching the Settings display.
+    const { total: todayTokens } = await getTodayTokenUsage(ctx.space.id);
 
     if (todayTokens >= dailyTokenBudget) {
       logger.warn('[ai/task] daily token budget exceeded', {

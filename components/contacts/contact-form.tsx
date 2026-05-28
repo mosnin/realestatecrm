@@ -687,8 +687,13 @@ function ParsedPreviewCard({ parsed }: { parsed: ParsedContact }) {
     },
     {
       label: 'Budget',
+      // Rentals quote monthly; buyers/sellers quote a purchase price.
       value:
-        parsed.monthlyBudget != null ? `$${parsed.monthlyBudget.toLocaleString()}/mo` : '—',
+        parsed.monthlyBudget != null
+          ? parsed.type === 'rental'
+            ? `$${parsed.monthlyBudget.toLocaleString()}/mo`
+            : `$${parsed.monthlyBudget.toLocaleString()}`
+          : '—',
     },
     {
       label: 'Looking for',

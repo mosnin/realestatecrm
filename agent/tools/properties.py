@@ -38,7 +38,7 @@ _ALLOWED_LISTING_STATUS = {
 }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def add_property(
     ctx: RunContextWrapper[AgentContext],
@@ -129,7 +129,7 @@ async def add_property(
     }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def send_property_packet(
     ctx: RunContextWrapper[AgentContext],

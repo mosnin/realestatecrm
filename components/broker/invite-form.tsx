@@ -83,7 +83,7 @@ export function InviteForm({ isOwner = true, seatUsage }: InviteFormProps) {
         setMessage({ type: 'error', text: data.error ?? 'Failed to send invitation.' });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Network error. Please try again.' });
+      setMessage({ type: 'error', text: "Couldn't reach the server — usually temporary." });
     } finally {
       setLoading(false);
     }

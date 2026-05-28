@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     if (lower.includes('openai') || lower.includes('api key') || lower.includes('rate_limit')) {
       return NextResponse.json(
-        { error: 'The scoring service is temporarily unavailable. Please try again in a moment.' },
+        { error: "Scoring's taking a breather. Try again in a moment." },
         { status: 502 },
       );
     }
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Something went wrong while scoring. Please try again or contact support if this continues.' },
+      { error: "Scoring didn't go through — usually temporary. Contact support if it sticks." },
       { status: 500 },
     );
   }

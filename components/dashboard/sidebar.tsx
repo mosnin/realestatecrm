@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
@@ -15,7 +16,6 @@ import {
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { ChippiInstrument } from '@/components/dashboard/chippi-instrument';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
@@ -83,11 +83,19 @@ const brokerAdminNavSections = [
   {
     label: '',
     items: [
+      // Chippi-for-Brokers Phase 1 — pinned at the top, mirroring the
+      // realtor sidebar's top-pinned Chippi entry. Same icon (chip avatar
+      // is rendered by the broker nav via FlatNavItem; MessageCircle is the
+      // fallback used elsewhere in the broker nav). The existing
+      // /broker/agent-activity entry was previously also labelled "Chippi"
+      // — that one is the activity feed, not the chat surface; renamed
+      // to "Agent activity" below to avoid two nav rows with the same name.
+      { href: '/broker/chippi', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Chippi', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Agent activity', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
@@ -884,6 +892,11 @@ function RealtorNav({
     (item) => !item.isAI && item.href !== '/settings',
   );
 
+  // Route IS the signal for which nav mode this sidebar is in. On
+  // /chippi/* the main links cross-fade out and the conversation history
+  // slides in their place; off Chippi, the reverse.
+  const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
+
   const getBadge = (item: NavItem): React.ReactNode => {
     if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
       return (
@@ -947,12 +960,19 @@ function RealtorNav({
         collapsed ? 'px-1' : 'px-3',
       )}
     >
-      {/* Primary nav — daily destinations. AI item rides up top via the
-          existing renderItem treatment; no section label needed when there
-          are only a handful of primaries. */}
+      {/* Two-mode sidebar: on /chippi the conversation history slides in
+          below the main nav. The main destinations (People, Deals,
+          Calendar…) stay visible the whole time — the realtor must always
+          have a door out of Chippi, not just a door in. The Chippi nav
+          item itself stays pinned at the top regardless so the door in is
+          always there too. Settings stays pinned at the bottom. */}
       <div>
         <div className="space-y-0.5">
+          {/* Always visible — top-pinned AI items (Chippi + future AI rows) */}
           {aiItems.map(renderItem)}
+          {/* Main destinations — visible on every route. Hiding them on
+              /chippi (the original cross-fade design) left the realtor
+              stranded with no navigation out. */}
           {mainItems.map(renderItem)}
         </div>
       </div>
@@ -966,45 +986,44 @@ function RealtorNav({
               future secondary nav without re-plumbing the layout.
           The previous Chats/Pages tab toggle was ceremony — Pages was
           empty so flipping to it dead-ended. Removed. */}
-      {(() => {
-        const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
-        const hasMore = realtorMoreNavItems.length > 0;
-        if (!onChippi && !hasMore) return null;
-        return (
-          <div>
+      <AnimatePresence initial={false} mode="wait">
+        {onChippi && (
+          <motion.div
+            key="chippi-history"
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 6 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             {collapsed ? (
               <>
-                {onChippi && (
-                  <>
-                    <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
-                    <CollapsedTooltip enabled label="Conversations">
-                      <Link
-                        href={`/s/${slug}/chippi?view=history`}
-                        aria-label="Conversation history"
-                        className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
-                      >
-                        <History size={15} strokeWidth={1.75} />
-                      </Link>
-                    </CollapsedTooltip>
-                  </>
-                )}
-                {hasMore && (
-                  <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
-                )}
+                <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+                <CollapsedTooltip enabled label="Conversations">
+                  <Link
+                    href={`/s/${slug}/chippi?view=history`}
+                    aria-label="Conversation history"
+                    className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
+                  >
+                    <History size={15} strokeWidth={1.75} />
+                  </Link>
+                </CollapsedTooltip>
               </>
             ) : (
-              <>
-                {onChippi && <SidebarConversations slug={slug} />}
-                {hasMore && (
-                  <div className={cn('space-y-0.5', onChippi && 'mt-4')}>
-                    {realtorMoreNavItems.map(renderItem)}
-                  </div>
-                )}
-              </>
+              <SidebarConversations slug={slug} />
             )}
-          </div>
-        );
-      })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* realtorMoreNavItems — the secondary slot for non-Chippi pages.
+          Empty today; kept so future additions don't require a layout
+          replumb. Only renders when the array has items AND we're not on
+          Chippi (the Chippi state owns this region). */}
+      {realtorMoreNavItems.length > 0 && !onChippi && (
+        <div>
+          <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+        </div>
+      )}
 
       {/* Settings — collapsible, pinned at bottom of scroll area */}
       <div className="pt-1">
@@ -1069,7 +1088,7 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0">
+      <aside data-dashboard-sidebar className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0">
         <div className="px-4 pt-5 pb-3">
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
@@ -1119,7 +1138,7 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
+      <aside data-dashboard-sidebar className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
@@ -1254,10 +1273,11 @@ function RealtorSidebarShell({
   displayName: string;
   imageUrl?: string | null;
 }) {
-  const { collapsed } = useSidebarCollapsed();
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   return (
     <aside
+      data-dashboard-sidebar
       className={cn(
         'group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0',
         'transition-[width] duration-200 ease-in-out',
@@ -1278,15 +1298,28 @@ function RealtorSidebarShell({
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Brand mark — small, monochrome, sets identity without dominating.
-            In collapsed mode the BrandLogo is already an icon-tight mark; we
-            just center it on the rail. */}
+            In collapsed mode the BrandLogo doubles as the expand affordance:
+            tapping the mark flips the rail open. The EdgeCollapseHandle is
+            a thin slice on the right edge; the logo is the big, obvious
+            target you'd reach for anyway. */}
         <div
           className={cn(
             'pt-5 pb-3',
             collapsed ? 'flex justify-center px-2' : 'px-4',
           )}
         >
-          <BrandLogo className="h-5" alt="Chippi" />
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label="Expand sidebar"
+              className="flex items-center justify-center w-10 h-10 rounded-md transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            >
+              <BrandLogo className="h-5" alt="Chippi" />
+            </button>
+          ) : (
+            <BrandLogo className="h-5" alt="Chippi" />
+          )}
         </div>
 
         {/* Workspace identity (with switcher when there's somewhere to go) */}
@@ -1305,9 +1338,6 @@ function RealtorSidebarShell({
         <div className="mt-3">
           <SearchPill collapsed={collapsed} />
         </div>
-
-        {/* Cockpit instrument — live agent readout (working / idle / paused) */}
-        <ChippiInstrument collapsed={collapsed} />
 
         {/* Primary nav + More + Settings */}
         <RealtorNav

@@ -462,6 +462,7 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "rentalFormConfig"     jsonb
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "buyerFormConfig"      jsonb DEFAULT NULL;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "formConfigSource"     text NOT NULL DEFAULT 'legacy';
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "trackingPixels"       jsonb;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "isVerified"           boolean NOT NULL DEFAULT false;
 
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"    text;
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageFormConfig"  jsonb DEFAULT NULL;

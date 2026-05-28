@@ -1,7 +1,81 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
+import { supabase } from '@/lib/supabase';
 import { DealsPageClient } from '@/components/deals/deals-page-client';
+import type { Pipeline, DealStage, Deal } from '@/lib/types';
+
+type StageWithDeals = DealStage & { deals: Deal[] };
+
+/**
+ * Server-side fetch for pipelines + the default pipeline's stages-with-deals.
+ *
+ * Without this the deals page would render KPI cells at 0 until the client
+ * round-trip finished — on a slow connection the realtor would see "0 active
+ * deals" for a beat on every reload, which read as "I lost your data."
+ * Pre-computing on the server makes the first paint truthful.
+ *
+ * Failures are non-fatal: any throw drops us back to the legacy
+ * empty-then-fetch behaviour so the page never hard-blocks on a stat strip.
+ */
+async function loadInitialDealsData(spaceId: string): Promise<{
+  pipelines: Pipeline[];
+  initialStages: StageWithDeals[];
+  initialPipelineId: string | null;
+}> {
+  try {
+    const { data: pipelineRows } = await supabase
+      .from('Pipeline')
+      .select('*')
+      .eq('spaceId', spaceId)
+      .order('position', { ascending: true });
+
+    const pipelines = (pipelineRows ?? []) as Pipeline[];
+    if (pipelines.length === 0) {
+      return { pipelines, initialStages: [], initialPipelineId: null };
+    }
+
+    // The client may override this with the realtor's localStorage pick after
+    // mount; the first paint uses the first pipeline so we always have
+    // something to compute KPIs from.
+    const firstPipelineId = pipelines[0].id;
+    const { data: stageRows } = await supabase
+      .from('DealStage')
+      .select('*')
+      .eq('spaceId', spaceId)
+      .eq('pipelineId', firstPipelineId)
+      .order('position', { ascending: true });
+    const stages = (stageRows ?? []) as DealStage[];
+
+    const stageIds = stages.map((s) => s.id);
+    let dealRows: Deal[] = [];
+    if (stageIds.length > 0) {
+      const { data } = await supabase
+        .from('Deal')
+        .select('*')
+        .eq('spaceId', spaceId)
+        .in('stageId', stageIds);
+      dealRows = (data ?? []) as Deal[];
+    }
+
+    const dealsByStage = new Map<string, Deal[]>();
+    for (const deal of dealRows) {
+      const arr = dealsByStage.get(deal.stageId) ?? [];
+      arr.push(deal);
+      dealsByStage.set(deal.stageId, arr);
+    }
+
+    const initialStages: StageWithDeals[] = stages.map((s) => ({
+      ...s,
+      deals: dealsByStage.get(s.id) ?? [],
+    }));
+
+    return { pipelines, initialStages, initialPipelineId: firstPipelineId };
+  } catch (err) {
+    console.error('[deals] initial SSR fetch failed', err);
+    return { pipelines: [], initialStages: [], initialPipelineId: null };
+  }
+}
 
 export default async function DealsPage({
   params
@@ -34,5 +108,14 @@ export default async function DealsPage({
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) notFound();
 
-  return <DealsPageClient slug={slug} />;
+  const { pipelines, initialStages, initialPipelineId } = await loadInitialDealsData(space.id);
+
+  return (
+    <DealsPageClient
+      slug={slug}
+      initialPipelines={pipelines}
+      initialStages={initialStages}
+      initialPipelineId={initialPipelineId}
+    />
+  );
 }

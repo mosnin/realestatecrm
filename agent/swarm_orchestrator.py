@@ -17,7 +17,7 @@ from openai import AsyncOpenAI
 
 from config import settings
 from db import supabase as get_supabase
-from llm import configure_agents_sdk, get_llm_client, openai_model, resolve_chat_model
+from llm import configure_agents_sdk, get_llm_client, make_chat_model, openai_model, resolve_chat_model
 
 logger = structlog.get_logger(__name__)
 
@@ -100,7 +100,7 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
         agent = Agent(
             name=member["name"],
             instructions=system_prompt,
-            model=resolve_chat_model(settings.worker_model),
+            model=make_chat_model(resolve_chat_model(settings.worker_model)),
             model_settings=ModelSettings(max_tokens=2048),
         )
 
@@ -193,7 +193,17 @@ async def run_swarm(payload: dict) -> None:
         # Create SwarmMember rows
         members = []
         for task_def in plan.get("tasks", []):
-            agent_index = task_def.get("agentIndex", -1)
+            if not isinstance(task_def, dict):
+                continue
+            # The planning LLM (gpt-4o-mini via OpenRouter) routinely returns
+            # `agentIndex` as a string or null even though the prompt asks for
+            # an int — a comparison against len() then raises TypeError and
+            # the entire swarm run flips to 'failed'. Coerce defensively.
+            raw_index = task_def.get("agentIndex", -1)
+            try:
+                agent_index = int(raw_index)
+            except (TypeError, ValueError):
+                agent_index = -1
             agent_config = (
                 custom_agents[agent_index]
                 if 0 <= agent_index < len(custom_agents)

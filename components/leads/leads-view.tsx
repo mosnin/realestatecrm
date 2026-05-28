@@ -682,7 +682,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
             const app = lead.applicationData as ApplicationData | null;
             const details = lead.scoreDetails as LeadScoreDetails | null;
             const rawBudget = app?.monthlyRent ?? lead.budget;
-            const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
+            // Rentals quote monthly; buyers/sellers quote a purchase price.
+            const isRental = lead.leadType === 'rental';
+            const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? (isRental ? `${formatMoney(rawBudget)}/mo` : formatMoney(rawBudget)) : null;
             const incomeDisplay = typeof app?.monthlyGrossIncome === 'string' ? app.monthlyGrossIncome : app?.monthlyGrossIncome != null ? `${formatMoney(app.monthlyGrossIncome)} income` : null;
             const intentLabel = app?.leaseTermPreference;
             const intentBadge = intentLabel === 'Yes, ready now' ? { text: 'Ready now', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' }
@@ -968,7 +970,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                   const isNew = newLeadIds.has(lead.id);
                   const app = lead.applicationData as ApplicationData | null;
                   const rawBudget = app?.monthlyRent ?? lead.budget;
-                  const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
+                  // Rentals quote monthly; buyers/sellers quote a purchase price.
+                  const isRental = lead.leadType === 'rental';
+                  const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? (isRental ? `${formatMoney(rawBudget)}/mo` : formatMoney(rawBudget)) : null;
                   const tierKey = getTierKey(lead);
                   const tier = TIERS[tierKey];
                   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;

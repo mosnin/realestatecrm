@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const { allowed: ipAllowed } = await checkRateLimit(`draft:save:ip:${ip}`, 60, 3600);
   if (!ipAllowed) {
     return NextResponse.json(
-      { error: 'Too many saves. Please try again later.' },
+      { error: 'Too many saves. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`draft:save:${normalizedEmail}`, 30, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many saves. Please try again later.' },
+      { error: 'Too many saves. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error('[form-draft] Failed to save draft:', error);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }
 
@@ -191,7 +191,7 @@ export async function GET(req: NextRequest) {
   const { allowed } = await checkRateLimit(`draft:get:${ip}`, 20, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: 'Too many requests. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -234,6 +234,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('[form-draft] Failed to load draft:', error);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

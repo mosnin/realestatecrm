@@ -20,6 +20,7 @@ import { falConfigured } from '@/lib/studio/fal';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
+import { checkStudioSpendBudget } from '@/lib/studio/spend';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -46,6 +47,19 @@ export async function POST(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many edits. Try again in a little while.' },
+      { status: 429 },
+    );
+  }
+
+  // Per-space daily spend cap. Shared budget with /api/studio/generate
+  // — both routes deduct from the same StudioGeneration table, so
+  // checkStudioSpendBudget reflects the realtor's total day's burn.
+  const budget = await checkStudioSpendBudget(space.id);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      {
+        error: `Daily generation limit reached ($${budget.spentUsd.toFixed(2)} / $${budget.capUsd.toFixed(2)}). Resets in 24 hours, or contact support to raise the cap.`,
+      },
       { status: 429 },
     );
   }
@@ -93,7 +107,7 @@ export async function POST(req: NextRequest) {
     await uploadObject({ key: sourceKey, body: sourceBuffer, contentType: file.type, isPublic: false });
   } catch (err) {
     logger.error('[studio.edit] source upload failed', { spaceId: space.id }, err as Error);
-    return NextResponse.json({ error: 'Could not start the edit. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't start the edit — usually temporary." }, { status: 500 });
   }
 
   const { error: srcErr } = await supabase.from('File').insert({
@@ -110,7 +124,7 @@ export async function POST(req: NextRequest) {
   if (srcErr) {
     await deleteObject(sourceKey).catch(() => undefined);
     logger.error('[studio.edit] source insert failed', { spaceId: space.id }, srcErr);
-    return NextResponse.json({ error: 'Could not start the edit. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't start the edit — usually temporary." }, { status: 500 });
   }
 
   try {
@@ -126,6 +140,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof StudioGenerationError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    return NextResponse.json({ error: 'The edit failed. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Edit didn't go through — usually temporary." }, { status: 500 });
   }
 }

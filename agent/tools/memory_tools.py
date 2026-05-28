@@ -25,7 +25,7 @@ _VALID_TYPES = {"fact", "observation", "preference", "reminder"}
 _VALID_ENTITIES = {"contact", "deal", "space"}
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def recall_memory(
     ctx: RunContextWrapper[AgentContext],
     entity_id: str | None = None,
@@ -104,7 +104,7 @@ async def recall_memory(
     ]
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def store_memory(
     ctx: RunContextWrapper[AgentContext],

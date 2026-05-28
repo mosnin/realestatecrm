@@ -25,7 +25,11 @@ interface EditResult {
   fileId: string;
 }
 
-export function EditPanel() {
+export function EditPanel({
+  initialFileId,
+}: {
+  initialFileId?: string;
+} = {}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [tool, setTool] = useState<string>('upscale');
@@ -34,6 +38,47 @@ export function EditPanel() {
   const [result, setResult] = useState<EditResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Library "Edit" affordance: hydrate the source picker from a stored
+  // asset. We fetch the signed URL, then the bytes, then wrap them in a
+  // File so the existing apply path treats it identically to a fresh
+  // upload. Failure is silent — the realtor can still upload manually.
+  useEffect(() => {
+    if (!initialFileId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const metaRes = await fetch(`/api/files/${initialFileId}`);
+        if (!metaRes.ok) return;
+        const meta = (await metaRes.json()) as {
+          url: string;
+          name?: string;
+          mimeType?: string;
+        };
+        if (cancelled || !meta.url) return;
+        const blobRes = await fetch(meta.url);
+        if (!blobRes.ok || cancelled) return;
+        const blob = await blobRes.blob();
+        if (cancelled) return;
+        const hydrated = new File(
+          [blob],
+          meta.name || `library-${initialFileId}`,
+          { type: meta.mimeType || blob.type || 'image/png' },
+        );
+        if (cancelled) return;
+        setFile(hydrated);
+        setPreview((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(hydrated);
+        });
+      } catch {
+        // Silent: the upload card is still available.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialFileId]);
 
   // Resume-on-mount. A refresh or nav while fal is transforming the image
   // would otherwise drop the realtor's result on the floor.
@@ -114,11 +159,11 @@ export function EditPanel() {
         error?: string;
       };
       if (!res.ok || !body.url || !body.fileId) {
-        throw new Error(body.error || 'The edit failed. Please try again.');
+        throw new Error(body.error || "Edit didn't go through — usually temporary.");
       }
       setResult({ url: body.url, fileId: body.fileId });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'The edit failed. Please try again.');
+      setError(e instanceof Error ? e.message : "Edit didn't go through — usually temporary.");
     } finally {
       setProcessing(false);
     }

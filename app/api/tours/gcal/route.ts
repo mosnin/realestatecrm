@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
-import { encrypt, decrypt } from '@/lib/crypto';
+import { encrypt, decrypt, decryptOrPassthrough } from '@/lib/crypto';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -82,7 +82,12 @@ export async function POST(req: NextRequest) {
     const upsertPayload: Record<string, unknown> = {
       id: crypto.randomUUID(),
       spaceId: space.id,
-      accessToken: tokens.access_token,
+      // Access tokens at rest are encrypted now too — used to be plaintext.
+      // A leaked DB row used to hand the attacker a working Google API
+      // session for ~1 hour with no detection. Encrypted columns mean a
+      // DB breach alone is not enough; the attacker also needs the app
+      // server's ENCRYPTION_KEY. Refresh tokens were already encrypted.
+      accessToken: encrypt(tokens.access_token),
       expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -183,7 +188,12 @@ export async function POST(req: NextRequest) {
 async function getValidAccessToken(tokenRow: any, spaceId: string): Promise<string> {
   const expiresAt = new Date(tokenRow.expiresAt).getTime();
   if (Date.now() < expiresAt - 60_000) {
-    return tokenRow.accessToken;
+    // Soft-migration: rows written before the encrypt-at-rest fix are still
+    // plaintext. decryptOrPassthrough returns the raw value when decrypt
+    // fails, so we transparently handle both shapes during the rollout
+    // window. Self-extinguishes when every row has gone through a refresh
+    // cycle (~1h for Google access tokens).
+    return decryptOrPassthrough(tokenRow.accessToken);
   }
 
   // Refresh the token
@@ -209,7 +219,7 @@ async function getValidAccessToken(tokenRow: any, spaceId: string): Promise<stri
   await supabase
     .from('GoogleCalendarToken')
     .update({
-      accessToken: tokens.access_token,
+      accessToken: encrypt(tokens.access_token),
       expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     })

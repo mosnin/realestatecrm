@@ -29,7 +29,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
   // When broker is on /broker/* pages (or broker-only), show team nav
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
+      <nav data-dashboard-mobile-nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
         {/* Realtor workspace link (hidden for broker-only) */}
         {!isBrokerOnly && slug && (
           <Link
@@ -73,7 +73,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
 
   // Standard workspace mobile nav
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
+    <nav data-dashboard-mobile-nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
       {mobileNavItems.map((item) => {
         const href = `${base}${item.href}`;
         const isActive = pathname.startsWith(`${base}${item.href}`);

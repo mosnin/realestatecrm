@@ -187,6 +187,7 @@ export function ChippiBar({ slug }: Props) {
 
   return (
     <div
+      data-page-chat-input
       className={cn(
         'fixed z-30 pointer-events-none',
         // Right column on desktop (after the 240px sidebar); above mobile nav on mobile.

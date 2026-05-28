@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BrokerageSettingsForm } from '@/components/broker/settings-form';
 import { BrokerageIntakeTrustSignalsForm } from '@/components/broker/intake-trust-signals-form';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'General Settings — Broker Dashboard' };
@@ -16,12 +18,15 @@ export default async function BrokerSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">General</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Manage your brokerage name, logo, website, and join code
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Settings.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          General
+        </h1>
+        <p className={cn(BODY_MUTED)}>
+          Workspace and brokerage preferences.
         </p>
-      </div>
+      </header>
 
       <Card>
         <CardContent className="px-5 py-5">

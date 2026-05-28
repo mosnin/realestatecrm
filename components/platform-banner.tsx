@@ -67,7 +67,7 @@ export function PlatformBanner() {
   if (!isSignedIn || items.length === 0) return null;
 
   return (
-    <div className="sticky top-0 z-[60] flex flex-col">
+    <div data-platform-banner className="sticky top-0 z-[60] flex flex-col">
       {items.map((a) => {
         const s = STYLES[a.severity];
         const Icon = s.icon;

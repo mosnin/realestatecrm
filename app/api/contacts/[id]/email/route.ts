@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { sendEmailFromCRM } from '@/lib/email';
+import { sendEmailFromCRM, EmailSendError } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function POST(
   // Rate limit: max 20 emails per user per hour
   const { allowed } = await checkRateLimit(`email:${userId}`, 20, 3600);
   if (!allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 });
+    return NextResponse.json({ error: 'Too many emails. Try again in a bit.' }, { status: 429 });
   }
 
   const { id } = await params;
@@ -53,13 +54,28 @@ export async function POST(
     return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
   }
 
-  await sendEmailFromCRM({
-    toEmail: contact.email,
-    fromName: user?.name ?? space.name,
-    replyTo: user?.email,
-    subject: subject.trim().slice(0, 200),
-    body: emailBody.trim().slice(0, 10000),
-  });
+  // sendEmailFromCRM throws on Resend rejection — surface that to the caller
+  // as a 502 so the UI can show a real error instead of a false success toast.
+  try {
+    await sendEmailFromCRM({
+      toEmail: contact.email,
+      fromName: user?.name ?? space.name,
+      replyTo: user?.email,
+      subject: subject.trim().slice(0, 200),
+      body: emailBody.trim().slice(0, 10000),
+    });
+  } catch (err) {
+    logger.error('[contacts/email] delivery failed', { contactId: id, spaceId: space.id }, err);
+    return NextResponse.json(
+      {
+        error:
+          err instanceof EmailSendError
+            ? `Email delivery failed: ${err.message}`
+            : 'Email delivery failed',
+      },
+      { status: 502 },
+    );
+  }
 
   // Bump lastContactedAt so the contact list ordering and the "X days quiet"
   // line on the detail page both reflect this send immediately — not just the

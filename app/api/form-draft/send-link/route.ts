@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`draft:email:${normalizedEmail}`, 3, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many email requests. Please try again later.' },
+      { error: 'Too many email requests. Try again in a bit.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
@@ -91,6 +91,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: true });
   } catch (error) {
     console.error('[form-draft/send-link] Failed to send resume link:', error);
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: "Server hiccup — usually temporary." }, { status: 500 });
   }
 }

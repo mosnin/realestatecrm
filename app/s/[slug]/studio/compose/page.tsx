@@ -22,9 +22,7 @@ export default async function StudioComposePage({
         <h1 className={H1} style={TITLE_FONT}>
           Compose
         </h1>
-        <p className={BODY_MUTED}>
-          Turn a photo into a finished, on-brand listing post.
-        </p>
+        <p className={BODY_MUTED}>Write a social caption for a photo.</p>
       </header>
       <ComposePanel />
     </div>

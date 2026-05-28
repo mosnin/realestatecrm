@@ -5,6 +5,8 @@ import { ArrowLeft, Wrench, MessageCircle } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
+import { SECTION_LABEL } from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +118,51 @@ function truncate(s: string | null | undefined, max = 200): string {
   return s.slice(0, max) + '…';
 }
 
+/** snake_case tool name → readable label. Mirrors the agent step timeline
+ *  so realtor-facing chrome reads the same on every surface. */
+function humanizeStepName(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return 'Step';
+  const spaced = trimmed.replace(/_/g, ' ').trim();
+  if (!spaced) return 'Step';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Calm one-line status sentence for the page subtitle.
+ *  Examples:
+ *    "Completed 4 minutes ago."
+ *    "Running — 3 of 7 steps."
+ *    "Queued — waiting to start."
+ *    "Paused — waiting on your approval." */
+function statusSentence(task: AgentTask, steps: ExecutionStep[]): string {
+  const completedSteps = steps.filter((s) => s.status === 'completed').length;
+  const totalSteps = steps.length;
+
+  switch (task.status) {
+    case 'completed':
+      return task.completedAt
+        ? `Completed ${relativeTime(task.completedAt)}.`
+        : 'Completed.';
+    case 'failed':
+      return task.completedAt
+        ? `Failed ${relativeTime(task.completedAt)}.`
+        : 'Failed.';
+    case 'cancelled':
+      return task.cancelledAt
+        ? `Cancelled ${relativeTime(task.cancelledAt)}.`
+        : 'Cancelled.';
+    case 'running':
+      return totalSteps > 0
+        ? `Running — ${completedSteps} of ${totalSteps} steps.`
+        : 'Running.';
+    case 'paused':
+      return 'Paused — waiting on your approval.';
+    case 'queued':
+    default:
+      return 'Queued — waiting to start.';
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function AgentTaskDetailPage({
@@ -189,50 +236,47 @@ export default async function AgentTaskDetailPage({
       ? ((task.metadata as Record<string, unknown>).result as string)
       : null);
 
+  const goalText = task.goalDescription ?? task.title;
+
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-12">
-      {/* Header */}
-      <header className="space-y-3">
-        <Link
-          href={`/s/${slug}/chippi/tasks`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={12} /> All Tasks
-        </Link>
+    <ChippiPageShell
+      greeting="Task."
+      title={goalText}
+      subtitle={statusSentence(task, steps)}
+    >
+      {/* Back-link + chrome row sit inside children so the shell header stays pure. */}
+      <Link
+        href={`/s/${slug}/chippi/tasks`}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft size={12} /> All Tasks
+      </Link>
 
-        <h1
-          className="text-3xl tracking-tight text-foreground leading-snug"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          {task.goalDescription ?? task.title}
-        </h1>
+      {/* Status badge + cost */}
+      <div className="flex flex-wrap items-center gap-3">
+        {statusBadge(task.status)}
+        {cost > 0 && (
+          <span className="text-xs text-muted-foreground tabular-nums">${cost.toFixed(2)}</span>
+        )}
+      </div>
 
-        {/* Status + cost */}
-        <div className="flex flex-wrap items-center gap-3">
-          {statusBadge(task.status)}
-          {cost > 0 && (
-            <span className="text-xs text-muted-foreground tabular-nums">${cost.toFixed(2)}</span>
-          )}
-        </div>
-
-        {/* Timestamps */}
-        <p className="text-xs text-muted-foreground tabular-nums space-x-3">
-          <span>Created {relativeTime(task.createdAt)} · {formatAbsolute(task.createdAt)}</span>
-          {task.completedAt && (
-            <span>· Completed {formatAbsolute(task.completedAt)}</span>
-          )}
-          {task.cancelledAt && (
-            <span>· Cancelled {formatAbsolute(task.cancelledAt)}</span>
-          )}
-        </p>
-      </header>
+      {/* Timestamps */}
+      <p className="text-xs text-muted-foreground tabular-nums space-x-3">
+        <span>Created {relativeTime(task.createdAt)} · {formatAbsolute(task.createdAt)}</span>
+        {task.completedAt && (
+          <span>· Completed {formatAbsolute(task.completedAt)}</span>
+        )}
+        {task.cancelledAt && (
+          <span>· Cancelled {formatAbsolute(task.cancelledAt)}</span>
+        )}
+      </p>
 
       {/* Execution steps */}
       <section className="border-t border-border/60 pt-6 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">
+        <h2 className={SECTION_LABEL}>
           Execution steps
           {steps.length > 0 && (
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
+            <span className="ml-2 normal-case tracking-normal">
               ({steps.length})
             </span>
           )}
@@ -243,9 +287,6 @@ export default async function AgentTaskDetailPage({
         ) : (
           <ul className="divide-y divide-border/60">
             {steps.map((step) => {
-              const isToolCall =
-                step.stepType === 'tool_call' ||
-                (!step.stepType && step.toolName);
               const isLlmCall = step.stepType === 'llm_call';
               const duration = formatDuration(step.startedAt, step.completedAt);
 
@@ -275,7 +316,7 @@ export default async function AgentTaskDetailPage({
                         <Wrench size={12} className="flex-shrink-0 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium text-foreground">
-                        {step.toolName}
+                        {humanizeStepName(step.toolName)}
                       </span>
                     </div>
 
@@ -319,7 +360,7 @@ export default async function AgentTaskDetailPage({
       {/* Result section */}
       {resultText && (
         <section className="border-t border-border/60 pt-6 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Result</h2>
+          <h2 className={SECTION_LABEL}>Result</h2>
           <div className="rounded-md bg-muted/40 border border-border/60 px-4 py-3">
             <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words font-mono leading-relaxed">
               {resultText}
@@ -327,6 +368,6 @@ export default async function AgentTaskDetailPage({
           </div>
         </section>
       )}
-    </div>
+    </ChippiPageShell>
   );
 }

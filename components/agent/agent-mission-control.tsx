@@ -12,18 +12,37 @@ import { ChippiAvatar } from './chippi-avatar';
 
 const ACTION_LABELS: Record<string, string> = {
   create_draft_message: 'Drafted message',
+  message_drafted: 'Drafted message',
+  packet_drafted: 'Drafted property packet',
   set_contact_follow_up: 'Scheduled follow-up',
   set_deal_follow_up: 'Scheduled deal follow-up',
   log_agent_observation: 'Logged observation',
+  log_observation: 'Logged observation',
+  log_note: 'Logged note',
+  store_memory: 'Stored insight',
   update_lead_score: 'Updated lead score',
   update_deal_probability: 'Updated deal probability',
   create_follow_up_reminder: 'Created reminder',
-  log_observation: 'Logged observation',
-  store_memory: 'Stored insight',
+  send_sms: 'Sent SMS',
+  send_email: 'Sent email',
+  tour_booked: 'Booked tour',
+  deal_stage_advanced: 'Moved deal forward',
+  review_requested: 'Flagged deal for review',
+  lead_routed_out: 'Routed contact out',
+  lead_routed_in: 'Received contact',
+  task_completed: 'Marked task done',
+  task_paused: 'Paused task',
+  task_cancelled: 'Cancelled task',
+  task_resumed: 'Resumed task',
 };
 
 function formatAction(t: string): string {
-  return ACTION_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  if (ACTION_LABELS[t]) return ACTION_LABELS[t];
+  // Sentence-case fallback so unknown action types don't leak title-case
+  // snake_case ("Tool Call Send Email") into the chrome.
+  const spaced = t.replace(/_/g, ' ').trim();
+  if (!spaced) return 'Activity';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 const AGENT_LABELS: Record<string, string> = {

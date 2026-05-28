@@ -58,3 +58,32 @@ export function safeHref(url: string | null | undefined): string {
     return '#';
   }
 }
+
+/**
+ * Sanitize a URL intended for an <img src> attribute. Modern browsers
+ * already refuse to execute javascript: / data: in image src, but
+ * defense-in-depth: validate the scheme on our side so we never even
+ * hand a hostile URL to the browser. Allows http(s) and same-origin
+ * relative paths; rejects everything else (returns null so the caller
+ * can render a placeholder icon instead of a broken image).
+ *
+ * Used by the chat markdown renderer where the model could in theory
+ * emit `![alt](javascript:...)` or `![alt](data:text/html,...)`. Real
+ * exploitation requires browser bugs we don't depend on; this is the
+ * belt to the browser's suspenders.
+ */
+export function safeImageSrc(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed, 'https://placeholder.invalid');
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return trimmed;
+    }
+    return null;
+  } catch {
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+    return null;
+  }
+}

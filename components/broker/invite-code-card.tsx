@@ -27,7 +27,7 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
       if (res.ok) setCode(data.joinCode);
       else alert(data.error ?? 'Failed to generate code.');
     } catch {
-      alert('Network error. Please try again.');
+      alert("Couldn't reach the server — usually temporary.");
     } finally {
       setGenerating(false);
     }

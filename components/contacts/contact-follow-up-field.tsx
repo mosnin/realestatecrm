@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarDays, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatFollowUpDate, toDateInputValue, timeAgo } from '@/lib/formatting';
@@ -15,6 +15,12 @@ interface Props {
 export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt, lastContactedAt: initialLastContactedAt }: Props) {
   const [followUpAt, setFollowUpAt] = useState(initialFollowUpAt);
   const [lastContactedAt, setLastContactedAt] = useState(initialLastContactedAt);
+  // Time-relative formatting (formatFollowUpDate, timeAgo, "is it overdue
+  // right now") depends on Date.now() and the runtime's timezone, so the
+  // server and client can disagree. Hold the render to a stable fallback
+  // until after mount, then flip to the live string on the client only.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   async function patch(data: Record<string, unknown>): Promise<boolean> {
     try {
@@ -54,7 +60,11 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
     if (!ok) setLastContactedAt(prev);
   }
 
-  const isOverdue = followUpAt && new Date(followUpAt) < new Date();
+  const isOverdue = mounted && followUpAt && new Date(followUpAt) < new Date();
+  const followUpLabel = followUpAt ? (mounted ? formatFollowUpDate(followUpAt) : toDateInputValue(followUpAt)) : null;
+  const contactedLabel = lastContactedAt
+    ? (mounted ? `Contacted ${timeAgo(new Date(lastContactedAt))}` : 'Contacted')
+    : 'Mark contacted';
 
   return (
     <div className="flex flex-col gap-2">
@@ -77,9 +87,9 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
         {/* Follow-up date (override) */}
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer group/fu">
           <CalendarDays size={12} className="text-muted-foreground" />
-          {followUpAt ? (
+          {followUpLabel ? (
             <span className={cn('font-medium', isOverdue ? 'text-destructive' : 'text-foreground')}>
-              {formatFollowUpDate(followUpAt)}
+              {followUpLabel}
             </span>
           ) : (
             <span className="group-hover/fu:text-foreground transition-colors">Set follow-up</span>
@@ -105,7 +115,7 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
           title="Mark as contacted now"
         >
           <CheckCircle2 size={11} />
-          {lastContactedAt ? `Contacted ${timeAgo(new Date(lastContactedAt))}` : 'Mark contacted'}
+          {contactedLabel}
         </button>
       </div>
     </div>

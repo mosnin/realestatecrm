@@ -1,8 +1,8 @@
 /**
  * `draft_sms` — compose-only SMS. Same shape as draft_email, channel='sms'.
  *
- * Read-only. NO AgentDraft, NO send. The route's compose helper accepts
- * a channel; SMS skips the voice samples (note voice, not email voice).
+ * Read-only. NO AgentDraft, NO send. The compose helper accepts a channel;
+ * SMS skips the voice samples (note voice, not email voice).
  *
  * The route's `channelForIntent` maps log-call → note. We don't want a
  * note here — this tool is for SMS — so we always pass channel='sms'
@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 import { defineTool } from '../types';
-import { composeQuickDraft } from '@/app/api/agent/quick-draft/route';
+import { composeQuickDraft } from '@/lib/agent/quick-draft';
 
 const INTENTS = ['check-in', 'log-call', 'welcome', 'reach-out'] as const;
 

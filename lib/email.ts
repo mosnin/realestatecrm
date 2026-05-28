@@ -3,6 +3,31 @@ import { getSubmissionDisplay, formatAnswerValue } from '@/lib/form-versioning';
 import { logger } from '@/lib/logger';
 
 /**
+ * Redact an email address to its first character + masked local part +
+ * its TLD for log lines. Every email send through this module logs the
+ * recipient — at scale that means every contact's address ends up in
+ * log retention (Vercel, Sentry, Datadog). With redaction we keep
+ * enough signal to correlate "this email failed for this user" reports
+ * back to a delivery without writing the full PII to disk.
+ *
+ *   "sam.chen@example.com" → "s***@***.com"
+ *   "x@y.io"                → "x***@***.io"
+ *
+ * Resend's own dashboard has the unredacted recipient if ops need to
+ * see who actually got served.
+ */
+function redactEmail(email: string | null | undefined): string {
+  if (!email) return '<none>';
+  const at = email.indexOf('@');
+  if (at < 1) return '<invalid>';
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const tldDot = domain.lastIndexOf('.');
+  const tld = tldDot >= 0 ? domain.slice(tldDot) : '';
+  return `${local[0]}***@***${tld}`;
+}
+
+/**
  * Normalize RESEND_FROM_EMAIL — if someone sets it to just a domain like
  * "alerts.usechippi.com" instead of "notifications@alerts.usechippi.com",
  * fix it automatically.
@@ -156,12 +181,12 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
       html,
     });
     if (result.error) {
-      logger.error('[email] new lead: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] new lead: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] new lead sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] new lead sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] new lead send failed', { to: toEmail }, err);
+    logger.error('[email] new lead send failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -240,12 +265,12 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
       html,
     });
     if (result.error) {
-      logger.error('[email] follow-up digest: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] follow-up digest: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] follow-up digest sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] follow-up digest sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] follow-up digest failed', { to: toEmail }, err);
+    logger.error('[email] follow-up digest failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -266,6 +291,27 @@ export interface SendEmailFromCRMParams {
   subject: string;
   body: string;
   attachments?: SendEmailAttachment[];
+}
+
+/**
+ * Send an email through the CRM's "from" identity. THROWS on Resend rejection
+ * or network failure so callers can distinguish "delivered" from "the
+ * provider said no". Previously this returned `Promise<void>` and swallowed
+ * every failure, which meant /api/agent/send reported `success: true` for
+ * emails Resend rejected — realtors were told their messages went out when
+ * they didn't. That's fiduciary harm.
+ *
+ * Misconfiguration (no RESEND_API_KEY in dev) is the one exception: we log
+ * and return without throwing so local dev doesn't blow up. Production
+ * always has the key set; if it's missing in prod, the warn log surfaces it.
+ */
+export class EmailSendError extends Error {
+  readonly cause?: unknown;
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'EmailSendError';
+    this.cause = cause;
+  }
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
@@ -296,8 +342,9 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
 </html>`;
 
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  let result: Awaited<ReturnType<typeof resend.emails.send>>;
   try {
-    const result = await resend.emails.send({
+    result = await resend.emails.send({
       from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
       replyTo: replyTo ?? undefined,
@@ -311,14 +358,24 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
           }))
         : undefined,
     });
-    if (result.error) {
-      logger.error('[email] CRM email: Resend API error', { to: toEmail, resendError: result.error });
-    } else {
-      logger.info('[email] CRM email sent', { to: toEmail, messageId: result.data?.id });
-    }
   } catch (err) {
-    logger.error('[email] CRM email failed', { to: toEmail }, err);
+    logger.error('[email] CRM email transport failed', { to: redactEmail(toEmail) }, err);
+    throw new EmailSendError(
+      err instanceof Error ? err.message : 'Email transport failed',
+      err,
+    );
   }
+
+  if (result.error) {
+    logger.error('[email] CRM email: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
+    const errMessage =
+      typeof result.error === 'object' && result.error && 'message' in result.error
+        ? String((result.error as { message: unknown }).message)
+        : 'Resend rejected the send';
+    throw new EmailSendError(errMessage, result.error);
+  }
+
+  logger.info('[email] CRM email sent', { to: redactEmail(toEmail), messageId: result.data?.id });
 }
 
 export interface NewDealEmailParams {
@@ -389,12 +446,12 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
       html,
     });
     if (result.error) {
-      logger.error('[email] new deal: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] new deal: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] new deal sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] new deal sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] new deal failed', { to: toEmail }, err);
+    logger.error('[email] new deal failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -462,12 +519,12 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
       html,
     });
     if (result.error) {
-      logger.error('[email] brokerage invitation: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] brokerage invitation: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] brokerage invitation sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] brokerage invitation sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] brokerage invitation failed', { to: toEmail }, err);
+    logger.error('[email] brokerage invitation failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -552,12 +609,12 @@ export async function sendApplicationConfirmation(params: ApplicationConfirmatio
       html,
     });
     if (result.error) {
-      logger.error('[email] application confirmation: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] application confirmation: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] application confirmation sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] application confirmation sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] application confirmation failed', { to: toEmail }, err);
+    logger.error('[email] application confirmation failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -631,12 +688,12 @@ export async function sendWelcomeEmail(params: {
       html,
     });
     if (result.error) {
-      logger.error('[email] welcome: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] welcome: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] welcome sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] welcome sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] welcome failed', { to: toEmail }, err);
+    logger.error('[email] welcome failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -736,12 +793,12 @@ export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Prom
       text,
     });
     if (result.error) {
-      logger.error('[email] draft resume: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] draft resume: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] draft resume sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] draft resume sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] draft resume failed', { to: toEmail }, err);
+    logger.error('[email] draft resume failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -811,12 +868,12 @@ export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams)
       html,
     });
     if (result.error) {
-      logger.error('[email] MFA prompt: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] MFA prompt: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] MFA prompt sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] MFA prompt sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] MFA prompt failed', { to: toEmail }, err);
+    logger.error('[email] MFA prompt failed', { to: redactEmail(toEmail) }, err);
   }
 }
 
@@ -942,11 +999,11 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
       html,
     });
     if (result.error) {
-      logger.error('[email] status update: Resend API error', { to: toEmail, resendError: result.error });
+      logger.error('[email] status update: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
     } else {
-      logger.info('[email] status update sent', { to: toEmail, messageId: result.data?.id });
+      logger.info('[email] status update sent', { to: redactEmail(toEmail), messageId: result.data?.id });
     }
   } catch (err) {
-    logger.error('[email] status update failed', { to: toEmail }, err);
+    logger.error('[email] status update failed', { to: redactEmail(toEmail) }, err);
   }
 }

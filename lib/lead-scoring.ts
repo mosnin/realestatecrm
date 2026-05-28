@@ -142,7 +142,7 @@ function failedResult(): LeadScoringResult {
     scoringStatus: 'failed',
     leadScore: null,
     scoreLabel: 'unscored',
-    scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+    scoreSummary: 'Scoring unavailable right now. Lead saved.',
     scoreDetails: null,
   };
 }

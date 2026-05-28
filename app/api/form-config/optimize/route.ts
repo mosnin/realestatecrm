@@ -117,13 +117,13 @@ export async function POST(req: NextRequest) {
 
     if (lower.includes('openai') || lower.includes('api key') || lower.includes('rate_limit')) {
       return NextResponse.json(
-        { error: 'AI analysis is temporarily unavailable. Your data-driven suggestions may still appear. Please try again in a minute.' },
+        { error: "AI analysis is taking a breather. Data-driven suggestions may still come through. Try again in a minute." },
         { status: 502 },
       );
     }
     if (lower.includes('timeout') || lower.includes('econnrefused')) {
       return NextResponse.json(
-        { error: 'The analysis timed out. This can happen with large datasets. Please try again.' },
+        { error: "Analysis timed out — happens with larger datasets. Try again in a bit." },
         { status: 504 },
       );
     }
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Something unexpected went wrong while analyzing your form. Please try again or contact support if this persists.' },
+      { error: "Analysis didn't go through — usually temporary. Contact support if it sticks." },
       { status: 500 },
     );
   }

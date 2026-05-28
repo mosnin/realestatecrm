@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Loader2,
   XCircle,
   MinusCircle,
   Lock,
@@ -28,6 +27,46 @@ import { ToursResult } from './tool-results/tours-result';
 import { PropertiesResult } from './tool-results/properties-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
 
+/**
+ * Row-level shimmer styles for the running state. A gentle gradient sweep
+ * across the row, paper-flat in tone. STYLESHEET.md "premium" voice:
+ * subtle, expensive-feeling, opacity capped low so the row never feels
+ * busy. Injected on first mount and dedup'd by id so the second mount
+ * doesn't re-add the stylesheet.
+ *
+ * The existing `an-tg-shimmer` class in tool-group.tsx is text-only
+ * (background-clip: text). Tool-call-row shimmer needs to sweep across
+ * the entire row, so the gradient lives on a pseudo-element overlay
+ * sized to 200% of the row width and animated via background-position.
+ */
+const ROW_SHIMMER_KEY = 'an-tool-call-row-shimmer';
+
+function ensureRowShimmerStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(ROW_SHIMMER_KEY)) return;
+  const style = document.createElement('style');
+  style.id = ROW_SHIMMER_KEY;
+  style.textContent = `
+@keyframes an-tool-call-row-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.an-tool-call-row-shimmer {
+  background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: an-tool-call-row-shimmer 1.8s ease-in-out infinite;
+}
+.dark .an-tool-call-row-shimmer {
+  background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .an-tool-call-row-shimmer { animation: none; }
+}
+`;
+  document.head.appendChild(style);
+}
+
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
   search_contacts: Users,
@@ -38,6 +77,9 @@ const TOOL_ICONS: Record<string, typeof Users> = {
   get_note: FileText,
   send_email: Mail,
   send_sms: MessageSquare,
+  send_email_now: Mail,
+  send_sms_now: MessageSquare,
+  draft_message: Mail,
   add_property: Building2,
   find_property: Building2,
   search_properties: Building2,
@@ -63,6 +105,9 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   find_tours: 'Checking calendar…',
   send_email: 'Drafting…',
   draft_email: 'Drafting…',
+  draft_message: 'Drafting…',
+  send_email_now: 'Sending…',
+  send_sms_now: 'Texting…',
   send_sms: 'Writing…',
   draft_sms: 'Writing…',
   recall_history: 'Checking history…',
@@ -88,6 +133,13 @@ function friendlyName(name: string): string {
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+/** Keep failure messages short enough to fit the transcript column. The full
+ *  text stays in the expandable detail pane. */
+function truncateErrorMessage(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 /**
@@ -158,6 +210,12 @@ export function ToolCallBlockView({
   const [expanded, setExpanded] = useState(false);
   const Icon = TOOL_ICONS[block.name] ?? Wrench;
 
+  // Inject the row-shimmer keyframes once per process. Cheap — the early
+  // return inside ensureRowShimmerStyles dedupes via the stylesheet id.
+  useEffect(() => {
+    ensureRowShimmerStyles();
+  }, []);
+
   const status: 'running' | ToolCallBlock['status'] = live ? 'running' : block.status;
 
   const {
@@ -167,9 +225,13 @@ export function ToolCallBlockView({
   }: { label: string; iconEl: React.ReactNode; tint: string } = (() => {
     switch (status) {
       case 'running':
+        // The row-level shimmer IS the running indicator now — a single
+        // calm signal across the row. Dropping the spinner glyph next to
+        // the label keeps the running pill as one quiet line; double
+        // motion (spinner + shimmer) reads as busy. Apple-style: pick.
         return {
           label: TOOL_RUNNING_LABEL[block.name] ?? 'Working…',
-          iconEl: <Loader2 size={12} className="animate-spin" />,
+          iconEl: null,
           tint: 'text-muted-foreground',
         };
       case 'complete':
@@ -244,14 +306,19 @@ export function ToolCallBlockView({
     return null;
   })();
 
-  // Whether there is a rich display card below this pill.
-  const hasRich = richResult !== null;
-
-  // Inline text summary shown when there's no rich card and the tool finished
-  // successfully. Realtors get the answer without having to click expand.
-  const inlineSummary =
-    status === 'complete' && !hasRich && block.result?.summary
-      ? block.result.summary
+  // Inline error breadcrumb. On failure the realtor needs to know WHY without
+  // hunting for the expand chevron — Stream C's status-honesty pattern
+  // (commit 4859066). Truncated to keep the transcript scannable; the full
+  // text remains in the expandable details pane.
+  //
+  // Inline textual SUCCESS summary used to render here too, but that
+  // duplicated whatever the LLM already said in the following text block —
+  // a row of redundant copy below every read. Removed in this pass; the
+  // collapsed row is now icon + label + status, with the rich result card
+  // (when present) carrying the substance below.
+  const inlineError =
+    status === 'error' && (block.result?.error || block.result?.summary)
+      ? truncateErrorMessage(block.result?.error ?? block.result?.summary ?? '', 160)
       : null;
 
   // Prose hint derived from args — non-monospace, human readable.
@@ -287,16 +354,23 @@ export function ToolCallBlockView({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* Compact step row */}
+      {/* Compact step row. Collapsed by default — args, summary, and full
+          result detail live behind the expand chevron. Three pieces stay
+          visible without an expand-click: (1) the rich result card below,
+          since it IS the realtor's answer; (2) the rose-tone error
+          breadcrumb on failure (Stream C status-honesty pattern); and
+          (3) a subtle row-shimmer while running, replacing the spinner-
+          only signal with a calm, paper-flat sweep. */}
       <button
         type="button"
         disabled={!hasDetails}
         onClick={() => hasDetails && setExpanded((v) => !v)}
         className={cn(
           'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg text-left min-h-[36px]',
-          'transition-colors',
+          'transition-colors overflow-hidden',
           hasDetails && 'hover:bg-muted/20 cursor-pointer',
           !hasDetails && 'cursor-default',
+          status === 'running' && 'an-tool-call-row-shimmer',
         )}
       >
         {/* Left accent bar */}
@@ -315,15 +389,16 @@ export function ToolCallBlockView({
           {friendlyName(block.name)}
         </span>
 
-        {/* Args hint — prose, non-monospace, only when not expanded */}
-        {argsHint && !expanded && (
+        {/* Args hint — only when expanded. Collapsed view stays minimal
+            (icon + label + status); the realtor expands to see context. */}
+        {argsHint && expanded && (
           <span className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
             {argsHint}
           </span>
         )}
 
-        {/* Spacer when no args hint */}
-        {(!argsHint || expanded) && <span className="flex-1" />}
+        {/* Spacer */}
+        {(!argsHint || !expanded) && <span className="flex-1" />}
 
         {/* Status badge */}
         <span
@@ -344,11 +419,16 @@ export function ToolCallBlockView({
         )}
       </button>
 
-      {/* Inline text summary for non-rich completed tools. No expand needed —
-          the answer is right here. */}
-      {inlineSummary && !expanded && (
-        <p className="text-[12px] text-muted-foreground/80 mt-1 px-1 leading-snug">
-          {inlineSummary}
+      {/* Inline error breadcrumb for failed tools. Always visible — this
+          is Stream C's status-honesty pattern (commit 4859066): the realtor
+          must not have to hunt for the expand chevron to see WHY a call
+          failed. Tone token matches STYLESHEET.md status-pill failed tone. */}
+      {inlineError && (
+        <p
+          role="status"
+          className="text-[12px] text-rose-700 dark:text-rose-400 mt-1 px-1 leading-snug"
+        >
+          {inlineError}
         </p>
       )}
 

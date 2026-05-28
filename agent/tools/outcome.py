@@ -39,7 +39,7 @@ _SCORE_DELTAS = {
 }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def outcome(
     ctx: RunContextWrapper[AgentContext],

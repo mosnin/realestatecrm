@@ -18,7 +18,7 @@ export async function POST(
   // Rate limit: max 10 rescore requests per user per hour
   const { allowed } = await checkRateLimit(`rescore:${userId}`, 10, 3600);
   if (!allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 });
+    return NextResponse.json({ error: 'Too many rescore requests. Try again in a bit.' }, { status: 429 });
   }
 
   const { id } = await params;

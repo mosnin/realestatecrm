@@ -112,15 +112,20 @@ export const WARM_LEAD_THRESHOLD = 40;
 // ── Activity type metadata ──────────────────────────────────────────────────
 // Covers all 7 types used across deal-panel + contact-activity-tab.
 // Contact UI only exposes the first 5 (no stage_change / status_change).
+//
+// One muted neutral for every activity icon. Differentiation is the icon
+// shape — not color. Brand orange is sacred (logo, Chippi cues, agent
+// output, lead-warm) and does not appear on generic timeline chrome.
+// Mirrors the discipline applied to deal-detail-client.tsx (commit 28994e9).
 
 export const ACTIVITY_META = {
-  note:         { label: 'Note',          icon: FileText,     color: 'text-muted-foreground bg-muted' },
-  call:         { label: 'Call',          icon: Phone,        color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10' },
-  email:        { label: 'Email',         icon: Mail,         color: 'text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10' },
-  meeting:      { label: 'Meeting',       icon: Calendar,     color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  follow_up:    { label: 'Follow-up',     icon: MessageSquare,color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' },
-  stage_change: { label: 'Stage change',  icon: Activity,     color: 'text-muted-foreground bg-muted' },
-  status_change:{ label: 'Status change', icon: CheckCircle2, color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' },
+  note:         { label: 'Note',          icon: FileText,     color: 'bg-muted text-muted-foreground' },
+  call:         { label: 'Call',          icon: Phone,        color: 'bg-muted text-muted-foreground' },
+  email:        { label: 'Email',         icon: Mail,         color: 'bg-muted text-muted-foreground' },
+  meeting:      { label: 'Meeting',       icon: Calendar,     color: 'bg-muted text-muted-foreground' },
+  follow_up:    { label: 'Follow-up',     icon: MessageSquare,color: 'bg-muted text-muted-foreground' },
+  stage_change: { label: 'Stage change',  icon: Activity,     color: 'bg-muted text-muted-foreground' },
+  status_change:{ label: 'Status change', icon: CheckCircle2, color: 'bg-muted text-muted-foreground' },
 } as const;
 
 export type ActivityType = keyof typeof ACTIVITY_META;

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell } from 'lucide-react';
+import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
@@ -16,6 +17,10 @@ interface BookingFormProps {
   businessName: string;
   timezone: string;
   accentColor?: string;
+  /** When set, the confirmed-state renders an outbound link back to the
+   *  realtor's public page so the applicant has somewhere to go after
+   *  booking. Same dead-end fix the intake success card has. */
+  profileHref?: string | null;
 }
 
 interface DaySlots {
@@ -40,7 +45,7 @@ const INPUT_CLASS = cn(FIELD_BASE, 'h-10');
 const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
 const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
-export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f' }: BookingFormProps) {
+export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f', profileHref }: BookingFormProps) {
   const primaryTextColor = pickContrastColor(accentColor);
   const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
@@ -235,6 +240,15 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
             at <span className="font-medium text-foreground">{timeLabel}</span>.
             {` ${businessName} will reach out if anything changes.`}
           </p>
+          {profileHref && (
+            <Link
+              href={profileHref}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors pt-2"
+            >
+              See {businessName}&apos;s page
+              <ArrowRight size={14} aria-hidden />
+            </Link>
+          )}
         </motion.div>
       </>
     );

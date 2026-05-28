@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('McpApiKey')
-    .select('id, name, keyPrefix, lastUsedAt, createdAt')
+    .select('id, name, keyPrefix, lastUsedAt, createdAt, expiresAt')
     .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
 
@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
   const clientSecret = `cs_${crypto.randomBytes(32).toString('hex')}`;
   const clientSecretHash = crypto.createHash('sha256').update(clientSecret).digest('hex');
 
+  // Default 365-day TTL — keys cool off after a year unless the realtor
+  // rotates. Long enough that a set-and-forget Claude connector keeps
+  // working through a billing cycle; short enough that a stale leak goes
+  // cold within a year. Legacy keys (created before this migration)
+  // carry NULL expiresAt and live until manually revoked.
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await supabase
     .from('McpApiKey')
     .insert({
@@ -71,8 +78,9 @@ export async function POST(req: NextRequest) {
       keyPrefix,
       clientId,
       clientSecretHash,
+      expiresAt,
     })
-    .select('id, name, keyPrefix, createdAt, clientId')
+    .select('id, name, keyPrefix, createdAt, clientId, expiresAt')
     .single();
 
   if (error)

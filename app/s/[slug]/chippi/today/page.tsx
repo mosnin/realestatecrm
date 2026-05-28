@@ -14,6 +14,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +24,7 @@ import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
 import { TodayFocus } from '@/components/chippi/today-focus';
 import { WhatsComing } from '@/components/chippi/whats-coming';
 import { WhatIDid } from '@/components/chippi/what-i-did';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,36 +59,34 @@ export default async function ChippiTodayPage({
   const draftCount = pendingDraftCount ?? 0;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-8 sm:space-y-10">
-        <MorningStory slug={slug} />
+    <ChippiPageShell
+      greeting="Full day."
+      title="Your day at a glance"
+      subtitle="The morning story, your drafts, what's coming next — one scroll."
+    >
+      <MorningStory slug={slug} />
 
-        {draftCount > 0 && (
-          <Link
-            href={`/s/${slug}/chippi/drafts`}
-            className="group flex items-center gap-3 pb-3 border-b border-border/60"
-          >
-            <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-              Drafts
-            </h2>
-            <span className="text-[11px] text-muted-foreground tabular-nums">
-              {draftCount}
-            </span>
-            <span className="text-sm text-foreground">
-              waiting for your review
-            </span>
-            <span className="ml-auto text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-              Review →
-            </span>
-          </Link>
-        )}
+      {/* Drafts pointer — calm caption callout. MorningStory above owns the
+          focal moment; this is quiet secondary info, sized like CAPTION so it
+          never competes with the H1 or the story headline. */}
+      {draftCount > 0 && (
+        <Link
+          href={`/s/${slug}/chippi/drafts`}
+          className="group inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <span className="tabular-nums">{draftCount}</span>
+          <span>
+            {draftCount === 1 ? 'draft waiting for your review' : 'drafts waiting for your review'}
+          </span>
+          <ChevronRight size={11} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+        </Link>
+      )}
 
-        <AgentQuestionsPanel />
-        <TodayFocus slug={slug} />
-        <WhatsComing slug={slug} />
-        <WhatIDid slug={slug} />
-        <AgentGoalsPanel />
-      </div>
-    </div>
+      <AgentQuestionsPanel />
+      <TodayFocus slug={slug} />
+      <WhatsComing slug={slug} />
+      <WhatIDid slug={slug} />
+      <AgentGoalsPanel />
+    </ChippiPageShell>
   );
 }

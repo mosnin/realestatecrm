@@ -48,6 +48,28 @@ export interface UseAgentTaskOptions {
    * sends scoped to the same conversation.
    */
   onConversationCreated?: (conversationId: string) => void;
+  /**
+   * Backing API endpoints. Defaults route to the realtor surface; the
+   * broker variant (`/broker/chippi`) overrides both to hit the broker-
+   * gated routes (`resolveBrokerContext()` gates layer 2 of the
+   * defense-in-depth chain).
+   *
+   * - `taskEndpoint`          — POST target for a chat turn.
+   * - `conversationsEndpoint` — POST creates a new conversation; the body
+   *                             shape differs per variant (realtor sends
+   *                             `{ slug }`; broker sends nothing because
+   *                             the broker route resolves brokerage from
+   *                             the Clerk session).
+   * - `resumeEndpoint`        — POST target for approve / deny resume.
+   *                             Phase 1 doesn't ship broker approvals so
+   *                             the broker variant inherits the realtor
+   *                             default; Phase 3 will introduce a parallel.
+   * - `conversationCreatePayload` — overrides the POST body for create.
+   */
+  taskEndpoint?: string;
+  conversationsEndpoint?: string;
+  resumeEndpointBase?: string;
+  conversationCreatePayload?: Record<string, unknown>;
 }
 
 export interface UseAgentTaskResult {
@@ -100,7 +122,15 @@ function newId(): string {
 }
 
 export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
-  const { spaceSlug, conversationId: initialConversationId, onConversationCreated } = options;
+  const {
+    spaceSlug,
+    conversationId: initialConversationId,
+    onConversationCreated,
+    taskEndpoint = '/api/ai/task',
+    conversationsEndpoint = '/api/ai/conversations',
+    resumeEndpointBase = '/api/ai/task/resume',
+    conversationCreatePayload,
+  } = options;
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -541,20 +571,27 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
    * Ensure we have a conversationId before opening a stream. The task route
    * will create one for us if we don't pass one, but we have no way to read
    * the new id back from the SSE stream — so we create it client-side first.
+   *
+   * `conversationsEndpoint` and `conversationCreatePayload` are configurable
+   * so the broker variant can target /api/ai/broker-conversations (gated by
+   * resolveBrokerContext) without a custom hook. Defaults preserve the
+   * realtor behaviour: POST /api/ai/conversations { slug }.
    */
   const ensureConversationId = useCallback(async (): Promise<string> => {
     if (conversationIdRef.current) return conversationIdRef.current;
-    const res = await fetch('/api/ai/conversations', {
+    const body =
+      conversationCreatePayload ?? ({ slug: spaceSlug } as Record<string, unknown>);
+    const res = await fetch(conversationsEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: spaceSlug }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error('Could not start conversation');
     const conv = (await res.json()) as { id: string };
     conversationIdRef.current = conv.id;
     onConversationCreated?.(conv.id);
     return conv.id;
-  }, [spaceSlug, onConversationCreated]);
+  }, [spaceSlug, onConversationCreated, conversationsEndpoint, conversationCreatePayload]);
 
   const send = useCallback(
     async (text: string, attachmentIds?: string[]) => {
@@ -606,14 +643,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
-      await consumeStream('/api/ai/task', {
+      await consumeStream(taskEndpoint, {
         spaceSlug,
         conversationId: convId,
         message: trimmed,
         ...(hasAttachments ? { attachmentIds } : {}),
       });
     },
-    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError],
+    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
   );
 
   const approve = useCallback(
@@ -631,12 +668,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`/api/ai/task/resume/${encodeURIComponent(requestId)}`, {
+      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
         approved: true,
         ...(editedArgs ? { editedArgs } : {}),
       });
     },
-    [isStreaming, consumeStream],
+    [isStreaming, consumeStream, resumeEndpointBase],
   );
 
   const deny = useCallback(
@@ -683,11 +720,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`/api/ai/task/resume/${encodeURIComponent(requestId)}`, {
+      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
         approved: false,
       });
     },
-    [isStreaming, pendingApproval, consumeStream],
+    [isStreaming, pendingApproval, consumeStream, resumeEndpointBase],
   );
 
   const alwaysAllow = useCallback(

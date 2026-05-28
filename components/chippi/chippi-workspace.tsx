@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, PanelRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +34,12 @@ import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -67,6 +73,20 @@ interface ChippiWorkspaceProps {
   showConnectBanner?: boolean;
   /** Skills offered in the chat's `/` menu. From loadUserInvocableSkills(). */
   skills?: SkillItem[];
+  /**
+   * Which Chippi variant this surface is rendering.
+   *
+   * - `realtor` (default) — solo / brokerage-member chat at /s/<slug>/chippi.
+   *   Backed by `/api/ai/task` and the native realtor tool catalog.
+   * - `broker` — chief-of-staff chat at /broker/chippi. Backed by the
+   *   broker-gated `/api/ai/broker-task` (defense layer 2) and the
+   *   `BROKER_TOOLS` registry (empty in Phase 1; Phase 2/3 will populate).
+   *
+   * The variant is a quiet signal, not a re-skin — same logo, same chat
+   * shape, same composer. It switches the API endpoints and the empty-
+   * state copy only.
+   */
+  variant?: 'realtor' | 'broker';
 }
 
 const MESSAGE_LIMIT = 50;
@@ -115,7 +135,9 @@ export function ChippiWorkspace({
   initialPrefill,
   showConnectBanner = false,
   skills = [],
+  variant = 'realtor',
 }: ChippiWorkspaceProps) {
+  const isBroker = variant === 'broker';
   const { user } = useUser();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
@@ -163,6 +185,18 @@ export function ChippiWorkspace({
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
+    // Broker variant routes through `/api/ai/broker-task` — the broker
+    // version re-checks `resolveBrokerContext()` (defense layer 2) before
+    // forwarding the turn to Modal with `mode: 'broker'`.
+    ...(isBroker
+      ? {
+          taskEndpoint: '/api/ai/broker-task',
+          conversationsEndpoint: '/api/ai/broker-conversations',
+          // The broker conversations route reads brokerage scope from the
+          // Clerk session, not from the body — no payload needed.
+          conversationCreatePayload: {},
+        }
+      : {}),
     onConversationCreated: (id) => {
       setActiveConversationId(id);
       // Mark as loaded so the conversation-loading effect won't try to
@@ -187,8 +221,10 @@ export function ChippiWorkspace({
       );
       // Reflect the new conversation in the URL so a refresh (or share)
       // lands on the same transcript. `replace` so the history doesn't
-      // grow a step for every new chat.
-      router.replace(`/s/${slug}/chippi?conversationId=${id}`, { scroll: false });
+      // grow a step for every new chat. The base path differs per variant
+      // — realtor sits at /s/<slug>/chippi, broker at /broker/chippi.
+      const newConvBase = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+      router.replace(`${newConvBase}?conversationId=${id}`, { scroll: false });
     },
   });
 
@@ -294,7 +330,8 @@ export function ChippiWorkspace({
       const next = new URLSearchParams(searchParams.toString());
       next.delete('view');
       const qs = next.toString();
-      router.replace(`/s/${slug}/chippi${qs ? `?${qs}` : ''}`, { scroll: false });
+      const baseUrl = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+      router.replace(`${baseUrl}${qs ? `?${qs}` : ''}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -361,32 +398,43 @@ export function ChippiWorkspace({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingApproval, isStreaming]);
 
+  // Resolve the route base once. Same URL shape both variants — broker
+  // sits at /broker/chippi, realtor at /s/<slug>/chippi.
+  const chippiBaseUrl = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+
   function handleSelectConversation(conv: Conversation) {
     setDrawerOpen(false);
     if (conv.id === activeConversationId) return;
     startConversationTransition(() => {
-      router.push(`/s/${slug}/chippi?conversationId=${conv.id}`, { scroll: false });
+      router.push(`${chippiBaseUrl}?conversationId=${conv.id}`, { scroll: false });
     });
   }
 
   async function handleNewConversation() {
-    const res = await fetch('/api/ai/conversations', {
+    const endpoint = isBroker ? '/api/ai/broker-conversations' : '/api/ai/conversations';
+    const body = isBroker ? {} : { slug };
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
+      body: JSON.stringify(body),
     });
     if (res.ok) {
       const conv = (await res.json()) as Conversation;
       setConversations((prev) => [conv, ...prev]);
       setDrawerOpen(false);
       startConversationTransition(() => {
-        router.push(`/s/${slug}/chippi?conversationId=${conv.id}`, { scroll: false });
+        router.push(`${chippiBaseUrl}?conversationId=${conv.id}`, { scroll: false });
       });
     }
   }
 
   async function handleDeleteConversation(id: string) {
     try {
+      // Broker conversations live under the same Conversation table — the
+      // existing /api/ai/conversations/[id] DELETE owns the row by id and
+      // auth-checks via Space ownership, which holds for broker rows too
+      // (they live on the broker_owner's space). Phase 1 reuses it; Phase
+      // 2 may revisit if cross-brokerage auth needs sharpening.
       const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         console.error('[Chat] Failed to delete conversation:', res.status);
@@ -395,7 +443,7 @@ export function ChippiWorkspace({
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeConversationId === id) {
         startConversationTransition(() => {
-          router.push(`/s/${slug}/chippi`, { scroll: false });
+          router.push(chippiBaseUrl, { scroll: false });
         });
       }
     } catch (err) {
@@ -539,6 +587,9 @@ export function ChippiWorkspace({
   // the today view — no point pinging while in an active conversation. The
   // child sections still self-fetch their own data; this is a lightweight
   // duplicate read for a one-line summary.
+  //
+  // Broker variant doesn't surface drafts/questions on the chat home —
+  // those endpoints are space-scoped (realtor-only). Skip the fetch.
   const [counts, setCounts] = useState<{ drafts: number; questions: number }>({
     drafts: 0,
     questions: 0,
@@ -546,6 +597,10 @@ export function ChippiWorkspace({
   const [countsLoaded, setCountsLoaded] = useState(false);
   useEffect(() => {
     if (!isEmpty) return;
+    if (isBroker) {
+      setCountsLoaded(true);
+      return;
+    }
     const controller = new AbortController();
     void (async () => {
       try {
@@ -566,7 +621,7 @@ export function ChippiWorkspace({
       }
     })();
     return () => controller.abort();
-  }, [isEmpty]);
+  }, [isEmpty, isBroker]);
 
   // Day-one signal: zero of everything. The realtor has truly never engaged.
   // We wait for `countsLoaded` so we don't flash the welcome before we know
@@ -814,12 +869,46 @@ export function ChippiWorkspace({
       {/* Floating control cluster — top-right, no top bar chrome */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
         <ApprovalsPill />
+        {/* Prominent split-view affordance — discoverable icon+label sibling
+            to the icon-only `SplitPanelToggle` further down the cluster. The
+            small toggle was invisible on busy screens; this one carries text
+            so a first-time realtor sees they can chat alongside a deal/contact.
+            Hidden once `isSplit === true` (they're already in split) and on
+            mobile (split panel is md-and-up only).
+            Broker variant: the right-panel surfaces (RightPanel tabs for
+            contacts/deals/etc.) are realtor-scoped — split view is
+            disabled on broker for Phase 1. */}
+        {!isSplit && !isBroker && (
+          <div className="hidden md:flex mr-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleSplit}
+                    aria-label="Open Chippi beside this page"
+                    className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  >
+                    <PanelRight size={13} />
+                    <span>Open beside</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Open Chippi beside this page so you can chat without leaving.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
         {messages.length >= MESSAGE_LIMIT * 0.8 && (
           <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
             {messages.length}/{MESSAGE_LIMIT}
           </span>
         )}
-        {isEmpty && (
+        {/* Run now is a realtor-only autonomous trigger — Phase 1 broker
+            variant has no autonomous run path. Phase 4 may introduce a
+            brokerage-wide sweep with its own affordance. */}
+        {isEmpty && !isBroker && (
           <button
             type="button"
             onClick={() => void handleRunNow()}
@@ -854,20 +943,25 @@ export function ChippiWorkspace({
         >
           <History size={15} />
         </button>
-        <button
-          type="button"
-          onClick={() => setVoiceOpen((v) => !v)}
-          className={cn(
-            'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
-            voiceOpen
-              ? 'bg-foreground text-background'
-              : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
-          )}
-          title="Voice mode"
-          aria-label="Toggle voice mode"
-        >
-          <Mic size={15} />
-        </button>
+        {/* Voice mode uses /api/ai/realtime-session which is space-scoped
+            (realtor-only). Phase 1 broker variant has no broker-side voice
+            session — disabled here. */}
+        {!isBroker && (
+          <button
+            type="button"
+            onClick={() => setVoiceOpen((v) => !v)}
+            className={cn(
+              'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+              voiceOpen
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
+            )}
+            title="Voice mode"
+            aria-label="Toggle voice mode"
+          >
+            <Mic size={15} />
+          </button>
+        )}
         {/* Secondary actions fold under a single overflow menu so the
             cluster stays a small row of primary affordances — approvals,
             run-now, history, voice — instead of seven competing icons. */}
@@ -887,21 +981,31 @@ export function ChippiWorkspace({
               <SquarePen size={14} className="mr-2" />
               New chat
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
-                <NotebookText size={14} className="mr-2" />
-                What I remember
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
-                <Settings size={14} className="mr-2" />
-                Chippi settings
-              </Link>
-            </DropdownMenuItem>
+            {/* Memory + per-Chippi settings are realtor-only in Phase 1.
+                The broker variant has no /s/<slug>/settings to link to
+                (broker settings live at /broker/settings) and Phase 4 will
+                introduce the broker-side equivalents. */}
+            {!isBroker && (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
+                    <NotebookText size={14} className="mr-2" />
+                    What I remember
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
+                    <Settings size={14} className="mr-2" />
+                    Chippi settings
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />
+        {/* Split panel disabled on broker variant — see comment on the
+            "Open beside" affordance above. */}
+        {!isBroker && <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />}
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -950,15 +1054,21 @@ export function ChippiWorkspace({
         </div>
       ) : (
         <>
-          <AnimatePresence mode="popLayout">
-            {isEmpty && (
-              <motion.div
-                key="chippi-hero"
-                exit={{ opacity: 0, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } }}
-                className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
-              >
-                <div className="w-full max-w-2xl">
-                  <motion.h1
+          {/* Empty-state hero. Previously wrapped in AnimatePresence with
+              `mode="popLayout"` and a shared `layoutId="chippi-composer"`
+              between the centered composer and the docked composer below.
+              popLayout keeps the exiting motion.div mounted for the duration
+              of the exit animation, so the realtor briefly had TWO textareas
+              in the DOM whenever `isEmpty` flipped false. Simplest fix:
+              render the two composers mutually exclusively, no AnimatePresence,
+              no shared layoutId. The morph animation is gone; only-one-
+              textarea is back. */}
+          {isEmpty && (
+            <div
+              className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
+            >
+              <div className="w-full max-w-2xl">
+                <motion.h1
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: greeting ? 1 : 0, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
@@ -970,31 +1080,42 @@ export function ChippiWorkspace({
                   {/* Day-one guidance — only for users with zero history.
                       Without this the empty hero is just a greeting + blank
                       composer, which is too sparse for first-run when the
-                      realtor doesn't yet know what Chippi can do. */}
-                  {isFresh && (
+                      realtor doesn't yet know what Chippi can do.
+
+                      Broker variant: a single calm line setting the chief-
+                      of-staff frame and stating the trust boundary up front
+                      (won't read a realtor's private notes without their
+                      okay). Per the Phase 1 voice spec — facts vs.
+                      benchmarks, not judgements about realtors. */}
+                  {isBroker ? (
                     <motion.p
                       initial={{ opacity: 0, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
                       className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
                     >
-                      Type below to get started — or browse{' '}
-                      <span className="text-foreground/70">Full day</span>,{' '}
-                      <span className="text-foreground/70">Drafts</span>, and{' '}
-                      <span className="text-foreground/70">Activity</span> from the sidebar.
+                      I see across your whole brokerage. I won&apos;t read a
+                      realtor&apos;s private notes without their okay. Ask me anything.
                     </motion.p>
+                  ) : (
+                    isFresh && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -2 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+                        className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
+                      >
+                        Type below to get started — or browse{' '}
+                        <span className="text-foreground/70">Full day</span>,{' '}
+                        <span className="text-foreground/70">Drafts</span>, and{' '}
+                        <span className="text-foreground/70">Activity</span> from the sidebar.
+                      </motion.p>
+                    )
                   )}
-                  <motion.div
-                    layoutId="chippi-composer"
-                    layout
-                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  >
-                    {renderInput()}
-                  </motion.div>
+                  {renderInput()}
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
 
           {!isEmpty && (
             <>
@@ -1185,13 +1306,13 @@ export function ChippiWorkspace({
               composer's right-slot (Send → Stop swap) so the abort affordance
               sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
-          {/* Docked input. Shares `layoutId="chippi-composer"` with the
-              empty-state hero composer so framer-motion animates the
-              transition from centered → docked when the first message ships. */}
-          <motion.div
-            layoutId="chippi-composer"
-            layout
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          {/* Docked input — pinned to the bottom of the active thread.
+              Previously a `motion.div` with `layoutId="chippi-composer"`
+              shared with the empty-state hero composer above. The shared
+              layoutId + popLayout AnimatePresence combo briefly mounted
+              both composers (= two textareas in the DOM). Plain <div>
+              keeps only one composer alive at a time. */}
+          <div
             className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
           >
             {atLimit ? (
@@ -1217,7 +1338,7 @@ export function ChippiWorkspace({
             ) : (
               renderInput()
             )}
-          </motion.div>
+          </div>
             </>
           )}
         </>
@@ -1243,21 +1364,26 @@ export function ChippiWorkspace({
         )}
       </div>{/* end split panel container */}
 
-      <VoiceMode
-        open={voiceOpen}
-        onClose={() => setVoiceOpen(false)}
-        slug={slug}
-        onTranscript={(role, text) => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              role,
-              blocks: [{ type: 'text', content: text }],
-            },
-          ]);
-        }}
-      />
+      {/* Voice mode realtime session is space-scoped (realtor-only).
+          Broker variant disables it in Phase 1; the button above is also
+          hidden. */}
+      {!isBroker && (
+        <VoiceMode
+          open={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
+          slug={slug}
+          onTranscript={(role, text) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                role,
+                blocks: [{ type: 'text', content: text }],
+              },
+            ]);
+          }}
+        />
+      )}
     </div>
   );
 }

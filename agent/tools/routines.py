@@ -30,7 +30,7 @@ MAX_INSTRUCTION = 600
 MIN_INSTRUCTION = 10
 
 
-@function_tool
+@function_tool(strict_mode=False)
 @idempotent_tool
 async def manage_routines(
     ctx: RunContextWrapper[AgentContext],

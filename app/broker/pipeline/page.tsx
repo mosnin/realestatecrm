@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { dealHealth } from '@/lib/deals/health';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import { formatCompact } from '@/lib/formatting';
 import type { Metadata } from 'next';
 import {
   PipelineClient,
@@ -186,14 +189,23 @@ export default async function BrokerPipelinePage() {
     ),
   };
 
+  // Status sentence — calm fact from the data already on the page.
+  const statusSentence = (() => {
+    if (activeDeals === 0) {
+      return 'No active deals yet.';
+    }
+    return `${formatCompact(totalPipelineValue)} across ${activeDeals} active ${activeDeals === 1 ? 'deal' : 'deals'}.`;
+  })();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Pipeline</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Team deal pipeline across all realtors &middot; {brokerage.name}
-        </p>
-      </div>
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Pipeline.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          Pipeline
+        </h1>
+        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
+      </header>
 
       <PipelineClient
         deals={deals}

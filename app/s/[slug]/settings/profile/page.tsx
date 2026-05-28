@@ -10,5 +10,5 @@ export default async function ProfileRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/s/${slug}/settings?tab=profile`);
+  permanentRedirect(`/s/${slug}/settings?tab=you`);
 }

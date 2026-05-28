@@ -11,7 +11,7 @@ import {
   ExternalLink,
   MessageCircle,
   Calendar,
-  Mic,
+  ChevronDown,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -26,12 +26,12 @@ import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
+import { ContactActionPills } from '@/components/contacts/contact-action-pills';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
 import {
   buildPeopleDetailActions,
-  type PeopleDetailAction,
   type PersonStateForActions,
 } from '@/lib/people-detail-actions';
 
@@ -132,7 +132,7 @@ export default async function ClientDetailPage({
       {/* Headline — name is the page. The next four lines tell the realtor
           everything they need to know in three seconds: who, how warm, how
           quiet, what just happened, what to do next. */}
-      <header className="space-y-2">
+      <header className="space-y-2 mb-6 pb-4 border-b border-border/60">
         <Link
           href={`/s/${slug}/contacts`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -159,26 +159,17 @@ export default async function ClientDetailPage({
       </header>
 
       {/* Action pills — same vocabulary as the morning home's compose
-          actions. State picks them; the realtor doesn't. The "Log a tour"
-          pill is always present (it's a doorway, not a state-driven verb)
-          and uses the same outline shape as a secondary action so it reads
-          as a peer to "Schedule a tour" / "Send a check-in" without
-          competing for the primary slot. */}
-      <div className="flex flex-wrap gap-2">
-        {actions.map((a, i) => (
-          <ActionPill key={a.id} action={a} primary={i === 0} />
-        ))}
-        <Link
-          href={`/s/${slug}/chippi/log?personId=${contact.id}`}
-          className={cn(
-            'inline-flex items-center gap-1.5 h-9 rounded-full px-4 text-sm transition-colors',
-            'border border-border/70 bg-background text-foreground hover:bg-muted/40',
-          )}
-        >
-          <Mic size={13} />
-          Log a tour
-        </Link>
-      </div>
+          actions. State picks them; the realtor doesn't. Tap a verb pill
+          and the inline draft surface opens beneath; the realtor reviews,
+          edits, sends without leaving the page. "Log a tour" stays a Link
+          to the dedicated recording flow. */}
+      <ContactActionPills
+        slug={slug}
+        contactId={contact.id}
+        contactName={contact.name}
+        actions={actions}
+      />
+
 
       {/* Quick contact bar — email/phone/address inline, applicant portal
           tucked in. Hairline on the page, not a card. */}
@@ -224,8 +215,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Activity timeline</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4">
           <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
@@ -243,8 +237,11 @@ export default async function ClientDetailPage({
               <MessageCircle size={13} className="text-orange-500 dark:text-orange-400" />
               Lead score
             </span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <div className="mt-4 space-y-4">
             <div className="flex items-baseline gap-3 flex-wrap">
@@ -302,9 +299,12 @@ export default async function ClientDetailPage({
       {hasOpenDeals && (
         <details open className="group border-t border-border/60 pt-4">
           <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
-            <span>Active deals ({contact.dealContacts.length})</span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span>Active deals (<span className="tabular-nums">{contact.dealContacts.length}</span>)</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <ul className="mt-4 divide-y divide-border/60">
             {contact.dealContacts.map(({ deal }) => (
@@ -350,8 +350,11 @@ export default async function ClientDetailPage({
                 </span>
               )}
             </span>
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
           </summary>
           <div className="mt-4 space-y-4">
             <div className="flex items-center justify-end">
@@ -392,8 +395,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Pipeline stage</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4 overflow-x-auto pb-1">
           <div className="min-w-max">
@@ -407,8 +413,11 @@ export default async function ClientDetailPage({
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
           <span>Follow-up &amp; lifecycle</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
-          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="mt-4 space-y-4">
           <ContactFollowUpField
@@ -432,27 +441,6 @@ export default async function ClientDetailPage({
         </div>
       </details>
     </div>
-  );
-}
-
-// ── Action pills ────────────────────────────────────────────────────
-
-function ActionPill({ action, primary }: { action: PeopleDetailAction; primary: boolean }) {
-  // The first pill is the primary verb (foreground bg), the rest are
-  // outlined. Matches the morning home's compose-vs-navigate vocabulary.
-  return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
-        primary
-          ? 'border border-border/70 bg-foreground text-background hover:bg-foreground/90'
-          : 'border border-border/70 bg-background text-foreground hover:bg-muted/40',
-      )}
-      data-intent={action.intent}
-    >
-      {action.label}
-    </button>
   );
 }
 

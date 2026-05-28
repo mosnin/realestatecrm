@@ -13,7 +13,7 @@ from security.context import AgentContext
 from tools.streaming import publish_event
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def ask_realtor(
     ctx: RunContextWrapper[AgentContext],
     question: str,

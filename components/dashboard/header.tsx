@@ -74,6 +74,10 @@ const brokerMobileNavSections = [
 
 interface HeaderProps {
   slug: string;
+  /** Owning Space.id — threaded through to NotificationCenter so its
+   *  Realtime subscriptions can filter by spaceId. Without this, a
+   *  permissive RLS regression would deliver cross-tenant rows. */
+  spaceId?: string;
   spaceName: string;
   title: string;
   isBroker?: boolean;
@@ -82,7 +86,7 @@ interface HeaderProps {
   brokerageRole?: string | null;
 }
 
-export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
+export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
   const [mobileShowPages, setMobileShowPages] = useState(false);
@@ -99,7 +103,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
   }, [pathname]);
 
   return (
-    <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
+    <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
             state, not a bare SVG. Radix's Trigger wraps whatever child you
@@ -564,7 +568,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
       <div className="flex items-center gap-0.5">
         {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
-        {slug && <NotificationCenter slug={slug} />}
+        {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
         {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
         <button

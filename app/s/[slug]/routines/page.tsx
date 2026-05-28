@@ -10,7 +10,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { RoutinesManager } from '@/components/routines/routines-manager';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 
 export default async function RoutinesPage({
   params,
@@ -26,19 +26,12 @@ export default async function RoutinesPage({
   if (!space) notFound();
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Routines.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          What Chippi does on its own
-        </h1>
-        <p className={BODY_MUTED}>
-          Standing instructions Chippi runs on a schedule — even when you&apos;re
-          not here. Every run drafts; nothing is sent without your approval.
-        </p>
-      </header>
-
+    <ChippiPageShell
+      greeting="Routines."
+      title="What Chippi does on its own"
+      subtitle="Standing instructions Chippi runs on a schedule — even when you're not here. Every run drafts; nothing is sent without your approval."
+    >
       <RoutinesManager />
-    </div>
+    </ChippiPageShell>
   );
 }

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { IntakeLinkRow } from './intake-link-row';
 import { timeAgo } from '@/lib/formatting';
-import { ArrowRight, MessageCircle } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import {
   H1,
   H3,
@@ -89,8 +89,11 @@ export default async function IntakeOverviewPage({
 
   const intakeUrl = buildIntakeUrl(space.slug);
   const intakePath = `/apply/${space.slug}`;
-  const chatUrl = `${intakeUrl}/chat`;
-  const chatPath = `${intakePath}/chat`;
+  // 2026-05-25: `/apply/<slug>/chat` is now a permanent redirect to
+  // `/apply/<slug>` — the chat is the only intake. The "AI chat mode" CTA
+  // below has been hidden because it advertised a non-existent second mode
+  // that just redirected to the same surface. Re-enable it only if a real
+  // alternate intake variant ships again.
 
   // Chippi narration ladder — one sentence describing the state of intake
   // right now. No counts in stat tiles; the count lives in the sentence so
@@ -142,20 +145,10 @@ export default async function IntakeOverviewPage({
         <IntakeLinkRow url={intakeUrl} previewHref={intakePath} />
       </section>
 
-      {/* AI chat mode — informational, near the share link */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <MessageCircle size={13} className="text-muted-foreground/70" />
-          <h2 className={H3}>AI chat mode</h2>
-          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground font-medium">
-            New
-          </span>
-        </div>
-        <p className="text-[13px] text-muted-foreground">
-          Applicants can apply via a conversational AI chatbot instead of the traditional form.
-        </p>
-        <IntakeLinkRow url={chatUrl} previewHref={chatPath} />
-      </section>
+      {/* AI chat mode — hidden 2026-05-25. The `/apply/<slug>/chat` route
+          now permanent-redirects to `/apply/<slug>` (which IS the chat). The
+          section advertised a second "mode" that didn't exist; the share
+          link above already gives the realtor the chat surface. */}
 
       {/* Recent submissions — the second thing they come here for */}
       <section>

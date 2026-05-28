@@ -1,40 +1,63 @@
 'use client';
 
 /**
- * IntakeChatShell — bespoke layout for the public intake chat surface.
+ * IntakeChatShell — the realtor's storefront wrapped around the intake chat.
  *
- * The generic PublicPageShell carries form-page furniture (page title,
- * intro paragraph, trust line, "Applying with X" band, footer columns)
- * that competes with the chat for attention. The intake chat doesn't
- * need any of it — the realtor's presence is the brand, the chat is
- * the content, the footer is small print.
+ * What the applicant sees in the first second:
+ *   1. (optional) a soft, dimmed cover-photo band — same image the public
+ *      profile uses, just narrower and pulled back so it never competes
+ *      with the question.
+ *   2. The realtor's face (or a brand-orange-tinted monogram fallback —
+ *      never a generic figure on a purple gradient).
+ *   3. The business name in serif Times — the brand's focal flourish.
+ *      Verified blue-check rides the baseline when isVerified is true.
+ *   4. The agent's name as a secondary line. Suppressed if it equals the
+ *      business name.
  *
- * What this renders:
- *   - Top: realtor photo + name + optional secondary line (brokerage).
- *     ONE appearance. No business-name repetition. No "Applying with"
- *     duplicate band. A hairline divider closes the header.
- *   - Middle: a max-w-2xl column that the chat fills.
- *   - Bottom: an almost-invisible footer (Terms / Privacy / "Powered by
- *     Chippi"). Stays out of the way unless the lead looks for it.
+ * What this shell is NOT:
+ *   - Not the public profile. No bio, no social icons, no listing cards.
+ *     The intake is a focused conversation; the hero just establishes
+ *     identity and gets out of the way.
+ *   - Not a logo dump. If `logoUrl` is set, we substitute it for the
+ *     wordmark in a quiet, single-line treatment — but we don't render
+ *     both the logo and the typed name.
  *
- * The shell makes no decisions about chat behaviour — children render
- * whatever the chat state machine produces.
+ * The shell renders no chat content; children render whatever the
+ * IntakeChat state machine produces.
  */
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
+import { BadgeCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { safeHref, cn } from '@/lib/utils';
+import { TITLE_FONT } from '@/lib/typography';
 
 export interface IntakeChatShellProps {
+  /** The realtor's brand-facing name — businessName from SpaceSetting, or
+   *  the Space.name fallback. This is the focal serif moment. */
+  businessName: string;
+  /** The actual person's name. Rendered as a secondary line only when it
+   *  differs from `businessName` (avoids "Jane Doe / Jane Doe"). */
   agentName: string;
+  /** Realtor face. Already signed-and-resolved upstream; null if the
+   *  realtor hasn't uploaded one (we fall back to a serif monogram). */
   agentPhoto?: string | null;
-  /** Optional secondary line under the agent's name. Use the brokerage
-   *  or business name only when it adds context — duplicating the agent
-   *  name (or the slug) here is the failure mode this shell is fixing. */
-  secondaryLabel?: string | null;
+  /** Optional cover photo (same field /p/[slug] uses). When present, it
+   *  becomes a softened brand band behind the avatar. */
+  coverPhotoUrl?: string | null;
+  /** When the realtor has uploaded a wordmark, it substitutes for the
+   *  typed business name. Quiet, single-line — no doubled identity. */
+  logoUrl?: string | null;
+  /** Drives the blue-check next to the business name. */
+  isVerified?: boolean;
+  /** When set, the realtor identity in the header becomes a Link to this
+   *  href — typically the public profile at /p/[slug]. Lets applicants
+   *  step over to learn more about the realtor without abandoning the
+   *  intake flow. Null/undefined → identity renders non-interactive. */
+  profileHref?: string | null;
   accentColor?: string;
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
@@ -84,11 +107,177 @@ function deriveInitials(name: string): string {
     .join('');
 }
 
-export function IntakeChatShell({
+/**
+ * Realtor identity hero — cover band + avatar + name.
+ *
+ * Sweat the details: the cover (if any) gets a soft top-to-bottom gradient
+ * dimmer so the avatar reads against it without looking pasted on. The
+ * avatar lifts above the band with a `border-4 border-background` ring
+ * that doubles as a paper-flat lift signal — no shadow needed.
+ *
+ * Fallback rules (no agentPhoto):
+ *   - Use a `bg-brand-subtle` (washed orange tint, defined in globals.css)
+ *     monogram circle with the realtor's initials in serif Times, brand-
+ *     orange text. This is the ONLY place outside Chippi proper where
+ *     brand-orange appears in the intake — and it's the realtor's
+ *     identity slot, not a button or chrome — so it reads as warmth, not
+ *     as a brand violation.
+ *   - In dark mode the brand-subtle token already swaps to the right
+ *     warm-brown tint, so the monogram stays legible.
+ */
+function RealtorIdentity({
+  businessName,
   agentName,
   agentPhoto,
-  secondaryLabel,
-  accentColor,
+  coverPhotoUrl,
+  logoUrl,
+  isVerified,
+  profileHref,
+}: {
+  businessName: string;
+  agentName: string;
+  agentPhoto?: string | null;
+  coverPhotoUrl?: string | null;
+  logoUrl?: string | null;
+  isVerified?: boolean;
+  /** When provided, the business name / logo becomes a quiet Link to the
+   *  realtor's public page. Gives applicants a way to learn more about
+   *  who they're applying with without abandoning the chat. */
+  profileHref?: string | null;
+}) {
+  const initials = deriveInitials(businessName || agentName);
+  const showSecondary =
+    agentName && agentName.trim() && agentName.trim() !== businessName.trim();
+
+  return (
+    <div className="text-center">
+      {/* Cover band — only when the realtor has uploaded a cover. The 16:9
+          aspect ratio matches /p/[slug] but the height is constrained so
+          the band reads as a quiet brand frame, not a hero takeover. The
+          bottom-gradient mask blends into the page so the avatar appears
+          to float out of it without a hard edge. */}
+      {coverPhotoUrl && (
+        // The negative top margin (-mt-5 sm:-mt-6) cancels the header
+        // container's pt-5 sm:pt-6 so the cover band sits flush against
+        // the top of the page — no body-coloured strip above it on iOS
+        // even when the safe-area drops content below the notch. The
+        // image grows in height a touch on mobile (h-28) so the extra
+        // vertical real estate goes INTO the brand frame, not into empty
+        // space above it.
+        <div className="relative -mx-5 sm:-mx-8 -mt-5 sm:-mt-6 mb-[-2.75rem] h-28 sm:h-32 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverPhotoUrl}
+            alt=""
+            loading="eager"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover opacity-80"
+          />
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/40 to-background"
+          />
+        </div>
+      )}
+
+      <div className="relative inline-flex flex-col items-center">
+        {agentPhoto ? (
+          // Real photo wins every time. The 4px background ring carries
+          // the lift against any cover; no shadow needed.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={agentPhoto}
+            alt={agentName}
+            className={cn(
+              'h-16 w-16 sm:h-[72px] sm:w-[72px] rounded-full object-cover object-top',
+              'border-4 border-background',
+            )}
+          />
+        ) : (
+          // Brand-orange-tinted monogram. Serif Times — matches the focal
+          // serif moment used on the business name below. The 4px ring
+          // mirrors the photo variant so layout stays steady.
+          <span
+            aria-hidden
+            className={cn(
+              'h-16 w-16 sm:h-[72px] sm:w-[72px] rounded-full inline-flex items-center justify-center',
+              'border-4 border-background',
+              'bg-orange-50 text-orange-600',
+              'dark:bg-orange-500/15 dark:text-orange-400',
+              'text-2xl sm:text-[26px] leading-none select-none',
+            )}
+            style={TITLE_FONT}
+          >
+            {initials}
+          </span>
+        )}
+      </div>
+
+      {/* Business name — the focal serif moment. Logo, if uploaded,
+          substitutes for the typed name (single source of identity).
+          The whole identity block wraps in a Link to /p/[slug] when a
+          profileHref is provided so applicants can step over to the
+          realtor's public page without breaking the intake flow. */}
+      <div className="mt-3 sm:mt-4">
+        {(() => {
+          const identityNode = logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={businessName}
+              loading="eager"
+              decoding="async"
+              className="mx-auto h-8 sm:h-9 max-w-[220px] object-contain"
+            />
+          ) : (
+            <h1
+              className={cn(
+                'inline-flex items-center justify-center gap-1.5',
+                'text-[22px] sm:text-2xl leading-tight tracking-tight text-foreground',
+              )}
+              style={TITLE_FONT}
+            >
+              {businessName}
+              {isVerified && (
+                <BadgeCheck
+                  size={16}
+                  aria-label="Verified"
+                  className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+                />
+              )}
+            </h1>
+          );
+          return profileHref ? (
+            <Link
+              href={profileHref}
+              className="inline-block transition-opacity hover:opacity-80"
+              aria-label={`View ${businessName}'s page`}
+            >
+              {identityNode}
+            </Link>
+          ) : (
+            identityNode
+          );
+        })()}
+
+        {showSecondary && (
+          <p className="mt-1 text-[12px] sm:text-[13px] text-muted-foreground">
+            {agentName}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function IntakeChatShell({
+  businessName,
+  agentName,
+  agentPhoto,
+  coverPhotoUrl,
+  logoUrl,
+  isVerified,
+  profileHref,
   privacyPolicyUrl,
   termsUrl,
   hidePoweredBy,
@@ -105,38 +294,46 @@ export function IntakeChatShell({
   const hasTrustBlock = Boolean(
     trustedLicense || trustedNotice || showEqualHousingMark,
   );
-  // If the secondary label is just the agent name again (the common
-  // "businessName === agentName" case), drop it. Repetition is the
-  // exact thing this shell exists to prevent.
-  const showSecondary =
-    secondaryLabel && secondaryLabel.trim().length > 0 && secondaryLabel !== agentName;
-
-  // Soft accent-tinted gradient background — the previous "plain white
-  // slab" failure mode this shell was rebuilt to fix. The gradient is
-  // subtle (max 14% opacity) so it never competes with the chat content,
-  // but it's visible enough that the page reads as a designed surface
-  // rather than a default form.
-  const gradientStyle = {
-    backgroundImage: `radial-gradient(ellipse 90% 60% at 50% 0%, ${withAlpha(
-      accentColor || '#0c0c0d',
-      0.14,
-    )} 0%, transparent 65%)`,
-  } as React.CSSProperties;
 
   return (
-    <div className="relative h-dvh min-h-[600px] flex flex-col text-foreground overflow-hidden bg-background">
-      {/* Background gradient — sits below everything. The dot grid texture
-          adds craft: a 1px @ 0.04 opacity pattern that reads as paper, not
-          screen. Both layers are absolute so the flex layout above
-          remains correct. */}
+    // Outer canvas. On mobile the chat fills the viewport edge-to-edge.
+    // On sm+ the chat becomes a centred card on a blurred image fill —
+    // same family as /p/[slug] and /book/[slug] so all three applicant-
+    // facing surfaces share one product aesthetic.
+    <div className="relative min-h-dvh bg-background sm:bg-muted/40 text-foreground">
+      {/* Desktop blur canvas — only sm+. Cover photo blurred behind the
+          card; 45% darken so the chat stays legible. Mobile skips this
+          (no card frame on mobile means the blur would be invisible). */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 pointer-events-none"
-        style={gradientStyle}
-      />
+        className="pointer-events-none fixed inset-0 hidden sm:block"
+      >
+        {coverPhotoUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverPhotoUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="h-full w-full scale-110 object-cover blur-[48px]"
+            />
+            <div className="absolute inset-0 bg-black/45" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60" />
+        )}
+      </div>
+
+      {/* The chat card. Full-screen on mobile, centred 540-wide card on
+          sm+ with rounded corners and a hairline border — matches the
+          public profile / booking shell vocabulary. */}
+      <div className="relative mx-auto h-dvh min-h-[600px] flex flex-col w-full sm:max-w-[540px] sm:my-8 sm:h-[calc(100dvh-4rem)] sm:rounded-[28px] sm:border sm:border-border/60 sm:overflow-hidden sm:shadow-2xl sm:shadow-black/10 bg-background overflow-hidden">
+      {/* Paper texture — 1px dot grid at ultra-low opacity. Reads as paper,
+          not screen. Sits beneath everything, never interactive. */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 pointer-events-none opacity-[0.045] dark:opacity-[0.08]"
+        className="absolute inset-0 -z-10 pointer-events-none opacity-[0.035] dark:opacity-[0.07]"
         style={{
           backgroundImage:
             'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
@@ -144,59 +341,23 @@ export function IntakeChatShell({
         }}
       />
 
-      {/* ── Sticky header — realtor presence pinned at the top ──────── */}
+      {/* ── Sticky header — realtor identity hero pinned at the top ──── */}
       <motion.header
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-        className="flex-shrink-0 w-full bg-background/70 backdrop-blur-xl border-b border-border/40"
+        className="flex-shrink-0 w-full bg-background/80 backdrop-blur-xl border-b border-border/40"
       >
-        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-4 sm:py-5">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-shrink-0">
-              {agentPhoto ? (
-                // Real photo wins every time it's available. The fallback
-                // initials only fire when the realtor hasn't uploaded one.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={agentPhoto}
-                  alt={agentName}
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover ring-2 ring-background"
-                  style={{ boxShadow: `0 0 0 1px ${withAlpha(accentColor || '#0c0c0d', 0.2)}` }}
-                />
-              ) : (
-                <span
-                  aria-hidden
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full inline-flex items-center justify-center text-base sm:text-lg font-semibold text-white select-none ring-2 ring-background"
-                  style={{
-                    backgroundColor: accentColor || '#0c0c0d',
-                    boxShadow: `0 0 0 1px ${withAlpha(accentColor || '#0c0c0d', 0.3)}`,
-                  }}
-                >
-                  {deriveInitials(agentName)}
-                </span>
-              )}
-              {/* Presence dot — subtle "available" signal in the realtor's
-                  accent color. Doesn't pulse (that would feel anxious);
-                  just sits there steadily. */}
-              <span
-                aria-hidden
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-background"
-                style={{ backgroundColor: '#10b981' }}
-                title="Available"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[16px] sm:text-[17px] font-semibold text-foreground leading-tight truncate">
-                {agentName}
-              </p>
-              {showSecondary && (
-                <p className="mt-0.5 text-[12px] sm:text-[13px] text-muted-foreground truncate">
-                  {secondaryLabel}
-                </p>
-              )}
-            </div>
-          </div>
+        <div className="max-w-2xl mx-auto px-5 sm:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5">
+          <RealtorIdentity
+            businessName={businessName}
+            agentName={agentName}
+            agentPhoto={agentPhoto}
+            coverPhotoUrl={coverPhotoUrl}
+            logoUrl={logoUrl}
+            isVerified={isVerified}
+            profileHref={profileHref}
+          />
         </div>
       </motion.header>
 
@@ -281,38 +442,8 @@ export function IntakeChatShell({
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }
 
-/**
- * Add an alpha channel to a hex/rgb-style color string. Returns the
- * input untouched if the format isn't recognized (so the realtor's
- * arbitrary `intakeAccentColor` value never crashes the page).
- */
-function withAlpha(color: string, alpha: number): string {
-  const a = Math.max(0, Math.min(1, alpha));
-  // #RGB / #RRGGBB
-  const hexMatch = color.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
-  if (hexMatch) {
-    let hex = hexMatch[1];
-    if (hex.length === 3) {
-      hex = hex
-        .split('')
-        .map((c) => c + c)
-        .join('');
-    }
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
-  }
-  // rgb(...) / rgba(...) — swap the alpha
-  if (color.startsWith('rgb')) {
-    const nums = color.match(/[\d.]+/g);
-    if (nums && nums.length >= 3) {
-      return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${a})`;
-    }
-  }
-  return color;
-}

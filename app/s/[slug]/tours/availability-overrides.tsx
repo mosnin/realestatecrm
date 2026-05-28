@@ -148,7 +148,7 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
         setFormError(data.error || 'Failed to delete override');
       }
     } catch {
-      setFormError('Network error. Please try again.');
+      setFormError("Couldn't reach the server — usually temporary.");
     } finally {
       setDeletingId(null);
     }

@@ -99,13 +99,18 @@ export async function POST(req: NextRequest) {
 
   if (contactRow) {
     contactId = contactRow.id;
-    // Set source attribution if not already set
-    supabase
+    // Set source attribution if not already set. Awaited — the prior
+    // fire-and-forget pattern could be GC'd on a cold Vercel function
+    // before the update committed, so first-touch attribution was missed
+    // intermittently. Cost is one extra serial query; the route already
+    // does several.
+    const { error: srcErr } = await supabase
       .from('Contact')
       .update({ sourceLabel: 'tour-booking' })
       .eq('id', contactId)
-      .is('sourceLabel', null)
-      .then(({ error: srcErr }) => { if (srcErr) console.error('[book] Source update failed:', srcErr); });
+      .eq('spaceId', space.id)
+      .is('sourceLabel', null);
+    if (srcErr) console.error('[book] Source update failed:', srcErr);
   } else {
     // Auto-create a contact for this tour guest
     const newContactId = crypto.randomUUID();
@@ -119,7 +124,11 @@ export async function POST(req: NextRequest) {
       type: 'TOUR',
       tags: ['tour-booking'],
       sourceLabel: 'tour-booking',
-      scoringStatus: 'unscored',
+      // `'unscored'` violated the CHECK constraint
+      // (`contact_scoring_status_check` allows pending/scored/failed only),
+      // so every auto-create silently failed and the tour was booked with
+      // a NULL contactId — losing attribution and breaking follow-ups.
+      scoringStatus: 'pending',
     });
     if (!createErr) {
       contactId = newContactId;

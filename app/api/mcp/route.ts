@@ -35,15 +35,21 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
     }
   }
 
-  // Fall back to raw API key hash lookup
+  // Fall back to raw API key hash lookup. `expiresAt` is read so the
+  // verification path can reject keys whose TTL has passed — see the
+  // 20260607000012_mcp_key_expiry migration. NULL expiresAt = legacy key,
+  // never expires (preserves backward compat for existing integrations).
   const keyHash = crypto.createHash('sha256').update(token).digest('hex');
   const { data } = await supabase
     .from('McpApiKey')
-    .select('spaceId')
+    .select('spaceId, expiresAt')
     .eq('keyHash', keyHash)
     .maybeSingle();
 
   if (!data) return null;
+  if (data.expiresAt && new Date(data.expiresAt as string).getTime() < Date.now()) {
+    return null;
+  }
 
   supabase
     .from('McpApiKey')

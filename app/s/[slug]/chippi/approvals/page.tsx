@@ -5,6 +5,7 @@ import { ArrowLeft, Clock } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ApprovalActions } from './approval-actions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -104,23 +105,18 @@ export default async function ApprovalsPage({
         : `${pendingCount} actions are waiting for your decision.`;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
-      {/* Header — three-line pattern per STYLESHEET.md */}
-      <header className="space-y-1.5">
-        <Link
-          href={`/s/${slug}/chippi/tasks`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={12} /> Agent Tasks
-        </Link>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Pending Approvals
-        </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
-      </header>
+    <ChippiPageShell
+      greeting="Approvals."
+      title="Pending Approvals"
+      subtitle={statusSentence}
+    >
+      {/* Back-link sits inside children so the shell header stays pure. */}
+      <Link
+        href={`/s/${slug}/chippi/tasks`}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft size={12} /> Agent Tasks
+      </Link>
 
       {/* Approval list */}
       {approvalList.length === 0 ? (
@@ -171,6 +167,6 @@ export default async function ApprovalsPage({
           })}
         </ul>
       )}
-    </div>
+    </ChippiPageShell>
   );
 }

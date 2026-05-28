@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { formatPropertyAddress } from '@/lib/properties';
 import type { Property } from '@/lib/types';
 import { PropertyDetailClient } from '@/components/properties/property-detail-client';
 
@@ -41,14 +42,26 @@ export default async function PropertyDetailPage({
       .limit(20),
   ]);
 
+  const addr = formatPropertyAddress(property as Property);
+
   return (
-    <div className="space-y-4 max-w-[1200px]">
-      <Link
-        href={`/s/${slug}/deals`}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      {/* Breadcrumb — the detail page is no longer an orphan child of /deals.
+          Matches the contact-detail breadcrumb pattern: muted "back" link
+          with chevron, in muted-foreground. */}
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-1 text-xs text-muted-foreground"
       >
-        <ArrowLeft size={12} /> Deals
-      </Link>
+        <Link
+          href={`/s/${slug}/properties`}
+          className="hover:text-foreground transition-colors"
+        >
+          Properties
+        </Link>
+        <ChevronRight size={11} aria-hidden className="text-muted-foreground/60" />
+        <span className="truncate text-foreground">{addr}</span>
+      </nav>
 
       <PropertyDetailClient
         slug={slug}

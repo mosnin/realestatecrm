@@ -292,7 +292,14 @@ export default function IntakeCustomizePage() {
   const subtitle = hasChanges ? `${subtitleBase} Unsaved changes.` : subtitleBase;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px] pb-12">
+    // The form-builder itself has its own three-column layout (palette /
+    // sections / property inspector) — stacking the live-preview beside
+    // it at lg/xl squeezed the middle column to nothing on typical
+    // viewports. Side-by-side preview is reserved for 2xl+ (1536px),
+    // where everything fits. On smaller screens the preview drops below
+    // the builder; the "Open in new tab" link at the top of the preview
+    // is the escape hatch when the realtor wants a dedicated window.
+    <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px] pb-12">
       {/* Left column — scrolls with the page */}
       <div className="min-w-0 space-y-6">
         {/* Header — H1 + Chippi narration */}

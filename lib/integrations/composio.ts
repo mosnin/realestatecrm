@@ -186,5 +186,97 @@ export async function executeToolForEntity(args: {
   return composio.tools.execute(args.slug, {
     userId: args.entityId,
     arguments: args.arguments,
+    // Composio's tool-version handshake: without this flag the SDK throws
+    // ComposioToolVersionRequiredError on every manual execute() call,
+    // demanding a pinned `toolkitVersions` at construction. Our safety
+    // story isn't "latest is always safe" — Composio's parameter schemas
+    // drift between versions. The actual invariant is that the agent's
+    // dispatcher fetches the action schema (find_integration_tool →
+    // /api/internal/integrations/search) IMMEDIATELY before calling it
+    // (call_integration_tool → here), so the schema the model reads and
+    // the call it makes use the same snapshot. The flag opts into that
+    // adjacency guarantee rather than into permanent skew.
+    dangerouslySkipVersionCheck: true,
+  });
+}
+
+// ─── Triggers ────────────────────────────────────────────────────────────────
+//
+// Triggers are how Composio tells US when something happens in the realtor's
+// connected app (new email, calendar accept, deal-stage change). Each trigger
+// is a subscription tied to ONE connectedAccountId; Composio POSTs a signed
+// delivery to our webhook receiver, which our SDK then verifies in-process.
+//
+// We expose four thin wrappers so the rest of the codebase never imports
+// `@composio/core` directly — same vendor-isolation invariant as `tools.*`
+// above. If we ever move off Composio, this file changes and the rest of
+// the integrations layer doesn't notice.
+
+/**
+ * Register a new trigger subscription for a connected account.
+ *
+ * `entityId` is the realtor's Clerk userId (Composio "user"). `slug` is the
+ * trigger slug (e.g. 'GMAIL_NEW_GMAIL_MESSAGE'). `connectedAccountId` ties the
+ * subscription to a specific connection — required when the realtor has more
+ * than one account for the same toolkit (multiple Gmails, etc.). `triggerConfig`
+ * is an opaque shape per trigger type: Composio's `getType(slug)` lists what's
+ * valid. We pass it through verbatim.
+ *
+ * Returns Composio's trigger id — store this in `IntegrationTrigger.composioTriggerId`
+ * so the receiver can join incoming deliveries back to our row.
+ */
+export async function createTrigger(args: {
+  entityId: string;
+  slug: string;
+  connectedAccountId: string;
+  triggerConfig?: Record<string, unknown>;
+}): Promise<{ triggerId: string }> {
+  const composio = getComposio();
+  return composio.triggers.create(args.entityId, args.slug, {
+    connectedAccountId: args.connectedAccountId,
+    triggerConfig: args.triggerConfig,
+  });
+}
+
+/** Delete a trigger subscription. Idempotent on our side — log + swallow on miss. */
+export async function deleteTrigger(triggerId: string): Promise<void> {
+  const composio = getComposio();
+  try {
+    await composio.triggers.delete(triggerId);
+  } catch (err) {
+    logger.warn(
+      '[integrations.composio] trigger delete failed (may be already gone)',
+      { triggerId },
+      err,
+    );
+  }
+}
+
+/**
+ * Verify an incoming Composio webhook. Composio signs every delivery with
+ * HMAC-SHA256; the SDK does the verification in-process. We pass the raw
+ * body string + the three webhook-* headers + our secret.
+ *
+ * Throws on invalid signature OR if the delivery is older than `tolerance`
+ * seconds (default 300). The receiver catches the throw and returns 401.
+ *
+ * Returns the normalized `IncomingTriggerPayload` — the receiver dispatches
+ * from this, not from the raw payload, so version differences (V1/V2/V3)
+ * collapse into one handler.
+ */
+export async function verifyTriggerWebhook(args: {
+  webhookId: string;
+  webhookTimestamp: string;
+  signature: string;
+  rawBody: string;
+  secret: string;
+}) {
+  const composio = getComposio();
+  return composio.triggers.verifyWebhook({
+    id: args.webhookId,
+    timestamp: args.webhookTimestamp,
+    signature: args.signature,
+    payload: args.rawBody,
+    secret: args.secret,
   });
 }

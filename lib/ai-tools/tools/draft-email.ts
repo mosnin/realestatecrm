@@ -2,15 +2,16 @@
  * `draft_email` — compose-only. "What would you say."
  *
  * Read-only by design: NO AgentDraft row, NO send, NO persistence. Reuses
- * the exported `composeQuickDraft` from the existing /api/agent/quick-draft
- * route so we don't duplicate the OpenAI prompt + voice-sample logic.
+ * the exported `composeQuickDraft` from `lib/agent/quick-draft` (shared
+ * with the /api/agent/quick-draft route) so we don't duplicate the OpenAI
+ * prompt + voice-sample logic.
  *
  * Approval: NO. The realtor isn't sending anything; they're seeing a draft.
  */
 
 import { z } from 'zod';
 import { defineTool } from '../types';
-import { composeQuickDraft } from '@/app/api/agent/quick-draft/route';
+import { composeQuickDraft } from '@/lib/agent/quick-draft';
 
 const INTENTS = ['check-in', 'log-call', 'welcome', 'reach-out'] as const;
 

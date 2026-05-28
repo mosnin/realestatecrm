@@ -4,13 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2 } from 'lucide-react';
+import {
+  Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatting';
-import { formatPropertyAddress, formatPropertyFacts, PROPERTY_LISTING_STATUS_OPTIONS } from '@/lib/properties';
+import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
+import { SECTION_LABEL } from '@/lib/typography';
+import { Button } from '@/components/ui/button';
 import { PropertyForm } from './property-form';
 import { PropertyShareDialog } from './property-share-dialog';
+import { PropertyStatusBadge } from './property-status-badge';
 
 interface Props {
   slug: string;
@@ -54,18 +59,16 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
     const res = await fetch(`/api/properties/${property.id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error("Couldn't delete that property."); return; }
     toast.success('Deleted.');
-    router.push(`/s/${slug}/properties/commissions`);
+    router.push(`/s/${slug}/properties`);
   }
 
-  const statusLabel = PROPERTY_LISTING_STATUS_OPTIONS.find((o) => o.value === property.listingStatus)?.label
-    ?? property.listingStatus;
   const cover = property.photos[0];
   const addr = formatPropertyAddress(property);
   const facts = formatPropertyFacts(property);
 
   if (editing) {
     return (
-      <div className="rounded-lg border border-border/70 bg-card p-5">
+      <div className="rounded-xl border border-border/70 bg-card p-5">
         <h1 className="text-lg font-semibold mb-4">Edit property</h1>
         <PropertyForm
           initial={property}
@@ -79,95 +82,104 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-4">
-      {/* Left: hero + facts */}
-      <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
-        <div className="aspect-[4/3] bg-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {cover ? (
-            <img src={cover} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              <Building2 size={32} />
-            </div>
+    <div className="space-y-8">
+      {/* ── Hero ────────────────────────────────────────────────────────
+          Full-width 16:9 photo. Real estate leads with the photo — the
+          old 360px sidebar treatment hid it behind chrome. When no photo
+          is on file: same aspect ratio, hairline border, calm muted copy
+          (not a coloured block). */}
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt={addr}
+            className="aspect-video w-full object-cover"
+          />
+        ) : (
+          <div className="aspect-video w-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Building2 size={28} className="text-muted-foreground/50" aria-hidden />
+            <p className="text-xs text-muted-foreground">No photo on file yet.</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Title + status sentence ─────────────────────────────────────
+          Page-level focal: serif Times h1 + status pill row + price.
+          Same vocabulary as the contact detail page. */}
+      <header className="space-y-2">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          {addr}
+        </h1>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <PropertyStatusBadge status={property.listingStatus} />
+          {property.propertyType && (
+            <span>· {property.propertyType.replace('_', ' ')}</span>
           )}
+          {facts && <span>· {facts}</span>}
         </div>
-        <div className="p-4 space-y-3">
-          <div>
-            <h1 className="text-lg font-semibold leading-tight">{addr}</h1>
-            {facts && <p className="text-xs text-muted-foreground mt-0.5">{facts}</p>}
-          </div>
+        {property.listPrice != null && (
+          <p
+            className="text-3xl tracking-tight text-foreground tabular-nums pt-2"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            {formatCurrency(property.listPrice)}
+          </p>
+        )}
+      </header>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 bg-muted text-muted-foreground">
-              {statusLabel}
-            </span>
-            {property.propertyType && (
-              <span className="text-muted-foreground">· {property.propertyType.replace('_', ' ')}</span>
-            )}
-          </div>
-
-          {property.listPrice != null && (
-            <p className="text-2xl font-semibold tabular-nums">{formatCurrency(property.listPrice)}</p>
-          )}
-
-          <dl className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border">
+      {/* ── Facts grid + listing/notes ───────────────────────────────── */}
+      <section className="space-y-4 border-t border-border/60 pt-6">
+        {(property.yearBuilt != null || property.lotSizeSqft != null || property.mlsNumber) && (
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
             {property.yearBuilt != null && <Fact label="Year built" value={String(property.yearBuilt)} />}
             {property.lotSizeSqft != null && <Fact label="Lot" value={`${property.lotSizeSqft.toLocaleString()} sqft`} />}
             {property.mlsNumber && <Fact label="MLS" value={property.mlsNumber} />}
           </dl>
+        )}
 
-          {property.listingUrl && (
-            <a href={property.listingUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline">
-              View listing <ExternalLink size={11} />
-            </a>
-          )}
+        {property.listingUrl && (
+          <a
+            href={property.listingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-sm font-medium text-foreground hover:underline"
+          >
+            View listing <ExternalLink size={12} />
+          </a>
+        )}
 
-          {property.notes && (
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap pt-3 border-t border-border">
-              {property.notes}
-            </p>
-          )}
+        {property.notes && (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {property.notes}
+          </p>
+        )}
+      </section>
 
-          <div className="flex items-center justify-between pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={remove}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 size={11} /> Delete
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSharing(true)}
-                className="inline-flex items-center gap-1 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted px-2.5 py-1"
-              >
-                <Share2 size={11} /> Share
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1 text-xs font-semibold rounded-md bg-foreground text-background px-2.5 py-1"
-              >
-                <Pencil size={11} /> Edit
-              </button>
-            </div>
-          </div>
-
-          {sharing && (
-            <PropertyShareDialog
-              propertyId={property.id}
-              linkedDealIds={linkedDeals.map((d) => d.id)}
-              origin={origin}
-              onClose={() => setSharing(false)}
-            />
-          )}
+      {/* ── Action row ──────────────────────────────────────────────────
+          Canonical Button components — outline for Share, default for
+          Edit (primary), destructive for Delete. */}
+      <div className="flex items-center justify-between border-t border-border/60 pt-6">
+        <Button variant="destructive" size="sm" onClick={remove}>
+          <Trash2 /> Delete
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setSharing(true)}>
+            <Share2 /> Share
+          </Button>
+          <Button size="sm" onClick={() => setEditing(true)}>
+            <Pencil /> Edit
+          </Button>
         </div>
       </div>
 
-      {/* Right: linked deals + tours */}
-      <div className="space-y-4">
+      {/* ── Linked deals + tours ────────────────────────────────────────
+          Below the facts, not in a sidebar. Section labels use the
+          canonical SECTION_LABEL small-caps treatment. */}
+      <div className="space-y-8 border-t border-border/60 pt-6">
         <LinkedSection
           title="Linked deals"
           icon={Briefcase}
@@ -198,16 +210,25 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
           })}
         />
       </div>
+
+      {sharing && (
+        <PropertyShareDialog
+          propertyId={property.id}
+          linkedDealIds={linkedDeals.map((d) => d.id)}
+          origin={origin}
+          onClose={() => setSharing(false)}
+        />
+      )}
     </div>
   );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <>
-      <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value}</dd>
-    </>
+    <div>
+      <dt className={cn(SECTION_LABEL, 'mb-0.5')}>{label}</dt>
+      <dd className="text-sm text-foreground">{value}</dd>
+    </div>
   );
 }
 
@@ -223,28 +244,33 @@ function LinkedSection({
   empty: string;
 }) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-        <Icon size={14} className="text-muted-foreground" />
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="text-[11px] text-muted-foreground">{items.length}</span>
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon size={12} className="text-muted-foreground" aria-hidden />
+        <h2 className={cn(SECTION_LABEL)}>{title}</h2>
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {items.length}
+        </span>
       </div>
       {items.length === 0 ? (
-        <p className="px-4 py-5 text-xs text-muted-foreground text-center">{empty}</p>
+        <p className="text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-border/60">
           {items.map((item) => (
             <li key={item.key}>
-              <Link href={item.href} className={cn('flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors')}>
+              <Link
+                href={item.href}
+                className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.primary}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{item.secondary}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{item.primary}</p>
+                  <p className="text-xs text-muted-foreground truncate">{item.secondary}</p>
                 </div>
               </Link>
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
