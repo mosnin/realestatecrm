@@ -57,7 +57,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ skipped: true, reason: 'Already scoring' });
   }
 
-  await supabase.from('Contact').update({ scoringStatus: 'pending' }).eq('id', contactId);
+  // Every write below is double-scoped by (id, spaceId). The SELECT above
+  // already proved this contact lives in this spaceId, but a future code
+  // path that drops the SELECT can't reach across tenants if the writes
+  // themselves are also scoped. Treat the bearer secret as proving "this
+  // caller is Modal" — never as proving "this payload's spaceId is what
+  // Modal was originally authorized for."
+  await supabase
+    .from('Contact')
+    .update({ scoringStatus: 'pending' })
+    .eq('id', contactId)
+    .eq('spaceId', spaceId);
 
   const formConfig = (contact as Record<string, unknown>).formConfigSnapshot as IntakeFormConfig | null ?? null;
   const resolvedLeadType = contact.leadType || (contact as Record<string, unknown>).formLeadType as string || 'rental';
@@ -103,14 +113,16 @@ export async function POST(req: NextRequest) {
         scoreDetails: result.scoreDetails,
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', contactId);
+      .eq('id', contactId)
+      .eq('spaceId', spaceId);
 
     return NextResponse.json({ success: true, score: result.leadScore, label: result.scoreLabel });
   } catch {
     await supabase
       .from('Contact')
       .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
-      .eq('id', contactId);
+      .eq('id', contactId)
+      .eq('spaceId', spaceId);
     return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
   }
 }

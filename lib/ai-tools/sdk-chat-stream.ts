@@ -337,18 +337,53 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // Persist the assistant text. Empty buffers are normal on a paused
         // turn (the model hasn't said anything yet) — saveAssistantMessage
         // handles the empty-text case with a placeholder.
+        //
+        // Retry-with-backoff. The stream has already emitted `turn_complete`
+        // to the browser, so the realtor SAW the reply. If we just log and
+        // continue (the old behaviour), the assistant's whole turn vanishes
+        // from history on the next page load — and the next turn the model
+        // has no idea what it just said. A Supabase blip becomes silent
+        // data loss with no UI indication. Three attempts with exponential
+        // backoff cover the transient-network failure mode; a permanent
+        // failure surfaces as an error event so the realtor knows the
+        // history is stale and can copy what they need before refreshing.
         if (textBuffer.trim()) {
-          try {
-            const blocks: MessageBlock[] = [{ type: 'text', content: textBuffer }];
-            await saveAssistantMessage({
-              spaceId: input.ctx.space.id,
+          const blocks: MessageBlock[] = [{ type: 'text', content: textBuffer }];
+          let saved = false;
+          let lastError: unknown;
+          for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
+            try {
+              await saveAssistantMessage({
+                spaceId: input.ctx.space.id,
+                conversationId: input.conversationId,
+                blocks,
+              });
+              saved = true;
+            } catch (err) {
+              lastError = err;
+              logger.warn('[ai/task ts] save assistant message attempt failed', {
+                conversationId: input.conversationId,
+                attempt,
+              }, err);
+              if (attempt < 3) {
+                await new Promise((resolve) =>
+                  setTimeout(resolve, 200 * 2 ** (attempt - 1)),
+                );
+              }
+            }
+          }
+          if (!saved) {
+            logger.error('[ai/task ts] save assistant message failed after 3 attempts', {
               conversationId: input.conversationId,
-              blocks,
+            }, lastError);
+            // Surface to the client so the UI can show a non-blocking
+            // warning. The reply is on screen; the database doesn't have
+            // it. Refreshing now would lose the context.
+            pushEvent({
+              type: 'error',
+              message: chippiErrorMessage('persistence'),
+              code: 'persistence',
             });
-          } catch (err) {
-            logger.error('[ai/task ts] save assistant message failed', {
-              conversationId: input.conversationId,
-            }, err);
           }
         }
         controller.close();
