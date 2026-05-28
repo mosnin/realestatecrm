@@ -37,3 +37,27 @@ export function decrypt(encryptedHex: string): string {
   decipher.setAuthTag(authTag);
   return decipher.update(ciphertext) + decipher.final('utf8');
 }
+
+/**
+ * Soft-migration helper for fields that USED to be stored plaintext and now
+ * land encrypted. Attempts decrypt; on any failure (wrong shape, wrong
+ * algorithm, GCM tag mismatch — i.e. the value is legacy plaintext), returns
+ * the raw input unchanged.
+ *
+ * Used by Google Calendar access-token reads while existing rows from before
+ * the encrypt-at-rest migration drain off the table. New writes always go
+ * through encrypt(), so the legacy branch self-extinguishes within one
+ * refresh cycle (~1 hour for Google access tokens).
+ *
+ * Anti-pattern alert: do NOT use this for fields that have ALWAYS been
+ * encrypted (e.g. refreshToken). On those, a decrypt failure means data
+ * corruption and should surface, not silently return garbage. This is only
+ * safe for the soft-migration window.
+ */
+export function decryptOrPassthrough(value: string): string {
+  try {
+    return decrypt(value);
+  } catch {
+    return value;
+  }
+}

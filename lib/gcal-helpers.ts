@@ -14,7 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { decrypt } from '@/lib/crypto';
+import { decrypt, encrypt, decryptOrPassthrough } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
@@ -40,7 +40,10 @@ export async function getValidAccessToken(
 ): Promise<string> {
   const expiresAt = new Date(tokenRow.expiresAt).getTime();
   if (Date.now() < expiresAt - 60_000) {
-    return tokenRow.accessToken;
+    // Soft-migration: legacy rows are plaintext, new rows are encrypted.
+    // decryptOrPassthrough returns the raw value if decrypt fails — see
+    // lib/crypto for why this is safe only for the migration window.
+    return decryptOrPassthrough(tokenRow.accessToken);
   }
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -65,7 +68,7 @@ export async function getValidAccessToken(
   await supabase
     .from('GoogleCalendarToken')
     .update({
-      accessToken: tokens.access_token,
+      accessToken: encrypt(tokens.access_token),
       expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     })
