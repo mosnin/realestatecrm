@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { deleteGoogleEvent } from '@/lib/gcal-helpers';
 import { defineTool } from '../types';
 
 const parameters = z
@@ -38,7 +39,7 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
   async handler(args, ctx) {
     const { data: tour, error: tourErr } = await supabase
       .from('Tour')
-      .select('id, contactId, guestName, propertyAddress, status')
+      .select('id, contactId, guestName, propertyAddress, status, googleEventId')
       .eq('id', args.tourId)
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
@@ -64,6 +65,25 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
     if (updateErr) {
       logger.error('[tools.cancel_tour] update failed', { tourId: args.tourId }, updateErr);
       return { summary: `Cancel failed: ${updateErr.message}`, display: 'error' };
+    }
+
+    // Drop the mirrored Google Calendar event — the /api/tours/[id] PATCH
+    // route does this on status=cancelled; the tool path must match or the
+    // realtor's GCal keeps a ghost slot. Fire-and-forget: DB has committed,
+    // a GCal hiccup orphans the event and gcal-helpers logs it for ops.
+    const googleEventId = (tour as { googleEventId?: string | null }).googleEventId;
+    if (googleEventId) {
+      void deleteGoogleEvent({ spaceId: ctx.space.id, googleEventId }).then(async (ok) => {
+        if (ok) {
+          // Clear the stale id so a future sync doesn't try to update a
+          // deleted event.
+          await supabase
+            .from('Tour')
+            .update({ googleEventId: null })
+            .eq('id', args.tourId)
+            .eq('spaceId', ctx.space.id);
+        }
+      });
     }
 
     if (tour.contactId) {
