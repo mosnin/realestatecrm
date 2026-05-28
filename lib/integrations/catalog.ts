@@ -88,12 +88,12 @@ export const COMING_SOON_TOOLKITS = new Set<string>([
  */
 export const INTEGRATIONS: IntegrationApp[] = [
   // ── Email ────────────────────────────────────────────────────────────
-  { toolkit: 'gmail', name: 'Gmail', blurb: 'Send drafts and watch for replies.', category: 'email', promoted: true, iconUrl: '/integrations/gmail.svg' },
+  { toolkit: 'gmail', name: 'Gmail', blurb: 'Send drafts. Chippi notices replies and drafts an answer.', category: 'email', promoted: true, iconUrl: '/integrations/gmail.svg' },
   { toolkit: 'outlook', name: 'Outlook', blurb: 'Same, for Microsoft accounts.', category: 'email', promoted: true, iconUrl: '/integrations/outlook.svg' },
-  { toolkit: 'mailchimp', name: 'Mailchimp', blurb: 'Drip nurture, listing announcements, monthly newsletters.', category: 'email', promoted: true, iconUrl: '/integrations/mailchimp.svg' },
+  { toolkit: 'mailchimp', name: 'Mailchimp', blurb: 'Drip nurture, announcements. Chippi notices subscribes and unsubscribes.', category: 'email', promoted: true, iconUrl: '/integrations/mailchimp.svg' },
 
   // ── Calendar ─────────────────────────────────────────────────────────
-  { toolkit: 'googlecalendar', name: 'Google Calendar', blurb: 'Schedule tours, block time, see availability.', category: 'calendar', promoted: true, iconUrl: '/integrations/googlecalendar.svg' },
+  { toolkit: 'googlecalendar', name: 'Google Calendar', blurb: 'Schedule tours, block time. Chippi notices RSVPs and cancellations.', category: 'calendar', promoted: true, iconUrl: '/integrations/googlecalendar.svg' },
   { toolkit: 'outlook_calendar', name: 'Outlook Calendar', blurb: 'Same, for Microsoft accounts.', category: 'calendar', promoted: true, iconUrl: '/integrations/outlook.svg' },
   { toolkit: 'calendly', name: 'Calendly', blurb: 'Sync your booking link with Chippi.', category: 'calendar', promoted: true, iconUrl: '/integrations/calendly.svg' },
   { toolkit: 'cal', name: 'Cal.com', blurb: 'Open-source booking pages.', category: 'calendar' },
@@ -104,7 +104,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // team comms; the SMS-class tools are client comms.
   { toolkit: 'twilio', name: 'Twilio', blurb: 'SMS and voice with US clients — Chippi can reply where the conversation actually lives.', category: 'messaging', promoted: true, iconUrl: '/integrations/twilio.svg' },
   { toolkit: 'whatsapp', name: 'WhatsApp', blurb: 'International buyers, co-buyer group threads, agent-to-agent.', category: 'messaging', promoted: true, iconUrl: '/integrations/whatsapp.svg' },
-  { toolkit: 'slack', name: 'Slack', blurb: 'Post deals, alerts, and updates to your team channel.', category: 'messaging', promoted: true, iconUrl: '/integrations/slack.svg' },
+  { toolkit: 'slack', name: 'Slack', blurb: 'Post to your team channel. Chippi drafts replies to your DMs.', category: 'messaging', promoted: true, iconUrl: '/integrations/slack.svg' },
   { toolkit: 'discord', name: 'Discord', blurb: 'Same, for Discord servers.', category: 'messaging', iconUrl: '/integrations/discord.svg' },
   { toolkit: 'microsoft_teams', name: 'Microsoft Teams', blurb: 'Same, for Teams channels.', category: 'messaging', iconUrl: '/integrations/microsoftteams.svg' },
 
@@ -125,7 +125,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // Earnest-money deposits, transaction-coordination retainers, listing-prep
   // fees. Realtors increasingly take money directly instead of waiting on
   // closing — Chippi can draft and send the payment link.
-  { toolkit: 'stripe', name: 'Stripe', blurb: 'Collect earnest deposits, retainers, and service fees.', category: 'payments', promoted: true, iconUrl: '/integrations/stripe.svg' },
+  { toolkit: 'stripe', name: 'Stripe', blurb: 'Collect deposits and fees. Chippi acknowledges payments and chases failures.', category: 'payments', promoted: true, iconUrl: '/integrations/stripe.svg' },
 
   // ── Docs ─────────────────────────────────────────────────────────────
   { toolkit: 'notion', name: 'Notion', blurb: 'Capture deals, tours, and notes in your workspace.', category: 'docs', promoted: true, iconUrl: '/integrations/notion.svg' },
@@ -141,7 +141,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // HubSpot is the one most realtors land on. The rest are here for the
   // brokerage that already lives inside Salesforce/Pipedrive/Zoho — we
   // call out what's distinct so the row doesn't read as catalog padding.
-  { toolkit: 'hubspot', name: 'HubSpot', blurb: 'Sync deals and contacts both ways.', category: 'crm', promoted: true, iconUrl: '/integrations/hubspot.svg' },
+  { toolkit: 'hubspot', name: 'HubSpot', blurb: 'Sync deals and contacts. Chippi watches stage changes and new contacts.', category: 'crm', promoted: true, iconUrl: '/integrations/hubspot.svg' },
   { toolkit: 'salesforce', name: 'Salesforce', blurb: 'Mirror to your brokerage Salesforce org.', category: 'crm', iconUrl: '/integrations/salesforce.svg' },
   { toolkit: 'pipedrive', name: 'Pipedrive', blurb: 'Push pipeline stages into Pipedrive.', category: 'crm' },
   { toolkit: 'zoho', name: 'Zoho CRM', blurb: 'Two-way sync with Zoho.', category: 'crm', iconUrl: '/integrations/zoho.svg' },

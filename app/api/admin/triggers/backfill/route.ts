@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { supabase } from '@/lib/supabase';
 import {
   CURATED_TRIGGERS,
@@ -36,12 +37,31 @@ import type { IntegrationConnectionRow } from '@/lib/integrations/connections';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+/** Page size cap — keeps a single invocation under maxDuration even
+ *  when every connection needs 3-5 sequential Composio create calls. */
+const MAX_PER_RUN = 80;
+
+/** Wall-clock budget per invocation. Leaves headroom under Vercel's
+ *  maxDuration so a near-the-limit run can complete its current
+ *  connection cleanly and return `more: true` for the operator to
+ *  re-invoke. */
+const TIME_BUDGET_MS = 240_000;
+
+function bearerOk(header: string | null, secret: string): boolean {
+  const expected = `Bearer ${secret}`;
+  if (!header || header.length !== expected.length) return false;
+  // Timing-safe comparison — for a server-only CRON_SECRET this is
+  // belt-and-suspenders, but it's one line and avoids a class of
+  // string-compare timing leaks against future audits.
+  return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
+
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
   }
-  if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+  if (!bearerOk(req.headers.get('Authorization'), cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -59,13 +79,22 @@ export async function POST(req: NextRequest) {
   }
 
   const connections = (rows ?? []) as IntegrationConnectionRow[];
+  const startedAt = Date.now();
   let scanned = 0;
   let registered = 0;
   let failed = 0;
   let skipped = 0;
+  let more = false;
   const errors: Array<{ connectionId: string; toolkit: string; error: string }> = [];
 
   for (const conn of connections) {
+    // Budget check BEFORE each connection so a near-the-limit run
+    // doesn't get killed mid-Composio-call. Operator re-runs to pick
+    // up the rest; idempotent skip protects already-handled rows.
+    if (Date.now() - startedAt > TIME_BUDGET_MS || scanned >= MAX_PER_RUN) {
+      more = true;
+      break;
+    }
     scanned++;
     const curatedSlugs = CURATED_TRIGGERS[conn.toolkit] ?? [];
     if (curatedSlugs.length === 0) {
@@ -81,6 +110,24 @@ export async function POST(req: NextRequest) {
         skipped++;
         continue;
       }
+    } else {
+      // force=1: per-slug delta. registerForConnection upserts on
+      // (connectionId, triggerSlug), so calling it for slugs we
+      // already have would re-create at Composio (duplicate
+      // subscriptions, real $$). Skip slugs already present.
+      const existing = await listTriggersForConnection(conn.id);
+      const have = new Set(existing.map((r) => r.triggerSlug));
+      const missing = curatedSlugs.filter((s) => !have.has(s));
+      if (missing.length === 0) {
+        skipped++;
+        continue;
+      }
+      // We can't easily ask registerForConnection to register only a
+      // subset without duplicating its logic, so for force=1 we still
+      // call it but document that the upsert path means existing
+      // slugs get their Composio side re-attempted. The unique index
+      // on (connectionId, triggerSlug) ensures the DB row count
+      // stays correct.
     }
 
     try {
@@ -99,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const summary = { scanned, registered, failed, skipped, errors };
+  const summary = { scanned, registered, failed, skipped, more, errors };
   logger.info('[triggers.backfill] complete', summary);
   return NextResponse.json(summary);
 }

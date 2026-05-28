@@ -46,8 +46,11 @@ interface ConnectionRow {
    *  'active' — at least one trigger registered and listening; Chippi
    *             will draft something the next time the realtor's app
    *             emits an event we care about
-   *  'paused' — triggers exist but the realtor turned them off       */
-  triggers?: 'off' | 'active' | 'paused';
+   *  'paused' — triggers exist but the realtor turned them off
+   *  'failed' — registration was attempted but Composio rejected. The
+   *             realtor sees this as "couldn't tune in" so silent
+   *             failure doesn't masquerade as off-by-design.            */
+  triggers?: 'off' | 'active' | 'paused' | 'failed';
 }
 
 // ── Health badge types ────────────────────────────────────────────────────────
@@ -600,10 +603,11 @@ function IntegrationCard({
     ? explainCallbackReason(connection.lastError, app.toolkit)
     : null;
   // Only show the watch affordance when (a) the connection is active and
-  // (b) the toolkit actually has triggers registered ('off' means we have
-  // no curated triggers for this app — silent until we extend coverage).
+  // (b) we have something to say about it: active, paused, or failed.
+  // 'off' = no curated triggers for this app — silent until we extend.
   const showWatch = status === 'active' && connection?.triggers && connection.triggers !== 'off';
   const isPaused = connection?.triggers === 'paused';
+  const isFailed = connection?.triggers === 'failed';
 
   return (
     <div
@@ -629,15 +633,20 @@ function IntegrationCard({
             {errorLine}
           </p>
         )}
-        {showWatch && (
+        {showWatch && isFailed && (
+          <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+            Chippi couldn&apos;t tune in to this app. Try reconnecting.
+          </p>
+        )}
+        {showWatch && !isFailed && (
           <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
-            {isPaused ? 'Chippi is paused on this app.' : 'Chippi is watching.'}{' '}
+            {isPaused ? 'Quiet here.' : 'Chippi is listening.'}{' '}
             <button
               type="button"
               onClick={onTogglePause}
               className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
             >
-              {isPaused ? 'Resume' : 'Pause'}
+              {isPaused ? 'Turn on' : 'Pause'}
             </button>
           </p>
         )}

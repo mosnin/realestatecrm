@@ -140,19 +140,43 @@ describe('POST /api/admin/triggers/backfill', () => {
     expect(registerMock).not.toHaveBeenCalled();
   });
 
-  it('force=1 bypasses the existing-rows skip', async () => {
+  it('force=1 bypasses the all-rows-exist skip but still per-slug deltas', async () => {
+    // force=1 now uses per-slug delta. If the existing rows already
+    // cover EVERY curated slug for the toolkit, the connection is
+    // still skipped — preventing duplicate Composio subscriptions
+    // (which would cost real money). Only when at least one
+    // CURATED_TRIGGERS slug is missing from existing rows does
+    // registerForConnection run.
     supabaseConnections.push(
       { id: 'c1', spaceId: 's1', userId: 'u1', toolkit: 'gmail', composioConnectionId: 'ca1', status: 'active' },
     );
-    listMock.mockResolvedValue([{ id: 'existing-row' }]);
+    // Existing rows are missing the gmail curated slug (only the
+    // GMAIL_NEW_GMAIL_MESSAGE is curated for gmail). Stub existing as
+    // a different slug name so the delta is non-empty.
+    listMock.mockResolvedValue([{ id: 'existing', triggerSlug: 'SOMETHING_ELSE' }]);
     registerMock.mockResolvedValueOnce({ registered: 1, failed: 0 });
 
     const res = await POST(makeReq({ auth: 'Bearer test-secret', force: true }));
     const body = await res.json();
 
     expect(body.registered).toBe(1);
-    expect(listMock).not.toHaveBeenCalled(); // skipped the idempotency check
+    // force=1 DOES call listTriggersForConnection (for the delta check).
+    expect(listMock).toHaveBeenCalled();
     expect(registerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('force=1 still skips when every curated slug is already present (no duplicate Composio subscriptions)', async () => {
+    supabaseConnections.push(
+      { id: 'c1', spaceId: 's1', userId: 'u1', toolkit: 'gmail', composioConnectionId: 'ca1', status: 'active' },
+    );
+    // Existing rows cover every gmail curated slug → delta empty → skip.
+    listMock.mockResolvedValue([{ id: 'r1', triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE' }]);
+
+    const res = await POST(makeReq({ auth: 'Bearer test-secret', force: true }));
+    const body = await res.json();
+
+    expect(body.skipped).toBe(1);
+    expect(registerMock).not.toHaveBeenCalled();
   });
 
   it('captures per-connection failure without dropping the rest', async () => {

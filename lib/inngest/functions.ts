@@ -195,6 +195,26 @@ export const handleComposioTrigger = inngest.createFunction(
       payload: Record<string, unknown>;
     };
 
+    // 0. In-handler idempotency. The receiver dedupes on webhook-id at
+    //    HTTP-arrival time, but Inngest itself is at-least-once: if a
+    //    later step fails and the function retries, the dispatch step
+    //    re-runs and fires Modal again (fireRoutineRun is fire-and-
+    //    forget, so it creates a duplicate run). Claim a Redis key on
+    //    deliveryId at the head of the function so a retry sees the
+    //    claim and short-circuits. The first run's claim is memoised
+    //    by step.run, so the claim is genuinely once-per-event.
+    const claimed = await step.run('claim-delivery', async () => {
+      const key = `composio:trigger:handler:${data.deliveryId}`;
+      return redis.set(key, '1', { nx: true, ex: 24 * 60 * 60 });
+    });
+    if (claimed === null) {
+      logger.info('[composio.trigger] duplicate handler invocation — dropping', {
+        deliveryId: data.deliveryId,
+        triggerSlug: data.triggerSlug,
+      });
+      return { dispatched: 'noop', reason: 'duplicate_handler' };
+    }
+
     // 1. Resolve the connection. If it's gone (mid-disconnect) or non-active,
     //    drop the event. The receiver already verified the signature so we
     //    know the delivery is authentic — we just no longer care about it.
@@ -215,6 +235,20 @@ export const handleComposioTrigger = inngest.createFunction(
         triggerSlug: data.triggerSlug,
       });
       return { dispatched: 'noop', reason: 'connection_inactive' };
+    }
+
+    // Defense in depth: the delivery's toolkitSlug should match the
+    // connection we resolved. A mismatch means someone is re-using a
+    // composioConnectionId across toolkits — shouldn't happen with
+    // Composio's data model, but if it ever does, we don't want a Gmail
+    // trigger to dispatch against a HubSpot connection.
+    if (data.toolkitSlug && data.toolkitSlug !== connection.toolkit) {
+      logger.warn('[composio.trigger] toolkit mismatch — dropping', {
+        connectionId: connection.id,
+        connectionToolkit: connection.toolkit,
+        eventToolkit: data.toolkitSlug,
+      });
+      return { dispatched: 'noop', reason: 'toolkit_mismatch' };
     }
 
     // 2. Resolve the trigger row. Missing = stale registration (Composio
