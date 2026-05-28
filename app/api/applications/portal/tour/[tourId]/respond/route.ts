@@ -123,15 +123,33 @@ export async function POST(
     );
   }
 
-  // Update tour status
-  const { error: updateError } = await supabase
+  // Compare-and-swap on the tour status: only update if it's still in the
+  // status we read above. Two parallel calls (network glitch + applicant
+  // double-click) without CAS would both pass the L107 idempotency check
+  // (status was 'scheduled' for both), both run an unguarded UPDATE, and
+  // both insert their receipt message — cluttering the realtor's thread
+  // with duplicates. With CAS, only the first writer's UPDATE returns a
+  // row; the second sees zero affected rows and skips the message insert.
+  const { data: updated, error: updateError } = await supabase
     .from('Tour')
     .update({ status: targetStatus, updatedAt: new Date().toISOString() })
     .eq('id', tourId)
-    .eq('spaceId', contact.spaceId);
+    .eq('spaceId', contact.spaceId)
+    .eq('status', tour.status)
+    .select('id');
   if (updateError) {
     console.error('[portal/tour-respond] Tour update error:', updateError);
     return NextResponse.json({ error: 'Failed to update tour' }, { status: 500 });
+  }
+
+  // Lost the CAS — another concurrent caller already moved the tour.
+  // Return a clean success without inserting a duplicate message; the
+  // first writer's message is already on the thread.
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      tour: { id: tour.id, status: targetStatus },
+    });
   }
 
   // Compose receipt message for the thread.

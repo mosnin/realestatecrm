@@ -22,6 +22,17 @@ export async function GET(req: NextRequest) {
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
+  // Per-space cap on top of per-(slug, IP). A botnet rotating IPs can each
+  // stay under the per-IP limit while collectively hammering a single
+  // realtor's GCal quota (~1k free-tier ops/day burnt in minutes by 100
+  // attacker IPs at 60/hr each). 600/hour per space lets a busy public
+  // booking page absorb a real surge (multiple visitors flipping through
+  // dates) while shutting down the aggregate-amplification attack.
+  const spaceCheck = await checkRateLimit(`available:space:${space.id}`, 600, 3600);
+  if (!spaceCheck.allowed) {
+    return NextResponse.json({ error: 'Too many requests for this space' }, { status: 429 });
+  }
+
   // Load space settings
   const { data: settings } = await supabase
     .from('SpaceSetting')
