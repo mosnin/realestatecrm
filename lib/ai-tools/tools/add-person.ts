@@ -84,7 +84,7 @@ const parameters = z
       .nullable()
       .optional()
       .describe(
-        'Optional tags. Use `new-lead` for fresh leads (counts toward the morning unread-leads number); use `hot` only when the realtor explicitly said this person is hot.',
+        'Optional tags. Use `new-lead` for fresh leads (counts toward the morning unread-leads number); use `hot` only when the realtor explicitly said this person is hot. Prefer REUSING the workspace\'s existing tags over inventing new ones — only create a new tag for a meaningfully distinct concept. If the realtor mentions a tag verbatim ("tag this guy snowbird"), match the case + spelling they used.',
       ),
   })
   .describe(
