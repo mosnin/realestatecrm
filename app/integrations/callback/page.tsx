@@ -163,10 +163,22 @@ export default async function IntegrationsCallback({
     spaceId: space.id,
   });
 
-  // Register curated triggers for this toolkit. Best-effort: a failure
-  // here logs but does NOT fail the OAuth completion. The realtor sees
-  // the integration as connected; missing triggers surface via the
-  // health endpoint and recover on reconnect.
+  // Status from Composio: 'ACTIVE' is the green path. Anything else, we
+  // mark it failed but keep the row so the realtor sees something
+  // happened in the UI.
+  if (status && status.toUpperCase() !== 'ACTIVE') {
+    logger.warn('[integrations.callback] composio returned non-active status', {
+      connectedAccountId,
+      status,
+    });
+    return redirect(buildBackUrl({ ok: false, reason: status, slug: space.slug, toolkit }));
+  }
+
+  // Register curated triggers ONLY after the connection is confirmed
+  // ACTIVE. Registering against an INITIALIZING / FAILED connection
+  // creates failed IntegrationTrigger rows the realtor would have to
+  // clean up on reconnect. Best-effort: a failure here logs but does
+  // NOT fail the OAuth completion (the connection itself succeeded).
   try {
     const result = await registerForConnection({ connection: inserted });
     if (result.failed > 0) {
@@ -183,17 +195,6 @@ export default async function IntegrationsCallback({
       { toolkit, connectionId: inserted.id },
       err,
     );
-  }
-
-  // Status from Composio: 'ACTIVE' is the green path. Anything else, we
-  // mark it failed but keep the row so the realtor sees something
-  // happened in the UI.
-  if (status && status.toUpperCase() !== 'ACTIVE') {
-    logger.warn('[integrations.callback] composio returned non-active status', {
-      connectedAccountId,
-      status,
-    });
-    return redirect(buildBackUrl({ ok: false, reason: status, slug: space.slug, toolkit }));
   }
 
   return redirect(buildBackUrl({ ok: true, slug: space.slug, toolkit }));

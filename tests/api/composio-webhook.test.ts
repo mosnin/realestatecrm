@@ -34,13 +34,19 @@ vi.mock('@/lib/inngest/client', () => ({
 // The receiver uses three methods: set (with nx), incr, expire. We track
 // each one so the dedupe-claim and rate-cap branches are testable.
 
-const { redisSetMock, redisIncrMock, redisExpireMock } = vi.hoisted(() => ({
+const { redisSetMock, redisIncrMock, redisExpireMock, redisDelMock } = vi.hoisted(() => ({
   redisSetMock: vi.fn(),
   redisIncrMock: vi.fn(),
   redisExpireMock: vi.fn(async () => 1),
+  redisDelMock: vi.fn(async () => 1),
 }));
 vi.mock('@/lib/redis', () => ({
-  redis: { set: redisSetMock, incr: redisIncrMock, expire: redisExpireMock },
+  redis: {
+    set: redisSetMock,
+    incr: redisIncrMock,
+    expire: redisExpireMock,
+    del: redisDelMock,
+  },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -100,6 +106,8 @@ beforeEach(() => {
   redisIncrMock.mockReset();
   redisExpireMock.mockReset();
   redisExpireMock.mockResolvedValue(1);
+  redisDelMock.mockReset();
+  redisDelMock.mockResolvedValue(1);
   process.env.COMPOSIO_WEBHOOK_SECRET = 'whsec_test';
 });
 
@@ -172,7 +180,7 @@ describe('composio webhook receiver', () => {
     expect(inngestSendMock).not.toHaveBeenCalled();
   });
 
-  it('returns 500 when Inngest send fails', async () => {
+  it('returns 500 AND releases the dedupe key when Inngest send fails', async () => {
     verifyMock.mockResolvedValueOnce(verifiedPayload());
     redisSetMock.mockResolvedValueOnce('OK');
     redisIncrMock.mockResolvedValueOnce(1);
@@ -181,5 +189,11 @@ describe('composio webhook receiver', () => {
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(500);
+    // The dedupe key MUST be released so Composio's retry can re-claim
+    // it — otherwise the event is silently lost. This is the bug-fix
+    // contract being locked in.
+    expect(redisDelMock).toHaveBeenCalledTimes(1);
+    const [delKey] = redisDelMock.mock.calls[0] as unknown as [string];
+    expect(delKey).toContain('msg_abc');
   });
 });

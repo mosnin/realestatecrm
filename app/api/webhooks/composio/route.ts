@@ -139,14 +139,14 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    // Inngest send failure is logged + surfaced — Composio's retry will
-    // re-deliver, the dedupe ring has it, but if Inngest is truly down
-    // the dedupe key would still claim. Return 500 so Composio retries.
-    // The dedupe key is fine to keep — a retry hits the same key, finds
-    // it set, returns 200 with deduped=true. We accept that as a missed
-    // event since the alternative (delete the dedupe key on error) opens
-    // a race where two retries both enqueue.
-    logger.error('[composio-webhook] inngest send failed', { webhookId }, err);
+    // Release the dedupe key so Composio's retry can re-claim it —
+    // otherwise the second delivery short-circuits at the dedupe gate
+    // and the event is silently lost. The narrow race window (two
+    // concurrent retries both seeing no claim) is acceptable because
+    // Inngest itself is at-least-once at the function level; the
+    // alternative (event lost forever) is much worse.
+    await redis.del(dedupeKey).catch(() => null);
+    logger.error('[composio-webhook] inngest send failed — dedupe released', { webhookId }, err);
     return NextResponse.json({ error: 'enqueue_failed' }, { status: 500 });
   }
 
