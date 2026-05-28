@@ -41,15 +41,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
   }
 
-  // Verify the client_id belongs to this user's space
+  // Verify the client_id belongs to this user's space AND hasn't expired.
+  // Refusing the PKCE leg before code issuance means an expired key
+  // can't even start an OAuth flow — the Claude connector gets a clear
+  // "invalid_client" instead of silently exchanging a code it'll never
+  // be able to use at the token endpoint.
   const { data: mcpKey } = await supabase
     .from('McpApiKey')
-    .select('spaceId')
+    .select('spaceId, expiresAt')
     .eq('clientId', client_id)
     .maybeSingle();
 
   if (!mcpKey || mcpKey.spaceId !== space.id) {
     return NextResponse.json({ error: 'Invalid client_id' }, { status: 400 });
+  }
+  if (mcpKey.expiresAt && new Date(mcpKey.expiresAt as string).getTime() < Date.now()) {
+    return NextResponse.json(
+      { error: 'Invalid client_id', error_description: 'key expired' },
+      { status: 400 },
+    );
   }
 
   // Generate authorization code (short-lived, single-use)

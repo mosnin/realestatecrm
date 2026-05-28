@@ -189,12 +189,26 @@ export async function POST(req: NextRequest) {
     const secretHash = crypto.createHash('sha256').update(client_secret).digest('hex');
     const { data: key } = await supabase
       .from('McpApiKey')
-      .select('spaceId, clientSecretHash')
+      .select('spaceId, clientSecretHash, expiresAt')
       .eq('clientId', client_id)
       .maybeSingle();
 
-    if (!key || key.clientSecretHash !== secretHash) {
+    // Constant-time compare on the hash so a remote timing oracle can't
+    // be used to discover early-matching prefix bytes. SHA-256 of a
+    // 256-bit-entropy secret makes this academic, but it's the right
+    // default for credential paths.
+    const expectedHash = key?.clientSecretHash ?? '';
+    const a = Buffer.from(expectedHash);
+    const b = Buffer.from(secretHash);
+    const hashOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!key || !hashOk) {
       return NextResponse.json({ error: 'invalid_client' }, { status: 401 });
+    }
+
+    // Reject expired keys. NULL expiresAt = legacy key, treated as never
+    // expires for backward compat. See 20260607000012 migration.
+    if (key.expiresAt && new Date(key.expiresAt as string).getTime() < Date.now()) {
+      return NextResponse.json({ error: 'invalid_client', error_description: 'key expired' }, { status: 401 });
     }
 
     supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', client_id).then(() => {});
