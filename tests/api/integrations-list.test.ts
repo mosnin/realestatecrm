@@ -41,6 +41,17 @@ vi.mock('@/lib/integrations/composio', () => ({
   composioConfigured: composioConfiguredMock,
 }));
 
+// The list endpoint now joins per-connection trigger summaries from
+// IntegrationTrigger. That behaviour is owned by integrations-triggers
+// tests; here we stub the summary helper so the list endpoint's
+// projection contract is testable in isolation.
+const { summariesMock } = vi.hoisted(() => ({
+  summariesMock: vi.fn(async () => ({})),
+}));
+vi.mock('@/lib/integrations/triggers', () => ({
+  summariesForConnections: summariesMock,
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
@@ -175,7 +186,7 @@ describe('GET /api/integrations', () => {
     expect(body.connections).toHaveLength(1);
     const row = body.connections[0];
     expect(Object.keys(row).sort()).toEqual(
-      ['createdAt', 'id', 'label', 'lastError', 'status', 'toolkit'].sort(),
+      ['createdAt', 'id', 'label', 'lastError', 'status', 'toolkit', 'triggers'].sort(),
     );
     expect(row).not.toHaveProperty('composioConnectionId');
     expect(row).not.toHaveProperty('userId');

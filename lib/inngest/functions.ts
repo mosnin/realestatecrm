@@ -20,7 +20,18 @@ import {
   findByComposioTriggerId,
   stampFired,
 } from '@/lib/integrations/triggers';
+import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+
+// Per-space daily ceiling on trigger-initiated dispatches. The receiver
+// already enforces a per-(connection, slug) hourly cap; this one is the
+// total dollar floor. 100/day is conservative: a Modal autonomous run
+// is the costliest dispatch path and a single space accumulating 100 of
+// them in a day already implies something noisy worth investigating.
+// Above the cap → log + drop. The realtor noticing "Chippi got quiet"
+// is a better failure mode than a runaway bill.
+const SPACE_DAILY_CAP = 100;
+const DAY_SECONDS = 24 * 60 * 60;
 
 interface LoadedPost {
   status: string;
@@ -228,7 +239,30 @@ export const handleComposioTrigger = inngest.createFunction(
       return { dispatched: 'noop', reason: 'trigger_paused' };
     }
 
-    // 3. Dispatch. The dispatcher is the single place that decides DRAFT
+    // 3. Per-space daily cap. The receiver's per-(connection, slug)
+    //    hourly cap is finer-grained but lets a realtor with five
+    //    connected apps each at 60/hr accumulate 300+ Modal runs in a
+    //    day. This is the absolute ceiling per space.
+    const dayBucket = Math.floor(Date.now() / 1000 / DAY_SECONDS);
+    const dailyKey = `composio:trigger:space-daily:${connection.spaceId}:${dayBucket}`;
+    const dailyCount = await step.run('daily-cap-check', async () => {
+      const c = (await redis.incr(dailyKey)) as number;
+      if (c === 1) {
+        await redis.expire(dailyKey, DAY_SECONDS);
+      }
+      return c;
+    });
+    if (dailyCount > SPACE_DAILY_CAP) {
+      logger.warn('[composio.trigger] space daily cap exceeded — dropping', {
+        spaceId: connection.spaceId,
+        triggerSlug: data.triggerSlug,
+        count: dailyCount,
+        cap: SPACE_DAILY_CAP,
+      });
+      return { dispatched: 'noop', reason: 'space_daily_cap' };
+    }
+
+    // 4. Dispatch. The dispatcher is the single place that decides DRAFT
     //    vs NOTICE vs DATA_SYNC vs no-op based on the slug.
     const result = await step.run('dispatch', async () => {
       return dispatchTrigger({

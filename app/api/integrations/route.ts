@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { listConnections, reconcileFromComposio } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
+import { summariesForConnections } from '@/lib/integrations/triggers';
 
 export async function GET() {
   const auth = await requireAuth();
@@ -35,6 +36,15 @@ export async function GET() {
   const all = await listConnections(space.id);
   // Drop revoked rows — they're audit-only, not realtor-facing.
   const visible = all.filter((c) => c.status !== 'revoked');
+
+  // Per-connection trigger summary: 'off' (no curated triggers for that
+  // toolkit), 'active' (at least one trigger live), 'paused' (registered
+  // but realtor paused). Drives the "Chippi is watching" / "Paused"
+  // affordance on the connected app card. One DB roundtrip total — not
+  // one per connection.
+  const triggers = visible.length > 0
+    ? await summariesForConnections(visible.map((c) => c.id))
+    : {};
 
   // Setup diagnostics — surfaced on the settings panel when something's
   // missing. The OAuth callback URL Composio redirects to is composed from
@@ -61,6 +71,7 @@ export async function GET() {
       label: c.label,
       lastError: c.lastError,
       createdAt: c.createdAt,
+      triggers: triggers[c.id] ?? 'off',
     })),
   });
 }

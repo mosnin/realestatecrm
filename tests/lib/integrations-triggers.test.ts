@@ -73,6 +73,8 @@ import {
   registerForConnection,
   deleteForConnection,
   dispatchTrigger,
+  setPausedForConnection,
+  summariesForConnections,
   CURATED_TRIGGERS,
 } from '@/lib/integrations/triggers';
 import type { IntegrationConnectionRow } from '@/lib/integrations/connections';
@@ -227,6 +229,146 @@ describe('deleteForConnection', () => {
     await deleteForConnection('conn-1');
 
     expect(deleteTriggerMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── setPausedForConnection ──────────────────────────────────────────────────
+
+describe('setPausedForConnection', () => {
+  it('updates rows from active → paused when called with paused:true', async () => {
+    // Capture the chain to assert what was filtered + what was set.
+    let chainCalls: Array<[string, unknown[]]> = [];
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) {
+        chain[m] = vi.fn((...args: unknown[]) => {
+          chainCalls.push([m, args]);
+          return chain;
+        });
+      }
+      chainCalls = [];
+      const term = () => Promise.resolve({ data: [{ id: 'r1' }, { id: 'r2' }], error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: [{ id: 'r1' }, { id: 'r2' }], error: null }).then(r, e);
+      return chain;
+    });
+
+    const result = await setPausedForConnection({ connectionId: 'conn-1', paused: true });
+
+    expect(result.updated).toBe(2);
+    // Must have filtered on the OPPOSITE status — the helper only flips
+    // rows in the wrong state, leaving paused-already and failed alone.
+    const eqCalls = chainCalls.filter(([m]) => m === 'eq');
+    expect(eqCalls).toContainEqual(['eq', ['status', 'active']]);
+    // And updated TO 'paused'.
+    const updateCall = chainCalls.find(([m]) => m === 'update');
+    expect((updateCall![1][0] as { status: string }).status).toBe('paused');
+  });
+
+  it('updates rows from paused → active when called with paused:false', async () => {
+    let chainCalls: Array<[string, unknown[]]> = [];
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) {
+        chain[m] = vi.fn((...args: unknown[]) => {
+          chainCalls.push([m, args]);
+          return chain;
+        });
+      }
+      chainCalls = [];
+      const term = () => Promise.resolve({ data: [{ id: 'r1' }], error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: [{ id: 'r1' }], error: null }).then(r, e);
+      return chain;
+    });
+
+    const result = await setPausedForConnection({ connectionId: 'conn-1', paused: false });
+
+    expect(result.updated).toBe(1);
+    const eqCalls = chainCalls.filter(([m]) => m === 'eq');
+    expect(eqCalls).toContainEqual(['eq', ['status', 'paused']]);
+    const updateCall = chainCalls.find(([m]) => m === 'update');
+    expect((updateCall![1][0] as { status: string }).status).toBe('active');
+  });
+});
+
+// ─── summariesForConnections ─────────────────────────────────────────────────
+
+describe('summariesForConnections', () => {
+  it('returns "active" when ANY trigger row is active', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) chain[m] = vi.fn(() => chain);
+      const data = [
+        { connectionId: 'c1', status: 'paused' },
+        { connectionId: 'c1', status: 'active' }, // wins
+      ];
+      const term = () => Promise.resolve({ data, error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data, error: null }).then(r, e);
+      return chain;
+    });
+
+    const result = await summariesForConnections(['c1']);
+    expect(result.c1).toBe('active');
+  });
+
+  it('returns "paused" only when all rows are paused', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) chain[m] = vi.fn(() => chain);
+      const data = [
+        { connectionId: 'c1', status: 'paused' },
+        { connectionId: 'c1', status: 'paused' },
+      ];
+      const term = () => Promise.resolve({ data, error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data, error: null }).then(r, e);
+      return chain;
+    });
+
+    const result = await summariesForConnections(['c1']);
+    expect(result.c1).toBe('paused');
+  });
+
+  it('returns "off" for connections with no rows', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) chain[m] = vi.fn(() => chain);
+      const term = () => Promise.resolve({ data: [], error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(r, e);
+      return chain;
+    });
+
+    const result = await summariesForConnections(['c1', 'c2']);
+    expect(result.c1).toBe('off');
+    expect(result.c2).toBe('off');
+  });
+
+  it('is a no-op for an empty input list', async () => {
+    const result = await summariesForConnections([]);
+    expect(result).toEqual({});
   });
 });
 

@@ -276,6 +276,88 @@ export async function deleteForConnection(connectionId: string): Promise<void> {
   }
 }
 
+/**
+ * Flip every IntegrationTrigger row for a connection between 'active'
+ * and 'paused'. Realtor-facing — the integrations panel offers ONE
+ * toggle per connected app, not one per trigger. Per-trigger granularity
+ * is a settings rabbit hole the realtor does not need.
+ *
+ * Idempotent: pausing an already-paused connection is a no-op.
+ * Failed rows (status='failed') are left alone — those are a separate
+ * recovery path (re-register on reconnect).
+ */
+export async function setPausedForConnection(args: {
+  connectionId: string;
+  paused: boolean;
+}): Promise<{ updated: number }> {
+  const targetStatus: TriggerStatus = args.paused ? 'paused' : 'active';
+  const oppositeStatus: TriggerStatus = args.paused ? 'active' : 'paused';
+  const { data, error } = await supabase
+    .from('IntegrationTrigger')
+    .update({ status: targetStatus, updatedAt: new Date().toISOString() })
+    .eq('connectionId', args.connectionId)
+    .eq('status', oppositeStatus)
+    .select('id');
+  if (error) {
+    logger.warn('[integrations.triggers] setPausedForConnection failed', {
+      connectionId: args.connectionId,
+      paused: args.paused,
+      err: error.message,
+    });
+    return { updated: 0 };
+  }
+  return { updated: (data ?? []).length };
+}
+
+/**
+ * Did this connection have ANY active trigger at the time of the check?
+ * Used by the integrations list endpoint to render the per-connection
+ * "Chippi is watching" / "Paused" affordance. Returns false when the
+ * connection has no rows at all (nothing curated for that toolkit).
+ */
+export async function hasActiveTriggers(connectionId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('IntegrationTrigger')
+    .select('id', { count: 'exact', head: true })
+    .eq('connectionId', connectionId)
+    .eq('status', 'active');
+  if (error) return false;
+  return (count ?? 0) > 0;
+}
+
+/**
+ * Per-connection trigger summary for the integrations list endpoint.
+ * Three states:
+ *   - "off"     → no triggers registered (toolkit has empty CURATED_TRIGGERS)
+ *   - "active"  → at least one trigger active
+ *   - "paused"  → at least one trigger registered but all paused
+ * Returns null entries for connection IDs with no rows.
+ */
+export async function summariesForConnections(connectionIds: string[]): Promise<
+  Record<string, 'off' | 'active' | 'paused'>
+> {
+  if (connectionIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('IntegrationTrigger')
+    .select('connectionId, status')
+    .in('connectionId', connectionIds);
+  if (error) {
+    logger.warn('[integrations.triggers] summariesForConnections failed', { err: error.message });
+    return {};
+  }
+  const rows = (data ?? []) as Array<{ connectionId: string; status: TriggerStatus }>;
+  const map: Record<string, 'off' | 'active' | 'paused'> = {};
+  for (const id of connectionIds) map[id] = 'off';
+  for (const r of rows) {
+    // 'active' wins over 'paused' wins over 'off'.
+    if (r.status === 'active') map[r.connectionId] = 'active';
+    else if (r.status === 'paused' && map[r.connectionId] !== 'active') {
+      map[r.connectionId] = 'paused';
+    }
+  }
+  return map;
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 /**

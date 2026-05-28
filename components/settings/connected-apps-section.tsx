@@ -40,6 +40,14 @@ interface ConnectionRow {
   status: 'active' | 'expired' | 'failed';
   label: string | null;
   lastError: string | null;
+  /** Aggregate state of the connection's Composio trigger subscriptions.
+   *  'off'    — no curated triggers for this toolkit (the inbound half
+   *             of integrations isn't wired for this app yet)
+   *  'active' — at least one trigger registered and listening; Chippi
+   *             will draft something the next time the realtor's app
+   *             emits an event we care about
+   *  'paused' — triggers exist but the realtor turned them off       */
+  triggers?: 'off' | 'active' | 'paused';
 }
 
 // ── Health badge types ────────────────────────────────────────────────────────
@@ -310,6 +318,49 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
     }
   }
 
+  /**
+   * Pause or resume Chippi's watch on this connection. PATCHes the
+   * connection's trigger subscriptions in bulk (one toggle, all
+   * triggers). Optimistic update — the UI flips immediately and rolls
+   * back on a non-OK response.
+   */
+  async function handleTogglePause(connectionId: string, currentlyPaused: boolean) {
+    const target = !currentlyPaused;
+    setError(null);
+    setConnections((prev) =>
+      prev.map((c) =>
+        c.id === connectionId ? { ...c, triggers: target ? 'paused' : 'active' } : c,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/integrations/${connectionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: target }),
+      });
+      if (!res.ok) {
+        // Roll back the optimistic update.
+        setConnections((prev) =>
+          prev.map((c) =>
+            c.id === connectionId
+              ? { ...c, triggers: currentlyPaused ? 'paused' : 'active' }
+              : c,
+          ),
+        );
+        setError("Couldn't change Chippi's watch on that app.");
+      }
+    } catch {
+      setConnections((prev) =>
+        prev.map((c) =>
+          c.id === connectionId
+            ? { ...c, triggers: currentlyPaused ? 'paused' : 'active' }
+            : c,
+        ),
+      );
+      setError("Couldn't reach the integrations service.");
+    }
+  }
+
   const byToolkit = useMemo(() => {
     const map = new Map<string, ConnectionRow>();
     for (const c of connections) {
@@ -444,6 +495,12 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
                       const c = byToolkit.get(app.toolkit);
                       if (c) void handleDisconnect(c.id);
                     }}
+                    onTogglePause={() => {
+                      const c = byToolkit.get(app.toolkit);
+                      if (c && c.triggers && c.triggers !== 'off') {
+                        void handleTogglePause(c.id, c.triggers === 'paused');
+                      }
+                    }}
                   />
                 );
               })}
@@ -526,6 +583,7 @@ function IntegrationCard({
   healthLoading,
   onConnect,
   onDisconnect,
+  onTogglePause,
 }: {
   app: IntegrationApp;
   connection: ConnectionRow | null;
@@ -534,12 +592,18 @@ function IntegrationCard({
   healthLoading: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
+  onTogglePause: () => void;
 }) {
   const status = connection?.status ?? null;
   const action = pickRowAction({ comingSoon: app.comingSoon, status, busy });
   const errorLine = connection?.lastError && status !== 'active'
     ? explainCallbackReason(connection.lastError, app.toolkit)
     : null;
+  // Only show the watch affordance when (a) the connection is active and
+  // (b) the toolkit actually has triggers registered ('off' means we have
+  // no curated triggers for this app — silent until we extend coverage).
+  const showWatch = status === 'active' && connection?.triggers && connection.triggers !== 'off';
+  const isPaused = connection?.triggers === 'paused';
 
   return (
     <div
@@ -563,6 +627,18 @@ function IntegrationCard({
         {errorLine && (
           <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-3">
             {errorLine}
+          </p>
+        )}
+        {showWatch && (
+          <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
+            {isPaused ? 'Chippi is paused on this app.' : 'Chippi is watching.'}{' '}
+            <button
+              type="button"
+              onClick={onTogglePause}
+              className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
+            >
+              {isPaused ? 'Resume' : 'Pause'}
+            </button>
           </p>
         )}
       </div>
