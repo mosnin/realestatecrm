@@ -438,10 +438,11 @@ function DraftRow({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-orange-500 hover:bg-orange-600 text-white"
-                  onClick={handleApprove}
-                >
+                {/* Default foreground primary — NOT orange. Brand orange
+                    never goes on a CTA (STYLESHEET §Color §The brand
+                    orange rule); the send confirmation is the canonical
+                    primary action, so it wears the default Button style. */}
+                <AlertDialogAction onClick={handleApprove}>
                   Yes, send it
                 </AlertDialogAction>
               </AlertDialogFooter>

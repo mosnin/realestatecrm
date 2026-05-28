@@ -69,6 +69,8 @@ const NAMED_LEAF_FILES = new Set<string>([
   'components/ui/brand-logo.tsx',
   // CHIPPI_AVATAR widget
   'components/agent/chippi-avatar.tsx',
+  // ACTIVITY_BAR + LEAD_WARM — the score/progress bar fills
+  'components/agent/lead-score-bar.tsx',
   // The CHIPPI_PILL constant lives in typography.ts
   'lib/typography.ts',
   // The colors module itself
