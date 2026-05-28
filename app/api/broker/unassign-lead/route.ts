@@ -172,59 +172,105 @@ export async function POST(req: NextRequest) {
 
     const realtorName = assignedToName ?? assignedTo ?? 'Unknown';
 
-    // ── Delete cloned contact from realtor's space ───────────────────────
-    // First, clean up related DealContact links and Deals
-    try {
-      // Find DealContact rows linked to the cloned contact
-      const { data: dealContactLinks } = await supabase
-        .from('DealContact')
-        .select('dealId, contactId')
-        .eq('contactId', assignedContactId);
-
-      if (dealContactLinks && dealContactLinks.length > 0) {
-        const dealIds = dealContactLinks.map(
-          (dc: { dealId: string }) => dc.dealId,
-        );
-
-        // Delete DealContact links first (FK constraint)
-        await supabase
-          .from('DealContact')
-          .delete()
-          .eq('contactId', assignedContactId);
-
-        // For each deal, check if it has other contacts. If not, delete the deal.
-        for (const dealId of dealIds) {
-          const { data: remainingLinks } = await supabase
+    // ── Bind the delete blast radius to (assignedContactId, assignedSpaceId) ──
+    // The assignedSpaceId check above proved the SPACE belongs to a member
+    // of this brokerage. It did NOT prove `assignedContactId` actually
+    // lives in `assignedSpaceId` — which means tampered or stale
+    // `applicationStatusNote` metadata could point at a contact id from a
+    // different realtor's space. An unscoped DELETE would then whack the
+    // wrong contact. Verify the binding explicitly before any deletion.
+    if (assignedSpaceId) {
+      const { data: clonedContactRow } = await supabase
+        .from('Contact')
+        .select('id')
+        .eq('id', assignedContactId)
+        .eq('spaceId', assignedSpaceId)
+        .maybeSingle();
+      if (!clonedContactRow) {
+        // Either the realtor already deleted their copy (benign) or the
+        // metadata is corrupted. Skip the delete pass entirely — the
+        // broker-side tag flip below still runs, which is the only
+        // operation the broker actually cares about.
+        console.warn('[unassign-lead] cloned contact not found in assigned space — skipping delete', {
+          assignedContactId,
+          assignedSpaceId,
+          brokerageId: brokerage.id,
+        });
+      } else {
+        // Cleanup is safe to run, scoped by (contactId, spaceId) at every
+        // step so a future code path that drops the binding check still
+        // can't reach across tenants.
+        try {
+          // Delete DealContact links first (FK constraint). DealContact has
+          // no spaceId column, but the contactId predicate is already
+          // scoped: we just proved this contactId lives in the right space.
+          const { data: dealContactLinks } = await supabase
             .from('DealContact')
-            .select('id')
-            .eq('dealId', dealId)
-            .limit(1);
+            .select('dealId, contactId')
+            .eq('contactId', assignedContactId);
 
-          if (!remainingLinks || remainingLinks.length === 0) {
-            await supabase.from('Deal').delete().eq('id', dealId);
+          if (dealContactLinks && dealContactLinks.length > 0) {
+            const dealIds = dealContactLinks.map(
+              (dc: { dealId: string }) => dc.dealId,
+            );
+
+            await supabase
+              .from('DealContact')
+              .delete()
+              .eq('contactId', assignedContactId);
+
+            // Orphan-deal sweep — drop only deals in the realtor's space
+            // that have no remaining contact links. Belt: every delete is
+            // double-scoped (id + spaceId) so even a stray dealId from
+            // another tenant can't be touched.
+            for (const dealId of dealIds) {
+              const { data: remainingLinks } = await supabase
+                .from('DealContact')
+                .select('id')
+                .eq('dealId', dealId)
+                .limit(1);
+
+              if (!remainingLinks || remainingLinks.length === 0) {
+                await supabase
+                  .from('Deal')
+                  .delete()
+                  .eq('id', dealId)
+                  .eq('spaceId', assignedSpaceId);
+              }
+            }
           }
+
+          // Delete the cloned contact itself, scoped by spaceId.
+          const { error: deleteError } = await supabase
+            .from('Contact')
+            .delete()
+            .eq('id', assignedContactId)
+            .eq('spaceId', assignedSpaceId);
+
+          // If the realtor already deleted the contact, that's fine.
+          if (deleteError) {
+            console.warn('[unassign-lead] could not delete cloned contact', {
+              assignedContactId,
+              assignedSpaceId,
+              error: deleteError,
+            });
+          }
+        } catch (cleanupErr) {
+          // If the realtor already deleted their copy, we still proceed
+          // with the broker-side tag flip below.
+          console.warn('[unassign-lead] cleanup of realtor contact failed', {
+            assignedContactId,
+            assignedSpaceId,
+            cleanupErr,
+          });
         }
       }
-
-      // Delete the cloned contact itself
-      const { error: deleteError } = await supabase
-        .from('Contact')
-        .delete()
-        .eq('id', assignedContactId);
-
-      // If the realtor already deleted the contact, that's fine — don't error
-      if (deleteError) {
-        console.warn('[unassign-lead] could not delete cloned contact (may already be deleted)', {
-          assignedContactId,
-          error: deleteError,
-        });
-      }
-    } catch (cleanupErr) {
-      // If the realtor already deleted their copy, we still proceed with
-      // cleaning up the broker side. Log but don't fail.
-      console.warn('[unassign-lead] cleanup of realtor contact failed (may already be deleted)', {
-        assignedContactId,
-        cleanupErr,
+    } else {
+      // No assignedSpaceId in the metadata — legacy assignment or
+      // corrupted note. Don't attempt cross-space cleanup blindly.
+      console.warn('[unassign-lead] assignment metadata lacks assignedSpaceId — skipping cleanup', {
+        contactId,
+        brokerageId: brokerage.id,
       });
     }
 
