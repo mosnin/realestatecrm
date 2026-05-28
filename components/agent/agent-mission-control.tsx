@@ -253,9 +253,11 @@ export function AgentMissionControl({ slug }: { slug: string }) {
             </span>
             <div>
               <p className="text-sm font-medium">
-                {pendingDrafts === 1 ? '1 draft' : `${pendingDrafts} drafts`} awaiting your approval
+                {pendingDrafts === 1
+                  ? '1 ready to send in your outbox'
+                  : `${pendingDrafts} ready to send in your outbox`}
               </p>
-              <p className="text-xs text-muted-foreground">Review, edit, and send in the inbox</p>
+              <p className="text-xs text-muted-foreground">Open the outbox to sign off.</p>
             </div>
           </div>
           <ChevronRight size={14} className="text-muted-foreground shrink-0" />

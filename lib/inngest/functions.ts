@@ -297,12 +297,16 @@ export const handleComposioTrigger = inngest.createFunction(
     }
 
     // 4. Dispatch. The dispatcher is the single place that decides DRAFT
-    //    vs NOTICE vs DATA_SYNC vs no-op based on the slug.
+    //    vs NOTICE vs DATA_SYNC vs no-op based on the slug. deliveryId
+    //    threads through so the drafts tool can persist it on
+    //    AgentDraft.triggerSource for the inbox "noticed because"
+    //    breadcrumb.
     const result = await step.run('dispatch', async () => {
       return dispatchTrigger({
         triggerSlug: data.triggerSlug,
         connection,
         payload: data.payload,
+        deliveryId: data.deliveryId,
       });
     });
 

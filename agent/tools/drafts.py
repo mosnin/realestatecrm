@@ -212,6 +212,13 @@ async def draft_message(
         }
 
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    # Stamp trigger provenance on the row when this run was kicked by a
+    # Composio trigger. Inbox UI reads AgentDraft.triggerSource to render
+    # the "Chippi noticed because…" breadcrumb so the realtor sees WHY a
+    # draft appeared. Empty dict = chat / routine / sweep run — column
+    # stays null and the breadcrumb is hidden.
+    trigger_source_raw = getattr(ctx.context, "trigger_source", None) or {}
+    trigger_source = trigger_source_raw if trigger_source_raw else None
     draft = {
         "id": str(uuid.uuid4()),
         "spaceId": space_id,
@@ -221,6 +228,7 @@ async def draft_message(
         "subject": subject,
         "content": content,
         "reasoning": reasoning,
+        "triggerSource": trigger_source,
         "priority": max(0, min(100, priority)),
         "status": "pending",
         "expiresAt": expires_at,

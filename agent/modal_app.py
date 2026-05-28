@@ -209,6 +209,19 @@ async def run_now_webhook(item: dict) -> dict:
             raw_user_id.strip() if isinstance(raw_user_id, str) else ""
         )
 
+        # Optional: structured trigger provenance. Built by the TS
+        # dispatcher (`dispatchTrigger` in lib/integrations/triggers.ts)
+        # when this run was kicked by a Composio trigger delivery. We
+        # only accept it as a dict — anything else (mismatched shape
+        # from a hostile or stale caller) is treated as absent rather
+        # than crashing the run.
+        raw_trigger_source = item.get("trigger_source")
+        trigger_source = (
+            raw_trigger_source
+            if isinstance(raw_trigger_source, dict)
+            else {}
+        )
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -228,6 +241,7 @@ async def run_now_webhook(item: dict) -> dict:
             AgentSettings.model_validate(sr.data),
             instruction=instruction or None,
             owner_clerk_id=user_id or None,
+            trigger_source=trigger_source or None,
         )
         return {"ok": True, "space_id": space_id}
 

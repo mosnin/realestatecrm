@@ -807,6 +807,7 @@ export async function dispatchTrigger(args: {
   triggerSlug: string;
   connection: IntegrationConnectionRow;
   payload: Record<string, unknown> | undefined;
+  deliveryId?: string;
 }): Promise<{ dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop'; reason?: string }> {
   const kind: TriggerKind | undefined = TRIGGER_DISPATCH[args.triggerSlug];
   if (!kind) {
@@ -829,11 +830,24 @@ export async function dispatchTrigger(args: {
     // Prepend a structured trigger tag so the Modal autonomous-mode
     // detector can tell this run from a chat turn. Without it, the
     // model may read the first-person instruction as a chat message
-    // and reply "Got it." instead of doing the work. Also lets the
-    // model echo the trigger source in its draft reasoning so the
-    // realtor sees "Chippi drafted this because [event]" downstream.
+    // and reply "Got it." instead of doing the work.
     const tagged = `[Autonomous run — Composio trigger: ${args.triggerSlug}]\n\n${instruction}`;
-    await fireRoutineRun(args.connection.spaceId, tagged, args.connection.userId);
+    // Also pass the structured triggerSource through so the drafts
+    // tool can persist it on AgentDraft.triggerSource. The inbox UI
+    // reads from that column to render the "Chippi noticed because
+    // [event]" breadcrumb — the trust moment Phase 4 surfaces.
+    const triggerSource = {
+      kind: 'composio_trigger' as const,
+      slug: args.triggerSlug,
+      toolkit: args.connection.toolkit,
+      deliveryId: args.deliveryId ?? '',
+    };
+    await fireRoutineRun(
+      args.connection.spaceId,
+      tagged,
+      args.connection.userId,
+      triggerSource,
+    );
     return { dispatched: 'DRAFT' };
   }
 

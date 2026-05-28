@@ -34,10 +34,28 @@ export type RoutineWeekday = (typeof ROUTINE_WEEKDAYS)[number];
 /** Cap day-of-month at 28 — Feb has 28 every year, so the routine never skips a month. */
 export const ROUTINE_MAX_DAY_OF_MONTH = 28;
 
+/**
+ * Structured provenance for runs the realtor did not initiate by chat.
+ * Currently only `composio_trigger` exists; the kind discriminator is
+ * here so future inbound paths (calendar webhook, MLS push, etc.) can
+ * layer on the same column without a schema change.
+ *
+ * The orchestrator stashes this on AgentContext; the drafts tool writes
+ * it to AgentDraft.triggerSource. The inbox UI then renders a small
+ * "Chippi noticed because..." breadcrumb under each draft.
+ */
+export interface TriggerSource {
+  kind: 'composio_trigger';
+  slug: string;
+  toolkit: string;
+  deliveryId: string;
+}
+
 export async function fireRoutineRun(
   spaceId: string,
   instruction: string,
   userId?: string,
+  triggerSource?: TriggerSource,
 ): Promise<RoutineRunStatus> {
   // Read env at call time, not module load — see /api/cron/agent-sweep for why.
   const url = process.env.MODAL_WEBHOOK_URL ?? '';
@@ -56,8 +74,14 @@ export async function fireRoutineRun(
     // passing it explicitly from the cron is cheaper and removes the silent-
     // failure path where the server-side lookup returns null and the routine
     // runs with no integration tools.
+    //
+    // trigger_source flows through the Python AgentContext so the draft
+    // tool can persist it on AgentDraft.triggerSource. Absent for chat /
+    // routine / sweep runs — the orchestrator treats null as "realtor-
+    // initiated" and renders nothing in the inbox breadcrumb.
     const body: Record<string, unknown> = { space_id: spaceId, secret, instruction };
     if (userId) body.user_id = userId;
+    if (triggerSource) body.trigger_source = triggerSource;
     const res = await fetch(url, {
       method: 'POST',
       headers: {

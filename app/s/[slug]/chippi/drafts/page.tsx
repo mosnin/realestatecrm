@@ -1,12 +1,19 @@
 /**
- * /chippi/drafts — pending drafts the realtor needs to review.
+ * /chippi/drafts — Chippi's outbox: messages prepared and ready to go,
+ * pending the realtor's sign-off.
+ *
+ * The page LABEL is "Outbox" — "Drafts" was the wrong frame. Drafts =
+ * work in progress, realtor as author. Outbox = finished work queued
+ * for sign-off, Chippi as author. The route path stays /chippi/drafts
+ * (URL rename has no upside; the visible nav + page chrome carry the
+ * meaning).
  *
  * Hero + AgentDraftInbox. The /chippi/approvals route is separate: that's
  * the orchestrator's AgentTask paused-state queue, not the AgentDraft
- * inbox the realtor signs off on.
+ * outbox the realtor signs off on.
  *
- * /chippi/today shows only a compact "X drafts waiting → review" summary
- * that links here. This page is the dedicated queue.
+ * /chippi/today shows a compact "X waiting → outbox" summary that links
+ * here. This page is the dedicated queue.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -40,9 +47,9 @@ export default async function ChippiDraftsPage({
 
   return (
     <ChippiPageShell
-      greeting="Drafts."
-      title="What Chippi drafted for you"
-      subtitle="Approve, edit, or skip — nothing leaves without your sign-off."
+      greeting="Outbox."
+      title="Ready to go out"
+      subtitle="I prepared these. Sign off when they're right."
     >
       <AgentDraftInbox slug={slug} />
     </ChippiPageShell>

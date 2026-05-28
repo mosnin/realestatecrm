@@ -54,6 +54,15 @@ class AgentContext:
     # anything not in the first two.
     broker_role: str = field(default="", compare=False)
 
+    # ── Trigger provenance (Composio trigger → autonomous run) ───────────
+    # Set ONLY when the run was kicked by a Composio trigger delivery —
+    # `dispatchTrigger` (TS) builds the object and threads it through the
+    # Modal webhook body. The drafts tool reads this off context and
+    # writes it to AgentDraft.triggerSource so the inbox UI can render
+    # the "Chippi noticed because..." breadcrumb. Empty dict on every
+    # other run path (chat, routine, sweep, manual run-now).
+    trigger_source: dict = field(default_factory=dict, compare=False)
+
     @classmethod
     def from_settings(
         cls,
@@ -63,6 +72,7 @@ class AgentContext:
         user_id: str = "",
         brokerage_id: str = "",
         broker_role: str = "",
+        trigger_source: dict | None = None,
     ) -> "AgentContext":
         return cls(
             space_id=settings.space_id,
@@ -72,5 +82,6 @@ class AgentContext:
             user_id=user_id,
             brokerage_id=brokerage_id,
             broker_role=broker_role,
+            trigger_source=trigger_source or {},
         )
 

@@ -66,9 +66,13 @@ export default async function ChippiTodayPage({
     >
       <MorningStory slug={slug} />
 
-      {/* Drafts pointer — calm caption callout. MorningStory above owns the
-          focal moment; this is quiet secondary info, sized like CAPTION so it
-          never competes with the H1 or the story headline. */}
+      {/* Outbox pointer — calm caption callout. MorningStory above owns
+          the focal moment; this is quiet secondary info, sized like
+          CAPTION so it never competes with the H1 or the story
+          headline. Words: Chippi prepared these and the realtor's job
+          is sign-off, not editing — so the verb is "ready" not "waiting
+          for review." Waiting puts the burden on the realtor; ready
+          puts the credit on Chippi. */}
       {draftCount > 0 && (
         <Link
           href={`/s/${slug}/chippi/drafts`}
@@ -76,7 +80,7 @@ export default async function ChippiTodayPage({
         >
           <span className="tabular-nums">{draftCount}</span>
           <span>
-            {draftCount === 1 ? 'draft waiting for your review' : 'drafts waiting for your review'}
+            {draftCount === 1 ? 'ready in your outbox' : 'ready in your outbox'}
           </span>
           <ChevronRight size={11} className="opacity-60 group-hover:opacity-100 transition-opacity" />
         </Link>
