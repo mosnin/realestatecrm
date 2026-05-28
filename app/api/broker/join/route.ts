@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
@@ -10,10 +11,17 @@ import { notificationForMemberJoined } from '@/lib/notification-voice';
  * POST /api/broker/join
  * Join a brokerage using its invite code.
  * Any authenticated, onboarded user can join. Assigns role: realtor_member.
+ *
+ * Uses requireAuth (not raw Clerk auth()) so the offboarding gate fires —
+ * an offboarded user clicking an old join-code link must NOT be able to
+ * silently re-onboard themselves. Re-hire happens via an explicit
+ * /api/invitations/[token] flow, which is the only path that intentionally
+ * revives an offboarded User row.
  */
-export async function POST(req: Request) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function POST(req: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId: clerkId } = authResult;
 
   // 10 join attempts per user per hour (prevents code enumeration)
   const { allowed } = await checkRateLimit(`broker:join:${clerkId}`, 10, 3600);
@@ -65,6 +73,26 @@ export async function POST(req: Request) {
 
   if (existing) {
     return NextResponse.json({ brokerageName: brokerage.name, alreadyMember: true }, { status: 200 });
+  }
+
+  // Deny-list check. If this user was previously removed from this
+  // brokerage, the anonymous code path is closed — the only way back
+  // in is an explicit /api/invitations/[token] acceptance from a
+  // broker_owner or broker_admin. A removed agent re-clicking the
+  // join URL they kept in their email gets a clear 403; the broker
+  // doesn't get a silent member_joined notification for someone they
+  // already fired.
+  const { data: removalRow } = await supabase
+    .from('BrokerageRemoval')
+    .select('brokerageId')
+    .eq('brokerageId', brokerage.id)
+    .eq('userId', user.id)
+    .maybeSingle();
+  if (removalRow) {
+    return NextResponse.json(
+      { error: 'Your access to this brokerage was removed. Ask the broker to re-invite you by email.' },
+      { status: 403 },
+    );
   }
 
   // Create membership
