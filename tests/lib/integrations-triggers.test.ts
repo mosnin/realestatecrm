@@ -109,7 +109,7 @@ beforeEach(() => {
 
 describe('CURATED_TRIGGERS', () => {
   it('has an entry for every catalog toolkit that ships triggers', () => {
-    // Gmail must ship with at least one slug — Phase 3 is built on it.
+    // Gmail must ship with at least one slug — the v1 ship gate.
     expect(CURATED_TRIGGERS.gmail).toContain('GMAIL_NEW_GMAIL_MESSAGE');
   });
 
@@ -117,6 +117,45 @@ describe('CURATED_TRIGGERS', () => {
     for (const [toolkit, slugs] of Object.entries(CURATED_TRIGGERS)) {
       for (const slug of slugs) {
         expect(slug, `${toolkit} → ${slug}`).toMatch(/^[A-Z][A-Z0-9_]+$/);
+      }
+    }
+  });
+
+  it('every curated slug has a dispatch + a working template', async () => {
+    // Catches the failure mode where a slug enters CURATED_TRIGGERS
+    // but TRIGGER_DISPATCH / TEMPLATES weren't updated. Registration
+    // would succeed at Composio; deliveries would silently no-op.
+    // Hits the dispatcher with a generously-shaped payload so the
+    // template's bail-out branch doesn't masquerade as "no dispatch".
+    const conn = freshConnection();
+    const fatPayload = {
+      // Cover field names across Gmail/Outlook/Slack/Discord/CRMs/Stripe.
+      subject: 'X', from: 'a@b', sender: 'a@b', snippet: 'hi',
+      bodyPreview: 'hi', text: 'hi', message: 'hi', user: 'u', author: 'u',
+      summary: 'evt', responseStatus: 'accepted', startTime: 'soon',
+      attendees: [{ email: 'x@y' }],
+      properties: { firstname: 'A', lastname: 'B', email: 'a@b', phone: '1', dealname: 'D', dealstage: 'open' },
+      name: 'N', company: 'C', leadSource: 'web', stageName: 'open', amount: '1',
+      title: 'T', value: '1', personName: 'P',
+      amount_total: '1', customer_email: 'a@b', failure_message: 'f', amount_paid: '1',
+      taskName: 'T', listName: 'L', reaction: 'thumbs_up',
+      cardName: 'C', change: 'moved',
+      content: 'msg',
+      emailAddress: 'a@b',
+    };
+    for (const [toolkit, slugs] of Object.entries(CURATED_TRIGGERS)) {
+      for (const slug of slugs) {
+        const result = await dispatchTrigger({
+          triggerSlug: slug,
+          connection: conn,
+          payload: fatPayload,
+        });
+        // Every curated slug must either DRAFT or have a well-known
+        // skip reason (NOT 'no_dispatch' — that means we forgot to
+        // wire it up).
+        if (result.dispatched === 'noop') {
+          expect(result.reason, `${toolkit} → ${slug} should dispatch on a full payload`).not.toBe('no_dispatch');
+        }
       }
     }
   });
@@ -161,8 +200,13 @@ describe('registerForConnection', () => {
   });
 
   it('is a no-op when the toolkit has no curated triggers', async () => {
+    // `zoho` is intentionally empty in CURATED_TRIGGERS (see the per-
+    // entry comment in lib/integrations/triggers.ts). If this test
+    // starts failing, either (a) zoho got triggers, in which case
+    // swap to another intentionally-empty toolkit, or (b) we
+    // accidentally registered something — investigate the map.
     const result = await registerForConnection({
-      connection: freshConnection({ toolkit: 'salesforce' }),
+      connection: freshConnection({ toolkit: 'zoho' }),
     });
     expect(createTriggerMock).not.toHaveBeenCalled();
     expect(result).toEqual({ registered: 0, failed: 0 });
