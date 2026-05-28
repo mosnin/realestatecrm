@@ -38,6 +38,7 @@ import {
   Check,
   ExternalLink,
   Mic,
+  Tag as TagIcon,
 } from 'lucide-react';
 import { BODY_MUTED, TITLE_FONT, QUIET_LINK, PRIMARY_PILL } from '@/lib/typography';
 
@@ -51,6 +52,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
@@ -135,6 +141,13 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
+  // Popover-based tag filter. Replaces the previous always-on chip strip,
+  // which became unreadable noise once a workspace accumulated >10 tags
+  // (test data, ad-hoc agent tags, historic scoring experiments).
+  // STYLESHEET principle: one focal element per screen — the tag list
+  // was competing with the lead-type chips for the realtor's attention.
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [tagPopoverSearch, setTagPopoverSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'>('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -564,6 +577,91 @@ export function ContactTable({ slug }: ContactTableProps) {
             </DropdownMenu>
           )}
 
+          {/* Tag filter — popover. Hidden when no user-defined tags
+              exist in the workspace. Single-select: picking a tag
+              replaces the filter; the trigger then shows the active
+              tag with an X to clear. */}
+          {allTags.length > 0 && (
+            <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors hover:bg-foreground/[0.04]',
+                    tagFilter ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  <TagIcon size={12} className={tagFilter ? 'text-foreground' : 'text-muted-foreground'} />
+                  {tagFilter ? (
+                    <>
+                      <span className="truncate max-w-[160px]">{tagFilter}</span>
+                      <span
+                        role="button"
+                        aria-label="Clear tag filter"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTagFilter('');
+                        }}
+                        className="ml-0.5 -mr-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm hover:bg-foreground/10"
+                      >
+                        <X size={10} />
+                      </span>
+                    </>
+                  ) : (
+                    'Tag'
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-0">
+                <div className="border-b border-border/60 px-2 py-1.5">
+                  <Input
+                    value={tagPopoverSearch}
+                    onChange={(e) => setTagPopoverSearch(e.target.value)}
+                    placeholder="Search tags…"
+                    className="h-8 border-0 shadow-none focus-visible:ring-0 text-xs px-1"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {(() => {
+                    const q = tagPopoverSearch.trim().toLowerCase();
+                    const filtered = q
+                      ? allTags.filter((t) => t.toLowerCase().includes(q))
+                      : allTags;
+                    if (filtered.length === 0) {
+                      return (
+                        <p className="px-3 py-2 text-xs text-muted-foreground">
+                          No tags match.
+                        </p>
+                      );
+                    }
+                    return filtered.map((tag) => {
+                      const active = tagFilter === tag;
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setTagFilter(active ? '' : tag);
+                            setTagPopoverOpen(false);
+                            setTagPopoverSearch('');
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 hover:bg-foreground/[0.04]',
+                            active && 'font-semibold text-foreground',
+                          )}
+                        >
+                          {active && <Check size={10} className="flex-shrink-0" />}
+                          <span className={active ? '' : 'pl-[14px]'}>{tag}</span>
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
           {/* View toggle */}
           <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
             <button
@@ -687,36 +785,10 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Tag filter strip — paper-flat */}
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 items-center">
-          {tagFilter && (
-            <button
-              type="button"
-              onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 bg-foreground text-background"
-            >
-              <X size={10} />
-              Clear tag
-            </button>
-          )}
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={cn(
-                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 transition-colors',
-                tagFilter === tag
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground border border-border/70 bg-background',
-              )}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Tag filter strip removed — the always-on chip wall here was the
+          worst noise source on the page once a workspace accumulated ~10+
+          tags. Tag filtering moved into the popover next to Stage in the
+          toolbar above. */}
 
       {/* Stage breakdown — pipeline reading line */}
       {!loading && contacts.length > 0 && (
