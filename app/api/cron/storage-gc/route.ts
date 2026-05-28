@@ -136,6 +136,43 @@ const PREFIX_SPECS: PrefixSpec[] = [
       return new Set(candidates.filter((k) => referenced.has(k)));
     },
   },
+  {
+    // Public profile cover image. Replacement-on-POST orphans the
+    // previous object inline now, but historical replacements (pre-
+    // inline-fix) plus any inline-cleanup misses survive in storage
+    // — the sweeper catches them. The DELETE handler intentionally
+    // keeps the object until the next upload so the realtor can
+    // revert, so the active row's coverPhotoUrl is the only thing
+    // we need to keep.
+    prefix: STORAGE_PREFIXES.profileCover,
+    label: 'profile-cover',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('ProfilePage')
+        .select('coverPhotoUrl')
+        .in('coverPhotoUrl', candidates);
+      return new Set(
+        ((data ?? []) as { coverPhotoUrl: string }[])
+          .map((r) => r.coverPhotoUrl)
+          .filter(Boolean),
+      );
+    },
+  },
+  {
+    prefix: STORAGE_PREFIXES.profilePhoto,
+    label: 'profile-photo',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('ProfilePage')
+        .select('profilePhotoUrl')
+        .in('profilePhotoUrl', candidates);
+      return new Set(
+        ((data ?? []) as { profilePhotoUrl: string }[])
+          .map((r) => r.profilePhotoUrl)
+          .filter(Boolean),
+      );
+    },
+  },
 ];
 
 interface SweepResult {

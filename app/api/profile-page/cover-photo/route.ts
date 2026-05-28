@@ -15,7 +15,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { uploadObject, buildKey, getSignedDownloadUrl } from '@/lib/storage';
+import { uploadObject, buildKey, getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
 
 export const runtime = 'nodejs';
@@ -115,6 +115,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed.' }, { status: 500 });
   }
 
+  // Capture the previous storage key BEFORE the upsert overwrites it.
+  // The DELETE handler intentionally keeps the object so the realtor can
+  // revert; replacement is the explicit "I'm done with that photo"
+  // signal, so we clean up. Without this, every cover-photo change
+  // leaked the prior object into permanent storage with no DB pointer.
+  const { data: existing } = await supabase
+    .from('ProfilePage')
+    .select('coverPhotoUrl')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const previousKey = (existing as { coverPhotoUrl?: string | null } | null)?.coverPhotoUrl ?? null;
+
   // Store the STORAGE KEY (not a URL) in coverPhotoUrl. The public page
   // signs a fresh download URL on each render. The column name keeps its
   // historical shape — what changes is the value contract: keys that don't
@@ -138,6 +150,19 @@ export async function POST(req: NextRequest) {
       dbErr,
     );
     return NextResponse.json({ error: 'Save failed.' }, { status: 500 });
+  }
+
+  // Fire-and-forget the previous object's deletion. Legacy http(s)://
+  // values aren't storage keys we own — skip those. The storage-gc cron
+  // will still catch any object that slipped past this inline path.
+  if (previousKey && !/^https?:\/\//i.test(previousKey)) {
+    void deleteObject(previousKey).catch((err) =>
+      logger.warn('[profile-cover] previous object delete failed', {
+        spaceId: space.id,
+        keyPreview: previousKey.slice(0, 60),
+        err: err instanceof Error ? err.message : String(err),
+      }),
+    );
   }
 
   // Return a fresh signed URL alongside the key — the settings UI shows

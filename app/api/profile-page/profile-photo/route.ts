@@ -16,7 +16,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { uploadObject, buildKey, getSignedDownloadUrl } from '@/lib/storage';
+import { uploadObject, buildKey, getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
 
 export const runtime = 'nodejs';
@@ -101,6 +101,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed.' }, { status: 500 });
   }
 
+  // Capture the previous key before the upsert overwrites it — same
+  // orphan-on-replace fix as cover-photo. DELETE intentionally keeps the
+  // object for revert; POST is an explicit replacement signal.
+  const { data: existing } = await supabase
+    .from('ProfilePage')
+    .select('profilePhotoUrl')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const previousKey = (existing as { profilePhotoUrl?: string | null } | null)?.profilePhotoUrl ?? null;
+
   const { error: dbErr } = await supabase
     .from('ProfilePage')
     .upsert(
@@ -111,6 +121,16 @@ export async function POST(req: NextRequest) {
       },
       { onConflict: 'spaceId' },
     );
+
+  if (previousKey && !/^https?:\/\//i.test(previousKey)) {
+    void deleteObject(previousKey).catch((err) =>
+      logger.warn('[profile-photo] previous object delete failed', {
+        spaceId: space.id,
+        keyPreview: previousKey.slice(0, 60),
+        err: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
 
   if (dbErr) {
     logger.error(
