@@ -93,11 +93,22 @@ export async function POST(req: NextRequest) {
         .single();
 
       console.log('[checkout] Creating Stripe customer for space:', space.id);
-      const customer = await stripe.customers.create({
-        email: user?.email,
-        name: user?.name || undefined,
-        metadata: { spaceId: space.id, slug: space.slug },
-      });
+      // Idempotency key bound to the space — two concurrent checkout
+      // requests for the same space hit Stripe with the same key and
+      // Stripe returns the SAME customer object on both calls instead
+      // of creating two. The DB CAS below is the second layer of
+      // protection; the idempotency key prevents the orphan from
+      // existing in Stripe at all. Without it, racing creates left
+      // unreferenced customers sitting in Stripe's customer list
+      // forever (cosmetic bloat, audit confusion).
+      const customer = await stripe.customers.create(
+        {
+          email: user?.email,
+          name: user?.name || undefined,
+          metadata: { spaceId: space.id, slug: space.slug },
+        },
+        { idempotencyKey: `customer-create:space:${space.id}` },
+      );
       customerId = customer.id;
 
       // Conditional write: only persist if another request hasn't already set a customer ID.
@@ -252,11 +263,17 @@ async function handleBrokerageCheckout(
       .single();
 
     console.log('[checkout:brokerage] Creating Stripe customer for brokerage:', ctx.brokerage.id);
-    const customer = await stripe.customers.create({
-      email: owner?.email,
-      name: owner?.name || brokerageStripe.name || undefined,
-      metadata: { brokerageId: ctx.brokerage.id },
-    });
+    // Idempotency key bound to the brokerage — see the space-flow note
+    // above. Concurrent create calls return the same Stripe customer
+    // instead of leaving orphans in Stripe's customer list.
+    const customer = await stripe.customers.create(
+      {
+        email: owner?.email,
+        name: owner?.name || brokerageStripe.name || undefined,
+        metadata: { brokerageId: ctx.brokerage.id },
+      },
+      { idempotencyKey: `customer-create:brokerage:${ctx.brokerage.id}` },
+    );
     customerId = customer.id;
 
     // Conditional write: only persist if not already set by a concurrent request.
