@@ -11,13 +11,8 @@
 
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { Redis } from '@upstash/redis';
+import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL ?? '',
-  token: process.env.KV_REST_API_TOKEN ?? '',
-});
 
 const POLL_INTERVAL_MS = 600;
 const MAX_STREAM_DURATION_MS = 5 * 60 * 1000;

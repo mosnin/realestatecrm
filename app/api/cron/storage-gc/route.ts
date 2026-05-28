@@ -22,7 +22,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
+import { redis } from '@/lib/redis';
 import { supabase } from '@/lib/supabase';
 import {
   STORAGE_PREFIXES,
@@ -34,11 +34,6 @@ import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL ?? '',
-  token: process.env.KV_REST_API_TOKEN ?? '',
-});
 
 /** Don't touch objects modified in the last 10 minutes — a brand-new
  *  upload whose DB row hasn't landed yet would look like an orphan to
@@ -218,10 +213,17 @@ interface SweepResult {
   nextCursor: string | null;
 }
 
+// 30-day TTL on every cursor write. The sweeper runs daily so a
+// cursor older than ~6 days means rounds aren't reaching that prefix;
+// older than 30d means the cron is effectively disabled and the
+// cursor is dead state. Letting Redis evict it is cleaner than
+// leaving it forever.
+const CURSOR_TTL_SECONDS = 30 * 24 * 60 * 60;
+
 async function nextSpec(): Promise<{ spec: PrefixSpec; index: number }> {
   const rawIndex = await redis.get<number>(ROUND_ROBIN_KEY);
   const index = typeof rawIndex === 'number' ? rawIndex % PREFIX_SPECS.length : 0;
-  await redis.set(ROUND_ROBIN_KEY, (index + 1) % PREFIX_SPECS.length);
+  await redis.set(ROUND_ROBIN_KEY, (index + 1) % PREFIX_SPECS.length, { ex: CURSOR_TTL_SECONDS });
   return { spec: PREFIX_SPECS[index], index };
 }
 
@@ -271,7 +273,7 @@ async function sweepOnce(spec: PrefixSpec): Promise<SweepResult> {
   // truncated we're at the end — clear the cursor so the next pass
   // restarts from the beginning of the prefix.
   if (listing.nextToken) {
-    await redis.set(cursorKey, listing.nextToken);
+    await redis.set(cursorKey, listing.nextToken, { ex: CURSOR_TTL_SECONDS });
   } else {
     await redis.del(cursorKey);
   }

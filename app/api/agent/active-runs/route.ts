@@ -14,13 +14,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { Redis } from '@upstash/redis';
+import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL ?? '',
-  token: process.env.KV_REST_API_TOKEN ?? '',
-});
 
 const MAX_AGE_MS = 15 * 60 * 1000;
 

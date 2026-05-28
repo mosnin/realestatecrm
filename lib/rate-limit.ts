@@ -62,9 +62,17 @@ function memIncr(key: string, windowSeconds: number): number {
 }
 
 /**
- * Increment a sliding-window counter in Redis.
+ * Increment a fixed-window counter in Redis.
+ *
+ * Fixed (not sliding) because EXPIRE … NX sets the TTL only on the
+ * first increment: every call within the window shares the same
+ * expiry, so the window resets cleanly when the key dies. A real
+ * sliding window would need a sorted-set of timestamps; the cost
+ * isn't worth it for rate limiting where bucket-edge spikes are
+ * tolerable.
+ *
  * Returns { allowed: true } if under the limit, { allowed: false } if over.
- * Falls back to in-memory counter if Redis is unavailable.
+ * Falls back to an in-memory counter if Redis is unavailable.
  */
 export async function checkRateLimit(
   key: string,

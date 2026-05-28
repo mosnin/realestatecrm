@@ -17,12 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL ?? '',
-  token: process.env.KV_REST_API_TOKEN ?? '',
-});
+import { redis } from '@/lib/redis';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const VALID_TYPES = new Set(['info', 'action', 'draft', 'complete', 'error', 'warning']);
