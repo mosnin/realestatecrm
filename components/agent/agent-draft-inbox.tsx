@@ -39,6 +39,18 @@ interface DraftContact {
   phone: string | null;
 }
 
+/** Structured provenance for drafts kicked off by an inbound event
+ *  (Composio trigger fired, etc.) rather than the realtor's own chat
+ *  turn. Null on chat/routine/sweep drafts — the breadcrumb just
+ *  doesn't render. Persisted on AgentDraft.triggerSource by the
+ *  Python drafts tool when ctx.context.trigger_source is populated. */
+interface TriggerSource {
+  kind: 'composio_trigger';
+  slug: string;
+  toolkit: string;
+  deliveryId: string;
+}
+
 interface AgentDraft {
   id: string;
   contactId: string | null;
@@ -52,7 +64,44 @@ interface AgentDraft {
   status: 'pending' | 'approved' | 'dismissed' | 'sent';
   createdAt: string;
   expiresAt: string | null;
+  triggerSource: TriggerSource | null;
   Contact: DraftContact | null;
+}
+
+/** Slug → realtor-readable phrase. Keep these short — they render
+ *  as a single-line breadcrumb under each draft. */
+const TRIGGER_PHRASE: Record<string, string> = {
+  GMAIL_NEW_GMAIL_MESSAGE: 'a new Gmail message arrived',
+  OUTLOOK_MESSAGE_TRIGGER: 'a new Outlook message arrived',
+  SLACK_DIRECT_MESSAGE_RECEIVED: 'a Slack DM came in',
+  SLACK_REACTION_ADDED: 'someone reacted on Slack',
+  DISCORD_NEW_MESSAGE_TRIGGER: 'a Discord message arrived',
+  GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER: 'a calendar attendee changed their RSVP',
+  GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER: 'a calendar event was canceled',
+  GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER: 'a calendar event was starting soon',
+  HUBSPOT_CONTACT_CREATED_TRIGGER: 'a new HubSpot contact appeared',
+  HUBSPOT_DEAL_STAGE_UPDATED_TRIGGER: 'a HubSpot deal moved stages',
+  SALESFORCE_NEW_LEAD_TRIGGER: 'a new Salesforce lead landed',
+  SALESFORCE_NEW_OR_UPDATED_OPPORTUNITY_TRIGGER: 'a Salesforce opportunity changed',
+  PIPEDRIVE_NEW_DEAL_TRIGGER: 'a new Pipedrive deal appeared',
+  STRIPE_CHECKOUT_SESSION_COMPLETED_TRIGGER: 'a Stripe payment came through',
+  STRIPE_PAYMENT_FAILED_TRIGGER: 'a Stripe payment failed',
+  STRIPE_INVOICE_PAYMENT_SUCCEEDED_TRIGGER: 'a Stripe invoice was paid',
+  ASANA_TASK_CREATED: 'an Asana task was created',
+  ASANA_TASK_COMMENT_ADDED: 'an Asana task got a new comment',
+  TRELLO_NEW_CARD_TRIGGER: 'a new Trello card was created',
+  TRELLO_UPDATED_CARD_TRIGGER: 'a Trello card was updated',
+  MAILCHIMP_SUBSCRIBE_TRIGGER: 'someone subscribed in Mailchimp',
+  MAILCHIMP_UNSUBSCRIBE_TRIGGER: 'someone unsubscribed in Mailchimp',
+};
+
+/** Human-readable breadcrumb for a trigger-derived draft, or null when
+ *  the source is unmapped / absent (the row just renders nothing). */
+function triggerBreadcrumb(source: TriggerSource | null): string | null {
+  if (!source) return null;
+  const phrase = TRIGGER_PHRASE[source.slug];
+  if (!phrase) return null;
+  return `I noticed ${phrase}.`;
 }
 
 interface Props {
@@ -373,6 +422,22 @@ function DraftRow({
           Exceeds {meta.charLimit}-character SMS limit
         </p>
       )}
+
+      {/* Trigger provenance breadcrumb — Chippi-voiced one-liner that
+          says WHY this draft appeared. Renders only when the row carries
+          structured trigger source (Composio fired an event). For chat
+          / routine / sweep drafts the field is null and the row stays
+          quiet. This is the "Chippi noticed something for me" trust
+          moment Phase 4 of the triggers work surfaces. */}
+      {(() => {
+        const crumb = triggerBreadcrumb(draft.triggerSource);
+        if (!crumb || editing) return null;
+        return (
+          <p className="mt-2.5 text-[11px] leading-relaxed text-foreground/70">
+            {crumb}
+          </p>
+        );
+      })()}
 
       {/* Reasoning — quieter than before, no left border bar */}
       {draft.reasoning && !editing && (

@@ -380,6 +380,7 @@ async def run_agent_for_space(
     agent_settings: AgentSettings,
     instruction: str | None = None,
     owner_clerk_id: str | None = None,
+    trigger_source: dict | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
@@ -403,6 +404,12 @@ async def run_agent_for_space(
         this directly instead of doing a Space → User lookup — saves the
         roundtrip and removes the silent-null path where integrations
         would otherwise fail to load.
+    trigger_source:
+        Structured provenance for runs kicked by a Composio trigger. The
+        TS dispatcher builds it and threads it through the Modal body;
+        the drafts tool persists it on AgentDraft.triggerSource so the
+        inbox UI can render the "Chippi noticed because…" breadcrumb.
+        None for chat / routine / sweep paths.
     """
     # Respect the on/off switch. The realtor can pause Chippi from the
     # header; an autonomous run must honour that.
@@ -421,7 +428,14 @@ async def run_agent_for_space(
         logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
         return
     try:
-        await _run_locked(space, agent_settings, run_id, instruction, owner_clerk_id)
+        await _run_locked(
+            space,
+            agent_settings,
+            run_id,
+            instruction,
+            owner_clerk_id,
+            trigger_source,
+        )
     finally:
         await release_run_lock(space.id, run_id)
 
@@ -432,6 +446,7 @@ async def _run_locked(
     run_id: str,
     instruction: str | None,
     owner_clerk_id: str | None = None,
+    trigger_source: dict | None = None,
 ) -> None:
     """Execute one autonomous run with the per-space run lock held.
 
@@ -478,6 +493,7 @@ async def _run_locked(
         run_id=run_id,
         space_name=space.name,
         user_id=owner_clerk_id,
+        trigger_source=trigger_source,
     )
     # A routine run is scoped to its instruction — don't drain the trigger
     # queue out from under a trigger-driven run.

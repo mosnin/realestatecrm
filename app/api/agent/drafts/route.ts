@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, contactId, dealId, channel, subject, content, reasoning,
       priority, status, confidence, expiresAt, createdAt, updatedAt,
+      triggerSource,
       Contact:contactId ( id, name, email, phone )
     `)
     .eq('spaceId', space.id)
