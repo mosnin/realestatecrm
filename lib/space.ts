@@ -27,7 +27,16 @@ export async function getSpaceByOwnerId(ownerId: string): Promise<Space | null> 
 
 export async function getSpaceForUser(clerkUserId: string): Promise<Space | null> {
   // Two queries but they're simple index lookups — keeping sequential to avoid
-  // PostgREST FK constraint name ambiguity with inline references
+  // PostgREST FK constraint name ambiguity with inline references.
+  //
+  // The SELECT mirrors getSpaceFromSlug exactly — stripeSubscriptionStatus
+  // is critical: requireActiveSubscription reads it directly from this row.
+  // Previously this query omitted the column, so `space.stripeSubscriptionStatus`
+  // came back undefined → coerced to 'inactive' → every paying realtor was
+  // blocked from any route that combined getSpaceForUser + requireActiveSubscription
+  // (Studio generate/edit are the live callers). Active+trialing realtors saw
+  // a 403 on a paid feature unless they happened to also be platform admins.
+  // That's fiduciary harm — we were charging customers and locking them out.
   const { data: user, error: userErr } = await supabase
     .from('User')
     .select('id')
@@ -39,7 +48,7 @@ export async function getSpaceForUser(clerkUserId: string): Promise<Space | null
 
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus')
     .eq('ownerId', user.id)
     .limit(1)
     .maybeSingle();
