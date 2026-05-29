@@ -164,16 +164,37 @@ one element on a page. The whole reason it works is scarcity.
 ### The hierarchy (from `lib/typography.ts`)
 
 ```
-H1            text-3xl tracking-tight  + serif Times       — page title
-STAT_NUMBER   text-3xl tracking-tight  tabular-nums serif  — focal data
-H2            text-xl font-semibold                          — section
-H3            text-base font-semibold                        — card head
-SECTION_LABEL text-[11px] uppercase tracking-wider muted    — small caps over groups
-BODY          text-sm                                        — default
-BODY_MUTED    text-sm muted                                  — subtitle / helper
-CAPTION       text-xs muted                                  — chrome / metadata
-META          text-[11px] tabular-nums muted                 — timestamp / id
+H1            30px  text-3xl  tracking-tight  + serif Times       — page title
+STAT_NUMBER   30px  text-3xl  tracking-tight  tabular-nums serif  — focal data
+STAT_COMPACT  25px  text-[25px] tabular-nums                       — 4+ in a row
+H2            21px  text-[21px] font-semibold                      — section
+H3            17px  text-[17px] font-semibold                      — card head
+BODY          14px  text-sm                                        — default
+BODY_MUTED    14px  text-sm muted                                  — subtitle / helper
+BODY_COMPACT  14px  (alias of BODY)                                — dense surfaces
+CAPTION       12px  text-xs muted                                  — chrome / metadata
+META          11px  text-[11px] tabular-nums muted                 — timestamp / id
+SECTION_LABEL 11px  text-[11px] uppercase tracking-wider muted     — small caps
 ```
+
+### The ratio rule
+
+The ladder is snapped to a **1.2 modular ratio** — the Pythagorean minor
+third, the harmonic step the eye reads as proportional rather than
+arbitrary. Reading the ladder top-down: each step is the previous step
+divided by 1.2 (rounded to whole px). `30 → 25 → 21 → 17 → 14 → 12`.
+
+The **11px meta floor** sits one step BELOW the ratio (the strict
+ladder would put it at 10) by deliberate exception. 10px reads as
+"squinting" — the legibility floor for chrome metadata is 11. Below the
+music, but above silence. The exception is named so future additions
+don't try to invent a tier at 10.
+
+There are also **dead intervals** in the ladder. Do not add a tier:
+- between BODY (14) and CAPTION (12) — the old 13px BODY_COMPACT was a
+  dead interval the eye couldn't sense as a distinct step. It's now an
+  alias of BODY.
+- between H3 (17) and H2 (21) — no 19px tier earns its place.
 
 **Apply via `cn(...)` from `lib/typography.ts`.** Don't hand-roll text classes
 on a new page. If a new page needs a size that isn't in the file, that's a
@@ -205,11 +226,20 @@ status. Same shape on Chippi home, Reviews, agent-activity, broker overview.
 ## Space
 
 ```
-PAGE_RHYTHM    space-y-12   between major sections
-SECTION_RHYTHM space-y-6    within a section
-FIELD_RHYTHM   space-y-4    between form fields / list rows
-ROW_PAD        py-3         hairline-divided rows (or py-2.5 for tight)
+PAGE_RHYTHM    space-y-12   48px  between major sections
+SECTION_RHYTHM space-y-6    24px  within a section
+FIELD_RHYTHM   space-y-4    16px  between form fields / list rows
+ROW_PAD        py-3         12px  hairline-divided rows (or py-2.5 for tight)
 ```
+
+### The harmonic spacing ladder
+
+The spacing scale is already on a harmonic ladder by good luck and good
+intuition. Reading top-down: `48 → 24 → 16 → 12` traces an octave
+(2:1) → perfect fifth (3:2) → perfect fourth (4:3) — the Pythagorean
+descent. **Do not insert intermediate steps.** A new value between any
+two rungs is a sign the design is reaching for something that doesn't
+exist in the harmonic.
 
 ### Containers
 
@@ -219,8 +249,33 @@ ROW_PAD        py-3         hairline-divided rows (or py-2.5 for tight)
 | `max-w-4xl mx-auto` | Reviews, focused list views |
 | `max-w-3xl mx-auto` | Chat, settings, intake — single-column reading |
 | `max-w-[1500px]` | Wide tables, kanban |
+| `max-w-[868px]` | **FocusCard** — golden inset of the 1404px content column |
 
 Always paired with `pb-12` so the page has bottom breathing room.
+
+### Geometry — the FocusCard rule
+
+The realtor's primary surface is the FocusCard. It sits inside the
+1500px page max minus 2 × 48px content padding at `lg`, giving an
+inner content column of **1404px**. The card itself is **868px**.
+
+`1404 / 868 ≈ 1.618 = φ` — the golden ratio.
+
+The card is the golden rectangle inscribed in the column. The
+remaining 268px of left + right shoulder is the golden complement
+that lets the card feel deliberate rather than small.
+
+If you add a new focal element to a wide page, hold it against this
+test: is its width the column's width divided by φ? If not, name
+why. "It felt about right" is not a reason.
+
+### Geometry — the unfinished work (Phase 6)
+
+The macro frame still has magic numbers with no shared module:
+sidebar 240px, page max 1500px, chippi-bar 768px. Phase 6 will re-derive
+these from one base unit related by φ and the Pythagorean ratios (2:1,
+3:2, 4:3). Until then: don't add a new wide container without
+declaring which ratio relates it to its parent.
 
 ---
 
