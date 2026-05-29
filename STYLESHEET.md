@@ -352,6 +352,12 @@ The strict directory list grows one at a time as we audit + clean
 surfaces — promoting a directory is a one-way door. The file's
 `STRICT_DIRS_TODO` list shows the migration backlog.
 
+Strict today: `components/onboarding`, `components/agent`,
+`components/chippi` (the brand-heavy dirs). The docked Chippi composer
+(`chippi-bar.tsx`) is allowlisted — it's a floating surface, same class
+as a toast. Remaining backlog: `components/contacts`, `components/deals`,
+`components/dashboard`, `components/settings`, `app/s`, `app/broker`.
+
 ---
 
 ## Components
@@ -863,6 +869,52 @@ Auth pages are **not** allowed:
 The principle: auth is **calm welcome, not a pitch**. The marketing pages
 do the pitch. By the time the user lands at sign-in, they've already
 decided.
+
+---
+
+## Motion is earned
+
+The product is **calm by design**. Motion is not the default — it's a
+decision you defend. Most surfaces breathe through restraint: a hairline,
+a fade, a hover. That restraint IS the brand. Adding a pulse, a
+typewriter, or a celebration where one isn't earned is decoration, and
+decoration is the thing the whole system refuses.
+
+### The animated moments that exist (and why each earns it)
+
+| Moment | Where | Why it's earned |
+|---|---|---|
+| List stagger | every dashboard list | Orients the eye as rows arrive; ends flat, no overshoot. |
+| Approval sentence | `ApprovalCelebration` | The ONE beat after a realtor approves. *The sentence is the celebration — no icon, no checkmark, no pulse.* |
+| Onboarding reveal | `TypingText` in the V2 reveal | The payoff of the welcome promise — the realtor watches Chippi write. The one place we spend motion freely. |
+| Segmented-control slide | tabs, role switcher | `layoutId` shared-element; the iOS move. |
+
+### The bar for adding a new animated moment
+
+Before you add motion, answer: **what deliberate calm decision am I about
+to overturn?** Read the surrounding code and the git history first. The
+team has repeatedly *removed* motion on purpose:
+
+- The morning story was demoted from a focal hero to a calm "What's new"
+  list row (multiple commits). It is **not** a typewriter target — that
+  would re-promote what was deliberately quieted.
+- The floating "Chippi is working" activity toast was removed. Don't
+  re-add a floating live indicator.
+- The send-confirmation celebration is a sentence, by explicit decision.
+  Don't add an orange pulse to it.
+
+If your new moment fights one of these, it's decoration. Cut it.
+
+### Components built ahead of an honest home
+
+`ChippiAuthoredDot` and `ChippiWordmarkInline` (Phase 2) exist but have
+**no consumer yet** — on purpose. The activity feed and "What I did" are
+first-person Chippi ("I drafted…"), where a third-person wordmark fights
+the voice; and an authored-dot only earns its place on a *mixed-author*
+timeline (realtor actions interleaved with Chippi's), which the current
+surfaces don't render. Wire them when such a surface exists. Forcing them
+onto an all-Chippi surface makes them decoration on every row — exactly
+the scarcity failure the brand-orange rule guards against.
 
 ---
 

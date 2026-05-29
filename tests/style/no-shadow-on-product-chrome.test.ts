@@ -34,16 +34,23 @@ const ROOT = join(__dirname, '..', '..');
  * is a one-way door — every shadow on every file in that dir must be
  * allowlisted or removed before this list grows.
  */
-const STRICT_DIRS = ['components/onboarding'];
+const STRICT_DIRS = [
+  'components/onboarding',
+  // Phase 5: promoted after audit. agent/ had zero shadows; chippi/ had
+  // shadows only in the docked floating composer (allowlisted below).
+  // These are the two most brand-heavy dirs — locking them paper-flat
+  // is the highest-value strict promotion.
+  'components/agent',
+  'components/chippi',
+];
 
 /**
  * Directories with known shadow debt the migration hasn't reached yet.
  * Kept here so the size of the backlog is visible — not enforced.
- * Strict promotion follows the Phase 2-4 design rebuild plan.
+ * Each promoted to STRICT_DIRS once audited (allowlist the legit
+ * floating surfaces, fix the real violations).
  */
 const STRICT_DIRS_TODO = [
-  'components/agent',     // mostly legitimate floating composer + popovers — needs allowlist pass
-  'components/chippi',    // chippi-bar is a docked floating surface — legitimate; needs allowlist
   'components/contacts',  // mix of legitimate modals + a few real violations
   'components/deals',     // kanban drag overlays legitimate; segmented-control violations real
   'components/dashboard', // sidebar / header popovers — legitimate; needs allowlist
@@ -67,6 +74,10 @@ const SHADOW_ALLOWLIST = new Set<string>([
   'components/ui/alert-dialog.tsx',
   // Chart tooltips — hover surfaces over data; need clear separation.
   'components/ui/chart.tsx',
+  // The docked Chippi composer/bar — a floating surface over page
+  // content (backdrop-blur + lift), same class as a toast/dialog.
+  // The floating mic pill and recording state share the lift.
+  'components/chippi/chippi-bar.tsx',
 ]);
 
 function collectFiles(dir: string): string[] {
