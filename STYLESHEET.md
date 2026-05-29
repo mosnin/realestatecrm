@@ -110,13 +110,13 @@ If a feature looks like it needs a new dep, the bar is high — it almost never 
 
 Brand orange (`--brand`, `text-orange-500`, `text-orange-600 dark:text-orange-400`) lives in **only these five places**:
 
-| Context (constant in `lib/colors.ts`) | Where |
-|---|---|
-| `LOGO` | The logo + wordmark |
-| `CHIPPI_AVATAR` | The chip widget representing Chippi in composer, header, toast |
-| `AGENT_BADGE` | Authorship pill on AgentDraft rows, conversation messages, activity rows |
-| `ACTIVITY_BAR` | Progress fill on autonomous-run activity bars and in-flight indicators |
-| `LEAD_WARM` | Lead-warm tier indicator (mustard, not orange — but conceptually adjacent) |
+| Context (constant in `lib/colors.ts`) | Where | Built in |
+|---|---|---|
+| `LOGO` | The logo + wordmark + onboarding brand wash | `components/ui/brand-logo.tsx`, `components/onboarding/onboarding-shell.tsx` |
+| `CHIPPI_AVATAR` | Chip widget in composer/header/toast; `ChippiWordmarkInline` (serif "Chippi" in prose, used at most once per surface) | `components/agent/chippi-avatar.tsx`, `components/agent/chippi-authored.tsx` |
+| `AGENT_BADGE` | Authorship pill on AgentDraft rows, conversation messages, activity rows; the 4px `ChippiAuthoredDot` on Chippi-actored rows | `components/agent/agent-generated-badge.tsx`, `components/agent/chippi-authored.tsx` |
+| `ACTIVITY_BAR` | Progress fill on autonomous-run activity bars and in-flight indicators | `components/agent/lead-score-bar.tsx` and equivalents |
+| `LEAD_WARM` | Lead-warm tier indicator (mustard, not orange — but conceptually adjacent) | `components/agent/lead-score-bar.tsx` |
 
 It does **not** appear on default buttons, primary CTAs, links, focus rings,
 nav, or "active" indicators. Those are all foreground (black/white). If you
@@ -126,6 +126,23 @@ The five contexts are codified as `BRAND_ORANGE_CONTEXTS` in `lib/colors.ts`,
 along with a `brandOrange()` wrapper for tagging deliberate usage. Adding a
 sixth context requires deleting one of the existing five — discipline lives
 in the constraint, not in this paragraph.
+
+#### `CHIPPI_PILL` — the one pill that wears the brand
+
+`PRIMARY_PILL` is the locked primary pill (foreground bg). Buttons that
+DIRECTLY invoke Chippi ("Tell Chippi", "Ask Chippi", "Chippi, help with this")
+use `CHIPPI_PILL` instead: same vocabulary, but the hover state shifts to a
+barely-perceptible warm halo so the realtor feels Chippi at the moment they
+reach for the button. Reach for `CHIPPI_PILL` only on buttons that name
+Chippi explicitly — otherwise, `PRIMARY_PILL` stays the default.
+
+#### Enforcement
+
+`tests/style/no-stray-orange.test.ts` fails CI when a file in
+`STRICT_DIRS` uses an `*-orange-*` class without importing
+`brandOrange` (or `CHIPPI_PILL`, or being one of the named leaf
+components). The strict zone grows directory by directory as we audit
++ tag the existing call sites.
 
 ---
 
@@ -886,8 +903,10 @@ lib/colors.ts                    BRAND_ORANGE_CONTEXTS — the five places orang
 components/ui/button.tsx         The only canonical button
 components/ui/empty-state.tsx    Empty-state component (use it)
 components/motion/stagger-list.tsx   StaggerList + StaggerItem (use them)
-components/agent/agent-generated-badge.tsx   Chippi-stamp on agent-authored content
+components/agent/agent-generated-badge.tsx   AgentGeneratedBadge + AgentGeneratedBorder
+components/agent/chippi-authored.tsx ChippiAuthoredDot + ChippiWordmarkInline
 tests/style/no-shadow-on-product-chrome.test.ts   CI enforcement of the paper-flat rule
+tests/style/no-stray-orange.test.ts               CI enforcement of the brand-orange scarcity rule
 ```
 
 If you find a screen doing something this file doesn't sanction, the screen

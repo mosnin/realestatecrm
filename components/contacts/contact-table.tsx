@@ -40,7 +40,7 @@ import {
   Mic,
   Tag as TagIcon,
 } from 'lucide-react';
-import { BODY_MUTED, TITLE_FONT, QUIET_LINK, PRIMARY_PILL } from '@/lib/typography';
+import { BODY_MUTED, TITLE_FONT, QUIET_LINK, CHIPPI_PILL } from '@/lib/typography';
 
 import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
@@ -470,7 +470,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 faster than any form, so it gets the primary pill. */}
             <Link
               href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new person — ")}`}
-              className={PRIMARY_PILL}
+              className={CHIPPI_PILL}
             >
               Tell Chippi →
             </Link>

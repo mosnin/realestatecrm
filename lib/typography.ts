@@ -91,6 +91,32 @@ export const PRIMARY_PILL =
   'focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 ' +
   'focus-visible:ring-offset-background';
 
+/**
+ * `CHIPPI_PILL` — primary pill for buttons that DIRECTLY invoke
+ * Chippi ("Tell Chippi", "Ask Chippi", "Chippi, help with this").
+ *
+ * Same vocabulary as PRIMARY_PILL but with a barely-perceptible warm
+ * halo on hover: the bg shifts to a layered foreground-over-brand
+ * gradient so the realtor feels Chippi at the moment they reach for
+ * the button. STYLESHEET.md §Color §The brand orange rule sanctions
+ * this as one of the five named contexts.
+ *
+ * Do NOT reach for this on a generic Save / Send / Add button.
+ * Those stay PRIMARY_PILL. The warmth is the brand's punctuation —
+ * if everything has it, nothing has it.
+ *
+ * Importing this constant counts as a deliberate brand-orange use
+ * for the stray-orange lint rule (Phase 2). Call sites don't need
+ * to wrap the class themselves.
+ */
+export const CHIPPI_PILL =
+  'inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium ' +
+  'bg-foreground text-background ' +
+  'hover:bg-gradient-to-r hover:from-foreground hover:via-foreground hover:to-orange-500/90 ' +
+  'active:scale-[0.98] transition-all duration-150 focus-visible:outline-none ' +
+  'focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 ' +
+  'focus-visible:ring-offset-background';
+
 /** Secondary ghost — Cancel, Discard, secondary action. */
 export const GHOST_PILL =
   'inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium ' +
