@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 import { OnboardingRealtor } from '@/components/onboarding/onboarding-realtor';
+import { OnboardingRealtorV2 } from '@/components/onboarding/onboarding-realtor-v2';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export const metadata = { title: 'Create your workspace — Chippi' };
@@ -10,13 +11,19 @@ export const metadata = { title: 'Create your workspace — Chippi' };
 export default async function SetupPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ type?: string }>;
+  searchParams?: Promise<{ type?: string; legacy?: string }>;
 }) {
-  const { type } = (await searchParams) ?? {};
+  const { type, legacy } = (await searchParams) ?? {};
   // Realtor (default) gets the one-screen quick path. Brokers and agents-
   // joining-a-brokerage get the longer flow that collects brokerage data
   // via ?type=broker. The quick path itself links over to ?type=broker.
   const useQuickPath = type !== 'broker';
+
+  // V2 storytelling flow gates behind NEXT_PUBLIC_ONBOARDING_V2. `?legacy=1`
+  // forces the V1 flow regardless — the rollback escape hatch while V2
+  // proves out. Once V2 is default-on and stable, V1 + this gate get deleted.
+  const useV2Onboarding =
+    process.env.NEXT_PUBLIC_ONBOARDING_V2 === 'true' && legacy !== '1';
 
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
@@ -197,7 +204,9 @@ export default async function SetupPage({
   void email;
 
   if (useQuickPath) {
-    return <OnboardingRealtor defaultName={resolvedUser?.name ?? ''} />;
+    return useV2Onboarding
+      ? <OnboardingRealtorV2 defaultName={resolvedUser?.name ?? ''} />
+      : <OnboardingRealtor defaultName={resolvedUser?.name ?? ''} />;
   }
 
   return (

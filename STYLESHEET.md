@@ -866,6 +866,76 @@ decided.
 
 ---
 
+## Onboarding storytelling (`components/onboarding/onboarding-realtor-v2.tsx`)
+
+Onboarding is a **story**, not a wizard. The wizard collects fields then
+summarizes them. The story has an emotional arc: welcome → recognition →
+trust → a payoff where the product *does something for you before you
+arrive*. This is the Apple onboarding move, and it's the one place we
+spend motion freely — because the realtor's first impression is the
+whole game.
+
+### The arc
+
+Nine stages, **one idea each**. Never put two ideas on one onboarding
+screen — that's the wizard smell.
+
+```
+1. welcome   — "Hi. I'm Chippi." + the one promise. (the cover, no dots)
+2. name      — name + role. Role auto-advances when the name's filled.
+3. business  — business name → live slug check.
+4. where     — ZIP + tenure. Creates the workspace.
+5. promise   — the trust micro-screen.
+6. serve     — audience + voice guidance.
+7. voice     — pick warm vs direct from two real drafts.
+8. sources   — top 1-2 lead sources.
+9. reveal    — Chippi TYPES a first-touch draft, live. (the payoff, no dots)
+```
+
+### The three patterns that make it a story
+
+1. **The trust promise** (`StagePromise`). A breath between setup and
+   the profile questions. Names the single most common new-user fear —
+   *"will it send things without me?"* — once, plainly, in serif:
+   *"I draft. You approve. Nothing leaves without your name on it."*
+   A 1.4s minimum-display gate keeps the realtor from tapping past
+   before reading. Then it's never mentioned again. **Don't turn this
+   into a settings toggle** — it's a promise, not a preference.
+
+2. **The typing reveal** (`StageReveal` + `TypingText`). The payoff.
+   Chippi types out a real first-touch message in the realtor's chosen
+   voice, naming their business, tuned to their primary lead source.
+   The "take me in" button fades in only once typing finishes — the
+   realtor *watches Chippi work*, then walks in. The draft is
+   **deterministic** (`lib/onboarding-draft.ts`), never an LLM call:
+   onboarding is the one screen we cannot let a model misfire on, and
+   the magic is the live typing, not the generation.
+
+3. **Bookend stages hide progress dots** (`hideProgress` on
+   `OnboardingShell`). The welcome cover and the reveal payoff aren't
+   "step 1 of 9" and "step 8 of 9" — a book cover isn't a page, and the
+   payoff shouldn't read as a chore three-quarters done. Dots track only
+   the seven middle "doing work" stages.
+
+### Rollback discipline
+
+V2 is gated behind `NEXT_PUBLIC_ONBOARDING_V2`; `?legacy=1` forces the
+legacy `onboarding-realtor.tsx`. The legacy flow stays untouched as the
+rollback path until V2 proves out, then V1 + the gate + the temporary
+duplication in `onboarding-realtor-shared.tsx`'s consumers get deleted.
+**Don't refactor the legacy flow** — it's scheduled for removal; editing
+code you're about to delete is risk with no payoff.
+
+### The `TypingText` component
+
+`components/onboarding/typing-text.tsx`. Reusable typewriter. Honors
+`prefers-reduced-motion` (renders instantly, fires `onDone` immediately —
+no dead air for someone who asked for stillness). The caret is
+foreground, **not** orange — the brand signature belongs to the content,
+not the cursor. Also used by the Phase 4 morning-story reveal.
+
+---
+
 ## Iconography
 
 | Library | `lucide-react` |
@@ -905,6 +975,9 @@ components/ui/empty-state.tsx    Empty-state component (use it)
 components/motion/stagger-list.tsx   StaggerList + StaggerItem (use them)
 components/agent/agent-generated-badge.tsx   AgentGeneratedBadge + AgentGeneratedBorder
 components/agent/chippi-authored.tsx ChippiAuthoredDot + ChippiWordmarkInline
+components/onboarding/onboarding-realtor-v2.tsx   The V2 storytelling onboarding flow
+components/onboarding/typing-text.tsx             TypingText typewriter (reduced-motion aware)
+lib/onboarding-draft.ts          composeOnboardingDraft — the deterministic reveal draft
 tests/style/no-shadow-on-product-chrome.test.ts   CI enforcement of the paper-flat rule
 tests/style/no-stray-orange.test.ts               CI enforcement of the brand-orange scarcity rule
 ```
