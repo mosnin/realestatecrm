@@ -690,7 +690,13 @@ function VoiceCard({
       onClick={onClick}
       className={cn(
         'text-left rounded-xl border p-5 transition-all',
-        selected ? 'border-foreground bg-foreground/[0.04] shadow-sm' : 'border-border bg-background hover:bg-muted/30',
+        // Paper-flat — ring instead of shadow on selected. STYLESHEET.md
+        // forbids shadows on product chrome; the onboarding screen
+        // honours the same rule. A ring carries the "this is chosen"
+        // signal without breaking the system's voice.
+        selected
+          ? 'border-foreground bg-foreground/[0.04] ring-2 ring-foreground/10 ring-offset-2 ring-offset-background'
+          : 'border-border bg-background hover:bg-foreground/[0.04]',
       )}
     >
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">{label}</p>
@@ -799,19 +805,19 @@ function StagePlan({
         <PlanCard
           eyebrow="Voice"
           title={tone === 'warm' ? 'Warm and inviting' : 'Direct and informative'}
-          body={`I&rsquo;ll match this tone in every draft I write on behalf of ${businessName.trim() || 'you'}.`}
+          body={`I'll match this tone in every draft I write on behalf of ${businessName.trim() || 'you'}.`}
         />
         <PlanCard
           eyebrow="Focus"
           title={`Tuned for ${audience}`}
-          body="I&rsquo;ll prioritize leads and suggestions that fit this audience, and skip the ones that don&rsquo;t."
+          body="I'll prioritize leads and suggestions that fit this audience, and skip the ones that don't."
         />
         <PlanCard
           eyebrow="Watching"
           title={sourceCount > 0 ? `${sourceCount} lead ${sourceCount === 1 ? 'source' : 'sources'} on my radar` : 'Inbox and intake link'}
           body={sourceCount > 0
-            ? 'Connect them in Settings → Integrations and I&rsquo;ll start pulling leads in.'
-            : 'Connect more sources in Settings → Integrations whenever you&rsquo;re ready.'}
+            ? "Connect them in Settings → Integrations and I'll start pulling leads in."
+            : "Connect more sources in Settings → Integrations whenever you're ready."}
         />
         <PlanCard
           eyebrow="Today"
@@ -837,11 +843,16 @@ function StagePlan({
 }
 
 function PlanCard({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+  // Previously rendered title + body via dangerouslySetInnerHTML to support
+  // HTML-entity apostrophes (`I&rsquo;ll`). Switched to plain Unicode
+  // apostrophes in the call sites — `dangerouslySetInnerHTML` is a smell
+  // even when the input is hard-coded; it normalises the wrong thing
+  // (entity-encoded text) and makes the component a default-unsafe sink.
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{eyebrow}</p>
-      <p className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: title }} />
-      <p className="text-xs text-muted-foreground mt-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: body }} />
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{body}</p>
     </div>
   );
 }
