@@ -27,6 +27,7 @@ import { FOCUS_CARD_MAX } from '@/lib/geometry';
 import { BODY_MUTED, QUIET_LINK, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { buildIntakeUrl } from '@/lib/intake';
 import { levenshtein } from '@/lib/draft-feedback';
+import { ChippiWordmarkInline } from '@/components/agent/chippi-authored';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -266,11 +267,13 @@ export function FocusCard({
 
   if (loading) {
     return (
-      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 animate-pulse')}>
-        <div className="h-4 w-32 rounded bg-muted/50 mb-4" />
-        <div className="h-3 w-full rounded bg-muted/40 mb-2" />
-        <div className="h-3 w-5/6 rounded bg-muted/40 mb-6" />
-        <div className="flex gap-2">
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+        <p className={cn(BODY_MUTED, 'mb-4')}>Looking at your day.</p>
+        <div className="space-y-2 animate-pulse">
+          <div className="h-3 w-full rounded bg-muted/40" />
+          <div className="h-3 w-5/6 rounded bg-muted/40" />
+        </div>
+        <div className="mt-6 flex gap-2 animate-pulse">
           <div className="h-9 w-24 rounded bg-muted/50" />
           <div className="h-9 w-16 rounded bg-muted/40" />
         </div>
@@ -574,7 +577,7 @@ function FocusWelcome({
         Welcome{firstName ? `, ${firstName}` : ''}.
       </h2>
       <p className={cn(BODY_MUTED, 'mt-2 max-w-md mx-auto leading-relaxed')}>
-        I track your deals, draft your follow-ups, and flag what&apos;s stuck &mdash; automatically. Start with a lead and I&apos;ll show you.
+        I&apos;m <ChippiWordmarkInline />. I track your deals, draft your follow-ups, and flag what&apos;s stuck &mdash; automatically. Start with a lead and I&apos;ll show you.
       </p>
       <div className="mt-6 flex flex-col items-center gap-3">
         <button
