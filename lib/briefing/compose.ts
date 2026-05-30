@@ -28,6 +28,7 @@ import { leadsSource } from './signal-sources/leads';
 import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
 import { calendarGoogleSource } from './signal-sources/calendar-google';
+import { gmailSource } from './signal-sources/gmail';
 import { composeMomentum } from './momentum';
 import { composeTomorrow } from './tomorrow';
 import { pickBestTip, tipToCard } from './tips/tips-source';
@@ -36,9 +37,9 @@ import { pickBestTip, tipToCard } from './tips/tips-source';
  * The active source list. Phase A shipped three internal Chippi-DB
  * sources. Phase B layers more on — `drafts` surfaces the autonomous
  * agent's pending AgentDraft rows; `calendar_google` (Phase D2) pulls
- * the realtor's external Calendar for meetings scheduled outside Chippi.
- * Gmail / Slack / HubSpot follow as separate sources. The composer needs
- * no change as the list grows.
+ * external Calendar; `gmail` (Phase D3) catches quiet sent threads and
+ * inbound the agent skipped. Slack / HubSpot follow. The composer
+ * needs no change as the list grows.
  */
 const SOURCES: SignalGatherer[] = [
   pipelineSource,
@@ -46,6 +47,7 @@ const SOURCES: SignalGatherer[] = [
   calendarSource,
   draftsSource,
   calendarGoogleSource,
+  gmailSource,
 ];
 
 /**
