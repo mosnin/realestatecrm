@@ -72,17 +72,21 @@ export function useBriefLifecycle({
  * Format the "3 of 5 done" receipt. Counts tapped cards from the
  * lifecycle PATCHes (or 0 if telemetry hasn't shipped yet — Phase B5
  * will provide a real count, today we approximate from `acted` boolean).
+ *
+ * Voice rule: the receipt speaks the realtor's words, not the product
+ * team's. "Opened" / "Quiet today" — never "acted on", never enum.
  */
 export function formatProgress(
   totalCards: number,
   actedAt: string | null,
 ): string {
-  if (totalCards === 0) return 'Nothing today';
+  if (totalCards === 0) return 'Quiet today';
+  const word = totalCards === 1 ? 'card' : 'cards';
   // Pre-B5: we know acted-or-not but not which/how-many cards. The
-  // honest summary is "acted" or "not yet."
+  // honest summary is "opened" or "not yet."
   // Post-B5: replace with actual tap-count from cardTaps[].length.
-  if (actedAt) return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'} · acted on`;
-  return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'}`;
+  if (actedAt) return `${totalCards} ${word} · opened`;
+  return `${totalCards} ${word}`;
 }
 
 /** Format "last opened 7:11a" in short local time. */
