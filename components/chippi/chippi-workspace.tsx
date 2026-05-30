@@ -34,6 +34,7 @@ import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
+import { DailyBrief } from '@/components/chippi/daily-brief';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -1112,6 +1113,16 @@ export function ChippiWorkspace({
             <div
               className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
             >
+              {/* Daily brief — the 7am snapshot. Renders above the composer
+                  on the empty workspace surface only; once the realtor is
+                  in a conversation we yield the screen to the chat. Broker
+                  variant skips the brief (broker dashboards are a separate
+                  surface in Phase 1). */}
+              {!isBroker && !isFresh && (
+                <div className="w-full mb-8">
+                  <DailyBrief slug={slug} />
+                </div>
+              )}
               <div className="w-full max-w-2xl">
                 <motion.h1
                     initial={{ opacity: 0, y: -4 }}
