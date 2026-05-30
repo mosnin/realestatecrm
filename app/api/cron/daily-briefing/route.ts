@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { composeBrief } from '@/lib/briefing/compose';
 import { shouldGenerateFor } from '@/lib/briefing/timing';
+import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 
 export const runtime = 'nodejs';
 
@@ -42,7 +43,7 @@ interface CandidateRow {
 async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'failed'> {
   try {
     const { brief, cardMeta } = await composeBrief(spaceId);
-    const { error } = await supabase
+    const { data: row, error } = await supabase
       .from('Brief')
       .upsert(
         {
@@ -53,11 +54,32 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
           cardMeta,
         },
         { onConflict: 'spaceId,forDate' },
-      );
+      )
+      .select('id')
+      .single();
     if (error) {
       console.error(`[cron/daily-briefing] upsert failed for ${spaceId}:`, error.message);
       return 'failed';
     }
+
+    // Inline delivery fan-out. Wrapped in its own try/catch so a Resend
+    // / Telnyx hiccup never bubbles up and fails the brief generation —
+    // the brief surface itself is canon, delivery is best-effort.
+    try {
+      const space = await loadDeliveryContext(spaceId);
+      if (space && row) {
+        await deliverBrief({
+          briefId: row.id as string,
+          brief,
+          forDate,
+          space,
+          appOrigin: getAppOrigin(),
+        });
+      }
+    } catch (deliveryErr) {
+      console.error(`[cron/daily-briefing] delivery failed for ${spaceId}:`, deliveryErr);
+    }
+
     return 'ok';
   } catch (err) {
     console.error(`[cron/daily-briefing] compose failed for ${spaceId}:`, err);

@@ -34,9 +34,15 @@ export function BriefSection({ slug }: BriefSectionProps) {
   const [enabled, setEnabled] = useState(true);
   const [hour, setHour] = useState<number>(7);
   const [timezone, setTimezone] = useState<string>('America/New_York');
+  const [emailDelivery, setEmailDelivery] = useState(false);
+  const [smsDelivery, setSmsDelivery] = useState(false);
+  const [masterEmail, setMasterEmail] = useState(true);
+  const [masterSms, setMasterSms] = useState(false);
+  const [phoneOnFile, setPhoneOnFile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sendingTest, setSendingTest] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -47,6 +53,13 @@ export function BriefSection({ slug }: BriefSectionProps) {
         if (typeof s.briefEnabled === 'boolean') setEnabled(s.briefEnabled);
         if (typeof s.briefHour === 'number') setHour(s.briefHour);
         if (typeof s.timezone === 'string') setTimezone(s.timezone);
+        if (typeof s.briefEmail === 'boolean') setEmailDelivery(s.briefEmail);
+        if (typeof s.briefSms === 'boolean') setSmsDelivery(s.briefSms);
+        if (typeof s.notifications === 'boolean') setMasterEmail(s.notifications);
+        if (typeof s.smsNotifications === 'boolean') setMasterSms(s.smsNotifications);
+        if (typeof s.phoneNumber === 'string' && s.phoneNumber.trim().length > 0) {
+          setPhoneOnFile(true);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -59,7 +72,13 @@ export function BriefSection({ slug }: BriefSectionProps) {
       const res = await fetch('/api/spaces', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, briefEnabled: enabled, briefHour: hour }),
+        body: JSON.stringify({
+          slug,
+          briefEnabled: enabled,
+          briefHour: hour,
+          briefEmail: emailDelivery,
+          briefSms: smsDelivery,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -72,6 +91,22 @@ export function BriefSection({ slug }: BriefSectionProps) {
       toast.error(err instanceof Error ? err.message : 'That tripped me up. Try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendTest() {
+    setSendingTest(true);
+    try {
+      const res = await fetch('/api/agent/briefing/test', { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Test send failed.');
+      }
+      toast.success('Test sent.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Test send failed.');
+    } finally {
+      setSendingTest(false);
     }
   }
 
@@ -126,6 +161,48 @@ export function BriefSection({ slug }: BriefSectionProps) {
         </select>
       </div>
 
+      <div
+        className={cn(
+          'flex items-center justify-between gap-4 py-3 border-t border-border/60 transition-opacity',
+          (!enabled || !masterEmail) && 'opacity-50',
+        )}
+      >
+        <div className="min-w-0">
+          <p className={`${BODY} font-medium`}>Also send by email</p>
+          <p className={`${CAPTION} mt-0.5`}>
+            {masterEmail ? 'Headline + a tap to open. Off by default.' : 'Turn on email notifications first.'}
+          </p>
+        </div>
+        <Switch
+          checked={emailDelivery && masterEmail}
+          onCheckedChange={setEmailDelivery}
+          disabled={!enabled || !masterEmail}
+        />
+      </div>
+
+      <div
+        className={cn(
+          'flex items-center justify-between gap-4 py-3 border-t border-border/60 transition-opacity',
+          (!enabled || !masterSms || !phoneOnFile) && 'opacity-50',
+        )}
+      >
+        <div className="min-w-0">
+          <p className={`${BODY} font-medium`}>Also send by text</p>
+          <p className={`${CAPTION} mt-0.5`}>
+            {!masterSms
+              ? 'Turn on text notifications first.'
+              : !phoneOnFile
+                ? 'Add a phone number in Workspace settings first.'
+                : 'One line + the link. Off by default.'}
+          </p>
+        </div>
+        <Switch
+          checked={smsDelivery && masterSms && phoneOnFile}
+          onCheckedChange={setSmsDelivery}
+          disabled={!enabled || !masterSms || !phoneOnFile}
+        />
+      </div>
+
       <div className="flex items-center gap-3 pt-1">
         <button
           type="submit"
@@ -135,6 +212,16 @@ export function BriefSection({ slug }: BriefSectionProps) {
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
         </button>
+        {(emailDelivery || smsDelivery) && enabled && (
+          <button
+            type="button"
+            onClick={handleSendTest}
+            disabled={sendingTest}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 disabled:opacity-60"
+          >
+            {sendingTest ? 'Sending…' : 'Send me a test'}
+          </button>
+        )}
         {saved && <p className={BODY_MUTED}>Changes saved.</p>}
       </div>
     </form>
