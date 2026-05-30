@@ -111,12 +111,18 @@ export function DailyBrief({ slug, initialBrief }: Props) {
   const [loading, setLoading] = useState(!initialBrief);
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [forceExpanded, setForceExpanded] = useState(false);
   const [showYesterday, setShowYesterday] = useState(false);
 
   useEffect(() => {
     if (initialBrief) return;
     let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    setSlow(false);
+    setTimedOut(false);
     const slowTimer = setTimeout(() => !cancelled && setSlow(true), SLOW_STATUS_MS);
     const timeoutTimer = setTimeout(() => !cancelled && setTimedOut(true), TIMEOUT_FALLBACK_MS);
 
@@ -124,7 +130,10 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       try {
         const res = await fetch('/api/agent/briefing');
         if (!res.ok) {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            setLoading(false);
+            setFailed(true);
+          }
           return;
         }
         const json = (await res.json()) as ApiResponse;
@@ -148,7 +157,10 @@ export function DailyBrief({ slug, initialBrief }: Props) {
           }
         }
       } catch {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setFailed(true);
+        }
       } finally {
         clearTimeout(slowTimer);
         clearTimeout(timeoutTimer);
@@ -160,7 +172,7 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       clearTimeout(slowTimer);
       clearTimeout(timeoutTimer);
     };
-  }, [initialBrief]);
+  }, [initialBrief, retryNonce]);
 
   const lifecycle = useBriefLifecycle({
     status: data?.status ?? 'pending',
@@ -207,29 +219,58 @@ export function DailyBrief({ slug, initialBrief }: Props) {
     );
   }
 
-  if (!data) return null;
-
-  // Settled / carried — render the collapsed receipt above the composer
-  // and yield the screen back to the chat surface as the focal element.
-  if (lifecycle === 'settled') {
+  // Fetch failed — calm sentence + inline recovery. Norman-grade error
+  // handling: the realtor never stares at a blank surface wondering
+  // whether the page is broken or just empty.
+  if (failed || !data) {
     return (
-      <CollapsedBrief
-        data={data}
-        slug={slug}
-        onExpand={() => setForceExpanded(true)}
-        onToggleYesterday={() => setShowYesterday((v) => !v)}
-      />
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+        <p className={cn(BODY_MUTED, 'mb-4')}>
+          I couldn&apos;t pull your brief just now.
+        </p>
+        <button
+          type="button"
+          onClick={() => setRetryNonce((n) => n + 1)}
+          className={cn(GHOST_PILL, 'min-h-[44px] sm:min-h-0')}
+        >
+          Try again
+        </button>
+      </div>
     );
   }
 
+  // Settled / carried — render the collapsed receipt above the composer
+  // and yield the screen back to the chat surface as the focal element.
+  // Yesterday's brief renders from THIS parent in both lifecycle states
+  // so the "Yesterday →" toggle works whether the realtor is in the live
+  // brief OR the collapsed receipt — the bug used to be that the toggle
+  // lived on the receipt but the rendered surface lived only inside the
+  // live brief, so tapping the receipt's button did nothing.
   return (
-    <LiveBrief
-      data={data}
-      slug={slug}
-      showYesterday={showYesterday}
-      onAct={recordActed}
-      onToggleYesterday={() => setShowYesterday((v) => !v)}
-    />
+    <>
+      {lifecycle === 'settled' ? (
+        <CollapsedBrief
+          data={data}
+          slug={slug}
+          showYesterday={showYesterday}
+          onExpand={() => setForceExpanded(true)}
+          onToggleYesterday={() => setShowYesterday((v) => !v)}
+        />
+      ) : (
+        <LiveBrief
+          data={data}
+          slug={slug}
+          showYesterday={showYesterday}
+          onAct={recordActed}
+          onToggleYesterday={() => setShowYesterday((v) => !v)}
+        />
+      )}
+      {showYesterday && (
+        <div className="mt-6 opacity-80">
+          <YesterdayBrief slug={slug} onCollapse={() => setShowYesterday(false)} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -355,11 +396,19 @@ function LiveBrief({
         </>
       )}
 
-      {showYesterday && (
-        <div className="mt-8 opacity-80">
-          <YesterdayBrief slug={slug} onCollapse={onToggleYesterday} />
-        </div>
-      )}
+      {/* "Yesterday →" toggle — lives at the foot of the live brief so the
+          realtor can peek backward without leaving the surface. The actual
+          YesterdayBrief renders from the parent so the same toggle works
+          from the collapsed receipt too. */}
+      <div className="mt-6 flex justify-end px-6">
+        <button
+          type="button"
+          onClick={onToggleYesterday}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showYesterday ? 'Hide yesterday' : 'Yesterday →'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -422,12 +471,14 @@ function BriefCardRow({
 
 function CollapsedBrief({
   data,
-  slug,
+  slug: _slug,
+  showYesterday,
   onExpand,
   onToggleYesterday,
 }: {
   data: ApiResponse;
   slug: string;
+  showYesterday: boolean;
   onExpand: () => void;
   onToggleYesterday: () => void;
 }) {
@@ -441,7 +492,8 @@ function CollapsedBrief({
         <button
           type="button"
           onClick={onExpand}
-          className="flex items-baseline gap-3 min-w-0 flex-1 text-left group"
+          aria-label="Open today's brief"
+          className="flex items-baseline gap-3 min-w-0 flex-1 text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 rounded-sm"
         >
           <span className={cn(SECTION_LABEL, 'shrink-0')}>Today&apos;s brief</span>
           <span className={cn(BODY_MUTED, 'text-xs truncate group-hover:text-foreground transition-colors')}>
@@ -460,9 +512,10 @@ function CollapsedBrief({
           <button
             type="button"
             onClick={onToggleYesterday}
+            aria-expanded={showYesterday}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2"
           >
-            Yesterday →
+            {showYesterday ? 'Hide yesterday' : 'Yesterday →'}
           </button>
         </div>
       </div>

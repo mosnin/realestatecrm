@@ -78,10 +78,12 @@ export function formatProgress(
   actedAt: string | null,
 ): string {
   if (totalCards === 0) return 'Nothing today';
-  // Pre-B5: we know acted-or-not but not which/how-many cards. The
-  // honest summary is "acted" or "not yet."
+  // The receipt has to sound like a realtor would talk about their
+  // own morning — "handled," not "acted on" (that's product-internal).
+  // Pre-B5: we know handled-or-not but not which/how-many cards. The
+  // honest summary is "handled" or just the count.
   // Post-B5: replace with actual tap-count from cardTaps[].length.
-  if (actedAt) return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'} · acted on`;
+  if (actedAt) return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'} · handled`;
   return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'}`;
 }
 

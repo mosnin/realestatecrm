@@ -222,7 +222,6 @@ export function BriefSection({ slug }: BriefSectionProps) {
             {sendingTest ? 'Sending…' : 'Send me a test'}
           </button>
         )}
-        {saved && <p className={BODY_MUTED}>Changes saved.</p>}
       </div>
     </form>
   );
