@@ -261,7 +261,7 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
           onToggleYesterday={() => setShowYesterday((v) => !v)}
         />
       ) : (
-        <LiveBrief data={data} slug={slug} onAct={recordActed} />
+        <LiveBrief data={data} slug={slug} bare={alwaysLive} onAct={recordActed} />
       )}
       {showYesterday && (
         <div className="mt-6 opacity-80">
@@ -277,10 +277,18 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
 function LiveBrief({
   data,
   slug,
+  bare,
   onAct,
 }: {
   data: ApiResponse;
   slug: string;
+  /** When true, strip the internal chrome — no "Today's brief" header
+   *  bar, no bordered card wrapper, no intro line. The serif headline +
+   *  cards flow naturally under whatever page shell is rendering us.
+   *  Used by the dedicated /chippi/brief page where the ChippiPageShell
+   *  already provides orientation; rendering our own header creates the
+   *  three-headers-stacked problem. */
+  bare?: boolean;
   onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
 }) {
   const { brief, createdAt, showIntro } = data;
@@ -288,17 +296,19 @@ function LiveBrief({
 
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
-      <div className="flex items-baseline justify-between mb-4 gap-2">
-        <span className={SECTION_LABEL}>Today&apos;s brief</span>
-        <span className={cn(SECTION_LABEL, 'tabular-nums truncate')}>
-          {time} <span className="hidden sm:inline">· {formatBriefDate(createdAt, false)}</span>
-          <span className="sm:hidden">· {formatBriefDate(createdAt, true)}</span>
-        </span>
-      </div>
+      {!bare && (
+        <div className="flex items-baseline justify-between mb-4 gap-2">
+          <span className={SECTION_LABEL}>Today&apos;s brief</span>
+          <span className={cn(SECTION_LABEL, 'tabular-nums truncate')}>
+            {time} <span className="hidden sm:inline">· {formatBriefDate(createdAt, false)}</span>
+            <span className="sm:hidden">· {formatBriefDate(createdAt, true)}</span>
+          </span>
+        </div>
+      )}
 
       {brief.emptyState ? (
         <>
-          <div className="rounded-lg border border-border/70 bg-card px-6 py-10">
+          <div className={cn(!bare && 'rounded-lg border border-border/70 bg-card', bare ? '' : 'px-6 py-10')}>
             <h1
               className="text-[24px] sm:text-[28px] leading-tight tracking-tight text-foreground"
               style={TITLE_FONT}
@@ -306,7 +316,7 @@ function LiveBrief({
               {brief.headline}
             </h1>
             <p className={cn(BODY_MUTED, 'mt-3 max-w-md')}>{brief.emptyState.invitation}</p>
-            {showIntro && <IntroLine slug={slug} />}
+            {showIntro && !bare && <IntroLine slug={slug} />}
             <div className="mt-6">
               <Link
                 href={`/s/${slug}/chippi`}
@@ -318,7 +328,7 @@ function LiveBrief({
             </div>
           </div>
           {(brief.momentum || brief.tomorrow) && (
-            <div className="mt-6 px-6 space-y-1.5">
+            <div className={cn('mt-6 space-y-1.5', !bare && 'px-6')}>
               {brief.momentum && <p className={BODY_MUTED}>{brief.momentum}</p>}
               {brief.tomorrow && <p className={BODY_MUTED}>{brief.tomorrow}</p>}
             </div>
@@ -326,9 +336,9 @@ function LiveBrief({
         </>
       ) : (
         <>
-          <div className="rounded-lg border border-border/70 bg-card px-6 pt-6 pb-2">
+          <div className={cn(!bare && 'rounded-lg border border-border/70 bg-card px-6 pt-6 pb-2')}>
             <h1
-              className="text-[24px] sm:text-[28px] leading-snug tracking-tight text-foreground"
+              className="text-[28px] sm:text-[34px] leading-snug tracking-tight text-foreground"
               style={TITLE_FONT}
             >
               {brief.headline}
@@ -336,13 +346,8 @@ function LiveBrief({
             {brief.subheadline && (
               <p className={cn(BODY_MUTED, 'mt-2')}>{brief.subheadline}</p>
             )}
-            {showIntro && <IntroLine slug={slug} />}
+            {showIntro && !bare && <IntroLine slug={slug} />}
 
-            {/* Cards list — only renders when there are actual cards. When
-                cards is empty AND tip is the primary brief (headline =
-                tip.subject), the headline + subheadline above already
-                carry the tip's info; rendering it again as a card row
-                would duplicate. */}
             {brief.cards.length > 0 && (
               <ul className="mt-6 divide-y divide-border/60">
                 {brief.cards.map((card, idx) => (
@@ -365,9 +370,6 @@ function LiveBrief({
                 )}
               </ul>
             )}
-            {/* Tip-as-primary action — when cards is empty but a tip
-                replaced the empty state, give the realtor the explicit
-                CTA to open the tip's subject. */}
             {brief.cards.length === 0 && brief.tip && (
               <div className="mt-6">
                 <Link
@@ -382,17 +384,13 @@ function LiveBrief({
           </div>
 
           {(brief.momentum || brief.tomorrow) && (
-            <div className="mt-6 px-6 space-y-1.5">
+            <div className={cn('mt-6 space-y-1.5', !bare && 'px-6')}>
               {brief.momentum && <p className={BODY_MUTED}>{brief.momentum}</p>}
               {brief.tomorrow && <p className={BODY_MUTED}>{brief.tomorrow}</p>}
             </div>
           )}
         </>
       )}
-      {/* No "Yesterday" toggle here — the live brief is TODAY. The peek
-          backward lives on the collapsed receipt, after the realtor has
-          engaged with today's. Keeping it off the live surface protects
-          the one-idea rule. */}
     </div>
   );
 }
