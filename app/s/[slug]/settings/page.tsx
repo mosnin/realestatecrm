@@ -129,11 +129,11 @@ export default async function SettingsPage({
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center space-y-3 p-8">
-          <h2 className="text-xl tracking-tight font-semibold text-foreground">
-            Something went wrong
+          <h2 className="text-xl tracking-tight font-semibold text-foreground" style={TITLE_FONT}>
+            I couldn&apos;t reach your settings.
           </h2>
           <p className={BODY_MUTED}>
-            I couldn&apos;t load your settings. Usually temporary.
+            Usually temporary.
           </p>
           <a href={`/s/${slug}/settings`} className={PRIMARY_PILL}>
             Try again

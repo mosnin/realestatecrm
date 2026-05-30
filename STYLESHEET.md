@@ -989,14 +989,21 @@ If your new moment fights one of these, it's decoration. Cut it.
 
 ### Components built ahead of an honest home
 
-`ChippiAuthoredDot` and `ChippiWordmarkInline` (Phase 2) exist but have
-**no consumer yet** — on purpose. The activity feed and "What I did" are
-first-person Chippi ("I drafted…"), where a third-person wordmark fights
-the voice; and an authored-dot only earns its place on a *mixed-author*
-timeline (realtor actions interleaved with Chippi's), which the current
-surfaces don't render. Wire them when such a surface exists. Forcing them
-onto an all-Chippi surface makes them decoration on every row — exactly
-the scarcity failure the brand-orange rule guards against.
+`ChippiAuthoredDot` (Phase 2) still has **no consumer yet** — on purpose.
+The activity feed and "What I did" are first-person Chippi ("I drafted…"),
+and an authored-dot only earns its place on a *mixed-author* timeline
+(realtor actions interleaved with Chippi's), which the current surfaces
+don't render. Wire it when such a surface exists. Forcing it onto an
+all-Chippi surface makes it decoration on every row — exactly the
+scarcity failure the brand-orange rule guards against.
+
+`ChippiWordmarkInline` earned its first consumer on the day-one
+`FocusCard` welcome ("I'm Chippi. I track your deals…"). That's the
+realtor's first emotional moment with the agent; naming the brand once,
+in serif Times orange, anchors every first-person "I" that follows.
+Don't add a second instance to that surface — scarcity is the whole
+point. New surfaces are welcome to use it once, where the brand
+genuinely belongs.
 
 ---
 
