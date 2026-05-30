@@ -11,6 +11,8 @@ import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
 import { McpSection, TemplatesSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+import { MemoryList } from '@/components/chippi/memory-list';
+import { RoutinesManager } from '@/components/routines/routines-manager';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { ChatModelPicker } from '@/components/agent/chat-model-picker';
 import { UsageSection } from '@/components/settings/usage-section';
@@ -27,19 +29,19 @@ import {
 } from '@/lib/typography';
 
 /**
- * Settings — five task-grouped tabs the realtor can hold in their head:
+ * Settings — task-grouped tabs the realtor can hold in their head:
  *
  *   Workspace    space name + slug + danger zone
  *   You          profile + bio + AI personalization + chat model
  *   Connections  OAuth apps + message templates (everywhere Chippi acts through)
+ *   Memory       what Chippi has learned about this workspace
+ *   Routines     the realtor's standing instructions for Chippi
  *   Privacy      notifications + legal + compliance + fair-housing notice
  *   Developer    MCP + API keys + usage (per-tool cost breakdown)
  *
- * The old six-tab grouping was by feature bucket (Workspace / Profile / Memory
- * / Notifications / Apps / Usage). Realtors don't think in feature buckets;
- * they think in tasks. Memory was cut — /chippi/memory already gives the
- * realtor everything they need; a duplicate Settings tab was debug surface
- * masquerading as configuration.
+ * Memory and Routines moved here from the Chippi dropdown — they describe
+ * how Chippi WORKS, not what Chippi did today. The daily dropdown is for
+ * daily surfaces; configuration belongs in Settings.
  *
  * Tab state lives in `?tab=...` so the URL stays shareable, sub-route
  * redirects resolve cleanly, and back-button history works. Each render
@@ -51,6 +53,8 @@ const TABS = [
   { id: 'workspace', label: 'Workspace' },
   { id: 'you', label: 'You' },
   { id: 'connections', label: 'Connections' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'routines', label: 'Routines' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'developer', label: 'Developer' },
 ] as const;
@@ -62,8 +66,9 @@ function isValidTab(v: string | undefined | null): v is TabId {
 }
 
 /**
- * Map legacy tab IDs onto the new structure. Memory becomes a redirect to its
- * real surface at /chippi/memory; the rest fold onto the closest equivalent.
+ * Map legacy tab IDs onto the new structure. The Chippi dropdown reorg
+ * folded Integrations into Connections, so `?tab=integrations` now lands
+ * on the Connections tab. Older aliases fold onto the closest equivalent.
  * Anything unrecognized falls through to the default tab.
  */
 function resolveLegacyTab(
@@ -76,13 +81,12 @@ function resolveLegacyTab(
     case 'profile':
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=you` };
     case 'apps':
+    case 'integrations':
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=connections` };
     case 'notifications':
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=privacy` };
     case 'usage':
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=developer` };
-    case 'memory':
-      return { kind: 'redirect', to: `/s/${slug}/chippi/memory` };
     default:
       return null;
   }
@@ -104,8 +108,7 @@ export default async function SettingsPage({
   const sp = await searchParams;
 
   // Resolve legacy tab IDs first — anyone hitting an old bookmark gets routed
-  // to the new home (or to /chippi/memory for the removed Memory tab) before
-  // any DB work runs.
+  // to the new home before any DB work runs.
   const legacy = resolveLegacyTab(sp.tab, slug);
   if (legacy?.kind === 'redirect') redirect(legacy.to);
   const activeTab: TabId = legacy?.kind === 'tab' ? legacy.id : 'workspace';
@@ -256,8 +259,7 @@ export default async function SettingsPage({
 
       {/* You — profile photo, bio, AI personalization, chat model. Everything
           that shapes how Chippi sees the realtor and how the realtor shows
-          up to leads. Memory is intentionally absent; /chippi/memory is its
-          real surface. */}
+          up to leads. Memory has its own tab now. */}
       {activeTab === 'you' && (
         <div className="space-y-12">
           <section className="space-y-5">
@@ -306,6 +308,7 @@ export default async function SettingsPage({
               Gmail, Outlook, Slack, HubSpot, and the rest. Connect them so
               Chippi can act on your behalf through your own accounts.
             </p>
+            <p className={BODY_MUTED}>Chippi never sends without your tap.</p>
             <ConnectedAppsSection
               callbackResult={
                 sp.integration === 'connected' || sp.integration === 'failed'
@@ -324,6 +327,40 @@ export default async function SettingsPage({
           >
             <p className={SECTION_LABEL}>Message templates</p>
             <TemplatesSection />
+          </section>
+        </div>
+      )}
+
+      {/* Memory — what Chippi has learned about this workspace. Read-only
+          here; the correction pattern is "delete the wrong fact and let
+          Chippi re-learn it" — same logic as on the old /chippi/memory
+          surface. The tab is a mount point; the list component owns the
+          empty/loading/error states. */}
+      {activeTab === 'memory' && (
+        <div className="space-y-12">
+          <section className="space-y-5">
+            <p className={SECTION_LABEL}>Memory</p>
+            <p className={BODY_MUTED}>
+              What I&apos;m holding onto about you, your people, and your
+              deals.
+            </p>
+            <MemoryList />
+          </section>
+        </div>
+      )}
+
+      {/* Routines — the realtor's standing instructions for Chippi. Read
+          and write through /api/routines; the hourly cron at
+          /api/cron/routines fires them. Nothing goes out without the
+          realtor's tap. */}
+      {activeTab === 'routines' && (
+        <div className="space-y-12">
+          <section className="space-y-5">
+            <p className={SECTION_LABEL}>Routines</p>
+            <p className={BODY_MUTED}>
+              What I run on a schedule. Nothing goes out without your tap.
+            </p>
+            <RoutinesManager />
           </section>
         </div>
       )}

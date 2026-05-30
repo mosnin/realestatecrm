@@ -1,37 +1,19 @@
-/**
- * Routines — the realtor's standing instructions for Chippi.
- *
- * Server shell only — resolves the space, then hands off to the client
- * <RoutinesManager/>, which reads and writes through /api/routines. The
- * hourly cron at /api/cron/routines is what actually fires them.
- */
-
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSlug } from '@/lib/space';
-import { RoutinesManager } from '@/components/routines/routines-manager';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 
-export default async function RoutinesPage({
+/**
+ * /routines — legacy URL. Routines are configuration (how Chippi works,
+ * not what Chippi did today) so it moved into Settings. Kept as a redirect
+ * for bookmark safety.
+ */
+export default async function RoutinesRedirect({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
-  const space = await getSpaceFromSlug(slug);
-  if (!space) notFound();
-
-  return (
-    <ChippiPageShell
-      greeting="Routines."
-      title="What I run on a schedule."
-      subtitle="Nothing goes out without your tap."
-    >
-      <RoutinesManager />
-    </ChippiPageShell>
-  );
+  redirect(`/s/${slug}/settings?tab=routines`);
 }
