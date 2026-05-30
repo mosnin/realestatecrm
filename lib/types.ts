@@ -101,6 +101,14 @@ export type SpaceSetting = {
   notifyTourBookings: boolean;
   notifyNewDeals: boolean;
   notifyFollowUps: boolean;
+  // Daily brief settings (Phase B3 / B6)
+  briefEnabled: boolean;
+  briefHour: number;
+  briefEmail: boolean;
+  briefSms: boolean;
+  briefEnabledAt: string | null;
+  briefIntroSeenAt: string | null;
+  unsubscribeToken: string | null;
   timezone: string;
   phoneNumber: string | null;
   myConnections: string | null;

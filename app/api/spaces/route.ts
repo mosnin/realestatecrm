@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
     supabase
       .from('SpaceSetting')
       .select(
-        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber,' +
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber, timezone,' +
+        'briefEnabled, briefHour, briefEmail, briefSms,' +
         'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
         'intakeHeaderBgColor, intakeHeaderGradient, intakeFaviconUrl, logoUrl,' +
@@ -59,6 +60,12 @@ export async function GET(req: NextRequest) {
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
       phoneNumber: settings?.phoneNumber ?? '',
+      timezone: settings?.timezone ?? 'America/New_York',
+      // Daily brief settings (Phase B3 / B6)
+      briefEnabled: settings?.briefEnabled ?? true,
+      briefHour: settings?.briefHour ?? 7,
+      briefEmail: settings?.briefEmail ?? false,
+      briefSms: settings?.briefSms ?? false,
       myConnections: settings?.myConnections ?? '',
       // Profile settings
       bio: settings?.bio ?? '',
@@ -111,6 +118,8 @@ export async function PATCH(req: NextRequest) {
     notifyFollowUps,
     briefEnabled,
     briefHour,
+    briefEmail,
+    briefSms,
   } = body;
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
@@ -252,6 +261,8 @@ export async function PATCH(req: NextRequest) {
   if (typeof briefHour === 'number' && Number.isInteger(briefHour) && briefHour >= 0 && briefHour <= 23) {
     settingsPayload.briefHour = briefHour;
   }
+  if (typeof briefEmail === 'boolean') settingsPayload.briefEmail = briefEmail;
+  if (typeof briefSms === 'boolean') settingsPayload.briefSms = briefSms;
   if (phoneNumber !== undefined) settingsPayload.phoneNumber = phoneNumber;
   if (myConnections !== undefined) settingsPayload.myConnections = myConnections;
   if (aiPersonalization !== undefined) settingsPayload.aiPersonalization = aiPersonalization;
