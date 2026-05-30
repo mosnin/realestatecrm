@@ -152,24 +152,35 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       </div>
 
       {brief.emptyState ? (
-        <div className="rounded-lg border border-border/70 bg-card px-6 py-10">
-          <h1
-            className="text-[28px] leading-tight tracking-tight text-foreground"
-            style={TITLE_FONT}
-          >
-            {brief.headline}
-          </h1>
-          <p className={cn(BODY_MUTED, 'mt-3 max-w-md')}>{brief.emptyState.invitation}</p>
-          <div className="mt-6">
-            <Link
-              href={`/s/${slug}/chippi`}
-              onClick={recordActed}
-              className={cn(PRIMARY_PILL)}
+        <>
+          <div className="rounded-lg border border-border/70 bg-card px-6 py-10">
+            <h1
+              className="text-[28px] leading-tight tracking-tight text-foreground"
+              style={TITLE_FONT}
             >
-              Tell Chippi
-            </Link>
+              {brief.headline}
+            </h1>
+            <p className={cn(BODY_MUTED, 'mt-3 max-w-md')}>{brief.emptyState.invitation}</p>
+            <div className="mt-6">
+              <Link
+                href={`/s/${slug}/chippi`}
+                onClick={recordActed}
+                className={cn(PRIMARY_PILL)}
+              >
+                Tell Chippi
+              </Link>
+            </div>
           </div>
-        </div>
+          {/* Momentum + tomorrow still render on quiet mornings — they
+              tether the realtor to yesterday and the look forward
+              independent of today's urgency. */}
+          {(brief.momentum || brief.tomorrow) && (
+            <div className="mt-6 px-6 space-y-1.5">
+              {brief.momentum && <p className={BODY_MUTED}>{brief.momentum}</p>}
+              {brief.tomorrow && <p className={BODY_MUTED}>{brief.tomorrow}</p>}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="rounded-lg border border-border/70 bg-card px-6 pt-6 pb-2">
