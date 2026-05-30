@@ -3,7 +3,7 @@
 import { UserButton } from '@clerk/nextjs';
 import { Sun, Moon, X } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -19,8 +19,10 @@ import { useTheme } from '@/components/theme-provider';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems, realtorNavItems } from '@/lib/nav-items';
+import type { NavChild, NavItem } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
+import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -86,6 +88,32 @@ interface HeaderProps {
   brokerageRole?: string | null;
 }
 
+/** Returns true if the pathname belongs to this item or any of its children.
+ *  Mirrors the desktop sidebar's helper so accordion auto-expansion is
+ *  computed the same way on both viewports. */
+function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean {
+  if (item.children?.length) {
+    const childOwns = item.children.some((child) => {
+      const childPath = child.href.split('?')[0];
+      const fullChildPath = `${base}${childPath}`;
+      return child.exact
+        ? pathname === fullChildPath
+        : pathname.startsWith(fullChildPath);
+    });
+    if (childOwns) return true;
+  }
+  return pathname.startsWith(`${base}${item.href}`);
+}
+
+/** Lightweight child-active match for the mobile drawer. Realtor children
+ *  today don't carry query params, so the desktop's query-string branch
+ *  isn't needed here. If that changes, swap this for the shared helper. */
+function isMobileChildActive(child: NavChild, pathname: string, base: string): boolean {
+  const fullHref = `${base}${child.href.split('?')[0]}`;
+  if (child.exact) return pathname === fullHref;
+  return pathname === fullHref || pathname.startsWith(`${fullHref}/`);
+}
+
 export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
@@ -95,6 +123,30 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
   const isOnChippi = pathname.startsWith(`${base}/chippi`);
+
+  // Accordion expansion state for the mobile drawer — same contract as the
+  // desktop sidebar: at most one parent open at a time, auto-expand the
+  // parent that owns the current route. Closing the drawer doesn't reset
+  // this; reopening reflects whatever route the realtor is on now.
+  const findActiveParentKey = (): string | null => {
+    for (const item of realtorNavItems) {
+      if (item.children?.length && doesItemOwnPath(item, pathname, base)) {
+        return item.href;
+      }
+    }
+    return null;
+  };
+  const [expandedKey, setExpandedKey] = useState<string | null>(findActiveParentKey);
+
+  useEffect(() => {
+    const next = findActiveParentKey();
+    if (next) setExpandedKey(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, base]);
+
+  const handleToggle = (key: string) => () =>
+    setExpandedKey((prev) => (prev === key ? null : key));
+  const closeDrawer = () => setOpen(false);
 
   return (
     <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
@@ -215,74 +267,29 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                   {/* Primary nav ALWAYS renders. The realtor must be able to
                       reach any destination from any route — the previous
                       drawer hid the nav entirely on /chippi, which left them
-                      stranded with only chat history. */}
-                  <div>
+                      stranded with only chat history.
+
+                      Uses the SAME SidebarNavItem the desktop sidebar
+                      renders, so accordion behaviour, chevron affordance,
+                      and motion params are identical across viewports.
+                      Default state: every parent COLLAPSED. The parent of
+                      the active route auto-expands; tapping a different
+                      parent's chevron closes the previous one (one open at
+                      a time). Tapping a link closes the drawer. */}
+                  <div className="space-y-0.5">
                     {realtorNavItems.map((item) => {
-                      const itemHref = `${base}${item.href}`;
-                      const isActive = item.exact
-                        ? pathname === itemHref
-                        : pathname.startsWith(itemHref);
+                      const hasChildren = !!item.children?.length;
                       return (
-                        <div key={item.href}>
-                          <Link
-                            href={itemHref}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-                              isActive
-                                ? 'bg-foreground/[0.045] text-foreground font-medium'
-                                : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-                            )}
-                          >
-                            {isActive && (
-                              <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
-                            )}
-                            {item.isAI ? (
-                              <img
-                                src="/chip-avatar.png"
-                                alt=""
-                                className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-                              />
-                            ) : (
-                              <item.icon
-                                size={15}
-                                strokeWidth={isActive ? 2.25 : 1.75}
-                                className={cn(
-                                  'flex-shrink-0',
-                                  isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-                                )}
-                              />
-                            )}
-                            {item.label}
-                          </Link>
-                          {/* Children render inline under their parent.
-                              No collapse — the drawer scrolls, and a
-                              flat tree means every destination is one
-                              tap away. */}
-                          {item.children && item.children.length > 0 && (
-                            <div className="ml-7 mt-0.5 mb-1 space-y-0.5">
-                              {item.children.map((child) => {
-                                const childHref = `${base}${child.href}`;
-                                const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
-                                return (
-                                  <Link
-                                    key={child.href}
-                                    href={childHref}
-                                    onClick={() => setOpen(false)}
-                                    className={cn(
-                                      'flex items-center h-8 px-3 rounded-md text-[12.5px] transition-colors duration-150',
-                                      childActive
-                                        ? 'text-foreground font-medium'
-                                        : 'text-foreground/55 hover:text-foreground',
-                                    )}
-                                  >
-                                    {child.label}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        <SidebarNavItem
+                          key={item.href}
+                          item={item}
+                          base={base}
+                          isActive={doesItemOwnPath(item, pathname, base)}
+                          isExpanded={hasChildren && expandedKey === item.href}
+                          isChildActive={(child) => isMobileChildActive(child, pathname, base)}
+                          onToggle={handleToggle(item.href)}
+                          onNavigate={closeDrawer}
+                        />
                       );
                     })}
                   </div>

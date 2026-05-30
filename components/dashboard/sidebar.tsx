@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import {
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
+import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
@@ -208,228 +209,6 @@ function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean
     if (childMatch) return true;
   }
   return pathname.startsWith(`${base}${item.href}`);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Collapsible children wrapper with smooth CSS height animation
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function CollapsibleChildren({
-  children,
-  isOpen,
-}: {
-  children: React.ReactNode;
-  isOpen: boolean;
-}) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | undefined>(isOpen ? undefined : 0);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    if (isOpen) {
-      const measured = el.scrollHeight;
-      setHeight(0);
-      setIsAnimating(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setHeight(measured);
-        });
-      });
-    } else {
-      const measured = el.scrollHeight;
-      setHeight(measured);
-      setIsAnimating(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setHeight(0);
-        });
-      });
-    }
-  }, [isOpen]);
-
-  const handleTransitionEnd = useCallback(() => {
-    setIsAnimating(false);
-    if (isOpen) {
-      setHeight(undefined); // Allow natural height after opening
-    }
-  }, [isOpen]);
-
-  return (
-    <div
-      ref={contentRef}
-      style={{ height: height !== undefined ? `${height}px` : 'auto' }}
-      className={cn(
-        'transition-[height] duration-200 ease-in-out',
-        !isOpen && !isAnimating && 'hidden',
-        isAnimating && 'overflow-hidden',
-      )}
-      onTransitionEnd={handleTransitionEnd}
-    >
-      {children}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Shopify-style nav item — parent with optional inline collapsible children
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function CollapsibleNavItem({
-  item,
-  base,
-  pathname,
-  searchParams,
-  isExpanded,
-  onToggle,
-  badge,
-  badgeText,
-  collapsed = false,
-}: {
-  item: NavItem;
-  base: string;
-  pathname: string;
-  searchParams?: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  badge?: React.ReactNode;
-  /** Plain-text version of the badge for the collapsed-mode tooltip. */
-  badgeText?: string;
-  collapsed?: boolean;
-}) {
-  const Icon = item.icon;
-  const hasChildren = item.children && item.children.length > 0;
-  const isParentActive = doesItemOwnPath(item, pathname, base);
-  const href = `${base}${item.href}`;
-
-  const handleClick = useCallback(() => {
-    // Parent row click should ALWAYS navigate to its own href. The previous
-    // behaviour `e.preventDefault(); onToggle();` left a lead stranded on a
-    // sub-page like /chippi/today with no obvious way back to /chippi — the
-    // sidebar's "Chippi" row only opened the dropdown.
-    //
-    // New behaviour: let the <Link> navigate as normal, and additionally
-    // ensure the dropdown is open so the lead can see where they are in
-    // the tree. If it was already open, leave it open (don't collapse on
-    // navigation — collapsing the section the user just navigated into is
-    // hostile).
-    if (hasChildren && !collapsed && !isExpanded) {
-      onToggle();
-    }
-  }, [hasChildren, collapsed, isExpanded, onToggle]);
-
-  // Dedicated chevron toggle so a lead who wants to expand/collapse the
-  // section without navigating still has that escape hatch. Stops the
-  // event from bubbling to the parent <Link>.
-  const handleChevronClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!hasChildren || collapsed) return;
-      e.preventDefault();
-      e.stopPropagation();
-      onToggle();
-    },
-    [hasChildren, collapsed, onToggle],
-  );
-
-  const tooltipLabel = badgeText ? `${item.label} · ${badgeText}` : item.label;
-
-  return (
-    <div>
-      {/* Parent row — same visual language as FlatNavItem so the realtor
-          sidebar (collapsible items with optional children) and the broker
-          sidebar (flat items) read as one design. AI items show the chip
-          avatar in place of an icon — that's the brand signature. */}
-      <CollapsedTooltip enabled={collapsed} label={tooltipLabel}>
-        <Link
-          href={href}
-          onClick={handleClick}
-          className={cn(
-            'group relative rounded-md text-[13px] transition-colors duration-150',
-            collapsed
-              ? 'flex items-center justify-center w-10 h-10 mx-auto'
-              : 'flex items-center gap-2.5 h-9 pl-3 pr-2.5',
-            isParentActive
-              ? 'bg-foreground/[0.045] text-foreground font-medium'
-              : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-          )}
-        >
-          {isParentActive && (
-            <span
-              aria-hidden
-              className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-            />
-          )}
-          {item.isAI ? (
-            <img
-              src="/chip-avatar.png"
-              alt=""
-              className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-            />
-          ) : (
-            <Icon
-              size={15}
-              strokeWidth={isParentActive ? 2.25 : 1.75}
-              className={cn(
-                'flex-shrink-0 transition-colors',
-                isParentActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-              )}
-            />
-          )}
-
-          {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-
-          {!collapsed && badge}
-
-          {!collapsed && hasChildren && (
-            <button
-              type="button"
-              onClick={handleChevronClick}
-              aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
-              aria-expanded={isExpanded}
-              className="flex-shrink-0 -mr-1.5 p-1 rounded hover:bg-foreground/[0.04] transition-colors"
-            >
-              <ChevronRight
-                size={11}
-                className={cn(
-                  'text-muted-foreground/40 transition-transform duration-150',
-                  isExpanded && 'rotate-90',
-                )}
-              />
-            </button>
-          )}
-        </Link>
-      </CollapsedTooltip>
-
-      {/* Children — indented, no icons, slightly smaller. Hairline guide.
-          Hidden in collapsed mode — there's no room to expand inline. */}
-      {hasChildren && !collapsed && (
-        <CollapsibleChildren isOpen={isExpanded}>
-          <div className="ml-[14px] pl-3 py-1 space-y-px border-l border-border/50">
-            {item.children!.map((child) => {
-              const childHref = `${base}${child.href}`;
-              const childActive = isChildActive(child, pathname, base, searchParams);
-              return (
-                <Link
-                  key={child.href}
-                  href={childHref}
-                  className={cn(
-                    'flex items-center h-7 px-2 rounded text-[12px] transition-colors duration-150',
-                    childActive
-                      ? 'text-foreground font-medium'
-                      : 'text-foreground/55 hover:text-foreground hover:bg-foreground/[0.025]',
-                  )}
-                >
-                  <span className="truncate">{child.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </CollapsibleChildren>
-      )}
-    </div>
-  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -858,32 +637,29 @@ function RealtorNav({
 }) {
   const { collapsed } = useSidebarCollapsed();
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
-  const isOnSettings = doesItemOwnPath(settingsItem, pathname, base);
-  const [settingsExpanded, setSettingsExpanded] = useState(isOnSettings);
 
-  // Expandable key for main items that have children (e.g. Intake form, Analytics)
-  const getInitialExpandedKey = () => {
+  // Accordion: at most one parent is expanded at a time. The parent that
+  // owns the active route auto-expands; if no parent owns it, everyone
+  // stays collapsed. Computed from pathname so route changes (incl. soft
+  // navigations) keep the open section in sync without a separate effect.
+  const findActiveParentKey = (): string | null => {
     for (const item of realtorNavItems) {
-      if (item.children && item.href !== '/settings' && doesItemOwnPath(item, pathname, base)) {
+      if (item.children?.length && doesItemOwnPath(item, pathname, base)) {
         return item.href;
       }
     }
     return null;
   };
-  const [expandedKey, setExpandedKey] = useState<string | null>(getInitialExpandedKey);
+  const [expandedKey, setExpandedKey] = useState<string | null>(findActiveParentKey);
 
   useEffect(() => {
-    if (isOnSettings) setSettingsExpanded(true);
-  }, [isOnSettings]);
-
-  // Auto-expand when navigating into a child route
-  useEffect(() => {
-    for (const item of realtorNavItems) {
-      if (item.children && item.href !== '/settings' && doesItemOwnPath(item, pathname, base)) {
-        setExpandedKey(item.href);
-        return;
-      }
-    }
+    const next = findActiveParentKey();
+    // Only auto-set if the route actually maps to a parent. If the user
+    // navigates to a leaf that lives outside any parent (e.g. /contacts),
+    // leave whatever they last opened alone — closing it on every nav
+    // would feel hostile.
+    if (next) setExpandedKey(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, base]);
 
   // AI-related items always sit at the top
@@ -936,17 +712,24 @@ function RealtorNav({
     return undefined;
   };
 
+  // Accordion handler: opening any parent closes the previously-open one.
+  // The shared SidebarNavItem fires onToggle when the user taps the chevron;
+  // we own the single source of expansion state here, so the contract is
+  // naturally "one open at a time" without per-item bookkeeping.
+  const handleToggle = (key: string) => () =>
+    setExpandedKey((prev) => (prev === key ? null : key));
+
   const renderItem = (item: NavItem) => {
     const hasChildren = !!(item.children && item.children.length > 0);
     return (
-      <CollapsibleNavItem
+      <SidebarNavItem
         key={item.href}
         item={item}
         base={base}
-        pathname={pathname}
-        searchParams={searchParamsString}
-        isExpanded={hasChildren ? expandedKey === item.href : false}
-        onToggle={hasChildren ? () => setExpandedKey((p) => (p === item.href ? null : item.href)) : () => {}}
+        isActive={doesItemOwnPath(item, pathname, base)}
+        isExpanded={hasChildren && expandedKey === item.href}
+        isChildActive={(child) => isChildActive(child, pathname, base, searchParamsString)}
+        onToggle={handleToggle(item.href)}
         badge={getBadge(item)}
         badgeText={getBadgeText(item)}
         collapsed={collapsed}
@@ -1031,15 +814,17 @@ function RealtorNav({
         </div>
       )}
 
-      {/* Settings — collapsible, pinned at bottom of scroll area */}
+      {/* Settings — pinned at bottom of scroll area. No children today; the
+          shared row handles the no-children case as a plain link with no
+          chevron, so this stays in lockstep with the rest of the nav. */}
       <div className="pt-1">
-        <CollapsibleNavItem
+        <SidebarNavItem
           item={settingsItem}
           base={base}
-          pathname={pathname}
-          searchParams={searchParamsString}
-          isExpanded={settingsExpanded}
-          onToggle={() => setSettingsExpanded((p) => !p)}
+          isActive={doesItemOwnPath(settingsItem, pathname, base)}
+          isExpanded={false}
+          isChildActive={(child) => isChildActive(child, pathname, base, searchParamsString)}
+          onToggle={handleToggle(settingsItem.href)}
           collapsed={collapsed}
         />
       </div>
