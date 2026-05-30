@@ -37,6 +37,11 @@ interface Props {
   /** When set, render this brief directly instead of fetching. Used for
    *  preview surfaces (settings page mock) and tests. */
   initialBrief?: Brief;
+  /** When true, suppress the auto-collapse → settled lifecycle. The
+   *  brief stays in the live state regardless of seenAt / actedAt. Used
+   *  by the dedicated /chippi/brief page where the realtor navigated
+   *  here intentionally — they want the full brief, not the receipt. */
+  alwaysLive?: boolean;
 }
 
 interface ApiResponse {
@@ -94,7 +99,7 @@ function formatBriefTime(iso: string): string {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-export function DailyBrief({ slug, initialBrief }: Props) {
+export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
   const [data, setData] = useState<ApiResponse | null>(
     initialBrief
       ? {
@@ -177,7 +182,7 @@ export function DailyBrief({ slug, initialBrief }: Props) {
   const lifecycle = useBriefLifecycle({
     status: data?.status ?? 'pending',
     seenAt: data?.seenAt ?? null,
-    forceExpanded,
+    forceExpanded: alwaysLive || forceExpanded,
     forceCollapsed: false,
   });
 
