@@ -56,6 +56,7 @@ const ACTION_LABEL: Record<SignalKind, string> = {
   review: 'REVIEW',
   sign: 'SIGN',
   celebrate: 'NOTED',
+  tip: 'TIP',
 };
 
 const VERB: Record<SignalKind, string> = {
@@ -65,6 +66,7 @@ const VERB: Record<SignalKind, string> = {
   review: 'Open',
   sign: 'Open',
   celebrate: 'Open',
+  tip: 'Open',
 };
 
 /** Loading status that swaps in at 1.2s — calmer than a spinner. */
@@ -301,17 +303,47 @@ function LiveBrief({
             )}
             {showIntro && <IntroLine slug={slug} />}
 
-            <ul className="mt-6 divide-y divide-border/60">
-              {brief.cards.map((card, idx) => (
-                <BriefCardRow
-                  key={`${card.subject.id}-${idx}`}
-                  slug={slug}
-                  card={card}
-                  cardIndex={idx}
-                  onAct={onAct}
-                />
-              ))}
-            </ul>
+            {/* Cards list — only renders when there are actual cards. When
+                cards is empty AND tip is the primary brief (headline =
+                tip.subject), the headline + subheadline above already
+                carry the tip's info; rendering it again as a card row
+                would duplicate. */}
+            {brief.cards.length > 0 && (
+              <ul className="mt-6 divide-y divide-border/60">
+                {brief.cards.map((card, idx) => (
+                  <BriefCardRow
+                    key={`${card.subject.id}-${idx}`}
+                    slug={slug}
+                    card={card}
+                    cardIndex={idx}
+                    onAct={onAct}
+                  />
+                ))}
+                {brief.tip && (
+                  <BriefCardRow
+                    key={`tip-${brief.tip.subject.id}`}
+                    slug={slug}
+                    card={brief.tip}
+                    cardIndex={brief.cards.length}
+                    onAct={onAct}
+                  />
+                )}
+              </ul>
+            )}
+            {/* Tip-as-primary action — when cards is empty but a tip
+                replaced the empty state, give the realtor the explicit
+                CTA to open the tip's subject. */}
+            {brief.cards.length === 0 && brief.tip && (
+              <div className="mt-6">
+                <Link
+                  href={deepLink(slug, brief.tip.subject.href)}
+                  onClick={() => onAct(0, brief.tip!.source, brief.tip!.kind)}
+                  className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
+                >
+                  Open
+                </Link>
+              </div>
+            )}
           </div>
 
           {(brief.momentum || brief.tomorrow) && (
