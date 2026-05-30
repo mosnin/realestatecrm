@@ -321,33 +321,13 @@ export function RoutinesManager() {
     );
   }
 
-  if (routines.length === 0 && !composerOpen) {
-    return (
-      <div className="space-y-3">
-        {actionError && <p className="text-sm text-destructive">{actionError}</p>}
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 py-12 text-center">
-          <p className="text-sm font-medium text-foreground">No routines yet.</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-            A routine is a standing instruction — a sentence and a time. Chippi
-            runs it for you on schedule and leaves the work as drafts to approve.
-          </p>
-          <button
-            type="button"
-            onClick={() => setComposerOpen(true)}
-            className={cn(PRIMARY_PILL, 'mt-5')}
-          >
-            <Plus size={14} />
-            Write your first routine
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
+      {/* The composer is an input surface — it stays a discrete card.
+          The list below is a reading surface — it converts to divide-y
+          rows. Different vocabularies for different jobs. */}
       {composerOpen ? (
         <div className="rounded-xl border border-border/60 bg-card p-4">
           <RoutineComposer
@@ -366,33 +346,41 @@ export function RoutinesManager() {
         </Button>
       )}
 
-      <div className="space-y-3">
-        {routines.map((routine) => (
-          <RoutineCard
-            key={routine.id}
-            routine={routine}
-            editing={editingId === routine.id}
-            busy={busyId === routine.id}
-            running={runningId === routine.id}
-            onEdit={() => {
-              setEditingId(routine.id);
-              setActionError('');
-            }}
-            onCancelEdit={() => setEditingId(null)}
-            onSave={(payload) => updateRoutine(routine.id, payload)}
-            onToggle={() => toggleRoutine(routine)}
-            onRunNow={() => runNow(routine.id)}
-            onDelete={() => deleteRoutine(routine.id)}
-          />
-        ))}
-      </div>
+      {routines.length === 0 && !composerOpen ? (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Nothing on a schedule yet. Set one up to give me a recurring beat.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border/60">
+          {routines.map((routine) => (
+            <RoutineRow
+              key={routine.id}
+              routine={routine}
+              editing={editingId === routine.id}
+              busy={busyId === routine.id}
+              running={runningId === routine.id}
+              onEdit={() => {
+                setEditingId(routine.id);
+                setActionError('');
+              }}
+              onCancelEdit={() => setEditingId(null)}
+              onSave={(payload) => updateRoutine(routine.id, payload)}
+              onToggle={() => toggleRoutine(routine)}
+              onRunNow={() => runNow(routine.id)}
+              onDelete={() => deleteRoutine(routine.id)}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
 // ── One routine ──────────────────────────────────────────────────────────────
 
-function RoutineCard({
+function RoutineRow({
   routine,
   editing,
   busy,
@@ -418,76 +406,75 @@ function RoutineCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (editing) {
+    // Editing flips this row back into a composer card — the same input
+    // chrome the realtor saw when they wrote it. The list rhythm picks
+    // up again above and below.
     return (
-      <div className="rounded-xl border border-border/60 bg-card p-4">
-        <RoutineComposer
-          initial={{
-            instruction: routine.instruction,
-            cadence: routine.cadence,
-            hour: routine.hour,
-            dayOfMonth: routine.dayOfMonth,
-            daysOfWeek: routine.daysOfWeek,
-          }}
-          onSave={onSave}
-          onCancel={onCancelEdit}
-          saving={busy}
-        />
-      </div>
+      <li className="py-3 first:pt-0">
+        <div className="rounded-xl border border-border/60 bg-card p-4">
+          <RoutineComposer
+            initial={{
+              instruction: routine.instruction,
+              cadence: routine.cadence,
+              hour: routine.hour,
+              dayOfMonth: routine.dayOfMonth,
+              daysOfWeek: routine.daysOfWeek,
+            }}
+            onSave={onSave}
+            onCancel={onCancelEdit}
+            saving={busy}
+          />
+        </div>
+      </li>
     );
   }
 
   const failed = routine.lastRunStatus === 'error';
   const lastRun = routine.lastRunAt
     ? `${failed ? 'Last run failed' : 'Ran'} ${formatRelative(routine.lastRunAt)}`
-    : 'Hasn’t run yet';
-  const nextRun =
-    new Date(routine.nextRunAt).getTime() <= Date.now()
-      ? 'Next run due now'
-      : `Next ${formatRelative(routine.nextRunAt)}`;
+    : null;
 
   return (
-    <div
+    <li
       className={cn(
-        'rounded-xl border border-border/60 bg-card p-4 transition-opacity',
+        'group/row flex items-start gap-3 py-3 first:pt-0 transition-opacity',
         !routine.enabled && 'opacity-60',
       )}
     >
-      <div className="flex items-start gap-3">
-        <p className="flex-1 text-sm leading-relaxed text-foreground">
-          {routine.instruction}
-        </p>
-        <Switch
-          checked={routine.enabled}
-          onCheckedChange={onToggle}
-          aria-label={routine.enabled ? 'Pause routine' : 'Resume routine'}
-        />
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <Repeat2 size={13} />
-          {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
-        </span>
-        <span aria-hidden>·</span>
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5',
-            failed && 'text-amber-600 dark:text-amber-500',
+      <div className="flex-1 min-w-0">
+        <p className="text-sm leading-snug text-foreground">{routine.instruction}</p>
+        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Repeat2 size={11} />
+            {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
+          </span>
+          {lastRun && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1',
+                  failed && 'text-amber-600 dark:text-amber-500',
+                )}
+              >
+                {failed && <AlertTriangle size={11} />}
+                {lastRun}
+              </span>
+            </>
           )}
-        >
-          {failed && <AlertTriangle size={12} />}
-          {lastRun}
-        </span>
-        <span aria-hidden>·</span>
-        <span>{routine.enabled ? nextRun : 'Paused'}</span>
+          {!routine.enabled && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>Paused</span>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-1 border-t border-border/60 pt-2.5">
+      <div className="flex items-center gap-1 flex-shrink-0">
         {confirmingDelete ? (
           <>
-            <span className="px-1 text-xs text-muted-foreground">
-              Delete this routine?
-            </span>
+            <span className="px-1 text-xs text-muted-foreground">Delete?</span>
             <button
               type="button"
               onClick={() => setConfirmingDelete(false)}
@@ -508,9 +495,17 @@ function RoutineCard({
           </>
         ) : (
           <>
-            <CardAction icon={Play} label="Run now" onClick={onRunNow} loading={running} disabled={busy} />
-            <CardAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || running} />
-            <CardAction
+            <Switch
+              checked={routine.enabled}
+              onCheckedChange={onToggle}
+              aria-label={routine.enabled ? 'Pause routine' : 'Resume routine'}
+            />
+            {/* Run / edit / delete fade in on hover — same vocabulary as
+                memory-list's delete button. Visible always on touch where
+                there is no hover state. */}
+            <RowAction icon={Play} label="Run now" onClick={onRunNow} loading={running} disabled={busy} />
+            <RowAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || running} />
+            <RowAction
               icon={Trash2}
               label="Delete"
               onClick={() => setConfirmingDelete(true)}
@@ -520,11 +515,11 @@ function RoutineCard({
           </>
         )}
       </div>
-    </div>
+    </li>
   );
 }
 
-function CardAction({
+function RowAction({
   icon: Icon,
   label,
   onClick,
@@ -539,20 +534,27 @@ function CardAction({
   loading?: boolean;
   destructive?: boolean;
 }) {
+  // Icon-only square button. Label lives in aria + title so screen readers
+  // and hovering pointers still get the verb. Color is invisible by
+  // default and fades in on row hover — same vocabulary as memory-list's
+  // delete affordance.
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
+      aria-label={label}
+      title={label}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50',
+        'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
+        'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+        'transition-colors disabled:opacity-50',
         destructive
-          ? 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-          : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+          ? 'hover:text-destructive hover:bg-destructive/10'
+          : 'hover:text-foreground hover:bg-foreground/[0.05]',
       )}
     >
       {loading ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
-      {label}
     </button>
   );
 }
