@@ -1,22 +1,21 @@
 /**
  * GET /api/cron/daily-briefing
  *
- * Once-daily tick. Scheduled at 7am UTC via vercel.json. Composes a Brief
- * for every active Space and UPSERTs into the Brief table keyed on
- * (spaceId, forDate). Idempotent — re-running the same UTC day overwrites
- * the existing row's payload with a fresh compose.
+ * Hourly tick (UTC). For each Space whose SpaceSetting matches the
+ * current local hour in its timezone, generates today's Brief and
+ * UPSERTs it. The `forDate` key is the SPACE'S local date — what the
+ * realtor sees on their phone, not the server's UTC date.
  *
- * Phase A scope:
- *   - Generates briefs for ALL spaces, UTC-naive. Per-realtor 7am-local is
- *     Phase B (needs a User.timezone column or Space-level pref).
- *   - Internal signal sources only (pipeline / leads / calendar). Phase B
- *     layers Gmail / Calendar-Google / Slack / HubSpot onto SOURCES with
- *     no change to this route.
- *   - No notification fan-out (email / SMS). Phase B opt-in.
+ * Why hourly: per-realtor 7am local. A 7am UTC daily cron would deliver
+ * to Pacific realtors at midnight. Each tick now scans every space and
+ * generates only for those whose briefHour matches the current local
+ * hour. Spaces with briefEnabled=false are skipped.
  *
  * Bounds:
- *   - MAX_PER_TICK = 1000 spaces; overflow gets caught next day.
+ *   - MAX_PER_TICK = 1000; overflow caught next tick (one hour later).
  *   - MAX_CONCURRENCY = 8 in-flight composes.
+ *   - IDEMPOTENT: re-running the same UTC hour overwrites the existing
+ *     row's payload with a fresh compose (same forDate, same UPSERT key).
  *
  * Auth: Bearer ${CRON_SECRET}. Disable: CRON_DAILY_BRIEFING_DISABLED=1.
  */
@@ -24,18 +23,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { composeBrief } from '@/lib/briefing/compose';
+import { shouldGenerateFor } from '@/lib/briefing/timing';
 
 export const runtime = 'nodejs';
 
 const MAX_PER_TICK = 1000;
 const MAX_CONCURRENCY = 8;
+const DEFAULT_TIMEZONE = 'America/New_York';
+const DEFAULT_BRIEF_HOUR = 7;
 
-interface SpaceRow {
-  id: string;
-}
-
-function todayUtcDate(): string {
-  return new Date().toISOString().slice(0, 10);
+interface CandidateRow {
+  spaceId: string;
+  timezone: string | null;
+  briefEnabled: boolean | null;
+  briefHour: number | null;
 }
 
 async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'failed'> {
@@ -79,37 +80,61 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = Date.now();
-  const forDate = todayUtcDate();
+  const at = new Date();
 
-  const { data: spaces, error } = await supabase
-    .from('Space')
-    .select('id')
+  // Read every space's brief settings in one query. SpaceSetting is the
+  // truth source — spaces without a settings row get the defaults.
+  const { data: settings, error } = await supabase
+    .from('SpaceSetting')
+    .select('spaceId, timezone, briefEnabled, briefHour')
+    .eq('briefEnabled', true)
     .limit(MAX_PER_TICK);
 
   if (error) {
-    console.error('[cron/daily-briefing] space lookup failed:', error.message);
-    return NextResponse.json({ error: 'Space lookup failed' }, { status: 500 });
+    console.error('[cron/daily-briefing] settings lookup failed:', error.message);
+    return NextResponse.json({ error: 'Settings lookup failed' }, { status: 500 });
   }
 
-  if (!spaces || spaces.length === 0) {
-    return NextResponse.json({ status: 'no-spaces', forDate, durationMs: Date.now() - startedAt });
+  if (!settings || settings.length === 0) {
+    return NextResponse.json({
+      status: 'no-candidates',
+      atIso: at.toISOString(),
+      durationMs: Date.now() - startedAt,
+    });
   }
 
-  // Bounded concurrency — a worker pool with promise.all over chunks. Each
-  // compose hits Supabase ~5 times; without bounds we'd hammer the pool.
-  const rows = spaces as SpaceRow[];
+  // Filter to the spaces whose local briefHour matches the current UTC
+  // tick. forDate is computed in the space's timezone so the realtor's
+  // brief is keyed on their local date.
+  const due: { spaceId: string; forDate: string }[] = [];
+  for (const row of settings as CandidateRow[]) {
+    const timezone = row.timezone ?? DEFAULT_TIMEZONE;
+    const briefHour = row.briefHour ?? DEFAULT_BRIEF_HOUR;
+    const forDate = shouldGenerateFor(at, timezone, briefHour);
+    if (forDate) due.push({ spaceId: row.spaceId, forDate });
+  }
+
+  if (due.length === 0) {
+    return NextResponse.json({
+      status: 'no-due',
+      atIso: at.toISOString(),
+      candidates: settings.length,
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
   const counts = { ok: 0, failed: 0 };
-
-  for (let i = 0; i < rows.length; i += MAX_CONCURRENCY) {
-    const chunk = rows.slice(i, i + MAX_CONCURRENCY);
-    const results = await Promise.all(chunk.map((row) => generateOne(row.id, forDate)));
+  for (let i = 0; i < due.length; i += MAX_CONCURRENCY) {
+    const chunk = due.slice(i, i + MAX_CONCURRENCY);
+    const results = await Promise.all(chunk.map((d) => generateOne(d.spaceId, d.forDate)));
     for (const r of results) counts[r] += 1;
   }
 
   return NextResponse.json({
     status: 'ok',
-    forDate,
-    total: rows.length,
+    atIso: at.toISOString(),
+    candidates: settings.length,
+    due: due.length,
     succeeded: counts.ok,
     failed: counts.failed,
     durationMs: Date.now() - startedAt,
