@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, PanelRight } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -34,12 +34,6 @@ import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -413,53 +407,150 @@ export function ChippiWorkspace({
   async function handleNewConversation() {
     const endpoint = isBroker ? '/api/ai/broker-conversations' : '/api/ai/conversations';
     const body = isBroker ? {} : { slug };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        toast.error("Couldn't start a new chat.", {
+          action: { label: 'Retry', onClick: () => void handleNewConversation() },
+        });
+        return;
+      }
       const conv = (await res.json()) as Conversation;
       setConversations((prev) => [conv, ...prev]);
       setDrawerOpen(false);
       startConversationTransition(() => {
         router.push(`${chippiBaseUrl}?conversationId=${conv.id}`, { scroll: false });
       });
+    } catch (err) {
+      console.error('[Chat] new conversation failed', err);
+      toast.error("Couldn't start a new chat.", {
+        action: { label: 'Retry', onClick: () => void handleNewConversation() },
+      });
     }
   }
 
+  // Pending hard-delete timers, keyed by conversation id. The DELETE doesn't
+  // fire until the toast window closes — Undo just clears the timer and puts
+  // the row back. Gmail's pattern: removal feels immediate, the destructive
+  // call is delayed enough that the realtor can walk it back without a
+  // confirm dialog gating every click. Norman's Designing for Error:
+  // reversibility beats interruption.
+  const DELETE_DELAY_MS = 5000;
+  const pendingDeleteTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    return () => {
+      // Fire any still-pending deletes on unmount so a row doesn't survive
+      // a page nav after the realtor walked away from the toast.
+      for (const [id, timer] of pendingDeleteTimersRef.current.entries()) {
+        clearTimeout(timer);
+        void fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+      }
+      pendingDeleteTimersRef.current.clear();
+    };
+  }, []);
+
   async function handleDeleteConversation(id: string) {
-    try {
-      // Broker conversations live under the same Conversation table — the
-      // existing /api/ai/conversations/[id] DELETE owns the row by id and
-      // auth-checks via Space ownership, which holds for broker rows too
-      // (they live on the broker_owner's space). Phase 1 reuses it; Phase
-      // 2 may revisit if cross-brokerage auth needs sharpening.
-      const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        console.error('[Chat] Failed to delete conversation:', res.status);
-        return;
-      }
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeConversationId === id) {
-        startConversationTransition(() => {
-          router.push(chippiBaseUrl, { scroll: false });
-        });
-      }
-    } catch (err) {
-      console.error('[Chat] Error deleting conversation:', err);
+    // Snapshot for restore on undo. Capture both the row and the active-
+    // conversation flag — the latter drives whether undo also needs to
+    // navigate back into the transcript.
+    const prevConv = conversations.find((c) => c.id === id);
+    if (!prevConv) return;
+    const wasActive = activeConversationId === id;
+    const prevIndex = conversations.findIndex((c) => c.id === id);
+
+    // Optimistic: remove from the sidebar immediately so the realtor sees
+    // the action took. Navigate away from the transcript if it was active.
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (wasActive) {
+      startConversationTransition(() => {
+        router.push(chippiBaseUrl, { scroll: false });
+      });
     }
+
+    // Broker conversations live under the same Conversation table — the
+    // existing /api/ai/conversations/[id] DELETE owns the row by id and
+    // auth-checks via Space ownership, which holds for broker rows too
+    // (they live on the broker_owner's space). Phase 1 reuses it; Phase
+    // 2 may revisit if cross-brokerage auth needs sharpening.
+    const timer = setTimeout(async () => {
+      pendingDeleteTimersRef.current.delete(id);
+      try {
+        const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          // Server rejected the delete — put the row back and tell the
+          // realtor. They've already moved on by now, so the toast carries
+          // the burden of explaining what slipped.
+          setConversations((prev) => {
+            if (prev.some((c) => c.id === id)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(prevIndex, next.length), 0, prevConv);
+            return next;
+          });
+          toast.error("Couldn't delete that conversation. Try again.");
+        }
+      } catch (err) {
+        console.error('[Chat] delete conversation failed', err);
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === id)) return prev;
+          const next = [...prev];
+          next.splice(Math.min(prevIndex, next.length), 0, prevConv);
+          return next;
+        });
+        toast.error("Couldn't delete that conversation. Try again.");
+      }
+    }, DELETE_DELAY_MS);
+    pendingDeleteTimersRef.current.set(id, timer);
+
+    toast.success('Conversation deleted.', {
+      duration: DELETE_DELAY_MS,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          const pending = pendingDeleteTimersRef.current.get(id);
+          if (pending) {
+            clearTimeout(pending);
+            pendingDeleteTimersRef.current.delete(id);
+          }
+          setConversations((prev) => {
+            if (prev.some((c) => c.id === id)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(prevIndex, next.length), 0, prevConv);
+            return next;
+          });
+          if (wasActive) {
+            startConversationTransition(() => {
+              router.push(`${chippiBaseUrl}?conversationId=${id}`, { scroll: false });
+            });
+          }
+        },
+      },
+    });
   }
 
   async function handleRenameConversation(id: string, title: string) {
-    const res = await fetch(`/api/ai/conversations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/ai/conversations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) {
+        toast.error("Couldn't rename that. Try again.", {
+          action: { label: 'Retry', onClick: () => void handleRenameConversation(id, title) },
+        });
+        return;
+      }
       const updated = (await res.json()) as Conversation;
       setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    } catch (err) {
+      console.error('[Chat] rename conversation failed', err);
+      toast.error("Couldn't rename that. Try again.", {
+        action: { label: 'Retry', onClick: () => void handleRenameConversation(id, title) },
+      });
     }
   }
 
@@ -501,6 +592,12 @@ export function ChippiWorkspace({
         }
       } catch (err) {
         console.error('[Chat] Mention search failed:', err);
+        // Deduplicated by id so a fast typist offline doesn't get a wall
+        // of stacked toasts. Sonner replaces the prior toast with the same
+        // id; once a search succeeds again the realtor just dismisses it.
+        toast.error("Couldn't search contacts or deals.", {
+          id: 'mention-search-error',
+        });
       }
       return results;
     },
@@ -866,65 +963,20 @@ export function ChippiWorkspace({
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
-      {/* Floating control cluster — top-right, no top bar chrome */}
+      {/* Floating control cluster — top-right, no top bar chrome.
+          Four affordances + one menu trigger. The composer below is the
+          focal element on this surface; this row stays a small calm
+          shelf instead of competing with it. Voice, Run now, memory, and
+          settings live inside the More menu — primary chat actions (new
+          chat, history, approvals, split) earn the visible row.
+          Pre-fix this cluster carried eight competing icons plus a
+          message-limit counter; the DOET audit (PR #101) called it a
+          score-2 Discoverability failure. */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
         <ApprovalsPill />
-        {/* Prominent split-view affordance — discoverable icon+label sibling
-            to the icon-only `SplitPanelToggle` further down the cluster. The
-            small toggle was invisible on busy screens; this one carries text
-            so a first-time realtor sees they can chat alongside a deal/contact.
-            Hidden once `isSplit === true` (they're already in split) and on
-            mobile (split panel is md-and-up only).
-            Broker variant: the right-panel surfaces (RightPanel tabs for
-            contacts/deals/etc.) are realtor-scoped — split view is
-            disabled on broker for Phase 1. */}
-        {!isSplit && !isBroker && (
-          <div className="hidden md:flex mr-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={toggleSplit}
-                    aria-label="Open Chippi beside this page"
-                    className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                  >
-                    <PanelRight size={13} />
-                    <span>Open beside</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Open Chippi beside this page so you can chat without leaving.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
-        {messages.length >= MESSAGE_LIMIT * 0.8 && (
-          <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
-            {messages.length}/{MESSAGE_LIMIT}
-          </span>
-        )}
-        {/* Run now is a realtor-only autonomous trigger — Phase 1 broker
-            variant has no autonomous run path. Phase 4 may introduce a
-            brokerage-wide sweep with its own affordance. */}
-        {isEmpty && !isBroker && (
-          <button
-            type="button"
-            onClick={() => void handleRunNow()}
-            disabled={running}
-            className="inline-flex items-center gap-1.5 mr-1 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
-            title="Run Chippi now"
-          >
-            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            <span className="hidden sm:inline">Run now</span>
-          </button>
-        )}
         {/* New chat — the discoverable affordance. Sits left of History so
             the pair reads as "new ↔ old" — the same convention iMessage
-            and the major chat apps use. Pre-rebuild this only existed as
-            an opaque link inside the sidebar's conversation list, which
-            wasn't even rendering due to the More-nav conditional. */}
+            and the major chat apps use. */}
         <button
           type="button"
           onClick={() => void handleNewConversation()}
@@ -943,68 +995,61 @@ export function ChippiWorkspace({
         >
           <History size={15} />
         </button>
-        {/* Voice mode uses /api/ai/realtime-session which is space-scoped
-            (realtor-only). Phase 1 broker variant has no broker-side voice
-            session — disabled here. */}
+        {/* More menu — folds Voice, Run now, memory, and settings. Voice
+            and Run now are realtor-only (Phase 1 broker has no autonomous
+            run path and no broker-side voice session — the realtime API
+            is space-scoped). On the broker variant the menu still
+            renders so realtors who jump between brokerage and solo see a
+            consistent shelf; it just narrows to nothing actionable, so
+            we hide the trigger entirely when empty. */}
         {!isBroker && (
-          <button
-            type="button"
-            onClick={() => setVoiceOpen((v) => !v)}
-            className={cn(
-              'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
-              voiceOpen
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
-            )}
-            title="Voice mode"
-            aria-label="Toggle voice mode"
-          >
-            <Mic size={15} />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+                title="More"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={15} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {isEmpty && (
+                <DropdownMenuItem
+                  onSelect={() => void handleRunNow()}
+                  disabled={running}
+                  className="cursor-pointer"
+                >
+                  {running ? (
+                    <Loader2 size={14} className="mr-2 animate-spin" />
+                  ) : (
+                    <Play size={14} className="mr-2" />
+                  )}
+                  Run now
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => setVoiceOpen((v) => !v)} className="cursor-pointer">
+                <Mic size={14} className="mr-2" />
+                Voice mode
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
+                  <NotebookText size={14} className="mr-2" />
+                  What I remember
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
+                  <Settings size={14} className="mr-2" />
+                  Chippi settings
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-        {/* Secondary actions fold under a single overflow menu so the
-            cluster stays a small row of primary affordances — approvals,
-            run-now, history, voice — instead of seven competing icons. */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="More"
-              aria-label="More options"
-            >
-              <MoreHorizontal size={15} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onSelect={() => void handleNewConversation()} className="cursor-pointer">
-              <SquarePen size={14} className="mr-2" />
-              New chat
-            </DropdownMenuItem>
-            {/* Memory + per-Chippi settings are realtor-only in Phase 1.
-                The broker variant has no /s/<slug>/settings to link to
-                (broker settings live at /broker/settings) and Phase 4 will
-                introduce the broker-side equivalents. */}
-            {!isBroker && (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
-                    <NotebookText size={14} className="mr-2" />
-                    What I remember
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
-                    <Settings size={14} className="mr-2" />
-                    Chippi settings
-                  </Link>
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {/* Split panel disabled on broker variant — see comment on the
-            "Open beside" affordance above. */}
+        {/* Split panel disabled on broker variant — RightPanel tabs
+            (contacts/deals/etc.) are realtor-scoped in Phase 1. */}
         {!isBroker && <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />}
       </div>
 
