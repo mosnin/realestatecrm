@@ -23,6 +23,7 @@ import {
 import { activeToolkits } from '@/lib/integrations/connections';
 import { composioConfigured, executeToolForEntity } from '@/lib/integrations/composio';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -141,6 +142,22 @@ export async function POST(req: NextRequest) {
           arguments: p.args,
         });
         if (resp.successful) {
+          // Log a CalendarEventMirror row when Chippi fires a calendar
+          // create through Composio. The realtor's calendar is the
+          // source of truth; this row is forensics — if they swap
+          // providers later we still know what we put there.
+          if (
+            p.tool === 'GOOGLECALENDAR_CREATE_EVENT' &&
+            (p.integrationToolkit === 'googlecalendar' ||
+              p.integrationToolkit === 'outlook_calendar')
+          ) {
+            await logCalendarMirrorBestEffort({
+              spaceId: space.id,
+              provider: p.integrationToolkit,
+              args: p.args,
+              resp,
+            });
+          }
           const verb = doneVerbForToolkit(p.integrationToolkit) ?? 'done';
           results.push({
             tool: p.tool,
@@ -181,4 +198,64 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ results });
+}
+
+/**
+ * Best-effort write of the mirror row for a successful Composio
+ * GOOGLECALENDAR_CREATE_EVENT call. Pulls what we can out of the args
+ * (which the realtor approved) + the response (which gives us the
+ * Google event id). Never throws — the realtor's calendar already has
+ * the event; the mirror is forensics only.
+ */
+async function logCalendarMirrorBestEffort(args: {
+  spaceId: string;
+  provider: 'googlecalendar' | 'outlook_calendar';
+  args: Record<string, unknown>;
+  resp: { data?: unknown };
+}): Promise<void> {
+  try {
+    // Composio's arg shape is the same one the model proposed; pull the
+    // canonical fields we wrote on the way out.
+    const a = args.args;
+    const title = typeof a.summary === 'string' ? a.summary : '(Untitled event)';
+    const startsAt =
+      typeof a.start_datetime === 'string'
+        ? a.start_datetime
+        : typeof a.startDateTime === 'string'
+          ? a.startDateTime
+          : null;
+    const endsAt =
+      typeof a.end_datetime === 'string'
+        ? a.end_datetime
+        : typeof a.endDateTime === 'string'
+          ? a.endDateTime
+          : null;
+    if (!startsAt || !endsAt) return;
+
+    const attendeesRaw = Array.isArray(a.attendees) ? a.attendees : [];
+    const attendees = attendeesRaw
+      .map((x) => x as { email?: string; displayName?: string; name?: string })
+      .filter((x) => typeof x.email === 'string' && x.email)
+      .map((x) => ({ email: x.email as string, name: x.displayName ?? x.name ?? null }));
+
+    const data = (args.resp.data as { id?: string; eventId?: string } | undefined) ?? undefined;
+    const externalEventId = data?.id ?? data?.eventId ?? null;
+
+    await supabase.from('CalendarEventMirror').insert({
+      spaceId: args.spaceId,
+      externalProvider: args.provider,
+      externalEventId,
+      title,
+      start: startsAt,
+      end: endsAt,
+      attendees,
+      createdBy: 'agent',
+    });
+  } catch (err) {
+    logger.warn(
+      '[chippi/post-tour/execute] mirror insert failed',
+      { spaceId: args.spaceId },
+      err,
+    );
+  }
 }

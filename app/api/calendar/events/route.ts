@@ -1,94 +1,208 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
-import { requireAuth } from '@/lib/api-auth';
-import { getSpaceForUser } from '@/lib/space';
-import { checkRateLimit } from '@/lib/rate-limit';
+/**
+ * GET /api/calendar/events?slug=xxx
+ *
+ * Returns the next 30 days of events from the realtor's connected
+ * external calendar (Google Calendar via Composio). On-demand fetch —
+ * no background sync, no webhook receiver, no cache layer beyond a
+ * thin 60s memoization to absorb the page's own re-renders.
+ *
+ * The Chippi calendar surface is a thin read view; the realtor's
+ * external calendar is the truth. If nothing's connected we return
+ * `{ connected: false }` so the UI renders the connect prompt without
+ * a separate roundtrip.
+ *
+ * Why not POST/DELETE on this route: the old chippi-owned events
+ * surface had CRUD here. That surface is deleted. Events are now
+ * created via tour booking (write-through to Composio) or directly in
+ * the realtor's calendar — Chippi doesn't have its own "add event"
+ * verb anymore.
+ */
 
-// GET /api/calendar/events?slug=xxx&month=YYYY-MM — list events for a space/month
+import { NextRequest, NextResponse } from 'next/server';
+import { requireSpaceOwner } from '@/lib/api-auth';
+import { logger } from '@/lib/logger';
+import { executeToolForEntity } from '@/lib/integrations/composio';
+import {
+  PROVIDER_TOOL_SLUGS,
+  findCalendarConnection,
+} from '@/lib/calendar/mirror';
+
+export const runtime = 'nodejs';
+// 30s is generous — the Composio call is typically <1s, but Google's
+// cold path on a primary calendar with many events can stretch.
+export const maxDuration = 30;
+
+const LOOKAHEAD_DAYS = 30;
+
+/** In-process memo. 60s TTL absorbs a realtor flipping between days
+ *  in the UI without hammering Composio. Keyed by spaceId so multi-
+ *  tenant calls don't cross-pollinate. The serverless cold-start
+ *  ratio means this is mostly a hot-loop guard, not a long-term cache. */
+interface CacheEntry {
+  expiresAt: number;
+  payload: ConnectedPayload;
+}
+const memo = new Map<string, CacheEntry>();
+const MEMO_TTL_MS = 60_000;
+
+interface CalendarEventOut {
+  id: string;
+  title: string;
+  description: string | null;
+  start: string;
+  end: string;
+  allDay: boolean;
+  htmlLink: string | null;
+  attendees: { email: string; name: string | null; responseStatus: string | null }[];
+}
+
+interface NotConnectedPayload {
+  connected: false;
+}
+
+interface ConnectedPayload {
+  connected: true;
+  provider: string;
+  events: CalendarEventOut[];
+}
+
+type Payload = NotConnectedPayload | ConnectedPayload;
+
+interface GcalEventAttendee {
+  email?: string | null;
+  displayName?: string | null;
+  responseStatus?: string | null;
+  self?: boolean | null;
+}
+
+interface GcalEvent {
+  id?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  htmlLink?: string | null;
+  start?: { dateTime?: string | null; date?: string | null } | null;
+  end?: { dateTime?: string | null; date?: string | null } | null;
+  attendees?: GcalEventAttendee[] | null;
+}
+
+function normalizeGcalEvent(raw: GcalEvent): CalendarEventOut | null {
+  const id = raw.id ?? '';
+  if (!id) return null;
+  // Google sends `dateTime` for timed events, `date` for all-day events.
+  // We pass both shapes through — the UI renders all-day differently.
+  const startIso = raw.start?.dateTime ?? raw.start?.date ?? null;
+  const endIso = raw.end?.dateTime ?? raw.end?.date ?? null;
+  if (!startIso || !endIso) return null;
+  const allDay = Boolean(raw.start?.date && !raw.start?.dateTime);
+  return {
+    id,
+    title: (raw.summary ?? '').trim() || '(No title)',
+    description: raw.description?.trim() || null,
+    start: startIso,
+    end: endIso,
+    allDay,
+    htmlLink: raw.htmlLink?.trim() || null,
+    attendees: (raw.attendees ?? [])
+      .filter((a): a is GcalEventAttendee => Boolean(a))
+      .map((a) => ({
+        email: (a.email ?? '').trim(),
+        name: a.displayName?.trim() || null,
+        responseStatus: a.responseStatus?.trim() || null,
+      }))
+      .filter((a) => a.email),
+  };
+}
+
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
-  const month = req.nextUrl.searchParams.get('month');
-
-  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+  if (!slug) {
+    return NextResponse.json({ error: 'slug required' }, { status: 400 });
+  }
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  let query = supabase
-    .from('CalendarEvent')
-    .select('id, title, description, date, time, color, createdAt')
-    .eq('spaceId', space.id)
-    .order('date', { ascending: true });
-
-  if (month && /^\d{4}-\d{2}$/.test(month)) {
-    const [y, m] = month.split('-').map(Number);
-    const start = `${y}-${String(m).padStart(2, '0')}-01`;
-    const end = new Date(y, m, 0);
-    const endStr = `${y}-${String(m).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
-    query = query.gte('date', start).lte('date', endStr);
+  // Connection presence is the data signal — IntegrationConnection row
+  // with toolkit in (googlecalendar, outlook_calendar) and status =
+  // 'active'. No row → render the connect prompt.
+  const connection = await findCalendarConnection(space.id);
+  if (!connection) {
+    const payload: Payload = { connected: false };
+    return NextResponse.json(payload);
   }
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: 'Failed to load events' }, { status: 500 });
-  return NextResponse.json(data ?? []);
-}
-
-// POST /api/calendar/events — create a new event
-export async function POST(req: NextRequest) {
-  const { slug, title, date, time, description, color } = await req.json();
-  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
-  if (!title || !date) return NextResponse.json({ error: 'title and date required' }, { status: 400 });
-
-  const auth = await requireSpaceOwner(slug);
-  if (auth instanceof NextResponse) return auth;
-  const { space } = auth;
-
-  // Rate limit: 60 events per hour per space
-  const { allowed } = await checkRateLimit(`calendar-events:${space.id}`, 60, 3600);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Too many events created. Try again later.' }, { status: 429 });
+  // Hot-path cache. Independent of connection identity — a reconnect
+  // (which mints a new connection id) bypasses the memo on the next
+  // request because the cached payload no longer satisfies "events for
+  // THIS active connection"; we just keep it simple and key by space.
+  const cached = memo.get(space.id);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.payload);
   }
 
-  const VALID_COLORS = ['gray', 'orange', 'blue', 'purple', 'green', 'red'];
-  const safeColor = VALID_COLORS.includes(String(color)) ? String(color) : 'gray';
+  const now = new Date();
+  const timeMax = new Date(now.getTime() + LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000);
+  const slugs = PROVIDER_TOOL_SLUGS[connection.toolkit];
 
-  const { data, error } = await supabase
-    .from('CalendarEvent')
-    .insert({
-      spaceId: space.id,
-      title: String(title).slice(0, 200),
-      date: String(date),
-      time: time ? String(time).slice(0, 10) : null,
-      description: description ? String(description).slice(0, 2000) : null,
-      color: safeColor,
-    })
-    .select()
-    .single();
+  let events: CalendarEventOut[] = [];
+  try {
+    const resp = await executeToolForEntity({
+      entityId: connection.userId,
+      slug: slugs.list,
+      arguments: {
+        timeMin: now.toISOString(),
+        timeMax: timeMax.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 250,
+      },
+    });
+    if (resp.successful) {
+      // Composio wraps Google's response; events can land at
+      // resp.data.items, resp.data.events, or resp.items depending on
+      // SDK version. Try in that order; bail to empty.
+      const data = resp.data as
+        | { items?: unknown; events?: unknown }
+        | undefined;
+      const rawItems =
+        (data && Array.isArray((data as { items?: unknown }).items)
+          ? ((data as { items?: unknown }).items as unknown[])
+          : null) ??
+        (data && Array.isArray((data as { events?: unknown }).events)
+          ? ((data as { events?: unknown }).events as unknown[])
+          : null) ??
+        ((resp as unknown as { items?: unknown }).items &&
+        Array.isArray((resp as unknown as { items?: unknown }).items)
+          ? ((resp as unknown as { items?: unknown }).items as unknown[])
+          : null) ??
+        [];
+      for (const raw of rawItems) {
+        const normalized = normalizeGcalEvent(raw as GcalEvent);
+        if (normalized) events.push(normalized);
+      }
+    } else {
+      logger.warn(
+        '[api/calendar/events] composio returned !successful',
+        { spaceId: space.id, provider: connection.toolkit, err: resp.error ?? null },
+      );
+    }
+  } catch (err) {
+    logger.error(
+      '[api/calendar/events] composio call threw',
+      { spaceId: space.id, provider: connection.toolkit },
+      err,
+    );
+    // Don't 500 — the realtor sees an empty list with the calm empty
+    // state. Composio's flakiness shouldn't break the calendar page.
+    events = [];
+  }
 
-  if (error) return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
-}
-
-// DELETE /api/calendar/events?id=xxx — delete an event
-export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
-  const { userId } = authResult;
-
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  const { error } = await supabase
-    .from('CalendarEvent')
-    .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
-
-  if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
-  return NextResponse.json({ success: true });
+  const payload: ConnectedPayload = {
+    connected: true,
+    provider: connection.toolkit,
+    events,
+  };
+  memo.set(space.id, { expiresAt: Date.now() + MEMO_TTL_MS, payload });
+  return NextResponse.json(payload);
 }

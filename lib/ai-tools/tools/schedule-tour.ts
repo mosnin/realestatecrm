@@ -1,12 +1,19 @@
 /**
- * `schedule_tour` — create a Tour row.
+ * `schedule_tour` — create a Tour row + mirror to the realtor's external
+ * calendar.
  *
- * Approval-gated: the tour lands on the realtor's calendar, and a
- * misclicked time/address is annoying to unwind. The user sees the
- * full prompt (guest, property, start/end) before we commit.
+ * Approval-gated: the tour lands on the realtor's actual calendar (Google,
+ * Outlook), and a misclicked time/address is annoying to unwind. The user
+ * sees the full prompt (guest, property, start/end) before we commit.
  *
- * Mirrors POST /api/tours. Google Calendar syncing happens server-side
- * on a separate cron job — we don't duplicate it here.
+ * Write order after approval:
+ *   1. Insert Tour row (idempotent booking primitive — manage tokens,
+ *      conflict checks, source attribution).
+ *   2. Write through to the connected external calendar via Composio
+ *      (`GOOGLECALENDAR_CREATE_EVENT`) AND log a CalendarEventMirror
+ *      row. The mirror row is the backup; the external calendar is the
+ *      source of truth. If the external write fails, the mirror row
+ *      still lands so we don't lose the intent.
  *
  * Either `contactId` (preferred, links to a saved Contact) or
  * `guestName` + `guestEmail` (off-platform guest) is required. The
@@ -19,6 +26,10 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import {
+  findCalendarConnection,
+  writeEventThrough,
+} from '@/lib/calendar/mirror';
 
 const parameters = z
   .object({
@@ -166,6 +177,43 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
           activityErr,
         );
       }
+    }
+
+    // Write through to the realtor's connected external calendar AND log
+    // a CalendarEventMirror row. Best-effort: the Tour row is committed
+    // either way. No connection → skip cleanly (the realtor sees the
+    // tour in their CRM; the calendar prompt teaches them to connect).
+    try {
+      const connection = await findCalendarConnection(ctx.space.id);
+      if (connection) {
+        const description = [
+          args.propertyAddress ? `Property: ${args.propertyAddress}` : null,
+          guestEmail ? `Guest: ${guestName} <${guestEmail}>` : null,
+          guestPhone ? `Phone: ${guestPhone}` : null,
+          args.notes ? `Notes: ${args.notes}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        await writeEventThrough({
+          spaceId: ctx.space.id,
+          connection,
+          title: `Tour: ${guestName || 'Guest'}`,
+          description: description || null,
+          startsAt: inserted.startsAt,
+          endsAt: inserted.endsAt,
+          attendees: guestEmail
+            ? [{ email: guestEmail, name: guestName || null }]
+            : [],
+          sourceTourId: tourId,
+          createdBy: 'agent',
+        });
+      }
+    } catch (err) {
+      logger.warn(
+        '[tools.schedule_tour] calendar through-write failed',
+        { tourId, spaceId: ctx.space.id },
+        err,
+      );
     }
 
     const prettyTime = new Date(inserted.startsAt).toLocaleString('en-US', {
