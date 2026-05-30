@@ -25,13 +25,16 @@ import {
 import { pipelineSource } from './signal-sources/pipeline';
 import { leadsSource } from './signal-sources/leads';
 import { calendarSource } from './signal-sources/calendar';
+import { draftsSource } from './signal-sources/drafts';
 
 /**
- * The active source list. Phase A: three internal sources. Phase B adds
- * external sources (Gmail, Calendar-Google, Slack, HubSpot) by pushing
- * onto this array — the composer needs no change.
+ * The active source list. Phase A shipped three internal Chippi-DB
+ * sources. Phase B layers more on — `drafts` (this PR) surfaces the
+ * autonomous agent's pending AgentDraft rows; Gmail / Calendar-Google /
+ * Slack / HubSpot follow as separate sources. The composer needs no
+ * change as the list grows.
  */
-const SOURCES: SignalGatherer[] = [pipelineSource, leadsSource, calendarSource];
+const SOURCES: SignalGatherer[] = [pipelineSource, leadsSource, calendarSource, draftsSource];
 
 /**
  * Rank rule: ascending urgency (1 = today, 3 = soon), then descending

@@ -85,6 +85,31 @@ describe('briefing — the composer locks the design rules', () => {
     it('returns an empty array when given no signals', () => {
       expect(selectCards([])).toEqual([]);
     });
+
+    it('a high-confidence drafts signal outranks a same-urgency pipeline signal', () => {
+      // The drafts source emits 0.95 for "high-priority draft for a hot lead";
+      // the pipeline source emits 0.72 for "at-risk, just slow". When both
+      // are urgency-1, the draft (concrete action ready) should win the slot.
+      const stuckDeal = signal({
+        source: 'pipeline',
+        kind: 'review',
+        urgency: 1,
+        confidence: 0.72,
+        subject: { id: 'deal-a', name: 'Maple deal', href: '/deals/a' },
+        evidence: '16 days in this stage',
+      });
+      const draftReady = signal({
+        source: 'drafts',
+        kind: 'reply',
+        urgency: 1,
+        confidence: 0.95,
+        subject: { id: 'sarah', name: 'Sarah Chen', href: '/contacts/sarah' },
+        evidence: 'Chippi drafted an email. Approve or edit.',
+      });
+      const cards = selectCards(rankSignals([stuckDeal, draftReady]));
+      expect(cards[0].subject.id).toBe('sarah');
+      expect(cards[0].source).toBe('drafts');
+    });
   });
 
   describe('headline composition', () => {

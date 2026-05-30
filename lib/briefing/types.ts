@@ -44,6 +44,7 @@ export type SignalSource =
   | 'pipeline'         // Chippi DB — Deal table, dealHealth signals
   | 'leads'            // Chippi DB — Contact table, leadScore + follow-ups
   | 'calendar'         // Chippi DB — Tour table
+  | 'drafts'           // Chippi DB — AgentDraft table (any origin)
   | 'gmail'            // Phase B — Composio Gmail trigger feed
   | 'calendar_google'  // Phase B — Composio Google Calendar
   | 'slack'            // Phase B — Composio Slack
