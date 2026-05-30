@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, TITLE_FONT, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
-import type { Brief, BriefCard, SignalKind } from '@/lib/briefing/types';
+import type { Brief, BriefCard, SignalKind, SignalSource } from '@/lib/briefing/types';
 import {
   useBriefLifecycle,
   formatProgress,
@@ -167,11 +167,20 @@ export function DailyBrief({ slug, initialBrief }: Props) {
     forceCollapsed: false,
   });
 
-  function recordActed() {
+  function recordActed(cardIndex: number, source: SignalSource, kind: SignalKind): void;
+  function recordActed(): void;
+  function recordActed(cardIndex?: number, source?: SignalSource, kind?: SignalKind) {
+    // Body shape depends on whether this came from a card tap (B5
+    // telemetry) or from the empty-state "Tell Chippi" button (which
+    // has no card identity).
+    const body =
+      typeof cardIndex === 'number' && source && kind
+        ? { event: 'acted' as const, cardIndex, source, kind }
+        : { event: 'acted' as const };
     void fetch('/api/agent/briefing', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'acted' }),
+      body: JSON.stringify(body),
     }).catch(() => {});
     // Optimistically flip status — the lifecycle hook collapses on next tick.
     setData((prev) =>
@@ -234,7 +243,7 @@ function LiveBrief({
   data: ApiResponse;
   slug: string;
   showYesterday: boolean;
-  onAct: () => void;
+  onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
   onToggleYesterday: () => void;
 }) {
   const { brief, createdAt, showIntro } = data;
@@ -264,7 +273,7 @@ function LiveBrief({
             <div className="mt-6">
               <Link
                 href={`/s/${slug}/chippi`}
-                onClick={onAct}
+                onClick={() => onAct()}
                 className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
               >
                 Tell Chippi
@@ -294,7 +303,13 @@ function LiveBrief({
 
             <ul className="mt-6 divide-y divide-border/60">
               {brief.cards.map((card, idx) => (
-                <BriefCardRow key={`${card.subject.id}-${idx}`} slug={slug} card={card} onAct={onAct} />
+                <BriefCardRow
+                  key={`${card.subject.id}-${idx}`}
+                  slug={slug}
+                  card={card}
+                  cardIndex={idx}
+                  onAct={onAct}
+                />
               ))}
             </ul>
           </div>
@@ -336,11 +351,13 @@ function IntroLine({ slug }: { slug: string }) {
 function BriefCardRow({
   slug,
   card,
+  cardIndex,
   onAct,
 }: {
   slug: string;
   card: BriefCard;
-  onAct: () => void;
+  cardIndex: number;
+  onAct: (cardIndex: number, source: SignalSource, kind: SignalKind) => void;
 }) {
   const tag = ACTION_LABEL[card.kind];
   const verb = VERB[card.kind];
@@ -359,7 +376,7 @@ function BriefCardRow({
       <div className="flex justify-end sm:contents">
         <Link
           href={href}
-          onClick={onAct}
+          onClick={() => onAct(cardIndex, card.source, card.kind)}
           className={cn(GHOST_PILL, 'shrink-0 min-h-[44px] sm:min-h-0')}
         >
           {verb}

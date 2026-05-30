@@ -97,6 +97,34 @@ export interface BriefCard {
 }
 
 /**
+ * Per-card meta stamped at compose time and persisted server-side. NOT
+ * sent to the surface — confidence and urgency are Chippi's reasoning,
+ * not the realtor's affordance. The analytics module reads this column
+ * to answer "are our confidence calibrations honest" (Phase B5).
+ *
+ * cardMeta[i] mirrors the order of Brief.cards[i].
+ */
+export interface BriefCardMeta {
+  cardIndex: number;
+  source: SignalSource;
+  kind: SignalKind;
+  confidence: number;
+  urgency: SignalUrgency;
+}
+
+/**
+ * Per-tap event captured on the 'acted' PATCH. Append-only — duplicate
+ * taps on the same (cardIndex, source, kind) are silently dropped at
+ * the server so the realtor's accidental double-tap doesn't double-count.
+ */
+export interface BriefCardTap {
+  cardIndex: number;
+  source: SignalSource;
+  kind: SignalKind;
+  tappedAt: string;
+}
+
+/**
  * The full Brief — what gets persisted to the Brief.payload column and
  * read by the workspace surface.
  */

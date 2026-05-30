@@ -16,6 +16,7 @@ import {
   MAX_CARDS,
   type Brief,
   type BriefCard,
+  type BriefCardMeta,
   type Signal,
   type SignalGatherer,
   type SignalKind,
@@ -55,15 +56,20 @@ function rankSignals(signals: Signal[]): Signal[] {
  * can produce signals from multiple sources (Gmail thread + overdue
  * follow-up from leads source for the same person); the realtor sees
  * one card per subject, leading with the highest-ranked angle.
+ *
+ * Returns BOTH the surface-facing cards AND the server-only meta
+ * (confidence + urgency). The two arrays mirror each other by index.
  */
-function selectCards(ranked: Signal[]): BriefCard[] {
+function selectCards(ranked: Signal[]): { cards: BriefCard[]; meta: BriefCardMeta[] } {
   const seen = new Set<string>();
   const cards: BriefCard[] = [];
+  const meta: BriefCardMeta[] = [];
 
   for (const signal of ranked) {
     if (cards.length >= MAX_CARDS) break;
     if (seen.has(signal.subject.id)) continue;
     seen.add(signal.subject.id);
+    const idx = cards.length;
     cards.push({
       kind: signal.kind,
       source: signal.source,
@@ -71,9 +77,16 @@ function selectCards(ranked: Signal[]): BriefCard[] {
       evidence: signal.evidence,
       draftedAction: signal.draftedAction ?? null,
     });
+    meta.push({
+      cardIndex: idx,
+      source: signal.source,
+      kind: signal.kind,
+      confidence: signal.confidence,
+      urgency: signal.urgency,
+    });
   }
 
-  return cards;
+  return { cards, meta };
 }
 
 /**
@@ -132,9 +145,16 @@ function composeEmptyState(): { invitation: string } {
 
 /**
  * The main entry. Reads from all signal sources for the given space,
- * ranks, selects, composes, returns one Brief.
+ * ranks, selects, composes, returns one Brief + the server-only cardMeta
+ * for telemetry (Phase B5).
+ *
+ * The Brief itself is unchanged — surface contract is stable. The meta
+ * is persisted to Brief.cardMeta separately by the caller so it never
+ * leaks to the surface.
  */
-export async function composeBrief(spaceId: string): Promise<Brief> {
+export async function composeBrief(
+  spaceId: string,
+): Promise<{ brief: Brief; cardMeta: BriefCardMeta[] }> {
   // Sources, momentum, and tomorrow all hit Supabase independently —
   // fan them out in parallel so the cron's per-space budget stays tight.
   const [sourceResults, momentum, tomorrow] = await Promise.all([
@@ -157,34 +177,36 @@ export async function composeBrief(spaceId: string): Promise<Brief> {
   }
 
   const ranked = rankSignals(allSignals);
-  const cards = selectCards(ranked);
+  const { cards, meta } = selectCards(ranked);
 
   if (cards.length === 0) {
     return {
-      headline: 'Quiet morning.',
-      subheadline: null,
-      cards: [],
-      // Momentum + tomorrow still render on quiet mornings — they're the
-      // tether to yesterday and the look forward, independent of today's
-      // urgency. The "say nothing" rule is per-section: each one is null
-      // when its own data is empty, not because cards is empty.
-      momentum,
-      tomorrow,
-      emptyState: composeEmptyState(),
-      sourcesUsed: [...sourcesUsed],
+      brief: {
+        headline: 'Quiet morning.',
+        subheadline: null,
+        cards: [],
+        momentum,
+        tomorrow,
+        emptyState: composeEmptyState(),
+        sourcesUsed: [...sourcesUsed],
+      },
+      cardMeta: [],
     };
   }
 
   const { headline, subheadline } = composeHeadline(cards);
 
   return {
-    headline,
-    subheadline,
-    cards,
-    momentum,
-    tomorrow,
-    emptyState: null,
-    sourcesUsed: [...sourcesUsed],
+    brief: {
+      headline,
+      subheadline,
+      cards,
+      momentum,
+      tomorrow,
+      emptyState: null,
+      sourcesUsed: [...sourcesUsed],
+    },
+    cardMeta: meta,
   };
 }
 

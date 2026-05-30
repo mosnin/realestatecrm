@@ -44,10 +44,15 @@ describe('briefing — the composer locks the design rules', () => {
           subject: { id: `s${i}`, name: `Subject ${i}`, href: `/s${i}` },
         }),
       );
-      const cards = selectCards(signals);
+      const { cards, meta } = selectCards(signals);
       expect(cards).toHaveLength(5);
       // The top five by rank should be the first five we created (highest confidence).
       expect(cards.map((c) => c.subject.id)).toEqual(['s0', 's1', 's2', 's3', 's4']);
+      // meta mirrors cards index-for-index and carries the per-card reasoning
+      // the surface doesn't see (Phase B5 telemetry).
+      expect(meta).toHaveLength(5);
+      expect(meta[0].cardIndex).toBe(0);
+      expect(meta[0].confidence).toBe(0.9);
     });
 
     it('deduplicates by subject.id — one card per person/deal', () => {
@@ -73,7 +78,7 @@ describe('briefing — the composer locks the design rules', () => {
       });
 
       const ranked = rankSignals([sarahReply, sarahFollowUp, marcus]);
-      const cards = selectCards(ranked);
+      const { cards } = selectCards(ranked);
 
       expect(cards).toHaveLength(2);
       // Sarah's highest-ranked angle (call, conf 0.92) wins her slot.
@@ -82,8 +87,10 @@ describe('briefing — the composer locks the design rules', () => {
       expect(cards[1].subject.id).toBe('marcus');
     });
 
-    it('returns an empty array when given no signals', () => {
-      expect(selectCards([])).toEqual([]);
+    it('returns empty arrays when given no signals', () => {
+      const result = selectCards([]);
+      expect(result.cards).toEqual([]);
+      expect(result.meta).toEqual([]);
     });
 
     it('a high-confidence drafts signal outranks a same-urgency pipeline signal', () => {
@@ -106,7 +113,7 @@ describe('briefing — the composer locks the design rules', () => {
         subject: { id: 'sarah', name: 'Sarah Chen', href: '/contacts/sarah' },
         evidence: 'Chippi drafted an email. Approve or edit.',
       });
-      const cards = selectCards(rankSignals([stuckDeal, draftReady]));
+      const { cards } = selectCards(rankSignals([stuckDeal, draftReady]));
       expect(cards[0].subject.id).toBe('sarah');
       expect(cards[0].source).toBe('drafts');
     });
@@ -114,7 +121,7 @@ describe('briefing — the composer locks the design rules', () => {
 
   describe('headline composition', () => {
     it('names the subject explicitly — never a count', () => {
-      const cards = selectCards([
+      const { cards } = selectCards([
         signal({
           kind: 'review',
           urgency: 1,
@@ -129,7 +136,7 @@ describe('briefing — the composer locks the design rules', () => {
     });
 
     it('produces a subheadline when more cards remain after the lead', () => {
-      const cards = selectCards([
+      const { cards } = selectCards([
         signal({ urgency: 1, confidence: 0.95, subject: { id: 'a', name: 'A', href: '/a' } }),
         signal({ urgency: 1, confidence: 0.9, subject: { id: 'b', name: 'B', href: '/b' } }),
         signal({ urgency: 1, confidence: 0.85, subject: { id: 'c', name: 'C', href: '/c' } }),
@@ -139,7 +146,7 @@ describe('briefing — the composer locks the design rules', () => {
     });
 
     it('returns no subheadline when the brief is exactly one card', () => {
-      const cards = selectCards([signal({ subject: { id: 'a', name: 'A', href: '/a' } })]);
+      const { cards } = selectCards([signal({ subject: { id: 'a', name: 'A', href: '/a' } })]);
       const { subheadline } = composeHeadline(cards);
       expect(subheadline).toBeNull();
     });

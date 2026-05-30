@@ -20,7 +20,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { composeBrief } from '@/lib/briefing/compose';
 import { localDateIn } from '@/lib/briefing/timing';
-import type { Brief } from '@/lib/briefing/types';
+import type { Brief, BriefCardTap, SignalKind, SignalSource } from '@/lib/briefing/types';
 
 const DEFAULT_TIMEZONE = 'America/New_York';
 
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
 
   // No row yet — compose on demand and persist. The realtor sees their
   // brief; tomorrow's cron tick fills the gap for everyone systematically.
-  const brief = await composeBrief(space.id);
+  const { brief, cardMeta } = await composeBrief(space.id);
   const { data: created, error } = await supabase
     .from('Brief')
     .insert({
@@ -131,6 +131,7 @@ export async function GET(req: NextRequest) {
       forDate,
       status: 'pending',
       payload: brief,
+      cardMeta,
     })
     .select('id, status, payload, createdAt, seenAt, actedAt')
     .single();
@@ -163,14 +164,19 @@ export async function GET(req: NextRequest) {
 /**
  * PATCH /api/agent/briefing
  *
- * Body: { event: 'seen' | 'acted' }
+ * Body shapes:
+ *   { event: 'seen' }
+ *   { event: 'acted', cardIndex, source, kind }   // since B5
  *
  * 'seen'  → set seenAt + flip status from 'pending' to 'seen' (once).
- * 'acted' → set actedAt + flip status to 'acted' (once). 'acted' implies seen.
+ * 'acted' → set actedAt + flip status to 'acted' (once) + append the
+ *           tap event to Brief.cardTaps. The cardIndex/source/kind
+ *           triple identifies WHICH card was tapped so analytics can
+ *           answer "which sources move realtors" without DOM scraping.
  *
- * Both are idempotent and additive — re-firing doesn't overwrite the
- * earlier timestamp, so the brief's true first-seen moment is preserved
- * for the momentum line that Phase B reads from.
+ * Both are idempotent and additive — re-firing 'seen' doesn't overwrite
+ * the earlier timestamp; re-firing 'acted' with the same
+ * (cardIndex, source, kind) drops the duplicate.
  */
 export async function PATCH(req: NextRequest) {
   const authResult = await requireAuth();
@@ -180,32 +186,63 @@ export async function PATCH(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { event } = (await req.json()) as { event?: 'seen' | 'acted' };
-  if (event !== 'seen' && event !== 'acted') {
+  const body = (await req.json()) as {
+    event?: 'seen' | 'acted';
+    cardIndex?: number;
+    source?: SignalSource;
+    kind?: SignalKind;
+  };
+
+  if (body.event !== 'seen' && body.event !== 'acted') {
     return NextResponse.json({ error: 'event must be "seen" or "acted"' }, { status: 400 });
   }
 
   const forDate = await todayLocalDate(space.id);
   const { data: existing } = await supabase
     .from('Brief')
-    .select('id, seenAt, actedAt, status')
+    .select('id, seenAt, actedAt, status, cardTaps')
     .eq('spaceId', space.id)
     .eq('forDate', forDate)
     .maybeSingle();
 
   if (!existing) return NextResponse.json({ ok: true });
 
-  const update: Record<string, string> = {};
+  const update: Record<string, string | BriefCardTap[]> = {};
   const nowIso = new Date().toISOString();
 
-  if (event === 'seen' && !existing.seenAt) {
+  if (body.event === 'seen' && !existing.seenAt) {
     update.seenAt = nowIso;
     if (existing.status === 'pending') update.status = 'seen';
   }
-  if (event === 'acted') {
+  if (body.event === 'acted') {
     if (!existing.seenAt) update.seenAt = nowIso;
     if (!existing.actedAt) update.actedAt = nowIso;
     update.status = 'acted';
+
+    // Append the tap to cardTaps — but only if (cardIndex, source, kind)
+    // is well-formed AND not already present. The triple is the dedup
+    // key; duplicate taps (refresh, double-click, retry) are dropped.
+    const taps = Array.isArray(existing.cardTaps) ? (existing.cardTaps as BriefCardTap[]) : [];
+    const isValid =
+      typeof body.cardIndex === 'number' &&
+      typeof body.source === 'string' &&
+      typeof body.kind === 'string';
+    if (isValid) {
+      const already = taps.some(
+        (t) => t.cardIndex === body.cardIndex && t.source === body.source && t.kind === body.kind,
+      );
+      if (!already) {
+        update.cardTaps = [
+          ...taps,
+          {
+            cardIndex: body.cardIndex as number,
+            source: body.source as SignalSource,
+            kind: body.kind as SignalKind,
+            tappedAt: nowIso,
+          },
+        ];
+      }
+    }
   }
 
   if (Object.keys(update).length > 0) {
@@ -215,7 +252,7 @@ export async function PATCH(req: NextRequest) {
   // The first ever 'seen' PATCH stamps briefIntroSeenAt so the one-line
   // intro never reappears. Only on 'seen' (not 'acted') because the
   // intro lives on the live brief surface, not on acted-then-collapsed.
-  if (event === 'seen') {
+  if (body.event === 'seen') {
     await supabase
       .from('SpaceSetting')
       .update({ briefIntroSeenAt: nowIso })

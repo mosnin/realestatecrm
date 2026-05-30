@@ -41,7 +41,7 @@ interface CandidateRow {
 
 async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'failed'> {
   try {
-    const brief = await composeBrief(spaceId);
+    const { brief, cardMeta } = await composeBrief(spaceId);
     const { error } = await supabase
       .from('Brief')
       .upsert(
@@ -50,6 +50,7 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
           forDate,
           status: 'pending',
           payload: brief,
+          cardMeta,
         },
         { onConflict: 'spaceId,forDate' },
       );
