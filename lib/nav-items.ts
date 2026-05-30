@@ -53,7 +53,7 @@ export const realtorNavItems: NavItem[] = [
     badgeKey: 'pendingDrafts',
     children: [
       { href: '/chippi/brief', label: 'Brief' },
-      { href: '/chippi/drafts', label: 'Drafts' },
+      { href: '/chippi/inbox', label: 'Inbox' },
       { href: '/chippi/history', label: 'History' },
     ],
   },
