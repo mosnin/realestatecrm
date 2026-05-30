@@ -197,8 +197,8 @@ export function DailyBrief({ slug, initialBrief }: Props) {
   function recordActed(): void;
   function recordActed(cardIndex?: number, source?: SignalSource, kind?: SignalKind) {
     // Body shape depends on whether this came from a card tap (B5
-    // telemetry) or from the empty-state "Tell Chippi" button (which
-    // has no card identity).
+    // telemetry) or from the empty-state "Plan with Chippi" button
+    // (which has no card identity).
     const body =
       typeof cardIndex === 'number' && source && kind
         ? { event: 'acted' as const, cardIndex, source, kind }
