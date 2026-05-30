@@ -297,7 +297,19 @@ function LiveBrief({
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
       <div className="flex items-baseline justify-between mb-4 gap-2">
-        <span className={SECTION_LABEL}>Today&apos;s brief</span>
+        <div className="flex items-baseline gap-3 min-w-0">
+          <span className={SECTION_LABEL}>Today&apos;s brief</span>
+          {/* Yesterday access from live state — without this, the realtor
+              who expanded the brief has no way to look back. */}
+          <button
+            type="button"
+            onClick={onToggleYesterday}
+            className="text-[11px] uppercase tracking-wider text-muted-foreground
+                       hover:text-foreground transition-colors"
+          >
+            {showYesterday ? 'Hide yesterday' : 'Yesterday'}
+          </button>
+        </div>
         <span className={cn(SECTION_LABEL, 'tabular-nums truncate')}>
           {time} <span className="hidden sm:inline">· {formatBriefDate(createdAt, false)}</span>
           <span className="sm:hidden">· {formatBriefDate(createdAt, true)}</span>
@@ -436,6 +448,7 @@ function BriefCardRow({
 }) {
   const tag = ACTION_LABEL[card.kind];
   const verb = VERB[card.kind];
+  const isTip = card.kind === 'tip';
   const href = deepLink(
     slug,
     card.draftedAction?.kind === 'open' ? card.draftedAction.href : card.subject.href,
@@ -443,7 +456,18 @@ function BriefCardRow({
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-start sm:gap-6 py-4 gap-2">
-      <span className={cn(SECTION_LABEL, 'sm:pt-0.5 sm:w-14 sm:shrink-0 tabular-nums')}>{tag}</span>
+      {/* Tip tag reads italic + lighter weight so it doesn't compete with
+          action verbs (REPLY, CALL) for the realtor's eye. Tips are
+          earned wisdom, not tasks — the visual treats them as such. */}
+      <span
+        className={cn(
+          SECTION_LABEL,
+          'sm:pt-0.5 sm:w-14 sm:shrink-0 tabular-nums',
+          isTip && 'italic font-normal text-muted-foreground/80',
+        )}
+      >
+        {tag}
+      </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{card.subject.name}</p>
         <p className={cn(BODY_MUTED, 'mt-0.5')}>{card.evidence}</p>
@@ -480,14 +504,20 @@ function CollapsedBrief({
 
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
-      <div className="flex items-center justify-between gap-3 py-2 border-y border-border/40">
+      <div className="flex items-center justify-between gap-3 border-y border-border/60">
+        {/* Whole-row clickable — padding + hover bg make the affordance
+            obvious. A bare text link with no chrome reads as decoration. */}
         <button
           type="button"
           onClick={onExpand}
-          className="flex items-baseline gap-3 min-w-0 flex-1 text-left group"
+          className="flex items-baseline gap-3 min-w-0 flex-1 text-left
+                     px-2 py-2 -mx-2 rounded-md
+                     hover:bg-foreground/[0.04] transition-colors
+                     focus-visible:outline-none focus-visible:ring-2
+                     focus-visible:ring-foreground/20"
         >
           <span className={cn(SECTION_LABEL, 'shrink-0')}>Today&apos;s brief</span>
-          <span className={cn(BODY_MUTED, 'text-xs truncate group-hover:text-foreground transition-colors')}>
+          <span className={cn(BODY_MUTED, 'text-xs truncate')}>
             {progress}
             {lastOpened && ` · last opened ${lastOpened}`}
           </span>
@@ -503,9 +533,13 @@ function CollapsedBrief({
           <button
             type="button"
             onClick={onToggleYesterday}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2"
+            className="text-xs text-muted-foreground hover:text-foreground
+                       transition-colors px-2 py-1 rounded-md
+                       hover:bg-foreground/[0.04]
+                       focus-visible:outline-none focus-visible:ring-2
+                       focus-visible:ring-foreground/20"
           >
-            Yesterday →
+            Yesterday
           </button>
         </div>
       </div>
