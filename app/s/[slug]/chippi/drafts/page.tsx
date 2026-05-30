@@ -48,8 +48,7 @@ export default async function ChippiDraftsPage({
   return (
     <ChippiPageShell
       greeting="Outbox."
-      title="Ready to go out"
-      subtitle="I prepared these. Sign off when they're right."
+      title="Sign off, I'll send."
     >
       <AgentDraftInbox slug={slug} />
     </ChippiPageShell>
