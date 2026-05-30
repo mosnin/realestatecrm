@@ -39,7 +39,18 @@ async function todayLocalDate(spaceId: string): Promise<string> {
   return localDateIn(new Date(), (data?.timezone as string | undefined) ?? DEFAULT_TIMEZONE);
 }
 
-export async function GET() {
+/**
+ * Compute the local date string N days offset from today in the
+ * given timezone. Used for `?day=yesterday` (offset = -1) — the
+ * lifecycle UX one-day window beyond which the brief stops being
+ * accessible from the workspace surface.
+ */
+function localDateOffset(timezone: string, offsetDays: number): string {
+  const at = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
+  return localDateIn(at, timezone);
+}
+
+export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
@@ -47,7 +58,49 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  // ?day=yesterday returns yesterday's brief as a READ-ONLY echo —
+  // never composes on demand, never PATCHes, never stamps showIntro.
+  // The one-day backward window is hard: there is no ?day=2-days-ago.
+  const dayParam = req.nextUrl.searchParams.get('day');
+  if (dayParam === 'yesterday') {
+    const { data: tz } = await supabase
+      .from('SpaceSetting')
+      .select('timezone')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    const yForDate = localDateOffset(
+      (tz?.timezone as string | undefined) ?? DEFAULT_TIMEZONE,
+      -1,
+    );
+    const { data: yRow } = await supabase
+      .from('Brief')
+      .select('id, status, payload, createdAt, seenAt, actedAt')
+      .eq('spaceId', space.id)
+      .eq('forDate', yForDate)
+      .maybeSingle();
+
+    if (!yRow) return NextResponse.json({ brief: null });
+    return NextResponse.json({
+      id: yRow.id,
+      status: yRow.status,
+      brief: yRow.payload as Brief,
+      createdAt: yRow.createdAt,
+      seenAt: yRow.seenAt,
+      actedAt: yRow.actedAt,
+    });
+  }
+
   const forDate = await todayLocalDate(space.id);
+
+  // Whether to show the one-line intro on this brief. Null means the
+  // realtor has never seen a brief — the intro renders. Once 'seen'
+  // PATCH fires the column gets stamped and the intro never returns.
+  const { data: setting } = await supabase
+    .from('SpaceSetting')
+    .select('briefIntroSeenAt')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const showIntro = setting?.briefIntroSeenAt == null;
 
   const { data: existing } = await supabase
     .from('Brief')
@@ -64,6 +117,7 @@ export async function GET() {
       createdAt: existing.createdAt,
       seenAt: existing.seenAt,
       actedAt: existing.actedAt,
+      showIntro,
     });
   }
 
@@ -91,6 +145,7 @@ export async function GET() {
       createdAt: new Date().toISOString(),
       seenAt: null,
       actedAt: null,
+      showIntro,
     });
   }
 
@@ -101,6 +156,7 @@ export async function GET() {
     createdAt: created.createdAt,
     seenAt: created.seenAt,
     actedAt: created.actedAt,
+    showIntro,
   });
 }
 
@@ -154,6 +210,17 @@ export async function PATCH(req: NextRequest) {
 
   if (Object.keys(update).length > 0) {
     await supabase.from('Brief').update(update).eq('id', existing.id);
+  }
+
+  // The first ever 'seen' PATCH stamps briefIntroSeenAt so the one-line
+  // intro never reappears. Only on 'seen' (not 'acted') because the
+  // intro lives on the live brief surface, not on acted-then-collapsed.
+  if (event === 'seen') {
+    await supabase
+      .from('SpaceSetting')
+      .update({ briefIntroSeenAt: nowIso })
+      .eq('spaceId', space.id)
+      .is('briefIntroSeenAt', null);
   }
 
   return NextResponse.json({ ok: true });
