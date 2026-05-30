@@ -15,8 +15,14 @@ describe('briefing lifecycle — receipt formatting', () => {
       expect(formatProgress(3, null)).toBe('3 cards');
     });
 
-    it('appends "acted on" when the realtor has tapped at least one card', () => {
-      expect(formatProgress(5, '2026-05-30T07:11:00Z')).toBe('5 cards · acted on');
+    it('appends "handled" when the realtor has tapped at least one card', () => {
+      // "handled" not "acted on" — the receipt has to sound like the
+      // realtor's own voice, not product-internal lifecycle vocabulary.
+      expect(formatProgress(5, '2026-05-30T07:11:00Z')).toBe('5 cards · handled');
+    });
+
+    it('uses "card" singular even when handled', () => {
+      expect(formatProgress(1, '2026-05-30T07:11:00Z')).toBe('1 card · handled');
     });
   });
 
