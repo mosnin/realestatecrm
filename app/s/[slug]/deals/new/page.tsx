@@ -10,6 +10,8 @@ import { WizardStepPipeline } from '@/components/deals/wizard-step-pipeline';
 import { WizardStepDetails } from '@/components/deals/wizard-step-details';
 import { WizardStepNotes } from '@/components/deals/wizard-step-notes';
 import { toast } from 'sonner';
+import type { Property } from '@/lib/types';
+import { formatPropertyAddress } from '@/lib/properties';
 
 type ContactResult = { id: string; name: string; email: string | null; leadType: 'rental' | 'buyer' | 'seller' };
 
@@ -30,6 +32,7 @@ export default function NewDealPage() {
   const [probability, setProbability] = useState('');
   const [closeDate, setCloseDate] = useState('');
   const [address, setAddress] = useState('');
+  const [propertyId, setPropertyId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [stageError, setStageError] = useState('');
   const [titleError, setTitleError] = useState('');
@@ -79,6 +82,7 @@ export default function NewDealPage() {
           ...(probability && { probability: parseInt(probability, 10) }),
           ...(closeDate && { closeDate }),
           ...(address.trim() && { address: address.trim() }),
+          ...(propertyId && { propertyId }),
           ...(description.trim() && { description: description.trim() }),
           contactIds: selectedContacts.map(c => c.id),
         }),
@@ -157,6 +161,7 @@ export default function NewDealPage() {
         )}
         {step === 3 && (
           <WizardStepDetails
+            slug={slug}
             title={title}
             onTitleChange={(v) => { setTitle(v); if (v.trim()) setTitleError(''); }}
             priority={priority}
@@ -171,6 +176,13 @@ export default function NewDealPage() {
             onCloseDateChange={setCloseDate}
             address={address}
             onAddressChange={setAddress}
+            propertyId={propertyId}
+            onPropertyChange={(p: Property | null) => {
+              setPropertyId(p?.id ?? null);
+              // Mirror the property's address into the deal's free-form address
+              // for display continuity (cards, sidebars still read .address).
+              setAddress(p ? formatPropertyAddress(p) : '');
+            }}
             titleError={titleError}
           />
         )}
