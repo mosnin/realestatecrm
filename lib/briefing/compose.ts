@@ -137,10 +137,16 @@ function headlineForCard(card: BriefCard): string {
 /**
  * What Chippi says when the realtor has nothing on fire. The right to
  * say nothing is the central design rule; this is its prose.
+ *
+ * Voice rule: the invitation has to match the CTA destination. The
+ * empty-state button takes the realtor to the chat surface, so the
+ * invitation reads as "let's talk about it" — not "let me start
+ * prospecting" which would imply Chippi acts autonomously without
+ * the conversation.
  */
 function composeEmptyState(): { invitation: string } {
   return {
-    invitation: 'Quiet morning. Nothing chasing you. Want me to start prospecting?',
+    invitation: "Quiet morning. Nothing chasing you. Want to plan the day together?",
   };
 }
 
@@ -168,11 +174,21 @@ export async function composeBrief(
 
   const allSignals: Signal[] = [];
   const sourcesUsed = new Set<SignalSource>();
+  const sourcesFailed: SignalSource[] = [];
 
   for (let i = 0; i < sourceResults.length; i++) {
     const result = sourceResults[i];
     const source = SOURCES[i].source;
-    if (result.status !== 'fulfilled') continue;
+    if (result.status !== 'fulfilled') {
+      // Per Q7 Error handling: a source failure used to be invisible.
+      // Log it loud so cron monitoring catches a degraded integration.
+      console.error(
+        `[briefing.compose] source ${source} failed for space ${spaceId}:`,
+        result.reason,
+      );
+      sourcesFailed.push(source);
+      continue;
+    }
     if (result.value.length > 0) sourcesUsed.add(source);
     for (const signal of result.value) {
       if (signal.confidence > CONFIDENCE_FLOOR) allSignals.push(signal);

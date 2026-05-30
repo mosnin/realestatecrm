@@ -360,7 +360,7 @@ function LiveBrief({
                 onClick={() => onAct()}
                 className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
               >
-                Tell Chippi
+                Plan with Chippi
               </Link>
             </div>
           </div>
