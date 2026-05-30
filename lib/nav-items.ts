@@ -54,7 +54,7 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/chippi/brief', label: 'Daily brief' },
       { href: '/routines', label: 'Routines' },
-      { href: '/chippi/drafts', label: 'Drafts' },
+      { href: '/chippi/inbox', label: 'Inbox' },
       { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/memory', label: 'Memory' },
       { href: '/integrations', label: 'Integrations' },
