@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
+import { FOCUS_CARD_MAX } from '@/lib/geometry';
 import { BODY_MUTED, QUIET_LINK, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { buildIntakeUrl } from '@/lib/intake';
 import { levenshtein } from '@/lib/draft-feedback';
@@ -265,7 +266,7 @@ export function FocusCard({
 
   if (loading) {
     return (
-      <div className="max-w-[868px] mx-auto rounded-lg border border-border/70 bg-card p-6 animate-pulse">
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 animate-pulse')}>
         <div className="h-4 w-32 rounded bg-muted/50 mb-4" />
         <div className="h-3 w-full rounded bg-muted/40 mb-2" />
         <div className="h-3 w-5/6 rounded bg-muted/40 mb-6" />
@@ -315,7 +316,7 @@ export function FocusCard({
     return (
       <article
         key={current.id}
-        className="max-w-[868px] mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150"
+        className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150')}
       >
         {/* Meta line */}
         <div className="flex items-center gap-3 text-sm">
@@ -460,7 +461,7 @@ export function FocusCard({
   return (
     <article
       key={current.id}
-      className="max-w-[868px] mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150"
+      className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150')}
     >
       <div className="flex items-center gap-3 text-sm">
         <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
@@ -556,7 +557,7 @@ function FocusWelcome({
   }
 
   return (
-    <div className="max-w-[868px] mx-auto text-center py-10">
+    <div className={cn(FOCUS_CARD_MAX, 'mx-auto text-center py-10')}>
       {/* Amber circle with a slow breathing pulse — signals life, not decoration. */}
       <motion.div
         aria-hidden
@@ -609,7 +610,7 @@ function FocusEmpty({
 }) {
   if (variant === 'held') {
     return (
-      <div className="max-w-[868px] mx-auto text-center py-10">
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto text-center py-10')}>
         <p className="text-base text-foreground">Nothing else right now.</p>
         <p className="mt-1 text-sm text-muted-foreground">
           You held everything for later. They&apos;re waiting in the full day view.
@@ -637,7 +638,7 @@ function FocusEmpty({
     );
   }
   return (
-    <div className="max-w-[868px] mx-auto text-center py-10">
+    <div className={cn(FOCUS_CARD_MAX, 'mx-auto text-center py-10')}>
       <p className="text-base text-foreground">You&apos;re clear.</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Nothing waiting on you. I&apos;ll let you know when something needs you.

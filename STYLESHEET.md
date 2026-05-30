@@ -269,13 +269,40 @@ If you add a new focal element to a wide page, hold it against this
 test: is its width the column's width divided by φ? If not, name
 why. "It felt about right" is not a reason.
 
-### Geometry — the unfinished work (Phase 6)
+### Geometry — the Vitruvian macro frame (Phase 6)
 
-The macro frame still has magic numbers with no shared module:
-sidebar 240px, page max 1500px, chippi-bar 768px. Phase 6 will re-derive
-these from one base unit related by φ and the Pythagorean ratios (2:1,
-3:2, 4:3). Until then: don't add a new wide container without
-declaring which ratio relates it to its parent.
+The macro frame now lives in **`lib/geometry.ts`** — one module, one
+derivation. Every layout width above ~200px imports its value from
+there. Two honest number families do the work:
+
+**Rhythm family** — multiples of `RHYTHM_U = 48` (the top of the
+harmonic spacing ladder 48 → 24 → 16 → 12, the Pythagorean
+octave → fifth → fourth):
+
+| Token | Formula | Value |
+|---|---|---|
+| `SIDEBAR_WIDTH_PX` | `RHYTHM_U × 5` | 240 |
+| `CHIPPI_BAR_WIDTH_PX` | `RHYTHM_U × 16` | 768 |
+| `PAGE_PAD_LG_PX` | `RHYTHM_U × 1` | 48 |
+
+**φ family** — the FocusCard inscribed inside the column:
+
+| Token | Formula | Value |
+|---|---|---|
+| `PAGE_MAX_PX` | The design ceiling (chosen, not derived) | 1500 |
+| `CONTENT_COLUMN_PX` | `PAGE_MAX_PX − 2 × PAGE_PAD_LG_PX` | 1404 |
+| `FOCUS_CARD_WIDTH_PX` | `round(CONTENT_COLUMN_PX / φ)` | 868 |
+
+**Chrome exception** — `SIDEBAR_COLLAPSED_PX = 56` is the icon-rail
+convention; it's NOT on the rhythm lattice and the module names it as
+the one exception so it can't be silently absorbed and drift.
+
+**The rule.** Don't write bare px widths above ~200px in JSX or CSS.
+Import the token. If you need a new macro width, derive it from one
+of the two families and add it to `lib/geometry.ts` with the formula
+in a comment — never as a magic number at the call site. A regression
+test in `tests/lib/geometry.test.ts` locks the lattice so a value
+can't drift without an intentional commit.
 
 ---
 

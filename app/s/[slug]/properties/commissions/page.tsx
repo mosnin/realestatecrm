@@ -13,6 +13,7 @@ import {
   SECTION_LABEL,
   PAGE_RHYTHM,
 } from '@/lib/typography';
+import { PAGE_MAX } from '@/lib/geometry';
 import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -109,7 +110,7 @@ export default async function PropertiesCommissionsPage({
   })();
 
   return (
-    <div className={cn(PAGE_RHYTHM, 'max-w-[1500px]')}>
+    <div className={cn(PAGE_RHYTHM, PAGE_MAX)}>
       {/* Header — H1 + Chippi-voiced subtitle naming the loudest money fact.
           The stat strip below is the supporting evidence. Commissions is its
           own destination now (the standalone Properties list has been cut),

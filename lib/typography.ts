@@ -95,8 +95,9 @@ export const ROW_PAD_TIGHT = 'py-2.5';
 
 /* ─── Layout containers ────────────────────────────────────────────────── */
 
-/** Standard page container max width — matches existing pages. */
-export const PAGE_MAX = 'max-w-[1500px]';
+/** Standard page container max width — re-exported from the geometry
+ *  module (Phase 6) so the Vitruvian macro frame stays in one place. */
+export { PAGE_MAX } from '@/lib/geometry';
 
 /** Reading column — single-form pages, settings, intake customize. */
 export const READING_MAX = 'max-w-3xl';
