@@ -251,19 +251,12 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       {lifecycle === 'settled' ? (
         <CollapsedBrief
           data={data}
-          slug={slug}
           showYesterday={showYesterday}
           onExpand={() => setForceExpanded(true)}
           onToggleYesterday={() => setShowYesterday((v) => !v)}
         />
       ) : (
-        <LiveBrief
-          data={data}
-          slug={slug}
-          showYesterday={showYesterday}
-          onAct={recordActed}
-          onToggleYesterday={() => setShowYesterday((v) => !v)}
-        />
+        <LiveBrief data={data} slug={slug} onAct={recordActed} />
       )}
       {showYesterday && (
         <div className="mt-6 opacity-80">
@@ -279,15 +272,11 @@ export function DailyBrief({ slug, initialBrief }: Props) {
 function LiveBrief({
   data,
   slug,
-  showYesterday,
   onAct,
-  onToggleYesterday,
 }: {
   data: ApiResponse;
   slug: string;
-  showYesterday: boolean;
   onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
-  onToggleYesterday: () => void;
 }) {
   const { brief, createdAt, showIntro } = data;
   const time = formatBriefTime(createdAt);
@@ -395,20 +384,10 @@ function LiveBrief({
           )}
         </>
       )}
-
-      {/* "Yesterday →" toggle — lives at the foot of the live brief so the
-          realtor can peek backward without leaving the surface. The actual
-          YesterdayBrief renders from the parent so the same toggle works
-          from the collapsed receipt too. */}
-      <div className="mt-6 flex justify-end px-6">
-        <button
-          type="button"
-          onClick={onToggleYesterday}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {showYesterday ? 'Hide yesterday' : 'Yesterday →'}
-        </button>
-      </div>
+      {/* No "Yesterday" toggle here — the live brief is TODAY. The peek
+          backward lives on the collapsed receipt, after the realtor has
+          engaged with today's. Keeping it off the live surface protects
+          the one-idea rule. */}
     </div>
   );
 }
@@ -471,13 +450,11 @@ function BriefCardRow({
 
 function CollapsedBrief({
   data,
-  slug: _slug,
   showYesterday,
   onExpand,
   onToggleYesterday,
 }: {
   data: ApiResponse;
-  slug: string;
   showYesterday: boolean;
   onExpand: () => void;
   onToggleYesterday: () => void;

@@ -12,7 +12,8 @@
  * the next thing they want is to ignore it. Don't give them either.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,6 +31,22 @@ const HOUR_OPTIONS: { value: number; label: string }[] = [
   { value: 9, label: '9:00 AM' },
 ];
 
+interface Snapshot {
+  enabled: boolean;
+  hour: number;
+  emailDelivery: boolean;
+  smsDelivery: boolean;
+}
+
+function snapshotsEqual(a: Snapshot, b: Snapshot): boolean {
+  return (
+    a.enabled === b.enabled &&
+    a.hour === b.hour &&
+    a.emailDelivery === b.emailDelivery &&
+    a.smsDelivery === b.smsDelivery
+  );
+}
+
 export function BriefSection({ slug }: BriefSectionProps) {
   const [enabled, setEnabled] = useState(true);
   const [hour, setHour] = useState<number>(7);
@@ -43,6 +60,10 @@ export function BriefSection({ slug }: BriefSectionProps) {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sendingTest, setSendingTest] = useState(false);
+  // The last-saved snapshot — Save button stays disabled until the
+  // realtor changes something. Saving a no-op is a small lie ("I saved
+  // your changes") that erodes the calm-confidence voice.
+  const lastSaved = useRef<Snapshot | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -60,10 +81,19 @@ export function BriefSection({ slug }: BriefSectionProps) {
         if (typeof s.phoneNumber === 'string' && s.phoneNumber.trim().length > 0) {
           setPhoneOnFile(true);
         }
+        lastSaved.current = {
+          enabled: typeof s.briefEnabled === 'boolean' ? s.briefEnabled : true,
+          hour: typeof s.briefHour === 'number' ? s.briefHour : 7,
+          emailDelivery: typeof s.briefEmail === 'boolean' ? s.briefEmail : false,
+          smsDelivery: typeof s.briefSms === 'boolean' ? s.briefSms : false,
+        };
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const current: Snapshot = { enabled, hour, emailDelivery, smsDelivery };
+  const dirty = lastSaved.current ? !snapshotsEqual(current, lastSaved.current) : false;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -84,6 +114,7 @@ export function BriefSection({ slug }: BriefSectionProps) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Could not save.');
       }
+      lastSaved.current = { enabled, hour, emailDelivery, smsDelivery };
       setSaved(true);
       toast.success('Daily brief saved.');
       setTimeout(() => setSaved(false), 3000);
@@ -170,7 +201,19 @@ export function BriefSection({ slug }: BriefSectionProps) {
         <div className="min-w-0">
           <p className={`${BODY} font-medium`}>Also send by email</p>
           <p className={`${CAPTION} mt-0.5`}>
-            {masterEmail ? 'Headline + a tap to open. Off by default.' : 'Turn on email notifications first.'}
+            {masterEmail ? (
+              'Headline + a tap to open. Off by default.'
+            ) : (
+              <>
+                <Link
+                  href={`/s/${slug}/settings?tab=privacy#notifications`}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Turn on email notifications
+                </Link>{' '}
+                first.
+              </>
+            )}
           </p>
         </div>
         <Switch
@@ -189,11 +232,29 @@ export function BriefSection({ slug }: BriefSectionProps) {
         <div className="min-w-0">
           <p className={`${BODY} font-medium`}>Also send by text</p>
           <p className={`${CAPTION} mt-0.5`}>
-            {!masterSms
-              ? 'Turn on text notifications first.'
-              : !phoneOnFile
-                ? 'Add a phone number in Workspace settings first.'
-                : 'One line + the link. Off by default.'}
+            {!masterSms ? (
+              <>
+                <Link
+                  href={`/s/${slug}/settings?tab=privacy#notifications`}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Turn on text notifications
+                </Link>{' '}
+                first.
+              </>
+            ) : !phoneOnFile ? (
+              <>
+                <Link
+                  href={`/s/${slug}/settings?tab=you`}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Add a phone number
+                </Link>{' '}
+                in Workspace settings first.
+              </>
+            ) : (
+              'One line + the link. Off by default.'
+            )}
           </p>
         </div>
         <Switch
@@ -206,7 +267,7 @@ export function BriefSection({ slug }: BriefSectionProps) {
       <div className="flex items-center gap-3 pt-1">
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || (!dirty && !saved)}
           className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
