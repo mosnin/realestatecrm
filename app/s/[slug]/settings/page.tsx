@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { GeneralSettingsForm, DangerZone } from './general-settings-form';
 import { ProfileSection } from './profile-section';
 import { NotificationsSection } from './notifications-section';
+import { BriefSection } from './brief-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
 import { McpSection, TemplatesSection } from './integrations-section';
@@ -332,7 +333,14 @@ export default async function SettingsPage({
           reaches the realtor. */}
       {activeTab === 'privacy' && (
         <div className="space-y-12">
-          <section id="notifications" className="space-y-5">
+          <section id="brief" className="space-y-5">
+            <p className={SECTION_LABEL}>Daily brief</p>
+            <BriefSection slug={space.slug} />
+          </section>
+          <section
+            id="notifications"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
             <p className={SECTION_LABEL}>Notifications</p>
             <NotificationsSection slug={space.slug} />
           </section>

@@ -109,6 +109,8 @@ export async function PATCH(req: NextRequest) {
     notifyTourBookings,
     notifyNewDeals,
     notifyFollowUps,
+    briefEnabled,
+    briefHour,
   } = body;
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
@@ -244,6 +246,12 @@ export async function PATCH(req: NextRequest) {
   if (typeof notifyTourBookings === 'boolean') settingsPayload.notifyTourBookings = notifyTourBookings;
   if (typeof notifyNewDeals === 'boolean') settingsPayload.notifyNewDeals = notifyNewDeals;
   if (typeof notifyFollowUps === 'boolean') settingsPayload.notifyFollowUps = notifyFollowUps;
+  if (typeof briefEnabled === 'boolean') settingsPayload.briefEnabled = briefEnabled;
+  // briefHour: integer 0-23 in the space's timezone. Reject malformed
+  // values silently so a typo'd payload doesn't write garbage.
+  if (typeof briefHour === 'number' && Number.isInteger(briefHour) && briefHour >= 0 && briefHour <= 23) {
+    settingsPayload.briefHour = briefHour;
+  }
   if (phoneNumber !== undefined) settingsPayload.phoneNumber = phoneNumber;
   if (myConnections !== undefined) settingsPayload.myConnections = myConnections;
   if (aiPersonalization !== undefined) settingsPayload.aiPersonalization = aiPersonalization;

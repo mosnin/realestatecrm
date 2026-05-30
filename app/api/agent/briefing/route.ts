@@ -19,10 +19,24 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { composeBrief } from '@/lib/briefing/compose';
+import { localDateIn } from '@/lib/briefing/timing';
 import type { Brief } from '@/lib/briefing/types';
 
-function todayUtcDate(): string {
-  return new Date().toISOString().slice(0, 10);
+const DEFAULT_TIMEZONE = 'America/New_York';
+
+/**
+ * The brief's `forDate` is the realtor's LOCAL date — the date they see
+ * on their phone when they open Chippi — not the server's UTC date.
+ * Otherwise the late-night Pacific realtor opening the app at 11:30 PM
+ * would already see "tomorrow's brief" because UTC has rolled over.
+ */
+async function todayLocalDate(spaceId: string): Promise<string> {
+  const { data } = await supabase
+    .from('SpaceSetting')
+    .select('timezone')
+    .eq('spaceId', spaceId)
+    .maybeSingle();
+  return localDateIn(new Date(), (data?.timezone as string | undefined) ?? DEFAULT_TIMEZONE);
 }
 
 export async function GET() {
@@ -33,7 +47,7 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const forDate = todayUtcDate();
+  const forDate = await todayLocalDate(space.id);
 
   const { data: existing } = await supabase
     .from('Brief')
@@ -115,7 +129,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'event must be "seen" or "acted"' }, { status: 400 });
   }
 
-  const forDate = todayUtcDate();
+  const forDate = await todayLocalDate(space.id);
   const { data: existing } = await supabase
     .from('Brief')
     .select('id, seenAt, actedAt, status')
