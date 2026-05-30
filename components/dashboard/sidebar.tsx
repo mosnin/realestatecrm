@@ -979,26 +979,26 @@ function RealtorNav({
       </div>
 
       {/* Context-aware second section. Route IS the signal:
-            - On /chippi/* → conversation list (expanded) or History icon
-              link (collapsed rail). Modern chat apps surface chat history
-              in their nav for a reason — you came back to find a thread.
+            - On /chippi/* → CHAT HISTORY label + recent conversation list
+              (expanded) or History icon link (collapsed rail). Bounded to
+              6 conversations + "See all →" link into the existing in-chat
+              history drawer. Animates in/out with the app's standard
+              [0.22, 1, 0.36, 1] curve.
             - Elsewhere → render `realtorMoreNavItems` if it has anything.
               It's intentionally empty today, but kept as the slot for
-              future secondary nav without re-plumbing the layout.
-          The previous Chats/Pages tab toggle was ceremony — Pages was
-          empty so flipping to it dead-ended. Removed. */}
+              future secondary nav without re-plumbing the layout. */}
       <AnimatePresence initial={false} mode="wait">
         {onChippi && (
           <motion.div
             key="chippi-history"
-            initial={{ opacity: 0, x: 6 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 6 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
           >
             {collapsed ? (
               <>
-                <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+                <div className="my-2 mx-2 h-px bg-border/60" aria-hidden />
                 <CollapsedTooltip enabled label="Conversations">
                   <Link
                     href={`/s/${slug}/chippi?view=history`}
@@ -1010,7 +1010,12 @@ function RealtorNav({
                 </CollapsedTooltip>
               </>
             ) : (
-              <SidebarConversations slug={slug} />
+              <>
+                {/* Hairline divider — the only thing separating primary
+                    nav from chat history. No card, no shadow. */}
+                <div className="mx-3 mt-1 mb-2 h-px bg-border/60" aria-hidden />
+                <SidebarConversations slug={slug} limit={6} />
+              </>
             )}
           </motion.div>
         )}

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MoreHorizontal, Plus, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BODY_COMPACT, CAPTION, META } from '@/lib/typography';
+import { BODY_COMPACT, META, SECTION_LABEL } from '@/lib/typography';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
   DropdownMenu,
@@ -21,6 +21,13 @@ import type { Conversation } from '@/lib/types';
 // sidebar's contextual section when on `/chippi`. Owns its own data fetch and
 // list mutations so it can be dropped into any sidebar slot.
 //
+// The component renders the CHAT HISTORY section label by default so it self-
+// frames as the secondary "history" region underneath the primary nav. Parents
+// that already render their own framing (e.g. an AnimatePresence wrapper) can
+// pass `hideLabel`. The inline list is bounded by `limit` (default 6); past
+// that, a "See all →" link deep-links into the existing in-chat history drawer
+// via the workspace's `?view=history` query param.
+//
 // The list deliberately collapses to nothing in collapsed (icon-rail) mode —
 // the rail is too narrow to read titles, and we already have the chat icon in
 // the primary nav.
@@ -33,6 +40,14 @@ interface SidebarConversationsProps {
   /** Fired when a conversation row or "New" is activated — useful for closing
    *  a parent mobile sheet on navigation. */
   onSelect?: () => void;
+  /** Cap the inline list — anything beyond is reached via "See all →".
+   *  Default 6 keeps the section bounded so primary nav doesn't get pushed
+   *  off-screen. */
+  limit?: number;
+  /** Hide the small-caps "CHAT HISTORY" section label. Used when a parent
+   *  surface (e.g. the desktop sidebar's chippi section) renders its own
+   *  label inside an AnimatePresence wrapper. */
+  hideLabel?: boolean;
 }
 
 function timeAgo(date: Date | string): string {
@@ -55,6 +70,8 @@ export function SidebarConversations({
   slug,
   collapsed = false,
   onSelect,
+  limit = 6,
+  hideLabel = false,
 }: SidebarConversationsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -134,8 +151,21 @@ export function SidebarConversations({
 
   if (collapsed) return null;
 
+  // Bound the inline list. Past `limit`, the "See all →" link below deep-links
+  // into the full conversation-history drawer the chat workspace already owns.
+  const visibleConversations =
+    conversations && limit > 0 ? conversations.slice(0, limit) : conversations;
+  const hasMore =
+    conversations !== null && limit > 0 && conversations.length > limit;
+
   return (
     <div className="space-y-1">
+      {!hideLabel && (
+        <p className={cn(SECTION_LABEL, 'px-3 pt-1 pb-1.5 select-none')}>
+          Chat history
+        </p>
+      )}
+
       <button
         type="button"
         onClick={() => void handleNew()}
@@ -157,8 +187,8 @@ export function SidebarConversations({
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <p className="text-xs text-muted-foreground/60 text-center px-4 py-6 leading-snug">
-            Start a conversation to build your history here.
+          <p className="text-xs text-muted-foreground/60 px-3 py-4 leading-snug">
+            No chats yet. Say something below.
           </p>
         ) : (
           <motion.ul
@@ -167,7 +197,7 @@ export function SidebarConversations({
             animate="enter"
             className="space-y-px"
           >
-            {conversations.map((conv) => {
+            {visibleConversations!.map((conv) => {
               const isActive = activeId === conv.id;
               const isRenaming = renamingId === conv.id;
               return (
@@ -270,6 +300,19 @@ export function SidebarConversations({
               );
             })}
           </motion.ul>
+        )}
+
+        {hasMore && (
+          <Link
+            href={`/s/${slug}/chippi?view=history`}
+            onClick={() => onSelect?.()}
+            className="mt-1 flex items-center justify-between gap-1 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+          >
+            <span>See all</span>
+            <span aria-hidden className="text-muted-foreground/60">
+              →
+            </span>
+          </Link>
         )}
       </div>
     </div>

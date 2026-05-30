@@ -1,14 +1,15 @@
 'use client';
 
 import { UserButton } from '@clerk/nextjs';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, X } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -19,7 +20,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems, realtorNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
-import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
@@ -89,18 +89,12 @@ interface HeaderProps {
 export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
-  const [mobileShowPages, setMobileShowPages] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
   const isOnChippi = pathname.startsWith(`${base}/chippi`);
-  // Reset the "show pages" override whenever the route changes so the sheet
-  // always opens to the right default for the current page.
-  useEffect(() => {
-    setMobileShowPages(false);
-  }, [pathname]);
 
   return (
     <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
@@ -120,8 +114,22 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           </SheetTrigger>
           <SheetContent
             side="left"
-            className="w-72 sm:max-w-xs p-0 border-r border-border/70 bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden"
+            showCloseButton={false}
+            className="w-screen max-w-none sm:max-w-none p-0 border-0 bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden"
           >
+            {/* 44x44 close affordance, top-right, plain X — Radix wires the
+                close behaviour. Solid background (no translucent overlay)
+                because the drawer is full-screen — the realtor is in nav
+                mode, not peeking through. */}
+            <SheetClose asChild>
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-11 h-11 rounded-md text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.98]"
+              >
+                <X className="size-5" strokeWidth={1.75} />
+              </button>
+            </SheetClose>
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent z-0" />
             <div className="relative z-10 flex flex-col h-full overflow-y-auto">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
@@ -204,117 +212,101 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  {/* On /chippi, render the conversations list with a "show
-                      pages" affordance — same dual-mode the desktop sidebar
-                      uses (chats on chippi, pages elsewhere). Everywhere
-                      else, render the realtorNavItems tree so the mobile
-                      drawer's items MATCH the desktop sidebar exactly. */}
-                  <AnimatePresence mode="wait" initial={false}>
-                    {isOnChippi && !mobileShowPages ? (
+                  {/* Primary nav ALWAYS renders. The realtor must be able to
+                      reach any destination from any route — the previous
+                      drawer hid the nav entirely on /chippi, which left them
+                      stranded with only chat history. */}
+                  <div>
+                    {realtorNavItems.map((item) => {
+                      const itemHref = `${base}${item.href}`;
+                      const isActive = item.exact
+                        ? pathname === itemHref
+                        : pathname.startsWith(itemHref);
+                      return (
+                        <div key={item.href}>
+                          <Link
+                            href={itemHref}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                              isActive
+                                ? 'bg-foreground/[0.045] text-foreground font-medium'
+                                : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+                            )}
+                          >
+                            {isActive && (
+                              <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                            )}
+                            {item.isAI ? (
+                              <img
+                                src="/chip-avatar.png"
+                                alt=""
+                                className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+                              />
+                            ) : (
+                              <item.icon
+                                size={15}
+                                strokeWidth={isActive ? 2.25 : 1.75}
+                                className={cn(
+                                  'flex-shrink-0',
+                                  isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                                )}
+                              />
+                            )}
+                            {item.label}
+                          </Link>
+                          {/* Children render inline under their parent.
+                              No collapse — the drawer scrolls, and a
+                              flat tree means every destination is one
+                              tap away. */}
+                          {item.children && item.children.length > 0 && (
+                            <div className="ml-7 mt-0.5 mb-1 space-y-0.5">
+                              {item.children.map((child) => {
+                                const childHref = `${base}${child.href}`;
+                                const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
+                                return (
+                                  <Link
+                                    key={child.href}
+                                    href={childHref}
+                                    onClick={() => setOpen(false)}
+                                    className={cn(
+                                      'flex items-center h-8 px-3 rounded-md text-[12.5px] transition-colors duration-150',
+                                      childActive
+                                        ? 'text-foreground font-medium'
+                                        : 'text-foreground/55 hover:text-foreground',
+                                    )}
+                                  >
+                                    {child.label}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Chat history — animates in/out below the primary nav
+                      when the route enters/leaves /chippi. Same motion
+                      params as the desktop sidebar's chippi section so the
+                      app feels coherent across viewports. */}
+                  <AnimatePresence initial={false} mode="wait">
+                    {isOnChippi && (
                       <motion.div
-                        key="chats"
-                        variants={PAGE_VARIANTS}
-                        initial="initial"
-                        animate="enter"
-                        exit="exit"
+                        key="mobile-chippi-history"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                        className="pt-2"
                       >
+                        <div className="mx-3 mb-2 h-px bg-border/60" aria-hidden />
                         <SidebarConversations
                           slug={slug}
+                          limit={6}
                           onSelect={() => setOpen(false)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setMobileShowPages(true)}
-                          className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Show pages →
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="pages"
-                        variants={PAGE_VARIANTS}
-                        initial="initial"
-                        animate="enter"
-                        exit="exit"
-                      >
-                        {realtorNavItems.map((item) => {
-                          const itemHref = `${base}${item.href}`;
-                          const isActive = item.exact
-                            ? pathname === itemHref
-                            : pathname.startsWith(itemHref);
-                          return (
-                            <div key={item.href}>
-                              <Link
-                                href={itemHref}
-                                onClick={() => setOpen(false)}
-                                className={cn(
-                                  'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-                                  isActive
-                                    ? 'bg-foreground/[0.045] text-foreground font-medium'
-                                    : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-                                )}
-                              >
-                                {isActive && (
-                                  <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
-                                )}
-                                {item.isAI ? (
-                                  <img
-                                    src="/chip-avatar.png"
-                                    alt=""
-                                    className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-                                  />
-                                ) : (
-                                  <item.icon
-                                    size={15}
-                                    strokeWidth={isActive ? 2.25 : 1.75}
-                                    className={cn(
-                                      'flex-shrink-0',
-                                      isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-                                    )}
-                                  />
-                                )}
-                                {item.label}
-                              </Link>
-                              {/* Children render inline under their parent.
-                                  No collapse — the drawer scrolls, and a
-                                  flat tree means every destination is one
-                                  tap away. */}
-                              {item.children && item.children.length > 0 && (
-                                <div className="ml-7 mt-0.5 mb-1 space-y-0.5">
-                                  {item.children.map((child) => {
-                                    const childHref = `${base}${child.href}`;
-                                    const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
-                                    return (
-                                      <Link
-                                        key={child.href}
-                                        href={childHref}
-                                        onClick={() => setOpen(false)}
-                                        className={cn(
-                                          'flex items-center h-8 px-3 rounded-md text-[12.5px] transition-colors duration-150',
-                                          childActive
-                                            ? 'text-foreground font-medium'
-                                            : 'text-foreground/55 hover:text-foreground',
-                                        )}
-                                      >
-                                        {child.label}
-                                      </Link>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {isOnChippi && (
-                          <button
-                            type="button"
-                            onClick={() => setMobileShowPages(false)}
-                            className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            ← Back to chats
-                          </button>
-                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
