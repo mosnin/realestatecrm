@@ -1060,12 +1060,21 @@ screen — that's the wizard smell.
 
 ### Rollback discipline
 
-V2 is gated behind `NEXT_PUBLIC_ONBOARDING_V2`; `?legacy=1` forces the
-legacy `onboarding-realtor.tsx`. The legacy flow stays untouched as the
-rollback path until V2 proves out, then V1 + the gate + the temporary
-duplication in `onboarding-realtor-shared.tsx`'s consumers get deleted.
-**Don't refactor the legacy flow** — it's scheduled for removal; editing
-code you're about to delete is risk with no payoff.
+V2 is the **live onboarding** — what every new realtor sees. Two escape
+hatches stay wired for safety:
+
+- **`?legacy=1`** on `/setup` — per-request rollback for a single realtor
+  (support can hand this URL to a user who hits trouble).
+- **`NEXT_PUBLIC_ONBOARDING_V2=false`** — deploy-level kill switch. Flip
+  this on Vercel and redeploy to revert every signup to V1 without a
+  code change.
+
+The legacy `onboarding-realtor.tsx` stays as that rollback path until V2
+has run in prod for a week without incident. Then a single cleanup PR
+deletes V1, the gate, and the `onboarding-realtor-shared.tsx` consumer
+in V2. Until that PR lands: **don't refactor the legacy flow** — it's
+scheduled for removal; editing code you're about to delete is risk with
+no payoff.
 
 ### The `TypingText` component
 

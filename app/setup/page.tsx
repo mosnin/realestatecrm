@@ -19,11 +19,12 @@ export default async function SetupPage({
   // via ?type=broker. The quick path itself links over to ?type=broker.
   const useQuickPath = type !== 'broker';
 
-  // V2 storytelling flow gates behind NEXT_PUBLIC_ONBOARDING_V2. `?legacy=1`
-  // forces the V1 flow regardless — the rollback escape hatch while V2
-  // proves out. Once V2 is default-on and stable, V1 + this gate get deleted.
+  // V2 storytelling is the live onboarding. Two escape hatches:
+  //   - `?legacy=1` forces V1 for a single request (per-realtor rollback)
+  //   - NEXT_PUBLIC_ONBOARDING_V2=false forces V1 deploy-wide (incident rollback)
+  // V1 stays as that rollback path until V2 proves out — DO NOT refactor it.
   const useV2Onboarding =
-    process.env.NEXT_PUBLIC_ONBOARDING_V2 === 'true' && legacy !== '1';
+    legacy !== '1' && process.env.NEXT_PUBLIC_ONBOARDING_V2 !== 'false';
 
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
