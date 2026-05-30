@@ -93,28 +93,17 @@ const OUTCOME_ICON: Record<string, LucideIcon> = {
   muted: Lightbulb,
 };
 
-// Filter values for the toolbar. Failures aren't a thing the realtor wants
-// to filter to — they appear inline with the rose tone in the All view.
-const FILTERS = [
-  { value: null, label: 'All' },
-  { value: 'completed', label: 'Done' },
-  { value: 'queued_for_approval', label: 'Awaiting you' },
-] as const;
-
 const UNDOABLE_TYPES = new Set(['set_contact_follow_up', 'set_deal_follow_up']);
 
 export function ActivityFeed({ slug }: { slug: string }) {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string | null>(null);
   const [undoing, setUndoing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '100' });
-      if (filter) params.set('outcome', filter);
-      const res = await fetch(`/api/agent/activity?${params}`);
+      const res = await fetch(`/api/agent/activity?limit=100`);
       if (res.ok) {
         const data = (await res.json()) as ActivityEntry[];
         setEntries(Array.isArray(data) ? data : []);
@@ -122,7 +111,7 @@ export function ActivityFeed({ slug }: { slug: string }) {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -153,27 +142,9 @@ export function ActivityFeed({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Filter toolbar */}
-      <div className="flex items-center gap-1 border-b border-border/60 -mx-2 px-2 overflow-x-auto">
-        {FILTERS.map((f) => {
-          const isActive = filter === f.value;
-          return (
-            <button
-              key={f.label}
-              type="button"
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                'px-3 py-2 -mb-px text-sm whitespace-nowrap border-b-2 transition-colors',
-                isActive
-                  ? 'border-foreground text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* No tab strip — the product has no tabs anywhere else. Chronological
+          by default is what realtors actually want; specific entries can be
+          found by scrolling or by deep-linking from the source surface. */}
 
       {loading && (
         <div className="space-y-4">
@@ -190,10 +161,11 @@ export function ActivityFeed({ slug }: { slug: string }) {
       )}
 
       {!loading && entries.length === 0 && (
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          {filter
-            ? 'Nothing matches that filter yet.'
-            : "Chippi hasn't done anything to log yet — when it acts, it'll show up here."}
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">Quiet here.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            When Chippi acts, it&apos;ll show up here.
+          </p>
         </div>
       )}
 

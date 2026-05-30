@@ -1,7 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import Link from 'next/link';
-import { ArrowLeft, Clock } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -37,10 +35,10 @@ function relativeTime(iso: string): string {
 }
 
 function pendingActionLabel(metadata: Record<string, unknown> | null): string {
-  if (!metadata) return 'Action requires your approval';
+  if (!metadata) return 'Waiting on your call.';
   const action = metadata['pendingAction'];
   if (typeof action === 'string' && action.trim().length > 0) return action.trim();
-  return 'Action requires your approval';
+  return 'Waiting on your call.';
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -57,7 +55,6 @@ export default async function ApprovalsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Verify the authenticated user owns this space.
   const { data: spaceOwner } = await supabase
     .from('User')
     .select('id')
@@ -66,7 +63,7 @@ export default async function ApprovalsPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
-  const { data: tasks, error } = await supabase
+  const { data: tasks } = await supabase
     .from('AgentTask')
     .select('*')
     .eq('spaceId', space.id)
@@ -75,55 +72,26 @@ export default async function ApprovalsPage({
     .order('createdAt', { ascending: false })
     .limit(50);
 
-  if (error) {
-    console.error('[chippi/approvals] query error:', error);
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            We couldn&apos;t load your pending approvals. This is usually temporary.
-          </p>
-          <a
-            href={`/s/${slug}/chippi/approvals`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Try again
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   const approvalList = (tasks ?? []) as ApprovalTask[];
   const pendingCount = approvalList.length;
   const statusSentence =
     pendingCount === 0
-      ? 'Nothing waiting. Chippi will ask before any risky action.'
+      ? "Nothing waiting. I'll ask before any risky action."
       : pendingCount === 1
-        ? '1 action is waiting for your decision.'
-        : `${pendingCount} actions are waiting for your decision.`;
+        ? '1 decision is waiting on you.'
+        : `${pendingCount} decisions are waiting on you.`;
 
   return (
     <ChippiPageShell
       greeting="Approvals."
-      title="Pending Approvals"
+      title="Decisions waiting"
       subtitle={statusSentence}
     >
-      {/* Back-link sits inside children so the shell header stays pure. */}
-      <Link
-        href={`/s/${slug}/chippi/tasks`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={12} /> Agent Tasks
-      </Link>
-
-      {/* Approval list */}
       {approvalList.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-          <p className="text-sm text-foreground">No pending approvals.</p>
+          <p className="text-sm text-foreground">Nothing to decide right now.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Chippi will ask before sending emails, archiving contacts, or any other risky action.
+            I&apos;ll surface anything risky here before I act on it.
           </p>
         </div>
       ) : (
@@ -136,7 +104,6 @@ export default async function ApprovalsPage({
 
             return (
               <li key={task.id} className="py-4 space-y-3">
-                {/* Top row: status badge + goal */}
                 <div className="flex items-start gap-3">
                   <div className="pt-0.5 flex-shrink-0">
                     <span
@@ -145,7 +112,7 @@ export default async function ApprovalsPage({
                         'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
                       )}
                     >
-                      Waiting
+                      Waiting · {waitingTime}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -154,13 +121,6 @@ export default async function ApprovalsPage({
                   </div>
                 </div>
 
-                {/* Time waiting */}
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums pl-0.5">
-                  <Clock size={11} className="flex-shrink-0" />
-                  <span>Waiting {waitingTime}</span>
-                </div>
-
-                {/* Approve / Reject actions (client component) */}
                 <ApprovalActions taskId={task.id} slug={slug} />
               </li>
             );

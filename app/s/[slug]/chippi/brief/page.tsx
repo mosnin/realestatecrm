@@ -1,15 +1,12 @@
 /**
  * /chippi/brief — the dedicated daily brief page.
  *
- * The brief also auto-renders inline on /chippi (the workspace home) when
- * the chat is empty — that's still the morning entry point. This page is
- * the persistent destination from the sidebar dropdown: a realtor who
- * wants to RE-OPEN today's brief at 3pm, or look at it on a quieter
- * surface than the workspace, lands here.
+ * The brief's serif morning sentence IS the page's identity, so we omit
+ * the shell's static title to avoid two serif h1s stacking. The greeting
+ * line ("Today.") still orients; everything below it is the brief.
  *
  * Renders the live brief — bypasses the lifecycle collapse so the realtor
- * always sees the full brief when they navigate here intentionally. They
- * came looking for it; show it.
+ * always sees the full brief when they navigate here intentionally.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -33,7 +30,6 @@ export default async function ChippiBriefPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Verify owner — same pattern as the other chippi/* pages.
   const { data: spaceOwner } = await supabase
     .from('User')
     .select('id')
@@ -43,11 +39,7 @@ export default async function ChippiBriefPage({
   if (!spaceOwner) notFound();
 
   return (
-    <ChippiPageShell
-      greeting="Today."
-      title="Daily brief"
-      subtitle="What matters this morning."
-    >
+    <ChippiPageShell greeting="Today.">
       <DailyBrief slug={slug} alwaysLive />
     </ChippiPageShell>
   );

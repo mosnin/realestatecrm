@@ -22,7 +22,6 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
-import { SECTION_LABEL } from '@/lib/typography';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
@@ -873,48 +872,48 @@ export function AgentDraftInbox({ slug }: Props) {
 
   return (
     <section>
-      {/* Section header — typography driven, no card chrome */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className={SECTION_LABEL}>
-          Drafts I made
-        </h2>
-        {!loading && drafts.length > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {drafts.length}
+      {/* Selection toolbar — no duplicate page title; the shell's serif
+          "Ready to go out" carries that. This bar surfaces only the count
+          + the multi-select actions, and only when there's something to
+          act on. */}
+      {!loading && drafts.length > 0 && (
+        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'}
           </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {!loading && drafts.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 h-7 rounded"
-              >
-                {selectedIds.size === drafts.length ? 'Clear' : 'Select all'}
-              </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-                onClick={approveAll}
-                disabled={approvingAll}
-              >
-                {approvingAll ? <Loader2 size={11} className="animate-spin" /> : null}
-                Approve all
-              </Button>
-            </>
-          )}
-          <button
-            onClick={load}
-            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-            title="Refresh"
-            aria-label="Refresh drafts"
-          >
-            <RefreshCw size={12} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {drafts.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 h-7 rounded"
+                >
+                  {selectedIds.size === drafts.length ? 'Clear' : 'Select all'}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                  onClick={approveAll}
+                  disabled={approvingAll}
+                >
+                  {approvingAll ? <Loader2 size={11} className="animate-spin" /> : null}
+                  Approve all
+                </Button>
+              </>
+            )}
+            <button
+              onClick={load}
+              className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="Refresh"
+              aria-label="Refresh drafts"
+            >
+              <RefreshCw size={12} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Delivery banner */}
       {deliveryFeedback && (

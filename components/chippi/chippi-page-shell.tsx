@@ -8,12 +8,15 @@
  * drifted spacing.
  *
  * Header treatment per the Jobs-lens audit: serif Times h1 + status
- * sentence. The earlier shell used a small sans h1 on the theory that
- * "Chippi is a chat-mode product." That was wrong. The chat HOME is
- * chat-mode (it has its own treatment in chippi-workspace.tsx). The
- * sub-pages — brief, drafts, activity, memory — are reading-and-deciding
- * mode. Reading-mode pages get the serif. That's how Chippi pages feel
- * like one product.
+ * sentence. The chat HOME is chat-mode (own treatment in chippi-workspace.tsx).
+ * The sub-pages — brief, drafts, activity, memory — are reading-and-deciding
+ * mode. Reading-mode pages get the serif. That's how Chippi pages feel like
+ * one product.
+ *
+ * `title` and `subtitle` are optional. When the page's content carries its
+ * OWN dynamic title (the brief's morning sentence, for example), omit the
+ * shell title so two serif h1s don't stack. The greeting line ("Today.")
+ * still orients without competing.
  *
  * If a page needs a section heading inside the body, use SECTION_LABEL
  * from lib/typography.ts — never hand-roll text classes.
@@ -25,11 +28,11 @@ import { BODY_MUTED, H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 interface ChippiPageShellProps {
   /** Small muted line above the title, e.g. "Drafts." or "Memory." */
   greeting: string;
-  /** Page title — serif Times, the same h1 vocabulary as every other
-   *  reading-register surface in the product. */
-  title: string;
-  /** Status-sentence subtitle. One line, plain prose, Chippi voice. */
-  subtitle: string;
+  /** Page title — serif Times. Optional: omit when the content owns the
+   *  page's h1 (the brief's morning sentence is its title). */
+  title?: string;
+  /** Status-sentence subtitle. Optional: pair with title. */
+  subtitle?: string;
   children: ReactNode;
 }
 
@@ -49,10 +52,12 @@ export function ChippiPageShell({
       >
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>{greeting}</p>
-          <h1 className={H1} style={TITLE_FONT}>
-            {title}
-          </h1>
-          <p className={BODY_MUTED}>{subtitle}</p>
+          {title && (
+            <h1 className={H1} style={TITLE_FONT}>
+              {title}
+            </h1>
+          )}
+          {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
         </header>
         {children}
       </div>
