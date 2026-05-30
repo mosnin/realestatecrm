@@ -1,23 +1,25 @@
 'use client';
 
 /**
- * Brief settings — two switches the realtor cares about, no more.
+ * Brief settings — four switches the realtor cares about, no more.
  *
  *   On / Off  — opt out of the daily brief entirely.
- *   Time      — hour of day in the realtor's timezone.
+ *   Time      — hour of day in the realtor's timezone (default 7 AM).
+ *   Email     — opt-in side channel.
+ *   SMS       — opt-in side channel; requires phone + SMS notifications.
  *
- * Configuration is failure to decide. We picked: 7 AM default, in-app
- * delivery only (B4 adds email + SMS), no audio. The brief is the
- * sentence on the morning surface; if a realtor wants more knobs,
- * the next thing they want is to ignore it. Don't give them either.
+ * Configuration is failure to decide. The 7 AM default is picked for
+ * everyone; the time picker exists for the few who want to shift it.
+ * Per the rubric: changes save on toggle. A 'Save' button is the
+ * realtor managing state the system should manage. Debounced 400ms so
+ * a rapid two-flip doesn't fire two PATCHes.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { BODY, BODY_MUTED, CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import { BODY, BODY_MUTED, CAPTION } from '@/lib/typography';
 
 interface BriefSectionProps {
   slug: string;
@@ -39,10 +41,15 @@ export function BriefSection({ slug }: BriefSectionProps) {
   const [masterEmail, setMasterEmail] = useState(true);
   const [masterSms, setMasterSms] = useState(false);
   const [phoneOnFile, setPhoneOnFile] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sendingTest, setSendingTest] = useState(false);
+
+  // True after the initial GET completes — auto-save only fires after the
+  // first hydration so the load itself doesn't trigger a PATCH back.
+  const hydrated = useRef(false);
+  // Debounce token — cleared on each setting change so a rapid two-flip
+  // fires one PATCH, not two.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -62,37 +69,48 @@ export function BriefSection({ slug }: BriefSectionProps) {
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        // One tick after hydration so the auto-save effect doesn't fire
+        // on the same render as the state landing.
+        setTimeout(() => {
+          hydrated.current = true;
+        }, 0);
+      });
   }, [slug]);
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const res = await fetch('/api/spaces', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          briefEnabled: enabled,
-          briefHour: hour,
-          briefEmail: emailDelivery,
-          briefSms: smsDelivery,
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || 'Could not save.');
+  // Auto-save on each change — kills the Save button per Q10
+  // Knowledge balance: the realtor shouldn't manage state the system
+  // can manage. Debounced 400ms so a two-flip fires one PATCH.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/spaces', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug,
+            briefEnabled: enabled,
+            briefHour: hour,
+            briefEmail: emailDelivery,
+            briefSms: smsDelivery,
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || 'Could not save.');
+        }
+        toast.success('Brief settings saved.');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'That tripped me up. Try again.');
       }
-      setSaved(true);
-      toast.success('Daily brief saved.');
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'That tripped me up. Try again.');
-    } finally {
-      setSaving(false);
-    }
-  }
+    }, 400);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [slug, enabled, hour, emailDelivery, smsDelivery]);
 
   async function handleSendTest() {
     setSendingTest(true);
@@ -115,10 +133,10 @@ export function BriefSection({ slug }: BriefSectionProps) {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <div className="space-y-6">
       <p className={BODY_MUTED}>
         One focal sentence and three to five cards, delivered to the workspace
-        each morning. Quiet days say so.
+        each morning. Quiet days say so. Changes save automatically.
       </p>
 
       <div className="flex items-center justify-between gap-4 py-3 border-t border-border/60">
@@ -203,16 +221,10 @@ export function BriefSection({ slug }: BriefSectionProps) {
         />
       </div>
 
-      <div className="flex items-center gap-3 pt-1">
-        <button
-          type="submit"
-          disabled={saving}
-          className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
-        >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
-        </button>
-        {(emailDelivery || smsDelivery) && enabled && (
+      {/* Only the test send remains — no Save button. The auto-save
+          effect commits each change. */}
+      {(emailDelivery || smsDelivery) && enabled && (
+        <div className="pt-1">
           <button
             type="button"
             onClick={handleSendTest}
@@ -221,9 +233,8 @@ export function BriefSection({ slug }: BriefSectionProps) {
           >
             {sendingTest ? 'Sending…' : 'Send me a test'}
           </button>
-        )}
-        {saved && <p className={BODY_MUTED}>Changes saved.</p>}
-      </div>
-    </form>
+        </div>
+      )}
+    </div>
   );
 }
