@@ -9,6 +9,18 @@
  * The hierarchy rule: every page has ONE focal element. Title + focal stats
  * are the loud notes. Section headings recede; body recedes further; muted
  * labels recede furthest. Spacing breathes between sections, tightens within.
+ *
+ * ── The type ladder ─────────────────────────────────────────────────────────
+ * Snapped to a 1.2 modular ratio (minor third — the Pythagorean step that
+ * the eye reads as proportional rather than arbitrary). Rounded to whole px:
+ *
+ *   30 → 25 → 21 → 17 → 14 → 12 → 11
+ *   H1   STAT  H2   H3   BODY  CAP   META
+ *
+ * 11 sits one step BELOW the ratio (would be 10) by deliberate exception —
+ * it's the legibility floor for chrome metadata. Below the music, but above
+ * silence. Do not add a tier between 14 and 12, or between 17 and 21; those
+ * are the dead intervals of the ladder.
  */
 
 /* ─── Display: focal numbers + page titles ─────────────────────────────── */
@@ -20,16 +32,16 @@ export const TITLE_FONT = { fontFamily: 'var(--font-title)' } as const;
 
 /** Focal stat number — same scale as H1 but treated as data. Use serif. */
 export const STAT_NUMBER = 'text-3xl tracking-tight text-foreground tabular-nums';
-/** Compact stat (when 4+ are in a row). */
-export const STAT_NUMBER_COMPACT = 'text-2xl tracking-tight text-foreground tabular-nums';
+/** Compact stat (when 4+ are in a row). 25px = H1 × 1/1.2. */
+export const STAT_NUMBER_COMPACT = 'text-[25px] leading-tight tracking-tight text-foreground tabular-nums';
 
 /* ─── Section headings ─────────────────────────────────────────────────── */
 
-/** Section h2 — sub-page heading. Sans-serif so it recedes from the page h1. */
-export const H2 = 'text-xl tracking-tight font-semibold text-foreground';
+/** Section h2 — sub-page heading. 21px = STAT_COMPACT × 1/1.2. */
+export const H2 = 'text-[21px] leading-snug tracking-tight font-semibold text-foreground';
 
-/** Card / panel heading. */
-export const H3 = 'text-base font-semibold text-foreground';
+/** Card / panel heading. 17px = H2 × 1/1.2. */
+export const H3 = 'text-[17px] leading-snug font-semibold text-foreground';
 
 /** Quiet small-caps section label (above a group of fields or rows). */
 export const SECTION_LABEL =
@@ -37,16 +49,24 @@ export const SECTION_LABEL =
 
 /* ─── Body ─────────────────────────────────────────────────────────────── */
 
-/** Default body. */
+/** Default body — 14px, the trunk of the ladder. */
 export const BODY = 'text-sm text-foreground';
 
 /** Muted body — subtitles, helper text, secondary info. */
 export const BODY_MUTED = 'text-sm text-muted-foreground';
 
-/** Compact body for dense surfaces (tables, sidebars). */
-export const BODY_COMPACT = 'text-[13px] text-foreground';
+/**
+ * Compact body for dense surfaces (tables, sidebars).
+ *
+ * Aliases BODY at the snapped ladder — the old 13px tier was a dead
+ * interval between BODY (14) and CAPTION (12) that the eye couldn't
+ * sense as a distinct step. Kept as a named import so existing call
+ * sites read semantically ("this is the compact zone") without
+ * fracturing the ladder.
+ */
+export const BODY_COMPACT = BODY;
 
-/** Caption / chrome / metadata. */
+/** Caption / chrome / metadata. 12px = BODY × 1/1.2. */
 export const CAPTION = 'text-xs text-muted-foreground';
 
 /** Smallest tabular metadata (timestamps, ids). */
