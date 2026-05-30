@@ -29,6 +29,7 @@ import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
 import { composeMomentum } from './momentum';
 import { composeTomorrow } from './tomorrow';
+import { pickBestTip, tipToCard } from './tips/tips-source';
 
 /**
  * The active source list. Phase A shipped three internal Chippi-DB
@@ -155,12 +156,14 @@ function composeEmptyState(): { invitation: string } {
 export async function composeBrief(
   spaceId: string,
 ): Promise<{ brief: Brief; cardMeta: BriefCardMeta[] }> {
-  // Sources, momentum, and tomorrow all hit Supabase independently —
-  // fan them out in parallel so the cron's per-space budget stays tight.
-  const [sourceResults, momentum, tomorrow] = await Promise.all([
+  // Sources, momentum, tomorrow, and the tips engine all hit Supabase
+  // independently — fan them out in parallel so the cron's per-space
+  // budget stays tight.
+  const [sourceResults, momentum, tomorrow, bestTip] = await Promise.all([
     Promise.allSettled(SOURCES.map((s) => s.gather(spaceId))),
     composeMomentum(spaceId).catch(() => null),
     composeTomorrow(spaceId).catch(() => null),
+    pickBestTip(spaceId).catch(() => null),
   ]);
 
   const allSignals: Signal[] = [];
@@ -179,12 +182,44 @@ export async function composeBrief(
   const ranked = rankSignals(allSignals);
   const { cards, meta } = selectCards(ranked);
 
+  // Tip slot rules (Phase C):
+  //   - When cards is empty AND tip exists, the tip's prose REPLACES the
+  //     empty-state invitation (the headline becomes the tip's subject,
+  //     subheadline becomes the evidence).
+  //   - When cards exist AND the tip confidence is ≥ 0.85 AND the tip's
+  //     subject isn't already in cards, the tip renders as Brief.tip
+  //     (one extra card below the regular cards).
+  //   - Otherwise tip is null.
+  const tipQualifiesForBottom =
+    bestTip != null &&
+    bestTip.confidence >= 0.85 &&
+    !cards.some((c) => c.subject.id === bestTip.subject.id);
+
+  if (cards.length === 0 && bestTip) {
+    sourcesUsed.add('tips');
+    return {
+      brief: {
+        headline: bestTip.subject.name,
+        subheadline: bestTip.evidence,
+        cards: [],
+        tip: tipToCard(bestTip),
+        momentum,
+        tomorrow,
+        // The tip replaces the emptyState — calmer than rendering both.
+        emptyState: null,
+        sourcesUsed: [...sourcesUsed],
+      },
+      cardMeta: [],
+    };
+  }
+
   if (cards.length === 0) {
     return {
       brief: {
         headline: 'Quiet morning.',
         subheadline: null,
         cards: [],
+        tip: null,
         momentum,
         tomorrow,
         emptyState: composeEmptyState(),
@@ -196,11 +231,14 @@ export async function composeBrief(
 
   const { headline, subheadline } = composeHeadline(cards);
 
+  if (tipQualifiesForBottom && bestTip) sourcesUsed.add('tips');
+
   return {
     brief: {
       headline,
       subheadline,
       cards,
+      tip: tipQualifiesForBottom && bestTip ? tipToCard(bestTip) : null,
       momentum,
       tomorrow,
       emptyState: null,
