@@ -22,6 +22,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, TITLE_FONT, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
@@ -187,6 +188,11 @@ export function DailyBrief({ slug, initialBrief }: Props) {
     forceCollapsed: false,
   });
 
+  // Track which cards the realtor has tapped this session so the surface
+  // can show a quiet "opened" marker on the cards behind the one they're
+  // navigating to. The PATCH is fire-and-forget; this state is local.
+  const [tappedIndices, setTappedIndices] = useState<Set<number>>(new Set());
+
   function recordActed(cardIndex: number, source: SignalSource, kind: SignalKind): void;
   function recordActed(): void;
   function recordActed(cardIndex?: number, source?: SignalSource, kind?: SignalKind) {
@@ -202,6 +208,24 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).catch(() => {});
+
+    // Q5 Feedback: a quiet toast confirms the tap registered before the
+    // navigation pulls the realtor to the next surface. Without this, the
+    // only signal the tap worked was the URL change — too subtle, too late.
+    // The subject name is what the realtor cares about, so we lead with it.
+    if (typeof cardIndex === 'number' && data) {
+      const card = cardIndex < data.brief.cards.length
+        ? data.brief.cards[cardIndex]
+        : data.brief.tip;
+      if (card) {
+        const verb =
+          kind === 'call' ? 'Calling' :
+          kind === 'tip' ? 'Opening tip' : 'Opening';
+        toast.success(`${verb} ${card.subject.name}.`);
+      }
+      setTappedIndices((prev) => new Set(prev).add(cardIndex));
+    }
+
     // Optimistically flip status — the lifecycle hook collapses on next tick.
     setData((prev) =>
       prev ? { ...prev, status: 'acted', actedAt: prev.actedAt ?? new Date().toISOString() } : prev,
@@ -270,6 +294,7 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       data={data}
       slug={slug}
       showYesterday={showYesterday}
+      tappedIndices={tappedIndices}
       onAct={recordActed}
       onToggleYesterday={() => setShowYesterday((v) => !v)}
     />
@@ -282,12 +307,14 @@ function LiveBrief({
   data,
   slug,
   showYesterday,
+  tappedIndices,
   onAct,
   onToggleYesterday,
 }: {
   data: ApiResponse;
   slug: string;
   showYesterday: boolean;
+  tappedIndices: Set<number>;
   onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
   onToggleYesterday: () => void;
 }) {
@@ -371,6 +398,7 @@ function LiveBrief({
                     slug={slug}
                     card={card}
                     cardIndex={idx}
+                    tapped={tappedIndices.has(idx)}
                     onAct={onAct}
                   />
                 ))}
@@ -380,6 +408,7 @@ function LiveBrief({
                     slug={slug}
                     card={brief.tip}
                     cardIndex={brief.cards.length}
+                    tapped={tappedIndices.has(brief.cards.length)}
                     onAct={onAct}
                   />
                 )}
@@ -439,11 +468,13 @@ function BriefCardRow({
   slug,
   card,
   cardIndex,
+  tapped,
   onAct,
 }: {
   slug: string;
   card: BriefCard;
   cardIndex: number;
+  tapped: boolean;
   onAct: (cardIndex: number, source: SignalSource, kind: SignalKind) => void;
 }) {
   const tag = ACTION_LABEL[card.kind];
@@ -455,7 +486,7 @@ function BriefCardRow({
   );
 
   return (
-    <li className="flex flex-col sm:flex-row sm:items-start sm:gap-6 py-4 gap-2">
+    <li className={cn('flex flex-col sm:flex-row sm:items-start sm:gap-6 py-4 gap-2', tapped && 'opacity-60')}>
       {/* Tip tag reads italic + lighter weight so it doesn't compete with
           action verbs (REPLY, CALL) for the realtor's eye. Tips are
           earned wisdom, not tasks — the visual treats them as such. */}
@@ -473,13 +504,24 @@ function BriefCardRow({
         <p className={cn(BODY_MUTED, 'mt-0.5')}>{card.evidence}</p>
       </div>
       <div className="flex justify-end sm:contents">
-        <Link
-          href={href}
-          onClick={() => onAct(cardIndex, card.source, card.kind)}
-          className={cn(GHOST_PILL, 'shrink-0 min-h-[44px] sm:min-h-0')}
-        >
-          {verb}
-        </Link>
+        {tapped ? (
+          /* Q8 evaluation: once tapped, the row reads as "you opened this"
+             instead of presenting the same action as if untapped. */
+          <span className={cn(
+            'shrink-0 inline-flex items-center h-9 px-3 text-xs',
+            'text-muted-foreground italic',
+          )}>
+            opened
+          </span>
+        ) : (
+          <Link
+            href={href}
+            onClick={() => onAct(cardIndex, card.source, card.kind)}
+            className={cn(GHOST_PILL, 'shrink-0 min-h-[44px] sm:min-h-0')}
+          >
+            {verb}
+          </Link>
+        )}
       </div>
     </li>
   );
