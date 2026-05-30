@@ -26,6 +26,8 @@ import { pipelineSource } from './signal-sources/pipeline';
 import { leadsSource } from './signal-sources/leads';
 import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
+import { composeMomentum } from './momentum';
+import { composeTomorrow } from './tomorrow';
 
 /**
  * The active source list. Phase A shipped three internal Chippi-DB
@@ -133,13 +135,19 @@ function composeEmptyState(): { invitation: string } {
  * ranks, selects, composes, returns one Brief.
  */
 export async function composeBrief(spaceId: string): Promise<Brief> {
-  const results = await Promise.allSettled(SOURCES.map((s) => s.gather(spaceId)));
+  // Sources, momentum, and tomorrow all hit Supabase independently —
+  // fan them out in parallel so the cron's per-space budget stays tight.
+  const [sourceResults, momentum, tomorrow] = await Promise.all([
+    Promise.allSettled(SOURCES.map((s) => s.gather(spaceId))),
+    composeMomentum(spaceId).catch(() => null),
+    composeTomorrow(spaceId).catch(() => null),
+  ]);
 
   const allSignals: Signal[] = [];
   const sourcesUsed = new Set<SignalSource>();
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+  for (let i = 0; i < sourceResults.length; i++) {
+    const result = sourceResults[i];
     const source = SOURCES[i].source;
     if (result.status !== 'fulfilled') continue;
     if (result.value.length > 0) sourcesUsed.add(source);
@@ -156,8 +164,12 @@ export async function composeBrief(spaceId: string): Promise<Brief> {
       headline: 'Quiet morning.',
       subheadline: null,
       cards: [],
-      momentum: null,
-      tomorrow: null,
+      // Momentum + tomorrow still render on quiet mornings — they're the
+      // tether to yesterday and the look forward, independent of today's
+      // urgency. The "say nothing" rule is per-section: each one is null
+      // when its own data is empty, not because cards is empty.
+      momentum,
+      tomorrow,
       emptyState: composeEmptyState(),
       sourcesUsed: [...sourcesUsed],
     };
@@ -169,10 +181,8 @@ export async function composeBrief(spaceId: string): Promise<Brief> {
     headline,
     subheadline,
     cards,
-    // Phase B will fill these. Phase A intentionally leaves them null
-    // rather than fabricating prose without the data behind it.
-    momentum: null,
-    tomorrow: null,
+    momentum,
+    tomorrow,
     emptyState: null,
     sourcesUsed: [...sourcesUsed],
   };
