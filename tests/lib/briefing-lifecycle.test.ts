@@ -3,8 +3,8 @@ import { formatProgress, formatLastOpened, DWELL_MS } from '@/components/chippi/
 
 describe('briefing lifecycle — receipt formatting', () => {
   describe('formatProgress', () => {
-    it('returns "Nothing today" when there are no cards', () => {
-      expect(formatProgress(0, null)).toBe('Nothing today');
+    it('returns "Quiet today" when there are no cards', () => {
+      expect(formatProgress(0, null)).toBe('Quiet today');
     });
 
     it('singularizes one card', () => {
@@ -15,8 +15,16 @@ describe('briefing lifecycle — receipt formatting', () => {
       expect(formatProgress(3, null)).toBe('3 cards');
     });
 
-    it('appends "acted on" when the realtor has tapped at least one card', () => {
-      expect(formatProgress(5, '2026-05-30T07:11:00Z')).toBe('5 cards · acted on');
+    it('appends "opened" when the realtor has tapped at least one card', () => {
+      expect(formatProgress(5, '2026-05-30T07:11:00Z')).toBe('5 cards · opened');
+    });
+
+    it("keeps the receipt in the realtor's vocabulary — never enum or product jargon", () => {
+      // Guard against drift toward 'acted on', 'actioned', 'engaged', etc.
+      // The receipt is one breath of prose; jargon kills it.
+      expect(formatProgress(5, '2026-05-30T07:11:00Z')).not.toMatch(
+        /acted on|actioned|engaged|interacted/i,
+      );
     });
   });
 
