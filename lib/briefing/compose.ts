@@ -29,6 +29,7 @@ import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
 import { calendarGoogleSource } from './signal-sources/calendar-google';
 import { gmailSource } from './signal-sources/gmail';
+import { hubspotSource } from './signal-sources/hubspot';
 import { composeMomentum } from './momentum';
 import { composeTomorrow } from './tomorrow';
 import { pickBestTip, tipToCard } from './tips/tips-source';
@@ -38,8 +39,8 @@ import { pickBestTip, tipToCard } from './tips/tips-source';
  * sources. Phase B layers more on — `drafts` surfaces the autonomous
  * agent's pending AgentDraft rows; `calendar_google` (Phase D2) pulls
  * external Calendar; `gmail` (Phase D3) catches quiet sent threads and
- * inbound the agent skipped. Slack / HubSpot follow. The composer
- * needs no change as the list grows.
+ * inbound the agent skipped; `hubspot` (Phase D1) surfaces cross-CRM
+ * drift. Slack follows. The composer needs no change as the list grows.
  */
 const SOURCES: SignalGatherer[] = [
   pipelineSource,
@@ -48,6 +49,7 @@ const SOURCES: SignalGatherer[] = [
   draftsSource,
   calendarGoogleSource,
   gmailSource,
+  hubspotSource,
 ];
 
 /**
