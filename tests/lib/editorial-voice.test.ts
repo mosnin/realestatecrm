@@ -200,6 +200,10 @@ describe('editorial voice — canonical CTA verbs', () => {
   const allText = audited.map((f) => f.text).join('\n');
 
   // Each entry is a verb-led CTA we ship. Listed as it appears in source.
+  // "Save event" / "Save note" were on the Chippi-owned calendar surface
+  // that was deleted when calendars went external-only — Chippi mirrors
+  // the realtor's Google Calendar now and doesn't have its own add-event
+  // verb. Removed from the canonical list.
   const CANONICAL_CTAS = [
     'Tell Chippi →',
     'Send',
@@ -208,8 +212,6 @@ describe('editorial voice — canonical CTA verbs', () => {
     'Try again',
     'Open chat',
     'Schedule tour',
-    'Save event',
-    'Save note',
   ];
 
   for (const cta of CANONICAL_CTAS) {
@@ -235,7 +237,7 @@ describe('editorial voice — canonical CTA verbs', () => {
     expect(
       offenders,
       `"Submit" appears as button copy in: ${offenders.join(', ')}. ` +
-        `Use a verb that names what's about to happen ("Send", "Save event", etc.).`,
+        `Use a verb that names what's about to happen ("Send", "Schedule tour", etc.).`,
     ).toEqual([]);
   });
 });
