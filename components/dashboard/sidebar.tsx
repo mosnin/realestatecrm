@@ -10,6 +10,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
+import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED } from '@/lib/geometry';
 import {
   SidebarCollapseProvider,
   CollapsedTooltip,
@@ -1088,7 +1089,7 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside data-dashboard-sidebar className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0">
+      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0', SIDEBAR_WIDTH)}>
         <div className="px-4 pt-5 pb-3">
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
@@ -1138,7 +1139,7 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside data-dashboard-sidebar className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
+      <aside data-dashboard-sidebar className={cn('relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden', SIDEBAR_WIDTH)}>
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
@@ -1281,7 +1282,7 @@ function RealtorSidebarShell({
       className={cn(
         'group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0',
         'transition-[width] duration-200 ease-in-out',
-        collapsed ? 'w-[56px]' : 'w-[240px]',
+        collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH,
       )}
     >
       {/* Edge-handle collapse toggle — sticks half-off the right edge of the

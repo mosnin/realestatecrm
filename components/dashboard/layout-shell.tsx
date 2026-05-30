@@ -4,6 +4,8 @@ import { usePathname } from 'next/navigation';
 import { PageTransition } from '@/components/motion/page-transition';
 import { DashboardFooter } from '@/components/dashboard/footer';
 import { SupabaseRealtimeBridge } from '@/components/dashboard/supabase-realtime-bridge';
+import { PAGE_MAX } from '@/lib/geometry';
+import { cn } from '@/lib/utils';
 
 interface LayoutShellProps {
   slug: string;
@@ -38,12 +40,12 @@ export function LayoutShell({ slug, children, liveNotifications }: LayoutShellPr
           ChippiBar overlays the bottom 80-100px of the viewport; pb-28
           on the content gives it just enough clearance without padding
           the page out to 160px. */}
-      <div className="dashboard-content w-full max-w-[1500px] mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28">
+      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28')}>
         <SupabaseRealtimeBridge />
         {liveNotifications}
         <PageTransition>{children}</PageTransition>
       </div>
-      <div className="dashboard-footer-wrap w-full max-w-[1500px] mx-auto px-4 sm:px-6 md:px-10 lg:px-12 pb-4">
+      <div className={cn('dashboard-footer-wrap w-full', PAGE_MAX, 'mx-auto px-4 sm:px-6 md:px-10 lg:px-12 pb-4')}>
         <DashboardFooter />
       </div>
     </main>

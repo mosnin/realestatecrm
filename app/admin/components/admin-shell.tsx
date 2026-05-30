@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
+import { PAGE_MAX } from '@/lib/geometry';
 import { useState } from 'react';
 
 const navSections = [
@@ -242,7 +243,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-20 md:pb-7">
-          <div className="w-full max-w-[1500px] mx-auto">
+          <div className={cn('w-full mx-auto', PAGE_MAX)}>
           {children}
           </div>
         </main>

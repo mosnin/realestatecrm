@@ -20,6 +20,7 @@ import {
   BODY_MUTED,
   SECTION_LABEL,
 } from '@/lib/typography';
+import { PAGE_MAX } from '@/lib/geometry';
 import { DealDetailClient } from '@/components/deals/deal-detail-client';
 import { DealInlineField } from '@/components/deals/deal-inline-field';
 import { DealFollowUpField } from '@/components/deals/deal-follow-up-field';
@@ -225,7 +226,7 @@ export default async function DealDetailPage({
   const ownerInitials = getInitials(ownerName);
 
   return (
-    <div className="max-w-[1500px] mx-auto space-y-8 pb-12">
+    <div className={cn(PAGE_MAX, 'mx-auto space-y-8 pb-12')}>
       {/* Quiet back link — mirrors the People detail's "ArrowLeft People"
           breadcrumb. The card-wrapped breadcrumb in the old design was loud
           chrome for a navigation primitive. */}

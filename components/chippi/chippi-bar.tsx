@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Send, Square, Loader2, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
@@ -201,7 +202,7 @@ export function ChippiBar({ slug }: Props) {
       {expanded && hasContent && (
         <div
           ref={panelRef}
-          className="pointer-events-auto mx-auto max-w-3xl mb-2 rounded-2xl border border-border bg-background/95 backdrop-blur-md shadow-xl overflow-hidden"
+          className={cn('pointer-events-auto mx-auto mb-2 rounded-2xl border border-border bg-background/95 backdrop-blur-md shadow-xl overflow-hidden', CHIPPI_BAR_MAX)}
         >
           <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -323,7 +324,8 @@ export function ChippiBar({ slug }: Props) {
       <form
         onSubmit={handleSubmit}
         className={cn(
-          'pointer-events-auto mx-auto max-w-3xl flex items-center gap-2',
+          'pointer-events-auto mx-auto flex items-center gap-2',
+          CHIPPI_BAR_MAX,
           'rounded-full border border-border bg-background/95 backdrop-blur-md',
           'pl-4 pr-1.5 py-1.5 shadow-lg',
         )}
