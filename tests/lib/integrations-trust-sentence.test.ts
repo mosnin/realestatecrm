@@ -1,11 +1,16 @@
 /**
- * Snapshot the exact wording of the integrations-page trust sentence.
+ * Snapshot the exact wording of the connected-apps trust sentence.
  *
  * The sentence is the answer to a realtor's actual fear ("am I handing
  * Chippi the keys to my inbox?"). Drive-by copy edits that soften it back
  * into corporate fluff would make this fix moot — so we read the page's
  * source and assert the verbatim string is present. Any change to that
  * sentence has to flip this test on purpose.
+ *
+ * Surface moved: the standalone /integrations page was collapsed into the
+ * Settings Connections tab in the Chippi dropdown reorg (the dropdown is
+ * for daily surfaces, configuration belongs in Settings). The sentence
+ * now lives next to ConnectedAppsSection inside the Settings page.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,7 +24,7 @@ const PAGE_PATH = resolve(
   'app',
   's',
   '[slug]',
-  'integrations',
+  'settings',
   'page.tsx',
 );
 
@@ -29,7 +34,7 @@ const PAGE_PATH = resolve(
 // only a softening of the actual promise should.
 const TRUST_PHRASE = 'Chippi never sends without your tap.';
 
-describe('integrations page — trust sentence', () => {
+describe('settings connections — trust sentence', () => {
   it('contains the realtor-facing consent line', () => {
     const src = readFileSync(PAGE_PATH, 'utf8');
     expect(src.includes(TRUST_PHRASE)).toBe(true);

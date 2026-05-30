@@ -1,44 +1,14 @@
-/**
- * /s/[slug]/integrations — the connected-apps page.
- *
- * The realtor opens this from the sidebar (or from a chat banner that
- * says "Connect Gmail to send drafts →"). One page, one job: see every
- * app Chippi can connect to, with status and a connect/disconnect verb
- * inline. No tabs, no wizards, no settings.
- *
- * The realtor's lens — what does Chippi DO once I connect Gmail? — is
- * answered by the app's blurb in the row, not by a help article. If the
- * blurb doesn't sell it, fix the blurb.
- *
- * Health status: ConnectedAppsSection fetches /api/integrations/health
- * client-side (non-blocking, refreshes on window focus) and shows a
- * colored dot + label next to each connected app:
- *   - green  "Connected"        — Composio reports ACTIVE
- *   - yellow "Auth expired"     — Composio reports EXPIRED; realtor must reconnect
- *   - red    "Connection error" — Composio reports FAILED or a fetch error
- *   - gray   "Not connected"    — no connection in our DB or Composio
- * This surfaces broken auth before Chippi tries to use the integration,
- * eliminating silent task failures.
- */
-
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSlug } from '@/lib/space';
-import { supabase } from '@/lib/supabase';
-import type { Metadata } from 'next';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
-import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  return { title: `Integrations — ${slug}` };
-}
-
-export default async function IntegrationsPage({
+/**
+ * /integrations — legacy URL. Connected apps are configuration (how Chippi
+ * works, not what Chippi did today) so it moved into Settings. Kept as a
+ * redirect for bookmark safety. The realtor-facing trust sentence
+ * ("Chippi never sends without your tap.") now lives in the Settings
+ * Connections section.
+ */
+export default async function IntegrationsRedirect({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -47,26 +17,5 @@ export default async function IntegrationsPage({
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
-  const space = await getSpaceFromSlug(slug);
-  if (!space) notFound();
-
-  // Verify the authenticated user owns this space — same gate as the
-  // other realtor pages.
-  const { data: spaceOwner } = await supabase
-    .from('User')
-    .select('id')
-    .eq('clerkId', userId)
-    .eq('id', space.ownerId)
-    .maybeSingle();
-  if (!spaceOwner) notFound();
-
-  return (
-    <ChippiPageShell
-      greeting="Tools."
-      title="What I work with."
-      subtitle="Chippi never sends without your tap."
-    >
-      <ConnectedAppsSection />
-    </ChippiPageShell>
-  );
+  redirect(`/s/${slug}/settings?tab=connections`);
 }
