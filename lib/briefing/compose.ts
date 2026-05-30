@@ -27,6 +27,7 @@ import { pipelineSource } from './signal-sources/pipeline';
 import { leadsSource } from './signal-sources/leads';
 import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
+import { calendarGoogleSource } from './signal-sources/calendar-google';
 import { composeMomentum } from './momentum';
 import { composeTomorrow } from './tomorrow';
 import { pickBestTip, tipToCard } from './tips/tips-source';
@@ -38,7 +39,13 @@ import { pickBestTip, tipToCard } from './tips/tips-source';
  * Slack / HubSpot follow as separate sources. The composer needs no
  * change as the list grows.
  */
-const SOURCES: SignalGatherer[] = [pipelineSource, leadsSource, calendarSource, draftsSource];
+const SOURCES: SignalGatherer[] = [
+  pipelineSource,
+  leadsSource,
+  calendarSource,
+  draftsSource,
+  calendarGoogleSource,
+];
 
 /**
  * Rank rule: ascending urgency (1 = today, 3 = soon), then descending
