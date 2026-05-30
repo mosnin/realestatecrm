@@ -49,13 +49,16 @@ interface ApiResponse {
   showIntro: boolean;
 }
 
+// The verb tag on each card. Realtor's vocabulary — "WIN" not "NOTED",
+// because "noted" is product-internal and a fresh realtor has to translate
+// it. A closing is a win; the brief calls it a win.
 const ACTION_LABEL: Record<SignalKind, string> = {
   reply: 'REPLY',
   call: 'CALL',
   prep: 'PREP',
   review: 'REVIEW',
   sign: 'SIGN',
-  celebrate: 'NOTED',
+  celebrate: 'WIN',
   tip: 'TIP',
 };
 
@@ -111,12 +114,18 @@ export function DailyBrief({ slug, initialBrief }: Props) {
   const [loading, setLoading] = useState(!initialBrief);
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [errored, setErrored] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [forceExpanded, setForceExpanded] = useState(false);
   const [showYesterday, setShowYesterday] = useState(false);
 
   useEffect(() => {
     if (initialBrief) return;
     let cancelled = false;
+    setErrored(false);
+    setSlow(false);
+    setTimedOut(false);
+    setLoading(true);
     const slowTimer = setTimeout(() => !cancelled && setSlow(true), SLOW_STATUS_MS);
     const timeoutTimer = setTimeout(() => !cancelled && setTimedOut(true), TIMEOUT_FALLBACK_MS);
 
@@ -124,7 +133,13 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       try {
         const res = await fetch('/api/agent/briefing');
         if (!res.ok) {
-          if (!cancelled) setLoading(false);
+          // Don't fail silently — surface a calm error with Try again.
+          // The original silent return null left the realtor with a
+          // blank space where the brief should be, no recovery path.
+          if (!cancelled) {
+            setErrored(true);
+            setLoading(false);
+          }
           return;
         }
         const json = (await res.json()) as ApiResponse;
@@ -148,7 +163,10 @@ export function DailyBrief({ slug, initialBrief }: Props) {
           }
         }
       } catch {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setErrored(true);
+          setLoading(false);
+        }
       } finally {
         clearTimeout(slowTimer);
         clearTimeout(timeoutTimer);
@@ -160,7 +178,7 @@ export function DailyBrief({ slug, initialBrief }: Props) {
       clearTimeout(slowTimer);
       clearTimeout(timeoutTimer);
     };
-  }, [initialBrief]);
+  }, [initialBrief, retryNonce]);
 
   const lifecycle = useBriefLifecycle({
     status: data?.status ?? 'pending',
@@ -199,10 +217,35 @@ export function DailyBrief({ slug, initialBrief }: Props) {
           <div className="h-3 w-5/6 rounded bg-muted/40" />
         </div>
         {timedOut && (
-          <p className={cn(BODY_MUTED, 'mt-4 text-xs')}>
-            I&apos;ll have your brief in a moment.
-          </p>
+          <div className="mt-4 flex items-center gap-3">
+            <p className={cn(BODY_MUTED, 'text-xs')}>This is taking longer than usual.</p>
+            <button
+              type="button"
+              onClick={() => setRetryNonce((n) => n + 1)}
+              className="text-xs text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Try again
+            </button>
+          </div>
         )}
+      </div>
+    );
+  }
+
+  // Explicit error surface — one calm sentence + recovery action. The
+  // fetch failure used to set data to null silently and the component
+  // rendered nothing; per the rubric, errors are named and recoverable.
+  if (errored && !data) {
+    return (
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+        <p className={cn(BODY_MUTED, 'mb-3')}>I couldn&apos;t reach your brief just now.</p>
+        <button
+          type="button"
+          onClick={() => setRetryNonce((n) => n + 1)}
+          className={cn(GHOST_PILL, 'h-8 px-3 text-xs')}
+        >
+          Try again
+        </button>
       </div>
     );
   }
