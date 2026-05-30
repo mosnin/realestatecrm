@@ -304,30 +304,6 @@
   }
 }
 
-.dashboard-footer-wrap {
-  padding-left: 1rem;
-  padding-right: 1rem;
-  padding-bottom: 1rem;
-}
-@media (min-width: 640px) {
-  .dashboard-footer-wrap {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-}
-@media (min-width: 768px) {
-  .dashboard-footer-wrap {
-    padding-left: 2.5rem;
-    padding-right: 2.5rem;
-  }
-}
-@media (min-width: 1024px) {
-  .dashboard-footer-wrap {
-    padding-left: 3rem;
-    padding-right: 3rem;
-  }
-}
-
 /* Chippi chat surface — same defensive pattern. The chat workspace's
    inner content wrappers have `px-4 sm:px-6` but production showed the
    composer overflowing the right edge on mobile. Explicit raw CSS class. */
@@ -816,12 +792,9 @@
 }
 /* Sidebar/header collapse means the content column shouldn't carry the
  * extra bottom padding the ChippiBar used to reserve. Tighten it. The
- * dashboard-content/dashboard-footer-wrap classes are set in LayoutShell. */
+ * dashboard-content class is set in LayoutShell. */
 [data-chippi-embed='true'] .dashboard-content {
   padding-bottom: 1rem !important;
-}
-[data-chippi-embed='true'] .dashboard-footer-wrap {
-  display: none !important;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

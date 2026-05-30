@@ -5,7 +5,6 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
-import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { PAGE_MAX } from '@/lib/geometry';
 import type { Metadata } from 'next';
@@ -166,7 +165,6 @@ export default async function BrokerLayout({ children }: { children: React.React
         <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
           <div className={`w-full mx-auto ${PAGE_MAX}`}>
           {children}
-          <DashboardFooter />
           </div>
         </main>
       </div>
