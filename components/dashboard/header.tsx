@@ -17,7 +17,7 @@ import {
 import { useTheme } from '@/components/theme-provider';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
-import { secondaryNavItems } from '@/lib/nav-items';
+import { secondaryNavItems, realtorNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
@@ -204,122 +204,49 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  {/* AI — single Chippi entry, matches the redesigned sidebar */}
-                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-1 select-none`}>AI</p>
-                  {[
-                    { href: `${base}/chippi`, label: 'Chippi', icon: MessageCircle, exact: false },
-                  ].map((item) => {
-                    const isActive = pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-                          isActive
-                            ? 'bg-foreground/[0.045] text-foreground font-medium'
-                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-                        )}
+                  {/* On /chippi, render the conversations list with a "show
+                      pages" affordance — same dual-mode the desktop sidebar
+                      uses (chats on chippi, pages elsewhere). Everywhere
+                      else, render the realtorNavItems tree so the mobile
+                      drawer's items MATCH the desktop sidebar exactly. */}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {isOnChippi && !mobileShowPages ? (
+                      <motion.div
+                        key="chats"
+                        variants={PAGE_VARIANTS}
+                        initial="initial"
+                        animate="enter"
+                        exit="exit"
                       >
-                        {isActive && (
-                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
-                        )}
-                        <img
-                          src="/chip-avatar.png"
-                          alt=""
-                          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+                        <SidebarConversations
+                          slug={slug}
+                          onSelect={() => setOpen(false)}
                         />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-
-                  {/* Primary — matches the redesigned realtor sidebar */}
-                  {[
-                    { href: '/contacts', label: 'People', icon: Users },
-                    { href: '/deals', label: 'Pipeline', icon: Briefcase },
-                  ].map((item) => {
-                    const href = `${base}${item.href}`;
-                    const isActive = pathname.startsWith(href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-                          isActive
-                            ? 'bg-foreground/[0.045] text-foreground font-medium'
-                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setMobileShowPages(true)}
+                          className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Show pages →
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="pages"
+                        variants={PAGE_VARIANTS}
+                        initial="initial"
+                        animate="enter"
+                        exit="exit"
                       >
-                        {isActive && (
-                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
-                        )}
-                        <item.icon
-                          size={15}
-                          strokeWidth={isActive ? 2.25 : 1.75}
-                          className={cn(
-                            'flex-shrink-0',
-                            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-                          )}
-                        />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-
-                  {/* Context-aware second section — Chippi conversations on
-                      /chippi, the static "More" pages everywhere else. The
-                      cross-fade reuses PAGE_VARIANTS so the swap reads as a
-                      page-level mode change, not a list refresh. */}
-                  <div className="pt-4">
-                    <AnimatePresence mode="wait" initial={false}>
-                      {isOnChippi && !mobileShowPages ? (
-                        <motion.div
-                          key="chats"
-                          variants={PAGE_VARIANTS}
-                          initial="initial"
-                          animate="enter"
-                          exit="exit"
-                        >
-                          <SidebarConversations
-                            slug={slug}
-                            onSelect={() => setOpen(false)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setMobileShowPages(true)}
-                            className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            Show pages →
-                          </button>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="pages"
-                          variants={PAGE_VARIANTS}
-                          initial="initial"
-                          animate="enter"
-                          exit="exit"
-                        >
-                          <p className={`${SECTION_LABEL} px-3 pb-2 select-none`}>
-                            More
-                          </p>
-                          {[
-                            { href: '/calendar', label: 'Calendar', icon: Calendar },
-                            { href: '/files', label: 'Files', icon: FolderOpen },
-                            { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
-                            { href: '/intake', label: 'Intake form', icon: ClipboardList },
-                            { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-                          ].map((item) => {
-                            const href = `${base}${item.href}`;
-                            const isActive = pathname.startsWith(href);
-                            return (
+                        {realtorNavItems.map((item) => {
+                          const itemHref = `${base}${item.href}`;
+                          const isActive = item.exact
+                            ? pathname === itemHref
+                            : pathname.startsWith(itemHref);
+                          return (
+                            <div key={item.href}>
                               <Link
-                                key={item.href}
-                                href={href}
+                                href={itemHref}
                                 onClick={() => setOpen(false)}
                                 className={cn(
                                   'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
@@ -331,56 +258,66 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                                 {isActive && (
                                   <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
                                 )}
-                                <item.icon
-                                  size={15}
-                                  strokeWidth={isActive ? 2.25 : 1.75}
-                                  className={cn(
-                                    'flex-shrink-0',
-                                    isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-                                  )}
-                                />
+                                {item.isAI ? (
+                                  <img
+                                    src="/chip-avatar.png"
+                                    alt=""
+                                    className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+                                  />
+                                ) : (
+                                  <item.icon
+                                    size={15}
+                                    strokeWidth={isActive ? 2.25 : 1.75}
+                                    className={cn(
+                                      'flex-shrink-0',
+                                      isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                                    )}
+                                  />
+                                )}
                                 {item.label}
                               </Link>
-                            );
-                          })}
-                          {isOnChippi && (
-                            <button
-                              type="button"
-                              onClick={() => setMobileShowPages(false)}
-                              className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              ← Back to chats
-                            </button>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Settings section — expanded flat list */}
-                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-5 select-none`}>Settings</p>
-                  {[
-                    { href: '/settings', label: 'Settings', exact: true },
-                    { href: '/billing', label: 'Billing' },
-                  ].map((item) => {
-                    const href = `${base}${item.href}`;
-                    const isActive = item.exact ? pathname === href : pathname.startsWith(href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] transition-colors',
-                          isActive
-                            ? 'bg-accent text-foreground font-medium'
-                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                              {/* Children render inline under their parent.
+                                  No collapse — the drawer scrolls, and a
+                                  flat tree means every destination is one
+                                  tap away. */}
+                              {item.children && item.children.length > 0 && (
+                                <div className="ml-7 mt-0.5 mb-1 space-y-0.5">
+                                  {item.children.map((child) => {
+                                    const childHref = `${base}${child.href}`;
+                                    const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
+                                    return (
+                                      <Link
+                                        key={child.href}
+                                        href={childHref}
+                                        onClick={() => setOpen(false)}
+                                        className={cn(
+                                          'flex items-center h-8 px-3 rounded-md text-[12.5px] transition-colors duration-150',
+                                          childActive
+                                            ? 'text-foreground font-medium'
+                                            : 'text-foreground/55 hover:text-foreground',
+                                        )}
+                                      >
+                                        {child.label}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {isOnChippi && (
+                          <button
+                            type="button"
+                            onClick={() => setMobileShowPages(false)}
+                            className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            ← Back to chats
+                          </button>
                         )}
-                      >
-                        {item.label}
-                      </Link>
-                    );
-                  })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </>
               )}
               {isBroker && showBrokerMobileNavOnly && (
