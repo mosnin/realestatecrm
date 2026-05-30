@@ -936,8 +936,11 @@ export function AgentDraftInbox({ slug }: Props) {
 
       {/* Empty state */}
       {!loading && drafts.length === 0 && (
-        <div className="py-8 text-sm text-muted-foreground">
-          Inbox is clear. Chippi will leave new outreach here whenever there&apos;s someone worth following up with.
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center mt-4">
+          <p className="text-sm text-foreground">Outbox is clear.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            New outreach lands here when there&apos;s someone worth following up with.
+          </p>
         </div>
       )}
 

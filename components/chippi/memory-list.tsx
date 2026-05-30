@@ -97,10 +97,9 @@ export function MemoryList() {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">I haven&apos;t learned anything yet.</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Facts, preferences, and observations land here as we work together.
+      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Facts and preferences I pick up while we work land here.
         </p>
       </div>
     );

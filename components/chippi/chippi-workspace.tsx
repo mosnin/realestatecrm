@@ -1034,9 +1034,9 @@ export function ChippiWorkspace({
                 Voice mode
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href={`/s/${slug}/settings?tab=memory`} className="cursor-pointer">
+                <Link href={`/s/${slug}/chippi/memory`} className="cursor-pointer">
                   <NotebookText size={14} className="mr-2" />
-                  What I remember
+                  Memory
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -1156,10 +1156,10 @@ export function ChippiWorkspace({
                         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
                         className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
                       >
-                        Type below to get started — or browse{' '}
-                        <span className="text-foreground/70">Full day</span>,{' '}
-                        <span className="text-foreground/70">Drafts</span>, and{' '}
-                        <span className="text-foreground/70">Activity</span> from the sidebar.
+                        Try me. Or browse the{' '}
+                        <span className="text-foreground/70">Brief</span>,{' '}
+                        <span className="text-foreground/70">Outbox</span>, and{' '}
+                        <span className="text-foreground/70">Log</span> from the sidebar.
                       </motion.p>
                     )
                   )}

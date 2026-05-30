@@ -74,23 +74,19 @@ export default async function ApprovalsPage({
 
   const approvalList = (tasks ?? []) as ApprovalTask[];
   const pendingCount = approvalList.length;
-  const statusSentence =
-    pendingCount === 0
-      ? "Nothing waiting. I'll ask before any risky action."
-      : pendingCount === 1
-        ? '1 decision is waiting on you.'
-        : `${pendingCount} decisions are waiting on you.`;
 
   return (
     <ChippiPageShell
       greeting="Approvals."
-      title="Decisions waiting"
-      subtitle={statusSentence}
+      title={
+        pendingCount === 0
+          ? 'Nothing to decide right now.'
+          : 'Need your call.'
+      }
     >
       {approvalList.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-          <p className="text-sm text-foreground">Nothing to decide right now.</p>
-          <p className="text-xs text-muted-foreground mt-1">
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+          <p className="text-xs text-muted-foreground">
             I&apos;ll surface anything risky here before I act on it.
           </p>
         </div>

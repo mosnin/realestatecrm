@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 
 interface ApprovalActionsProps {
   taskId: string;
@@ -52,11 +54,7 @@ export function ApprovalActions({ taskId, slug }: ApprovalActionsProps) {
       <button
         onClick={() => handle('approve')}
         disabled={pending !== null}
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md
-                   bg-foreground text-background text-xs font-medium
-                   transition-all duration-150 active:scale-[0.98]
-                   focus-visible:ring-2 ring-ring/40 ring-offset-2 ring-offset-background
-                   disabled:opacity-50 disabled:cursor-not-allowed"
+        className={cn(PRIMARY_PILL, 'disabled:opacity-50')}
       >
         <Check size={13} />
         {pending === 'approve' ? 'Approving…' : 'Approve'}
@@ -65,12 +63,7 @@ export function ApprovalActions({ taskId, slug }: ApprovalActionsProps) {
       <button
         onClick={() => handle('reject')}
         disabled={pending !== null}
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md
-                   border border-border text-foreground text-xs font-medium
-                   hover:bg-foreground/[0.04] transition-all duration-150
-                   active:scale-[0.98]
-                   focus-visible:ring-2 ring-ring/40 ring-offset-2 ring-offset-background
-                   disabled:opacity-50 disabled:cursor-not-allowed"
+        className={cn(GHOST_PILL, 'disabled:opacity-50')}
       >
         <X size={13} />
         {pending === 'reject' ? 'Rejecting…' : 'Reject'}

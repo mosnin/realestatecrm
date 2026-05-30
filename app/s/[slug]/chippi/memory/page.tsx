@@ -41,8 +41,7 @@ export default async function ChippiMemoryPage({
   return (
     <ChippiPageShell
       greeting="Memory."
-      title="What Chippi remembers"
-      subtitle="Facts, preferences, and observations Chippi has picked up while working with you. Delete anything you want forgotten."
+      title="What I'm holding onto."
     >
       <MemoryList />
     </ChippiPageShell>

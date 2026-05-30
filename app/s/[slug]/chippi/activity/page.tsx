@@ -30,9 +30,8 @@ export default async function ChippiActivityPage({
 
   return (
     <ChippiPageShell
-      greeting="Activity."
-      title="What Chippi did"
-      subtitle="Every action Chippi has taken — with reasoning. Undo anything reversible."
+      greeting="Log."
+      title="Here's what I did."
     >
       <ActivityFeed slug={slug} />
     </ChippiPageShell>
