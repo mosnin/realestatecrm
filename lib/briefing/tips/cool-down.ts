@@ -10,7 +10,7 @@
  * Per-category windows are tuned to the cadence of the signal:
  *   - Single-subject tips (hot lead dormant, deal closing): 7 days
  *   - Past-client / unworked-tag (segments need time to work): 30 days
- *   - Trend tips (overdue pileup, reply rate): 14 days
+ *   - Trend tips (overdue pileup, reply rate, stagnation, etc.): 14 days
  */
 
 import { supabase } from '@/lib/supabase';
@@ -24,6 +24,10 @@ const COOL_DOWN_DAYS: Record<string, number> = {
   past_client_referral: 30,
   unworked_tag: 30,
   overdue_pileup: 14,
+  reply_rate_decline: 14,
+  stage_stagnation: 14,
+  tour_conversion_drop: 14,
+  source_dry_spell: 14,
 };
 
 const DEFAULT_COOL_DOWN_DAYS = 7;

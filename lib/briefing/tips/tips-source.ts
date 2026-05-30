@@ -22,6 +22,32 @@ import { canFireTip, recordTipFired } from './cool-down';
 import { ALL_TIP_CATEGORIES } from './tip-categories';
 import type { Signal } from '../types';
 
+/**
+ * Anonymous-trend tip categories — the subject is "the realtor's own
+ * funnel," not a specific entity, so cool-down keys on (category, null)
+ * and ranking treats them below per-entity tips.
+ *
+ * `unworked_tag` is anonymous-by-prefix (`tag:*`) for legacy reasons —
+ * its subject IS a tag name, but the cool-down treats the whole category
+ * as one slot per realtor. Trend tips added in Phase C2 follow the same
+ * rule when their subject is global (reply rate, tour conversion).
+ */
+const ANONYMOUS_TREND_CATEGORIES = new Set([
+  'overdue_pileup',
+  'unworked_tag',
+  'reply_rate_decline',
+  'tour_conversion_drop',
+]);
+
+function isAnonymousTrend(sig: Signal): boolean {
+  if (!sig.tipCategory) return false;
+  return ANONYMOUS_TREND_CATEGORIES.has(sig.tipCategory);
+}
+
+function resolveSubjectId(sig: Signal): string | null {
+  return isAnonymousTrend(sig) ? null : sig.subject.id;
+}
+
 export async function pickBestTip(spaceId: string): Promise<Signal | null> {
   // Run every category in parallel — each is one Supabase call (some are
   // a few). The brief's per-realtor budget is generous.
@@ -36,15 +62,11 @@ export async function pickBestTip(spaceId: string): Promise<Signal | null> {
 
   if (candidates.length === 0) return null;
 
-  // Apply cool-down filter. Cheap — at most ~6 candidates × 1 query each.
+  // Apply cool-down filter. Cheap — at most ~10 candidates × 1 query each.
   const eligible: Signal[] = [];
   for (const sig of candidates) {
     if (!sig.tipCategory) continue;
-    // Trend tips use null subjectId; single-subject tips use the real id.
-    const subjectId = sig.subject.id.startsWith('tag:') || sig.tipCategory === 'overdue_pileup'
-      ? null
-      : sig.subject.id;
-    const ok = await canFireTip(spaceId, sig.tipCategory, subjectId);
+    const ok = await canFireTip(spaceId, sig.tipCategory, resolveSubjectId(sig));
     if (ok) eligible.push(sig);
   }
 
@@ -52,10 +74,10 @@ export async function pickBestTip(spaceId: string): Promise<Signal | null> {
 
   // Rank: named subjects > anonymous, then confidence desc.
   eligible.sort((a, b) => {
-    const aNamed = a.tipCategory !== 'overdue_pileup' && !a.subject.id.startsWith('tag:');
-    const bNamed = b.tipCategory !== 'overdue_pileup' && !b.subject.id.startsWith('tag:');
-    if (aNamed && !bNamed) return -1;
-    if (!aNamed && bNamed) return 1;
+    const aAnon = isAnonymousTrend(a);
+    const bAnon = isAnonymousTrend(b);
+    if (!aAnon && bAnon) return -1;
+    if (aAnon && !bAnon) return 1;
     return b.confidence - a.confidence;
   });
 
@@ -64,10 +86,7 @@ export async function pickBestTip(spaceId: string): Promise<Signal | null> {
   // Record the fire BEFORE returning so concurrent compose ticks (rare
   // but possible) don't both pick the same tip and double-stamp.
   if (winner.tipCategory) {
-    const subjectId = winner.subject.id.startsWith('tag:') || winner.tipCategory === 'overdue_pileup'
-      ? null
-      : winner.subject.id;
-    await recordTipFired(spaceId, winner.tipCategory, subjectId);
+    await recordTipFired(spaceId, winner.tipCategory, resolveSubjectId(winner));
   }
 
   return winner;
