@@ -39,6 +39,7 @@ import {
   ExternalLink,
   Mic,
   Tag as TagIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import { BODY_MUTED, TITLE_FONT, QUIET_LINK, CHIPPI_PILL } from '@/lib/typography';
 
@@ -153,6 +154,11 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  // Set on fetchContacts failure. Used to render an inline banner above the
+  // list instead of silently falling through to the "fresh workspace" empty
+  // state — which would tell a realtor with 200 contacts they have none. The
+  // surface owns its failure mode in the agent's voice.
+  const [error, setError] = useState(false);
   const [view, setView] = useState<'card' | 'list'>('list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
@@ -201,9 +207,15 @@ export function ContactTable({ slug }: ContactTableProps) {
     try {
       const params = new URLSearchParams({ slug, search, type: typeFilter });
       const res = await fetch(`/api/contacts?${params}`);
-      if (res.ok) setContacts(await res.json());
+      if (!res.ok) {
+        setError(true);
+        return;
+      }
+      setContacts(await res.json());
+      setError(false);
     } catch (err) {
       console.error('[contact-table] fetchContacts failed:', err);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -320,6 +332,17 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   async function handleBulkChangeType(newType: Client['type']) {
     const ids = [...selectedIds];
+    // Snapshot prior types so the success toast can offer undo. The undo
+    // pattern beats a confirm dialog here: bulk stage change isn't
+    // destructive, and the realtor's correct expectation is "I see what
+    // changed and can walk it back," not "wait, are you sure?" before
+    // every batch. Norman's Designing for Error: make actions reversible
+    // rather than blocking them.
+    const prevTypes = new Map<string, Client['type']>();
+    for (const id of ids) {
+      const contact = contacts.find((c) => c.id === id);
+      if (contact) prevTypes.set(id, contact.type);
+    }
     try {
       const results = await Promise.allSettled(
         ids.map((id) =>
@@ -331,13 +354,45 @@ export function ContactTable({ slug }: ContactTableProps) {
         ),
       );
       const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      const successes = ids.length - failures.length;
+      const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
+      if (successes > 0) {
+        toast.success(`Moved ${successes} to ${stageLabel}.`, {
+          action: {
+            label: 'Undo',
+            onClick: () => undoBulkStageChange(prevTypes),
+          },
+        });
+      }
       if (failures.length > 0) {
-        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} got stuck. Try those again.`);
+        toast.error(`${failures.length} got stuck. Try those again.`);
       }
     } catch {
       toast.error("Couldn't update those contacts. Try again.");
     } finally {
       setSelectedIds(new Set());
+      fetchContacts();
+    }
+  }
+
+  // Reverse the previous bulk stage change. Per-id PATCH back to the
+  // snapshotted prior type. Best-effort: if the realtor undoes after one
+  // contact was deleted, Promise.allSettled keeps the others moving.
+  async function undoBulkStageChange(prevTypes: Map<string, Client['type']>) {
+    try {
+      await Promise.allSettled(
+        [...prevTypes.entries()].map(([id, type]) =>
+          fetch(`/api/contacts/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type }),
+          }),
+        ),
+      );
+      toast.success('Moved back.');
+    } catch {
+      toast.error("Couldn't undo. Try moving them manually.");
+    } finally {
       fetchContacts();
     }
   }
@@ -413,7 +468,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   ];
 
   const sortLabels: Record<typeof sortBy, string> = {
-    'agent-priority': 'Smart',
+    'agent-priority': 'Hottest first',
     newest: 'Recently added',
     oldest: 'Oldest first',
     'name-az': 'Name A–Z',
@@ -795,20 +850,43 @@ export function ContactTable({ slug }: ContactTableProps) {
         <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-4 py-3">
           {STAGES.map((stage, i) => {
             const count = stageCounts[stage.key];
+            const isActive = typeFilter === stage.key;
             return (
               <div key={stage.key} className="flex items-center gap-3">
                 {i > 0 && (
                   <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
                 )}
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-muted-foreground">{stage.label}</span>
+                {/* The number is the affordance. Click to filter; click
+                    again to clear. Active stage gets foreground + bold so
+                    the surface reads its own state at a glance. */}
+                <button
+                  type="button"
+                  onClick={() => setTypeFilter(isActive ? 'ALL' : stage.key)}
+                  aria-pressed={isActive}
+                  aria-label={
+                    isActive
+                      ? `Currently filtering to ${stage.label}. Click to show all stages.`
+                      : `Filter to ${stage.label}`
+                  }
+                  className="group/stage flex items-baseline gap-2"
+                >
+                  <span
+                    className={cn(
+                      'text-xs transition-colors',
+                      isActive
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted-foreground group-hover/stage:text-foreground',
+                    )}
+                  >
+                    {stage.label}
+                  </span>
                   <span
                     className="text-lg tabular-nums text-foreground leading-none"
                     style={{ fontFamily: 'var(--font-title)' }}
                   >
                     {count}
                   </span>
-                </div>
+                </button>
               </div>
             );
           })}
@@ -860,8 +938,34 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
+      {/* Inline error banner — fetch failed. Suppresses the empty-state
+          branches below so the "fresh workspace" copy can't tell a working
+          realtor they have no contacts when really we just couldn't reach
+          the server. Voice matches the toast vocabulary. */}
+      {!loading && error && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
+            <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
+          </div>
+          <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+            I couldn&apos;t reach your contacts.
+          </p>
+          <p className="text-sm text-muted-foreground">Usually temporary.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchContacts();
+            }}
+            className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Empty state — context-aware */}
-      {!loading && visibleContacts.length === 0 && (() => {
+      {!loading && !error && visibleContacts.length === 0 && (() => {
         const hasStageFilter = typeFilter !== 'ALL';
         const hasLeadTypeFilter = leadTypeFilter !== 'all';
         const hasTagFilter = !!tagFilter;
@@ -1116,7 +1220,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                         {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     )}
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       {/* Log a note — one-click activity log via Chippi. */}
                       <Link
                         href={`/s/${slug}/chippi/log?personId=${contact.id}`}
@@ -1275,7 +1379,7 @@ function ContactCard({
               checked={selected}
               onChange={onToggleSelect}
               onClick={(e) => e.stopPropagation()}
-              className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity data-[checked=true]:opacity-100"
+              className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity data-[checked=true]:opacity-100"
               data-checked={selected}
             />
             <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
@@ -1290,7 +1394,7 @@ function ContactCard({
               </Link>
             </div>
           </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
             <button type="button" onClick={onEdit} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
               <Pencil size={12} />
             </button>
