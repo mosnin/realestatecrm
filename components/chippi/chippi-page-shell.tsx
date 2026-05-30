@@ -2,30 +2,33 @@
  * ChippiPageShell — the single canonical container for every Chippi sub-route.
  *
  * Same product = same identity below the page chrome. Every /chippi/* leaf
- * page (today, drafts, activity, memory, approvals, …) wraps its content in
- * this shell so containers, headers, vertical rhythm, and muted-greeting
- * pattern stay identical. No surprise hero text, no drifted spacing.
+ * page (brief, drafts, activity, memory, approvals, routines, integrations)
+ * wraps its content in this shell so containers, headers, vertical rhythm,
+ * and muted-greeting pattern stay identical. No surprise hero text, no
+ * drifted spacing.
  *
- * Header is deliberately calm — Chippi pages are conversational surfaces
- * where the CONTENT is the focal moment (the morning narration, the draft
- * card, the activity entry). The page title is orientation, not a hero:
- * a single sans-serif line at text-base font-semibold, no serif Times.
- * Other realtor surfaces (properties, contacts) keep the serif H1 because
- * those pages are reading registers — but Chippi is a chat-mode product.
+ * Header treatment per the Jobs-lens audit: serif Times h1 + status
+ * sentence. The earlier shell used a small sans h1 on the theory that
+ * "Chippi is a chat-mode product." That was wrong. The chat HOME is
+ * chat-mode (it has its own treatment in chippi-workspace.tsx). The
+ * sub-pages — brief, drafts, activity, memory — are reading-and-deciding
+ * mode. Reading-mode pages get the serif. That's how Chippi pages feel
+ * like one product.
  *
- * If a page needs a section heading inside the body, use SECTION_LABEL from
- * lib/typography.ts — never hand-roll text classes.
+ * If a page needs a section heading inside the body, use SECTION_LABEL
+ * from lib/typography.ts — never hand-roll text classes.
  */
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
+import { BODY_MUTED, H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 
 interface ChippiPageShellProps {
   /** Small muted line above the title, e.g. "Drafts." or "Memory." */
   greeting: string;
-  /** Page title — sans-serif, body-sized. Orientation, not a hero. */
+  /** Page title — serif Times, the same h1 vocabulary as every other
+   *  reading-register surface in the product. */
   title: string;
-  /** Status-sentence subtitle. One line, plain prose. */
+  /** Status-sentence subtitle. One line, plain prose, Chippi voice. */
   subtitle: string;
   children: ReactNode;
 }
@@ -44,9 +47,9 @@ export function ChippiPageShell({
           SECTION_RHYTHM,
         )}
       >
-        <header className="space-y-1">
+        <header className="space-y-1.5">
           <p className={BODY_MUTED}>{greeting}</p>
-          <h1 className="text-base font-semibold text-foreground">
+          <h1 className={H1} style={TITLE_FONT}>
             {title}
           </h1>
           <p className={BODY_MUTED}>{subtitle}</p>
