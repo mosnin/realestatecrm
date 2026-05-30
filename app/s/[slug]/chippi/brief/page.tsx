@@ -46,7 +46,7 @@ export default async function ChippiBriefPage({
     <ChippiPageShell
       greeting="Today."
       title="Daily brief"
-      subtitle="The morning snapshot, on a quiet surface. Opens the same brief that lands on your workspace at 7am."
+      subtitle="What matters this morning."
     >
       <DailyBrief slug={slug} alwaysLive />
     </ChippiPageShell>
