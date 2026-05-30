@@ -157,4 +157,25 @@ describe('briefing — the composer locks the design rules', () => {
       expect(subheadline).toBeNull();
     });
   });
+
+  describe('voice — copy invariants the surface depends on', () => {
+    it("the empty-state invitation matches the destination — Plan with Chippi", () => {
+      // The button beneath the invitation says 'Plan with Chippi' and
+      // routes to the chat surface. The invitation must match that verb
+      // so the realtor's expectation lines up with where they land.
+      // Cannot import the private composeEmptyState — assert via the
+      // headline path is over-engineered. Lock the string here so a
+      // future drift to 'Want me to prospect for you?' (which would
+      // mismatch the chat destination) is caught in CI.
+      //
+      // This is a literal-string test by design.
+      const fs = require('fs');
+      const composeSrc = fs.readFileSync(
+        require('path').resolve(__dirname, '../../lib/briefing/compose.ts'),
+        'utf8',
+      );
+      expect(composeSrc).toContain('plan the day together');
+      expect(composeSrc).not.toContain('start prospecting');
+    });
+  });
 });
