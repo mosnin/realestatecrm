@@ -16,6 +16,7 @@ import {
   MAX_CARDS,
   type Brief,
   type BriefCard,
+  type BriefCardMeta,
   type Signal,
   type SignalGatherer,
   type SignalKind,
@@ -25,13 +26,27 @@ import {
 import { pipelineSource } from './signal-sources/pipeline';
 import { leadsSource } from './signal-sources/leads';
 import { calendarSource } from './signal-sources/calendar';
+import { draftsSource } from './signal-sources/drafts';
+import { calendarGoogleSource } from './signal-sources/calendar-google';
+import { composeMomentum } from './momentum';
+import { composeTomorrow } from './tomorrow';
+import { pickBestTip, tipToCard } from './tips/tips-source';
 
 /**
- * The active source list. Phase A: three internal sources. Phase B adds
- * external sources (Gmail, Calendar-Google, Slack, HubSpot) by pushing
- * onto this array — the composer needs no change.
+ * The active source list. Phase A shipped three internal Chippi-DB
+ * sources. Phase B layers more on — `drafts` surfaces the autonomous
+ * agent's pending AgentDraft rows; `calendar_google` (Phase D2) pulls
+ * the realtor's external Calendar for meetings scheduled outside Chippi.
+ * Gmail / Slack / HubSpot follow as separate sources. The composer needs
+ * no change as the list grows.
  */
-const SOURCES: SignalGatherer[] = [pipelineSource, leadsSource, calendarSource];
+const SOURCES: SignalGatherer[] = [
+  pipelineSource,
+  leadsSource,
+  calendarSource,
+  draftsSource,
+  calendarGoogleSource,
+];
 
 /**
  * Rank rule: ascending urgency (1 = today, 3 = soon), then descending
@@ -50,15 +65,20 @@ function rankSignals(signals: Signal[]): Signal[] {
  * can produce signals from multiple sources (Gmail thread + overdue
  * follow-up from leads source for the same person); the realtor sees
  * one card per subject, leading with the highest-ranked angle.
+ *
+ * Returns BOTH the surface-facing cards AND the server-only meta
+ * (confidence + urgency). The two arrays mirror each other by index.
  */
-function selectCards(ranked: Signal[]): BriefCard[] {
+function selectCards(ranked: Signal[]): { cards: BriefCard[]; meta: BriefCardMeta[] } {
   const seen = new Set<string>();
   const cards: BriefCard[] = [];
+  const meta: BriefCardMeta[] = [];
 
   for (const signal of ranked) {
     if (cards.length >= MAX_CARDS) break;
     if (seen.has(signal.subject.id)) continue;
     seen.add(signal.subject.id);
+    const idx = cards.length;
     cards.push({
       kind: signal.kind,
       source: signal.source,
@@ -66,9 +86,16 @@ function selectCards(ranked: Signal[]): BriefCard[] {
       evidence: signal.evidence,
       draftedAction: signal.draftedAction ?? null,
     });
+    meta.push({
+      cardIndex: idx,
+      source: signal.source,
+      kind: signal.kind,
+      confidence: signal.confidence,
+      urgency: signal.urgency,
+    });
   }
 
-  return cards;
+  return { cards, meta };
 }
 
 /**
@@ -127,16 +154,31 @@ function composeEmptyState(): { invitation: string } {
 
 /**
  * The main entry. Reads from all signal sources for the given space,
- * ranks, selects, composes, returns one Brief.
+ * ranks, selects, composes, returns one Brief + the server-only cardMeta
+ * for telemetry (Phase B5).
+ *
+ * The Brief itself is unchanged — surface contract is stable. The meta
+ * is persisted to Brief.cardMeta separately by the caller so it never
+ * leaks to the surface.
  */
-export async function composeBrief(spaceId: string): Promise<Brief> {
-  const results = await Promise.allSettled(SOURCES.map((s) => s.gather(spaceId)));
+export async function composeBrief(
+  spaceId: string,
+): Promise<{ brief: Brief; cardMeta: BriefCardMeta[] }> {
+  // Sources, momentum, tomorrow, and the tips engine all hit Supabase
+  // independently — fan them out in parallel so the cron's per-space
+  // budget stays tight.
+  const [sourceResults, momentum, tomorrow, bestTip] = await Promise.all([
+    Promise.allSettled(SOURCES.map((s) => s.gather(spaceId))),
+    composeMomentum(spaceId).catch(() => null),
+    composeTomorrow(spaceId).catch(() => null),
+    pickBestTip(spaceId).catch(() => null),
+  ]);
 
   const allSignals: Signal[] = [];
   const sourcesUsed = new Set<SignalSource>();
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+  for (let i = 0; i < sourceResults.length; i++) {
+    const result = sourceResults[i];
     const source = SOURCES[i].source;
     if (result.status !== 'fulfilled') continue;
     if (result.value.length > 0) sourcesUsed.add(source);
@@ -146,32 +188,71 @@ export async function composeBrief(spaceId: string): Promise<Brief> {
   }
 
   const ranked = rankSignals(allSignals);
-  const cards = selectCards(ranked);
+  const { cards, meta } = selectCards(ranked);
+
+  // Tip slot rules (Phase C):
+  //   - When cards is empty AND tip exists, the tip's prose REPLACES the
+  //     empty-state invitation (the headline becomes the tip's subject,
+  //     subheadline becomes the evidence).
+  //   - When cards exist AND the tip confidence is ≥ 0.85 AND the tip's
+  //     subject isn't already in cards, the tip renders as Brief.tip
+  //     (one extra card below the regular cards).
+  //   - Otherwise tip is null.
+  const tipQualifiesForBottom =
+    bestTip != null &&
+    bestTip.confidence >= 0.85 &&
+    !cards.some((c) => c.subject.id === bestTip.subject.id);
+
+  if (cards.length === 0 && bestTip) {
+    sourcesUsed.add('tips');
+    return {
+      brief: {
+        headline: bestTip.subject.name,
+        subheadline: bestTip.evidence,
+        cards: [],
+        tip: tipToCard(bestTip),
+        momentum,
+        tomorrow,
+        // The tip replaces the emptyState — calmer than rendering both.
+        emptyState: null,
+        sourcesUsed: [...sourcesUsed],
+      },
+      cardMeta: [],
+    };
+  }
 
   if (cards.length === 0) {
     return {
-      headline: 'Quiet morning.',
-      subheadline: null,
-      cards: [],
-      momentum: null,
-      tomorrow: null,
-      emptyState: composeEmptyState(),
-      sourcesUsed: [...sourcesUsed],
+      brief: {
+        headline: 'Quiet morning.',
+        subheadline: null,
+        cards: [],
+        tip: null,
+        momentum,
+        tomorrow,
+        emptyState: composeEmptyState(),
+        sourcesUsed: [...sourcesUsed],
+      },
+      cardMeta: [],
     };
   }
 
   const { headline, subheadline } = composeHeadline(cards);
 
+  if (tipQualifiesForBottom && bestTip) sourcesUsed.add('tips');
+
   return {
-    headline,
-    subheadline,
-    cards,
-    // Phase B will fill these. Phase A intentionally leaves them null
-    // rather than fabricating prose without the data behind it.
-    momentum: null,
-    tomorrow: null,
-    emptyState: null,
-    sourcesUsed: [...sourcesUsed],
+    brief: {
+      headline,
+      subheadline,
+      cards,
+      tip: tipQualifiesForBottom && bestTip ? tipToCard(bestTip) : null,
+      momentum,
+      tomorrow,
+      emptyState: null,
+      sourcesUsed: [...sourcesUsed],
+    },
+    cardMeta: meta,
   };
 }
 
