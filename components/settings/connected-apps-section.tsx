@@ -26,7 +26,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CAPTION, BODY_MUTED } from '@/lib/typography';
+import { SECTION_LABEL } from '@/lib/typography';
 import {
   INTEGRATIONS,
   integrationsByCategory,
@@ -207,7 +207,22 @@ interface SetupHealth {
   callbackUrl: string | null;
 }
 
-export function ConnectedAppsSection({ callbackResult }: { callbackResult?: CallbackResult | null } = {}) {
+/**
+ * `showSetupHealth` gates the env-var / plumbing banners (missing
+ * COMPOSIO_API_KEY, missing NEXT_PUBLIC_APP_URL, the "not configured"
+ * checklist). Those messages name infrastructure the realtor can't act
+ * on — they belong on the admin-flavored /settings surface, not on
+ * /integrations where the realtor lives. Default: off (realtor view).
+ * Pass `showSetupHealth` from /settings to keep the warnings where the
+ * operator can fix them.
+ */
+export function ConnectedAppsSection({
+  callbackResult,
+  showSetupHealth = false,
+}: {
+  callbackResult?: CallbackResult | null;
+  showSetupHealth?: boolean;
+} = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [connections, setConnections] = useState<ConnectionRow[]>([]);
   const [setup, setSetup] = useState<SetupHealth | null>(null);
@@ -382,10 +397,20 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
   const grouped = integrationsByCategory();
 
   if (configured === false) {
-    // Replace the silent "not configured" line with an actionable checklist —
-    // the realtor (or their dev) needs to know exactly which env var is
-    // missing on Vercel and where to grab the value. Silent state was the
-    // most-reported integrations bug.
+    // The "not configured" state is plumbing — env vars, OAuth dashboards,
+    // redeploys. The realtor can't act on any of it. The admin-flavored
+    // /settings view passes `showSetupHealth` to surface the checklist
+    // where someone can fix it; the realtor sees the canonical empty
+    // state instead.
+    if (!showSetupHealth) {
+      return (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Connect a tool to give me real context.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30 p-5 space-y-3">
         <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
@@ -410,8 +435,9 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
   // Configured, but the callback URL env var is missing — this is the silent
   // killer the audit identified: OAuth completes, Composio redirects to a
   // default URL, the realtor never lands back in the app and the connection
-  // never persists. Surface it loud.
-  const showAppUrlWarning = setup && setup.apiKeySet && !setup.appUrlSet;
+  // never persists. Surface it loud — but only on the admin surface; the
+  // realtor can't act on a missing env var.
+  const showAppUrlWarning = showSetupHealth && setup && setup.apiKeySet && !setup.appUrlSet;
   const showCallbackBanner = callbackResult && !callbackDismissed;
 
   return (
@@ -476,17 +502,22 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
       )}
 
       {CATEGORY_ORDER.map((cat) => {
-        const apps = grouped[cat];
-        if (!apps || apps.length === 0) return null;
+        // Coming-soon entries get filtered at the render boundary — don't
+        // market what doesn't exist. The catalog data still carries them
+        // (the connect route uses COMING_SOON_TOOLKITS as its defense-in-
+        // depth 501 list) but the realtor never sees a row they can't act
+        // on.
+        const apps = (grouped[cat] ?? []).filter((a) => !a.comingSoon);
+        if (apps.length === 0) return null;
         return (
-          <div key={cat} className="space-y-3">
-            <p className={CAPTION}>{CATEGORY_LABEL[cat]}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <section key={cat} className="space-y-3">
+            <p className={SECTION_LABEL}>{CATEGORY_LABEL[cat]}</p>
+            <ul className="divide-y divide-border/60">
               {apps.map((app) => {
                 const connection = byToolkit.get(app.toolkit) ?? null;
-                const showHealth = Boolean(connection) && !app.comingSoon;
+                const showHealth = Boolean(connection);
                 return (
-                  <IntegrationCard
+                  <IntegrationRow
                     key={app.toolkit}
                     app={app}
                     connection={connection}
@@ -507,15 +538,10 @@ export function ConnectedAppsSection({ callbackResult }: { callbackResult?: Call
                   />
                 );
               })}
-            </div>
-          </div>
+            </ul>
+          </section>
         );
       })}
-
-      <p className={CAPTION}>
-        Connections are scoped to this workspace. Disconnect anytime —
-        Chippi stops using the app on the next message.
-      </p>
     </div>
   );
 }
@@ -526,14 +552,17 @@ function rank(status: ConnectionRow['status']): number {
   return 1; // failed
 }
 
-function AppIcon({ app }: { app: IntegrationApp }) {
+function AppIcon({ app, muted = false }: { app: IntegrationApp; muted?: boolean }) {
   if (app.iconUrl) {
     return (
       <img
         src={app.iconUrl}
         alt=""
         aria-hidden
-        className="w-8 h-8 object-contain flex-shrink-0"
+        className={cn(
+          'w-8 h-8 object-contain flex-shrink-0 transition-opacity',
+          muted && 'opacity-50 group-hover/row:opacity-80',
+        )}
       />
     );
   }
@@ -578,7 +607,7 @@ function StatusPill({
   return null;
 }
 
-function IntegrationCard({
+function IntegrationRow({
   app,
   connection,
   busy,
@@ -609,37 +638,42 @@ function IntegrationCard({
   const isPaused = connection?.triggers === 'paused';
   const isFailed = connection?.triggers === 'failed';
 
-  return (
-    <div
-      className={cn(
-        'group rounded-xl border border-border/70 bg-card p-4 flex flex-col gap-3 transition-colors duration-150',
-        !app.comingSoon && 'hover:bg-muted/30',
-      )}
-    >
-      {/* Top row: brand icon + status pill */}
-      <div className="flex items-start justify-between gap-2">
-        <AppIcon app={app} />
-        <StatusPill status={status} comingSoon={app.comingSoon} />
-      </div>
+  // Connected rows carry full foreground; disconnected rows recede so the
+  // eye lands on what's live. The name still uses foreground when active,
+  // muted-foreground otherwise — same vocabulary as memory-list.
+  const isConnected = status === 'active';
 
-      {/* Name + blurb */}
+  return (
+    <li className="group/row flex items-center gap-3 py-3 first:pt-0">
+      <AppIcon app={app} muted={!isConnected} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-          {connection?.label ? connection.label : app.blurb}
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className={cn(
+              'text-sm truncate',
+              isConnected ? 'text-foreground font-medium' : 'text-muted-foreground',
+            )}
+          >
+            {app.name}
+          </p>
+          {(health !== null || healthLoading) ? (
+            <IntegrationHealthBadge health={health} loading={healthLoading} />
+          ) : (
+            <StatusPill status={status} />
+          )}
+        </div>
         {errorLine && (
-          <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-3">
+          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-2">
             {errorLine}
           </p>
         )}
         {showWatch && isFailed && (
-          <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
             Chippi couldn&apos;t tune in to this app. Try reconnecting.
           </p>
         )}
         {showWatch && !isFailed && (
-          <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
+          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
             {isPaused ? 'Quiet here.' : 'Chippi is listening.'}{' '}
             <button
               type="button"
@@ -651,42 +685,9 @@ function IntegrationCard({
           </p>
         )}
       </div>
-
-      {/* Bottom row: health badge + action */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          {(health !== null || healthLoading) ? (
-            <IntegrationHealthBadge health={health} loading={healthLoading} />
-          ) : (
-            <Dot status={status} comingSoon={app.comingSoon} />
-          )}
-        </div>
-        <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
-      </div>
-    </div>
+      <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
+    </li>
   );
-}
-
-function Dot({
-  status,
-  comingSoon,
-}: {
-  status: ConnectionRow['status'] | null;
-  comingSoon?: boolean;
-}) {
-  // Coming-soon rows have no real status — keep the dot empty so the
-  // "Coming soon" pill carries the meaning. Showing a colored dot on an
-  // unconnectable row would imply state that isn't there.
-  const color = comingSoon
-    ? 'bg-border'
-    : status === 'active'
-      ? 'bg-emerald-500'
-      : status === 'expired'
-        ? 'bg-amber-500'
-        : status === 'failed'
-          ? 'bg-rose-500'
-          : 'bg-border';
-  return <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', color)} aria-hidden />;
 }
 
 /**

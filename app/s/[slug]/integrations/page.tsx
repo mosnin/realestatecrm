@@ -62,9 +62,9 @@ export default async function IntegrationsPage({
 
   return (
     <ChippiPageShell
-      greeting="Integrations."
-      title="Connected apps"
-      subtitle="Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap."
+      greeting="Tools."
+      title="What I work with."
+      subtitle="Chippi never sends without your tap."
     >
       <ConnectedAppsSection />
     </ChippiPageShell>

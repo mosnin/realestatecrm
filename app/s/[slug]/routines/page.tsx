@@ -28,8 +28,8 @@ export default async function RoutinesPage({
   return (
     <ChippiPageShell
       greeting="Routines."
-      title="What Chippi does on its own"
-      subtitle="Standing instructions Chippi runs on a schedule — even when you're not here. Every run drafts; nothing is sent without your approval."
+      title="What I run on a schedule."
+      subtitle="Nothing goes out without your tap."
     >
       <RoutinesManager />
     </ChippiPageShell>
