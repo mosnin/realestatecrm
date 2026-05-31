@@ -1117,18 +1117,30 @@ export function ChippiWorkspace({
           <span className="sr-only">Loading conversation…</span>
         </>
       ) : (
-        <>
-          {/* Empty-state hero. Previously wrapped in AnimatePresence with
-              `mode="popLayout"` and a shared `layoutId="chippi-composer"`
-              between the centered composer and the docked composer below.
-              popLayout keeps the exiting motion.div mounted for the duration
-              of the exit animation, so the realtor briefly had TWO textareas
-              in the DOM whenever `isEmpty` flipped false. Simplest fix:
-              render the two composers mutually exclusively, no AnimatePresence,
-              no shared layoutId. The morph animation is gone; only-one-
-              textarea is back. */}
+        /* Empty → active swap.
+           AnimatePresence with mode="wait" guarantees the hero unmounts
+           fully before the active-conversation tree mounts. This is the
+           load-bearing constraint here: a previous attempt wrapped both
+           branches with `mode="popLayout"` and a shared
+           `layoutId="chippi-composer"` to morph the composer between hero
+           and docked positions, but popLayout keeps the exiting node alive
+           through the exit animation, so the realtor briefly had TWO
+           textareas in the DOM whenever `isEmpty` flipped false. mode="wait"
+           + distinct keys keeps only one composer alive at any time, at the
+           cost of a small dead-time window (~180ms) between the hero exit
+           and the conversation enter — reads as "Chippi heard you, getting
+           ready" rather than a hard cut. Do NOT reintroduce a shared
+           layoutId here. `initial={false}` suppresses the entrance
+           animation on initial page load — the transition is for the
+           empty→active flip only, not for the first paint. */
+        <AnimatePresence mode="wait" initial={false}>
           {isEmpty && (
-            <div
+            <motion.div
+              key="empty-hero"
+              initial={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
             >
               {/* The daily brief lives at /chippi/brief (sidebar entry).
@@ -1184,11 +1196,18 @@ export function ChippiWorkspace({
                   )}
                   {renderInput()}
                 </div>
-              </div>
+              </motion.div>
             )}
 
           {!isEmpty && (
-            <>
+            <motion.div
+              key="active-conversation"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col flex-1 min-h-0 overflow-hidden"
+            >
               {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
@@ -1409,9 +1428,9 @@ export function ChippiWorkspace({
               renderInput()
             )}
           </div>
-            </>
+            </motion.div>
           )}
-        </>
+        </AnimatePresence>
       )}
 
         </div>{/* end left panel */}
