@@ -242,7 +242,9 @@ export function DealsPageClient({
                   aria-selected={isActive}
                   onClick={() => handleStatusChange(t.key)}
                   className={cn(
-                    'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
+                    // 150ms text-color cross-fade pairs with the shared-
+                    // layoutId underline so the toggle reads as one motion.
+                    'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out',
                     isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >

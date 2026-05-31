@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Building2, Check, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { EASE_APPLE } from '@/lib/motion';
 import type { Property } from '@/lib/types';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { formatCurrency } from '@/lib/formatting';
@@ -316,16 +318,31 @@ export function WizardStepDetails({
                 )}
 
                 {results.length > 0 && (
-                  <ul className="rounded-md border border-border divide-y divide-border max-h-72 overflow-y-auto">
-                    {results.map((p) => {
+                  // Re-key on the query so every debounced search re-mounts
+                  // the list and replays the row entrance. Without this the
+                  // existing nodes would just swap content with no motion —
+                  // the realtor wouldn't feel that new results arrived.
+                  <ul
+                    key={`results-${query}`}
+                    className="rounded-md border border-border divide-y divide-border max-h-72 overflow-y-auto"
+                  >
+                    {results.map((p, idx) => {
                       const isSelected = propertyId === p.id;
+                      // Stagger first 8 rows; past that, instant — a long
+                      // result list shouldn't choreograph the whole popup.
+                      const delay = idx < 8 ? idx * 0.025 : 0;
                       return (
-                        <li key={p.id}>
+                        <motion.li
+                          key={p.id}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
+                        >
                           <button
                             type="button"
                             onClick={() => pickProperty(p)}
                             className={cn(
-                              'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60',
+                              'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-muted/60',
                               isSelected && 'bg-primary/5',
                             )}
                           >
@@ -351,7 +368,7 @@ export function WizardStepDetails({
                               <Plus size={15} className="flex-shrink-0 text-muted-foreground" />
                             )}
                           </button>
-                        </li>
+                        </motion.li>
                       );
                     })}
                   </ul>

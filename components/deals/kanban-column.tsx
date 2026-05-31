@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { AnimatePresence } from 'framer-motion';
 import { DealCard } from './deal-card';
 import { Input } from '@/components/ui/input';
 import { Plus, SquarePen, Trash2, GripVertical } from 'lucide-react';
@@ -56,6 +57,20 @@ export function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const { active } = useDndContext();
   const isCardDragging = !!active && !active.id.toString().startsWith('stage:');
+
+  // Stagger entrance only on the FIRST mount. After that, only real
+  // add/remove events animate (AnimatePresence handles those). Without this
+  // flag every drag-drop / realtime refetch would re-choreograph the column,
+  // which would feel chaotic on a busy board.
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    // Defer one frame so the initial entrance commits with its stagger
+    // before we lock initial=false for subsequent re-renders.
+    const id = requestAnimationFrame(() => {
+      hasMountedRef.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
 
@@ -202,18 +217,31 @@ export function KanbanColumn({
           items={deals.map((d) => d.id)}
           strategy={verticalListSortingStrategy}
         >
-          {deals.map((deal) => (
-            <DealCard
-              key={deal.id}
-              deal={deal}
-              slug={slug}
-              onDelete={onDeleteDeal}
-              onStatusChange={onStatusChange}
-              nextStage={nextStage}
-              onAdvanceStage={onAdvanceStage}
-              onOpenDeal={onOpenDeal}
-            />
-          ))}
+          {/*
+            AnimatePresence wraps cards so add/remove animates after mount.
+            `initial={false}` (after first mount via hasMountedRef) means
+            re-renders triggered by drag-drops, kanban-board's fetchData,
+            and realtime UPDATEs do NOT re-choreograph the whole column —
+            only the changed cards animate. The first paint still staggers
+            (initial=true) because hasMountedRef is false on that frame.
+          */}
+          <AnimatePresence initial={!hasMountedRef.current}>
+            {deals.map((deal, idx) => (
+              <DealCard
+                key={deal.id}
+                deal={deal}
+                slug={slug}
+                onDelete={onDeleteDeal}
+                onStatusChange={onStatusChange}
+                nextStage={nextStage}
+                onAdvanceStage={onAdvanceStage}
+                onOpenDeal={onOpenDeal}
+                // Only the initial paint uses a staggered delay. After mount
+                // the index is meaningless — new cards arrive alone.
+                entranceIndex={hasMountedRef.current ? null : idx}
+              />
+            ))}
+          </AnimatePresence>
           {deals.length === 0 && !isOver && (
             <div className="flex items-center justify-center py-8 text-muted-foreground/40">
               <p className="text-xs">No deals</p>

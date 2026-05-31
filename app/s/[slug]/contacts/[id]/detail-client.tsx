@@ -5,9 +5,55 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { PAGE_VARIANTS } from '@/lib/motion';
+import { EASE_APPLE, PAGE_VARIANTS } from '@/lib/motion';
 import { timeAgo } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
+
+/* ─── Page entrance wrapper ───────────────────────────────────────────────
+ *
+ * The contact detail page is a server component, so the page-level fade
+ * lives on a client wrapper. 220ms with the Apple ease — every section
+ * arrives as one composed gesture. The focal block (`ContactDetailFocal`)
+ * adds a gentle 0.95 → 1 scale on top of the parent fade, landing on the
+ * realtor's eye instead of next to it.
+ */
+export function ContactDetailFrame({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.22, ease: EASE_APPLE }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+export function ContactDetailFocal({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.22, ease: EASE_APPLE }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 /* ─── URL-driven tab strip ──────────────────────────────────────────────── */
 
