@@ -3,6 +3,7 @@ import {
   UserCircle,
   Briefcase,
   MessageCircle,
+  MessageSquare,
   Settings,
   Calendar,
   ClipboardList,
@@ -72,6 +73,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/calendar',
     label: 'Calendar',
     icon: Calendar,
+  },
+  {
+    href: '/communication',
+    label: 'Communication',
+    icon: MessageSquare,
   },
   {
     href: '/properties',
