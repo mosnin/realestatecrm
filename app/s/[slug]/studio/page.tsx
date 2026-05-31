@@ -10,6 +10,7 @@ import {
   SECTION_LABEL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { PageTransition } from '@/components/motion/page-transition';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +68,7 @@ export default async function StudioPage({
   ] as const;
 
   return (
-    <div className={cn('mx-auto max-w-5xl px-6 py-8', PAGE_RHYTHM)}>
+    <PageTransition className={cn('mx-auto max-w-5xl px-6 py-8', PAGE_RHYTHM)}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Studio.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -109,6 +110,6 @@ export default async function StudioPage({
           })}
         </div>
       </section>
-    </div>
+    </PageTransition>
   );
 }

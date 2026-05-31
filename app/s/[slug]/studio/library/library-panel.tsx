@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BODY_MUTED, CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 interface LibraryItem {
   id: string;
@@ -219,9 +220,9 @@ export function LibraryPanel() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <StaggerList stagger={0.03} className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {items.map((item) => (
-          <div
+          <StaggerItem
             key={item.id}
             className="group relative rounded-xl border border-border/60 bg-card overflow-hidden"
           >
@@ -308,9 +309,9 @@ export function LibraryPanel() {
                 </p>
               )}
             </div>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerList>
       {nextOffset !== null && (
         <div className="flex justify-center pt-2">
           <Button onClick={() => void handleLoadMore()} disabled={loadingMore}>

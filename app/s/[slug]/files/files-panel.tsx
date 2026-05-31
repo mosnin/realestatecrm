@@ -28,6 +28,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatBytes, type FileCategory } from '@/lib/storage/limits';
 import { FilePreviewModal, type PreviewableFile } from './file-preview-modal';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 interface FileRow {
   id: string;
@@ -79,6 +80,7 @@ export function FilesPanel() {
   const [tab, setTab] = useState<Tab>('all');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<FileRow | null>(null);
@@ -119,17 +121,37 @@ export function FilesPanel() {
   const handleFiles = useCallback(
     async (incoming: File[]) => {
       setUploading(true);
+      setUploadProgress(0);
       setError(null);
+      // Tick the bar asymptotically toward 90% so it always reads as
+      // moving — never stalls at a single value — without lying about
+      // completion. CSS transition on the bar element smooths the steps
+      // (200-400ms ease per frame) so there's no jitter.
+      const startedAt = performance.now();
+      const ticker = setInterval(() => {
+        const elapsed = performance.now() - startedAt;
+        // Asymptote at 90; reaches ~70% in 3s, ~85% in 8s.
+        const next = 90 * (1 - Math.exp(-elapsed / 3500));
+        setUploadProgress(next);
+      }, 220);
       try {
         for (const f of incoming) {
           // eslint-disable-next-line no-await-in-loop
           await uploadOne(f);
         }
+        clearInterval(ticker);
+        setUploadProgress(100);
         await refresh();
       } catch (e) {
+        clearInterval(ticker);
         setError(e instanceof Error ? e.message : 'Upload failed');
       } finally {
-        setUploading(false);
+        // Hold the full bar for a beat so the realtor sees the finish
+        // line, then collapse back to zero for the next upload.
+        setTimeout(() => {
+          setUploading(false);
+          setUploadProgress(0);
+        }, 320);
       }
     },
     [uploadOne, refresh],
@@ -274,6 +296,28 @@ export function FilesPanel() {
         </div>
       )}
 
+      {/* Upload progress bar — subtle linear fill that ticks smoothly
+          toward completion. The bar lives just above the grid so the
+          eye lands on it without searching. */}
+      {uploading && (
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(uploadProgress)}
+          aria-label="Uploading"
+          className="h-[2px] w-full overflow-hidden rounded-full bg-muted/60"
+        >
+          <div
+            className="h-full bg-foreground/80"
+            style={{
+              width: `${uploadProgress}%`,
+              transition: 'width 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          />
+        </div>
+      )}
+
       {/* Drop overlay */}
       {dragActive && (
         <div className="pointer-events-none fixed inset-0 z-50 bg-foreground/5 backdrop-blur-sm flex items-center justify-center">
@@ -290,16 +334,21 @@ export function FilesPanel() {
       ) : visibleFiles.length === 0 ? (
         <EmptyState onPick={() => inputRef.current?.click()} />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <StaggerList
+          key={tab}
+          stagger={0.03}
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+        >
           {visibleFiles.map((file) => (
-            <FileCard
-              key={file.id}
-              file={file}
-              onDelete={onDelete}
-              onOpen={() => setPreview(file)}
-            />
+            <StaggerItem key={file.id}>
+              <FileCard
+                file={file}
+                onDelete={onDelete}
+                onOpen={() => setPreview(file)}
+              />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       <FilePreviewModal

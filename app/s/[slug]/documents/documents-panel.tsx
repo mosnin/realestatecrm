@@ -31,6 +31,7 @@ import DOMPurify from 'isomorphic-dompurify';
 import { motion } from 'framer-motion';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 // next/dynamic with ssr:false — TipTap reaches for browser APIs (window,
 // the DOM selection API) on instantiation. Loading it client-side also
@@ -309,9 +310,9 @@ export function DocumentsPanel() {
           </button>
         </div>
       ) : (
-        <ul className="divide-y divide-border/60">
+        <StaggerList stagger={0.03} className="divide-y divide-border/60">
           {docs.map((doc) => (
-            <li key={doc.id}>
+            <StaggerItem key={doc.id}>
               <button
                 type="button"
                 onClick={() => openDoc(doc.id)}
@@ -333,9 +334,9 @@ export function DocumentsPanel() {
                   Open
                 </span>
               </button>
-            </li>
+            </StaggerItem>
           ))}
-        </ul>
+        </StaggerList>
       )}
     </div>
   );
