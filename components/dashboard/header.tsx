@@ -23,6 +23,7 @@ import type { NavChild, NavItem } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
+import { SearchPill } from '@/components/dashboard/sidebar';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -261,6 +262,9 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                 )}
               </div>
             </SheetHeader>
+            <div className="px-3 pt-3">
+              <SearchPill />
+            </div>
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
