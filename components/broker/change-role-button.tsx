@@ -1,8 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Shield, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ChangeRoleButtonProps {
   membershipId: string;
@@ -15,15 +20,20 @@ const ROLES = [
   { value: 'realtor_member', label: 'Realtor' },
 ];
 
-export function ChangeRoleButton({ membershipId, currentRole, memberName }: ChangeRoleButtonProps) {
-  const [open, setOpen] = useState(false);
+/**
+ * Quiet text link that opens a small role-picker menu. Lives inside the
+ * hover-revealed action row on Members rows — same vocabulary as the
+ * realtor People page's inline edit/delete affordances.
+ */
+export function ChangeRoleButton({
+  membershipId,
+  currentRole,
+  memberName,
+}: ChangeRoleButtonProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleChange(newRole: string) {
-    if (newRole === currentRole) {
-      setOpen(false);
-      return;
-    }
+    if (newRole === currentRole) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/broker/members/${membershipId}/role`, {
@@ -41,41 +51,38 @@ export function ChangeRoleButton({ membershipId, currentRole, memberName }: Chan
       alert("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
-      setOpen(false);
     }
   }
 
   return (
-    <div className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
-        onClick={() => setOpen((o) => !o)}
-        disabled={loading}
-        title={`Change role for ${memberName}`}
-      >
-        <Shield size={11} />
-        <ChevronDown size={10} />
-      </Button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-card rounded-lg border border-border shadow-lg overflow-hidden min-w-[140px]">
-          {ROLES.map((r) => (
-            <button
-              key={r.value}
-              onClick={() => handleChange(r.value)}
-              className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-muted transition-colors ${
-                r.value === currentRole ? 'text-primary bg-primary/5' : 'text-foreground'
-              }`}
-              disabled={loading}
-            >
-              {r.label}
-              {r.value === currentRole && ' (current)'}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={loading}
+          aria-label={`Change role for ${memberName}`}
+          className="h-7 px-2 inline-flex items-center rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {loading ? 'Saving…' : 'Change role'}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        {ROLES.map((r) => (
+          <DropdownMenuItem
+            key={r.value}
+            onSelect={() => handleChange(r.value)}
+            className={cn(
+              'text-xs',
+              r.value === currentRole && 'font-semibold text-foreground',
+            )}
+          >
+            {r.label}
+            {r.value === currentRole && (
+              <span className="ml-auto text-[10px] text-muted-foreground">current</span>
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

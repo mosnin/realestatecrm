@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
 
 interface RemoveMemberButtonProps {
   membershipId: string;
   memberName: string;
 }
 
+/**
+ * Quiet text link that two-steps into a confirm. Lives in the hover-revealed
+ * row action group — matches the realtor People page's inline action pattern.
+ */
 export function RemoveMemberButton({ membershipId, memberName }: RemoveMemberButtonProps) {
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -33,39 +35,35 @@ export function RemoveMemberButton({ membershipId, memberName }: RemoveMemberBut
 
   if (confirming) {
     return (
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className="text-xs text-muted-foreground">Remove?</span>
-        <Button
-          variant="destructive"
-          size="sm"
-          className="h-7 text-xs px-2"
-          disabled={loading}
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          type="button"
           onClick={handleRemove}
+          disabled={loading}
+          className="h-7 px-2 inline-flex items-center rounded-md text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 transition-colors disabled:opacity-50"
         >
-          {loading ? '…' : 'Yes, remove'}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs px-2"
+          {loading ? 'Removing…' : 'Confirm'}
+        </button>
+        <button
+          type="button"
           onClick={() => setConfirming(false)}
           disabled={loading}
+          className="h-7 px-2 inline-flex items-center rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           Cancel
-        </Button>
-      </div>
+        </button>
+      </span>
     );
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive flex-shrink-0"
+    <button
+      type="button"
       onClick={() => setConfirming(true)}
-      title={`Remove ${memberName}`}
+      aria-label={`Remove ${memberName}`}
+      className="h-7 px-2 inline-flex items-center rounded-md text-xs font-medium text-muted-foreground hover:text-rose-700 dark:hover:text-rose-400 hover:bg-muted transition-colors"
     >
-      <Trash2 size={13} />
-    </Button>
+      Remove
+    </button>
   );
 }

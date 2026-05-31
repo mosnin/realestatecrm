@@ -2,7 +2,6 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
-import { Building2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
@@ -186,24 +185,26 @@ export default async function BrokerRealtorsPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Realtors.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Realtors
+          Your team in flight
         </h1>
         <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>
 
       {members.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-          <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
-          <p className="text-sm text-foreground">No realtors on the team yet.</p>
+          <p className="text-sm text-foreground">No realtors yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
-            <Link href="/broker/invitations" className="underline-offset-2 hover:underline">
-              Send the first invitation
+            <Link
+              href="/broker/invitations"
+              className="text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Send the first invite
             </Link>{' '}
-            to get started.
+            to get someone working.
           </p>
         </div>
       ) : (

@@ -7,17 +7,45 @@ import { InviteCodeCard } from '@/components/broker/invite-code-card';
 import { RevokeInviteButton } from '@/components/broker/revoke-invite-button';
 import { BulkInviteForm } from '@/components/broker/bulk-invite-form';
 import { getSeatUsage } from '@/lib/brokerage-seats';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import type { Metadata } from 'next';
 
-const statusBadge = (status: string) => {
+export const metadata: Metadata = { title: 'Invitations — Broker Dashboard' };
+
+// Status pill tone — muted by default. Pending earns amber; accepted earns
+// emerald; cancelled and expired recede to muted.
+function statusPill(status: string): { label: string; class: string } | null {
   switch (status) {
     case 'pending':
-      return 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15';
+      return {
+        label: 'Pending',
+        class:
+          'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+      };
     case 'accepted':
-      return 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15';
+      return {
+        label: 'Accepted',
+        class:
+          'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+      };
+    case 'cancelled':
+      return { label: 'Cancelled', class: 'text-muted-foreground bg-muted' };
+    case 'expired':
+      return { label: 'Expired', class: 'text-muted-foreground bg-muted' };
     default:
-      return 'text-muted-foreground bg-muted';
+      return { label: status, class: 'text-muted-foreground bg-muted' };
   }
-};
+}
+
+const roleLabel = (role: string) =>
+  role === 'broker_admin' ? 'Admin' : 'Realtor';
+
+// Role pill — small caps, muted bg. Matches the Members + Realtors rows so
+// the three pages read as one product.
+const rolePillClass =
+  'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 bg-muted text-muted-foreground';
 
 export default async function BrokerInvitationsPage() {
   const ctx = await getBrokerContext();
@@ -44,27 +72,34 @@ export default async function BrokerInvitationsPage() {
     createdAt: string;
   }>;
 
-  const roleLabel = (role: string) => (role === 'broker_admin' ? 'Admin' : 'Realtor');
+  const pendingCount = invs.filter((i) => i.status === 'pending').length;
 
-const roleBadge = (role: string) =>
-  role === 'broker_admin'
-    ? 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15'
-    : 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15';
+  // Status sentence — quietly names what matters. Pending count when there
+  // are open invites, otherwise the total sent.
+  const subtitle = (() => {
+    if (invs.length === 0)
+      return `Nobody invited to ${ctx.brokerage.name} yet.`;
+    if (pendingCount > 0) {
+      return `${pendingCount} pending · ${invs.length} sent in all.`;
+    }
+    return `${invs.length} ${invs.length === 1 ? 'invite' : 'invites'} sent. Quiet right now.`;
+  })();
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Invitations</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Invite realtors and admins to join {ctx.brokerage.name}
-        </p>
-      </div>
+    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Invitations.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          Bring the team in
+        </h1>
+        <p className={cn(BODY_MUTED)}>{subtitle}</p>
+      </header>
 
       <InviteCodeCard isOwner={ctx.membership.role === 'broker_owner'} />
 
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
-          <p className="text-sm font-medium">Send an email invitation</p>
+          <p className="text-sm font-medium">Send an email invite</p>
           <InviteForm
             isOwner={ctx.membership.role === 'broker_owner'}
             seatUsage={seatUsage}
@@ -74,55 +109,71 @@ const roleBadge = (role: string) =>
 
       <BulkInviteForm seatUsage={seatUsage} />
 
-      <div>
-        <p className="text-sm font-semibold mb-3">Sent invitations</p>
+      <section className="space-y-3">
+        <p className={cn(SECTION_LABEL)}>Sent</p>
         {invs.length === 0 ? (
-          <Card>
-            <CardContent className="px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No invitations sent yet.</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <p className="text-sm text-foreground">Nothing sent yet.</p>
+            <p className={cn('text-xs mt-1', BODY_MUTED)}>
+              Drop an email above and the first invite goes out.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <ul className="divide-y divide-border/60">
             {invs.map((inv) => {
-              const sentAt = new Date(inv.createdAt).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              });
-              const expiresAt = new Date(inv.expiresAt).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric',
-              });
+              const status = statusPill(inv.status);
+              const isPending = inv.status === 'pending';
+              const expiresOn = isPending
+                ? new Date(inv.expiresAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })
+                : null;
               return (
-                <div key={inv.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold truncate">{inv.email}</p>
+                <li
+                  key={inv.id}
+                  className="group/row flex items-center gap-3 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {inv.email}
+                      </span>
+                      <span className={rolePillClass}>
+                        {roleLabel(inv.roleToAssign)}
+                      </span>
+                      {status && (
                         <span
-                          className={`inline-flex text-[10px] font-semibold rounded-full px-1.5 py-0.5 flex-shrink-0 ${roleBadge(inv.roleToAssign)}`}
+                          className={cn(
+                            'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+                            status.class,
+                          )}
                         >
-                          {roleLabel(inv.roleToAssign)}
+                          {status.label}
                         </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Sent {sentAt}
-                        {inv.status === 'pending' && ` · Expires ${expiresAt}`}
-                      </p>
+                      )}
                     </div>
-                    <span
-                      className={`inline-flex text-xs font-semibold rounded-full px-2 py-0.5 capitalize flex-shrink-0 ${statusBadge(inv.status)}`}
-                    >
-                      {inv.status}
-                    </span>
-                    {inv.status === 'pending' && (
-                      <RevokeInviteButton invitationId={inv.id} />
-                    )}
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      Invited {timeAgo(inv.createdAt)}
+                      {expiresOn && (
+                        <>
+                          <span className="text-muted-foreground/40"> · </span>
+                          expires {expiresOn}
+                        </>
+                      )}
+                    </p>
                   </div>
-                </div>
+                  {isPending && (
+                    <div className="flex items-center gap-0.5 flex-shrink-0 lg:opacity-0 lg:group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+                      <RevokeInviteButton invitationId={inv.id} />
+                    </div>
+                  )}
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }
