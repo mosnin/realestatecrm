@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useClerk } from '@clerk/nextjs';
 import {
@@ -16,6 +17,7 @@ import {
   Trash2,
   LogOut,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -39,6 +41,14 @@ interface SidebarUserMenuProps {
   email?: string | null;
   imageUrl?: string | null;
   collapsed?: boolean;
+  /**
+   * When rendered inside the mobile drawer Sheet, the Radix Popover portal
+   * lands as a sibling of the Sheet's modal — and the modal sets
+   * `pointer-events: none` on siblings, so the popover content is unclickable.
+   * In drawer mode we skip the Popover entirely and expand the menu inline
+   * below the chip. Same row vocabulary, just no portal.
+   */
+  inDrawer?: boolean;
 }
 
 interface MenuRow {
@@ -61,9 +71,11 @@ export function SidebarUserMenu({
   email,
   imageUrl,
   collapsed = false,
+  inDrawer = false,
 }: SidebarUserMenuProps) {
   const { signOut } = useClerk();
   const { theme, toggleTheme } = useTheme();
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const base = `/s/${slug}`;
 
   const handleSignOut = () => {
@@ -158,6 +170,57 @@ export function SidebarUserMenu({
     </div>
   );
 
+  if (inDrawer) {
+    // Inline-expand mode for the mobile drawer. The chip toggles a list of
+    // rows directly underneath — no Portal, no Sheet-modal collision.
+    return (
+      <div className="p-2">
+        <button
+          type="button"
+          onClick={() => setDrawerExpanded((v) => !v)}
+          aria-expanded={drawerExpanded}
+          className="group w-full flex items-center gap-2.5 h-12 pl-1.5 pr-2 rounded-md hover:bg-foreground/[0.04] transition-colors duration-150 text-left"
+        >
+          {avatarBlock}
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium text-foreground truncate leading-tight">
+              {displayName}
+            </p>
+            {email && (
+              <p className="text-[11px] text-muted-foreground/80 truncate leading-tight mt-0.5">
+                {email}
+              </p>
+            )}
+          </div>
+          <ChevronDown
+            size={14}
+            strokeWidth={1.75}
+            className={cn(
+              'flex-shrink-0 text-muted-foreground/60 transition-transform duration-200',
+              drawerExpanded && 'rotate-180',
+            )}
+          />
+        </button>
+        {drawerExpanded && (
+          <div className="mt-1 pt-1 border-t border-border/40 space-y-0.5">
+            {rows.map((row) => {
+              const node = renderRow(row);
+              if (row.divider) {
+                return (
+                  <div key={`${row.label}-div`}>
+                    {node}
+                    <div className="my-1 mx-1 h-px bg-border/50" />
+                  </div>
+                );
+              }
+              return node;
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (collapsed) {
     // Rail mode — single avatar opens the user menu popover. The browser-
     // native `title` provides hover text instead of stacking a Radix Tooltip
@@ -213,6 +276,71 @@ export function SidebarUserMenu({
   );
 }
 
+function renderRow(row: MenuRow): React.ReactNode {
+  const Icon = row.icon;
+  const RightIcon = row.rightIcon;
+
+  const inner = (
+    <>
+      <Icon
+        size={13}
+        strokeWidth={1.75}
+        className={cn(
+          'flex-shrink-0',
+          row.destructive ? 'text-foreground/70' : 'text-foreground/55',
+        )}
+      />
+      <span className="flex-1 text-left truncate">{row.label}</span>
+      {row.kbd && (
+        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+          {row.kbd}
+        </kbd>
+      )}
+      {row.rightLabel && (
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-foreground/[0.04] rounded px-1.5 py-0.5">
+          {row.rightLabel}
+        </span>
+      )}
+      {RightIcon && (
+        <RightIcon size={11} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground/50" />
+      )}
+    </>
+  );
+
+  const classes = cn(
+    'flex items-center gap-2 h-8 px-2 rounded-md text-[12px] transition-colors duration-150',
+    row.destructive
+      ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
+      : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
+  );
+
+  if (row.href) {
+    if (row.external) {
+      return (
+        <a
+          key={row.label}
+          href={row.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={classes}
+        >
+          {inner}
+        </a>
+      );
+    }
+    return (
+      <Link key={row.label} href={row.href} className={classes}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button key={row.label} type="button" onClick={row.onClick} className={cn(classes, 'w-full text-left')}>
+      {inner}
+    </button>
+  );
+}
+
 function UserMenuPopoverContent({
   rows,
   side,
@@ -230,65 +358,7 @@ function UserMenuPopoverContent({
       className="w-64 p-1 rounded-xl border border-border/70"
     >
       {rows.map((row) => {
-        const Icon = row.icon;
-        const RightIcon = row.rightIcon;
-
-        const inner = (
-          <>
-            <Icon
-              size={13}
-              strokeWidth={1.75}
-              className={cn(
-                'flex-shrink-0',
-                row.destructive ? 'text-foreground/70' : 'text-foreground/55',
-              )}
-            />
-            <span className="flex-1 text-left truncate">{row.label}</span>
-            {row.kbd && (
-              <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-                {row.kbd}
-              </kbd>
-            )}
-            {row.rightLabel && (
-              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-foreground/[0.04] rounded px-1.5 py-0.5">
-                {row.rightLabel}
-              </span>
-            )}
-            {RightIcon && (
-              <RightIcon size={11} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground/50" />
-            )}
-          </>
-        );
-
-        const classes = cn(
-          'flex items-center gap-2 h-8 px-2 rounded-md text-[12px] transition-colors duration-150',
-          row.destructive
-            ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
-            : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
-        );
-
-        const node = row.href ? (
-          row.external ? (
-            <a
-              key={row.label}
-              href={row.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={classes}
-            >
-              {inner}
-            </a>
-          ) : (
-            <Link key={row.label} href={row.href} className={classes}>
-              {inner}
-            </Link>
-          )
-        ) : (
-          <button key={row.label} type="button" onClick={row.onClick} className={cn(classes, 'w-full text-left')}>
-            {inner}
-          </button>
-        );
-
+        const node = renderRow(row);
         if (row.divider) {
           return (
             <div key={`${row.label}-div`}>
@@ -297,7 +367,6 @@ function UserMenuPopoverContent({
             </div>
           );
         }
-
         return node;
       })}
     </PopoverContent>

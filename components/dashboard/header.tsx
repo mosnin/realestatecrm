@@ -214,6 +214,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                   }
                   isOnBrokerPage={pathname.startsWith('/broker')}
                   userEmail={drawerEmail}
+                  inDrawer
                 />
               </div>
             </SheetHeader>
@@ -363,6 +364,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                   displayName={drawerDisplayName}
                   email={drawerEmail}
                   imageUrl={user?.imageUrl ?? null}
+                  inDrawer
                 />
               </>
             )}

@@ -399,6 +399,7 @@ export function WorkspaceSwitcher({
   collapsed = false,
   showQuickCreate = false,
   userEmail = null,
+  inDrawer = false,
 }: {
   currentName: string;
   currentSubtitle: string;
@@ -412,8 +413,16 @@ export function WorkspaceSwitcher({
   showQuickCreate?: boolean;
   /** Current user's email, rendered as the popover header. */
   userEmail?: string | null;
+  /**
+   * Mobile-drawer mode — expands the workspace list inline below the chip
+   * instead of opening a Radix Popover. Radix Popover content inside a
+   * modal Sheet ends up pointer-events-blocked because it portals as a
+   * body sibling and the Sheet's modal disables siblings.
+   */
+  inDrawer?: boolean;
 }) {
   const base = `/s/${slug}`;
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
 
   // Build the workspace list. The realtor's own workspace is always first;
   // brokerage memberships follow. Each gets a ⌘1/⌘2/⌘3… shortcut so the
@@ -442,6 +451,44 @@ export function WorkspaceSwitcher({
       icon: Building2,
       isCurrent: isOnBrokerPage,
     });
+  }
+
+  if (inDrawer) {
+    // Inline-expand inside the mobile drawer. Same rich content as the
+    // popover (email header, ⌘1/⌘2/⌘3, "+ New") just stacked vertically
+    // below the chip instead of in a Popover portal.
+    return (
+      <div className="mx-3">
+        <button
+          type="button"
+          onClick={() => setDrawerExpanded((v) => !v)}
+          aria-expanded={drawerExpanded}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-foreground/[0.025]"
+        >
+          <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6">
+            <Icon size={12} className="text-foreground/80" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium truncate text-foreground leading-tight">
+              {currentName}
+            </p>
+            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
+              {currentSubtitle}
+            </p>
+          </div>
+          <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
+        </button>
+        {drawerExpanded && (
+          <div className="mt-1 pt-1 border-t border-border/40 space-y-0.5">
+            <WorkspaceSwitcherRows
+              workspaces={workspaces}
+              userEmail={userEmail}
+              hasTeam={brokerageMemberships.length > 0}
+            />
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -494,6 +541,81 @@ export function WorkspaceSwitcher({
   );
 }
 
+function WorkspaceSwitcherRows({
+  workspaces,
+  userEmail,
+  hasTeam,
+}: {
+  workspaces: {
+    key: string;
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    isCurrent: boolean;
+  }[];
+  userEmail: string | null;
+  hasTeam: boolean;
+}) {
+  return (
+    <>
+      {userEmail && (
+        <div className="flex items-center gap-2 px-2.5 py-2">
+          <span className="flex-1 truncate text-[12px] text-foreground/85">
+            {userEmail}
+          </span>
+          <ChevronsUpDown
+            size={12}
+            strokeWidth={1.75}
+            className="text-muted-foreground/60 flex-shrink-0"
+          />
+        </div>
+      )}
+      {userEmail && <div className="my-1 mx-1 h-px bg-border/60" />}
+      {workspaces.map((w, idx) => {
+        const WIcon = w.icon;
+        const shortcut = `⌘${idx + 1}`;
+        return (
+          <Link
+            key={w.key}
+            href={w.href}
+            className={cn(
+              'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
+              w.isCurrent
+                ? 'bg-foreground/[0.04] text-foreground'
+                : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
+            )}
+          >
+            <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+              <WIcon size={12} className="text-foreground/80" />
+            </div>
+            <span className="flex-1 truncate font-medium">{w.name}</span>
+            {w.isCurrent ? (
+              <Check size={13} strokeWidth={2} className="text-blue-500 flex-shrink-0" />
+            ) : (
+              <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+                {shortcut}
+              </kbd>
+            )}
+          </Link>
+        );
+      })}
+      <div className="my-1 mx-1 h-px bg-border/60" />
+      <Link
+        href="/brokerage"
+        className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
+      >
+        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
+        <span className="flex-1 text-left">
+          {hasTeam ? 'New team' : 'Create or join a team'}
+        </span>
+        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+          ⌘A
+        </kbd>
+      </Link>
+    </>
+  );
+}
+
 function WorkspaceSwitcherPopoverContent({
   workspaces,
   userEmail,
@@ -511,10 +633,6 @@ function WorkspaceSwitcherPopoverContent({
   hasTeam: boolean;
   collapsed: boolean;
 }) {
-  // The popover layout mirrors the inspiration: email header on top, a list
-  // of workspaces with monospaced ⌘N shortcuts and a check on the current
-  // one, and a footer row to add the next workspace. For solo realtors the
-  // footer reads "Create or join a team" — same affordance, accurate copy.
   return (
     <PopoverContent
       side={collapsed ? 'right' : 'bottom'}
@@ -522,66 +640,11 @@ function WorkspaceSwitcherPopoverContent({
       sideOffset={8}
       className="w-72 p-1 rounded-xl border border-border/70"
     >
-      {userEmail && (
-        <div className="flex items-center gap-2 px-2.5 py-2">
-          <span className="flex-1 truncate text-[12px] text-foreground/85">
-            {userEmail}
-          </span>
-          <ChevronsUpDown
-            size={12}
-            strokeWidth={1.75}
-            className="text-muted-foreground/60 flex-shrink-0"
-          />
-        </div>
-      )}
-      {userEmail && <div className="my-1 mx-1 h-px bg-border/60" />}
-      <div className="space-y-0.5">
-        {workspaces.map((w, idx) => {
-          const Icon = w.icon;
-          const shortcut = `⌘${idx + 1}`;
-          return (
-            <Link
-              key={w.key}
-              href={w.href}
-              className={cn(
-                'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
-                w.isCurrent
-                  ? 'bg-foreground/[0.04] text-foreground'
-                  : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
-              )}
-            >
-              <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-                <Icon size={12} className="text-foreground/80" />
-              </div>
-              <span className="flex-1 truncate font-medium">{w.name}</span>
-              {w.isCurrent ? (
-                <Check
-                  size={13}
-                  strokeWidth={2}
-                  className="text-blue-500 flex-shrink-0"
-                />
-              ) : (
-                <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-                  {shortcut}
-                </kbd>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-      <div className="my-1 mx-1 h-px bg-border/60" />
-      <Link
-        href={hasTeam ? '/brokerage' : '/brokerage'}
-        className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
-      >
-        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
-        <span className="flex-1 text-left">
-          {hasTeam ? 'New team' : 'Create or join a team'}
-        </span>
-        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-          ⌘A
-        </kbd>
-      </Link>
+      <WorkspaceSwitcherRows
+        workspaces={workspaces}
+        userEmail={userEmail}
+        hasTeam={hasTeam}
+      />
     </PopoverContent>
   );
 }
