@@ -74,7 +74,7 @@ interface AttachmentPayload {
 }
 
 /** Cap on history messages fed to the model. */
-const HISTORY_LIMIT = 20;
+const HISTORY_LIMIT = 8;
 
 interface PostBody {
   spaceSlug: string;
