@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { PropertyPhotoEditor } from './property-photo-editor';
 
 type FormValues = Partial<Property>;
 
@@ -29,10 +30,16 @@ interface Props {
  * quieter placeholder, 150ms transitions). The status/type pickers are
  * still native <select> for keyboard-first speed; they're styled with the
  * same chain as Input so the row visually aligns.
+ *
+ * Photos live at the top — a property is what it looks like, not what its
+ * MLS number is. The featured photo is `photos[0]` (convention reused from
+ * the list + detail pages); the editor lets the realtor tap any tile to
+ * promote it. The first uploaded photo is featured by default.
  */
 export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, submitLabel = 'Save' }: Props) {
   const [v, setV] = useState<FormValues>({
     listingStatus: 'active',
+    photos: [],
     ...initial,
   });
 
@@ -57,9 +64,11 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
       beds: v.beds != null ? Number(v.beds) : null,
       baths: v.baths != null ? Number(v.baths) : null,
       squareFeet: v.squareFeet != null ? Number(v.squareFeet) : null,
+      lotSizeSqft: v.lotSizeSqft != null ? Number(v.lotSizeSqft) : null,
       yearBuilt: v.yearBuilt != null ? Number(v.yearBuilt) : null,
       listPrice: v.listPrice != null ? Number(v.listPrice) : null,
       notes: v.notes?.toString() || null,
+      photos: Array.isArray(v.photos) ? v.photos : [],
     });
   }
 
@@ -75,6 +84,16 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* Photos first — the realtor is showing a house, not filing an MLS
+          form. The featured tile sets what the list, the deal card, and
+          the listing detail show. */}
+      <Field label="Photos">
+        <PropertyPhotoEditor
+          value={v.photos ?? []}
+          onChange={(next) => set('photos', next)}
+        />
+      </Field>
+
       {/* Address row */}
       <div className="grid grid-cols-[1fr_120px] gap-2">
         <Field label="Address" required>
@@ -171,13 +190,21 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
         </Field>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Field label="Sq ft">
           <Input
             type="number"
             min="0"
             value={v.squareFeet ?? ''}
             onChange={(e) => set('squareFeet', e.target.value === '' ? null : Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Lot (sqft)">
+          <Input
+            type="number"
+            min="0"
+            value={v.lotSizeSqft ?? ''}
+            onChange={(e) => set('lotSizeSqft', e.target.value === '' ? null : Number(e.target.value))}
           />
         </Field>
         <Field label="Year built">
@@ -213,7 +240,7 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={submitting}>
+        <Button type="submit" size="sm" disabled={submitting || !(v.address ?? '').trim()}>
           {submitting && <Loader2 className="animate-spin" />}
           {submitLabel}
         </Button>
