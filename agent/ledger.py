@@ -70,6 +70,7 @@ async def record_chat_usage(
     conversation_id: str | None = None,
     runtime: str = "modal",
     cached_tokens: int = 0,
+    route: str = "agent",
 ) -> None:
     """Insert one ChatUsage row for a completed interactive chat turn.
 
@@ -81,6 +82,12 @@ async def record_chat_usage(
     prompt cache. It's a subset of prompt_tokens (cache hits ARE input
     tokens, just billed at a discount), so we clamp it to prompt_tokens
     to keep cache_hit_rate = cached/prompt sane on the Usage page.
+
+    Phase 4: `route` records which dual-path branch handled this turn
+    ('direct' | 'agent' | 'direct→agent'). The Modal agent path always
+    passes 'agent'; the TS direct path passes 'direct' (or 'direct→agent'
+    on escalation). Pre-Phase-4 callers default to 'agent', which matches
+    the DB default and the legacy behavior.
     """
     prompt_tokens = max(0, int(prompt_tokens or 0))
     completion_tokens = max(0, int(completion_tokens or 0))
@@ -101,6 +108,7 @@ async def record_chat_usage(
                 "completionTokens": completion_tokens,
                 "cachedTokens": cached_tokens,
                 "provider": provider,
+                "route": route,
                 "costUsd": _calculate_cost(model, prompt_tokens, completion_tokens),
                 "runtime": runtime,
             })

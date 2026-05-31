@@ -703,6 +703,13 @@ async def chat_turn(item: dict):
                             cached_tokens=cached_in,
                             user_id=user_id or None,
                             conversation_id=conversation_id or None,
+                            # Phase 4 dual-path telemetry: every turn that
+                            # reaches the Modal endpoint went through the
+                            # router and landed on 'agent' (either as the
+                            # initial pick or as a direct→agent escalation).
+                            # The TS escalation path tags those rows itself;
+                            # everything else here is a primary agent route.
+                            route="agent",
                         )
                 except Exception:
                     logger.warning("chat_turn_usage_record_failed", space_id=space_id)

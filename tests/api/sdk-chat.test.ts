@@ -79,8 +79,14 @@ vi.mock('@/lib/ai-tools/context', () => ({
 // Stub the TS streamer — we just verify it's called when the flag is on.
 // vi.mock factories are hoisted to the top of the module, so any variables
 // the factory references must also be hoisted via vi.hoisted.
-const { tsStreamMock } = vi.hoisted(() => ({
+const { tsStreamMock, directStreamMock } = vi.hoisted(() => ({
   tsStreamMock: vi.fn(
+    (_input: unknown): Response =>
+      new Response(new ReadableStream({ start(c) { c.close(); } }), {
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+  ),
+  directStreamMock: vi.fn(
     (_input: unknown): Response =>
       new Response(new ReadableStream({ start(c) { c.close(); } }), {
         headers: { 'Content-Type': 'text/event-stream' },
@@ -90,6 +96,12 @@ const { tsStreamMock } = vi.hoisted(() => ({
 vi.mock('@/lib/ai-tools/sdk-chat-stream', () => ({
   streamTsChatTurn: tsStreamMock,
   streamTsResumeTurn: vi.fn(),
+}));
+
+// Phase 4 dual-path router — stub the direct stream so we can assert which
+// branch the router picked without mocking OpenRouter.
+vi.mock('@/lib/chat/direct-stream', () => ({
+  streamDirectTurn: directStreamMock,
 }));
 
 // Stub global fetch so the modal path doesn't try to talk to anything.
@@ -131,13 +143,17 @@ afterEach(() => {
   else process.env.AGENT_INTERNAL_SECRET = ORIGINAL_SECRET;
 });
 
+// Default to a verb that the Phase 4 router classifies as 'agent' so the
+// historical "every turn proxies to Modal" tests still exercise the Modal
+// branch. Tests that want the direct branch pass an action-verb-free
+// message override.
 function makeRequest(body: Record<string, unknown> = {}) {
   return new Request('http://localhost/api/ai/task', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       spaceSlug: 'jane',
-      message: 'hello',
+      message: 'send Preston a follow-up',
       ...body,
     }),
   }) as unknown as Parameters<typeof POST>[0];
@@ -224,5 +240,52 @@ describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=ts opt-in)',
     expect(call.userMessage).toBe('hi');
     expect(call.ctx.space.slug).toBe('jane');
     expect(typeof call.conversationId).toBe('string');
+  });
+});
+
+// ── Phase 4 dual-path router branch ──────────────────────────────────────
+describe('POST /api/ai/task — Phase 4 router', () => {
+  it('routes generic Q&A messages to the direct path (no Modal hop)', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    await POST(makeRequest({ message: "what's a CMA?" }));
+    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('routes action verbs to the Modal agent path', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    await POST(makeRequest({ message: 'add Preston as a contact' }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('routes attachments without action verbs to the direct path', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    await POST(
+      makeRequest({
+        message: 'summarize this listing',
+        attachmentIds: ['att1'],
+      }),
+    );
+    // attachment hydration is mocked → empty array, but the router still
+    // sees the message text. "summarize" is a read, no action verb.
+    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('passes the resolved chat model into the direct streamer', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    await POST(makeRequest({ message: 'what is a CMA?' }));
+    const call = directStreamMock.mock.calls[0]?.[0] as unknown as {
+      model: string;
+      userMessage: string;
+    };
+    expect(typeof call.model).toBe('string');
+    expect(call.model.length).toBeGreaterThan(0);
+    expect(call.userMessage).toBe('what is a CMA?');
   });
 });
