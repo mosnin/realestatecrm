@@ -18,6 +18,9 @@ import {
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
+import { SidebarFavorites } from '@/components/dashboard/sidebar-favorites';
+import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
+import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
@@ -48,7 +51,14 @@ import {
   Search,
   Flag,
   History,
+  SquarePen,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -334,6 +344,42 @@ export function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Quick-create — SquarePen icon button beside the workspace switcher. Opens a
+// small dropdown of "new record" shortcuts. The list deliberately stays short:
+// new contact, new deal, new property. Anything else lives behind a full menu
+// or the command palette.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function QuickCreateMenu({ slug }: { slug: string }) {
+  const base = `/s/${slug}`;
+  const items: { href: string; label: string }[] = [
+    { href: `${base}/contacts/new`, label: 'New contact' },
+    { href: `${base}/deals`, label: 'New deal' },
+    { href: `${base}/properties/new`, label: 'New property' },
+  ];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Quick create"
+          className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+        >
+          <SquarePen size={13} strokeWidth={1.75} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={6} className="w-44">
+        {items.map((item) => (
+          <DropdownMenuItem key={item.href} asChild>
+            <Link href={item.href}>{item.label}</Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Workspace switcher
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -346,6 +392,7 @@ function WorkspaceSwitcher({
   brokerageMemberships,
   isOnBrokerPage,
   collapsed = false,
+  showQuickCreate = false,
 }: {
   currentName: string;
   currentSubtitle: string;
@@ -355,6 +402,8 @@ function WorkspaceSwitcher({
   brokerageMemberships: { id: string; name: string; role: string }[];
   isOnBrokerPage: boolean;
   collapsed?: boolean;
+  /** Render the SquarePen "new" quick-create dropdown next to the switcher. */
+  showQuickCreate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -376,6 +425,7 @@ function WorkspaceSwitcher({
 
   return (
     <div ref={ref} className={cn('relative', collapsed ? 'flex justify-center' : 'mx-3')}>
+      <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-1')}>
       <CollapsedTooltip
         enabled={collapsed && !open}
         label={hasSwitchTargets ? `${currentName} · Switch workspace` : currentName}
@@ -387,7 +437,7 @@ function WorkspaceSwitcher({
             'rounded-md text-left transition-colors',
             collapsed
               ? 'flex items-center justify-center w-9 h-9'
-              : 'w-full flex items-center gap-2 px-2.5 py-1.5',
+              : 'flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5',
             hasSwitchTargets ? 'hover:bg-foreground/[0.025] cursor-pointer' : 'cursor-default',
           )}
           aria-label={collapsed ? currentName : undefined}
@@ -417,6 +467,10 @@ function WorkspaceSwitcher({
           )}
         </button>
       </CollapsedTooltip>
+      {!collapsed && showQuickCreate && (
+        <QuickCreateMenu slug={slug} />
+      )}
+      </div>
 
       {open && (
         <div
@@ -850,16 +904,24 @@ function RealtorNav({
             doesn't need a category to belong to. */}
         {aiItems.map(renderItem)}
 
-        {/* WORKSPACE — daily work surfaces. The label only renders in
-            expanded mode; in the rail it would just consume vertical
-            space without communicating anything. Tighter top-padding
-            than the broker-nav SectionLabel because realtor rows are
-            denser; `pt-4 pb-1.5` reads as a calm breath, not a chasm. */}
+        {/* FAVORITES — collapsible, realtor-curated quick links. v1 stores
+            in localStorage per-slug; no DB, no API. Hidden in collapsed
+            rail mode. Sits between Chippi (AI top) and Records to match
+            the inspiration: the agent up top, the realtor's personal
+            shortlist next, then the canonical record types. */}
+        <SidebarFavorites slug={slug} base={base} collapsed={collapsed} />
+
+        {/* RECORDS — daily work surfaces (the realtor's book of business:
+            People, Deals, Properties, etc.). Labeled to match the
+            inspiration's "Records" group above the existing workspace nav
+            items — no restructuring of `lib/nav-items.ts`, just a calmer
+            small-caps header above the same routes. Hidden in collapsed
+            rail mode (no horizontal room). */}
         {workspaceItems.length > 0 && (
           <>
             {!collapsed && (
               <p className={cn(SECTION_LABEL, 'px-3 pt-4 pb-1.5 select-none')}>
-                Workspace
+                Records
               </p>
             )}
             {workspaceItems.map(renderItem)}
@@ -996,6 +1058,8 @@ export function Sidebar({
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
     : 'My Account';
+  // Primary email — used as the muted subtitle in the user footer chip.
+  const userEmail = user?.primaryEmailAddress?.emailAddress ?? null;
 
   const isOnBrokerPage = pathname.startsWith('/broker');
   const isOnBrokerSettings = pathname.startsWith('/broker/settings');
@@ -1148,6 +1212,7 @@ export function Sidebar({
         isOnBrokerPage={isOnBrokerPage}
         displayName={displayName}
         imageUrl={user?.imageUrl}
+        email={userEmail}
       />
     </SidebarCollapseProvider>
   );
@@ -1173,6 +1238,7 @@ function RealtorSidebarShell({
   isOnBrokerPage,
   displayName,
   imageUrl,
+  email,
 }: {
   slug: string;
   spaceName: string;
@@ -1187,6 +1253,7 @@ function RealtorSidebarShell({
   isOnBrokerPage: boolean;
   displayName: string;
   imageUrl?: string | null;
+  email?: string | null;
 }) {
   const { collapsed, toggle } = useSidebarCollapsed();
 
@@ -1237,7 +1304,11 @@ function RealtorSidebarShell({
           )}
         </div>
 
-        {/* Workspace identity (with switcher when there's somewhere to go) */}
+        {/* Workspace identity (with switcher when there's somewhere to go).
+            The SquarePen quick-create button sits inline on the right when
+            the sidebar is expanded — a small dropdown of "new contact / new
+            deal / new property" shortcuts. Hidden in collapsed rail mode
+            because the row is the workspace identity at that width. */}
         <WorkspaceSwitcher
           currentName={spaceName}
           currentSubtitle="Solo realtor"
@@ -1247,6 +1318,7 @@ function RealtorSidebarShell({
           brokerageMemberships={brokerageMemberships}
           isOnBrokerPage={isOnBrokerPage}
           collapsed={collapsed}
+          showQuickCreate
         />
 
         {/* Search */}
@@ -1272,13 +1344,22 @@ function RealtorSidebarShell({
             the layout doesn't shift when it's added later. */}
         <SidebarNotificationSlot collapsed={collapsed} />
 
-        {/* User footer pinned at bottom, separated by a hairline. The
-            collapse toggle now lives as an edge-handle on the right rail
+        {/* What's new card — small paper-flat update card pinned just above
+            the user footer. Dismissed state lives in localStorage with a
+            `v1` suffix so future bumps re-show. Hidden entirely in
+            collapsed rail mode (no horizontal room). */}
+        <SidebarWhatsNew collapsed={collapsed} />
+
+        {/* User footer pinned at bottom, separated by a hairline. The chip
+            opens an account-menu popover (Themes, Settings, Notifications,
+            Hotkeys, Apps, Referrals, Plans, Help, Trash, Log out). The
+            collapse toggle lives as an edge-handle on the right rail
             (see EdgeCollapseHandle above) — discoverable on hover. */}
         <div className="border-t border-border/50" />
-        <UserFooter
-          href={`${base}/settings?tab=profile`}
+        <SidebarUserMenu
+          slug={slug}
           displayName={displayName}
+          email={email}
           imageUrl={imageUrl}
           collapsed={collapsed}
         />
