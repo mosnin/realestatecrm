@@ -934,3 +934,29 @@
 .prose pre code { background: transparent; padding: 0; }
 .prose hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Toast (Sonner) motion polish — retune Sonner's built-in transitions to
+ * match the chrome system. Sonner controls its own animation timeline at
+ * the DOM root, so the only way to override is global CSS keyed off its
+ * data attributes. Apple curve + 240ms = consistent with dialog/popover/
+ * dropdown chrome.
+ *
+ * `[data-sonner-toaster]` is the wrapper, `[data-sonner-toast]` is each
+ * individual toast li. Both have transitions baked in; we overwrite them.
+ * ────────────────────────────────────────────────────────────────────────── */
+[data-sonner-toaster] {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-sonner-toast] {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster],
+  [data-sonner-toast] {
+    transition: none !important;
+  }
+}
