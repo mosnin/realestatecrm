@@ -36,7 +36,8 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        // Match Dialog backdrop — 150ms Apple-curve fade.
+        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:animate-none",
         className
       )}
       {...props}
@@ -59,8 +60,14 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        // The pre-existing classes used `ease-in-out` + 300/500ms which felt
+        // mushy on open and looked like a bounce on close. Apple-curve
+        // [0.22, 1, 0.36, 1] is a strict ease-out that lands FLAT — no
+        // overshoot can occur with this curve + a translate-only animation.
+        // 240ms open, 200ms close keeps the panel firmly inside the
+        // 150-260ms band the brief asks for.
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+          "fixed z-50 flex flex-col gap-4 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ease-[cubic-bezier(0.22,1,0.36,1)] data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=open]:duration-[240ms] motion-reduce:animate-none",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l border-border/70 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
           side === "left" &&
