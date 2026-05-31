@@ -273,7 +273,11 @@ export function CalendarView({
     <div className="h-full overflow-y-auto">
       <div
         className={cn(
-          'w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-8',
+          // Bottom padding clears the mobile chat bar (~90px) + the floating
+          // bottom nav (~90px) — without it the last week of the month grid
+          // disappears behind that chrome. Desktop has neither, so pb-24 is
+          // enough above the safe-area inset.
+          'w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-8',
           wide ? 'max-w-6xl' : 'max-w-3xl',
         )}
       >
@@ -432,9 +436,15 @@ function ToggleRow({
             </button>
           </div>
         )}
-        <button type="button" onClick={onAdd} className={PRIMARY_PILL}>
+        <button
+          type="button"
+          onClick={onAdd}
+          className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0')}
+          aria-label="New event"
+        >
           <Plus className="h-4 w-4" />
-          New event
+          <span className="hidden sm:inline">New event</span>
+          <span className="sm:hidden">New</span>
         </button>
       </div>
     </div>
