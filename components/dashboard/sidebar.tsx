@@ -625,7 +625,7 @@ function EdgeCollapseHandle() {
 //
 // The buckets, top → bottom:
 //   • Chippi   → no header (top-pinned, AI)
-//   • WORKSPACE → daily work (People, Deals, Calendar, Properties, Studio, Files)
+//   • WORKSPACE → daily work (People, Deals, Calendar, Email, WhatsApp, Properties, Studio, Files)
 //   • SETUP    → once-and-done (Profile, Intake form)
 //   • Settings → no header (bottom-pinned)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -634,6 +634,8 @@ const WORKSPACE_HREFS = new Set<string>([
   '/contacts',
   '/deals',
   '/calendar',
+  '/email',
+  '/whatsapp',
   '/properties',
   '/studio',
   '/files',
