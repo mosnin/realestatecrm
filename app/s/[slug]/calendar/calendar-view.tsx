@@ -25,8 +25,10 @@
  * splice into the visible view + toast.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -63,6 +65,43 @@ import {
   weekDays,
 } from '@/lib/calendar/date';
 
+/* ── Motion constants ───────────────────────────────────────────────── */
+/* Apple-ish curve everywhere: [0.22, 1, 0.36, 1]. No springs, no overshoot
+ * beyond 1.02. Durations sit in 180–260ms — fast enough to feel
+ * instantaneous, slow enough to read as deliberate. */
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const DUR_QUICK = 0.18; // view crossfade, chevron press, chip enter
+const DUR_PRESS = 0.18; // chip tap scale-down
+const DUR_PULSE = 0.2; // time-slot ring pulse before modal
+const DUR_RING = 0.24; // today's-ring glow on mount + optimistic chip enter
+
+/* Row-stagger for the month grid: 40ms BETWEEN ROWS (not cells). Six rows
+ * → 240ms sweep total. The whole grid lands before the eye finishes
+ * tracking it. Per-cell delay is `row * STAGGER_ROW_DELAY`. */
+const STAGGER_ROW_DELAY = 0.04;
+const MONTH_CELL_VARIANTS: Variants = {
+  initial: { opacity: 0, y: 4 },
+  enter: (row: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: DUR_QUICK, ease: EASE, delay: row * STAGGER_ROW_DELAY },
+  }),
+};
+
+/* Chip enter (default): fade + 4px slide-down. Reused across Month/Week/Day. */
+const CHIP_ENTER_VARIANTS: Variants = {
+  initial: { opacity: 0, y: -4 },
+  animate: { opacity: 1, y: 0, transition: { duration: DUR_QUICK, ease: EASE } },
+};
+
+/* Chip enter (optimistic, just-created by the realtor): scale 0.95 → 1 +
+ * fade. The slight pop tells the realtor "your event landed" without
+ * shouting. 240ms with the Apple curve. */
+const CHIP_OPTIMISTIC_VARIANTS: Variants = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1, transition: { duration: DUR_RING, ease: EASE } },
+};
+
 interface CalendarEventOut {
   id: string;
   title: string;
@@ -72,6 +111,12 @@ interface CalendarEventOut {
   allDay: boolean;
   htmlLink: string | null;
   attendees: { email: string; name: string | null; responseStatus: string | null }[];
+  /**
+   * Client-only marker — set true when the realtor just created this event
+   * locally. Drives the optimistic "scale 0.95 → 1 + fade" entrance on the
+   * chip. Cleared after the animation lands (we don't ship it to the API).
+   */
+  __justCreated?: boolean;
 }
 
 interface ConnectedPayload {
@@ -240,8 +285,16 @@ export function CalendarView({
   }, [connected, slug]);
 
   // Splice the created event into local state — optimistic, no refetch.
+  // Tag with __justCreated so the chip can enter with scale 0.95 → 1 + fade.
+  // We strip the flag ~400ms later so subsequent re-renders don't replay it.
   const handleEventCreated = useCallback((ev: CalendarEventOut) => {
-    setEvents((curr) => [...curr, ev]);
+    const stamped: CalendarEventOut = { ...ev, __justCreated: true };
+    setEvents((curr) => [...curr, stamped]);
+    window.setTimeout(() => {
+      setEvents((curr) =>
+        curr.map((e) => (e.id === ev.id ? { ...e, __justCreated: false } : e)),
+      );
+    }, 400);
   }, []);
 
   // For Month/Week cursors that need to step.
@@ -360,33 +413,44 @@ export function CalendarView({
         )}
 
         {connected && !loading && !errorMessage && (
-          <>
-            {view === 'month' && (
-              <MonthView
-                cursor={cursor}
-                events={events}
-                onCellTap={(day) => {
-                  setCursor(day);
-                  setViewPersisted('day');
-                }}
-              />
-            )}
-            {view === 'week' && (
-              <WeekView
-                cursor={cursor}
-                events={events}
-                onSlotTap={(day, hour) => openAddModal(day, hour)}
-              />
-            )}
-            {view === 'day' && (
-              <DayView
-                cursor={cursor}
-                events={events}
-                onSlotTap={(hour) => openAddModal(cursor, hour)}
-              />
-            )}
-            {view === 'agenda' && <AgendaView events={events} />}
-          </>
+          // Cross-fade the body when the realtor flips Month/Week/Day/Agenda.
+          // 180ms with the Apple ease — no jump-cut, no slide. The view key
+          // forces remount so each grid gets a clean entrance pass.
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={view}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DUR_QUICK, ease: EASE }}
+            >
+              {view === 'month' && (
+                <MonthView
+                  cursor={cursor}
+                  events={events}
+                  onCellTap={(day) => {
+                    setCursor(day);
+                    setViewPersisted('day');
+                  }}
+                />
+              )}
+              {view === 'week' && (
+                <WeekView
+                  cursor={cursor}
+                  events={events}
+                  onSlotTap={(day, hour) => openAddModal(day, hour)}
+                />
+              )}
+              {view === 'day' && (
+                <DayView
+                  cursor={cursor}
+                  events={events}
+                  onSlotTap={(hour) => openAddModal(cursor, hour)}
+                />
+              )}
+              {view === 'agenda' && <AgendaView events={events} />}
+            </motion.div>
+          </AnimatePresence>
         )}
 
         {connected && (
@@ -396,6 +460,7 @@ export function CalendarView({
             prefill={modalPrefill}
             slug={slug}
             onCreated={handleEventCreated}
+            isMobile={isMobile}
           />
         )}
       </div>
@@ -456,14 +521,19 @@ function ToggleRow({
       <div className="flex items-center gap-2 sm:gap-3 sm:ml-auto flex-wrap">
         {showNav && (
           <div className="flex items-center gap-1 min-w-0">
-            <button
+            {/* Chevron press: 10° tilt on press, snap back. 180ms each leg.
+             * The press rotation gives the chrome a tactile beat — the
+             * realtor feels the calendar step instead of just seeing it. */}
+            <motion.button
               type="button"
               onClick={onPrev}
+              whileTap={{ rotate: -10 }}
+              transition={{ duration: DUR_PRESS, ease: EASE }}
               className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 shrink-0"
               aria-label="Previous"
             >
               <ChevronLeft size={16} strokeWidth={1.75} />
-            </button>
+            </motion.button>
             <span
               className={cn(
                 BODY,
@@ -472,14 +542,16 @@ function ToggleRow({
             >
               {headerLabel}
             </span>
-            <button
+            <motion.button
               type="button"
               onClick={onNext}
+              whileTap={{ rotate: 10 }}
+              transition={{ duration: DUR_PRESS, ease: EASE }}
               className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 shrink-0"
               aria-label="Next"
             >
               <ChevronRight size={16} strokeWidth={1.75} />
-            </button>
+            </motion.button>
             <button
               type="button"
               onClick={onToday}
@@ -529,6 +601,7 @@ function MonthView({
   events: CalendarEventOut[];
   onCellTap: (day: Date) => void;
 }) {
+  const reduced = useReducedMotion();
   const days = useMemo(() => monthGridDays(cursor), [cursor]);
   const monthIndex = startOfMonth(cursor).getMonth();
   const todayKey = localDayKey(new Date());
@@ -569,6 +642,7 @@ function MonthView({
               const key = localDayKey(day);
               const isCurrentMonth = day.getMonth() === monthIndex;
               const isToday = key === todayKey;
+              const row = Math.floor(i / 7);
               const dayEvents = eventsByDay.get(key) ?? [];
               const visible = dayEvents.slice(0, 3);
               const overflow = dayEvents.length - visible.length;
@@ -579,45 +653,108 @@ function MonthView({
                 i % 7 !== 0 ? 'border-l border-border/60' : '',
               );
               return (
-                <button
+                // Row-stagger entrance: each row of seven cells lands 40ms
+                // after the previous row. Whole sweep finishes in 240ms.
+                // `reduced` collapses to a flat fade-in so the visual still
+                // settles, just without the directional sweep.
+                <motion.button
                   key={key + i}
                   type="button"
                   onClick={() => onCellTap(day)}
+                  custom={row}
+                  variants={
+                    reduced
+                      ? {
+                          initial: { opacity: 0 },
+                          enter: { opacity: 1, transition: { duration: DUR_QUICK } },
+                        }
+                      : MONTH_CELL_VARIANTS
+                  }
+                  initial="initial"
+                  animate="enter"
                   className={cn(
                     'min-h-[96px] text-left p-2 hover:bg-muted/30 transition-colors duration-150 flex flex-col gap-1',
                     borderRules,
                   )}
                 >
+                  {/* Day-number badge. The today-ring is a separately
+                   * animated overlay — 240ms opacity glow on mount. If the
+                   * realtor lands on the month and today already has a
+                   * ring, we want it to feel like it's lighting up, not
+                   * sitting there static. */}
                   <span
                     className={cn(
-                      'inline-flex items-center justify-center h-6 w-6 rounded-full text-xs tabular-nums',
-                      isToday && 'ring-1 ring-foreground/30',
+                      'relative inline-flex items-center justify-center h-6 w-6 rounded-full text-xs tabular-nums',
                       isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/50',
                     )}
                   >
-                    {day.getDate()}
+                    {isToday && (
+                      <motion.span
+                        aria-hidden
+                        initial={reduced ? { opacity: 1 } : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: DUR_RING, ease: EASE }}
+                        className="absolute inset-0 rounded-full ring-1 ring-foreground/30"
+                      />
+                    )}
+                    <span className="relative">{day.getDate()}</span>
                   </span>
                   <div className="flex flex-col gap-0.5 min-w-0">
                     {visible.map((ev) => (
-                      <span
-                        key={ev.id}
-                        className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
-                        title={shortEventLabel(ev)}
-                      >
-                        {shortEventLabel(ev)}
-                      </span>
+                      <ChipInCell key={ev.id} event={ev} reduced={!!reduced} />
                     ))}
                     {overflow > 0 && (
                       <span className={cn(CAPTION, 'truncate px-1.5')}>+{overflow} more</span>
                     )}
                   </div>
-                </button>
+                </motion.button>
               );
             })}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Month/Week chip ────────────────────────────────────────────────── */
+/* The short-label chip rendered inside a month cell or week slot.
+ * Default enter: fade + 4px slide-down (CHIP_ENTER_VARIANTS).
+ * Optimistic enter (`__justCreated` true): scale 0.95 → 1 + fade.
+ * Tap: subtle scale 0.97 press, snap back. Apple curve, 180ms.
+ *
+ * `stopPropagation` is passed by the Week view so chip taps don't
+ * bubble up and pop the add-event modal. Month view leaves it false —
+ * the whole cell is one tap target there, and a chip-tap should
+ * follow the cell-tap into Day view. */
+function ChipInCell({
+  event,
+  reduced,
+  stopPropagation = false,
+  labelMode = 'short',
+}: {
+  event: CalendarEventOut;
+  reduced: boolean;
+  stopPropagation?: boolean;
+  /** `short` = "9a Tour" (Month — time prefix matters). `title` = "Tour"
+   *  (Week/Day — hour slot already carries the time). */
+  labelMode?: 'short' | 'title';
+}) {
+  const variants = event.__justCreated ? CHIP_OPTIMISTIC_VARIANTS : CHIP_ENTER_VARIANTS;
+  const label = labelMode === 'short' ? shortEventLabel(event) : event.title;
+  return (
+    <motion.span
+      initial={reduced ? false : 'initial'}
+      animate={reduced ? { opacity: 1 } : 'animate'}
+      variants={reduced ? undefined : variants}
+      whileTap={reduced ? undefined : { scale: 0.97 }}
+      transition={reduced ? undefined : { duration: DUR_PRESS, ease: EASE }}
+      className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
+      title={event.title}
+      onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+    >
+      {label}
+    </motion.span>
   );
 }
 
@@ -632,8 +769,38 @@ function WeekView({
   events: CalendarEventOut[];
   onSlotTap: (day: Date, hour: number) => void;
 }) {
+  const reduced = useReducedMotion();
   const days = useMemo(() => weekDays(cursor), [cursor]);
   const todayKey = localDayKey(new Date());
+  // Tap → ring-pulse → modal. The pulse is a 200ms confirmation that the
+  // tap landed. We hold the modal-open call back briefly (~140ms) so the
+  // pulse reads as a distinct beat rather than a flicker swallowed by
+  // the modal entrance. The two animations then overlap on the tail end.
+  const [pulseSlot, setPulseSlot] = useState<string | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
+  const openTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+      if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+    },
+    [],
+  );
+  const handleSlotTap = useCallback(
+    (d: Date, hour: number) => {
+      if (reduced) {
+        onSlotTap(d, hour);
+        return;
+      }
+      const k = `${localDayKey(d)}-${hour}`;
+      setPulseSlot(k);
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = window.setTimeout(() => setPulseSlot(null), DUR_PULSE * 1000);
+      if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = window.setTimeout(() => onSlotTap(d, hour), 140);
+    },
+    [onSlotTap, reduced],
+  );
   // Min-width 694px = 64px gutter + 7 × 90px columns so events have room
   // for at least 8-9 characters of title before truncating. The outer
   // container scrolls horizontally on narrow viewports; at `sm:+` the
@@ -651,14 +818,22 @@ function WeekView({
               return (
                 <div key={key} className="px-2 py-2">
                   <p className={cn(SECTION_LABEL)}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</p>
-                  <p
+                  <span
                     className={cn(
-                      'text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full',
-                      isToday && 'ring-1 ring-foreground/30',
+                      'relative text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full',
                     )}
                   >
-                    {d.getDate()}
-                  </p>
+                    {isToday && (
+                      <motion.span
+                        aria-hidden
+                        initial={reduced ? { opacity: 1 } : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: DUR_RING, ease: EASE }}
+                        className="absolute inset-0 rounded-full ring-1 ring-foreground/30"
+                      />
+                    )}
+                    <span className="relative">{d.getDate()}</span>
+                  </span>
                 </div>
               );
             })}
@@ -670,7 +845,9 @@ function WeekView({
                 hour={hour}
                 days={days}
                 events={events}
-                onSlotTap={onSlotTap}
+                onSlotTap={handleSlotTap}
+                pulseSlot={pulseSlot}
+                reduced={!!reduced}
               />
             ))}
           </div>
@@ -685,11 +862,15 @@ function HourRow({
   days,
   events,
   onSlotTap,
+  pulseSlot,
+  reduced,
 }: {
   hour: number;
   days: Date[];
   events: CalendarEventOut[];
   onSlotTap: (day: Date, hour: number) => void;
+  pulseSlot: string | null;
+  reduced: boolean;
 }) {
   return (
     <>
@@ -698,26 +879,39 @@ function HourRow({
       </div>
       {days.map((d) => {
         const key = localDayKey(d);
+        const slotKey = `${key}-${hour}`;
+        const isPulsing = pulseSlot === slotKey;
         const slotEvents = eventsForDayKey(events, key).filter((ev) => {
           if (ev.allDay) return hour === HOUR_START; // pin all-day to first row
           return new Date(ev.start).getHours() === hour;
         });
         return (
           <button
-            key={key + hour}
+            key={slotKey}
             type="button"
             onClick={() => onSlotTap(d, hour)}
-            className="border-t border-l border-border/60 min-h-[44px] hover:bg-muted/30 transition-colors duration-150 text-left p-1 flex flex-col gap-0.5"
+            className="relative border-t border-l border-border/60 min-h-[44px] hover:bg-muted/30 transition-colors duration-150 text-left p-1 flex flex-col gap-0.5"
           >
+            {/* Ring-pulse on tap confirms the gesture landed before the
+             * modal arrives. Fades out after DUR_PULSE so the modal's
+             * own entrance picks up the eye. */}
+            {isPulsing && !reduced && (
+              <motion.span
+                aria-hidden
+                initial={{ opacity: 0.55 }}
+                animate={{ opacity: 0 }}
+                transition={{ duration: DUR_PULSE, ease: EASE }}
+                className="pointer-events-none absolute inset-0 rounded-sm ring-2 ring-foreground/30"
+              />
+            )}
             {slotEvents.map((ev) => (
-              <span
+              <ChipInCell
                 key={ev.id}
-                className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
-                title={ev.title}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {ev.title}
-              </span>
+                event={ev}
+                reduced={reduced}
+                stopPropagation
+                labelMode="title"
+              />
             ))}
           </button>
         );
@@ -743,16 +937,43 @@ function DayView({
   events: CalendarEventOut[];
   onSlotTap: (hour: number) => void;
 }) {
+  const reduced = useReducedMotion();
   const key = localDayKey(cursor);
   const dayEvents = eventsForDayKey(events, key);
   const allDayEvents = dayEvents.filter((ev) => ev.allDay);
+  // Same pulse-before-modal pattern as WeekView, scoped to a single hour
+  // since the Day view's slot key is just the hour number.
+  const [pulseHour, setPulseHour] = useState<number | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
+  const openTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+      if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+    },
+    [],
+  );
+  const handleSlotTap = useCallback(
+    (hour: number) => {
+      if (reduced) {
+        onSlotTap(hour);
+        return;
+      }
+      setPulseHour(hour);
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = window.setTimeout(() => setPulseHour(null), DUR_PULSE * 1000);
+      if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = window.setTimeout(() => onSlotTap(hour), 140);
+    },
+    [onSlotTap, reduced],
+  );
   return (
     <div className="border border-border/60 rounded-md overflow-hidden">
       {allDayEvents.length > 0 && (
         <div className="border-b border-border/60 bg-muted/20 px-3 py-2 space-y-1">
           <p className={SECTION_LABEL}>All day</p>
           {allDayEvents.map((ev) => (
-            <EventChip key={ev.id} event={ev} />
+            <EventChip key={ev.id} event={ev} reduced={!!reduced} />
           ))}
         </div>
       )}
@@ -761,6 +982,7 @@ function DayView({
           const slotEvents = dayEvents.filter(
             (ev) => !ev.allDay && new Date(ev.start).getHours() === hour,
           );
+          const isPulsing = pulseHour === hour;
           return (
             <div key={hour} className="contents">
               <div className="border-t border-border/60 px-3 py-2 text-right">
@@ -768,11 +990,20 @@ function DayView({
               </div>
               <button
                 type="button"
-                onClick={() => onSlotTap(hour)}
-                className="border-t border-l border-border/60 min-h-[52px] hover:bg-muted/30 transition-colors duration-150 text-left p-2 flex flex-col gap-1"
+                onClick={() => handleSlotTap(hour)}
+                className="relative border-t border-l border-border/60 min-h-[52px] hover:bg-muted/30 transition-colors duration-150 text-left p-2 flex flex-col gap-1"
               >
+                {isPulsing && !reduced && (
+                  <motion.span
+                    aria-hidden
+                    initial={{ opacity: 0.55 }}
+                    animate={{ opacity: 0 }}
+                    transition={{ duration: DUR_PULSE, ease: EASE }}
+                    className="pointer-events-none absolute inset-0 rounded-sm ring-2 ring-foreground/30"
+                  />
+                )}
                 {slotEvents.map((ev) => (
-                  <EventChip key={ev.id} event={ev} />
+                  <EventChip key={ev.id} event={ev} reduced={!!reduced} />
                 ))}
               </button>
             </div>
@@ -783,9 +1014,15 @@ function DayView({
   );
 }
 
-function EventChip({ event }: { event: CalendarEventOut }) {
+function EventChip({ event, reduced }: { event: CalendarEventOut; reduced: boolean }) {
+  const variants = event.__justCreated ? CHIP_OPTIMISTIC_VARIANTS : CHIP_ENTER_VARIANTS;
   const body = (
-    <span
+    <motion.span
+      initial={reduced ? false : 'initial'}
+      animate={reduced ? { opacity: 1 } : 'animate'}
+      variants={reduced ? undefined : variants}
+      whileTap={reduced ? undefined : { scale: 0.97 }}
+      transition={reduced ? undefined : { duration: DUR_PRESS, ease: EASE }}
       className="block text-xs rounded bg-muted/40 px-2 py-1 text-foreground truncate"
       title={event.title}
     >
@@ -795,7 +1032,7 @@ function EventChip({ event }: { event: CalendarEventOut }) {
           {formatTimeRange(event.start, event.end, event.allDay)}
         </span>
       )}
-    </span>
+    </motion.span>
   );
   if (event.htmlLink) {
     return (
@@ -958,12 +1195,14 @@ function AddEventModal({
   prefill,
   slug,
   onCreated,
+  isMobile,
 }: {
   open: boolean;
   onClose: () => void;
   prefill: { date: Date; hour?: number } | null;
   slug: string;
   onCreated: (ev: CalendarEventOut) => void;
+  isMobile: boolean;
 }) {
   // Initial values rebuild each time the modal opens so prefill applies.
   const initialDate = useMemo(() => prefill?.date ?? new Date(), [prefill]);
@@ -1061,9 +1300,21 @@ function AddEventModal({
     ],
   );
 
+  // Two entrances, one modal.
+  // Mobile: slide up from below (220ms). The realtor's thumb just tapped
+  // the bottom-anchored "+ New" — the surface arrives from where they
+  // touched. We layer the slide on top of the base zoom; net effect reads
+  // as a slide with a subtle settle.
+  // Desktop: scale 0.98 → 1 + fade-in at 220ms. The `!` overrides the
+  // base `zoom-in-95` from `components/ui/dialog.tsx` — both set the
+  // same custom property, so cascade order isn't reliable.
+  const dialogMotionClass = isMobile
+    ? 'data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8 ' +
+      'duration-[220ms]'
+    : 'data-[state=open]:!zoom-in-98 data-[state=closed]:!zoom-out-98 duration-[220ms]';
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn('sm:max-w-md', dialogMotionClass)}>
         <DialogHeader>
           <DialogTitle>New event</DialogTitle>
         </DialogHeader>
