@@ -1,22 +1,30 @@
-'use client';
-
 /**
- * Marketing footer (foundation stub).
+ * Marketing footer — paper-flat, 5-column, reference (not destination).
  *
- * Phase 0 ships a dense, paper-flat footer with column groupings. The
- * polished version lands in `claude/marketing-footer` — don't refactor
- * here, replace.
+ * Apple discipline: a wall of small text in columns with the brand mark and
+ * copyright at the bottom. NO big CTA card here — the page's `<MarketingCTA>`
+ * lives above this footer. Hairlines only, no shadows, no gradients, no
+ * brand orange. Hover is a single beat: text color shifts from
+ * foreground/80 to foreground. No underline, no scale, no chrome.
  *
- * Apple-discipline: no big CTA card at the top of the footer (the page's
- * `<MarketingCTA>` already lives above it), text columns recede, brand
- * mark is small. Footer is reference, not destination.
+ * Layout:
+ * - 5-column grid on desktop: brand col 1, link cols 2-5.
+ * - 2-column on mobile, brand spans both columns at the top.
+ *
+ * Below the columns: a single hairline strip carries a small operational
+ * status line (Apple footers wear this same trust signal in the same quiet
+ * voice) and the copyright row. The status link reads as a calm fact, not
+ * a marketing claim.
  */
 
 import Link from 'next/link';
 import { BrandLogo } from '@/components/brand-logo';
 import { cn } from '@/lib/utils';
 
-const COLUMNS: { title: string; items: { href: string; label: string }[] }[] = [
+type FooterLink = { href: string; label: string };
+type FooterColumn = { title: string; items: FooterLink[] };
+
+const COLUMNS: FooterColumn[] = [
   {
     title: 'Product',
     items: [
@@ -62,49 +70,81 @@ const COLUMNS: { title: string; items: { href: string; label: string }[] }[] = [
   },
 ];
 
+const LINK_CLASS =
+  'text-[13px] text-foreground/80 hover:text-foreground transition-colors duration-150';
+
 export function MarketingFooter() {
+  const year = new Date().getFullYear();
+
   return (
     <footer
       className={cn('border-t border-border/60 bg-background')}
       role="contentinfo"
     >
       <div className="mx-auto max-w-7xl px-6 md:px-8 py-16 md:py-20">
+        {/* Columns: brand + 4 link groups. 2-col mobile, 5-col md+. */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-12">
+          {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" aria-label="Chippi home" className="inline-flex items-center">
+            <Link
+              href="/"
+              aria-label="Chippi home"
+              className="inline-flex items-center"
+            >
               <BrandLogo className="h-5" alt="Chippi" />
             </Link>
-            <p className="mt-4 text-[13px] text-muted-foreground leading-snug max-w-[14ch]">
+            <p className="mt-4 text-[13px] leading-snug text-muted-foreground max-w-[14ch]">
               The agentic OS for real-estate agents and brokerages.
             </p>
           </div>
-          {COLUMNS.map((c) => (
-            <div key={c.title}>
+
+          {/* Link columns */}
+          {COLUMNS.map((column) => (
+            <nav
+              key={column.title}
+              aria-label={column.title}
+              className="min-w-0"
+            >
               <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {c.title}
+                {column.title}
               </p>
               <ul className="mt-4 space-y-2.5">
-                {c.items.map((it) => (
-                  <li key={it.href}>
-                    <Link
-                      href={it.href}
-                      className="text-[13px] text-foreground/80 hover:text-foreground transition-colors duration-150"
-                    >
-                      {it.label}
+                {column.items.map((item) => (
+                  <li key={`${column.title}:${item.href}:${item.label}`}>
+                    <Link href={item.href} className={LINK_CLASS}>
+                      {item.label}
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
-        <div className="mt-16 pt-6 border-t border-border/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-[12px] text-muted-foreground">
-            © {new Date().getFullYear()} Chippi. All rights reserved.
-          </p>
-          <p className="text-[12px] text-muted-foreground">
-            Built quietly. Shipped daily.
-          </p>
+
+        {/* Bottom strip: status line + copyright row. */}
+        <div className="mt-16 border-t border-border/60 pt-6">
+          {/* Operational status — quiet trust signal, Apple footer move. */}
+          <div className="mb-4">
+            <Link
+              href="/status"
+              className="inline-flex items-center gap-2 text-[12px] text-muted-foreground hover:text-foreground transition-colors duration-150"
+            >
+              <span
+                aria-hidden
+                className="inline-block size-1.5 rounded-full bg-emerald-500"
+              />
+              All systems operational.
+            </Link>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-[12px] text-muted-foreground">
+              &copy; {year} Chippi. All rights reserved.
+            </p>
+            <p className="text-[12px] text-muted-foreground">
+              Built quietly. Shipped daily.
+            </p>
+          </div>
         </div>
       </div>
     </footer>
