@@ -13,10 +13,23 @@ Fallback: when `OPENROUTER_API_KEY` is absent everything falls back to
 calling OpenAI directly with `OPENAI_API_KEY`, so a deploy without the
 OpenRouter secret keeps working.
 
+Prompt caching (Phase 2):
+  Provider detection drives caching strategy per turn.
+  - anthropic: explicit `cache_control: {type: 'ephemeral'}` markers
+    attached to the system message and the last tool. ~90% input-token
+    discount on cached prefixes after first hit.
+  - openai / deepseek: automatic on stable prefixes >1024 tokens. Phase 1
+    already keeps the system prompt + tool list stable, so the provider
+    caches without explicit markers. ~50% discount on cached input.
+  - xai / google / unknown: no caching path on OpenRouter today. Phase 1's
+    prompt trim is the only saving.
+
 Keep CHAT_MODELS / DEFAULT_CHAT_MODEL in sync with lib/llm.ts.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -157,6 +170,30 @@ def resolve_chat_model(model: str | None) -> str:
     return DEFAULT_CHAT_MODEL
 
 
+def detect_provider(model: str | None) -> str:
+    """Return the OpenRouter provider prefix from a model slug.
+
+    Examples:
+        'anthropic/claude-opus-4.7' -> 'anthropic'
+        'openai/gpt-5.5'            -> 'openai'
+        'x-ai/grok-4.3'             -> 'xai'   (note: dash normalized out)
+        'deepseek/deepseek-chat'    -> 'deepseek'
+        'google/gemini-2.5-pro'     -> 'google'
+        'moonshotai/kimi-k2.6'      -> 'moonshotai'
+        'qwen/qwen3.6-flash'        -> 'qwen'
+        bare 'gpt-5'                -> 'openai' (OpenAI-direct fallback path)
+
+    Drives caching behavior and the ChatUsage.provider column.
+    """
+    if not model:
+        return "unknown"
+    if "/" not in model:
+        # Bare names (OpenAI-direct fallback path) are always OpenAI.
+        return "openai"
+    prefix = model.split("/", 1)[0].lower().replace("-", "")
+    return prefix or "unknown"
+
+
 def make_chat_model(name: str):
     """Wrap a model slug in OpenAIChatCompletionsModel against our LLM client.
 
@@ -170,9 +207,148 @@ def make_chat_model(name: str):
     its key is set, OpenAI direct otherwise. Also forces the Chat
     Completions endpoint, which is what OpenRouter speaks (it does not
     implement the Responses API).
+
+    For Anthropic models a thin subclass attaches `cache_control` markers
+    to the system message and the last tool just before the request goes
+    out. Every other provider gets the plain SDK model — OpenAI / DeepSeek
+    auto-cache on stable prefixes; xAI / Google / Moonshot / Qwen have no
+    OpenRouter caching path today.
     """
     from agents import OpenAIChatCompletionsModel
+
+    if detect_provider(name) == "anthropic":
+        return _AnthropicCachingChatModel(model=name, openai_client=get_llm_client())
     return OpenAIChatCompletionsModel(model=name, openai_client=get_llm_client())
+
+
+def _build_anthropic_cache_markers() -> dict[str, Any]:
+    """OpenRouter forwards Anthropic's `cache_control` extension verbatim.
+
+    The marker structure is identical to Anthropic's own API:
+    `{"type": "ephemeral"}` on the last content block of the cacheable region.
+
+    Two markers cover the static input surface:
+      1. SYSTEM — placed on the system-message content. Caches the
+         CHIPPI_INSTRUCTIONS (~3-5K tokens) + workspace_info + ai_profile.
+      2. TOOLS — placed on the LAST tool. Anthropic caches the entire tools
+         array up through any tool carrying a marker, so one marker on the
+         tail covers the full 30+ tool surface.
+
+    See: https://openrouter.ai/docs/features/prompt-caching
+         https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+    """
+    return {"type": "ephemeral"}
+
+
+class _AnthropicCachingChatModel:
+    """OpenAIChatCompletionsModel wrapper that injects Anthropic cache markers.
+
+    Wraps the SDK model rather than subclassing because the SDK builds the
+    raw `messages` array and tools list inline inside `_fetch_response`,
+    and the cache_control structure has to land on those built blocks.
+    We intercept the client's chat.completions.create call once at request
+    time and mutate the OUTGOING payload — same wire shape the SDK would
+    have sent, with two extra fields. No copy of the SDK's converter logic.
+
+    Concretely, between message construction and the HTTP POST:
+      - The system message {"role": "system", "content": str} is rewritten
+        to {"role": "system", "content": [{"type": "text", "text": str,
+        "cache_control": {"type": "ephemeral"}}]}.
+      - The last entry of the `tools` array gets cache_control attached.
+
+    Non-Anthropic providers never reach this class.
+    """
+
+    def __init__(self, model: str, openai_client: AsyncOpenAI):
+        from agents import OpenAIChatCompletionsModel
+        self._inner = OpenAIChatCompletionsModel(
+            model=model,
+            openai_client=_CacheMarkerClient(openai_client),
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        # Forward every other attribute (get_response, stream_response,
+        # model, etc.) to the wrapped SDK model. We only intercepted the
+        # client; everything else stays SDK-native.
+        return getattr(self._inner, name)
+
+
+class _CacheMarkerClient:
+    """Proxy wrapper around AsyncOpenAI that attaches Anthropic cache markers
+    on the way out. Forwards every other attribute unchanged.
+
+    We wrap only `chat.completions.create` — the one entry point the agents
+    SDK calls. Embeddings, files, etc. go through `get_llm_client()` directly
+    and never see this proxy.
+    """
+
+    def __init__(self, inner: AsyncOpenAI):
+        self._inner = inner
+        self.chat = _CacheMarkerChat(inner.chat)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+class _CacheMarkerChat:
+    def __init__(self, inner: Any):
+        self._inner = inner
+        self.completions = _CacheMarkerCompletions(inner.completions)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+class _CacheMarkerCompletions:
+    def __init__(self, inner: Any):
+        self._inner = inner
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    async def create(self, **kwargs: Any) -> Any:
+        # Mutate in place — the SDK does not reuse the dict after dispatch.
+        _apply_anthropic_cache_markers(kwargs)
+        return await self._inner.create(**kwargs)
+
+
+def _apply_anthropic_cache_markers(create_kwargs: dict[str, Any]) -> None:
+    """Mutate `messages` and `tools` to carry Anthropic cache_control markers.
+
+    Idempotent: if the system message is already a block list with markers,
+    or the last tool already carries cache_control, nothing changes. Safe
+    against the SDK rebuilding the same kwargs across a retry.
+
+    System message: the SDK inserts it as {"content": str, "role": "system"}.
+    Rewrite the string to a single-block content array carrying the marker.
+
+    Tools: the SDK passes tools as a list of dicts shaped like
+    {"type": "function", "function": {...}}. Anthropic on OpenRouter accepts
+    `cache_control` as a sibling of `function`. One marker on the last tool
+    covers every preceding tool.
+    """
+    messages = create_kwargs.get("messages")
+    if isinstance(messages, list):
+        for msg in messages:
+            if (
+                isinstance(msg, dict)
+                and msg.get("role") == "system"
+                and isinstance(msg.get("content"), str)
+            ):
+                msg["content"] = [
+                    {
+                        "type": "text",
+                        "text": msg["content"],
+                        "cache_control": _build_anthropic_cache_markers(),
+                    }
+                ]
+                break  # Only one system message; first hit wins.
+
+    tools = create_kwargs.get("tools")
+    if isinstance(tools, list) and tools:
+        last_tool = tools[-1]
+        if isinstance(last_tool, dict) and "cache_control" not in last_tool:
+            last_tool["cache_control"] = _build_anthropic_cache_markers()
 
 
 _configured = False
@@ -207,6 +383,24 @@ def extract_usage(result: object) -> tuple[int, int, int]:
     usage and budget number. Both shapes are tried so an SDK change can't
     quietly re-break metering.
     """
+    tokens_in, tokens_out, total, _ = extract_usage_with_cache(result)
+    return (tokens_in, tokens_out, total)
+
+
+def extract_usage_with_cache(result: object) -> tuple[int, int, int, int]:
+    """Return (input, output, total, cached_input) token counts.
+
+    The agents SDK normalizes provider-specific cached-token fields into
+    `usage.input_tokens_details.cached_tokens` — true for both OpenAI
+    (`prompt_tokens_details.cached_tokens`) and Anthropic via OpenRouter
+    (cache_read_input_tokens, which OpenRouter maps to the same field).
+    DeepSeek's `prompt_cache_hit_tokens` is also normalized here. Anything
+    the provider didn't populate falls through as 0 — honest zero, not
+    estimate.
+
+    Used by the chat-turn telemetry writer in modal_app.chat_turn to feed
+    the ChatUsage.cachedTokens column.
+    """
     usage = None
     ctx_wrapper = getattr(result, "context_wrapper", None)
     if ctx_wrapper is not None:
@@ -214,8 +408,12 @@ def extract_usage(result: object) -> tuple[int, int, int]:
     if usage is None:
         usage = getattr(result, "usage", None)
     if usage is None:
-        return (0, 0, 0)
+        return (0, 0, 0, 0)
     tokens_in = int(getattr(usage, "input_tokens", 0) or 0)
     tokens_out = int(getattr(usage, "output_tokens", 0) or 0)
     total = int(getattr(usage, "total_tokens", 0) or 0) or (tokens_in + tokens_out)
-    return (tokens_in, tokens_out, total)
+    cached = 0
+    details = getattr(usage, "input_tokens_details", None)
+    if details is not None:
+        cached = int(getattr(details, "cached_tokens", 0) or 0)
+    return (tokens_in, tokens_out, total, cached)

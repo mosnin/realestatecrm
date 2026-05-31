@@ -4,6 +4,15 @@ Records the token cost of a completed interactive chat turn into a ChatUsage
 row. The write is non-blocking — a telemetry failure must never break a chat
 turn. The TS runtime has an equivalent in lib/usage/record-chat-usage.ts;
 both target the same table.
+
+Phase 2 caching telemetry:
+  cachedTokens — input tokens served from the provider's prompt cache
+                 (free or discounted). 0 for providers without a cache
+                 path (xAI Grok, Google Gemini on OpenRouter today).
+                 Powers the cache-hit-rate stat on the Usage page.
+  provider     — OpenRouter prefix ('anthropic' | 'openai' | 'xai' |
+                 'deepseek' | 'google' | 'moonshotai' | 'qwen' | 'unknown').
+                 Powers the per-provider breakdown on the Usage page.
 """
 
 from __future__ import annotations
@@ -11,6 +20,7 @@ from __future__ import annotations
 import structlog
 
 from db import supabase
+from llm import detect_provider
 
 logger = structlog.get_logger(__name__)
 
@@ -59,17 +69,25 @@ async def record_chat_usage(
     user_id: str | None = None,
     conversation_id: str | None = None,
     runtime: str = "modal",
+    cached_tokens: int = 0,
 ) -> None:
     """Insert one ChatUsage row for a completed interactive chat turn.
 
     The TS runtime has an equivalent in lib/usage/record-chat-usage.ts —
     both target the same table. Never raises: a telemetry write must not
     break a chat turn. Zero-token turns are skipped (no billable usage).
+
+    cached_tokens is the count of prompt tokens served from the provider's
+    prompt cache. It's a subset of prompt_tokens (cache hits ARE input
+    tokens, just billed at a discount), so we clamp it to prompt_tokens
+    to keep cache_hit_rate = cached/prompt sane on the Usage page.
     """
     prompt_tokens = max(0, int(prompt_tokens or 0))
     completion_tokens = max(0, int(completion_tokens or 0))
+    cached_tokens = max(0, min(int(cached_tokens or 0), prompt_tokens))
     if prompt_tokens == 0 and completion_tokens == 0:
         return
+    provider = detect_provider(model)
     try:
         db = await supabase()
         await (
@@ -81,6 +99,8 @@ async def record_chat_usage(
                 "model": model,
                 "promptTokens": prompt_tokens,
                 "completionTokens": completion_tokens,
+                "cachedTokens": cached_tokens,
+                "provider": provider,
                 "costUsd": _calculate_cost(model, prompt_tokens, completion_tokens),
                 "runtime": runtime,
             })

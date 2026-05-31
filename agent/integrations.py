@@ -79,7 +79,13 @@ _NATIVE_TOOL_NAMES = frozenset({
 
 
 async def active_toolkits(space_id: str, user_id: str) -> list[str]:
-    """Toolkit slugs the realtor has connected and our DB has marked active."""
+    """Toolkit slugs the realtor has connected and our DB has marked active.
+
+    Returned in deterministic alphabetical order — stable across turns so
+    the agent's tool list (which derives from this) keeps a stable prefix
+    for prompt caching. Without an order clause Supabase's natural row order
+    can shuffle between requests and silently miss the provider cache.
+    """
     db = await supabase()
     res = await (
         db.table("IntegrationConnection")
@@ -87,6 +93,7 @@ async def active_toolkits(space_id: str, user_id: str) -> list[str]:
         .eq("spaceId", space_id)
         .eq("userId", user_id)
         .eq("status", "active")
+        .order("toolkit")
         .execute()
     )
     rows = res.data or []

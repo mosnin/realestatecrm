@@ -377,7 +377,7 @@ async def chat_turn(item: dict):
     from chippi import make_chippi_agent
     from chippi_broker import make_broker_agent
     from config import settings
-    from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
+    from llm import extract_usage_with_cache, fallback_models, make_chat_model, resolve_chat_model
     from tools.base import result_is_ok
 
     agent_settings = AgentSettings.model_validate(sr.data)
@@ -679,16 +679,20 @@ async def chat_turn(item: dict):
 
                 # Record this turn's token cost for the Usage page. Best-effort:
                 # a telemetry failure must never surface as a chat error.
+                # cached_tokens is the share served from the provider prompt
+                # cache (free or discounted); 0 for providers without a cache
+                # path on OpenRouter (xAI Grok, Google Gemini today).
                 try:
                     from ledger import record_chat_usage
 
-                    tokens_in, tokens_out, _ = extract_usage(result)
+                    tokens_in, tokens_out, _, cached_in = extract_usage_with_cache(result)
                     if tokens_in or tokens_out:
                         await record_chat_usage(
                             space_id=space_id,
                             model=model,
                             prompt_tokens=tokens_in,
                             completion_tokens=tokens_out,
+                            cached_tokens=cached_in,
                             user_id=user_id or None,
                             conversation_id=conversation_id or None,
                         )
