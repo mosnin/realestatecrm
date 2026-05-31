@@ -10,7 +10,7 @@
 
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { DURATION_BASE, EASE_OUT, CHAT_STAGGER_DELAY } from '@/lib/motion';
 
 export interface SuggestedActionsProps {
   suggestions: string[];
@@ -33,13 +33,21 @@ export function SuggestedActions({ suggestions, onSelect, className }: Suggested
           key={`${i}-${text}`}
           type="button"
           onClick={() => onSelect(text)}
-          initial={{ opacity: 0, y: 3 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: 0.12 + i * 0.04 }}
+          transition={{
+            duration: DURATION_BASE,
+            ease: EASE_OUT,
+            delay: 0.12 + i * CHAT_STAGGER_DELAY,
+          }}
           className={cn(
             'inline-flex items-center text-[12.5px] rounded-full',
-            'border border-border/70 bg-card hover:bg-muted/40 hover:border-border',
-            'px-3 py-1.5 text-foreground/85 transition-colors',
+            // Hover cross-fades to a foreground-tinted overlay — the
+            // standard chat-surface row-hover token. transition-colors
+            // duration matches DURATION_FAST (150ms) for the snappy feel
+            // a chip wants on press-imminent.
+            'border border-border/70 bg-card hover:bg-foreground/[0.05] hover:border-border',
+            'px-3 py-1.5 text-foreground/85 transition-colors duration-150',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
             'active:scale-[0.98]',
           )}

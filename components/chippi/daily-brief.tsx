@@ -29,9 +29,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
+import { DURATION_BASE, EASE_OUT, CHAT_STAGGER_DELAY } from '@/lib/motion';
 import type { Brief, BriefCard, SignalKind, SignalSource } from '@/lib/briefing/types';
 import type { PipelineSummary, OvernightSummary } from '@/lib/briefing/sections';
 import {
@@ -302,10 +304,20 @@ function LiveBrief({
 
   const anySection = hasOnDeck || hasYourDay || hasPipeline || hasOvernight;
 
+  // Compute a sequential index ONLY for the sections we actually render,
+  // so a missing ON DECK doesn't leave YOUR DAY waiting on an empty
+  // stagger slot. 40ms between siblings is the Apple cadence — present
+  // enough to read as "settling in", invisible enough to not feel
+  // animated. First paint only; section data arriving later (overnight
+  // /pipeline arrive after the calendar fetch resolves) animates in
+  // independently from index 0 since it's its own mount.
+  let sectionIndex = 0;
+  const nextDelay = () => 0.04 + sectionIndex++ * CHAT_STAGGER_DELAY;
+
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto space-y-12')}>
       {hasOnDeck && (
-        <BriefSection label="ON DECK">
+        <BriefSection label="ON DECK" delay={nextDelay()}>
           <ul className="divide-y divide-border/60">
             {brief.cards.map((card, idx) => (
               <BriefCardRow
@@ -330,19 +342,19 @@ function LiveBrief({
       )}
 
       {hasYourDay && (
-        <BriefSection label="YOUR DAY">
+        <BriefSection label="YOUR DAY" delay={nextDelay()}>
           <YourDayList events={events} />
         </BriefSection>
       )}
 
       {hasPipeline && sections?.pipeline && (
-        <BriefSection label="PIPELINE">
+        <BriefSection label="PIPELINE" delay={nextDelay()}>
           <PipelineLine summary={sections.pipeline} tomorrow={brief.tomorrow} />
         </BriefSection>
       )}
 
       {hasOvernight && sections?.overnight && (
-        <BriefSection label="OVERNIGHT">
+        <BriefSection label="OVERNIGHT" delay={nextDelay()}>
           <OvernightLine summary={sections.overnight} momentum={brief.momentum} />
         </BriefSection>
       )}
@@ -354,12 +366,28 @@ function LiveBrief({
 
 // ── Section primitive ────────────────────────────────────────────────────────
 
-function BriefSection({ label, children }: { label: string; children: React.ReactNode }) {
+function BriefSection({
+  label,
+  children,
+  delay = 0,
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** Stagger offset for first-paint section reveal. Defaults to 0 so
+   *  surfaces that don't use the brief's four-up cascade get a plain
+   *  fade-in. */
+  delay?: number;
+}) {
   return (
-    <section className="space-y-3">
+    <motion.section
+      className="space-y-3"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay }}
+    >
       <h2 className={SECTION_LABEL}>{label}</h2>
       {children}
-    </section>
+    </motion.section>
   );
 }
 

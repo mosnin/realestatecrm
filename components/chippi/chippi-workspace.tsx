@@ -86,6 +86,47 @@ interface ChippiWorkspaceProps {
 const MESSAGE_LIMIT = 50;
 
 /**
+ * Opt-in soft "tap" tone on message send. Generated via Web Audio API so
+ * we don't ship any asset, fires once at a quiet -28dB-ish gain, and
+ * gates on:
+ *
+ *   1. Browser context (server renders skip).
+ *   2. `prefers-reduced-motion` — same surface the rest of the chat
+ *      animation system respects. Sound is motion adjacent; calm-by-
+ *      default means quiet-by-default for that audience.
+ *   3. localStorage flag `chippi:sound:enabled === '1'`. Default OFF —
+ *      sound is a delight the realtor chooses to turn on, never one we
+ *      surprise them with on first send. No UI for the toggle in this
+ *      pass; the key is documented for the inevitable settings cluster.
+ *
+ * Failures are swallowed (suspended AudioContexts, autoplay blocks,
+ * Safari quirks) — a missing send tone is never a bug worth shouting
+ * about.
+ */
+function softTap(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.localStorage?.getItem('chippi:sound:enabled') !== '1') return;
+    type WebkitAudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
+    const w = window as WebkitAudioWindow;
+    const Ctor = window.AudioContext ?? w.webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 660; // C5-ish — soft, not chime-y.
+    gain.gain.setValueAtTime(0.04, ctx.currentTime); // -28dB-ish.
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  } catch {
+    // suspended context, autoplay block, or no AudioContext support — silent.
+  }
+}
+
+/**
  * Parse a create_plan tool call result into { task, steps }.
  * Returns null if the data doesn't match the expected shape.
  */
@@ -156,6 +197,18 @@ export function ChippiWorkspace({
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track which assistant message ids have already mounted so we only run the
+  // 8px slide-in entrance the FIRST time a bubble appears. Loading a
+  // conversation from history dumps the full transcript in at once; without
+  // this gate every bubble would slide in on every navigation. Re-keyed by
+  // active conversation id so a fresh thread starts with a clean set.
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Reset on conversation switch — the next render's messages are a fresh
+    // batch that should arrive without an animation cascade.
+    seenMessageIdsRef.current = new Set();
+  }, [activeConversationId]);
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
 
@@ -618,6 +671,11 @@ export function ChippiWorkspace({
 
       // Record the full text so the retry button can replay it.
       lastUserMsgRef.current = contextPrefix + text;
+
+      // Opt-in send chime. Gated inside softTap() so the call site stays
+      // clean — the helper no-ops when the realtor hasn't enabled sound
+      // or when reduced-motion is on.
+      softTap();
 
       await send(contextPrefix + text, attachmentIds);
 
@@ -1230,6 +1288,16 @@ export function ChippiWorkspace({
                     ) {
                       return null;
                     }
+                    // First time we see this id → run the 8px slide-in.
+                    // Subsequent renders (re-mount during scroll virtualization
+                    // would also hit this code path, though we don't virtualize)
+                    // skip the animation. User messages: no entrance animation
+                    // — typed text reading "instantly there" is the realtor's
+                    // own action, not Chippi delivering something.
+                    const isFresh = !seenMessageIdsRef.current.has(msg.id);
+                    if (isFresh) seenMessageIdsRef.current.add(msg.id);
+                    const animateEntrance = isFresh && msg.role === 'assistant';
+
                     if (msg.role === 'assistant') {
                       // Find any create_plan tool call in this message and
                       // render a PlanCard inline below the transcript blocks.
@@ -1239,7 +1307,13 @@ export function ChippiWorkspace({
                       );
 
                       return (
-                        <div key={msg.id} className="flex gap-3">
+                        <motion.div
+                          key={msg.id}
+                          className="flex gap-3"
+                          initial={animateEntrance ? { opacity: 0, y: 8 } : false}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                        >
                           <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
                             <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                           </div>
@@ -1307,7 +1381,7 @@ export function ChippiWorkspace({
                               </button>
                             )}
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     }
                     return (
