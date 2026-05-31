@@ -198,9 +198,8 @@ export default async function BrokerPipelinePage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-56 md:pb-24">
       <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Pipeline.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
           Pipeline
         </h1>

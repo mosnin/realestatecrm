@@ -114,11 +114,10 @@ export default async function BrokerAnalyticsPage() {
     });
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-8 w-full pb-56 md:pb-24">
       <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Analytics.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Conversion analytics
+          Analytics
         </h1>
         <p className={cn(BODY_MUTED)}>
           Funnel and conversion over the last 30 days.
