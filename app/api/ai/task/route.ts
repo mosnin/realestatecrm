@@ -46,6 +46,10 @@ import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { decideRoute } from '@/lib/chat/router';
+import { streamDirectTurn } from '@/lib/chat/direct-stream';
+import type { MultimodalAttachment } from '@/lib/chat/multimodal';
+import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
 
 /** TTL for attachment URLs forwarded to Modal. The agent reads them within
  *  seconds of receiving the task; 30 minutes is plenty of headroom and short
@@ -577,6 +581,9 @@ export async function POST(req: NextRequest) {
   const hydratedAttachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
 
   // ── TS fallback (local dev without Modal) ────────────────────────────────
+  // The TS runtime is full-agent (no router). Skipping the router here keeps
+  // local dev's behavior identical to pre-Phase-4 — the dual path is a
+  // production optimization, not a local concern.
   if (chatRuntime() === 'ts') {
     logger.info('[ai/task] using in-process TS runtime (CHIPPI_CHAT_RUNTIME=ts)', { spaceSlug });
     return streamTsChatTurn({
@@ -588,7 +595,95 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── Modal runtime (default) ──────────────────────────────────────────────
+  // ── Phase 4 dual-path router ─────────────────────────────────────────────
+  // The router decides direct (fast path, no tools) vs agent (Modal, full
+  // tool surface). Attachments + the parsed message both feed the decision.
+  // Errors → 'agent' (router safe default), so a router bug can never
+  // silently drop an action.
+  const routerAttachments = hydratedAttachments.map((a) => ({
+    id: a.id,
+    mimeType: a.mime_type,
+  }));
+  const route = decideRoute(message, routerAttachments);
+
+  // Direct path: load the workspace's preferred model + skip Modal entirely.
+  if (route === 'direct') {
+    const model = await loadWorkspaceModel(ctx.space.id);
+    logger.info('[ai/task] router → direct', { spaceSlug, model });
+    return streamDirectTurn({
+      spaceId: ctx.space.id,
+      userId: ctx.userId,
+      conversationId,
+      model,
+      userMessage: message,
+      history: history.map((h) => ({ role: h.role, content: h.content })),
+      attachments: hydratedAttachments.map<MultimodalAttachment>((a) => ({
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mime_type,
+        url: a.public_url,
+      })),
+      abortController,
+      // Escalation hook — when the direct model's reply triggers
+      // shouldEscalate(), we hand off to the agent path. For v1 we
+      // surface escalation to the caller via a soft signal; the actual
+      // agent call still ships in the same Response is deferred. Returning
+      // false means "commit the direct answer".
+      onEscalate: async () => false,
+    });
+  }
+
+  // Agent path (Modal) — full tool surface.
+  logger.info('[ai/task] router → agent', { spaceSlug });
+  return callModalAgent({
+    ctx,
+    conversationId,
+    message,
+    history,
+    hydratedAttachments,
+    abortController,
+    spaceSlug,
+  });
+}
+
+// ── Workspace model lookup ────────────────────────────────────────────────
+
+/**
+ * Resolve the chat model the realtor's workspace is configured for. The
+ * direct path needs this BEFORE the LLM call (provider detection drives
+ * multimodal encoding); the agent path reads it inside Modal so it doesn't
+ * need this helper. Falls back to DEFAULT_CHAT_MODEL on any lookup failure.
+ */
+async function loadWorkspaceModel(spaceId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('AgentSettings')
+      .select('"chatModel"')
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    const m = (data as { chatModel?: string } | null)?.chatModel;
+    return m && typeof m === 'string' && m.trim() ? m.trim() : DEFAULT_CHAT_MODEL;
+  } catch {
+    return DEFAULT_CHAT_MODEL;
+  }
+}
+
+// ── Modal agent call (extracted so the router can call either path) ──────
+
+interface CallModalAgentInput {
+  ctx: ToolContext;
+  conversationId: string;
+  message: string;
+  history: HistoryRow[];
+  hydratedAttachments: AttachmentPayload[];
+  abortController: AbortController;
+  spaceSlug: string;
+}
+
+async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
+  const { ctx, conversationId, message, history, hydratedAttachments, abortController, spaceSlug } =
+    input;
+
   const modalChatUrl = process.env.MODAL_CHAT_URL;
   if (!modalChatUrl) {
     logger.error('[ai/task] MODAL_CHAT_URL not set — cannot route to Modal sandbox', { spaceSlug });
