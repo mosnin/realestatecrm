@@ -27,7 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -150,9 +150,31 @@ export function CalendarView({
   // View mode — defaults to Month; rehydrate from localStorage post-mount
   // so SSR-and-hydration agree (we can't read localStorage on the server).
   const [view, setView] = useState<ViewMode>('month');
+
+  // Mobile flag — Tailwind `sm:` breakpoint is 640px. Drives the auto-switch
+  // to Day on first paint AND the header compression. We track via
+  // matchMedia + a listener so rotating a phone updates the layout.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(viewStorageKey(slug));
+      // On mobile, Month/Week are unusable in the 640px column — auto-fall
+      // back to Day on first paint. We do NOT persist this override: if the
+      // realtor explicitly taps Month/Week later, that intent sticks.
+      const mobile = window.innerWidth < 640;
+      if (mobile && (!stored || stored === 'month' || stored === 'week')) {
+        setView('day');
+        return;
+      }
       if (isViewMode(stored)) setView(stored);
     } catch {
       // localStorage unavailable (private mode, SSR edge); fall back to default.
@@ -243,19 +265,35 @@ export function CalendarView({
 
   const headerLabel = useMemo(() => {
     if (view === 'month') {
-      return cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      // Mobile: "May 2026" → "May" (year is implicit from cursor + Today nudge).
+      return cursor.toLocaleDateString(undefined, {
+        month: 'long',
+        year: isMobile ? undefined : 'numeric',
+      });
     }
     if (view === 'week') {
       const start = weekDays(cursor)[0];
       const end = weekDays(cursor)[6];
       const sameMonth = start.getMonth() === end.getMonth();
       const monthFmt: Intl.DateTimeFormatOptions = { month: 'short' };
+      // Mobile: collapse the range to "Week of May 31" — saves ~10ch.
+      if (isMobile) {
+        return `Week of ${start.toLocaleDateString(undefined, monthFmt)} ${start.getDate()}`;
+      }
       if (sameMonth) {
         return `${start.toLocaleDateString(undefined, monthFmt)} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`;
       }
       return `${start.toLocaleDateString(undefined, monthFmt)} ${start.getDate()} – ${end.toLocaleDateString(undefined, monthFmt)} ${end.getDate()}, ${end.getFullYear()}`;
     }
     if (view === 'day') {
+      // Mobile: drop the year + use short weekday so it fits beside the chevrons.
+      if (isMobile) {
+        return cursor.toLocaleDateString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+      }
       return cursor.toLocaleDateString(undefined, {
         weekday: 'long',
         month: 'long',
@@ -264,7 +302,7 @@ export function CalendarView({
       });
     }
     return 'Next 30 days';
-  }, [cursor, view]);
+  }, [cursor, view, isMobile]);
 
   // Width: month/week need more room than the reading column.
   const wide = view === 'month' || view === 'week';
@@ -386,12 +424,15 @@ function ToggleRow({
   onToday: () => void;
   onAdd: () => void;
 }) {
+  // Two stacked rows on mobile (toggle then nav+add); single row on `sm:+`.
+  // The label has a tight floor on mobile (110px) so the chevrons stay
+  // anchored even on a 320px viewport without the row wrapping mid-control.
   return (
-    <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:flex-wrap">
       <div
         role="tablist"
         aria-label="Calendar view"
-        className="inline-flex items-center rounded-full border border-border/70 p-0.5"
+        className="inline-flex self-start items-center rounded-full border border-border/70 p-0.5"
       >
         {VIEW_MODES.map((m) => (
           <button
@@ -400,7 +441,8 @@ function ToggleRow({
             aria-selected={view === m}
             onClick={() => onViewChange(m)}
             className={cn(
-              'px-3 h-7 rounded-full text-[11px] font-medium uppercase tracking-wider transition-colors duration-150',
+              'h-7 rounded-full text-[11px] font-medium uppercase tracking-wider transition-colors duration-150',
+              'px-2.5 sm:px-3',
               view === m
                 ? 'bg-foreground text-background'
                 : 'text-muted-foreground hover:text-foreground',
@@ -411,40 +453,65 @@ function ToggleRow({
         ))}
       </div>
 
-      <div className="flex items-center gap-3 ml-auto">
+      <div className="flex items-center gap-2 sm:gap-3 sm:ml-auto flex-wrap">
         {showNav && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 min-w-0">
             <button
               type="button"
               onClick={onPrev}
-              className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+              className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 shrink-0"
               aria-label="Previous"
             >
               <ChevronLeft size={16} strokeWidth={1.75} />
             </button>
-            <span className={cn(BODY, 'min-w-[180px] text-center')}>{headerLabel}</span>
+            <span
+              className={cn(
+                BODY,
+                'text-center truncate min-w-[110px] sm:min-w-[180px]',
+              )}
+            >
+              {headerLabel}
+            </span>
             <button
               type="button"
               onClick={onNext}
-              className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+              className="h-8 w-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 shrink-0"
               aria-label="Next"
             >
               <ChevronRight size={16} strokeWidth={1.75} />
             </button>
-            <button type="button" onClick={onToday} className={cn(GHOST_PILL, 'h-7 px-3 text-xs')}>
-              Today
+            <button
+              type="button"
+              onClick={onToday}
+              className={cn(
+                GHOST_PILL,
+                'shrink-0',
+                // Icon-only on mobile (RotateCcw = jump back to today);
+                // text label re-appears at `sm:+`.
+                'h-8 w-8 px-0 sm:h-7 sm:w-auto sm:px-3 sm:text-xs',
+              )}
+              aria-label="Today"
+              title="Today"
+            >
+              <RotateCcw size={14} strokeWidth={1.75} className="sm:hidden" />
+              <span className="hidden sm:inline">Today</span>
             </button>
           </div>
         )}
         <button
           type="button"
           onClick={onAdd}
-          className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0')}
+          className={cn(
+            PRIMARY_PILL,
+            'whitespace-nowrap shrink-0 ml-auto sm:ml-0',
+            // Smallest screens: icon-only "+" (40px square). Names appear
+            // progressively as room allows.
+            'h-9 w-9 px-0 sm:w-auto sm:px-4',
+          )}
           aria-label="New event"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">New event</span>
-          <span className="sm:hidden">New</span>
         </button>
       </div>
     </div>
@@ -481,65 +548,74 @@ function MonthView({
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // On mobile, the 7-col grid would crush every cell to ~55px — chips render
+  // as "C…" or "Or…". We give the grid a 630px floor (90px × 7) and let the
+  // outer container scroll horizontally. At `sm:+` (≥640px viewport), the
+  // overflow context goes away entirely so the grid fills naturally and any
+  // future sticky behavior anchors to the page scroll like before.
   return (
     <div className="border border-border/60 rounded-md overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-border/60 bg-muted/20">
-        {weekdayLabels.map((w) => (
-          <div key={w} className={cn(SECTION_LABEL, 'px-3 py-2 text-left')}>
-            {w}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 grid-rows-6">
-        {days.map((day, i) => {
-          const key = localDayKey(day);
-          const isCurrentMonth = day.getMonth() === monthIndex;
-          const isToday = key === todayKey;
-          const dayEvents = eventsByDay.get(key) ?? [];
-          const visible = dayEvents.slice(0, 3);
-          const overflow = dayEvents.length - visible.length;
-          // Hairline border between cells — top and left borders so the
-          // outer frame doesn't double up.
-          const borderRules = cn(
-            i >= 7 ? 'border-t border-border/60' : '',
-            i % 7 !== 0 ? 'border-l border-border/60' : '',
-          );
-          return (
-            <button
-              key={key + i}
-              type="button"
-              onClick={() => onCellTap(day)}
-              className={cn(
-                'min-h-[96px] text-left p-2 hover:bg-muted/30 transition-colors duration-150 flex flex-col gap-1',
-                borderRules,
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-flex items-center justify-center h-6 w-6 rounded-full text-xs tabular-nums',
-                  isToday && 'ring-1 ring-foreground/30',
-                  isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/50',
-                )}
-              >
-                {day.getDate()}
-              </span>
-              <div className="flex flex-col gap-0.5 min-w-0">
-                {visible.map((ev) => (
-                  <span
-                    key={ev.id}
-                    className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
-                    title={shortEventLabel(ev)}
-                  >
-                    {shortEventLabel(ev)}
-                  </span>
-                ))}
-                {overflow > 0 && (
-                  <span className={cn(CAPTION, 'truncate px-1.5')}>+{overflow} more</span>
-                )}
+      <div className="overflow-x-auto sm:overflow-visible">
+        <div className="min-w-[630px] sm:min-w-0">
+          <div className="grid grid-cols-7 border-b border-border/60 bg-muted/20">
+            {weekdayLabels.map((w) => (
+              <div key={w} className={cn(SECTION_LABEL, 'px-3 py-2 text-left')}>
+                {w}
               </div>
-            </button>
-          );
-        })}
+            ))}
+          </div>
+          <div className="grid grid-cols-7 grid-rows-6">
+            {days.map((day, i) => {
+              const key = localDayKey(day);
+              const isCurrentMonth = day.getMonth() === monthIndex;
+              const isToday = key === todayKey;
+              const dayEvents = eventsByDay.get(key) ?? [];
+              const visible = dayEvents.slice(0, 3);
+              const overflow = dayEvents.length - visible.length;
+              // Hairline border between cells — top and left borders so the
+              // outer frame doesn't double up.
+              const borderRules = cn(
+                i >= 7 ? 'border-t border-border/60' : '',
+                i % 7 !== 0 ? 'border-l border-border/60' : '',
+              );
+              return (
+                <button
+                  key={key + i}
+                  type="button"
+                  onClick={() => onCellTap(day)}
+                  className={cn(
+                    'min-h-[96px] text-left p-2 hover:bg-muted/30 transition-colors duration-150 flex flex-col gap-1',
+                    borderRules,
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-flex items-center justify-center h-6 w-6 rounded-full text-xs tabular-nums',
+                      isToday && 'ring-1 ring-foreground/30',
+                      isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/50',
+                    )}
+                  >
+                    {day.getDate()}
+                  </span>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    {visible.map((ev) => (
+                      <span
+                        key={ev.id}
+                        className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
+                        title={shortEventLabel(ev)}
+                      >
+                        {shortEventLabel(ev)}
+                      </span>
+                    ))}
+                    {overflow > 0 && (
+                      <span className={cn(CAPTION, 'truncate px-1.5')}>+{overflow} more</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -558,38 +634,47 @@ function WeekView({
 }) {
   const days = useMemo(() => weekDays(cursor), [cursor]);
   const todayKey = localDayKey(new Date());
+  // Min-width 694px = 64px gutter + 7 × 90px columns so events have room
+  // for at least 8-9 characters of title before truncating. The outer
+  // container scrolls horizontally on narrow viewports; at `sm:+` the
+  // overflow context dissolves so the sticky day header keeps anchoring
+  // to the page scroll like it always did on desktop.
   return (
     <div className="border border-border/60 rounded-md overflow-hidden">
-      <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-border/60 bg-muted/20 sticky top-0 z-10">
-        <div />
-        {days.map((d) => {
-          const key = localDayKey(d);
-          const isToday = key === todayKey;
-          return (
-            <div key={key} className="px-2 py-2">
-              <p className={cn(SECTION_LABEL)}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</p>
-              <p
-                className={cn(
-                  'text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full',
-                  isToday && 'ring-1 ring-foreground/30',
-                )}
-              >
-                {d.getDate()}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))]">
-        {HOURS.map((hour) => (
-          <HourRow
-            key={hour}
-            hour={hour}
-            days={days}
-            events={events}
-            onSlotTap={onSlotTap}
-          />
-        ))}
+      <div className="overflow-x-auto sm:overflow-visible">
+        <div className="min-w-[694px] sm:min-w-0">
+          <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-border/60 bg-muted/20 sticky top-0 z-10">
+            <div />
+            {days.map((d) => {
+              const key = localDayKey(d);
+              const isToday = key === todayKey;
+              return (
+                <div key={key} className="px-2 py-2">
+                  <p className={cn(SECTION_LABEL)}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</p>
+                  <p
+                    className={cn(
+                      'text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full',
+                      isToday && 'ring-1 ring-foreground/30',
+                    )}
+                  >
+                    {d.getDate()}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))]">
+            {HOURS.map((hour) => (
+              <HourRow
+                key={hour}
+                hour={hour}
+                days={days}
+                events={events}
+                onSlotTap={onSlotTap}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
