@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   GripVertical,
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { formatCompact, formatCurrency } from '@/lib/formatting';
 import { dealHealth, inferNextAction, HEALTH_META } from '@/lib/deals/health';
 import { summarizeChecklist, type DealChecklistItem } from '@/lib/deals/checklist';
+import { EASE_APPLE } from '@/lib/motion';
 import { TITLE_FONT } from '@/lib/typography';
 
 type DealWithRelations = Deal & {
@@ -39,6 +41,12 @@ interface DealCardProps {
   onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
   /** Open the deal in the slide-over panel. If omitted, falls back to navigation. */
   onOpenDeal?: (deal: DealWithRelations) => void;
+  /**
+   * Index used for the initial-mount stagger. `null` means this card is
+   * arriving after the column already mounted — it gets a single fade-in
+   * with no stagger delay. Set by `KanbanColumn`.
+   */
+  entranceIndex?: number | null;
 }
 
 /**
@@ -54,6 +62,7 @@ export function DealCard({
   nextStage,
   onAdvanceStage,
   onOpenDeal,
+  entranceIndex = null,
 }: DealCardProps) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -64,6 +73,12 @@ export function DealCard({
     transition,
     opacity: isDragging ? 0.4 : 1,
   };
+
+  // Initial-mount stagger only — capped at 8 cards so a deep column doesn't
+  // turn into a parade. After the column has mounted, entranceIndex is null
+  // and the card gets a single 200ms fade with no delay (an add).
+  const staggerDelay =
+    entranceIndex !== null && entranceIndex < 8 ? entranceIndex * 0.03 : 0;
 
   const health = dealHealth(deal);
   const healthMeta = HEALTH_META[health.state];
@@ -78,7 +93,18 @@ export function DealCard({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="mb-2">
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      className="mb-2"
+      // Entrance: 200ms fade + 8px slide-up, Apple ease. The stagger is the
+      // index-driven delay — null entranceIndex => single add, no delay.
+      // Exit: a quick fade so a deleted/moved card doesn't pop.
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_APPLE } }}
+      transition={{ duration: 0.2, ease: EASE_APPLE, delay: staggerDelay }}
+    >
       <div
         className={cn(
           'group bg-background border border-border/70 rounded-md p-3 cursor-pointer',
@@ -290,6 +316,6 @@ export function DealCard({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

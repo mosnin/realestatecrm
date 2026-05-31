@@ -30,6 +30,7 @@ import { ContactActionPills } from '@/components/contacts/contact-action-pills';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
+import { ContactDetailFrame, ContactDetailFocal } from './detail-client';
 import {
   buildPeopleDetailActions,
   type PersonStateForActions,
@@ -128,35 +129,39 @@ export default async function ClientDetailPage({
   const hasOpenDeals = contact.dealContacts.length > 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <ContactDetailFrame className="max-w-4xl mx-auto space-y-8 pb-12">
       {/* Headline — name is the page. The next four lines tell the realtor
           everything they need to know in three seconds: who, how warm, how
-          quiet, what just happened, what to do next. */}
-      <header className="space-y-2 mb-6 pb-4 border-b border-border/60">
-        <Link
-          href={`/s/${slug}/contacts`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={12} /> People
-        </Link>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          {contact.name}
-        </h1>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {buildStatusLine(contact, personState)}
-        </p>
-        {lastActivity && (
-          <p className="text-sm text-muted-foreground">
-            {buildLastActivityLine(lastActivity)}
+          quiet, what just happened, what to do next.
+          ContactDetailFocal adds a 0.95 → 1 scale on entry so the eye lands
+          on the headline as the page settles. */}
+      <ContactDetailFocal>
+        <header className="space-y-2 mb-6 pb-4 border-b border-border/60">
+          <Link
+            href={`/s/${slug}/contacts`}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={12} /> People
+          </Link>
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            {contact.name}
+          </h1>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {buildStatusLine(contact, personState)}
           </p>
-        )}
-        <p className="text-base text-foreground leading-relaxed">
-          {buildNextMove(contact, personState, details)}
-        </p>
-      </header>
+          {lastActivity && (
+            <p className="text-sm text-muted-foreground">
+              {buildLastActivityLine(lastActivity)}
+            </p>
+          )}
+          <p className="text-base text-foreground leading-relaxed">
+            {buildNextMove(contact, personState, details)}
+          </p>
+        </header>
+      </ContactDetailFocal>
 
       {/* Action pills — same vocabulary as the morning home's compose
           actions. State picks them; the realtor doesn't. Tap a verb pill
@@ -440,7 +445,7 @@ export default async function ClientDetailPage({
           />
         </div>
       </details>
-    </div>
+    </ContactDetailFrame>
   );
 }
 

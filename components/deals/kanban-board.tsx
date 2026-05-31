@@ -13,6 +13,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  type DropAnimation,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -58,6 +59,20 @@ import { useRealtime } from '@/hooks/use-realtime';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { dealHealth } from '@/lib/deals/health';
 import type { BoardStatus, BoardFocus } from './deals-page-client';
+
+/**
+ * Drop snap config — 180ms with the Apple ease curve. No spring overshoot:
+ * the card snaps to its slot like a piece of paper landing, not a ball
+ * bouncing. Constant lives at module scope (not inside the component)
+ * specifically so its identity is stable across renders — keeping it
+ * stable matters here because the @dnd-kit DropAnimation prop is
+ * referenced from inside `useDropAnimation` and a new object identity
+ * each render would cancel and restart the animation.
+ */
+const KANBAN_DROP_ANIMATION: DropAnimation = {
+  duration: 180,
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+};
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -1197,9 +1212,17 @@ export function KanbanBoard({
                 </div>
               </StaggerList>
             </SortableContext>
-            <DragOverlay>
+            <DragOverlay dropAnimation={KANBAN_DROP_ANIMATION}>
               {activeDeal && (
-                <div className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-md opacity-95">
+                // Lifted card during drag — gentle scale + 1deg rotate.
+                // `transform-gpu` keeps the lift on the compositor; the
+                // shadow bump reinforces the "this is in your hand" cue.
+                // No spring physics — when released, `dropAnimation` does
+                // a 180ms ease-out snap into the target slot.
+                <div
+                  className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-lg opacity-95 transform-gpu"
+                  style={{ transform: 'scale(1.03) rotate(1deg)' }}
+                >
                   <div className="flex items-start gap-2">
                     <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0">

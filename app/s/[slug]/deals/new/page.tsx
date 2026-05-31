@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WizardProgress } from '@/components/deals/wizard-progress';
@@ -10,10 +11,31 @@ import { WizardStepPipeline } from '@/components/deals/wizard-step-pipeline';
 import { WizardStepDetails } from '@/components/deals/wizard-step-details';
 import { WizardStepNotes } from '@/components/deals/wizard-step-notes';
 import { toast } from 'sonner';
+import { EASE_APPLE } from '@/lib/motion';
 import type { Property } from '@/lib/types';
 import { formatPropertyAddress } from '@/lib/properties';
 
 type ContactResult = { id: string; name: string; email: string | null; leadType: 'rental' | 'buyer' | 'seller' };
+
+/**
+ * Wizard step slide variants. `custom` is the direction:
+ *   +1 = moving forward  (incoming from right, outgoing to left)
+ *   -1 = moving backward (incoming from left,  outgoing to right)
+ *    0 = first paint     (no slide, just hold position)
+ * 24px is enough offset to read as motion without feeling like a swipe;
+ * 220ms with EASE_APPLE matches the contacts list cadence.
+ */
+const WIZARD_STEP_VARIANTS = {
+  enter: (direction: number) => ({
+    x: direction === 0 ? 0 : direction * 24,
+    opacity: direction === 0 ? 1 : 0,
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction: number) => ({
+    x: direction === 0 ? 0 : direction * -24,
+    opacity: 0,
+  }),
+};
 
 export default function NewDealPage() {
   const router = useRouter();
@@ -22,6 +44,13 @@ export default function NewDealPage() {
   const searchParams = useSearchParams();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  // Direction tracker for the slide transition. The current step's render
+  // pass commits to this ref AFTER deriving direction, so the next state
+  // change has a true "I used to be on step N" reference to compare against.
+  // Initial render: prev = current, direction reads 0 (no slide).
+  const prevStepRef = useRef<number>(1);
+  const direction = step > prevStepRef.current ? 1 : step < prevStepRef.current ? -1 : 0;
+  prevStepRef.current = step;
   const [selectedContacts, setSelectedContacts] = useState<ContactResult[]>([]);
   const [pipelineType, setPipelineType] = useState<'rental' | 'buyer' | 'seller'>('rental');
   const [stageId, setStageId] = useState(searchParams.get('stageId') ?? '');
@@ -139,59 +168,75 @@ export default function NewDealPage() {
         />
       </div>
 
-      {/* Step content */}
-      <div className="flex-1">
-        {step === 1 && (
-          <WizardStepContacts
-            slug={slug}
-            selectedContacts={selectedContacts}
-            onSelectionChange={setSelectedContacts}
-          />
-        )}
-        {step === 2 && (
-          <WizardStepPipeline
-            slug={slug}
-            pipelineType={pipelineType}
-            onPipelineChange={(type: 'rental' | 'buyer' | 'seller') => { setPipelineType(type); setStageId(''); setStageError(''); }}
-            stageId={stageId}
-            onStageChange={(id) => { setStageId(id); if (id) setStageError(''); }}
-            detectedPipelineType={detectedPipelineType}
-            error={stageError}
-          />
-        )}
-        {step === 3 && (
-          <WizardStepDetails
-            slug={slug}
-            title={title}
-            onTitleChange={(v) => { setTitle(v); if (v.trim()) setTitleError(''); }}
-            priority={priority}
-            onPriorityChange={setPriority}
-            value={value}
-            onValueChange={setValue}
-            commissionRate={commissionRate}
-            onCommissionRateChange={setCommissionRate}
-            probability={probability}
-            onProbabilityChange={setProbability}
-            closeDate={closeDate}
-            onCloseDateChange={setCloseDate}
-            address={address}
-            onAddressChange={setAddress}
-            propertyId={propertyId}
-            onPropertyChange={(p: Property | null) => {
-              setPropertyId(p?.id ?? null);
-              // Mirror the property's address into the deal's free-form address
-              // for display continuity (cards, sidebars still read .address).
-              setAddress(p ? formatPropertyAddress(p) : '');
-            }}
-            titleError={titleError}
-          />
-        )}
-        {step === 4 && (
-          <WizardStepNotes
-            description={description}
-            onDescriptionChange={setDescription}
-          />
-        )}
+      {/* Step content — slide left/right between steps. The outer wrapper
+          is overflow-x-clip so the off-screen step doesn't show during the
+          transition. `mode="popLayout"` lets the incoming step start its
+          animation while the outgoing step finishes, which is what makes
+          the slide read as one gesture rather than two stacked fades. */}
+      <div className="flex-1 overflow-x-clip">
+        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.div
+            key={step}
+            custom={direction}
+            variants={WIZARD_STEP_VARIANTS}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: EASE_APPLE }}
+          >
+            {step === 1 && (
+              <WizardStepContacts
+                slug={slug}
+                selectedContacts={selectedContacts}
+                onSelectionChange={setSelectedContacts}
+              />
+            )}
+            {step === 2 && (
+              <WizardStepPipeline
+                slug={slug}
+                pipelineType={pipelineType}
+                onPipelineChange={(type: 'rental' | 'buyer' | 'seller') => { setPipelineType(type); setStageId(''); setStageError(''); }}
+                stageId={stageId}
+                onStageChange={(id) => { setStageId(id); if (id) setStageError(''); }}
+                detectedPipelineType={detectedPipelineType}
+                error={stageError}
+              />
+            )}
+            {step === 3 && (
+              <WizardStepDetails
+                slug={slug}
+                title={title}
+                onTitleChange={(v) => { setTitle(v); if (v.trim()) setTitleError(''); }}
+                priority={priority}
+                onPriorityChange={setPriority}
+                value={value}
+                onValueChange={setValue}
+                commissionRate={commissionRate}
+                onCommissionRateChange={setCommissionRate}
+                probability={probability}
+                onProbabilityChange={setProbability}
+                closeDate={closeDate}
+                onCloseDateChange={setCloseDate}
+                address={address}
+                onAddressChange={setAddress}
+                propertyId={propertyId}
+                onPropertyChange={(p: Property | null) => {
+                  setPropertyId(p?.id ?? null);
+                  // Mirror the property's address into the deal's free-form address
+                  // for display continuity (cards, sidebars still read .address).
+                  setAddress(p ? formatPropertyAddress(p) : '');
+                }}
+                titleError={titleError}
+              />
+            )}
+            {step === 4 && (
+              <WizardStepNotes
+                description={description}
+                onDescriptionChange={setDescription}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Navigation footer */}

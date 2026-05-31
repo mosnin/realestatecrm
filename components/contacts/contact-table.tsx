@@ -60,6 +60,7 @@ import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { motion } from 'framer-motion';
+import { EASE_APPLE } from '@/lib/motion';
 
 type Client = {
   id: string;
@@ -499,7 +500,9 @@ export function ContactTable({ slug }: ContactTableProps) {
                 onClick={() => setLeadTypeFilter(chip.key)}
                 aria-pressed={active}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors',
+                  // Cross-fade the active state at 150ms — Apple-soft so the
+                  // toggle reads as a single color shift, not a flash.
+                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150 ease-out',
                   active
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
@@ -508,7 +511,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 {chip.label}
                 <span
                   className={cn(
-                    'tabular-nums text-[11px]',
+                    'tabular-nums text-[11px] transition-opacity duration-150 ease-out',
                     active ? 'opacity-70' : 'opacity-60',
                   )}
                 >
@@ -1194,8 +1197,14 @@ function ContactRow({
   onDelete: () => void;
 }) {
   const stage = STAGES.find((s) => s.key === contact.type)!;
-  // Cap stagger to first 10 rows — past that, no entrance.
-  const delay = idx < 10 ? idx * 0.04 : 0;
+  // Cap stagger to first 10 rows — past that, the row enters instantly.
+  // 30ms-per-row is the Apple list cadence (tight enough to read as one
+  // gesture, loose enough that each row reads its own arrival).
+  const shouldAnimate = idx < 10;
+  const delay = shouldAnimate ? idx * 0.03 : 0;
+  // Stage pill follows the row by 50ms — small enough to feel like a single
+  // composed gesture; large enough that the eye registers the row first.
+  const pillDelay = shouldAnimate ? delay + 0.05 : 0;
   const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
   const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
 
@@ -1211,14 +1220,17 @@ function ContactRow({
           <span className="text-sm font-medium text-foreground truncate">
             {contact.name}
           </span>
-          <span
+          <motion.span
+            initial={shouldAnimate ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18, ease: EASE_APPLE, delay: pillDelay }}
             className={cn(
               'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
               stage.className,
             )}
           >
             {stage.label}
-          </span>
+          </motion.span>
         </div>
         {/* email · phone — single truncating line. Either may be absent;
             the separator only renders when both are present. */}
@@ -1307,9 +1319,11 @@ function ContactRow({
 
   return (
     <motion.li
-      initial={idx < 10 ? { opacity: 0, y: 4 } : false}
+      // Apple list entrance — 200ms fade + 8px slide-up. Capped at 10 rows
+      // so a long contact list doesn't choreograph the whole page on load.
+      initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
+      transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
     >
       {selectMode ? (
         <button
