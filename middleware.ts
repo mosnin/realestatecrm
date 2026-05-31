@@ -67,6 +67,16 @@ const isFullyPublicRoute = createRouteMatcher([
   '/.well-known/(.*)',
   '/invite/(.*)/sign-up(.*)',
   '/invite/(.*)/sign-in(.*)',
+  // Marketing site — every URL under app/(marketing)/ except `/` itself,
+  // which keeps Clerk middleware so the homepage can detect auth users
+  // and redirect them to their workspace (see `app/(marketing)/page.tsx`).
+  '/realtors',
+  '/teams',
+  '/teams/(.*)',
+  '/features',
+  '/features/(.*)',
+  '/pricing',
+  '/about',
 ]);
 
 // Routes that should NEVER be passed as redirect_url after login.
@@ -88,12 +98,11 @@ export default clerkMiddleware(async (auth, request) => {
 
   const session = await auth();
 
-  // `/` → send everyone to the right place immediately.
-  if (pathname === '/') {
-    if (session.userId) {
-      return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
-    }
-    return NextResponse.redirect(new URL('/login/realtor', request.url));
+  // `/` → auth users bounce to their dashboard (fast-path before render).
+  // Unauth users fall through to `app/(marketing)/page.tsx` (the marketing
+  // homepage). The page also re-checks auth as a fallback.
+  if (pathname === '/' && session.userId) {
+    return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
   }
 
   // Authenticated users on auth pages → send to their dashboard.
