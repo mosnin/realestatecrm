@@ -57,29 +57,10 @@ async def find_integration_tool(
     query: str,
     limit: int = 10,
 ) -> str:
-    """Discover Composio actions in the realtor's connected toolkits.
-
-    Use this when the realtor asks Chippi to do something that needs an
-    external integration — read their Gmail, post to LinkedIn, list
-    HubSpot contacts, send a Slack message, etc. Returns the top matching
-    actions across every connected toolkit (Gmail, HubSpot, Slack, etc.).
-
-    query: a short natural-language description of what you need to do.
-           Examples: "read recent emails", "send gmail", "create hubspot
-           contact", "post to linkedin", "list slack channels".
-
-    limit: how many results to return. Default 10, max 30.
-
-    Returns JSON of {tools: [{slug, name, description, toolkit, parameters}]}.
-    The `slug` is what you pass to call_integration_tool to actually run
-    the action. The `parameters` is the JSON schema for that action's
-    arguments — read it carefully before calling.
-
-    Returns {tools: []} when no toolkits are connected or none match the
-    query. Don't keep searching with new queries — if the first search
-    didn't surface what you need, tell the realtor the integration isn't
-    connected and ask if they want to connect it.
-    """
+    """Discover Composio actions across the realtor's connected toolkits."""
+    # query: short natural-language description of what you need to do.
+    # limit: 1-30, default 10. Returns JSON {tools: [{slug, name, description, toolkit, parameters}]}.
+    # Pass slug to call_integration_tool. Don't loop searches — if first miss, tell the realtor.
     proxy = _proxy_base()
     if proxy is None:
         return json.dumps({"tools": [], "error": "integration proxy not configured"})
@@ -143,31 +124,11 @@ async def call_integration_tool(
     slug: str,
     arguments_json: str,
 ) -> str:
-    """Execute one Composio action by slug.
-
-    Use this after find_integration_tool to actually run the action you
-    discovered. Pass the slug verbatim from the search result and the
-    arguments as a JSON-encoded string that matches the action's
-    `parameters` schema.
-
-    slug: the action slug from find_integration_tool (e.g. 'GMAIL_FETCH_EMAILS',
-          'HUBSPOT_CRM_CREATE_CONTACT', 'SLACK_SEND_MESSAGE').
-
-    arguments_json: a JSON-encoded object whose shape matches the action's
-                    `parameters` JSON schema. Pass an empty object string
-                    `'{}'` when the action takes no arguments.
-
-    Returns JSON of {ok, data?, error?}. On success, `data` carries the
-    action's response (an email list, a contact object, a message id,
-    etc.) — surface the relevant pieces back to the realtor naturally;
-    don't dump raw JSON.
-
-    Common failure modes the realtor should understand:
-      - `ok=false` with an auth message → the integration needs to be
-        reconnected; tell the realtor to visit /settings.
-      - `ok=false` with a 4xx detail → arguments were malformed; re-read
-        the schema and try again at most once before asking the realtor.
-    """
+    """Execute one Composio action by slug (use after find_integration_tool)."""
+    # slug: from find_integration_tool result (e.g. 'GMAIL_SEND_EMAIL').
+    # arguments_json: JSON-encoded args matching the action's parameters schema; '{}' if none.
+    # Returns {ok, data?, error?}. Auth error -> tell realtor to reconnect at /settings.
+    # 4xx -> re-read schema and retry at most once before asking the realtor.
     proxy = _proxy_base()
     if proxy is None:
         return json.dumps({"ok": False, "error": "integration proxy not configured"})

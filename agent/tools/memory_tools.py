@@ -33,25 +33,11 @@ async def recall_memory(
     query: str | None = None,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """Recall stored memories.
-
-    Two modes — choose the one that fits the question:
-
-    KEYED (entity_id given, no query):
-      Returns memories about that specific contact/deal, ordered by
-      importance. entity_type defaults to 'contact'. For workspace-level
-      context use entity_type='space' (entity_id is then optional).
-      Examples: "what do we know about Sarah?" → entity_id=sarah_id.
-
-    SEMANTIC (query given):
-      pgvector similarity search across the whole workspace. Optionally
-      narrow by entity_type. Use when you have a topic in mind but no
-      specific entity.
-      Examples: "anyone mentioned pre-approval?" → query="pre-approval".
-                "tour feedback patterns" → query="tour feedback".
-
-    limit: 1-50.
-    """
+    """Recall memories by entity (keyed) or by topic (semantic pgvector search)."""
+    # Keyed: pass entity_id (+optional entity_type, default contact); ordered by importance.
+    # Semantic: pass query; pgvector cosine across workspace, narrowable by entity_type.
+    # entity_type: contact|deal|space (use 'space' for workspace-level keyed).
+    # limit: 1-50.
     space_id = ctx.context.space_id
 
     if entity_type and entity_type not in _VALID_ENTITIES:
@@ -114,19 +100,9 @@ async def store_memory(
     memory_type: str = "fact",
     importance: float = 0.5,
 ) -> dict[str, Any]:
-    """Store a memory for future runs. Auto-embedded for semantic recall.
-
-    entity_type: 'contact' | 'deal' | 'space'
-    entity_id: contact/deal id (or space id for workspace-level memories)
-    memory_type: 'fact' | 'observation' | 'preference' | 'reminder'
-      - fact: durable truth (deadline, pre-approval, areas of interest)
-      - observation: behavioural pattern (responsiveness, channel preference)
-      - preference: explicit stated preference
-      - reminder: time-bounded note for the agent's own future use
-    importance: 0.0 (trivial) to 1.0 (critical). Default 0.5.
-
-    Threshold: would a realtor want to remember this six months from now?
-    """
+    """Store a memory for future runs; auto-embedded for semantic recall."""
+    # entity_type: contact|deal|space. memory_type: fact|observation|preference|reminder.
+    # importance: 0.0-1.0 (default 0.5). Bar: would a realtor want this in 6 months?
     space_id = ctx.context.space_id
 
     if entity_type not in _VALID_ENTITIES:

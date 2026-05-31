@@ -36,24 +36,9 @@ async def route_lead(
     target_user_id: str | None = None,
     commit: bool = False,
 ) -> dict[str, Any]:
-    """Suggest or commit a brokerage routing decision for a contact.
-
-    target_user_id: if provided, manual override — assigns to that
-      brokerage member directly (after eligibility check). If omitted,
-      evaluates DealRoutingRule rows in priority order and picks the
-      first matching destination. Round-robin / score-based pool
-      methods aren't selected client-side here; manual override is.
-
-    commit: when True, actually moves the contact to the destination
-      realtor's space. When False (default), returns a preview without
-      writing anything.
-
-    Returns: {
-      ok, action: 'previewed' | 'routed' | 'no-op',
-      destinationUserId, destinationSpaceId, ruleMatched (id or null),
-      contactId
-    }
-    """
+    """Suggest or commit a brokerage routing decision for a contact."""
+    # target_user_id: manual override (brokerage member); else evaluates DealRoutingRule by priority.
+    # commit=False (default) previews; commit=True writes the move.
     space_id = ctx.context.space_id
     db = await supabase()
 

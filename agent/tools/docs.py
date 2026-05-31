@@ -21,22 +21,10 @@ async def recall_docs(
     query: str,
     category: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Search the app knowledge base for help and how-to documentation.
-
-    query: natural language question or keywords, e.g. "how to create a deal"
-      or "why isn't my tour booking working" or "where is commissions".
-    category: optional filter — 'contacts' | 'deals' | 'properties' | 'tours'
-      | 'calendar' | 'chippi' | 'settings' | 'troubleshooting'.
-
-    Returns up to 5 matching docs with title and content.
-
-    Call this when:
-    - The realtor asks "how do I...?", "where is...?", "why isn't...?"
-    - You need to explain an app feature accurately rather than guessing.
-    - The realtor reports something not working and you need to troubleshoot.
-
-    Do NOT call for routine CRM tasks — only for help/how-to queries.
-    """
+    """Search the app knowledge base for help and how-to documentation."""
+    # query: natural-language question or keywords.
+    # category: contacts|deals|properties|tours|calendar|chippi|settings|troubleshooting.
+    # Returns up to 5 docs. Only for how-to/troubleshooting, not routine CRM tasks.
     clean_query = query.strip()[:500] if query else ""
     if not clean_query:
         return []

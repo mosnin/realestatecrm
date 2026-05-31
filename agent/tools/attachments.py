@@ -177,14 +177,9 @@ async def read_attachment(
     ctx: RunContextWrapper[AgentContext],
     attachment_id: str,
 ) -> dict[str, Any]:
-    """Read the contents of a chat attachment by id.
-
-    The user message footer lists attachment ids as `[Attached <filename> — id <id>]`.
-    For text-bearing files (PDF, DOCX, XLSX, txt/csv/md/json), this returns
-    `{filename, mime_type, text}`. For images, the model already received the
-    image via vision, so this returns `{filename, mime_type, text: null,
-    public_url, hint}`. On failure, returns `{error: "..."}`.
-    """
+    """Read the contents of a chat attachment by id (PDF/DOCX/XLSX/txt/csv/md/json)."""
+    # attachment_id: from user message footer `[Attached <filename> — id <id>]`.
+    # Images return {public_url, hint} since the model already saw them via vision.
     space_id = ctx.context.space_id
     db = await supabase()
 

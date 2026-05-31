@@ -53,27 +53,10 @@ async def add_property(
     listing_url: str | None = None,
     notes: str | None = None,
 ) -> dict[str, Any]:
-    """Add a property to the realtor's inventory.
-
-    Use this when the realtor asks to add a listing, register a property
-    they're working on, or save an address for later use. The property
-    can later be linked to deals and tour bookings.
-
-    Required: address.
-    Optional everything else — capture what the realtor mentions, leave
-    the rest null. Don't ask follow-up questions just to fill the form.
-
-    list_price is in dollars (number). $850,000 → 850000.
-
-    property_type, when provided, must be one of: 'single_family',
-    'condo', 'townhouse', 'multi_family', 'land', 'commercial', 'other'.
-
-    listing_status, when provided, must be one of: 'active', 'pending',
-    'sold', 'off_market', 'owned'. Defaults to 'active' if omitted.
-
-    Returns {id, address, list_price, listing_status} on success, or
-    {error: "..."} on validation/insert failure.
-    """
+    """Add a property to the realtor's inventory; later linkable to deals and tours."""
+    # address required. Capture only what the realtor named; leave rest null.
+    # list_price in dollars. property_type: single_family|condo|townhouse|multi_family|land|commercial|other.
+    # listing_status: active|pending|sold|off_market|owned (default active).
     space_id = ctx.context.space_id
     db = await supabase()
 
@@ -141,26 +124,10 @@ async def send_property_packet(
     subject: str | None = None,
     intro_message: str | None = None,
 ) -> dict[str, Any]:
-    """Send a property packet to a contact — drafts a message with the
-    shareable packet URL pre-filled.
-
-    Pass exactly one of:
-      packet_id — an existing PropertyPacket in this workspace.
-      property_id — a Property in this workspace; the most recently
-                    created non-revoked packet for that property is
-                    auto-selected.
-
-    channel: 'email' (default) | 'sms' | 'note'.
-    subject: required when channel='email'.
-    intro_message: optional 1-2 sentence intro that goes before the link
-                   ("Hi Sarah, here's the packet for the Westwood unit
-                   we toured Tuesday.").
-
-    The tool creates a pending AgentDraft (same auto-dedup window as
-    draft_message). Surfaces draft id so the realtor can find it.
-
-    Returns: { ok, draftId, packetId, packetUrl, contactId } on success.
-    """
+    """Draft a message to a contact with a shareable property packet URL pre-filled."""
+    # Pass exactly one of packet_id or property_id (latter picks newest non-revoked packet).
+    # channel: email|sms|note (default email). subject required for email.
+    # Creates a pending AgentDraft with same 48h auto-dedup as draft_message.
     if not packet_id and not property_id:
         return {"error": "Pass packet_id or property_id"}
     if channel not in {"email", "sms", "note"}:

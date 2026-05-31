@@ -18,6 +18,7 @@ import {
   UserPlus,
   PhoneCall,
   Plug,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -229,6 +230,14 @@ export function CommandPalette({ slug }: Props) {
             className="flex-1 bg-transparent outline-none text-sm py-3"
           />
           <kbd className="hidden sm:inline-block text-[11px] font-mono bg-muted text-muted-foreground rounded px-1.5 py-0.5">Esc</kbd>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close search"
+            className="sm:hidden flex-shrink-0 -mr-2 inline-flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors active:scale-[0.98]"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto py-1">

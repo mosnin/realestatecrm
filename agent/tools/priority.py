@@ -24,20 +24,9 @@ async def generate_priority_list(
     ctx: RunContextWrapper[AgentContext],
     top_n: int = 5,
 ) -> dict[str, Any]:
-    """Generate a ranked list of contacts the realtor should focus on today.
-
-    Scores each contact by urgency signals:
-    +30  overdue follow-up (followUpAt is in the past)
-    +20  high lead score (>= 70)
-    +15  recent inbound message (lastContactedAt within 48h — they reached out)
-    +10  active goal exists for this contact
-    +8   tour scheduled or recently completed (type == 'TOUR')
-    -10  contacted very recently (lastContactedAt within 24h)
-    -20  no contact info (no email AND no phone)
-
-    Returns the top top_n contacts with a brief reasoning string each.
-    Stores the result as a space-level memory for the UI to read.
-    """
+    """Rank today's top contacts by urgency signals; persists result as space memory."""
+    # top_n: 1-10. Scoring: +30 overdue follow-up, +20 hot (>=70), +15 recent inbound,
+    # +10 active goal, +8 tour stage, -10 contacted <24h, -20 no email/phone.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc)

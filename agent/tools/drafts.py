@@ -56,44 +56,12 @@ async def draft_message(
     deal_id: str | None = None,
     priority: int = 0,
 ) -> dict[str, Any]:
-    """Draft a message for the realtor's approval. THE canonical outreach tool.
-
-    Use this for ANY person-facing message — known CRM lead, fresh email
-    address, SMS to a phone the realtor names. The realtor reviews and
-    approves; on approval the system routes through their connected inbox
-    (Gmail / Outlook via Composio) or SMS provider automatically.
-
-    Identify the recipient ONE of these three ways — provide whichever the
-    realtor named, and the tool finds the existing contact or auto-creates
-    a stub Contact row so the draft has somewhere to live:
-
-      contact_id        — when you already have it from find_contacts.
-      recipient_email   — when the realtor typed a raw address ("send
-                          jane@acme.com an email"). The tool looks for an
-                          existing contact with that email in the space;
-                          if none, creates a minimal stub (name derived
-                          from the email, leadType 'buyer', tagged
-                          'auto-created') so the draft lands somewhere.
-      recipient_phone   — same as email but for SMS.
-
-    channel: 'sms' | 'email' | 'note'.
-    subject: required when channel == 'email'.
-    content: message body. Keep SMS under 160 chars.
-    reasoning: why this outreach is warranted (visible to the realtor).
-    priority: 0 (normal) to 100 (urgent) — affects inbox ordering.
-
-    Auto-dedup: if a pending draft exists for the same contact+channel
-    from the last 48h, returns it instead of creating a duplicate.
-
-    Returns: { "action": "drafted" | "deduped", "draftId": "...",
-              "contactId": "...", "channel": "...",
-              "autoCreatedContact": bool?, "nextStep": "..." }
-
-    `nextStep` is a one-sentence, realtor-facing line the model should
-    quote or paraphrase in its reply so the trust boundary stays visible:
-    something was drafted, it's awaiting approval, and if a contact was
-    auto-stubbed the realtor is told.
-    """
+    """Draft a person-facing message for realtor approval; canonical outreach path."""
+    # channel: 'sms' | 'email' | 'note'. subject required for email. SMS keep <160 chars.
+    # Identify recipient by contact_id OR recipient_email OR recipient_phone (auto-stubs if missing).
+    # reasoning is shown to realtor. priority 0-100 orders the inbox.
+    # Auto-dedup: existing pending draft (same contact+channel, <48h) returned, not duplicated.
+    # Quote nextStep in your reply so the trust boundary stays visible.
     space_id = ctx.context.space_id
 
     if channel not in _VALID_CHANNELS:
@@ -475,33 +443,11 @@ async def send_email_now(
     recipient_email: str | None = None,
     deal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Send an email RIGHT NOW — no draft, no approval step.
-
-    Use ONLY when the realtor used an imperative send verb ("send Alice
-    the welcome email", "fire off a reply to John", "ship it"). For any
-    routine, suggestion, or autonomous turn, use draft_message instead so
-    the realtor approves before it goes out. The default is always draft;
-    this tool is the exception path for explicit human intent.
-
-    Identify the recipient one of two ways (same shape as draft_message):
-      contact_id        — when you already have it from find_contacts.
-      recipient_email   — when the realtor typed a raw address. The tool
-                          looks up the contact in the space; if none, it
-                          auto-creates a minimal stub so the activity
-                          row has somewhere to land.
-
-    Required:
-      content   — the message body, verbatim, as the realtor wants it sent.
-      subject   — required for email. Single line; no newlines.
-      reasoning — why this immediate send was warranted (audit trail).
-
-    Returns: { ok: True, action: 'sent', channel: 'email', contactId,
-              deliveredTo, autoCreatedContact, summary }
-
-    On failure returns { error, code, retryable } — the model should surface
-    the error to the realtor in plain English; do NOT silently retry with
-    different args.
-    """
+    """Send an email immediately, bypassing the approval queue."""
+    # ONLY when the realtor used an imperative verb ("send", "fire off", "ship it").
+    # Routines / autonomous turns must use draft_message instead.
+    # Identify by contact_id or recipient_email (auto-stubs if no match).
+    # On failure returns {error, code, retryable}; surface in plain English, don't blindly retry.
     space_id = ctx.context.space_id
     if not subject or not subject.strip():
         return {
@@ -593,21 +539,10 @@ async def send_sms_now(
     recipient_phone: str | None = None,
     deal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Send an SMS RIGHT NOW — no draft, no approval step.
-
-    Same rule as send_email_now: only when the realtor used an imperative
-    send verb. Routines and autonomous turns must use draft_message.
-
-    Identify the recipient one of two ways:
-      contact_id      — when you already have it.
-      recipient_phone — when the realtor named a phone number.
-
-    Keep content under 160 chars where possible — Telnyx will fragment
-    longer messages and the recipient sees them as separate texts.
-
-    Returns: { ok: True, action: 'sent', channel: 'sms', contactId,
-              deliveredTo, autoCreatedContact, summary }
-    """
+    """Send an SMS immediately, bypassing the approval queue."""
+    # ONLY when the realtor used an imperative verb. Routines must use draft_message.
+    # Identify by contact_id or recipient_phone (auto-stubs if no match).
+    # Keep content <160 chars; Telnyx fragments longer messages.
     space_id = ctx.context.space_id
     if not content or not content.strip():
         return {
