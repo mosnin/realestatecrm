@@ -69,13 +69,10 @@ async def log_activity_run(
     contact_id: str | None = None,
     deal_id: str | None = None,
 ) -> str:
-    """Persist an entry to AgentActivityLog so the realtor has an audit
-    trail. Call once per substantive run. Skip for trivial lookups.
-
-    action_type: short label, e.g. 'sweep', 'tour_followup', 'lead_qualification'.
-    outcome: 'completed' | 'queued_for_approval' | 'suggested' | 'failed'.
-    reasoning: 1-2 sentences describing what was decided and why.
-    """
+    """Persist one AgentActivityLog row; call once per substantive run, skip trivial lookups."""
+    # action_type: short label (e.g. 'sweep', 'tour_followup').
+    # outcome: completed|queued_for_approval|suggested|failed.
+    # reasoning: 1-2 sentences describing what was decided and why.
     return await persist_log(
         ctx.context,
         action_type=action_type,

@@ -41,17 +41,8 @@ async def find_stuck_deals(
     ctx: RunContextWrapper[AgentContext],
     min_days: int = 7,
 ) -> dict[str, Any]:
-    """Find active deals across the brokerage that haven't moved in
-    `min_days` or more, ranked by (days_since_activity × value) so the
-    biggest stalled deals surface first.
-
-    Use when the broker asks "what's stuck?", "where am I losing momentum?",
-    or "show me the deals nobody's touched". Returns the top 20 by score.
-
-    Definition of stuck: status='active' AND updatedAt is older than
-    `min_days`. Stages of 'closed' / 'lost' / 'won' / 'on_hold' are excluded
-    because they aren't in flight.
-    """
+    """Find active deals across the brokerage stalled min_days+, ranked by days*value."""
+    # Stuck = status='active' AND updatedAt older than min_days. Returns top 20.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -155,23 +146,9 @@ async def find_unassigned_leads(
     ctx: RunContextWrapper[AgentContext],
     min_hours: int = 2,
 ) -> dict[str, Any]:
-    """Find brokerage-intake leads that have been sitting in the queue
-    unassigned for `min_hours` or longer, and propose the realtor with the
-    lightest current load as the routing target for each.
-
-    Use when the broker asks "who's not been routed?", "what's in the
-    leads queue?", or "where should these leads go?".
-
-    Definition of unassigned: Contact with brokerageId = this brokerage,
-    tagged 'brokerage-lead', NOT tagged 'assigned', and createdAt is older
-    than `min_hours`. Mirrors the broker leads page logic
-    (`app/broker/leads/page.tsx`).
-
-    proposed_routing picks the realtor with the smallest open_load
-    (active_deals + open_leads). The reason string contrasts the chosen
-    realtor's load against the brokerage median so the broker sees facts,
-    not a black-box suggestion.
-    """
+    """Find unassigned brokerage-intake leads, with the lightest-load realtor proposed."""
+    # Unassigned = Contact in this brokerage tagged 'brokerage-lead', not 'assigned', older than min_hours.
+    # proposed_routing picks min(open_load=active_deals+open_leads); reason includes team median.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 

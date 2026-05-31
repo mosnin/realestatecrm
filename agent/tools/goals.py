@@ -48,19 +48,10 @@ async def manage_goal(
     status: str | None = None,
     completion_notes: str | None = None,
 ) -> dict[str, Any]:
-    """Manage persistent agent goals.
-
-    action='list': returns up to 20 active goals, optionally filtered by
-      contact_id or deal_id.
-
-    action='create': create a new goal. Required: goal_type, description.
-      goal_type ∈ {follow_up_sequence, tour_booking, offer_progress, deal_close,
-      reengagement, custom}. Optional: contact_id, deal_id, instructions,
-      priority (0-100).
-
-    action='update_status': mark a goal completed/cancelled/paused. Required:
-      goal_id, status. Optional: completion_notes.
-    """
+    """Manage persistent agent goals across runs (list / create / update_status)."""
+    # list: up to 20 active, filter by contact_id or deal_id.
+    # create: needs goal_type + description. Types: follow_up_sequence|tour_booking|offer_progress|deal_close|reengagement|custom.
+    # update_status: needs goal_id + status (active|completed|cancelled|paused).
     if action not in VALID_ACTIONS:
         return {"error": f"action must be one of {VALID_ACTIONS}"}
 

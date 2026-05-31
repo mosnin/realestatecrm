@@ -28,26 +28,9 @@ async def generate_studio_image(
     prompt: str,
     model: str | None = None,
 ) -> dict[str, Any]:
-    """Generate a branded image or video for the realtor with Studio.
-
-    Use this when the realtor asks Chippi to create marketing content — a
-    listing graphic, a social image, a branded quote card, a short listing
-    video. The result is saved to the realtor's Files library and appears in
-    Studio; its cost is metered into their usage automatically.
-
-    prompt: a vivid, plain-English description of what to create. Be
-            specific — "a warm dusk photo of a modern two-story home with a
-            manicured lawn and the porch lights on". The realtor's brand
-            palette is folded in automatically; don't restate colors.
-
-    model: optional. One of:
-      - 'flux-schnell'   — fast draft image (default)
-      - 'flux-2'         — high-quality image
-      - 'seedream-4'     — photoreal image
-      - 'seedance-video' — a short video (takes a few minutes)
-
-    Returns {file_id, url, kind, cost_usd} on success, or {error: "..."}.
-    """
+    """Generate a branded image or short video via Studio for the realtor's Files library."""
+    # prompt: vivid plain-English description; realtor's brand palette is auto-applied.
+    # model: flux-schnell (fast, default), flux-2 (HQ image), seedream-4 (photoreal), seedance-video.
     space_id = ctx.context.space_id
 
     clean_prompt = (prompt or "").strip()
@@ -102,26 +85,10 @@ async def edit_studio_image(
     tool: str,
     prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Edit an image the realtor already has, with Studio.
-
-    Use this to transform an existing image — one Chippi just generated with
-    generate_studio_image, or any image in the realtor's Files. The edited
-    result is saved as a NEW image in their Files and Studio; the original is
-    left untouched.
-
-    file_id: the id of the image to edit. For an image you just generated,
-             pass the file_id that generate_studio_image returned.
-
-    tool: one of
-      - 'upscale'   — sharpen and enlarge the image
-      - 'remove-bg' — cut out the background (transparent PNG)
-      - 'restyle'   — change the image by instruction (needs `prompt`)
-
-    prompt: required only for 'restyle' — a plain-English instruction
-            ("warm up the lighting", "make the sky blue", "remove the car").
-
-    Returns {file_id, url, cost_usd} on success, or {error: "..."}.
-    """
+    """Edit an existing image via Studio; saves a NEW image, leaves original untouched."""
+    # file_id: id of the source image (e.g. from generate_studio_image).
+    # tool: 'upscale' | 'remove-bg' | 'restyle' (restyle requires prompt).
+    # prompt: plain-English instruction, required only for restyle.
     space_id = ctx.context.space_id
 
     clean_file_id = (file_id or "").strip()

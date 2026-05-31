@@ -21,13 +21,9 @@ async def ask_realtor(
     contact_id: str | None = None,
     priority: int = 0,
 ) -> dict[str, Any]:
-    """Ask the realtor a question when uncertain how to proceed.
-
-    The tool returns immediately — it does NOT wait for an answer.
-    The agent should continue its run; answers are delivered asynchronously.
-
-    priority: 0=normal, 50=important, 100=urgent.
-    """
+    """Queue a question for the realtor; returns immediately, answer is async."""
+    # question: 10-500 chars. context: optional, <=1000 chars.
+    # priority: 0 normal, 50 important, 100 urgent.
     space_id = ctx.context.space_id
 
     # Validate question length

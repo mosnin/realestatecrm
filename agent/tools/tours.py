@@ -54,22 +54,9 @@ async def book_tour(
     property_address: str | None = None,
     notes: str | None = None,
 ) -> dict[str, Any]:
-    """Book a tour for a contact at a specific time.
-
-    contact_id: must belong to this workspace.
-    starts_at: ISO 8601 datetime, e.g. '2026-05-04T14:00:00-07:00' or
-      '2026-05-04T21:00:00Z'. Be explicit about timezone — naive datetimes
-      are treated as UTC.
-    duration_minutes: 5-240 (default 30).
-    property_address: free-text address of the property being toured.
-      Optional — sometimes set later when the realtor confirms.
-    notes: anything else worth attaching to the tour record.
-
-    Logs a ContactActivity entry so the realtor sees the booking in the
-    contact's timeline.
-
-    Returns: { ok, tourId, startsAt, endsAt, contactId } on success.
-    """
+    """Book a tour for a contact + mirror to the connected external calendar."""
+    # starts_at: ISO 8601 (include tz; naive = UTC). duration_minutes: 5-240 (default 30).
+    # Contact must have email on file. Through-writes to Google Calendar if connected.
     space_id = ctx.context.space_id
     db = await supabase()
 

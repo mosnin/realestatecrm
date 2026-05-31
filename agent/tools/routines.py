@@ -44,24 +44,11 @@ async def manage_routines(
     # ── update only ──
     enabled: bool | None = None,
 ) -> dict[str, Any]:
-    """Manage the realtor's routines — standing instructions Chippi runs on a schedule.
-
-    A routine is a sentence + a schedule. The autonomous run it fires DRAFTS
-    work for the realtor to approve; it never sends messages unattended.
-
-    action='list': return every routine in the workspace.
-
-    action='create': create a routine. Required: instruction — a full
-      sentence describing what Chippi should do. Optional: cadence ∈
-      {hourly, daily, weekdays}, default 'daily'; hour 0-23 in UTC, default
-      13. hour is ignored when cadence='hourly'. Times are UTC — tell the
-      realtor they can fine-tune the exact time on the Routines page.
-
-    action='update': edit a routine. Required: routine_id. Optional:
-      instruction, cadence, hour, enabled (false pauses the routine).
-
-    action='delete': remove a routine. Required: routine_id.
-    """
+    """Manage realtor routines (standing scheduled instructions that DRAFT, never send)."""
+    # list: returns all routines.
+    # create: needs instruction; cadence hourly|daily|weekdays (default daily); hour 0-23 UTC (default 13).
+    # update: needs routine_id + any of instruction/cadence/hour/enabled.
+    # delete: needs routine_id.
     if action not in VALID_ACTIONS:
         return {"error": f"action must be one of {sorted(VALID_ACTIONS)}"}
 

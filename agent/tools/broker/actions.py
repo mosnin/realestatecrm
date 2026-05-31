@@ -215,21 +215,10 @@ async def reassign_lead(
     to_realtor_id: str,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    """Move a brokerage-intake lead to a different realtor on the team.
-
-    lead_id: the Contact.id of a brokerage-routed lead. Must belong to your
-      brokerage — either by Contact.brokerageId or by living in the broker
-      owner's space (matches the assignLeadToRealtor flow). Cross-brokerage
-      contacts are refused.
-    to_realtor_id: User.id of a realtor who is a BrokerageMembership of this
-      brokerage. They must already have a personal workspace.
-    reason: optional short note explaining why. Surfaces in the audit log
-      and on the realtor's ContactActivity so it isn't a black-box move.
-
-    Use when the broker says "move Alice's lead to Jordan", "reassign this
-    lead", or "give Sarah Chen to someone else". Logs to AuditLog and notes
-    the activity on the realtor's contact timeline.
-    """
+    """Move a brokerage-intake lead to a different realtor on the team."""
+    # lead_id: Contact.id of a brokerage-routed lead; must belong to this brokerage.
+    # to_realtor_id: User.id of a member of this brokerage with a workspace.
+    # reason: optional note, logged to AuditLog + realtor's ContactActivity.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
     db = await supabase()
@@ -468,18 +457,9 @@ async def flag_deal_for_broker_review(
     deal_id: str,
     reason: str,
 ) -> dict[str, Any]:
-    """Open a review request on a realtor's deal so it surfaces in your
-    /broker/reviews queue.
-
-    deal_id: the Deal.id. Must belong to a space inside your brokerage.
-    reason: required short string (10+ chars). Surfaces verbatim to the
-      broker queue.
-
-    Use when the broker says "flag this deal for me" or wants to put a
-    deal in their own review queue. Mirrors the realtor-side
-    request_deal_review flow — same DealReviewRequest table, same partial
-    unique constraint (one open review per deal).
-    """
+    """Open a review request on a realtor's deal in this brokerage's /broker/reviews queue."""
+    # deal_id: Deal.id (must be inside this brokerage).
+    # reason: required 10+ chars; surfaces verbatim to the broker queue.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -599,19 +579,10 @@ async def send_team_announcement(
     urgency: Literal["normal", "urgent"] = "normal",
     title: str | None = None,
 ) -> dict[str, Any]:
-    """Post a team-wide announcement to the brokerage. Lands on the
-    /broker/announcements surface every realtor reads.
-
-    message: the announcement body. 1-10000 chars.
-    urgency: 'normal' (default) or 'urgent'. Urgent announcements MAY trigger
-      SMS if Telnyx is configured for the brokerage — best-effort, never
-      blocking.
-    title: optional short title. Defaults to the first 80 chars of the
-      message.
-
-    Use when the broker says "tell the team", "announce that...", "send
-    something out about...".
-    """
+    """Post a team-wide announcement to the brokerage's /broker/announcements surface."""
+    # message: 1-10000 chars.
+    # urgency: 'normal' or 'urgent' (urgent may trigger SMS if Telnyx is set).
+    # title: optional; defaults to first 80 chars of message.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -749,23 +720,11 @@ async def change_member_role(
     new_role: Literal["broker_admin", "realtor_member"],
     confirmed: bool = False,
 ) -> dict[str, Any]:
-    """Change a brokerage member's role (broker_admin ↔ realtor_member).
-
-    member_id: BrokerageMembership.id of the affected member.
-    new_role: 'broker_admin' or 'realtor_member'. The owner role cannot be
-      assigned here; that's a separate, more deliberate flow.
-    confirmed: must be True to actually apply the change. On the first call
-      (confirmed=False), the tool returns requires_confirmation=true and a
-      summary the agent reads back to the broker. After the broker confirms
-      in chat, the agent re-calls with confirmed=True.
-
-    Permission: broker_owner can change any non-owner role. broker_admin
-    can only demote/promote realtor_member ↔ realtor_member — they cannot
-    change another admin's role.
-
-    Use when the broker says "make Alice an admin" or "demote Jordan back
-    to a realtor". Never executed on the first call.
-    """
+    """Change a brokerage member's role; two-step confirmed gate."""
+    # member_id: BrokerageMembership.id.
+    # new_role: 'broker_admin' or 'realtor_member' (owner cannot be set here).
+    # confirmed: false first call returns requires_confirmation, true applies.
+    # broker_admin can only flip realtor_member <-> realtor_member; owner-only otherwise.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
     db = await supabase()
@@ -891,25 +850,11 @@ async def offboard_member(
     destination_member_id: str | None = None,
     confirmed: bool = False,
 ) -> dict[str, Any]:
-    """Remove a member from the brokerage. Highest-friction tool.
-
-    member_id: BrokerageMembership.id of the member to remove.
-    destination_member_id: BrokerageMembership.id of the active member who
-      will inherit the leaving member's contacts, deals, and open tours.
-      Required for the actual offboarding (not for the confirmation step).
-    confirmed: must be True to actually execute. On the first call
-      (confirmed=False), the tool returns requires_confirmation=true and a
-      summary; the agent reads it back to the broker and re-calls with
-      confirmed=True on broker confirmation.
-
-    Permission: broker_owner ONLY. broker_admin cannot offboard.
-
-    Use when the broker says "remove Alice", "offboard Jordan", "take
-    Sarah off the team". Mirrors POST /api/broker/members/[id]/offboard
-    via the offboard_brokerage_member RPC. The leaving user's workspace is
-    preserved; only their brokerage membership and asset attribution
-    change.
-    """
+    """Remove a member from the brokerage; broker_owner only, two-step confirmed gate."""
+    # member_id: BrokerageMembership.id to remove.
+    # destination_member_id: required on the apply call; inherits contacts/deals/tours.
+    # confirmed: false first call returns requires_confirmation, true executes.
+    # Leaving user's workspace stays; only brokerage membership + asset attribution change.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
     db = await supabase()
@@ -1073,25 +1018,9 @@ async def set_routing_rule(
     ctx: RunContextWrapper[AgentContext],
     strategy: Literal["manual", "round_robin", "score_based"],
 ) -> dict[str, Any]:
-    """Set the brokerage-wide default routing strategy for new unassigned
-    leads.
-
-    strategy:
-      'manual'       — every new lead waits for a broker to assign it
-                       (autoAssignEnabled=false; the current default).
-      'round_robin'  — new leads cycle through eligible realtors in order,
-                       one per realtor (autoAssignEnabled=true).
-      'score_based'  — new leads route to the highest-scoring eligible
-                       realtor at intake time (autoAssignEnabled=true).
-
-    Use when the broker says "auto-route my leads round-robin", "send
-    everything to my top performer", or "stop auto-routing".
-
-    Writes the two columns the routing engine in lib/brokerage-routing.ts
-    actually reads: autoAssignEnabled (kill switch) and assignmentMethod
-    (the strategy). Enforcement on lead arrival is already wired through
-    the engine — this tool flips the switch.
-    """
+    """Set the brokerage-wide default routing for new unassigned leads."""
+    # strategy: 'manual' (broker assigns), 'round_robin' (cycle), 'score_based' (best fit).
+    # Writes Brokerage.assignmentMethod + autoAssignEnabled the routing engine reads.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 

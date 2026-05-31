@@ -221,21 +221,10 @@ def _load_signal(open_load: int, avg_response_hours: float | None, last_active: 
 
 @function_tool(strict_mode=False)
 async def team_health(ctx: RunContextWrapper[AgentContext]) -> dict[str, Any]:
-    """Read every realtor's current capacity and load — active deals, open leads,
-    response speed in the last seven days, and a load_signal classifier per
-    realtor (healthy / underused / overloaded).
-
-    Use this when the broker asks "how's my team?", "who needs more leads?",
-    or "is anyone overloaded?". Returns one row per realtor plus the team
-    median response time, which is a benchmark for the broker's chat to
-    contrast against — never a judgment about anyone.
-
-    load_signal heuristic:
-      overloaded — open work (active_deals + open_leads) > 15, OR
-                   7-day avg response > 24 hours.
-      underused  — open work < 3 AND last active in the past 30 days.
-      healthy    — everything else.
-    """
+    """Read every realtor's current capacity, load, and 7-day response speed."""
+    # Per-realtor: active_deals, open_leads, avg_response_hours_7d, load_signal.
+    # load_signal: overloaded (>15 open OR >24h resp), underused (<3 open + active <30d), healthy.
+    # team_median_response_hours_7d returned as a benchmark; frame as comparison, not judgment.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -321,25 +310,10 @@ async def realtor_performance(
     ctx: RunContextWrapper[AgentContext],
     realtor_id: str,
 ) -> dict[str, Any]:
-    """Drill into one realtor: deals broken out by stage and by status,
-    conversion percentage, year-to-date GCI, active leads count, last-7-day
-    average response speed, last activity, and wins in the last 30 days.
-
-    Use when the broker names a realtor and wants the deeper read:
-    "tell me about Alice", "how's Jordan doing this quarter", "drill into
-    Sarah's pipeline".
-
-    Cross-brokerage drill is refused — the named realtor must belong to the
-    broker's own brokerage (raises BrokerPermissionError otherwise).
-
-    deals_by_stage uses the actual DealStage.name in this realtor's space
-    (stage names vary per workspace, so the keys are the real stage labels,
-    not synthetic ones). deals_by_status uses the canonical Deal.status
-    enum: active / won / lost / on_hold.
-
-    GCI = sum(value * commissionRate / 100) over won deals — same formula
-    as `lib/commissions.ts`. YTD is the calendar year of "today".
-    """
+    """Deep-dive on one realtor: deals by stage/status, conversion, YTD GCI, response speed."""
+    # Cross-brokerage drill raises BrokerPermissionError.
+    # deals_by_stage keyed by actual DealStage.name. deals_by_status: active|won|lost|on_hold.
+    # GCI = sum(value * commissionRate / 100) over won deals; YTD = current calendar year.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -480,17 +454,9 @@ async def read_realtor_morning_story(
     ctx: RunContextWrapper[AgentContext],
     realtor_id: str,
 ) -> dict[str, Any]:
-    """Mirror the morning briefing the named realtor sees on their /chippi home,
-    scoped to their workspace. Returns counts plus named subjects — the same
-    shape `/api/agent/morning` returns to the realtor.
-
-    Use when the broker asks "what's on Alice's plate today?" or "show me
-    what Jordan's home looks like this morning". This is the PII-safe drill:
-    the broker sees the realtor's *surface* (counts + names + IDs), not
-    the realtor's private notes, DMs, or message threads.
-
-    Cross-brokerage block: the realtor must belong to your brokerage.
-    """
+    """Mirror the realtor's /chippi morning briefing; counts + named subjects only."""
+    # PII-safe: surface (counts/names/ids) only, never private notes/DMs/threads.
+    # Cross-brokerage drill raises BrokerPermissionError.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 

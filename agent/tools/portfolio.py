@@ -17,12 +17,7 @@ from security.context import AgentContext
 async def analyze_portfolio(
     ctx: RunContextWrapper[AgentContext],
 ) -> dict[str, Any]:
-    """Analyse the full contact and deal portfolio for the space.
-
-    Fetches all contacts and active deals concurrently, computes space-level
-    health metrics, generates narrative insights, and persists a summary memory
-    so the agent accumulates portfolio awareness over time.
-    """
+    """Analyse the workspace portfolio (contacts + active deals); persists summary memory."""
     space_id = ctx.context.space_id
     db = await supabase()
 

@@ -53,22 +53,9 @@ _SLOW_MULTIPLIER = 2.0
 async def audit_response_times(
     ctx: RunContextWrapper[AgentContext],
 ) -> dict[str, Any]:
-    """Read the per-realtor median time from a contact arriving to that
-    realtor's first outbound touch, over the last 30 days, then surface
-    laggards and fast movers against the team median.
-
-    Use when the broker asks "who's slow to respond?", "how does my team
-    compare on first-touch?", or "is anyone falling behind on outreach?".
-
-    Bands (all relative to team median, never absolute):
-      fast    — median ≤ team_median × 0.5
-      slow    — median ≥ team_median × 2.0
-      on_pace — anything between
-
-    A realtor with no outbound activity in the window is treated as having
-    no data and surfaces in `no_data` — not in `slow`. The broker should
-    see "no data" as its own state, not as silent absence.
-    """
+    """Per-realtor median first-touch response time over 30d, banded vs team median."""
+    # Bands relative to team_median: fast (<=0.5x), on_pace (mid), slow (>=2x).
+    # Realtors with no outbound in window surface as no_data, not slow.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 

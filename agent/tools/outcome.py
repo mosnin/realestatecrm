@@ -51,15 +51,10 @@ async def outcome(
     # ── for action='summary' ──
     days: int = 30,
 ) -> dict[str, Any]:
-    """Record an outcome or summarise outcomes.
-
-    action='record': Required draft_id and outcome.
-      outcome ∈ {responded, no_response, bounced, unsubscribed, meeting_booked}.
-      Adjusts the contact's lead score (see module docstring for deltas).
-
-    action='summary': returns counts by outcome over the past `days` days
-      (1-90, default 30) plus a response rate.
-    """
+    """Record a draft outcome or summarise rolling outcome counts."""
+    # action='record': needs draft_id + outcome (responded|no_response|bounced|unsubscribed|meeting_booked).
+    # Score deltas: responded +5, meeting_booked +15, no_response -2, bounced -5, unsubscribed -20.
+    # action='summary': counts + response rate over past N days (1-90, default 30).
     if action not in VALID_ACTIONS:
         return {"error": f"action must be one of {VALID_ACTIONS}"}
 
