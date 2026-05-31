@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2,
   ChevronDown,
@@ -436,39 +436,55 @@ export function ToolCallBlockView({
           shapes (contacts, deals, tours) so the realtor doesn't have to expand. */}
       {richResult}
 
-      {/* Collapsible details — rendered below the row, slightly indented */}
-      {expanded && hasDetails && (
-        <div className="mt-1 ml-3 pl-3 border-l-2 border-border space-y-2.5 py-2">
-          {argsEntries.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Arguments
-              </p>
-              <pre className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
-                {JSON.stringify(block.args, null, 2)}
-              </pre>
+      {/* Collapsible details — rendered below the row, slightly indented.
+          Height + opacity transition on expand/collapse keeps the tool row
+          from snapping; `overflow-hidden` on the outer wrapper clips the
+          content while height animates from 0 → auto. 220ms is the iOS
+          disclosure cadence — fast enough to feel direct, slow enough that
+          the detail pane reads as "opened" rather than "appeared". */}
+      <AnimatePresence initial={false}>
+        {expanded && hasDetails && (
+          <motion.div
+            key="details"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-1 ml-3 pl-3 border-l-2 border-border space-y-2.5 py-2">
+              {argsEntries.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                    Arguments
+                  </p>
+                  <pre className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
+                    {JSON.stringify(block.args, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {block.result?.summary && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                    Result
+                  </p>
+                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                    {block.result.summary}
+                  </p>
+                </div>
+              )}
+              {block.result?.error && block.result.ok === false && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
+                    Error
+                  </p>
+                  <p className="text-xs text-rose-700 dark:text-rose-300">{block.result.error}</p>
+                </div>
+              )}
             </div>
-          )}
-          {block.result?.summary && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Result
-              </p>
-              <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                {block.result.summary}
-              </p>
-            </div>
-          )}
-          {block.result?.error && block.result.ok === false && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
-                Error
-              </p>
-              <p className="text-xs text-rose-700 dark:text-rose-300">{block.result.error}</p>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
