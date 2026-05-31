@@ -1,13 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import {
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 interface IntakeTrustSignalsFormProps {
   licenseNumber: string;
@@ -56,26 +61,20 @@ export function BrokerageIntakeTrustSignalsForm({
       const data = await res.json();
       if (res.ok) {
         setSaved(true);
-        toast.success('Trust signals saved');
+        toast.success('Trust signals saved.');
         setTimeout(() => setSaved(false), 2000);
       } else {
-        toast.error(data.error ?? 'Failed to save');
+        toast.error(data.error ?? 'Failed to save.');
       }
     } catch {
-      toast.error('Network error');
+      toast.error('Network error.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        These show on the brokerage intake-form footer (/apply/b/&lt;id&gt;) for
-        every agent under your brokerage. Brokerage values override per-agent
-        settings on the brokerage variant.
-      </p>
-
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="brokerageLicenseNumber">License number</Label>
         <Input
@@ -86,7 +85,7 @@ export function BrokerageIntakeTrustSignalsForm({
           maxLength={200}
           disabled={!isOwner}
         />
-        <p className="text-xs text-muted-foreground">Your brokerage license number, shown verbatim.</p>
+        <p className={CAPTION}>Your brokerage license number, shown verbatim.</p>
       </div>
 
       <div className="space-y-1.5">
@@ -100,7 +99,7 @@ export function BrokerageIntakeTrustSignalsForm({
           maxLength={2000}
           disabled={!isOwner}
         />
-        <p className="text-xs text-muted-foreground">Plain text. Line breaks are preserved.</p>
+        <p className={CAPTION}>Plain text. Line breaks are preserved.</p>
       </div>
 
       <div className="flex items-start gap-3 pt-1">
@@ -117,24 +116,36 @@ export function BrokerageIntakeTrustSignalsForm({
           >
             Show Equal Housing mark
           </Label>
-          <p className="text-xs text-muted-foreground">Displays the standard Equal Housing Opportunity logo.</p>
+          <p className={CAPTION}>Displays the standard Equal Housing Opportunity logo.</p>
         </div>
       </div>
 
       {isOwner && (
-        <Button type="submit" size="sm" disabled={saving}>
-          {saving ? (
-            <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
-          ) : saved ? (
-            <><CheckCircle2 size={14} className="mr-1.5" /> Saved</>
-          ) : (
-            'Save changes'
-          )}
-        </Button>
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
+          >
+            {saving ? (
+              <>
+                <Loader2 size={13} className="animate-spin" /> Saving…
+              </>
+            ) : saved ? (
+              <>
+                <CheckCircle2 size={13} /> Saved
+              </>
+            ) : (
+              'Save changes'
+            )}
+          </button>
+        </div>
       )}
 
       {!isOwner && (
-        <p className="text-xs text-muted-foreground">Only the brokerage owner or admins can edit these settings.</p>
+        <p className={BODY_MUTED}>
+          Only the brokerage owner or admins can edit these settings.
+        </p>
       )}
     </form>
   );

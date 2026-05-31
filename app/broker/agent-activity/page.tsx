@@ -155,7 +155,7 @@ export default async function BrokerAgentActivityPage() {
   const initial = await rollupForBrokerage(ctx.brokerage.id, DEFAULT_WINDOW_DAYS);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-8 pb-56 md:pb-24">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Chippi.</p>
         <h1

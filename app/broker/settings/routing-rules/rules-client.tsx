@@ -11,9 +11,9 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -22,8 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,6 +29,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+  GHOST_PILL,
+  SECTION_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 import type { DealRoutingRuleRow } from '@/lib/routing-rule-schema';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,21 +58,16 @@ type BrokerageMember = {
 
 type EditorMode = { kind: 'create' } | { kind: 'edit'; rule: DealRoutingRuleRow };
 
-/**
- * Client-side form values for the editor dialog. Kept as strings for
- * budget fields so the input control can be empty ("no bound"); we
- * coerce to number at submit time.
- */
 type EditorForm = {
   name: string;
-  priority: string; // form input — coerced to int at submit
+  priority: string;
   enabled: boolean;
   leadType: LeadTypeOption;
   minBudget: string;
   maxBudget: string;
   matchTag: string;
   destinationKind: DestinationKind;
-  destinationUserId: string; // "" when unset
+  destinationUserId: string;
   destinationPoolMethod: PoolMethod;
   destinationPoolTag: string;
 };
@@ -132,12 +136,12 @@ export default function RulesClient({
         });
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          toast.error(data.error ?? 'Failed to toggle');
+          toast.error(data.error ?? 'Failed to toggle.');
           return;
         }
         await reloadList();
       } catch {
-        toast.error('Network error');
+        toast.error('Network error.');
       } finally {
         setTogglingId(null);
       }
@@ -156,13 +160,13 @@ export default function RulesClient({
         });
         if (!res.ok && res.status !== 204) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          toast.error(data.error ?? 'Failed to delete');
+          toast.error(data.error ?? 'Failed to delete.');
           return;
         }
-        toast.success('Rule deleted');
+        toast.success('Rule deleted.');
         await reloadList();
       } catch {
-        toast.error('Network error');
+        toast.error('Network error.');
       } finally {
         setDeleting(null);
       }
@@ -185,12 +189,12 @@ export default function RulesClient({
         });
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          toast.error(data.error ?? 'Failed to reorder');
+          toast.error(data.error ?? 'Failed to reorder.');
           return;
         }
         await reloadList();
       } catch {
-        toast.error('Network error');
+        toast.error('Network error.');
       } finally {
         setReordering(null);
       }
@@ -198,131 +202,128 @@ export default function RulesClient({
     [canEdit, reloadList],
   );
 
+  const subtitle =
+    sortedRules.length === 0
+      ? `No rules yet. Falling back to ${METHOD_LABEL[fallbackMethod].toLowerCase()}.`
+      : `${sortedRules.length} rule${sortedRules.length === 1 ? '' : 's'}. ${METHOD_LABEL[fallbackMethod]} handles the rest.`;
+
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Routing rules</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Send specific leads to specific agents before round-robin kicks in.
-          </p>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5 min-w-0">
+          <p className={BODY_MUTED}>Settings.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            Routing rules
+          </h1>
+          <p className={BODY_MUTED}>{subtitle}</p>
         </div>
-        {canEdit ? (
-          <Button size="sm" onClick={() => setEditor({ kind: 'create' })}>
-            <Plus size={14} className="mr-1.5" /> Add rule
-          </Button>
-        ) : null}
-      </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setEditor({ kind: 'create' })}
+            className={cn(PRIMARY_PILL, 'shrink-0')}
+          >
+            <Plus size={13} />
+            Add rule
+          </button>
+        )}
+      </header>
 
       {sortedRules.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center space-y-2">
-            <p className="text-sm font-medium text-foreground">No routing rules yet.</p>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Add one when you want a specific type of lead to always go to a specific agent —
-              otherwise your <span className="font-medium">{METHOD_LABEL[fallbackMethod]}</span>{' '}
-              setting handles everything.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">No routing rules yet.</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+            Add one when a specific kind of lead should always go to a specific agent.
+            Otherwise{' '}
+            <span className="font-medium text-foreground">
+              {METHOD_LABEL[fallbackMethod].toLowerCase()}
+            </span>{' '}
+            handles every lead.
+          </p>
+        </div>
       ) : (
-        <Card>
-          <CardContent className="px-0 py-0">
-            <ul className="divide-y divide-border">
-              {sortedRules.map((rule, idx) => (
-                <li key={rule.id} className="flex items-start gap-3 px-5 py-4">
-                  <div className="flex flex-col items-center gap-1 pt-0.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      disabled={!canEdit || idx === 0 || reordering === rule.id}
-                      onClick={() => handleReorder(rule, 'up')}
-                      title="Raise priority"
-                    >
-                      <ArrowUp size={13} />
-                    </Button>
-                    <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {rule.priority}
+        <ul className="divide-y divide-border/60">
+          {sortedRules.map((rule, idx) => (
+            <li key={rule.id} className="flex items-start gap-3 py-3">
+              <div className="flex flex-col items-center gap-0.5 pt-0.5">
+                <button
+                  type="button"
+                  disabled={!canEdit || idx === 0 || reordering === rule.id}
+                  onClick={() => handleReorder(rule, 'up')}
+                  title="Raise priority"
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                >
+                  <ArrowUp size={12} />
+                </button>
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {rule.priority}
+                </span>
+                <button
+                  type="button"
+                  disabled={!canEdit || idx === sortedRules.length - 1 || reordering === rule.id}
+                  onClick={() => handleReorder(rule, 'down')}
+                  title="Lower priority"
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                >
+                  <ArrowDown size={12} />
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {rule.name}
+                  </p>
+                  {!rule.enabled && (
+                    <span className="inline-flex text-[11px] font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground">
+                      Paused
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      disabled={!canEdit || idx === sortedRules.length - 1 || reordering === rule.id}
-                      onClick={() => handleReorder(rule, 'down')}
-                      title="Lower priority"
-                    >
-                      <ArrowDown size={13} />
-                    </Button>
-                  </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {summarizeRule(rule, memberById)}
+                </p>
+              </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium truncate">{rule.name}</p>
-                      {!rule.enabled ? (
-                        <Badge variant="outline" className="text-[11px]">Disabled</Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {summarizeRule(rule, memberById)}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-0.5">
+                <Switch
+                  checked={rule.enabled}
+                  onCheckedChange={() => handleToggleEnabled(rule)}
+                  disabled={!canEdit || togglingId === rule.id}
+                  aria-label={rule.enabled ? 'Disable rule' : 'Enable rule'}
+                />
+                {canEdit && (
+                  <>
                     <button
                       type="button"
-                      role="switch"
-                      aria-checked={rule.enabled}
-                      aria-label={rule.enabled ? 'Disable rule' : 'Enable rule'}
-                      disabled={!canEdit || togglingId === rule.id}
-                      onClick={() => handleToggleEnabled(rule)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-                        rule.enabled ? 'bg-primary' : 'bg-muted-foreground/30'
-                      }`}
+                      onClick={() => setEditor({ kind: 'edit', rule })}
+                      title="Edit rule"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
                     >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          rule.enabled ? 'translate-x-5' : 'translate-x-0.5'
-                        }`}
-                      />
+                      <Pencil size={13} />
                     </button>
-                    {canEdit ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setEditor({ kind: 'edit', rule })}
-                          title="Edit rule"
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                          disabled={deleting === rule.id}
-                          onClick={() => handleDelete(rule)}
-                          title="Delete rule"
-                        >
-                          {deleting === rule.id ? (
-                            <Loader2 size={13} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={13} />
-                          )}
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+                    <button
+                      type="button"
+                      disabled={deleting === rule.id}
+                      onClick={() => handleDelete(rule)}
+                      title="Delete rule"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-foreground/[0.04] transition-colors disabled:opacity-60"
+                    >
+                      {deleting === rule.id ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={13} />
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {editor ? (
+      {editor && (
         <RuleEditorDialog
           mode={editor}
           members={members}
@@ -332,7 +333,7 @@ export default function RulesClient({
             await reloadList();
           }}
         />
-      ) : null}
+      )}
     </div>
   );
 }
@@ -394,41 +395,41 @@ function RuleEditorDialog({
 
   const validate = useCallback((): { ok: boolean; errs: FieldError } => {
     const errs: FieldError = {};
-    if (!form.name.trim()) errs.name = 'Name is required';
-    else if (form.name.trim().length > 100) errs.name = 'Max 100 characters';
+    if (!form.name.trim()) errs.name = 'Name is required.';
+    else if (form.name.trim().length > 100) errs.name = 'Max 100 characters.';
 
     const priorityNum = Number(form.priority);
     if (!Number.isFinite(priorityNum) || !Number.isInteger(priorityNum)) {
-      errs.priority = 'Priority must be a whole number';
+      errs.priority = 'Priority must be a whole number.';
     } else if (priorityNum < 0 || priorityNum > 10000) {
-      errs.priority = 'Priority must be between 0 and 10000';
+      errs.priority = 'Priority must be between 0 and 10000.';
     }
 
     let minNum: number | null = null;
     let maxNum: number | null = null;
     if (form.minBudget.trim() !== '') {
       const n = Number(form.minBudget);
-      if (!Number.isFinite(n) || n < 0) errs.minBudget = 'Must be a non-negative number';
+      if (!Number.isFinite(n) || n < 0) errs.minBudget = 'Must be a non-negative number.';
       else minNum = n;
     }
     if (form.maxBudget.trim() !== '') {
       const n = Number(form.maxBudget);
-      if (!Number.isFinite(n) || n < 0) errs.maxBudget = 'Must be a non-negative number';
+      if (!Number.isFinite(n) || n < 0) errs.maxBudget = 'Must be a non-negative number.';
       else maxNum = n;
     }
     if (minNum !== null && maxNum !== null && maxNum < minNum) {
-      errs.maxBudget = 'Max budget must be greater than or equal to min budget';
+      errs.maxBudget = 'Max budget must be greater than or equal to min budget.';
     }
 
     if (form.matchTag.trim().length > 60) {
-      errs.matchTag = 'Tags are at most 60 characters';
+      errs.matchTag = 'Tags are at most 60 characters.';
     }
 
     if (form.destinationKind === 'agent') {
-      if (!form.destinationUserId) errs.destinationUserId = 'Choose an agent';
+      if (!form.destinationUserId) errs.destinationUserId = 'Choose an agent.';
     } else {
       if (form.destinationPoolTag.trim().length > 60) {
-        errs.destinationPoolTag = 'Tags are at most 60 characters';
+        errs.destinationPoolTag = 'Tags are at most 60 characters.';
       }
     }
 
@@ -486,14 +487,14 @@ function RuleEditorDialog({
           }
           setErrors(fieldErrs);
         }
-        toast.error(data.error ?? 'Failed to save rule');
+        toast.error(data.error ?? 'Failed to save rule.');
         return;
       }
 
-      toast.success(isEdit ? 'Rule updated' : 'Rule created');
+      toast.success(isEdit ? 'Rule updated.' : 'Rule created.');
       await onSaved();
     } catch {
-      toast.error('Network error');
+      toast.error('Network error.');
     } finally {
       setSaving(false);
     }
@@ -521,7 +522,7 @@ function RuleEditorDialog({
               placeholder="Rental inquiries → Sam"
               onChange={(e) => update('name', e.target.value)}
             />
-            {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
+            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -538,28 +539,17 @@ function RuleEditorDialog({
               {errors.priority ? (
                 <p className="text-xs text-destructive">{errors.priority}</p>
               ) : (
-                <p className="text-[11px] text-muted-foreground">Lower number evaluated first (0–10000).</p>
+                <p className={CAPTION}>Lower number runs first (0–10000).</p>
               )}
             </div>
 
             <div className="space-y-1.5">
               <Label>Enabled</Label>
               <div className="flex items-center gap-2 h-9">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={form.enabled}
-                  onClick={() => update('enabled', !form.enabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    form.enabled ? 'bg-primary' : 'bg-muted-foreground/30'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      form.enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={form.enabled}
+                  onCheckedChange={(v) => update('enabled', v)}
+                />
                 <span className="text-sm text-muted-foreground">
                   {form.enabled ? 'Active' : 'Paused'}
                 </span>
@@ -567,7 +557,7 @@ function RuleEditorDialog({
             </div>
           </div>
 
-          <fieldset className="space-y-3 rounded-md border border-border p-3">
+          <fieldset className="space-y-3 rounded-md border border-border/70 p-3">
             <legend className="text-xs font-medium text-muted-foreground px-1">Criteria</legend>
 
             <div className="space-y-1.5">
@@ -598,9 +588,9 @@ function RuleEditorDialog({
                   value={form.minBudget}
                   onChange={(e) => update('minBudget', e.target.value)}
                 />
-                {errors.minBudget ? (
+                {errors.minBudget && (
                   <p className="text-xs text-destructive">{errors.minBudget}</p>
-                ) : null}
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="rule-max-budget">Max budget</Label>
@@ -612,9 +602,9 @@ function RuleEditorDialog({
                   value={form.maxBudget}
                   onChange={(e) => update('maxBudget', e.target.value)}
                 />
-                {errors.maxBudget ? (
+                {errors.maxBudget && (
                   <p className="text-xs text-destructive">{errors.maxBudget}</p>
-                ) : null}
+                )}
               </div>
             </div>
 
@@ -630,14 +620,12 @@ function RuleEditorDialog({
               {errors.matchTag ? (
                 <p className="text-xs text-destructive">{errors.matchTag}</p>
               ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Case-insensitive — leave blank to match any tag set.
-                </p>
+                <p className={CAPTION}>Case-insensitive. Leave blank to match any tag.</p>
               )}
             </div>
           </fieldset>
 
-          <fieldset className="space-y-3 rounded-md border border-border p-3">
+          <fieldset className="space-y-3 rounded-md border border-border/70 p-3">
             <legend className="text-xs font-medium text-muted-foreground px-1">Destination</legend>
 
             <div className="space-y-2">
@@ -651,10 +639,8 @@ function RuleEditorDialog({
                   className="mt-1"
                 />
                 <div>
-                  <p className="text-sm font-medium">Send to a specific agent</p>
-                  <p className="text-xs text-muted-foreground">
-                    If the agent is offboarded, the engine skips the rule.
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Send to a specific agent</p>
+                  <p className={CAPTION}>If the agent is offboarded, the engine skips this rule.</p>
                 </div>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
@@ -667,9 +653,11 @@ function RuleEditorDialog({
                   className="mt-1"
                 />
                 <div>
-                  <p className="text-sm font-medium">Run a mini round-robin / score pick</p>
-                  <p className="text-xs text-muted-foreground">
-                    Uses the realtor pool; tag narrowing is ignored until the membership tags column ships.
+                  <p className="text-sm font-medium text-foreground">
+                    Mini round-robin / score pick
+                  </p>
+                  <p className={CAPTION}>
+                    Uses the realtor pool. Tag narrowing is ignored until the membership tags column ships.
                   </p>
                 </div>
               </label>
@@ -687,9 +675,7 @@ function RuleEditorDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {members.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        No brokerage members yet.
-                      </div>
+                      <div className={cn(CAPTION, 'px-3 py-2')}>No brokerage members yet.</div>
                     ) : (
                       members.map((m) => (
                         <SelectItem key={m.userId} value={m.userId}>
@@ -700,9 +686,9 @@ function RuleEditorDialog({
                     )}
                   </SelectContent>
                 </Select>
-                {errors.destinationUserId ? (
+                {errors.destinationUserId && (
                   <p className="text-xs text-destructive">{errors.destinationUserId}</p>
-                ) : null}
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -730,27 +716,38 @@ function RuleEditorDialog({
                     placeholder="ignored for now"
                     onChange={(e) => update('destinationPoolTag', e.target.value)}
                   />
-                  {errors.destinationPoolTag ? (
+                  {errors.destinationPoolTag && (
                     <p className="text-xs text-destructive">{errors.destinationPoolTag}</p>
-                  ) : null}
+                  )}
                 </div>
               </div>
             )}
           </fieldset>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className={cn(GHOST_PILL, 'disabled:opacity-60')}
+            >
               Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
+            >
               {saving ? (
-                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+                <>
+                  <Loader2 size={13} className="animate-spin" /> Saving…
+                </>
               ) : mode.kind === 'create' ? (
                 'Create rule'
               ) : (
                 'Save changes'
               )}
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>

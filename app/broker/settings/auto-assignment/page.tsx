@@ -1,12 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  CAPTION,
+  SECTION_LABEL,
+  SECTION_RHYTHM,
+  READING_MAX,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 type AssignmentMethod = 'manual' | 'round_robin' | 'score_based';
 
@@ -30,6 +40,28 @@ const METHOD_LABEL: Record<AssignmentMethod, string> = {
   score_based: 'Score-based',
 };
 
+const METHOD_OPTIONS: Array<{
+  value: AssignmentMethod;
+  label: string;
+  helper: string;
+}> = [
+  {
+    value: 'round_robin',
+    label: 'Round-robin',
+    helper: 'Distribute leads evenly across active realtors in rotation.',
+  },
+  {
+    value: 'score_based',
+    label: 'Score-based',
+    helper: 'Send each lead to the realtor with the highest score and availability.',
+  },
+  {
+    value: 'manual',
+    label: 'Manual only',
+    helper: 'Leads stay unassigned until a broker admin picks an owner.',
+  },
+];
+
 export default function BrokerSettingsAutoAssignmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,8 +84,6 @@ export default function BrokerSettingsAutoAssignmentPage() {
       const data = (await res.json()) as SettingsResponse;
       setSettings(data);
       setEnabled(Boolean(data.autoAssignEnabled));
-      // If the stored method is somehow invalid, fall back to round_robin so the
-      // UI shows a sensible default rather than an empty radio group.
       const nextMethod: AssignmentMethod =
         data.assignmentMethod === 'manual' ||
         data.assignmentMethod === 'round_robin' ||
@@ -62,7 +92,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
           : 'round_robin';
       setMethod(nextMethod);
     } catch {
-      setLoadError('Network error');
+      setLoadError('Network error.');
     } finally {
       setLoading(false);
     }
@@ -90,27 +120,32 @@ export default function BrokerSettingsAutoAssignmentPage() {
           setSettings(data);
         }
         setSaved(true);
-        toast.success('Auto-assignment settings saved');
+        toast.success('Auto-assignment saved.');
         setTimeout(() => setSaved(false), 2000);
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(data.error ?? 'Failed to save');
+        toast.error(data.error ?? 'Failed to save.');
       }
     } catch {
-      toast.error('Network error');
+      toast.error('Network error.');
     } finally {
       setSaving(false);
     }
   }
 
+  const subtitle = enabled
+    ? `Currently ${METHOD_LABEL[method].toLowerCase()}.`
+    : 'Auto-assignment is paused. Leads stay where they land.';
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Auto-Assignment</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Configure how new leads are automatically distributed to your realtors
-        </p>
-      </div>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Settings.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Auto-assignment
+        </h1>
+        <p className={BODY_MUTED}>{subtitle}</p>
+      </header>
 
       {loading ? (
         <LoadingSkeleton />
@@ -124,109 +159,75 @@ export default function BrokerSettingsAutoAssignmentPage() {
         />
       ) : (
         <>
-          <Card>
-            <CardContent className="px-5 py-5 space-y-5">
-              {/* Enable toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Enable auto-assignment</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Automatically assign new leads to available realtors
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={enabled}
-                  onClick={() => setEnabled(!enabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enabled ? 'bg-primary' : 'bg-muted-foreground/30'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+          <section className="space-y-5">
+            <p className={SECTION_LABEL}>How it works</p>
+            <div className="flex items-start justify-between gap-4 py-3 border-b border-border/60">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium text-foreground">Enable auto-assignment</Label>
+                <p className={CAPTION}>
+                  Send new leads to a realtor automatically. Off means they sit in the inbox.
+                </p>
               </div>
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+            </div>
 
-              {/* Assignment method */}
-              {enabled && (
-                <div className="space-y-3 pt-2 border-t border-border">
-                  <Label className="text-sm font-medium">Assignment method</Label>
-                  <div className="space-y-2">
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="method"
-                        value="round_robin"
-                        checked={method === 'round_robin'}
-                        onChange={() => setMethod('round_robin')}
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <p className="text-sm font-medium">Round-robin</p>
-                        <p className="text-xs text-muted-foreground">
-                          Distribute leads evenly across all active realtors in rotation
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="method"
-                        value="score_based"
-                        checked={method === 'score_based'}
-                        onChange={() => setMethod('score_based')}
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <p className="text-sm font-medium">Score-based</p>
-                        <p className="text-xs text-muted-foreground">
-                          Assign leads to the realtor with the highest performance score and availability
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="method"
-                        value="manual"
-                        checked={method === 'manual'}
-                        onChange={() => setMethod('manual')}
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <p className="text-sm font-medium">Manual only</p>
-                        <p className="text-xs text-muted-foreground">
-                          All leads stay unassigned until a broker admin manually assigns them
-                        </p>
-                      </div>
-                    </label>
-                  </div>
+            {enabled && (
+              <div className="space-y-2 pt-1">
+                <p className={SECTION_LABEL}>Method</p>
+                <div className="divide-y divide-border/60">
+                  {METHOD_OPTIONS.map((opt) => {
+                    const active = method === opt.value;
+                    return (
+                      <label
+                        key={opt.value}
+                        className={cn(
+                          'flex items-start gap-3 py-3 cursor-pointer transition-colors',
+                          active ? 'text-foreground' : 'hover:text-foreground',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="method"
+                          value={opt.value}
+                          checked={active}
+                          onChange={() => setMethod(opt.value)}
+                          className="mt-1"
+                        />
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                          <p className={CAPTION}>{opt.helper}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            )}
 
-              <Button
+            <div className="pt-2">
+              <button
                 type="button"
-                size="sm"
                 onClick={handleSave}
                 disabled={saving}
+                className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
               >
                 {saving ? (
-                  <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+                  <>
+                    <Loader2 size={13} className="animate-spin" /> Saving…
+                  </>
                 ) : saved ? (
-                  <><CheckCircle2 size={14} className="mr-1.5" /> Saved</>
+                  <>
+                    <CheckCircle2 size={13} /> Saved
+                  </>
                 ) : (
                   'Save changes'
                 )}
-              </Button>
-            </CardContent>
-          </Card>
+              </button>
+            </div>
+          </section>
 
           {settings?.autoAssignEnabled && (
-            <RoutingActivityCard settings={settings} />
+            <RoutingActivitySection settings={settings} />
           )}
         </>
       )}
@@ -235,37 +236,36 @@ export default function BrokerSettingsAutoAssignmentPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Readout card
+// Routing activity — read-only snapshot, divide-y rows.
 // ---------------------------------------------------------------------------
 
-function RoutingActivityCard({ settings }: { settings: SettingsResponse }) {
+function RoutingActivitySection({ settings }: { settings: SettingsResponse }) {
+  const rows: Array<[string, React.ReactNode]> = [
+    ['Current method', METHOD_LABEL[settings.assignmentMethod]],
+    ['Last assigned', settings.lastAssignedUserName ?? 'Nobody yet'],
+    [
+      'Active realtors',
+      <span key="count" className="tabular-nums">
+        {settings.realtorMemberCount}
+      </span>,
+    ],
+  ];
+
   return (
-    <Card>
-      <CardContent className="px-5 py-5 space-y-3">
-        <div>
-          <Label className="text-sm font-medium">Routing activity</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Live snapshot of how leads are being routed right now.
-          </p>
-        </div>
-        <div className="space-y-1.5 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Current method</span>
-            <span className="font-medium">{METHOD_LABEL[settings.assignmentMethod]}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Last assigned agent</span>
-            <span className="font-medium">
-              {settings.lastAssignedUserName ?? 'Nobody yet'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Active realtors</span>
-            <span className="font-medium">{settings.realtorMemberCount}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <section className="space-y-5 pt-10 border-t border-border/60">
+      <div className="space-y-0.5">
+        <p className={SECTION_LABEL}>Routing right now</p>
+        <p className={CAPTION}>Live snapshot of how leads are being routed today.</p>
+      </div>
+      <ul className="divide-y divide-border/60">
+        {rows.map(([label, value]) => (
+          <li key={label} className="flex items-center justify-between gap-3 py-3 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium text-foreground">{value}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -275,45 +275,42 @@ function RoutingActivityCard({ settings }: { settings: SettingsResponse }) {
 
 function LoadingSkeleton() {
   return (
-    <Card aria-busy>
-      <CardContent className="px-5 py-5 space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-64" />
-          </div>
-          <Skeleton className="h-6 w-11 rounded-full" />
+    <section className="space-y-5" aria-busy>
+      <div className="flex items-center justify-between border-b border-border/60 py-3">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-64" />
         </div>
-        <div className="space-y-3 pt-2 border-t border-border">
-          <Skeleton className="h-4 w-32" />
-          <div className="space-y-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border">
-                <Skeleton className="size-4 rounded-full mt-0.5" />
-                <div className="space-y-1.5 flex-1">
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              </div>
-            ))}
+        <Skeleton className="h-6 w-11 rounded-full" />
+      </div>
+      <div className="space-y-2 divide-y divide-border/60">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-start gap-3 py-3">
+            <Skeleton className="size-4 rounded-full mt-0.5" />
+            <div className="space-y-1.5 flex-1">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-full" />
+            </div>
           </div>
-        </div>
-        <Skeleton className="h-8 w-28" />
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+      <Skeleton className="h-9 w-32 rounded-full" />
+    </section>
   );
 }
 
 function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <Card>
-      <CardContent className="px-5 py-12 text-center space-y-3">
-        <p className="text-sm font-medium text-foreground">Couldn&apos;t load auto-assignment settings</p>
-        <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center space-y-3">
+      <p className="text-sm font-medium text-foreground">I couldn&apos;t load auto-assignment.</p>
+      <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className={cn(PRIMARY_PILL, 'h-8 px-3 text-xs')}
+      >
+        Try again
+      </button>
+    </div>
   );
 }

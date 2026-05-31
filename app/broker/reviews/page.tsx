@@ -2,6 +2,12 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { ReviewsClient, type ReviewRow } from './reviews-client';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  SECTION_RHYTHM,
+} from '@/lib/typography';
 
 // Server component: fetch the open queue directly via supabase (bypass API
 // round-trip), then hand off to the client for tab-switching.
@@ -110,22 +116,19 @@ export default async function BrokerReviewsPage() {
   const openCount = initialReviews.length;
   const statusSentence = (() => {
     if (openCount === 0) {
-      return "Nothing flagged. Quiet day.";
+      return 'Nothing flagged. Quiet day.';
     }
     return `${openCount} ${openCount === 1 ? 'deal' : 'deals'} waiting for your sign-off.`;
   })();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className={`max-w-4xl mx-auto ${SECTION_RHYTHM} pb-56 md:pb-24`}>
       <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Reviews.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <p className={BODY_MUTED}>Reviews.</p>
+        <h1 className={H1} style={TITLE_FONT}>
           Deals flagged for you
         </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+        <p className={BODY_MUTED}>{statusSentence}</p>
       </header>
       <ReviewsClient
         initialReviews={initialReviews}

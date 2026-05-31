@@ -246,7 +246,7 @@ export function ReviewsClient({ initialReviews, initialOpenCount, role, brokerag
             )}
           </motion.div>
         ) : (
-          <StaggerList key={`list-${tab}`} className="space-y-2">
+          <StaggerList key={`list-${tab}`} className="divide-y divide-border/60">
             {reviews.map((r) => {
               const agentInitials = initialsOf(r.requestingUser.name, r.requestingUser.email);
               const agentName = r.requestingUser.name ?? r.requestingUser.email ?? 'Unknown agent';
@@ -258,23 +258,22 @@ export function ReviewsClient({ initialReviews, initialOpenCount, role, brokerag
                 <StaggerItem key={r.id}>
                   <Link
                     href={`/broker/reviews/${r.id}`}
-                    className="group/row block rounded-xl border border-border/70 bg-card px-4 py-3 hover:bg-muted/30 transition-colors"
+                    className="group/row block py-3 -mx-2 px-2 rounded-md hover:bg-foreground/[0.04] transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-orange-500/10 dark:bg-orange-500/15 flex items-center justify-center text-xs font-semibold text-orange-600 dark:text-orange-400 flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
                           {agentInitials}
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <p className="text-sm font-semibold truncate">{agentName}</p>
+                            <p className="text-sm font-medium text-foreground truncate">{agentName}</p>
                             <span className="text-muted-foreground text-xs">·</span>
                             <span className="text-sm text-foreground truncate">
                               {dealTitle}
                             </span>
-                            <span className="text-muted-foreground text-xs">·</span>
-                            <span className="text-xs text-muted-foreground">
-                              flagged {formatRelative(r.createdAt)}
+                            <span className="text-[11px] text-muted-foreground">
+                              · flagged {formatRelative(r.createdAt)}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
