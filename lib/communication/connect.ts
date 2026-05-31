@@ -1,18 +1,17 @@
 /**
- * Communication through-write helpers — unified surface for email
- * (Gmail/Outlook) and WhatsApp Business via Composio. The realtor lives
- * in their provider; `/s/[slug]/communication` mirrors what's there and
- * sends THROUGH the provider.
+ * Communication through-write helpers — shared seam for email
+ * (Gmail/Outlook) and WhatsApp Business via Composio.
  *
- * One seam, one bug surface. The communication surface, future "send
- * follow-up" routines, and anything else that wants to send-as-the-
- * realtor route through `sendEmailThrough` / `sendWhatsAppThrough`.
- * Provider routing lives in one place.
+ * After PR #163 the unified `/s/[slug]/communication` surface split into
+ * two dedicated pages: `/s/[slug]/email` and `/s/[slug]/whatsapp`. Each
+ * has its own API namespace (`/api/email/*`, `/api/whatsapp/*`), but they
+ * both reuse the helpers below — one seam means one bug surface for
+ * provider plumbing.
  *
- * No backup table for v1: sent messages live in the provider's history
- * and inbox reads are fetched on-demand. There's no forensic state worth
- * mirroring locally yet — calendar earned its mirror because Chippi creates
- * tour events autonomously; here the realtor is in the loop on every send.
+ * No backup table: sent messages live in the provider's history and
+ * inbox reads are fetched on-demand. Calendar earned a local mirror
+ * because Chippi creates tour events autonomously; here the realtor is
+ * in the loop on every send and read.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -50,11 +49,18 @@ export const PROVIDER_MAIL_SLUGS = {
     list: 'GMAIL_FETCH_EMAILS',
     get: 'GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID',
     send: 'GMAIL_SEND_EMAIL',
+    /** Add a system label (e.g. STARRED) to a message. Used by the star
+     *  toggle on /email — no local schema, Gmail's label is the truth. */
+    addLabel: 'GMAIL_ADD_LABEL_TO_EMAIL',
+    /** Remove a system label (e.g. STARRED). Star toggle's "off" branch. */
+    removeLabel: 'GMAIL_REMOVE_LABEL_FROM_EMAIL',
   },
   outlook: {
     list: 'OUTLOOK_LIST_MESSAGES',
     get: 'OUTLOOK_GET_MESSAGE',
     send: 'OUTLOOK_SEND_EMAIL',
+    addLabel: null,
+    removeLabel: null,
   },
 } as const;
 
@@ -189,62 +195,6 @@ export async function findWhatsAppConnection(
   };
 }
 
-/**
- * One DB roundtrip that gets both connection states for the surface.
- * Used by the page server pass and the GET feed route — we render the
- * right shape (both connected → unified feed; one → feed + nudge for
- * the other; neither → calm prompt) on the first paint.
- */
-export async function findAnyCommunicationConnections(
-  spaceId: string,
-): Promise<{ email: MailConnection | null; whatsapp: WhatsAppConnection | null }> {
-  if (!composioConfigured()) return { email: null, whatsapp: null };
-
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
-    .select('id, userId, toolkit')
-    .eq('spaceId', spaceId)
-    .in('toolkit', ['gmail', 'outlook', 'whatsapp'])
-    .eq('status', 'active');
-
-  if (error) {
-    logger.warn(
-      '[communication.connect] findAnyCommunicationConnections failed',
-      { spaceId, err: error.message },
-    );
-    return { email: null, whatsapp: null };
-  }
-
-  const rows = (data ?? []) as Array<{ id: string; userId: string; toolkit: string }>;
-
-  let email: MailConnection | null = null;
-  let whatsapp: WhatsAppConnection | null = null;
-
-  // Gmail beats Outlook if both somehow exist.
-  for (const r of rows) {
-    if (r.toolkit === 'gmail') {
-      email = { id: r.id, userId: r.userId, toolkit: 'gmail' };
-      break;
-    }
-  }
-  if (!email) {
-    for (const r of rows) {
-      if (r.toolkit === 'outlook') {
-        email = { id: r.id, userId: r.userId, toolkit: 'outlook' };
-        break;
-      }
-    }
-  }
-  for (const r of rows) {
-    if (r.toolkit === 'whatsapp') {
-      whatsapp = { id: r.id, userId: r.userId, toolkit: 'whatsapp' };
-      break;
-    }
-  }
-
-  return { email, whatsapp };
-}
-
 /* ── Email send ─────────────────────────────────────────────────────── */
 
 export interface SendEmailInput {
@@ -271,10 +221,10 @@ export interface SendResult {
  * provider's Sent folder is the truth.
  *
  * Outlook send path is wired but only Gmail is enabled at the call site
- * (see app/api/communication/send/route.ts). If the realtor only has
- * Outlook connected, we surface a clear "Outlook send isn't supported
- * yet" error rather than trying a slug that may or may not match
- * Composio's current Outlook send shape.
+ * (see app/api/email/send/route.ts). If the realtor only has Outlook
+ * connected, we surface a clear "Outlook send isn't supported yet"
+ * error rather than trying a slug that may or may not match Composio's
+ * current Outlook send shape.
  */
 export async function sendEmailThrough(
   input: SendEmailInput,
@@ -334,6 +284,70 @@ export async function sendEmailThrough(
       ok: false,
       externalMessageId: null,
       error: err instanceof Error ? err.message : 'send_threw',
+    };
+  }
+}
+
+/* ── Email star toggle ──────────────────────────────────────────────── */
+
+export interface SetStarInput {
+  entityId: string;
+  provider: MailProvider;
+  /** Gmail message id (NOT a thread id — the STARRED label is per-message). */
+  messageId: string;
+  starred: boolean;
+}
+
+/**
+ * Star / unstar an email in the realtor's provider.
+ *
+ * Gmail: toggles the system `STARRED` label via add/remove tool slugs.
+ * Outlook: not supported in v1 — surfaces a clean error so the UI can
+ * leave the row alone rather than fake state.
+ *
+ * No local mirror: Gmail's label IS the star state. The next list fetch
+ * will reflect it.
+ */
+export async function setEmailStar(
+  input: SetStarInput,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!composioConfigured()) {
+    return { ok: false, error: 'composio_not_configured' };
+  }
+  if (input.provider !== 'gmail') {
+    return { ok: false, error: 'outlook_star_unsupported' };
+  }
+  const slug = input.starred
+    ? PROVIDER_MAIL_SLUGS.gmail.addLabel
+    : PROVIDER_MAIL_SLUGS.gmail.removeLabel;
+  try {
+    const resp = await executeToolForEntity({
+      entityId: input.entityId,
+      slug,
+      // Composio's Gmail label tools accept several arg names across SDK
+      // drifts; pass the canonical pair so we don't break on one rename.
+      arguments: {
+        message_id: input.messageId,
+        messageId: input.messageId,
+        label_ids: ['STARRED'],
+        labelIds: ['STARRED'],
+      },
+    });
+    if (resp.successful === false) {
+      const err = (resp as { error?: string | null }).error ?? 'star_failed';
+      logger.warn('[communication.connect] star toggle failed', {
+        messageId: input.messageId,
+        starred: input.starred,
+        err,
+      });
+      return { ok: false, error: err };
+    }
+    return { ok: true };
+  } catch (err) {
+    logger.error('[communication.connect] star toggle threw', {}, err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'star_threw',
     };
   }
 }
