@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { LeaderboardClient } from './leaderboard-client';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Leaderboard — Broker Dashboard' };
@@ -36,10 +38,17 @@ export default async function LeaderboardPage() {
 
   if (!members?.length) {
     return (
-      <div className="space-y-6 max-w-4xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Leaderboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">No realtors to rank yet.</p>
+      <div className="space-y-8 max-w-5xl pb-56 md:pb-24">
+        <header className="space-y-1.5">
+          <h1 className={cn(H1)} style={TITLE_FONT}>
+            Leaderboard
+          </h1>
+          <p className={cn(BODY_MUTED)}>No realtors to rank yet.</p>
+        </header>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
+          <p className={cn(BODY_MUTED, 'text-[13px]')}>
+            I&apos;ll start ranking the team here once someone&apos;s on it.
+          </p>
         </div>
       </div>
     );
@@ -155,14 +164,23 @@ export default async function LeaderboardPage() {
   // Default sort by deals closed
   stats.sort((a, b) => b.dealsClosed - a.dealsClosed);
 
+  // Status sentence — calm fact about the team, narrated by Chippi.
+  const ranked = stats.length;
+  const closed = stats.reduce((sum, s) => sum + s.dealsClosed, 0);
+  const statusSentence = (() => {
+    if (ranked === 0) return 'No realtors to rank yet.';
+    if (closed === 0) return `Ranking ${ranked} ${ranked === 1 ? 'realtor' : 'realtors'} — no deals closed yet.`;
+    return `Ranking ${ranked} ${ranked === 1 ? 'realtor' : 'realtors'} · ${closed} ${closed === 1 ? 'deal' : 'deals'} closed.`;
+  })();
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Leaderboard</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          See how your team is performing
-        </p>
-      </div>
+    <div className="space-y-8 max-w-5xl pb-56 md:pb-24">
+      <header className="space-y-1.5">
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          Leaderboard
+        </h1>
+        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
+      </header>
       <LeaderboardClient initialStats={stats} />
     </div>
   );

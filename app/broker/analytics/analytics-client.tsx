@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, TrendingUp, Users, BarChart3 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { SECTION_LABEL, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,86 +91,93 @@ function FunnelBar({
   );
 }
 
-// ── Agent funnel card ────────────────────────────────────────────────────────
+// ── Agent funnel card (paper-flat) ───────────────────────────────────────────
 
 function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
   return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-            {initials(agent.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold truncate">{agent.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-lg font-bold tabular-nums text-primary">{agent.overallConversion}%</p>
-            <p className="text-[10px] text-muted-foreground">Lead-to-Win</p>
-          </div>
+    <section className="rounded-xl border border-border/70 bg-background px-4 py-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-semibold text-foreground flex-shrink-0">
+          {initials(agent.name)}
         </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate">{agent.name}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p
+            className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
+            style={TITLE_FONT}
+          >
+            {agent.overallConversion}%
+          </p>
+          <p className="text-[10px] text-muted-foreground">Lead to win</p>
+        </div>
+      </div>
 
-        <div className="space-y-1.5">
-          <FunnelBar label="Leads" value={agent.totalLeads} maxValue={agent.totalLeads} color="bg-violet-500/60" />
-          <FunnelBar label="Tours" value={agent.tours} maxValue={agent.totalLeads} color="bg-purple-500/60" />
-          <FunnelBar label="Applications" value={agent.applications} maxValue={agent.totalLeads} color="bg-amber-500/60" />
-          <FunnelBar label="Deals" value={agent.totalDeals} maxValue={agent.totalLeads} color="bg-cyan-500/60" />
-          <FunnelBar label="Won" value={agent.wonDeals} maxValue={agent.totalLeads} color="bg-emerald-500/60" />
-        </div>
+      <div className="space-y-1.5">
+        <FunnelBar label="Leads" value={agent.totalLeads} maxValue={agent.totalLeads} color="bg-violet-500/60" />
+        <FunnelBar label="Tours" value={agent.tours} maxValue={agent.totalLeads} color="bg-purple-500/60" />
+        <FunnelBar label="Applications" value={agent.applications} maxValue={agent.totalLeads} color="bg-amber-500/60" />
+        <FunnelBar label="Deals" value={agent.totalDeals} maxValue={agent.totalLeads} color="bg-cyan-500/60" />
+        <FunnelBar label="Won" value={agent.wonDeals} maxValue={agent.totalLeads} color="bg-emerald-500/60" />
+      </div>
 
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border">
-          <div className="text-center">
-            <p className="text-xs font-semibold tabular-nums">{agent.leadToTour}%</p>
-            <p className="text-[10px] text-muted-foreground">Lead-to-Tour</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs font-semibold tabular-nums">{agent.tourToApp}%</p>
-            <p className="text-[10px] text-muted-foreground">Tour-to-App</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs font-semibold tabular-nums">{agent.appToDeal}%</p>
-            <p className="text-[10px] text-muted-foreground">App-to-Deal</p>
-          </div>
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/60">
+        <div className="text-center">
+          <p className="text-xs font-semibold tabular-nums">{agent.leadToTour}%</p>
+          <p className="text-[10px] text-muted-foreground">Lead to tour</p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="text-center">
+          <p className="text-xs font-semibold tabular-nums">{agent.tourToApp}%</p>
+          <p className="text-[10px] text-muted-foreground">Tour to app</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xs font-semibold tabular-nums">{agent.appToDeal}%</p>
+          <p className="text-[10px] text-muted-foreground">App to deal</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BuyerFunnelCard({ agent }: { agent: AgentFunnelData }) {
+  const maxVal = agent.buyerLeads ?? 0;
+  const closeRate = maxVal > 0 ? Math.round(((agent.buyerClosed ?? 0) / maxVal) * 100) : 0;
+  return (
+    <section className="rounded-xl border border-border/70 bg-background px-4 py-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-semibold text-foreground flex-shrink-0">
+          {initials(agent.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate">{agent.name}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p
+            className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
+            style={TITLE_FONT}
+          >
+            {closeRate}%
+          </p>
+          <p className="text-[10px] text-muted-foreground">Lead to close</p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <FunnelBar label="Leads" value={agent.buyerLeads ?? 0} maxValue={maxVal} color="bg-violet-500/60" />
+        <FunnelBar label="Pre-approved" value={agent.buyerPreApproved ?? 0} maxValue={maxVal} color="bg-blue-500/60" />
+        <FunnelBar label="Showings" value={agent.buyerShowings ?? 0} maxValue={maxVal} color="bg-purple-500/60" />
+        <FunnelBar label="Offers" value={agent.buyerOffers ?? 0} maxValue={maxVal} color="bg-amber-500/60" />
+        <FunnelBar label="Under contract" value={agent.buyerUnderContract ?? 0} maxValue={maxVal} color="bg-cyan-500/60" />
+        <FunnelBar label="Closed" value={agent.buyerClosed ?? 0} maxValue={maxVal} color="bg-emerald-500/60" />
+      </div>
+    </section>
   );
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-
-function BuyerFunnelCard({ agent }: { agent: AgentFunnelData }) {
-  const maxVal = agent.buyerLeads ?? 0;
-  return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-            {initials(agent.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold truncate">{agent.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-lg font-bold tabular-nums text-primary">{maxVal > 0 ? Math.round(((agent.buyerClosed ?? 0) / maxVal) * 100) : 0}%</p>
-            <p className="text-[10px] text-muted-foreground">Lead-to-Close</p>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <FunnelBar label="Leads" value={agent.buyerLeads ?? 0} maxValue={maxVal} color="bg-violet-500/60" />
-          <FunnelBar label="Pre-Approved" value={agent.buyerPreApproved ?? 0} maxValue={maxVal} color="bg-blue-500/60" />
-          <FunnelBar label="Showings" value={agent.buyerShowings ?? 0} maxValue={maxVal} color="bg-purple-500/60" />
-          <FunnelBar label="Offers" value={agent.buyerOffers ?? 0} maxValue={maxVal} color="bg-amber-500/60" />
-          <FunnelBar label="Under Contract" value={agent.buyerUnderContract ?? 0} maxValue={maxVal} color="bg-cyan-500/60" />
-          <FunnelBar label="Closed" value={agent.buyerClosed ?? 0} maxValue={maxVal} color="bg-emerald-500/60" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export function AnalyticsClient({ agents }: Props) {
   const [view, setView] = useState<'funnel' | 'table'>('funnel');
@@ -221,140 +229,128 @@ export function AnalyticsClient({ agents }: Props) {
     return t;
   }, [agents]);
 
+  // Headline conversion % for the team funnel block. Read big in serif.
+  const teamHeadline = leadType === 'rental'
+    ? teamTotals.overallConversion
+    : buyerTeamTotals.buyerLeads > 0
+      ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerLeads) * 100)
+      : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Lead type toggle */}
-      <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
-        <button
-          onClick={() => setLeadType('rental')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            leadType === 'rental' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Rental
-        </button>
-        <button
-          onClick={() => setLeadType('buyer')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            leadType === 'buyer' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Buyer
-        </button>
+    <div className="space-y-10">
+      {/* Lead type toggle — paper-flat segmented control on a hairline strip. */}
+      <div role="tablist" aria-label="Lead type" className="flex items-center gap-1 border-b border-border/70 pb-0 -mb-2">
+        {(['rental', 'buyer'] as const).map((t) => {
+          const isActive = leadType === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setLeadType(t)}
+              className={cn(
+                'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
+                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t === 'rental' ? 'Rental' : 'Buyer'}
+              {isActive && (
+                <span
+                  className="absolute bottom-[-1px] left-2 right-2 h-[2px] rounded-full bg-foreground"
+                  aria-hidden
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Team overview funnel */}
-      <Card>
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold">Team {leadType === 'buyer' ? 'Buyer' : 'Rental'} Conversion Funnel</h2>
-            </div>
-            {leadType === 'rental' ? (
-              <p className="text-lg font-bold tabular-nums text-primary">{teamTotals.overallConversion}% overall</p>
-            ) : (
-              <p className="text-lg font-bold tabular-nums text-primary">
-                {buyerTeamTotals.buyerLeads > 0 ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerLeads) * 100) : 0}% overall
-              </p>
-            )}
+      {/* Team funnel — hairline section, serif headline. The bars stay loud. */}
+      <section className="rounded-xl border border-border/70 bg-background px-4 sm:px-5 py-5 space-y-4">
+        <div className="flex items-end justify-between gap-3 flex-wrap pb-3 border-b border-border/60">
+          <div className="space-y-1">
+            <p className={SECTION_LABEL}>Team funnel · {leadType === 'buyer' ? 'buyer' : 'rental'}</p>
+            <p className="text-[13px] text-muted-foreground">Conversion top to bottom.</p>
           </div>
+          <p
+            className="text-[25px] leading-tight tracking-tight tabular-nums text-foreground"
+            style={TITLE_FONT}
+          >
+            {teamHeadline}%
+          </p>
+        </div>
 
-          {leadType === 'rental' ? (
+        {leadType === 'rental' ? (
           <div className="space-y-2">
-            <FunnelBar label="Total Leads" value={teamTotals.totalLeads} maxValue={teamTotals.totalLeads} color="bg-violet-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{teamTotals.leadToTour}%</span>
-            </div>
+            <FunnelBar label="Leads" value={teamTotals.totalLeads} maxValue={teamTotals.totalLeads} color="bg-violet-500/60" />
+            <StepArrow pct={teamTotals.leadToTour} />
             <FunnelBar label="Tours" value={teamTotals.tours} maxValue={teamTotals.totalLeads} color="bg-purple-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{teamTotals.tourToApp}%</span>
-            </div>
+            <StepArrow pct={teamTotals.tourToApp} />
             <FunnelBar label="Applications" value={teamTotals.applications} maxValue={teamTotals.totalLeads} color="bg-amber-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{teamTotals.appToDeal}%</span>
-            </div>
+            <StepArrow pct={teamTotals.appToDeal} />
             <FunnelBar label="Deals" value={teamTotals.totalDeals} maxValue={teamTotals.totalLeads} color="bg-cyan-500/60" />
             <FunnelBar label="Won" value={teamTotals.wonDeals} maxValue={teamTotals.totalLeads} color="bg-emerald-500/60" />
           </div>
-          ) : (
+        ) : (
           <div className="space-y-2">
             <FunnelBar label="Leads" value={buyerTeamTotals.buyerLeads} maxValue={buyerTeamTotals.buyerLeads} color="bg-violet-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                {buyerTeamTotals.buyerLeads > 0 ? Math.round((buyerTeamTotals.buyerPreApproved / buyerTeamTotals.buyerLeads) * 100) : 0}%
-              </span>
-            </div>
-            <FunnelBar label="Pre-Approved" value={buyerTeamTotals.buyerPreApproved} maxValue={buyerTeamTotals.buyerLeads} color="bg-blue-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                {buyerTeamTotals.buyerPreApproved > 0 ? Math.round((buyerTeamTotals.buyerShowings / buyerTeamTotals.buyerPreApproved) * 100) : 0}%
-              </span>
-            </div>
+            <StepArrow pct={buyerTeamTotals.buyerLeads > 0 ? Math.round((buyerTeamTotals.buyerPreApproved / buyerTeamTotals.buyerLeads) * 100) : 0} />
+            <FunnelBar label="Pre-approved" value={buyerTeamTotals.buyerPreApproved} maxValue={buyerTeamTotals.buyerLeads} color="bg-blue-500/60" />
+            <StepArrow pct={buyerTeamTotals.buyerPreApproved > 0 ? Math.round((buyerTeamTotals.buyerShowings / buyerTeamTotals.buyerPreApproved) * 100) : 0} />
             <FunnelBar label="Showings" value={buyerTeamTotals.buyerShowings} maxValue={buyerTeamTotals.buyerLeads} color="bg-purple-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                {buyerTeamTotals.buyerShowings > 0 ? Math.round((buyerTeamTotals.buyerOffers / buyerTeamTotals.buyerShowings) * 100) : 0}%
-              </span>
-            </div>
+            <StepArrow pct={buyerTeamTotals.buyerShowings > 0 ? Math.round((buyerTeamTotals.buyerOffers / buyerTeamTotals.buyerShowings) * 100) : 0} />
             <FunnelBar label="Offers" value={buyerTeamTotals.buyerOffers} maxValue={buyerTeamTotals.buyerLeads} color="bg-amber-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                {buyerTeamTotals.buyerOffers > 0 ? Math.round((buyerTeamTotals.buyerUnderContract / buyerTeamTotals.buyerOffers) * 100) : 0}%
-              </span>
-            </div>
-            <FunnelBar label="Under Contract" value={buyerTeamTotals.buyerUnderContract} maxValue={buyerTeamTotals.buyerLeads} color="bg-cyan-500/60" />
-            <div className="flex items-center gap-1 pl-28">
-              <ArrowRight size={10} className="text-muted-foreground/40" />
-              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
-                {buyerTeamTotals.buyerUnderContract > 0 ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerUnderContract) * 100) : 0}%
-              </span>
-            </div>
+            <StepArrow pct={buyerTeamTotals.buyerOffers > 0 ? Math.round((buyerTeamTotals.buyerUnderContract / buyerTeamTotals.buyerOffers) * 100) : 0} />
+            <FunnelBar label="Under contract" value={buyerTeamTotals.buyerUnderContract} maxValue={buyerTeamTotals.buyerLeads} color="bg-cyan-500/60" />
+            <StepArrow pct={buyerTeamTotals.buyerUnderContract > 0 ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerUnderContract) * 100) : 0} />
             <FunnelBar label="Closed" value={buyerTeamTotals.buyerClosed} maxValue={buyerTeamTotals.buyerLeads} color="bg-emerald-500/60" />
           </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </section>
 
-      {/* View toggle + sort */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
-          <button
-            onClick={() => setView('funnel')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              view === 'funnel' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <BarChart3 size={12} className="inline mr-1.5 -mt-0.5" />
-            Funnels
-          </button>
-          <button
-            onClick={() => setView('table')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              view === 'table' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Users size={12} className="inline mr-1.5 -mt-0.5" />
-            Table
-          </button>
+      {/* View toggle + sort — paper-flat row. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap pb-3 border-b border-border/60">
+        <div role="tablist" aria-label="View" className="flex items-center">
+          {(['funnel', 'table'] as const).map((v) => {
+            const isActive = view === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setView(v)}
+                className={cn(
+                  'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
+                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {v === 'funnel' ? 'Funnels' : 'Table'}
+                {isActive && (
+                  <span
+                    className="absolute bottom-[-13px] left-2 right-2 h-[2px] rounded-full bg-foreground"
+                    aria-hidden
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground"
-        >
-          <option value="leads">Sort by Leads</option>
-          <option value="conversion">Sort by Conversion</option>
-          <option value="name">Sort by Name</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <label htmlFor="analytics-sort" className={SECTION_LABEL}>Sort</label>
+          <select
+            id="analytics-sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-sm border border-border/70 rounded-md px-2 h-8 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="leads">Leads</option>
+            <option value="conversion">Conversion</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
       </div>
 
       {/* Funnel view */}
@@ -368,103 +364,113 @@ export function AnalyticsClient({ agents }: Props) {
             )
           )}
           {sorted.length === 0 && (
-            <Card className="md:col-span-2">
-              <CardContent className="py-12 text-center">
-                <p className="text-sm text-muted-foreground">No agents with data yet.</p>
-              </CardContent>
-            </Card>
+            <div className="md:col-span-2 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
+              <p className={cn(BODY_MUTED, 'text-[13px]')}>No agents with data yet.</p>
+            </div>
           )}
         </div>
       )}
 
       {/* Table view */}
       {view === 'table' && (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Leads</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tours</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Apps</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deals</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Won</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Won Value</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lead-to-Tour</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Tour-to-App</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">App-to-Deal</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversion %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {sorted.map((a) => (
-                  <tr key={a.userId} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary flex-shrink-0">
-                          {initials(a.name)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{a.name}</p>
-                          <p className="text-[11px] text-muted-foreground truncate">{a.role}</p>
-                        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/60">
+                <th className="text-left px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Agent</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Leads</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Tours</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground hidden md:table-cell">Apps</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Deals</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground hidden sm:table-cell">Won</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground hidden lg:table-cell">Won value</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">L→T</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground hidden md:table-cell">T→A</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground hidden md:table-cell">A→D</th>
+                <th className="text-right px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-muted-foreground">Conv.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {sorted.map((a) => (
+                <tr key={a.userId} className="hover:bg-foreground/[0.04] transition-colors">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[10px] font-semibold text-foreground flex-shrink-0">
+                        {initials(a.name)}
                       </div>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-semibold">{a.totalLeads}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{a.tours}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs hidden md:table-cell">{a.applications}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-semibold">{a.totalDeals}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs hidden sm:table-cell text-emerald-600 dark:text-emerald-400 font-semibold">{a.wonDeals}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs hidden lg:table-cell text-emerald-600 dark:text-emerald-400">{formatCompact(a.wonValue)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{a.leadToTour}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs hidden md:table-cell">{a.tourToApp}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs hidden md:table-cell">{a.appToDeal}%</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums ${
-                        a.overallConversion >= CONVERSION_THRESHOLD_GOOD
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                          : a.overallConversion >= CONVERSION_THRESHOLD_OK
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {a.overallConversion}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {sorted.length === 0 && (
-                  <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      No agent data available.
-                    </td>
-                  </tr>
-                )}
-                {/* Totals row */}
-                {sorted.length > 0 && (
-                  <tr className="bg-muted/40 font-semibold">
-                    <td className="px-4 py-3 text-xs font-bold">Team Total</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold">{teamTotals.totalLeads}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold">{teamTotals.tours}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold hidden md:table-cell">{teamTotals.applications}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold">{teamTotals.totalDeals}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold hidden sm:table-cell text-emerald-600 dark:text-emerald-400">{teamTotals.wonDeals}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold hidden lg:table-cell text-emerald-600 dark:text-emerald-400">{formatCompact(teamTotals.wonValue)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold">{teamTotals.leadToTour}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold hidden md:table-cell">{teamTotals.tourToApp}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-bold hidden md:table-cell">{teamTotals.appToDeal}%</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tabular-nums bg-primary/10 text-primary">
-                        {teamTotals.overallConversion}%
-                      </span>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{a.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{a.role}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{a.totalLeads}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px]">{a.tours}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] hidden md:table-cell">{a.applications}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{a.totalDeals}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] hidden sm:table-cell text-emerald-700 dark:text-emerald-400 font-semibold">{a.wonDeals}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] hidden lg:table-cell text-emerald-700 dark:text-emerald-400">{formatCompact(a.wonValue)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px]">{a.leadToTour}%</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] hidden md:table-cell">{a.tourToApp}%</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] hidden md:table-cell">{a.appToDeal}%</td>
+                  <td className="px-3 py-3 text-right">
+                    <span className={cn(
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums',
+                      a.overallConversion >= CONVERSION_THRESHOLD_GOOD
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        : a.overallConversion >= CONVERSION_THRESHOLD_OK
+                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                        : 'bg-muted/60 text-muted-foreground',
+                    )}>
+                      {a.overallConversion}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={11} className="px-3 py-10 text-center">
+                    <span className={cn(BODY_MUTED, 'text-[13px]')}>No agent data yet.</span>
+                  </td>
+                </tr>
+              )}
+              {/* Totals row — quiet emphasis, no pedestal. */}
+              {sorted.length > 0 && (
+                <tr className="bg-muted/30">
+                  <td className="px-3 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Team</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{teamTotals.totalLeads}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{teamTotals.tours}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold hidden md:table-cell">{teamTotals.applications}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{teamTotals.totalDeals}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold hidden sm:table-cell text-emerald-700 dark:text-emerald-400">{teamTotals.wonDeals}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold hidden lg:table-cell text-emerald-700 dark:text-emerald-400">{formatCompact(teamTotals.wonValue)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold">{teamTotals.leadToTour}%</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold hidden md:table-cell">{teamTotals.tourToApp}%</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-[13px] font-semibold hidden md:table-cell">{teamTotals.appToDeal}%</td>
+                  <td className="px-3 py-3 text-right">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums bg-foreground/[0.06] text-foreground">
+                      {teamTotals.overallConversion}%
+                    </span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Inline step arrow between two funnel bars — small, muted, conversion %.
+ * Lives between bars and reads in one glance.
+ */
+function StepArrow({ pct }: { pct: number }) {
+  return (
+    <div className="flex items-center gap-1 pl-28">
+      <ArrowRight size={10} className="text-muted-foreground/50" />
+      <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{pct}%</span>
     </div>
   );
 }
