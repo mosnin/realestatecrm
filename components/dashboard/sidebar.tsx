@@ -616,6 +616,58 @@ function EdgeCollapseHandle() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Section groupings — sit BETWEEN the existing nav items as small-caps
+// headers. The realtor nav is one flat list in `lib/nav-items.ts` (so any
+// route addition picks up shared chrome); the groupings are an inline
+// rendering concern here. Adding a header means picking which existing items
+// belong to which bucket — not a new feature, just a calmer read.
+//
+// The buckets, top → bottom:
+//   • Chippi   → no header (top-pinned, AI)
+//   • WORKSPACE → daily work (People, Deals, Calendar, Properties, Studio, Files)
+//   • SETUP    → once-and-done (Profile, Intake form)
+//   • Settings → no header (bottom-pinned)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WORKSPACE_HREFS = new Set<string>([
+  '/contacts',
+  '/deals',
+  '/calendar',
+  '/properties',
+  '/studio',
+  '/files',
+]);
+const SETUP_HREFS = new Set<string>([
+  '/profile-page',
+  '/intake',
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification slot — reserved space that sits between the scroll area
+// (RealtorNav, including conversation history on /chippi) and the pinned
+// user footer. The inspiration the realtor shared shows a small
+// "Update available →" card here; we don't have a real notification feed
+// yet, so the slot renders nothing today. Shipping a fake "update card"
+// here would be product theatre — Jobs rule: configuration is failure to
+// decide, and decorative copy is failure to be honest.
+//
+// The slot is a function (not a JSX block) so the call site reads as
+// `<SidebarNotificationSlot />` and the empty-today contract is visible
+// at the render point. When the feed exists, replace `return null` with
+// the card render and the layout will absorb it without re-plumbing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SidebarNotificationSlot({ collapsed = false }: { collapsed?: boolean }) {
+  // Rail-mode collapses the slot entirely — no horizontal room for a card
+  // and we don't want a half-card hint in the icon strip.
+  if (collapsed) return null;
+  // v1: no notification feed, so render nothing. Reserved so future work
+  // (e.g. "new release notes", "billing nudge") slots in without moving
+  // the user footer up/down.
+  return null;
+}
+
 function RealtorNav({
   slug,
   base,
@@ -664,9 +716,25 @@ function RealtorNav({
 
   // AI-related items always sit at the top
   const aiItems = realtorNavItems.filter((item) => item.isAI);
-  // Everything else except AI and settings
-  const mainItems = realtorNavItems.filter(
-    (item) => !item.isAI && item.href !== '/settings',
+  // Workspace bucket — daily work surfaces (gets the WORKSPACE small-caps
+  // header above it). Filtered through the canonical realtorNavItems order
+  // so route additions inherit the order without touching this file.
+  const workspaceItems = realtorNavItems.filter(
+    (item) => !item.isAI && WORKSPACE_HREFS.has(item.href),
+  );
+  // Setup bucket — once-and-done surfaces (gets the SETUP small-caps header).
+  const setupItems = realtorNavItems.filter(
+    (item) => !item.isAI && SETUP_HREFS.has(item.href),
+  );
+  // Any leaf the buckets above didn't claim — kept appended (no header) so
+  // a new route added to `lib/nav-items.ts` still renders. The set-based
+  // filter makes the bucketing additive, not exhaustive.
+  const otherItems = realtorNavItems.filter(
+    (item) =>
+      !item.isAI &&
+      item.href !== '/settings' &&
+      !WORKSPACE_HREFS.has(item.href) &&
+      !SETUP_HREFS.has(item.href),
   );
 
   // Route IS the signal for which nav mode this sidebar is in. On
@@ -674,24 +742,41 @@ function RealtorNav({
   // slides in their place; off Chippi, the reverse.
   const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
 
+  // Badge vocabulary, two tiers:
+  //   • Calm count (leads, properties) — muted pill, rounded-md, small.
+  //     Sits to the right of the label like the inspiration's "Messages 16".
+  //     `bg-foreground/[0.05]` keeps it inside the paper-flat hairline
+  //     vocabulary; no `bg-secondary` blue, no harsh accent.
+  //   • Action count (pendingDrafts) — foreground pill, rounded-full.
+  //     Reserved for "you owe this" per STYLESHEET §Visual hierarchy —
+  //     the only badge that should pull the eye.
+  const calmBadgeClasses =
+    'inline-flex h-[18px] items-center justify-center rounded-md px-1.5 ' +
+    'text-[11px] font-medium tabular-nums flex-shrink-0 ' +
+    'bg-foreground/[0.05] text-muted-foreground';
+  const loudBadgeClasses =
+    'inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center ' +
+    'rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 ' +
+    'bg-primary text-primary-foreground';
+
   const getBadge = (item: NavItem): React.ReactNode => {
     if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
       return (
-        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
+        <span className={calmBadgeClasses}>
           <PulseNumber value={unreadLeadCount > 99 ? '99+' : unreadLeadCount} />
         </span>
       );
     }
     if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
       return (
-        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
+        <span className={loudBadgeClasses}>
           <PulseNumber value={pendingDraftCount > 99 ? '99+' : pendingDraftCount} />
         </span>
       );
     }
     if (item.badgeKey === 'properties' && activePropertyCount > 0) {
       return (
-        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
+        <span className={calmBadgeClasses}>
           <PulseNumber value={activePropertyCount > 99 ? '99+' : activePropertyCount} />
         </span>
       );
@@ -749,16 +834,54 @@ function RealtorNav({
           Calendar…) stay visible the whole time — the realtor must always
           have a door out of Chippi, not just a door in. The Chippi nav
           item itself stays pinned at the top regardless so the door in is
-          always there too. Settings stays pinned at the bottom. */}
-      <div>
-        <div className="space-y-0.5">
-          {/* Always visible — top-pinned AI items (Chippi + future AI rows) */}
-          {aiItems.map(renderItem)}
-          {/* Main destinations — visible on every route. Hiding them on
-              /chippi (the original cross-fade design) left the realtor
-              stranded with no navigation out. */}
-          {mainItems.map(renderItem)}
-        </div>
+          always there too. Settings stays pinned at the bottom.
+
+          The visual polish pass (PR: sidebar-jobs-polish) introduced two
+          small-caps headers — WORKSPACE above the daily-work rows, SETUP
+          above the once-and-done rows — to give a 7-row flat list a
+          calmer read without changing what's in it. `lib/nav-items.ts`
+          stays the canonical order; the headers are an inline rendering
+          choice here. In collapsed-rail mode the labels disappear (no
+          horizontal room) and the rows render flush. */}
+      <div className="space-y-0.5">
+        {/* Always visible — top-pinned AI items (Chippi + future AI rows).
+            No header above this bucket: Chippi is the brand mark; it
+            doesn't need a category to belong to. */}
+        {aiItems.map(renderItem)}
+
+        {/* WORKSPACE — daily work surfaces. The label only renders in
+            expanded mode; in the rail it would just consume vertical
+            space without communicating anything. Tighter top-padding
+            than the broker-nav SectionLabel because realtor rows are
+            denser; `pt-4 pb-1.5` reads as a calm breath, not a chasm. */}
+        {workspaceItems.length > 0 && (
+          <>
+            {!collapsed && (
+              <p className={cn(SECTION_LABEL, 'px-3 pt-4 pb-1.5 select-none')}>
+                Workspace
+              </p>
+            )}
+            {workspaceItems.map(renderItem)}
+          </>
+        )}
+
+        {/* SETUP — once-and-done surfaces (Profile, Intake form). Same
+            collapse rule as WORKSPACE. */}
+        {setupItems.length > 0 && (
+          <>
+            {!collapsed && (
+              <p className={cn(SECTION_LABEL, 'px-3 pt-4 pb-1.5 select-none')}>
+                Setup
+              </p>
+            )}
+            {setupItems.map(renderItem)}
+          </>
+        )}
+
+        {/* Anything the buckets above didn't claim — appended without a
+            header so a new `lib/nav-items.ts` route stays renderable
+            without forcing an edit to this file. */}
+        {otherItems.map(renderItem)}
       </div>
 
       {/* Context-aware second section. Route IS the signal:
@@ -1141,6 +1264,12 @@ function RealtorSidebarShell({
           pendingDraftCount={pendingDraftCount}
           activePropertyCount={activePropertyCount}
         />
+
+        {/* Notification card slot — reserved space the inspiration the
+            realtor sent shows as an "Update available →" card. We don't
+            have a notification feed yet; the slot returns null today so
+            the layout doesn't shift when it's added later. */}
+        <SidebarNotificationSlot collapsed={collapsed} />
 
         {/* User footer pinned at bottom, separated by a hairline. The
             collapse toggle now lives as an edge-handle on the right rail
