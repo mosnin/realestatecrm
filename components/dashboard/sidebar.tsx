@@ -634,6 +634,7 @@ const WORKSPACE_HREFS = new Set<string>([
   '/contacts',
   '/deals',
   '/calendar',
+  '/sms',
   '/properties',
   '/studio',
   '/files',

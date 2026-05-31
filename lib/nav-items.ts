@@ -80,6 +80,11 @@ export const realtorNavItems: NavItem[] = [
     icon: MessageSquare,
   },
   {
+    href: '/sms',
+    label: 'SMS',
+    icon: MessageCircle,
+  },
+  {
     href: '/properties',
     label: 'Properties',
     icon: Building2,
