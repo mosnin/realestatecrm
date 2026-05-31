@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { validateCreatePayload } from '@/app/api/calendar/events/route';
+import { validateCreatePayload } from '@/lib/calendar/event-validation';
 import {
   monthGridDays,
   startOfMonth,
