@@ -26,6 +26,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Mail, Plug, Plus, Send, Star } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -39,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ShimmerText } from '@/components/chippi/shimmer-text';
 import { cn } from '@/lib/utils';
+import { EASE_APPLE } from '@/lib/motion';
 import {
   BODY,
   BODY_MUTED,
@@ -142,6 +144,10 @@ export function EmailInboxView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noteOutlookReadPending, setNoteOutlookReadPending] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  /** Index where the most-recent "load more" batch starts. Rows at indices
+   *  below this entered with the initial filter paint and should not re-
+   *  animate; rows at/after it are the newly appended page and stagger in. */
+  const [appendCursor, setAppendCursor] = useState(0);
   const filterRef = useRef<EmailFilter>('inbox');
 
   // Hydrate filter from localStorage on mount.
@@ -184,7 +190,14 @@ export function EmailInboxView({
         }
         setConnected(true);
         setNoteOutlookReadPending(Boolean(data.noteOutlookReadPending));
-        setItems((prev) => (args.append ? [...prev, ...data.items] : data.items));
+        setItems((prev) => {
+          if (args.append) {
+            setAppendCursor(prev.length);
+            return [...prev, ...data.items];
+          }
+          setAppendCursor(0);
+          return data.items;
+        });
         setNextPageToken(data.nextPageToken);
       } catch (err) {
         if (filterRef.current !== args.filter) return;
@@ -303,37 +316,68 @@ export function EmailInboxView({
         </Card>
       )}
 
-      {!loading && !errorMessage && items.length === 0 && (
-        <EmptyFeed filter={filter} />
-      )}
-
-      {!loading && !errorMessage && items.length > 0 && (
-        <>
-          <ul className="divide-y divide-border/60">
-            {items.map((it) => (
-              <EmailRow
-                key={it.id}
-                item={it}
-                filter={filter}
-                onOpen={() => handleRowOpen(it.id)}
-                onToggleStar={() => handleStarToggle(it.id, !it.starred)}
-              />
-            ))}
-          </ul>
-          {nextPageToken && (
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className={cn(GHOST_PILL, 'border border-border/70')}
-              >
-                {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
+      {/* Cross-fade between filter datasets (Inbox / Starred / Sent). The
+       *  list inside is a stagger container; on filter change AnimatePresence
+       *  swaps the whole list cleanly. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {!loading && !errorMessage && (
+          <motion.div
+            key={`feed-${filter}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: EASE_APPLE }}
+          >
+            {items.length === 0 ? (
+              <EmptyFeed filter={filter} />
+            ) : (
+              <>
+                <motion.ul
+                  className="divide-y divide-border/60"
+                  initial="initial"
+                  animate="enter"
+                  variants={{
+                    initial: {},
+                    enter: { transition: { staggerChildren: 0.03 } },
+                  }}
+                >
+                  {items.map((it, idx) => (
+                    <EmailRow
+                      key={it.id}
+                      item={it}
+                      filter={filter}
+                      /* Newly appended rows start their stagger fresh; the
+                       *  initial batch staggers off the container above. */
+                      appendDelay={
+                        idx >= appendCursor && appendCursor > 0
+                          ? (idx - appendCursor) * 0.03
+                          : undefined
+                      }
+                      onOpen={() => handleRowOpen(it.id)}
+                      onToggleStar={() => handleStarToggle(it.id, !it.starred)}
+                    />
+                  ))}
+                </motion.ul>
+                {nextPageToken && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className={cn(
+                        GHOST_PILL,
+                        'border border-border/70 transition-transform duration-150 active:scale-[0.98]',
+                      )}
+                    >
+                      {loadingMore ? 'Loading…' : 'Load more'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {noteOutlookReadPending && (
         <p className={cn(CAPTION, 'pt-2')}>
@@ -383,14 +427,48 @@ function FilterChips({
   );
 }
 
+/** Star icon with a one-shot scale pulse when the value transitions
+ *  false → true (the moment the realtor stars something). Unstarring
+ *  is intentionally quiet — the row already lost amber, that's feedback
+ *  enough. First paint never pulses; only an in-session toggle does. */
+function StarPulse({
+  starred,
+  size = 15,
+  className,
+}: {
+  starred: boolean;
+  size?: number;
+  className?: string;
+}) {
+  const prevRef = useRef(starred);
+  const pulse = !prevRef.current && starred;
+  useEffect(() => {
+    prevRef.current = starred;
+  }, [starred]);
+  return (
+    <motion.span
+      initial={false}
+      animate={pulse ? { scale: [0.9, 1] } : { scale: 1 }}
+      transition={{ duration: 0.18, ease: EASE_APPLE }}
+      className="inline-flex"
+    >
+      <Star size={size} strokeWidth={1.75} className={className} />
+    </motion.span>
+  );
+}
+
 function EmailRow({
   item,
   filter,
+  appendDelay,
   onOpen,
   onToggleStar,
 }: {
   item: EmailListItem;
   filter: EmailFilter;
+  /** When set, this row entered via "Load more" and stagger off its own
+   *  delay rather than the parent container's staggerChildren. */
+  appendDelay?: number;
   onOpen: () => void;
   onToggleStar: () => void;
 }) {
@@ -401,8 +479,35 @@ function EmailRow({
     : item.fromName || item.fromAddress || '(unknown sender)';
   const displayAddress = isSent ? item.toAddress : item.fromAddress;
 
+  // Item entrance: 8px slide-up + fade. EASE_APPLE for the calm settle.
+  // When this is a load-more row, override the parent container's stagger
+  // with our own incremental delay.
+  const itemVariants =
+    appendDelay !== undefined
+      ? {
+          initial: { opacity: 0, y: 8 },
+          enter: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.24, ease: EASE_APPLE, delay: appendDelay },
+          },
+        }
+      : {
+          initial: { opacity: 0, y: 8 },
+          enter: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.24, ease: EASE_APPLE },
+          },
+        };
+
   return (
-    <li className="group/row">
+    <motion.li
+      className="group/row"
+      variants={itemVariants}
+      initial={appendDelay !== undefined ? 'initial' : undefined}
+      animate={appendDelay !== undefined ? 'enter' : undefined}
+    >
       <div className="flex items-start gap-3 py-3">
         {/* Unread dot — left rail. Tiny but earned by being the only thing
             that pulls the eye to a new row. */}
@@ -419,7 +524,7 @@ function EmailRow({
         <button
           type="button"
           onClick={onOpen}
-          className="flex-1 min-w-0 text-left hover:bg-foreground/[0.02] transition-colors duration-150 -my-1 py-1"
+          className="flex-1 min-w-0 text-left hover:bg-foreground/[0.02] transition-all duration-150 -my-1 py-1 rounded-sm hover:-translate-y-px active:scale-[0.98] active:translate-y-0"
         >
           <div className="flex items-baseline gap-2">
             <span
@@ -470,15 +575,15 @@ function EmailRow({
               : 'opacity-100 md:opacity-0 md:group-hover/row:opacity-100',
           )}
         >
-          <Star
-            size={15}
-            strokeWidth={1.75}
+          <StarPulse
+            starred={item.starred}
             className={cn(
-              'transition-colors',
+              'transition-colors duration-200',
               item.starred
-                ? 'fill-foreground text-foreground'
+                ? 'fill-amber-500 text-amber-500'
                 : 'text-muted-foreground hover:text-foreground',
             )}
+            size={15}
           />
         </button>
 
@@ -486,7 +591,7 @@ function EmailRow({
           {formatRelative(item.sentAt)}
         </span>
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -611,7 +716,18 @@ function ComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xl">
+      {/* Compose entrance — Apple subtlety:
+       *  - Mobile: slide-up from bottom + fade (sheet-feel without a sheet).
+       *  - Desktop: scale 0.98 → 1 + fade, 200ms.
+       *  Overrides the shadcn defaults (zoom-in-95) to land at the spec. */}
+      <DialogContent
+        className={cn(
+          'sm:max-w-xl duration-200',
+          'data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-[0.98]',
+          'data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-4',
+          'sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0',
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="text-base font-medium text-foreground">
             New message
@@ -707,3 +823,6 @@ function ComposeDialog({
 
 /** Exposed so the read page can reuse the same compose modal. */
 export { ComposeDialog as EmailComposeDialog };
+
+/** Exposed so the read page can reuse the same star pulse. */
+export { StarPulse as EmailStarPulse };

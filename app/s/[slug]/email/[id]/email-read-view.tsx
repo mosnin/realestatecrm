@@ -15,10 +15,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, Reply, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, ExternalLink, Reply } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShimmerText } from '@/components/chippi/shimmer-text';
 import { cn } from '@/lib/utils';
+import { EASE_APPLE } from '@/lib/motion';
 import {
   H1,
   TITLE_FONT,
@@ -28,7 +30,10 @@ import {
   PRIMARY_PILL,
   GHOST_PILL,
 } from '@/lib/typography';
-import { EmailComposeDialog } from '@/components/communication/email-inbox-view';
+import {
+  EmailComposeDialog,
+  EmailStarPulse,
+} from '@/components/communication/email-inbox-view';
 
 interface EmailMessage {
   id: string;
@@ -205,11 +210,25 @@ export function EmailReadView({
         )}
 
         {!loading && !errorMessage && message && (
-          <article className="space-y-6">
+          /* Page-level fade-in for the whole read view; the serif subject
+           *  scales from 0.98 → 1 with the same fade to give the headline
+           *  an unmistakable but quiet arrival. 220ms, Apple ease. */
+          <motion.article
+            className="space-y-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.22, ease: EASE_APPLE }}
+          >
             <header className="space-y-3">
-              <h1 className={H1} style={TITLE_FONT}>
+              <motion.h1
+                className={H1}
+                style={TITLE_FONT}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.22, ease: EASE_APPLE }}
+              >
                 {message.subject || '(no subject)'}
-              </h1>
+              </motion.h1>
               <div className="space-y-1">
                 <p className={BODY}>
                   <span className="font-medium">
@@ -248,15 +267,21 @@ export function EmailReadView({
                 type="button"
                 onClick={handleStar}
                 disabled={starBusy}
-                className={cn(GHOST_PILL, 'border border-border/70')}
+                className={cn(
+                  GHOST_PILL,
+                  'border border-border/70 transition-transform duration-150 active:scale-[0.98]',
+                )}
                 aria-label={message.starred ? 'Unstar' : 'Star'}
               >
-                <Star
+                {/* Same pulse as the inbox row — false→true triggers a
+                 *  one-shot 180ms scale; first paint and unstar are quiet. */}
+                <EmailStarPulse
+                  starred={message.starred}
                   size={14}
-                  strokeWidth={1.75}
                   className={cn(
+                    'transition-colors duration-200',
                     message.starred
-                      ? 'fill-foreground text-foreground'
+                      ? 'fill-amber-500 text-amber-500'
                       : 'text-muted-foreground',
                   )}
                 />
@@ -280,7 +305,7 @@ export function EmailReadView({
                 {message.body || '(no body)'}
               </div>
             </div>
-          </article>
+          </motion.article>
         )}
 
         <EmailComposeDialog
