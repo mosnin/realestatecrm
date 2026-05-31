@@ -26,8 +26,14 @@ interface MobileNavProps {
   isBrokerOnly?: boolean;
 }
 
-// ─── Charcoal palette ─────────────────────────────────────────────────────────
-const BAR_FILL = '#1a1a1c';
+// ─── Geometry ─────────────────────────────────────────────────────────────────
+//
+// The bar uses semantic CSS-variable backgrounds (`bg-card`, `border-border`,
+// `text-foreground`) so it follows the active theme automatically. In light
+// mode it reads as a near-white pill with hairline border + dark icons;
+// in dark mode it reads as charcoal with light icons. One component, two
+// looks, no theme prop.
+
 const BAR_HEIGHT = 64;
 
 // ─── Side tab cell ────────────────────────────────────────────────────────────
@@ -54,8 +60,8 @@ function SideTab({
         className={cn(
           'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
           isActive
-            ? 'bg-white/[0.08] text-white'
-            : 'text-white/70 hover:text-white',
+            ? 'bg-foreground/[0.08] text-foreground'
+            : 'text-muted-foreground hover:text-foreground',
         )}
       >
         <Icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
@@ -65,9 +71,6 @@ function SideTab({
 }
 
 // ─── Center Chippi tab — flush inside the bar ─────────────────────────────────
-//
-// Sits flat in the bar like the other four icons. The chip avatar + subtle
-// ring carries the focal weight; the raised notch design is gone.
 
 function ChippiTab({ href, isActive }: { href: string; isActive: boolean }) {
   return (
@@ -81,8 +84,8 @@ function ChippiTab({ href, isActive }: { href: string; isActive: boolean }) {
         className={cn(
           'inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-150',
           isActive
-            ? 'ring-2 ring-white/40 bg-white/[0.05]'
-            : 'ring-1 ring-white/15 hover:ring-white/30',
+            ? 'ring-2 ring-foreground/40 bg-foreground/[0.05]'
+            : 'ring-1 ring-border hover:ring-foreground/30',
         )}
       >
         <img
@@ -95,26 +98,25 @@ function ChippiTab({ href, isActive }: { href: string; isActive: boolean }) {
   );
 }
 
-// ─── Bar shell — flat charcoal pill, no notch ─────────────────────────────────
+// ─── Bar shell — flat themed pill ─────────────────────────────────────────────
 
 function BarShell({ children }: { children: React.ReactNode }) {
   return (
     <nav
       data-dashboard-mobile-nav
-      className="md:hidden fixed left-3 right-3 z-50"
-      style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      className={cn(
+        'md:hidden fixed left-3 right-3 z-50',
+        'rounded-full flex items-stretch',
+        'bg-card border border-border',
+        'shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
+      )}
+      style={{
+        height: BAR_HEIGHT,
+        bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+      }}
       aria-label="Primary"
     >
-      <div
-        className="rounded-full ring-1 ring-white/[0.06] flex items-stretch"
-        style={{
-          height: BAR_HEIGHT,
-          backgroundColor: BAR_FILL,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-        }}
-      >
-        {children}
-      </div>
+      {children}
     </nav>
   );
 }
@@ -126,51 +128,50 @@ function BrokerMobileNav({ pathname, slug, isBrokerOnly }: { pathname: string; s
   return (
     <nav
       data-dashboard-mobile-nav
-      className="md:hidden fixed left-3 right-3 z-50"
-      style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      className={cn(
+        'md:hidden fixed left-3 right-3 z-50',
+        'rounded-full flex items-stretch',
+        'bg-card border border-border',
+        'shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
+      )}
+      style={{
+        height: BAR_HEIGHT,
+        bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+      }}
       aria-label="Brokerage"
     >
-      <div
-        className="rounded-full ring-1 ring-white/[0.06] flex items-stretch"
-        style={{
-          height: BAR_HEIGHT,
-          backgroundColor: BAR_FILL,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-        }}
-      >
-        {!isBrokerOnly && slug && (
+      {!isBrokerOnly && slug && (
+        <Link
+          href={base}
+          aria-label="Workspace"
+          className="flex-1 flex items-center justify-center min-h-[44px] text-muted-foreground hover:text-foreground"
+        >
+          <Briefcase size={22} strokeWidth={1.75} />
+        </Link>
+      )}
+      {brokerMobileItems.map((item) => {
+        const isActive = item.exact
+          ? pathname === item.href
+          : pathname.startsWith(item.href);
+        return (
           <Link
-            href={base}
-            aria-label="Workspace"
-            className="flex-1 flex items-center justify-center min-h-[44px] text-white/70 hover:text-white"
+            key={item.href}
+            href={item.href}
+            aria-label={item.label}
+            aria-current={isActive ? 'page' : undefined}
+            className="relative flex-1 flex items-center justify-center min-h-[44px] focus-visible:outline-none"
           >
-            <Briefcase size={22} strokeWidth={1.75} />
-          </Link>
-        )}
-        {brokerMobileItems.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              aria-current={isActive ? 'page' : undefined}
-              className="relative flex-1 flex items-center justify-center min-h-[44px] focus-visible:outline-none"
+            <span
+              className={cn(
+                'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
+                isActive ? 'bg-foreground/[0.08] text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
             >
-              <span
-                className={cn(
-                  'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
-                  isActive ? 'bg-white/[0.08] text-white' : 'text-white/70 hover:text-white',
-                )}
-              >
-                <item.icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+              <item.icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
+            </span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }
