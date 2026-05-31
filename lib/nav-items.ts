@@ -9,6 +9,7 @@ import {
   Building2,
   FolderOpen,
   Aperture,
+  Mail,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -72,6 +73,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/calendar',
     label: 'Calendar',
     icon: Calendar,
+  },
+  {
+    href: '/mail',
+    label: 'Mail',
+    icon: Mail,
   },
   {
     href: '/properties',
