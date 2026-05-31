@@ -113,7 +113,7 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
   const dropdown = open && mounted ? createPortal(
     <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)}>
       <div
-        className="absolute right-4 md:right-8 top-12 w-80 sm:w-96 rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
+        className="absolute right-4 md:right-8 top-12 w-80 sm:w-96 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -138,7 +138,7 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
                   <button
                     key={n.id}
                     onClick={() => navigate(n.href)}
-                    className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-accent/50 transition-colors"
+                    className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-foreground/[0.04] transition-colors"
                   >
                     <div className={cn(
                       'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',

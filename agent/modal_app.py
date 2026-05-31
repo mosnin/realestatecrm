@@ -546,10 +546,8 @@ async def chat_turn(item: dict):
         # Tracing exports only reach OpenAI's backend; disable on a pure-
         # OpenRouter deploy, which may carry no OpenAI key at all.
         tracing_disabled=bool(settings.openrouter_api_key),
-        model_settings=ModelSettings(
-            truncation="auto",
-            reasoning=Reasoning(effort="medium"),
-        ),
+        # low default; planner/research skills can escalate later via Phase 2.
+        model_settings=ModelSettings(reasoning=Reasoning(effort="low")),
     )
 
     # Load this realtor's connected-toolkit tools (Gmail, Slack, HubSpot,

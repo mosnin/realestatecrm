@@ -113,7 +113,7 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm pt-[8vh] px-4" onClick={onClose}>
-      <div className="w-full max-w-[720px] rounded-xl border border-border bg-card shadow-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-[720px] rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
           <Share2 size={16} className="text-muted-foreground" />
           <h2 className="text-sm font-semibold">Share this property</h2>

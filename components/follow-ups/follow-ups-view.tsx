@@ -329,12 +329,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                         <Timer size={14} />
                       </button>
                       {snoozeOpen === contact.id && (
-                        <div className="absolute right-0 top-8 z-20 bg-popover border border-border rounded-lg shadow-lg py-1 w-36">
+                        <div className="absolute right-0 top-8 z-20 bg-popover border border-border/70 rounded-md shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] py-1 w-36">
                           {SNOOZE_OPTIONS.map(opt => (
                             <button
                               key={opt.hours}
                               onClick={() => handleSnooze(contact.id, opt.hours)}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-foreground/[0.04] hover:text-foreground transition-colors"
                             >
                               {opt.label}
                             </button>
@@ -406,12 +406,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                         <Timer size={14} />
                       </button>
                       {snoozeOpen === `deal-${deal.id}` && (
-                        <div className="absolute right-0 top-8 z-20 bg-popover border border-border rounded-lg shadow-lg py-1 w-36">
+                        <div className="absolute right-0 top-8 z-20 bg-popover border border-border/70 rounded-md shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] py-1 w-36">
                           {SNOOZE_OPTIONS.map(opt => (
                             <button
                               key={opt.hours}
                               onClick={() => handleSnooze(deal.id, opt.hours, true)}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-foreground/[0.04] hover:text-foreground transition-colors"
                             >
                               {opt.label}
                             </button>

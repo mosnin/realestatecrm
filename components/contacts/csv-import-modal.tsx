@@ -187,7 +187,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl mx-4 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-xl mx-4 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
