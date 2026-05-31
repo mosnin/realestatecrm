@@ -209,17 +209,17 @@ export function WhatsAppThreadView({
     <div className="h-full overflow-y-auto">
       <div className="w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-6 max-w-3xl">
         <Link
-          href={`/s/${slug}/whatsapp`}
+          href={`/s/${slug}/communication?tab=messages`}
           className={cn(
             'inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors',
           )}
         >
           <ArrowLeft size={14} strokeWidth={1.75} />
-          WhatsApp
+          Messages
         </Link>
 
         <header className="space-y-1.5">
-          <p className={BODY_MUTED}>WhatsApp.</p>
+          <p className={BODY_MUTED}>Messages.</p>
           <h1 className={H1} style={TITLE_FONT}>
             {contact?.contactName || 'Conversation'}
           </h1>

@@ -1,45 +1,21 @@
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { getSpaceFromSlug } from '@/lib/space';
-import { findWhatsAppConnection } from '@/lib/communication/connect';
-import { WhatsAppConversationListView } from './whatsapp-list-view';
-import { PAGE_RHYTHM } from '@/lib/typography';
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  return { title: `WhatsApp — ${slug}` };
-}
+import { redirect } from 'next/navigation';
 
 /**
- * /s/[slug]/whatsapp — WhatsApp Business conversations.
+ * /s/[slug]/whatsapp — legacy direct URL.
  *
- * One list, contacts. Tap a row → full conversation page. No tabs, no
- * filters in v1; what the realtor wants is to find a thread and reply.
+ * The unified Communication surface now owns the messages list view at
+ * /s/[slug]/communication?tab=messages. This route keeps deep-link
+ * compatibility (old bookmarks, /whatsapp/[id] back-links) by redirecting
+ * to the Messages tab of Communication.
  *
- * Server pass renders connection presence so the page paints the right
- * shape with no flash. Conversation fetch happens client-side.
+ * /s/[slug]/whatsapp/[id] (full-page thread) stays — it's the deep link
+ * from the conversation rows and isn't part of the toggle.
  */
-export default async function WhatsAppPage({
+export default async function WhatsAppRedirect({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const space = await getSpaceFromSlug(slug);
-  if (!space) notFound();
-
-  const conn = await findWhatsAppConnection(space.id);
-
-  return (
-    <div className={PAGE_RHYTHM}>
-      <WhatsAppConversationListView
-        slug={slug}
-        initialConnected={Boolean(conn)}
-      />
-    </div>
-  );
+  redirect(`/s/${slug}/communication?tab=messages`);
 }

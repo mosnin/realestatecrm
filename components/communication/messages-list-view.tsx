@@ -1,10 +1,16 @@
 'use client';
 
 /**
- * /s/[slug]/whatsapp — conversation list.
+ * Messages list view — the Messages tab of the Communication surface.
  *
- * Rows: contact name (bold) · phone (muted) · last message snippet ·
- * relative time. Tap → full thread page. No filters, no tabs in v1.
+ * Underlying channel is WhatsApp Business via Composio; "Messages" is the
+ * realtor-facing label. Rows: contact name (bold) · phone (muted) · last
+ * message snippet · relative time. Tap → full thread page at
+ * /whatsapp/[id]. No filters, no tabs in v1.
+ *
+ * Page chrome (scroll container, greeting, title, subtitle) is owned by
+ * the parent CommunicationView. This component renders only the list /
+ * empty / loading states for the messages tab.
  *
  * Slug uncertainty: Composio's WhatsApp toolkit slugs aren't fully
  * verified. The API tries each candidate and surfaces a calm
@@ -19,8 +25,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ShimmerText } from '@/components/chippi/shimmer-text';
 import { cn } from '@/lib/utils';
 import {
-  H1,
-  TITLE_FONT,
   BODY,
   BODY_MUTED,
   CAPTION,
@@ -28,7 +32,7 @@ import {
   PRIMARY_PILL,
 } from '@/lib/typography';
 
-interface WhatsAppConversation {
+interface MessagesConversation {
   id: string;
   contactName: string;
   contactPhone: string;
@@ -38,7 +42,7 @@ interface WhatsAppConversation {
 
 interface ConnectedPayload {
   connected: true;
-  conversations: WhatsAppConversation[];
+  conversations: MessagesConversation[];
   noteSlugUnresolved?: boolean;
 }
 
@@ -59,7 +63,7 @@ function formatRelative(iso: string): string {
   return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function WhatsAppConversationListView({
+export function MessagesListView({
   slug,
   initialConnected,
 }: {
@@ -67,7 +71,7 @@ export function WhatsAppConversationListView({
   initialConnected: boolean;
 }) {
   const [connected, setConnected] = useState(initialConnected);
-  const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
+  const [conversations, setConversations] = useState<MessagesConversation[]>([]);
   const [loading, setLoading] = useState(initialConnected);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [slugUnresolved, setSlugUnresolved] = useState(false);
@@ -96,7 +100,7 @@ export function WhatsAppConversationListView({
       })
       .catch((err: Error) => {
         if (cancelled) return;
-        setErrorMessage(err.message || 'Couldn’t load WhatsApp messages.');
+        setErrorMessage(err.message || 'Couldn’t load your messages.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -106,53 +110,39 @@ export function WhatsAppConversationListView({
     };
   }, [connected, slug]);
 
+  if (!connected) return <DisconnectedState slug={slug} />;
+
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-8 max-w-3xl">
-        <header className="space-y-1.5">
-          <p className={BODY_MUTED}>WhatsApp.</p>
-          <h1 className={H1} style={TITLE_FONT}>
-            Your conversations, in here.
-          </h1>
-          <p className={BODY_MUTED}>
-            {connected
-              ? 'Reading from WhatsApp Business.'
-              : 'Connect WhatsApp Business so your chats live here, not in tabs.'}
-          </p>
-        </header>
+    <div className="space-y-5">
+      {loading && (
+        <ShimmerText
+          messages={['Pulling your WhatsApp.', 'Bringing in your conversations.']}
+          className="block text-sm"
+        />
+      )}
 
-        {!connected && <DisconnectedState slug={slug} />}
+      {!loading && errorMessage && (
+        <Card>
+          <CardContent className="p-5 space-y-2">
+            <p className={BODY}>Couldn’t load your messages.</p>
+            <p className={BODY_MUTED}>{errorMessage}</p>
+          </CardContent>
+        </Card>
+      )}
 
-        {connected && loading && (
-          <ShimmerText
-            messages={['Catching up on WhatsApp.', 'Bringing in your conversations.']}
-            className="block text-sm"
-          />
-        )}
-
-        {connected && !loading && errorMessage && (
-          <Card>
-            <CardContent className="p-5 space-y-2">
-              <p className={BODY}>Couldn’t load WhatsApp messages.</p>
-              <p className={BODY_MUTED}>{errorMessage}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {connected && !loading && !errorMessage && (
-          <>
-            {conversations.length === 0 ? (
-              <EmptyState slugUnresolved={slugUnresolved} />
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {conversations.map((c) => (
-                  <ConversationRow key={c.id} slug={slug} item={c} />
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
+      {!loading && !errorMessage && (
+        <>
+          {conversations.length === 0 ? (
+            <EmptyState slugUnresolved={slugUnresolved} />
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {conversations.map((c) => (
+                <ConversationRow key={c.id} slug={slug} item={c} />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -162,7 +152,7 @@ function ConversationRow({
   item,
 }: {
   slug: string;
-  item: WhatsAppConversation;
+  item: MessagesConversation;
 }) {
   return (
     <li>
@@ -207,7 +197,7 @@ function EmptyState({ slugUnresolved }: { slugUnresolved: boolean }) {
           />
         </div>
         <p className="text-sm font-medium text-foreground">
-          Couldn’t load WhatsApp messages.
+          Couldn’t load your messages.
         </p>
         <p className="mt-1 text-[13px] text-muted-foreground max-w-[320px] leading-relaxed">
           The WhatsApp tool isn’t responding. Check the connection in
@@ -225,9 +215,7 @@ function EmptyState({ slugUnresolved }: { slugUnresolved: boolean }) {
           className="text-muted-foreground"
         />
       </div>
-      <p className="text-sm font-medium text-foreground">
-        WhatsApp is quiet.
-      </p>
+      <p className="text-sm font-medium text-foreground">Messages are quiet.</p>
       <p className="mt-1 text-[13px] text-muted-foreground max-w-[280px] leading-relaxed">
         New conversations will land here.
       </p>
@@ -249,8 +237,7 @@ function DisconnectedState({ slug }: { slug: string }) {
           </div>
           <div className="space-y-1.5">
             <p className={BODY}>
-              Bring your WhatsApp Business chats here so they live with the
-              rest of your day.
+              Connect WhatsApp to send and receive messages here.
             </p>
             <p className={BODY_MUTED}>
               WhatsApp Business is the fast path.

@@ -4,7 +4,6 @@ import {
   Briefcase,
   MessageCircle,
   MessageSquare,
-  Mail,
   Settings,
   Calendar,
   ClipboardList,
@@ -76,13 +75,8 @@ export const realtorNavItems: NavItem[] = [
     icon: Calendar,
   },
   {
-    href: '/email',
-    label: 'Email',
-    icon: Mail,
-  },
-  {
-    href: '/whatsapp',
-    label: 'WhatsApp',
+    href: '/communication',
+    label: 'Communication',
     icon: MessageSquare,
   },
   {

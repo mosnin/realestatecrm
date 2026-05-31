@@ -1,16 +1,18 @@
 'use client';
 
 /**
- * /s/[slug]/email — the realtor's Gmail inbox, here.
+ * Email inbox view — the Email tab of the Communication surface.
  *
- * Channel-pure (no WhatsApp). Rows are tappable into a full-page read at
+ * Channel-pure (no WhatsApp). Rows tap into a full-page read at
  * /email/[id]. Filter sits at the top: Inbox · Starred · Sent. Star
  * toggles right from the row (always visible on mobile, hover-revealed
  * on desktop) and writes through to Gmail's STARRED label. Load more
  * pages in 30 at a time via Gmail's pageToken.
  *
- * No channel chip in the row — this surface IS email. Showing "EMAIL"
- * on every row would be the surface confessing it doesn't know what it is.
+ * Page chrome (scroll container, greeting, title, subtitle) is owned by
+ * the parent CommunicationView. This component renders one toolbar row
+ * (filter chips · New message) followed by the list / empty / loading
+ * states for the email tab only.
  *
  * Compose stays a modal: writing is a focal task that earns a dialog.
  */
@@ -38,8 +40,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShimmerText } from '@/components/chippi/shimmer-text';
 import { cn } from '@/lib/utils';
 import {
-  H1,
-  TITLE_FONT,
   BODY,
   BODY_MUTED,
   SECTION_LABEL,
@@ -130,11 +130,10 @@ function writeStoredFilter(slug: string, filter: EmailFilter): void {
 export function EmailInboxView({
   slug,
   initialConnected,
-  initialProvider,
+  initialProvider: _initialProvider,
 }: EmailInboxViewProps) {
   const router = useRouter();
   const [connected, setConnected] = useState(initialConnected);
-  const [provider, setProvider] = useState<string | null>(initialProvider);
   const [filter, setFilter] = useState<EmailFilter>('inbox');
   const [items, setItems] = useState<EmailListItem[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
@@ -184,7 +183,6 @@ export function EmailInboxView({
           return;
         }
         setConnected(true);
-        setProvider(data.provider);
         setNoteOutlookReadPending(Boolean(data.noteOutlookReadPending));
         setItems((prev) => (args.append ? [...prev, ...data.items] : data.items));
         setNextPageToken(data.nextPageToken);
@@ -271,117 +269,86 @@ export function EmailInboxView({
     [router, slug],
   );
 
-  const visible = items;
+  if (!connected) return <DisconnectedState slug={slug} />;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-8 max-w-3xl">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1.5 min-w-0">
-            <p className={BODY_MUTED}>Email.</p>
-            <h1 className={H1} style={TITLE_FONT}>
-              Your inbox, in here.
-            </h1>
-            <p className={BODY_MUTED}>
-              {connected
-                ? statusLine(provider)
-                : 'Connect Gmail so your email lives here, not in tabs.'}
-            </p>
-          </div>
-          {connected && (
-            <button
-              type="button"
-              onClick={() => setComposeOpen(true)}
-              className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0')}
-              aria-label="New message"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">New message</span>
-              <span className="sm:hidden">New</span>
-            </button>
-          )}
-        </header>
-
-        {!connected && <DisconnectedState slug={slug} />}
-
-        {connected && (
-          <div className="space-y-5">
-            <FilterChips value={filter} onChange={handleFilterChange} />
-
-            {loading && (
-              <ShimmerText
-                messages={[
-                  'Reading your inbox.',
-                  'Bringing in the latest.',
-                ]}
-                className="block text-sm"
-              />
-            )}
-
-            {!loading && errorMessage && (
-              <Card>
-                <CardContent className="p-5 space-y-2">
-                  <p className={BODY}>I couldn’t reach your inbox just now.</p>
-                  <p className={BODY_MUTED}>{errorMessage}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {!loading && !errorMessage && visible.length === 0 && (
-              <EmptyFeed filter={filter} />
-            )}
-
-            {!loading && !errorMessage && visible.length > 0 && (
-              <>
-                <ul className="divide-y divide-border/60">
-                  {visible.map((it) => (
-                    <EmailRow
-                      key={it.id}
-                      item={it}
-                      filter={filter}
-                      onOpen={() => handleRowOpen(it.id)}
-                      onToggleStar={() => handleStarToggle(it.id, !it.starred)}
-                    />
-                  ))}
-                </ul>
-                {nextPageToken && (
-                  <div className="flex justify-center pt-2">
-                    <button
-                      type="button"
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className={cn(GHOST_PILL, 'border border-border/70')}
-                    >
-                      {loadingMore ? 'Loading…' : 'Load more'}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {noteOutlookReadPending && (
-              <p className={cn(CAPTION, 'pt-2')}>
-                Outlook reading is on the way. Connect Gmail to see your inbox.
-              </p>
-            )}
-          </div>
-        )}
-
-        <ComposeDialog
-          open={composeOpen}
-          onClose={() => setComposeOpen(false)}
-          slug={slug}
-          onSent={handleSent}
-        />
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-4">
+        <FilterChips value={filter} onChange={handleFilterChange} />
+        <button
+          type="button"
+          onClick={() => setComposeOpen(true)}
+          className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0')}
+          aria-label="New message"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">New message</span>
+          <span className="sm:hidden">New</span>
+        </button>
       </div>
+
+      {loading && (
+        <ShimmerText
+          messages={['Reading your inbox.', 'Catching up.']}
+          className="block text-sm"
+        />
+      )}
+
+      {!loading && errorMessage && (
+        <Card>
+          <CardContent className="p-5 space-y-2">
+            <p className={BODY}>I couldn’t reach your inbox just now.</p>
+            <p className={BODY_MUTED}>{errorMessage}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && !errorMessage && items.length === 0 && (
+        <EmptyFeed filter={filter} />
+      )}
+
+      {!loading && !errorMessage && items.length > 0 && (
+        <>
+          <ul className="divide-y divide-border/60">
+            {items.map((it) => (
+              <EmailRow
+                key={it.id}
+                item={it}
+                filter={filter}
+                onOpen={() => handleRowOpen(it.id)}
+                onToggleStar={() => handleStarToggle(it.id, !it.starred)}
+              />
+            ))}
+          </ul>
+          {nextPageToken && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className={cn(GHOST_PILL, 'border border-border/70')}
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {noteOutlookReadPending && (
+        <p className={cn(CAPTION, 'pt-2')}>
+          Outlook reading is on the way. Connect Gmail to see your inbox.
+        </p>
+      )}
+
+      <ComposeDialog
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        slug={slug}
+        onSent={handleSent}
+      />
     </div>
   );
-}
-
-function statusLine(provider: string | null): string {
-  if (provider === 'gmail') return 'Reading from Gmail.';
-  if (provider === 'outlook') return 'Reading from Outlook.';
-  return '';
 }
 
 function FilterChips({
