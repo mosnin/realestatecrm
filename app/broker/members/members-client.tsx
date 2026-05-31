@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, AlertCircle, Search, X, UserMinus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/formatting';
+import { BODY_MUTED } from '@/lib/typography';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
 import { OffboardMemberDialog } from '@/components/broker/offboard-member-dialog';
@@ -22,18 +23,11 @@ interface Member {
 const roleLabel = (role: string) =>
   role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
 
-const roleBadgeClass = (role: string) => {
-  switch (role) {
-    case 'broker_owner':
-      return 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15';
-    case 'broker_admin':
-      return 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15';
-    default:
-      return 'text-muted-foreground bg-muted';
-  }
-};
-
-type RoleTab = 'all' | 'admins' | 'members';
+// Role pill — small caps, muted background. Matches the contacts page's
+// stage pill vocabulary so the team feels like one product. Role is a
+// label, not a status — no tone tints.
+const rolePillClass =
+  'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 bg-muted text-muted-foreground';
 
 export function MembersClient({
   members,
@@ -45,172 +39,150 @@ export function MembersClient({
   currentUserRole: string;
 }) {
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<RoleTab>('all');
   const [offboardTargetId, setOffboardTargetId] = useState<string | null>(null);
 
-  const adminCount = members.filter((m) => m.role === 'broker_admin' || m.role === 'broker_owner').length;
-  const memberCount = members.filter((m) => m.role === 'realtor_member').length;
+  const activeCount = members.filter((m) => m.userOnboard).length;
+  const pendingCount = members.length - activeCount;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return members.filter((m) => {
-      if (tab === 'admins' && m.role !== 'broker_admin' && m.role !== 'broker_owner') return false;
-      if (tab === 'members' && m.role !== 'realtor_member') return false;
-      if (q) {
-        return (
-          (m.userName ?? '').toLowerCase().includes(q) ||
-          (m.userEmail ?? '').toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [members, search, tab]);
+    if (!q) return members;
+    return members.filter(
+      (m) =>
+        (m.userName ?? '').toLowerCase().includes(q) ||
+        (m.userEmail ?? '').toLowerCase().includes(q),
+    );
+  }, [members, search]);
 
-  const tabs: { key: RoleTab; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: members.length },
-    { key: 'admins', label: 'Admins', count: adminCount },
-    { key: 'members', label: 'Members', count: memberCount },
-  ];
+  // One-sentence status read of the team. Loud fact wins. Brokerage name
+  // anchors the empty case so the page still reads as "your team."
+  const subtitle = (() => {
+    if (members.length === 0) return `Nobody on the team at ${brokerageName} yet.`;
+    if (pendingCount > 0) {
+      return `${activeCount} active · ${pendingCount} pending invite${pendingCount === 1 ? '' : 's'}.`;
+    }
+    return `${activeCount} ${activeCount === 1 ? 'person' : 'people'} on the team.`;
+  })();
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Members</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {members.length} {members.length === 1 ? 'member' : 'members'} in {brokerageName}
-            <span className="mx-1.5">&middot;</span>
-            <span className="text-amber-600 dark:text-amber-400">{adminCount} {adminCount === 1 ? 'admin' : 'admins'}</span>
-            <span className="mx-1.5">&middot;</span>
-            <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border pb-0 mb-4">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`relative px-3 py-2 text-sm font-medium transition-colors rounded-t-md ${
-              tab === t.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t.label}
-            <span className={`ml-1.5 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums ${
-              tab === t.key ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-            }`}>
-              {t.count}
-            </span>
-            {tab === t.key && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />}
-          </button>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search members..."
-          className="h-8 w-56 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-            <X size={12} />
-          </button>
-        )}
-      </div>
+    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Members.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Who&apos;s on the team
+        </h1>
+        <p className={BODY_MUTED}>{subtitle}</p>
+      </header>
 
       {members.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-8 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">No members yet.</p>
-            <div className="flex items-center justify-center gap-3">
-              <a href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2">
-                Send an email invite &rarr;
-              </a>
-              <span className="text-xs text-muted-foreground">or</span>
-              <a href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2">
-                Share an invite code &rarr;
-              </a>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+          <p className="text-sm text-foreground">Nobody here yet.</p>
+          <p className={cn('text-xs mt-1', BODY_MUTED)}>
+            <a
+              href="/broker/invitations"
+              className="text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Send the first invite
+            </a>{' '}
+            to get someone on the team.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((m) => {
-            const initials = ((m.userName ?? m.userEmail ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2));
-            const joinedAt = new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const canManage =
-              m.role !== 'broker_owner' &&
-              (currentUserRole === 'broker_owner' ||
-                (currentUserRole === 'broker_admin' && m.role === 'realtor_member'));
-            return (
-              <div key={m.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                      {initials}
+        <>
+          {/* Search — the only chrome. Role tabs were stacked state-cuts
+              competing with the role pill on each row. One filter wins. */}
+          <div className="relative w-full sm:w-64">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search members…"
+              className="h-9 w-full rounded-md border border-border/70 bg-background pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10">
+              Nobody matches.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {filtered.map((m) => {
+                const canManage =
+                  m.role !== 'broker_owner' &&
+                  (currentUserRole === 'broker_owner' ||
+                    (currentUserRole === 'broker_admin' && m.role === 'realtor_member'));
+                const display = m.userName ?? m.userEmail ?? 'Unnamed';
+                return (
+                  <li
+                    key={m.id}
+                    className="group/row flex items-center gap-3 py-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                      {getInitials(display)}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{m.userName ?? 'No name'}</p>
-                      <p className="text-xs text-muted-foreground truncate">{m.userEmail}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 text-right">
-                    <div className="hidden sm:block text-right">
-                      <p className="text-xs text-muted-foreground">Joined {joinedAt}</p>
-                      {m.spaceSlug && (
-                        <p className="text-xs text-primary font-medium">/{m.spaceSlug}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {display}
+                        </span>
+                        <span className={rolePillClass}>{roleLabel(m.role)}</span>
+                        {!m.userOnboard && (
+                          <span className="inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                      {m.userName && m.userEmail && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {m.userEmail}
+                        </p>
                       )}
                     </div>
-                    <span className={`hidden sm:inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${roleBadgeClass(m.role)}`}>
-                      {roleLabel(m.role)}
-                    </span>
-                    {m.userOnboard ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                        <CheckCircle2 size={11} /> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                        <AlertCircle size={11} /> Pending
-                      </span>
-                    )}
-                    {canManage && (
-                      <>
+                    {canManage ? (
+                      <div className="flex items-center gap-0.5 flex-shrink-0 lg:opacity-0 lg:group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
                         <ChangeRoleButton
                           membershipId={m.id}
                           currentRole={m.role}
-                          memberName={m.userName ?? m.userEmail ?? 'this member'}
+                          memberName={display}
                         />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
+                        <button
+                          type="button"
                           onClick={() => setOffboardTargetId(m.id)}
-                          title={`Offboard ${m.userName ?? m.userEmail ?? 'this member'}`}
+                          aria-label={`Offboard ${display}`}
+                          className="h-7 px-2 inline-flex items-center rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         >
-                          <UserMinus size={13} />
-                        </Button>
+                          Offboard
+                        </button>
                         <RemoveMemberButton
                           membershipId={m.id}
-                          memberName={m.userName ?? m.userEmail ?? 'this member'}
+                          memberName={display}
                         />
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">No members match your search.</p>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </div>
+        </>
       )}
 
       {(() => {
