@@ -1,9 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { ContactTable } from '@/components/contacts/contact-table';
-import { PeopleTabs } from '@/components/people/people-tabs';
 
 export default async function ContactsPage({
   params,
@@ -21,21 +19,10 @@ export default async function ContactsPage({
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) notFound();
 
-  // The "New" tab badge — count contacts still flagged 'new-lead'. Visiting
-  // /leads clears the flag, so this drops to 0 after the first visit there.
-  const { count: newCount } = await supabase
-    .from('Contact')
-    .select('*', { count: 'exact', head: true })
-    .eq('spaceId', space.id)
-    .is('brokerageId', null)
-    .contains('tags', ['new-lead']);
-
-  // Header lives inside ContactTable so the "Add a person" button shares state
-  // with the modal. One client component, one source of truth for the surface.
-  return (
-    <div className="space-y-6">
-      <PeopleTabs slug={slug} newCount={newCount ?? 0} />
-      <ContactTable slug={slug} />
-    </div>
-  );
+  // ContactTable owns its own header, filters, and rows — one client
+  // component, one source of truth for the surface. The New/All tab strip
+  // that used to sit above is gone: the stage filter already cuts state,
+  // and stacking two state-cuts on top of each other was the chief source
+  // of the "messy top" the realtor flagged.
+  return <ContactTable slug={slug} />;
 }

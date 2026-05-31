@@ -11,8 +11,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ContactForm } from './contact-form';
-import { LeadScoreBar } from '@/components/agent/lead-score-bar';
-import { ContactAgentContext } from '@/components/agent/contact-agent-context';
 import {
   Search,
   Trash2,
@@ -23,7 +21,6 @@ import {
   MapPin,
   LayoutGrid,
   List,
-  ArrowRight,
   Download,
   Upload,
   Bookmark,
@@ -32,25 +29,20 @@ import {
   GitCompare,
   CalendarDays,
   MoreHorizontal,
-  Users,
   Inbox,
-  Copy,
-  Check,
-  ExternalLink,
   Mic,
   Tag as TagIcon,
   AlertTriangle,
+  ChevronRight,
 } from 'lucide-react';
-import { BODY_MUTED, TITLE_FONT, QUIET_LINK, CHIPPI_PILL } from '@/lib/typography';
+import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
-import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -98,44 +90,6 @@ interface ContactTableProps {
   slug: string;
 }
 
-function CopyButton({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore clipboard rejection */
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={copied ? 'Copied' : 'Copy intake link'}
-      className={cn(
-        'inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150 active:scale-[0.98]',
-        copied
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-          : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-      )}
-    >
-      {copied ? <Check size={12} strokeWidth={2.25} /> : <Copy size={12} strokeWidth={1.75} />}
-    </button>
-  );
-}
-
 export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
@@ -143,23 +97,27 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
   // Popover-based tag filter. Replaces the previous always-on chip strip,
-  // which became unreadable noise once a workspace accumulated >10 tags
-  // (test data, ad-hoc agent tags, historic scoring experiments).
-  // STYLESHEET principle: one focal element per screen — the tag list
-  // was competing with the lead-type chips for the realtor's attention.
+  // which became unreadable noise once a workspace accumulated >10 tags.
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [tagPopoverSearch, setTagPopoverSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'>('agent-priority');
+  const [sortBy, setSortBy] = useState<
+    'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'
+  >('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   // Set on fetchContacts failure. Used to render an inline banner above the
   // list instead of silently falling through to the "fresh workspace" empty
-  // state — which would tell a realtor with 200 contacts they have none. The
-  // surface owns its failure mode in the agent's voice.
+  // state — which would tell a realtor with 200 contacts they have none.
   const [error, setError] = useState(false);
   const [view, setView] = useState<'card' | 'list'>('list');
+  // Multi-select moves behind a deliberate Select mode. Default is "scan and
+  // tap a row" — the row is a link, no checkbox in sight. Hit Select and the
+  // checkboxes appear and the row toggles instead of navigating. The
+  // realtor's screenshot showed a permanent checkbox column crowding every
+  // row; we owe them that space back.
+  const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -173,7 +131,9 @@ export function ContactTable({ slug }: ContactTableProps) {
     try {
       const stored = localStorage.getItem(`saved-views-contacts-${slug}`);
       if (stored) setSavedViews(JSON.parse(stored));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [slug]);
 
   function persistSavedViews(views: SavedView[]) {
@@ -225,19 +185,26 @@ export function ContactTable({ slug }: ContactTableProps) {
     fetchContacts();
   }, [fetchContacts]);
 
-  // Clear selection when contacts change
+  // Leaving Select mode clears the active selection — no orphaned state.
   useEffect(() => {
-    setSelectedIds(new Set());
-  }, [contacts]);
+    if (!selectMode) setSelectedIds(new Set());
+  }, [selectMode]);
 
-  // Escape to clear selection
+  // Esc clears the selection AND exits Select mode — single calming gesture
+  // for "I'm done with this," same shortcut the drafts inbox uses.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSelectedIds(new Set());
+      if (e.key === 'Escape') {
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+        } else if (selectMode) {
+          setSelectMode(false);
+        }
+      }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [selectMode, selectedIds.size]);
 
   async function handleAdd(data: any) {
     const res = await fetch('/api/contacts', {
@@ -271,7 +238,9 @@ export function ContactTable({ slug }: ContactTableProps) {
     const contact = contacts.find((c) => c.id === id);
     const confirmed = await confirm({
       title: 'Delete this client?',
-      description: contact ? `"${contact.name}" will be gone. I can't bring them back.` : "This client will be gone. I can't bring them back.",
+      description: contact
+        ? `"${contact.name}" will be gone. I can't bring them back.`
+        : "This client will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
@@ -312,8 +281,12 @@ export function ContactTable({ slug }: ContactTableProps) {
     });
     if (!confirmed) return;
     try {
-      const results = await Promise.allSettled(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
-      const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      const results = await Promise.allSettled(
+        ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })),
+      );
+      const failures = results.filter(
+        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok),
+      );
       if (failures.length === 0) {
         toast.success(`Deleted ${ids.length} contacts.`);
       } else if (failures.length === ids.length) {
@@ -332,12 +305,6 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   async function handleBulkChangeType(newType: Client['type']) {
     const ids = [...selectedIds];
-    // Snapshot prior types so the success toast can offer undo. The undo
-    // pattern beats a confirm dialog here: bulk stage change isn't
-    // destructive, and the realtor's correct expectation is "I see what
-    // changed and can walk it back," not "wait, are you sure?" before
-    // every batch. Norman's Designing for Error: make actions reversible
-    // rather than blocking them.
     const prevTypes = new Map<string, Client['type']>();
     for (const id of ids) {
       const contact = contacts.find((c) => c.id === id);
@@ -353,7 +320,9 @@ export function ContactTable({ slug }: ContactTableProps) {
           }),
         ),
       );
-      const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      const failures = results.filter(
+        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok),
+      );
       const successes = ids.length - failures.length;
       const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
       if (successes > 0) {
@@ -375,9 +344,6 @@ export function ContactTable({ slug }: ContactTableProps) {
     }
   }
 
-  // Reverse the previous bulk stage change. Per-id PATCH back to the
-  // snapshotted prior type. Best-effort: if the realtor undoes after one
-  // contact was deleted, Promise.allSettled keeps the others moving.
   async function undoBulkStageChange(prevTypes: Map<string, Client['type']>) {
     try {
       await Promise.allSettled(
@@ -407,32 +373,30 @@ export function ContactTable({ slug }: ContactTableProps) {
   }
 
   function exportContactsCSV(items: Client[]) {
-    downloadCSV('contacts.csv', items.map((c) => ({
-      Name: c.name,
-      Stage: c.type,
-      Phone: c.phone ?? '',
-      Email: c.email ?? '',
-      'Budget ($/mo)': c.budget ?? '',
-      Address: c.address ?? '',
-      Preferences: c.preferences ?? '',
-      Notes: c.notes ?? '',
-      Tags: c.tags.join('; '),
-      'Follow-up': c.followUpAt ? new Date(c.followUpAt).toLocaleDateString('en-US') : '',
-      'Added': new Date(c.createdAt).toLocaleDateString('en-US'),
-    })));
+    downloadCSV(
+      'contacts.csv',
+      items.map((c) => ({
+        Name: c.name,
+        Stage: c.type,
+        Phone: c.phone ?? '',
+        Email: c.email ?? '',
+        'Budget ($/mo)': c.budget ?? '',
+        Address: c.address ?? '',
+        Preferences: c.preferences ?? '',
+        Notes: c.notes ?? '',
+        Tags: c.tags.join('; '),
+        'Follow-up': c.followUpAt
+          ? new Date(c.followUpAt).toLocaleDateString('en-US')
+          : '',
+        Added: new Date(c.createdAt).toLocaleDateString('en-US'),
+      })),
+    );
   }
-
-  // Stage totals for pipeline bar
-  const stageCounts = {
-    QUALIFICATION: contacts.filter((c) => c.type === 'QUALIFICATION').length,
-    TOUR: contacts.filter((c) => c.type === 'TOUR').length,
-    APPLICATION: contacts.filter((c) => c.type === 'APPLICATION').length,
-  };
 
   // Unique user-defined tags (exclude system tags)
   const SYSTEM_TAGS = new Set(['application-link', 'new-lead']);
   const allTags = Array.from(
-    new Set(contacts.flatMap((c) => c.tags.filter((t) => !SYSTEM_TAGS.has(t))))
+    new Set(contacts.flatMap((c) => c.tags.filter((t) => !SYSTEM_TAGS.has(t)))),
   ).sort();
 
   // Apply tag + leadType filters and sorting client-side
@@ -447,9 +411,13 @@ export function ContactTable({ slug }: ContactTableProps) {
     if (sortBy === 'agent-priority') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
     } else if (sortBy === 'oldest') {
-      list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      list = [...list].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
     } else if (sortBy === 'newest') {
-      list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      list = [...list].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
     } else if (sortBy === 'name-az') {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'name-za') {
@@ -460,7 +428,11 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
-  const leadTypeChips: { key: 'all' | 'new' | 'rental' | 'buyer'; label: string; count: number }[] = [
+  const leadTypeChips: {
+    key: 'all' | 'new' | 'rental' | 'buyer';
+    label: string;
+    count: number;
+  }[] = [
     { key: 'all', label: 'All', count: contacts.length },
     { key: 'new', label: 'New', count: contacts.filter((c) => c.tags.includes('new-lead')).length },
     { key: 'rental', label: 'Rental', count: contacts.filter((c) => c.leadType === 'rental').length },
@@ -482,70 +454,42 @@ export function ContactTable({ slug }: ContactTableProps) {
     APPLICATION: 'Applied',
   };
 
-  const fullIntakeUrl = buildIntakeUrl(slug);
-  const intakeUrlWithoutProtocol = fullIntakeUrl.replace(/^https?:\/\//, '');
-
-  // Status sentence — counts from the data already loaded. Calm voice, comma-
-  // separated facts. STYLESHEET.md "status-sentence pattern": muted greeting,
-  // serif h1, one-sentence status — every page wears the same shape.
-  const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
-  const awaitingCount = contacts.filter((c) => c.followUpAt).length;
+  // Subtitle copy — one quiet sentence, count-aware. The old loud chrome
+  // ("Qualifying 5 → Tour 0 → Applied 0 → 5 total" pipeline strip) is gone;
+  // the stage filter carries the cut, and a sentence carries the count.
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const newThisWeekCount = contacts.filter(
     (c) => new Date(c.createdAt).getTime() >= weekAgo,
   ).length;
-  const statusSentence = (() => {
-    if (loading) return 'Loading.';
-    if (contacts.length === 0) return 'No one in your book yet.';
-    const parts: string[] = [];
-    if (hotCount > 0) parts.push(`${hotCount} hot ${hotCount === 1 ? 'lead' : 'leads'}`);
-    if (awaitingCount > 0) parts.push(`${awaitingCount} awaiting follow-up`);
-    if (newThisWeekCount > 0) parts.push(`${newThisWeekCount} new this week`);
-    if (parts.length === 0) return `${contacts.length} ${contacts.length === 1 ? 'person' : 'people'} in your book.`;
-    return parts.join(' · ') + '.';
+  const subtitle = (() => {
+    if (loading || error) return null;
+    if (contacts.length === 0) return null;
+    const noun = contacts.length === 1 ? 'contact' : 'contacts';
+    if (newThisWeekCount > 0) {
+      return `${contacts.length} ${noun} · ${newThisWeekCount} new this week.`;
+    }
+    return `${contacts.length} ${noun}.`;
   })();
 
   return (
-    <div className="space-y-4">
-      {/* Page header — canonical three-line pattern: muted greeting, serif
-          Times h1, one-sentence status. Every surface in the product wears
-          this shape (STYLESHEET.md — "status-sentence pattern"). Action
-          cluster sits on the right of the h1 row. */}
-      <header className="mb-6 space-y-1.5">
-        <p className="text-sm text-muted-foreground">People.</p>
-        <div className="flex items-end justify-between gap-4">
-          <h1
-            className="text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Your relationships
-          </h1>
-          <div className="flex flex-col items-end gap-1">
-            {/* The conversation is the front door. Saying it out loud is
-                faster than any form, so it gets the primary pill. */}
-            <Link
-              href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new person — ")}`}
-              className={CHIPPI_PILL}
-            >
-              Tell Chippi →
-            </Link>
-            {/* The form still exists for those who want it; offered quietly. */}
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className={QUIET_LINK}
-            >
-              or fill out the form
-            </button>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+    <div className="space-y-6">
+      {/* Header — canonical three-line pattern: muted greeting, serif Times
+          h1, one-sentence status. The "Tell Chippi → / or fill out the form"
+          pair that used to sit awkwardly inside the h1 row moved to the
+          empty state — when there's data, that affordance is noise. */}
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>People.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Your relationships
+        </h1>
+        {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
       </header>
 
-      {/* Filter chip row + toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Lead type chips (with New folded in) */}
-        <div className="flex items-center gap-1">
+      {/* Lead-type chip strip — small line directly under the title, only
+          when there's data to filter. The chip count format matches the
+          existing labels (All · New · Rental · Buyer). */}
+      {!loading && !error && contacts.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
           {leadTypeChips.map((chip) => {
             const active = leadTypeFilter === chip.key;
             return (
@@ -553,6 +497,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 key={chip.key}
                 type="button"
                 onClick={() => setLeadTypeFilter(chip.key)}
+                aria-pressed={active}
                 className={cn(
                   'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors',
                   active
@@ -561,53 +506,40 @@ export function ContactTable({ slug }: ContactTableProps) {
                 )}
               >
                 {chip.label}
-                <span className={cn('tabular-nums text-[11px]', active ? 'opacity-70' : 'opacity-60')}>
+                <span
+                  className={cn(
+                    'tabular-nums text-[11px]',
+                    active ? 'opacity-70' : 'opacity-60',
+                  )}
+                >
                   {chip.count}
                 </span>
               </button>
             );
           })}
         </div>
+      )}
 
-        {/* Toolbar — pushes right */}
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          {/* Search */}
+      {/* ONE filter row — search · stage · tag · sort · view · select ·
+          overflow. Used to be three rows of chrome plus a pipeline progress
+          strip; mirrors the deals page toolbar pattern. */}
+      {!loading && !error && contacts.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 sm:flex-initial min-w-[160px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
             <Input
               placeholder="Search…"
-              className="pl-9 h-9 w-full sm:w-56 bg-background border-border/70"
+              className="pl-9 h-9 w-full sm:w-64 bg-background border-border/70"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          {/* Sort dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
-              >
-                <span className="text-muted-foreground">Sort:</span>
-                {sortLabels[sortBy]}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
-                <DropdownMenuItem
-                  key={key}
-                  onSelect={() => setSortBy(key)}
-                  className={cn(sortBy === key && 'font-semibold')}
-                >
-                  {sortLabels[key]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Stage filter — keep as dedicated dropdown (commonly used) */}
-          {(view === 'list' || search) && (
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {/* Stage filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -630,156 +562,198 @@ export function ContactTable({ slug }: ContactTableProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
 
-          {/* Tag filter — popover. Hidden when no user-defined tags
-              exist in the workspace. Single-select: picking a tag
-              replaces the filter; the trigger then shows the active
-              tag with an X to clear. */}
-          {allTags.length > 0 && (
-            <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-              <PopoverTrigger asChild>
+            {/* Tag filter — hidden when no user-defined tags exist. */}
+            {allTags.length > 0 && (
+              <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors hover:bg-foreground/[0.04]',
+                      tagFilter ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    <TagIcon
+                      size={12}
+                      className={tagFilter ? 'text-foreground' : 'text-muted-foreground'}
+                    />
+                    {tagFilter ? (
+                      <>
+                        <span className="truncate max-w-[160px]">{tagFilter}</span>
+                        <span
+                          role="button"
+                          aria-label="Clear tag filter"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTagFilter('');
+                          }}
+                          className="ml-0.5 -mr-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm hover:bg-foreground/10"
+                        >
+                          <X size={10} />
+                        </span>
+                      </>
+                    ) : (
+                      'Tag'
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-0">
+                  <div className="border-b border-border/60 px-2 py-1.5">
+                    <Input
+                      value={tagPopoverSearch}
+                      onChange={(e) => setTagPopoverSearch(e.target.value)}
+                      placeholder="Search tags…"
+                      className="h-8 border-0 shadow-none focus-visible:ring-0 text-xs px-1"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {(() => {
+                      const q = tagPopoverSearch.trim().toLowerCase();
+                      const filtered = q
+                        ? allTags.filter((t) => t.toLowerCase().includes(q))
+                        : allTags;
+                      if (filtered.length === 0) {
+                        return (
+                          <p className="px-3 py-2 text-xs text-muted-foreground">
+                            No tags match.
+                          </p>
+                        );
+                      }
+                      return filtered.map((tag) => {
+                        const active = tagFilter === tag;
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              setTagFilter(active ? '' : tag);
+                              setTagPopoverOpen(false);
+                              setTagPopoverSearch('');
+                            }}
+                            className={cn(
+                              'w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-foreground/[0.04]',
+                              active && 'font-semibold text-foreground',
+                            )}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Sort */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={cn(
-                    'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors hover:bg-foreground/[0.04]',
-                    tagFilter ? 'text-foreground' : 'text-muted-foreground',
-                  )}
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
                 >
-                  <TagIcon size={12} className={tagFilter ? 'text-foreground' : 'text-muted-foreground'} />
-                  {tagFilter ? (
-                    <>
-                      <span className="truncate max-w-[160px]">{tagFilter}</span>
-                      <span
-                        role="button"
-                        aria-label="Clear tag filter"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTagFilter('');
-                        }}
-                        className="ml-0.5 -mr-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm hover:bg-foreground/10"
-                      >
-                        <X size={10} />
-                      </span>
-                    </>
-                  ) : (
-                    'Tag'
-                  )}
+                  <span className="text-muted-foreground">Sort:</span>
+                  {sortLabels[sortBy]}
                 </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-64 p-0">
-                <div className="border-b border-border/60 px-2 py-1.5">
-                  <Input
-                    value={tagPopoverSearch}
-                    onChange={(e) => setTagPopoverSearch(e.target.value)}
-                    placeholder="Search tags…"
-                    className="h-8 border-0 shadow-none focus-visible:ring-0 text-xs px-1"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-64 overflow-y-auto py-1">
-                  {(() => {
-                    const q = tagPopoverSearch.trim().toLowerCase();
-                    const filtered = q
-                      ? allTags.filter((t) => t.toLowerCase().includes(q))
-                      : allTags;
-                    if (filtered.length === 0) {
-                      return (
-                        <p className="px-3 py-2 text-xs text-muted-foreground">
-                          No tags match.
-                        </p>
-                      );
-                    }
-                    return filtered.map((tag) => {
-                      const active = tagFilter === tag;
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => {
-                            setTagFilter(active ? '' : tag);
-                            setTagPopoverOpen(false);
-                            setTagPopoverSearch('');
-                          }}
-                          className={cn(
-                            'w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 hover:bg-foreground/[0.04]',
-                            active && 'font-semibold text-foreground',
-                          )}
-                        >
-                          {active && <Check size={10} className="flex-shrink-0" />}
-                          <span className={active ? '' : 'pl-[14px]'}>{tag}</span>
-                        </button>
-                      );
-                    });
-                  })()}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onSelect={() => setSortBy(key)}
+                    className={cn(sortBy === key && 'font-semibold')}
+                  >
+                    {sortLabels[key]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              aria-label="List view"
-              className={cn(
-                'h-9 w-9 flex items-center justify-center transition-colors',
-                view === 'list'
-                  ? 'bg-foreground/[0.045] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-              )}
-            >
-              <List size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('card')}
-              aria-label="Grid view"
-              className={cn(
-                'h-9 w-9 flex items-center justify-center transition-colors',
-                view === 'card'
-                  ? 'bg-foreground/[0.045] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-              )}
-            >
-              <LayoutGrid size={14} />
-            </button>
-          </div>
-
-          {/* Overflow */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            {/* View toggle */}
+            <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
               <button
                 type="button"
-                aria-label="More options"
-                className="h-9 w-9 flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                onClick={() => setView('list')}
+                aria-label="List view"
+                aria-pressed={view === 'list'}
+                className={cn(
+                  'h-9 w-9 flex items-center justify-center transition-colors',
+                  view === 'list'
+                    ? 'bg-foreground/[0.045] text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                )}
               >
-                <MoreHorizontal size={14} />
+                <List size={14} />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
-                <Bookmark size={12} />
-                Save view
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                <Upload size={12} />
-                Import
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => handleExportAll()}
-                disabled={contacts.length === 0}
+              <button
+                type="button"
+                onClick={() => setView('card')}
+                aria-label="Grid view"
+                aria-pressed={view === 'card'}
+                className={cn(
+                  'h-9 w-9 flex items-center justify-center transition-colors',
+                  view === 'card'
+                    ? 'bg-foreground/[0.045] text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                )}
               >
-                <Download size={12} />
-                Export
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+                <LayoutGrid size={14} />
+              </button>
+            </div>
 
-      {/* Save view inline input */}
+            {/* Select-mode toggle — bulk actions live behind a deliberate
+                gesture instead of a permanent checkbox column on every row. */}
+            <button
+              type="button"
+              onClick={() => setSelectMode((s) => !s)}
+              aria-pressed={selectMode}
+              className={cn(
+                'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-xs font-medium transition-colors',
+                selectMode
+                  ? 'bg-foreground text-background border-foreground'
+                  : 'bg-background border-border/70 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+              )}
+            >
+              <CheckSquare size={12} />
+              {selectMode ? 'Done' : 'Select'}
+            </button>
+
+            {/* Overflow */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More options"
+                  className="h-9 w-9 flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
+                  <Bookmark size={12} />
+                  Save view
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                  <Upload size={12} />
+                  Import
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => handleExportAll()}
+                  disabled={contacts.length === 0}
+                >
+                  <Download size={12} />
+                  Export
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
+
+      {/* Save-view inline input */}
       {showSaveInput && (
         <div className="flex items-center gap-1.5">
           <input
@@ -812,7 +786,7 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Saved view chips — paper-flat */}
+      {/* Saved-view chips */}
       {contactViews.length > 0 && (
         <div className="flex flex-wrap gap-1.5 items-center">
           <span className="text-xs text-muted-foreground mr-1">Saved:</span>
@@ -840,112 +814,30 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Tag filter strip removed — the always-on chip wall here was the
-          worst noise source on the page once a workspace accumulated ~10+
-          tags. Tag filtering moved into the popover next to Stage in the
-          toolbar above. */}
-
-      {/* Stage breakdown — pipeline reading line */}
-      {!loading && contacts.length > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-4 py-3">
-          {STAGES.map((stage, i) => {
-            const count = stageCounts[stage.key];
-            const isActive = typeFilter === stage.key;
-            return (
-              <div key={stage.key} className="flex items-center gap-3">
-                {i > 0 && (
-                  <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
-                )}
-                {/* The number is the affordance. Click to filter; click
-                    again to clear. Active stage gets foreground + bold so
-                    the surface reads its own state at a glance. */}
-                <button
-                  type="button"
-                  onClick={() => setTypeFilter(isActive ? 'ALL' : stage.key)}
-                  aria-pressed={isActive}
-                  aria-label={
-                    isActive
-                      ? `Currently filtering to ${stage.label}. Click to show all stages.`
-                      : `Filter to ${stage.label}`
-                  }
-                  className="group/stage flex items-baseline gap-2"
-                >
-                  <span
-                    className={cn(
-                      'text-xs transition-colors',
-                      isActive
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted-foreground group-hover/stage:text-foreground',
-                    )}
-                  >
-                    {stage.label}
-                  </span>
-                  <span
-                    className="text-lg tabular-nums text-foreground leading-none"
-                    style={{ fontFamily: 'var(--font-title)' }}
-                  >
-                    {count}
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-          <div className="ml-auto text-xs text-muted-foreground">
-            {/* Any client-side narrowing (tag filter, lead-type chip) makes the
-                full list count misleading. Surface the visible count as the
-                primary number when a filter is active so "5 total" can't
-                contradict "3 rows showing". */}
-            {(tagFilter || leadTypeFilter !== 'all') && visibleContacts.length !== contacts.length ? (
-              <>
-                <span
-                  className="text-base tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
-                  {visibleContacts.length}
-                </span>{' '}
-                of {contacts.length} shown
-              </>
-            ) : (
-              <>
-                <span
-                  className="text-base tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
-                  {contacts.length}
-                </span>{' '}
-                total
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Loading skeleton — matches final full-width row layout */}
+      {/* Loading skeleton — rows match the calmer divide-y vocabulary. */}
       {loading && (
-        <div className="rounded-lg border border-border overflow-hidden bg-card divide-y divide-border">
-          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3 h-[56px]">
-              <Skeleton className="h-4 w-4 rounded-sm flex-shrink-0" />
-              <Skeleton className="h-7 w-7 rounded-full flex-shrink-0" />
-              <Skeleton className="h-3.5 w-32 sm:w-40 flex-shrink-0" />
-              <Skeleton className="h-5 w-16 rounded-full hidden sm:block flex-shrink-0" />
-              <Skeleton className="h-3 flex-1 max-w-[220px] hidden sm:block" />
-              <Skeleton className="h-3 w-16 hidden md:block flex-shrink-0" />
-              <Skeleton className="h-3 w-28 hidden lg:block flex-shrink-0" />
-              <Skeleton className="ml-auto h-3 w-12 hidden xl:block flex-shrink-0" />
-            </div>
+        <ul className="divide-y divide-border/60">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <li key={i} className="flex items-center gap-3 py-3">
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* Inline error banner — fetch failed. Suppresses the empty-state
-          branches below so the "fresh workspace" copy can't tell a working
-          realtor they have no contacts when really we just couldn't reach
-          the server. Voice matches the toast vocabulary. */}
+      {/* Inline error banner — fetch failed. */}
       {!loading && error && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
-            <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
+            <AlertTriangle
+              size={20}
+              className="text-rose-600 dark:text-rose-400"
+              strokeWidth={1.5}
+            />
           </div>
           <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
             I couldn&apos;t reach your contacts.
@@ -964,7 +856,10 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Empty state — context-aware */}
+      {/* Empty state — context-aware. The fresh-workspace case is where the
+          "Tell Chippi → / or fill out the form" pair lives now: when the
+          list is empty the affordance earns its place; when it isn't, that
+          header CTA was just chrome competing with the title. */}
       {!loading && !error && visibleContacts.length === 0 && (() => {
         const hasStageFilter = typeFilter !== 'ALL';
         const hasLeadTypeFilter = leadTypeFilter !== 'all';
@@ -980,41 +875,27 @@ export function ContactTable({ slug }: ContactTableProps) {
 
         if (isFreshWorkspace) {
           return (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-14 h-14 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-5">
-                <Users size={22} className="text-muted-foreground/60" strokeWidth={1.5} />
-              </div>
-              <h2
-                className="text-3xl tracking-tight text-foreground mb-2"
-                style={TITLE_FONT}
-              >
-                Welcome. Let&apos;s get your first lead.
-              </h2>
-              <p className={cn(BODY_MUTED, 'max-w-md mb-6')}>
-                Share this link with anyone interested. New leads land here automatically.
-              </p>
-              <div className="w-full max-w-md flex items-center gap-2 rounded-lg border border-border/70 bg-foreground/[0.04] p-3">
-                <code className="flex-1 truncate text-left font-mono text-sm text-foreground">
-                  {intakeUrlWithoutProtocol}
-                </code>
-                <CopyButton url={fullIntakeUrl} />
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+              <p className="text-base text-foreground">No relationships yet.</p>
+              <p className={cn(BODY_MUTED, 'mt-1.5')}>
                 <Link
-                  href={`/apply/${slug}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Preview intake page"
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  href={`/s/${slug}/chippi?prefill=${encodeURIComponent(
+                    "I'm adding a new person — ",
+                  )}`}
+                  className="text-foreground underline underline-offset-2 hover:no-underline"
                 >
-                  <ExternalLink size={12} strokeWidth={1.75} />
+                  Tell Chippi about someone
                 </Link>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className={cn(QUIET_LINK, 'mt-5 underline-offset-2 hover:underline')}
-              >
-                Or add someone manually
-              </button>
+                {', or '}
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  className="text-foreground underline underline-offset-2 hover:no-underline"
+                >
+                  fill out the form
+                </button>
+                .
+              </p>
             </div>
           );
         }
@@ -1068,31 +949,51 @@ export function ContactTable({ slug }: ContactTableProps) {
         );
       })()}
 
-      {/* ── Card view — stage-grouped ── */}
-      {!loading && visibleContacts.length > 0 && view === 'card' && (
+      {/* Card view — stage-grouped (existing pattern, kept for the grid
+          toggle; cleaned only of the always-on checkbox). */}
+      {!loading && !error && visibleContacts.length > 0 && view === 'card' && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
-            if (stageContacts.length === 0 && !search && !tagFilter) return (
-              <div key={stage.key} className={cn('rounded-lg border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
-                <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
-                <p className="text-xs font-semibold text-muted-foreground">{stage.label}</p>
-                <p className="text-[11px] text-muted-foreground/60">{stage.description}</p>
-              </div>
-            );
+            if (stageContacts.length === 0 && !search && !tagFilter) {
+              return (
+                <div
+                  key={stage.key}
+                  className={cn(
+                    'rounded-lg border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2',
+                    stage.border,
+                  )}
+                >
+                  <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {stage.label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60">
+                    {stage.description}
+                  </p>
+                </div>
+              );
+            }
             if (stageContacts.length === 0) return null;
             return (
               <div key={stage.key} className="flex flex-col gap-2">
-                {/* Stage column header */}
-                <div className={cn('flex items-center gap-2 rounded-lg px-3 py-2', stage.headerBg)}>
+                <div
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-3 py-2',
+                    stage.headerBg,
+                  )}
+                >
                   <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
                   <span className="text-xs font-semibold text-foreground">{stage.label}</span>
-                  <span className={cn('ml-auto text-[11px] font-semibold rounded-md px-1.5 py-0.5', stage.className)}>
+                  <span
+                    className={cn(
+                      'ml-auto text-[11px] font-semibold rounded-md px-1.5 py-0.5',
+                      stage.className,
+                    )}
+                  >
                     {stageContacts.length}
                   </span>
                 </div>
-
-                {/* Cards in this stage */}
                 {stageContacts.map((contact) => (
                   <ContactCard
                     key={contact.id}
@@ -1100,7 +1001,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                     slug={slug}
                     onEdit={() => setEditContact(contact)}
                     onDelete={() => handleDelete(contact.id)}
-                    stageClassName={stage.className}
+                    selectMode={selectMode}
                     selected={selectedIds.has(contact.id)}
                     onToggleSelect={() => toggleSelect(contact.id)}
                   />
@@ -1111,155 +1012,53 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* ── List view — divide-y row list ──
-          STYLESHEET.md "Surfaces / Tables": if a cell is a sentence, divide-y
-          rows. The card chrome that used to wrap each row was paying no rent;
-          a hairline divider does the structural work without the visual cost.
-          The bulk-select checkbox stays — it just moves from a card to a row,
-          same affordance, lower weight. */}
-      {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <div className="space-y-2">
-          {/* Tiny header row — Select-all + label, font-semibold so the
-              "Name" anchor reads loud enough for the scan. STYLESHEET.md
-              Visual hierarchy: section labels should anchor the columns. */}
-          <div className="flex items-center gap-3 px-4 pb-2 border-b border-border/60">
-            <input
-              type="checkbox"
-              checked={selectedIds.size === visibleContacts.length && visibleContacts.length > 0}
-              onChange={toggleSelectAll}
-              aria-label="Select all"
-              className="rounded border-border cursor-pointer flex-shrink-0"
-            />
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Name
-            </span>
-            <span className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:inline">
-              Activity
-            </span>
-          </div>
+      {/* List view — divide-y row vocabulary. */}
+      {!loading && !error && visibleContacts.length > 0 && view === 'list' && (
+        <div>
+          {/* Tiny strip — only when select mode is on, so the select-all
+              checkbox has a home. Otherwise the row list speaks for itself;
+              column labels on a single-data-line list are chrome that pays
+              no rent. */}
+          {selectMode && (
+            <div className="flex items-center gap-3 pb-2 border-b border-border/60 mb-1">
+              <input
+                type="checkbox"
+                checked={
+                  selectedIds.size === visibleContacts.length && visibleContacts.length > 0
+                }
+                onChange={toggleSelectAll}
+                aria-label="Select all"
+                className="rounded border-border cursor-pointer flex-shrink-0"
+              />
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} selected`
+                  : `Select up to ${visibleContacts.length}`}
+              </span>
+            </div>
+          )}
+
           <ul className="divide-y divide-border/60">
-            {visibleContacts.map((contact, idx) => {
-              const stage = STAGES.find((s) => s.key === contact.type)!;
-              const isSelected = selectedIds.has(contact.id);
-              // Cap stagger to first 10 rows — past that, no entrance.
-              const delay = idx < 10 ? idx * 0.04 : 0;
-              const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
-              const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
-              return (
-                <motion.li
-                  key={contact.id}
-                  initial={idx < 10 ? { opacity: 0, y: 4 } : false}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
-                  className={cn(
-                    'group flex items-center gap-3 px-4 py-3 transition-colors',
-                    isSelected ? 'bg-muted/40' : 'hover:bg-muted/30',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelect(contact.id)}
-                    aria-label={`Select ${contact.name}`}
-                    className="rounded border-border cursor-pointer flex-shrink-0"
-                  />
-                  {/* Avatar — chrome, not focal. Muted bg/text so the name
-                      pulls the eye instead. */}
-                  <div className="w-7 h-7 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                    {getInitials(contact.name)}
-                  </div>
-                  {/* Name + sentence-shaped secondary line */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        href={`/s/${slug}/contacts/${contact.id}`}
-                        className="text-sm font-medium text-foreground hover:underline truncate"
-                      >
-                        {contact.name}
-                      </Link>
-                      <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0', stage.className)}>
-                        {stage.label}
-                      </span>
-                      <LeadScoreBar score={contact.leadScore ?? null} />
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                      {contact.email && (
-                        <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate max-w-[200px]">
-                          <Mail size={10} className="flex-shrink-0" />
-                          <span className="truncate">{contact.email}</span>
-                        </a>
-                      )}
-                      {contact.phone && (
-                        <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-                          <Phone size={10} className="flex-shrink-0" />
-                          {contact.phone}
-                        </a>
-                      )}
-                      {contact.budget != null && (
-                        <span className="inline-flex items-center gap-1 tabular-nums">
-                          <Wallet size={10} className="flex-shrink-0" />
-                          {formatCurrency(contact.budget)}{contact.leadType === 'rental' ? '/mo' : ''}
-                        </span>
-                      )}
-                    </div>
-                    <ContactAgentContext contactId={contact.id} />
-                  </div>
-                  {/* Right metadata — last-activity / follow-up — plus
-                      hover-reveal row actions. */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {followUpDate && (
-                      <span
-                        className={cn(
-                          'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
-                          followUpOverdue
-                            ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
-                            : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-                        )}
-                      >
-                        <CalendarDays size={10} />
-                        {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
-                    <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                      {/* Log a note — one-click activity log via Chippi. */}
-                      <Link
-                        href={`/s/${slug}/chippi/log?personId=${contact.id}`}
-                        aria-label={`Log a note for ${contact.name}`}
-                        title="Log a note"
-                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                      >
-                        <Mic size={13} />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => setEditContact(contact)}
-                        aria-label={`Edit ${contact.name}`}
-                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(contact.id)}
-                        aria-label={`Delete ${contact.name}`}
-                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.li>
-              );
-            })}
+            {visibleContacts.map((contact, idx) => (
+              <ContactRow
+                key={contact.id}
+                contact={contact}
+                slug={slug}
+                idx={idx}
+                selectMode={selectMode}
+                selected={selectedIds.has(contact.id)}
+                onToggleSelect={() => toggleSelect(contact.id)}
+                onEdit={() => setEditContact(contact)}
+                onDelete={() => handleDelete(contact.id)}
+              />
+            ))}
           </ul>
         </div>
       )}
 
-      {/* Bulk action bar — paper-flat. A hairline border separates it from
-          the row list above; no shadow lift. STYLESHEET.md "Shadows": product
-          surfaces use a hairline border, not a drop shadow. */}
+      {/* Bulk-action bar — only when something is selected. */}
       {selectedIds.size > 0 && (
-        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border/70 border-t border-t-border/60 bg-card px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border/70 bg-card px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -1274,21 +1073,37 @@ export function ContactTable({ slug }: ContactTableProps) {
             </SelectContent>
           </Select>
           {selectedIds.size >= 2 && (
-            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs hidden sm:inline-flex">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowCompare(true)}
+              className="h-8 gap-1.5 text-xs hidden sm:inline-flex"
+            >
               <GitCompare size={12} />
               Compare
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={handleExportSelected} className="h-8 gap-1.5 text-xs">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportSelected}
+            className="h-8 gap-1.5 text-xs"
+          >
             <Download size={12} />
             Export
           </Button>
-          <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 text-xs">
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleBulkDelete}
+            className="h-8 text-xs"
+          >
             Delete
           </Button>
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
+            aria-label="Clear selection"
             className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1"
           >
             <X size={13} />
@@ -1303,7 +1118,13 @@ export function ContactTable({ slug }: ContactTableProps) {
           onClose={() => setShowCompare(false)}
         />
       )}
-      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} mode="add" slug={slug} />
+      <ContactForm
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSubmit={handleAdd}
+        mode="add"
+        slug={slug}
+      />
       <ContactForm
         open={!!editContact}
         onOpenChange={(o) => !o && setEditContact(null)}
@@ -1345,14 +1166,185 @@ export function ContactTable({ slug }: ContactTableProps) {
   );
 }
 
-// ── Contact card sub-component ────────────────────────────────────────────────
+// ─── ContactRow — canonical divide-y row vocabulary ────────────────────────
+//
+// Avatar (32) / name + stage pill on top / email · phone on a single line
+// below. The line truncates as one — phone numbers no longer wrap to their
+// own line on mobile. Edit / mic / delete fade in on row hover at lg+; on
+// smaller screens a quiet chevron hints the row is tappable. Multi-select
+// moves behind the page-level Select toggle.
+
+function ContactRow({
+  contact,
+  slug,
+  idx,
+  selectMode,
+  selected,
+  onToggleSelect,
+  onEdit,
+  onDelete,
+}: {
+  contact: Client;
+  slug: string;
+  idx: number;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const stage = STAGES.find((s) => s.key === contact.type)!;
+  // Cap stagger to first 10 rows — past that, no entrance.
+  const delay = idx < 10 ? idx * 0.04 : 0;
+  const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
+  const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
+
+  // The body of the row — shared between Link and select-toggle wrappers so
+  // the visual layout never drifts between modes.
+  const body = (
+    <>
+      <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+        {getInitials(contact.name)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-medium text-foreground truncate">
+            {contact.name}
+          </span>
+          <span
+            className={cn(
+              'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+              stage.className,
+            )}
+          >
+            {stage.label}
+          </span>
+        </div>
+        {/* email · phone — single truncating line. Either may be absent;
+            the separator only renders when both are present. */}
+        {(contact.email || contact.phone) && (
+          <div className="mt-0.5 text-xs text-muted-foreground truncate">
+            {contact.email && <span>{contact.email}</span>}
+            {contact.email && contact.phone && (
+              <span className="text-muted-foreground/40"> · </span>
+            )}
+            {contact.phone && <span className="tabular-nums">{contact.phone}</span>}
+          </div>
+        )}
+      </div>
+      {/* Right metadata — follow-up pill stays visible (the realtor needs
+          to see it without hovering). The action icons hide until row
+          hover at lg+; smaller screens fall back to a quiet chevron. */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {followUpDate && (
+          <span
+            className={cn(
+              'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
+              followUpOverdue
+                ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
+                : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+            )}
+          >
+            <CalendarDays size={10} />
+            {followUpDate.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        )}
+        {!selectMode && (
+          <>
+            <div className="hidden lg:flex gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+              <Link
+                href={`/s/${slug}/chippi/log?personId=${contact.id}`}
+                aria-label={`Log a note for ${contact.name}`}
+                title="Log a note"
+                onClick={(e) => e.stopPropagation()}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Mic size={13} />
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                aria-label={`Edit ${contact.name}`}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                aria-label={`Delete ${contact.name}`}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+            <ChevronRight
+              size={14}
+              className="lg:hidden text-muted-foreground/40 flex-shrink-0"
+              aria-hidden
+            />
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  const rowClassName = cn(
+    'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors',
+    selected ? 'bg-muted/40' : 'hover:bg-muted/30',
+  );
+
+  return (
+    <motion.li
+      initial={idx < 10 ? { opacity: 0, y: 4 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
+    >
+      {selectMode ? (
+        <button
+          type="button"
+          onClick={onToggleSelect}
+          aria-pressed={selected}
+          className={cn(rowClassName, 'w-full text-left cursor-pointer')}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${contact.name}`}
+            className="rounded border-border cursor-pointer flex-shrink-0"
+          />
+          {body}
+        </button>
+      ) : (
+        <Link href={`/s/${slug}/contacts/${contact.id}`} className={rowClassName}>
+          {body}
+        </Link>
+      )}
+    </motion.li>
+  );
+}
+
+// ─── Card view sub-component ────────────────────────────────────────────────
 
 function ContactCard({
   contact,
   slug,
   onEdit,
   onDelete,
-  stageClassName,
+  selectMode,
   selected,
   onToggleSelect,
 }: {
@@ -1360,28 +1352,30 @@ function ContactCard({
   slug: string;
   onEdit: () => void;
   onDelete: () => void;
-  stageClassName: string;
+  selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
   return (
-    <div className={cn(
-      'group rounded-lg border bg-card overflow-hidden transition-colors duration-150 hover:bg-muted/30',
-      selected ? 'border-border bg-muted/40' : 'border-border/70',
-    )}>
+    <div
+      className={cn(
+        'group rounded-lg border bg-card overflow-hidden transition-colors duration-150 hover:bg-muted/30',
+        selected ? 'border-border bg-muted/40' : 'border-border/70',
+      )}
+    >
       <div className="px-4 py-3">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-start gap-2.5 min-w-0">
-            {/* Checkbox */}
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={onToggleSelect}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity data-[checked=true]:opacity-100"
-              data-checked={selected}
-            />
+            {selectMode && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggleSelect}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5"
+                aria-label={`Select ${contact.name}`}
+              />
+            )}
             <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
               {getInitials(contact.name)}
             </div>
@@ -1394,22 +1388,36 @@ function ContactCard({
               </Link>
             </div>
           </div>
-          <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
-            <button type="button" onClick={onEdit} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-              <Pencil size={12} />
-            </button>
-            <button type="button" onClick={onDelete} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-              <Trash2 size={12} />
-            </button>
-          </div>
+          {!selectMode && (
+            <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
+              <button
+                type="button"
+                onClick={onEdit}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                aria-label={`Edit ${contact.name}`}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                aria-label={`Delete ${contact.name}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Info */}
         <div className="space-y-1">
           {contact.phone && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Phone size={10} className="flex-shrink-0" />
-              <a href={`tel:${contact.phone}`} className="truncate hover:text-foreground transition-colors">
+              <a
+                href={`tel:${contact.phone}`}
+                className="truncate hover:text-foreground transition-colors"
+              >
                 {contact.phone}
               </a>
             </div>
@@ -1417,7 +1425,10 @@ function ContactCard({
           {contact.email && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Mail size={10} className="flex-shrink-0" />
-              <a href={`mailto:${contact.email}`} className="truncate hover:text-foreground transition-colors">
+              <a
+                href={`mailto:${contact.email}`}
+                className="truncate hover:text-foreground transition-colors"
+              >
                 {contact.email}
               </a>
             </div>
@@ -1425,7 +1436,10 @@ function ContactCard({
           {contact.budget != null && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Wallet size={10} className="flex-shrink-0" />
-              <span>{formatCurrency(contact.budget)}{contact.leadType === 'rental' ? '/mo' : ''}</span>
+              <span>
+                {formatCurrency(contact.budget)}
+                {contact.leadType === 'rental' ? '/mo' : ''}
+              </span>
             </div>
           )}
           {contact.preferences && (
@@ -1435,14 +1449,21 @@ function ContactCard({
             </div>
           )}
           {contact.followUpAt && (
-            <div className={cn(
-              'flex items-center gap-1.5 text-xs font-medium',
-              new Date(contact.followUpAt) < new Date() ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
-            )}>
+            <div
+              className={cn(
+                'flex items-center gap-1.5 text-xs font-medium',
+                new Date(contact.followUpAt) < new Date()
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-amber-600 dark:text-amber-400',
+              )}
+            >
               <CalendarDays size={10} className="flex-shrink-0" />
               <span>
                 {new Date(contact.followUpAt) < new Date() ? 'Overdue' : 'Due'}{' '}
-                {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {new Date(contact.followUpAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </span>
             </div>
           )}
