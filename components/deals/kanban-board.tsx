@@ -466,16 +466,29 @@ export function KanbanBoard({
   // stat strip already loads itself on mount. Subsequent fetches are
   // mutation-driven and should kick the strip to resync so KPIs don't go
   // stale right after a deal is created.
+  //
+  // `onDataChanged` is held in a ref so that `fetchData` stays stable across
+  // parent re-renders. The parent passes an inline arrow (`() => setRefreshKey(...)`)
+  // which is a new reference every render — if we depended on it directly,
+  // every parent render would invalidate `fetchData`, refire the effect below,
+  // call `fetchData()` again (with hasFetchedRef.current already true),
+  // bump refreshKey on the parent, re-render the parent, invalidate
+  // `fetchData` again — an infinite fetch loop that pegged the network and
+  // glitched the page on every keystroke / focus toggle / realtime event.
   const hasFetchedRef = useRef(false);
+  const onDataChangedRef = useRef(onDataChanged);
+  useEffect(() => {
+    onDataChangedRef.current = onDataChanged;
+  }, [onDataChanged]);
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`);
     if (res.ok) setStages(await res.json());
     if (hasFetchedRef.current) {
-      onDataChanged?.();
+      onDataChangedRef.current?.();
     } else {
       hasFetchedRef.current = true;
     }
-  }, [slug, pipelineId, onDataChanged]);
+  }, [slug, pipelineId]);
 
   useEffect(() => {
     fetchData();
