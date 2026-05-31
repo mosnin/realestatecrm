@@ -296,7 +296,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
               <PhoneIncoming size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
               <p className="text-sm text-foreground">No assigned leads yet.</p>
               <p className={cn('text-xs mt-1', BODY_MUTED)}>
-                Leads assigned by your brokerage will land here.
+                Leads assigned by your team will land here.
               </p>
             </div>
           ) : (
@@ -405,7 +405,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
             <Megaphone size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
             <p className="text-sm text-foreground">No announcements.</p>
             <p className={cn('text-xs mt-1', BODY_MUTED)}>
-              Notes from your brokerage will appear here.
+              Notes from your team will appear here.
             </p>
           </div>
         ) : (

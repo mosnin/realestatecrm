@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Realtor Detail — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Realtor Detail — Teams' };
 
 type Params = { params: Promise<{ userId: string }> };
 

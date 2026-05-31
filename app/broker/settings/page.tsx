@@ -7,7 +7,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'General Settings — Broker Dashboard' };
+export const metadata: Metadata = { title: 'General Settings — Teams' };
 
 export default async function BrokerSettingsPage() {
   const ctx = await getBrokerContext();

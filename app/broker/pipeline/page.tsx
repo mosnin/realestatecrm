@@ -15,7 +15,7 @@ import {
   type PipelineSummary,
 } from './pipeline-client';
 
-export const metadata: Metadata = { title: 'Pipeline — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Pipeline — Teams' };
 
 export default async function BrokerPipelinePage() {
   let ctx;

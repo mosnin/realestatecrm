@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CommissionsClient, type LedgerRow } from './commissions-client';
 
-export const metadata: Metadata = { title: 'Commissions — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Commissions — Teams' };
 
 /** Raw row shape as stored in CommissionLedger. */
 type LedgerDbRow = {

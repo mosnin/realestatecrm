@@ -150,7 +150,7 @@ const brokerMemberNavSections = [
 
 const brokerSettingsNavSections = [
   {
-    label: 'Brokerage',
+    label: 'Team',
     items: [
       { href: '/broker/settings', label: 'General', icon: Settings, exact: true },
       { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
@@ -505,7 +505,7 @@ function WorkspaceSwitcher({
             <>
               <div className="border-t border-border" />
               <p className={`${SECTION_LABEL} px-3 pt-2 pb-1`}>
-                Brokerages
+                Teams
               </p>
               {brokerageMemberships.map((b) => (
                 <Link
@@ -545,7 +545,7 @@ function WorkspaceSwitcher({
                 className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Plus size={14} className="flex-shrink-0" />
-                <span>Create or join a brokerage</span>
+                <span>Create or join a team</span>
               </Link>
             </>
           )}
@@ -1130,8 +1130,8 @@ export function Sidebar({
           </div>
 
           <WorkspaceSwitcher
-            currentName={brokerageName ?? 'Brokerage'}
-            currentSubtitle="Brokerage"
+            currentName={brokerageName ?? 'Team'}
+            currentSubtitle="Team"
             currentIcon={Building2}
             slug={slug}
             spaceName={spaceName}

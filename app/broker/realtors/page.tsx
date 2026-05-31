@@ -9,7 +9,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
 
-export const metadata: Metadata = { title: 'Realtors — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Realtors — Teams' };
 
 export default async function BrokerRealtorsPage() {
   const ctx = await getBrokerContext();

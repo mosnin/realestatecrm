@@ -5,12 +5,10 @@ import { redirect } from 'next/navigation';
 import {
   Building2,
   Briefcase,
-  TrendingUp,
   Inbox,
   ChevronRight,
   ArrowRight,
   Mail,
-  MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
@@ -260,22 +258,6 @@ export default async function BrokerOverviewPage() {
   );
   const totalPendingDrafts = Object.values(draftsBySpace).reduce((a, b) => a + b, 0);
 
-  // Compose the morning status sentence the broker reads at the top.
-  const statusSentence = (() => {
-    if (activeMembers === 0) {
-      return 'No realtors on the team yet — invite your first.';
-    }
-    const parts: string[] = [];
-    parts.push(`${activeMembers} ${activeMembers === 1 ? 'realtor' : 'realtors'} on the team`);
-    if (totalPendingDrafts > 0) {
-      parts.push(`${totalPendingDrafts} draft${totalPendingDrafts === 1 ? '' : 's'} awaiting review`);
-    }
-    if (totalLeads > 0) {
-      parts.push(`${totalLeads} new lead${totalLeads === 1 ? '' : 's'}`);
-    }
-    return parts.join(' · ') + '.';
-  })();
-
   const hasSettings = !!(brokerage.name && (brokerage.logoUrl || brokerage.websiteUrl));
 
   // Sort members by current activity load (active drafts + new leads + active deals)
@@ -299,23 +281,26 @@ export default async function BrokerOverviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-12">
-      {/* Header — Chippi's morning sentence is the lead. The brokerage name
-          and status counts step down into the supporting role they actually
-          deserve: context, not headline. */}
+      {/* Header — canonical three-line pattern. Muted greeting (with the
+          team name as the calm anchor), serif Times h1 from BrokerMorningStory
+          carrying Chippi's chief-of-staff sentence, and the small hairline
+          stats row inside the story handles the context numbers. No second
+          muted line — two stat surfaces stacked read as noise. */}
       <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
-        <BrokerMorningStory />
         <p className="text-sm text-muted-foreground">
-          {brokerage.name} &middot; {statusSentence}
+          {getGreeting()}. {brokerage.name}.
         </p>
+        <BrokerMorningStory />
       </header>
 
-      {/* First-run nudge — only when the brokerage hasn't been set up yet */}
+      {/* First-run nudge — only when the team hasn't been set up yet.
+          Neutral icon: this is a settings affordance, not Chippi speaking,
+          so orange would be unearned. */}
       {!hasSettings && (
         <section className="rounded-xl border border-border/70 bg-muted/30 px-4 py-3 flex items-start gap-3">
-          <MessageCircle size={14} className="text-orange-500 flex-shrink-0 mt-0.5" />
+          <Building2 size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
           <div className="flex-1 space-y-0.5">
-            <p className="text-sm font-medium">Finish setting up your brokerage</p>
+            <p className="text-sm font-medium">Finish setting up your team</p>
             <p className="text-[13px] text-muted-foreground">
               Add a logo, website, and intake form details so leads see a polished surface.
             </p>
@@ -330,30 +315,42 @@ export default async function BrokerOverviewPage() {
         </section>
       )}
 
-      {/* Snapshot — three numbers the broker actually cares about */}
+      {/* Snapshot — three numbers the broker actually cares about.
+          Uses TITLE_FONT + SECTION_LABEL so the snapshot vocabulary
+          matches the Commission grid below; one numeric vocabulary
+          on the whole page. */}
       <section className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
-        <div className="bg-background px-4 py-4">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Pipeline</p>
-          <p className="text-2xl font-semibold tabular-nums mt-1">
+        <div className="bg-background p-4">
+          <p className={SECTION_LABEL}>Pipeline</p>
+          <p
+            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+            style={TITLE_FONT}
+          >
             ${formatCompact(totalPipeline)}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-1">
             {totalDeals} active deal{totalDeals === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="bg-background px-4 py-4">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Won</p>
-          <p className="text-2xl font-semibold tabular-nums mt-1">
+        <div className="bg-background p-4">
+          <p className={SECTION_LABEL}>Won</p>
+          <p
+            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+            style={TITLE_FONT}
+          >
             ${formatCompact(totalWonValue)}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">closed this period</p>
+          <p className="text-[11px] text-muted-foreground mt-1">closed this period</p>
         </div>
-        <div className="bg-background px-4 py-4">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Funnel</p>
-          <p className="text-2xl font-semibold tabular-nums mt-1">
+        <div className="bg-background p-4">
+          <p className={SECTION_LABEL}>Funnel</p>
+          <p
+            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
+            style={TITLE_FONT}
+          >
             {totalLeads}&nbsp;→&nbsp;{totalApplications}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">leads → applications</p>
+          <p className="text-[11px] text-muted-foreground mt-1">leads → applications</p>
         </div>
       </section>
 
@@ -425,9 +422,7 @@ export default async function BrokerOverviewPage() {
       {pendingInvitations.length > 0 && (
         <section>
           <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-            <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-              Pending invitations
-            </h2>
+            <h2 className={SECTION_LABEL}>Pending invitations</h2>
             <span className="text-[11px] text-muted-foreground tabular-nums">
               {pendingInvitations.length}
             </span>
@@ -479,8 +474,11 @@ export default async function BrokerOverviewPage() {
         </div>
 
         {memberRows.length === 0 ? (
-          <div className="py-8 text-sm text-muted-foreground">
-            No realtors yet. Invite your first one to get started.
+          <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <p className="text-sm text-foreground">Your team, in here.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Invite your first realtor and their work will land in this view.
+            </p>
           </div>
         ) : (
           <ul className="divide-y divide-border/60">
@@ -556,35 +554,17 @@ export default async function BrokerOverviewPage() {
       </section>
 
       {/* Draft impact — how Chippi's drafts have actually been landing across
-          the brokerage over the last 30 days. Sits below the team list so the
+          the team over the last 30 days. Sits below the team list so the
           realtor row remains the focal element of the page. */}
       <DraftImpactCard stats={draftStats} />
 
       {/* What the team did — proof of work across the swarm */}
       <section>
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-            What the team did
-          </h2>
-          <TrendingUp size={11} className="text-muted-foreground" />
+          <h2 className={SECTION_LABEL}>What the team did</h2>
         </div>
         <div className="pt-4">
           <TeamActivityFeed />
-        </div>
-      </section>
-
-      {/* Brokerage Chippi observations placeholder — surfaces in Phase 7b
-          when the meta-agent lands. Keeps the visual real-estate so the
-          shape lands now and the data fills in without a layout shift. */}
-      <section className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-3.5 flex items-start gap-3">
-        <Building2 size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-        <div className="space-y-0.5">
-          <p className="text-sm font-medium">Brokerage Chippi is settling in</p>
-          <p className="text-[13px] text-muted-foreground">
-            Once the team has a few weeks of data, I&apos;ll start surfacing patterns here —
-            who closes hottest in which neighborhood, where leads are getting stuck, who&apos;s
-            ready for more volume.
-          </p>
         </div>
       </section>
     </div>
