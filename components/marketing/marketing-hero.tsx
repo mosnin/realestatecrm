@@ -17,9 +17,20 @@
  * Headline + sub + CTA fade-up on mount (480ms, Apple curve). Media slot
  * fades in 120ms after, so the eye reads the words before the picture
  * announces itself.
+ *
+ * As the user scrolls past the hero, the media slot drifts upward at
+ * roughly 0.92× the page rate — a calm parallax that adds depth without
+ * theatre. Words DO NOT parallax; only the picture moves. The effect is
+ * disabled entirely for prefers-reduced-motion.
  */
 
-import { motion } from 'motion/react';
+import { useRef } from 'react';
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useReducedMotion,
+} from 'motion/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
@@ -51,8 +62,24 @@ export function MarketingHero({
   children,
   className,
 }: MarketingHeroProps) {
+  const heroRef = useRef<HTMLElement | null>(null);
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  });
+  // Media drifts upward 40px as the user scrolls past the hero — a ~0.92
+  // ratio against the rest of the page. Hooks must run unconditionally, so
+  // we always create the transform and zero it out when reduced motion is
+  // requested at the consumer site.
+  const yRaw = useTransform(scrollYProgress, [0, 1], [0, -40]);
+  const y = reduced ? 0 : yRaw;
+
   return (
-    <section className={cn('relative pt-24 md:pt-32 pb-12 md:pb-16', className)}>
+    <section
+      ref={heroRef}
+      className={cn('relative pt-24 md:pt-32 pb-12 md:pb-16', className)}
+    >
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-3xl mx-auto">
           {eyebrow && (
@@ -113,7 +140,8 @@ export function MarketingHero({
             animate="enter"
             variants={MARKETING_HERO_REVEAL}
             transition={{ delay: 0.24 }}
-            className="mt-16 md:mt-20"
+            style={{ y }}
+            className="mt-16 md:mt-20 will-change-transform"
           >
             {children}
           </motion.div>

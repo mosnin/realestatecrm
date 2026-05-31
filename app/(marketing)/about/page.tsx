@@ -13,22 +13,21 @@
  * - Brand orange does not decorate this page.
  * - All media is a MarketingMediaSlot — no stock photos, no posed founder
  *   headshots.
+ *
+ * The pull-quote and stat-row blocks use the shared marketing primitives
+ * (`MarketingQuote`, `MarketingStatRow`) so every page renders the same
+ * typographic moments the same way. The primitives carry their own
+ * vertical breath — no extra section wrappers needed.
  */
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
+import { MarketingQuote } from '@/components/marketing/marketing-quote';
+import { MarketingStatRow } from '@/components/marketing/marketing-stat-row';
 
 export const metadata = { title: 'About — Chippi' };
-
-const STATS: { number: string; label: string }[] = [
-  { number: '10×', label: 'First-touch faster' },
-  { number: '45 min', label: 'Saved per realtor per day' },
-  { number: '98%', label: 'Approval rate on Chippi drafts' },
-  { number: '0', label: "Tabs you'll need to keep open" },
-];
 
 export default function AboutPage() {
   return (
@@ -57,18 +56,11 @@ export default function AboutPage() {
         sub="Real estate work is mostly attention management. Email, calendar, replies, follow-ups, pipeline updates. The actual selling — listening, judging, knowing — happens in maybe ten percent of the day. We built an agent to handle the other ninety."
       />
 
-      {/* 3. Pull quote — inline serif Times quote with curly quotes. */}
-      <section className="relative py-24 md:py-32">
-        <div className="mx-auto max-w-3xl px-6 md:px-8 text-center">
-          <p
-            style={TITLE_FONT}
-            className="text-3xl md:text-5xl leading-[1.15] tracking-[-0.01em] text-foreground"
-          >
-            {"“The work shouldn’t be the chrome. The work should be the deals.”"}
-          </p>
-          <p className={`${SECTION_LABEL} mt-8`}>Chippi product principles</p>
-        </div>
-      </section>
+      {/* 3. Pull quote — typographic moment, no card chrome. */}
+      <MarketingQuote
+        quote={"“The work shouldn’t be the chrome. The work should be the deals.”"}
+        attribution="Chippi product principles"
+      />
 
       {/* 4. What we believe — first belief. */}
       <MarketingSection
@@ -104,24 +96,15 @@ export default function AboutPage() {
         />
       </MarketingSection>
 
-      {/* 7. Stat row — inline 4-col, serif numbers + small-caps labels. */}
-      <section className="relative py-24 md:py-32">
-        <div className="mx-auto max-w-6xl px-6 md:px-8">
-          <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12">
-            {STATS.map((s) => (
-              <li key={s.label} className="text-center md:text-left">
-                <p
-                  style={TITLE_FONT}
-                  className="text-[44px] md:text-[56px] leading-none tracking-[-0.02em] text-foreground tabular-nums"
-                >
-                  {s.number}
-                </p>
-                <p className={`${SECTION_LABEL} mt-4`}>{s.label}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      {/* 7. Stat row — serif numbers, small-caps labels, hairline verticals. */}
+      <MarketingStatRow
+        stats={[
+          { number: '10×', label: 'First-touch faster' },
+          { number: '45 min', label: 'Saved per realtor per day' },
+          { number: '98%', label: 'Approval rate on Chippi drafts' },
+          { number: '0', label: "Tabs you'll need to keep open" },
+        ]}
+      />
 
       {/* 8. CTA */}
       <MarketingCTA

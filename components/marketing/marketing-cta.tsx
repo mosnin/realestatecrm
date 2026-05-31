@@ -4,13 +4,20 @@
  * `<MarketingCTA>` — bottom-of-page call to action. Single primary, single
  * secondary at most. Lives inside its own padded section with generous
  * vertical breath so the CTA reads as an arrival, not an interruption.
+ *
+ * The primary pill performs a SINGLE scale pulse the first time it enters
+ * the viewport — 1 → 1.02 → 1 over 240ms. One beat, then still. The
+ * secondary CTA stays calm; only the primary earns the pulse, because
+ * only the primary is the one decision the page is asking for. Reduced
+ * motion: no pulse at all.
  */
 
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { MARKETING_REVEAL, MARKETING_VIEWPORT } from '@/lib/marketing-motion';
+import { EASE_APPLE } from '@/lib/motion';
 
 export interface MarketingCTAProps {
   title: string;
@@ -27,6 +34,7 @@ export function MarketingCTA({
   secondaryCta,
   className,
 }: MarketingCTAProps) {
+  const reduced = useReducedMotion();
   return (
     <motion.section
       initial="initial"
@@ -48,9 +56,17 @@ export function MarketingCTA({
           </p>
         )}
         <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
-          <Link href={primaryCta.href} className={PRIMARY_PILL}>
-            {primaryCta.label}
-          </Link>
+          <motion.div
+            className="inline-flex"
+            initial={false}
+            whileInView={reduced ? undefined : { scale: [1, 1.02, 1] }}
+            viewport={MARKETING_VIEWPORT}
+            transition={{ duration: 0.24, ease: EASE_APPLE }}
+          >
+            <Link href={primaryCta.href} className={PRIMARY_PILL}>
+              {primaryCta.label}
+            </Link>
+          </motion.div>
           {secondaryCta && (
             <Link href={secondaryCta.href} className={GHOST_PILL}>
               {secondaryCta.label} <span aria-hidden>→</span>
