@@ -13,19 +13,27 @@
  * time it renders, 'acted' the first time a card is tapped. Auto-
  * collapses 60 seconds after 'seen'; manual Open re-expands.
  *
- * Visual language: paper-flat, title-serif headline, hairline card
- * borders, no shadows, no icons inside cards, no emoji. The verb
- * pill at the right of each card is the only loud element below
- * the headline. Mobile stacks the tag above the content + pushes the
- * action button to a second row so the surface holds at 320–414px.
+ * Visual language (post-redesign): a sectioned command center, not a
+ * narrative h1. Each section has a small-caps SECTION_LABEL header and
+ * renders only when its underlying data is present — calm silence beats
+ * filler. The composed `brief.headline` still exists (email + SMS
+ * templates consume it) but the surface no longer renders it; the
+ * "Today." greeting from ChippiPageShell orients without competing.
+ *
+ * Sections:
+ *   ON DECK   the realtor's action cards (reuses brief.cards)
+ *   YOUR DAY  today's events from /api/calendar/events (when connected)
+ *   PIPELINE  active · closing this week · at risk (from /api/agent/brief/sections)
+ *   OVERNIGHT what Chippi did in the last 12h (from the same endpoint)
  */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { BODY_MUTED, TITLE_FONT, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
+import { BODY_MUTED, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
 import type { Brief, BriefCard, SignalKind, SignalSource } from '@/lib/briefing/types';
+import type { PipelineSummary, OvernightSummary } from '@/lib/briefing/sections';
 import {
   useBriefLifecycle,
   formatProgress,
@@ -81,22 +89,6 @@ const TIMEOUT_FALLBACK_MS = 4000;
 function deepLink(slug: string, href: string): string {
   if (href.startsWith('http')) return href;
   return `/s/${slug}${href}`;
-}
-
-/** "Wed · May 28" below sm, full weekday at sm+. */
-function formatBriefDate(iso: string, compact: boolean): string {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return '';
-  if (compact) {
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-}
-
-function formatBriefTime(iso: string): string {
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
@@ -209,7 +201,7 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
 
   if (loading) {
     return (
-      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
         <p className={cn(BODY_MUTED, 'mb-4')}>{slow ? 'Reading your day…' : 'Looking at your day.'}</p>
         <div className="space-y-2 animate-pulse">
           <div className="h-3 w-full rounded bg-muted/40" />
@@ -229,7 +221,7 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
   // whether the page is broken or just empty.
   if (failed || !data) {
     return (
-      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
         <p className={cn(BODY_MUTED, 'mb-4')}>
           I couldn&apos;t pull your brief just now.
         </p>
@@ -261,7 +253,7 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
           onToggleYesterday={() => setShowYesterday((v) => !v)}
         />
       ) : (
-        <LiveBrief data={data} slug={slug} bare={alwaysLive} onAct={recordActed} />
+        <LiveBrief data={data} slug={slug} onAct={recordActed} />
       )}
       {showYesterday && (
         <div className="mt-6 opacity-80">
@@ -274,142 +266,93 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
 
 // ── Live state ────────────────────────────────────────────────────────────────
 
+/**
+ * Sectioned command-center layout. ChippiPageShell already provides the
+ * "Today." greeting; we render the four sections directly. Each section
+ * renders only when its data is present — calm silence over filler.
+ */
 function LiveBrief({
   data,
   slug,
-  bare,
   onAct,
 }: {
   data: ApiResponse;
   slug: string;
-  /** When true, strip the internal chrome — no "Today's brief" header
-   *  bar, no bordered card wrapper, no intro line. The serif headline +
-   *  cards flow naturally under whatever page shell is rendering us.
-   *  Used by the dedicated /chippi/brief page where the ChippiPageShell
-   *  already provides orientation; rendering our own header creates the
-   *  three-headers-stacked problem. */
-  bare?: boolean;
   onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
 }) {
-  const { brief, createdAt, showIntro } = data;
-  const time = formatBriefTime(createdAt);
+  const { brief } = data;
+  const sections = useBriefSections(slug);
+  const events = useTodaysCalendarEvents(slug);
+
+  const hasOnDeck = brief.cards.length > 0 || brief.tip != null;
+  const hasYourDay = events.length > 0;
+  const hasPipeline = sections?.pipeline != null && sections.pipeline.active > 0;
+  const hasOvernight = sections?.overnight != null;
+
+  const anySection = hasOnDeck || hasYourDay || hasPipeline || hasOvernight;
 
   return (
-    <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
-      {!bare && (
-        <div className="flex items-baseline justify-between mb-4 gap-2">
-          <span className={SECTION_LABEL}>Today&apos;s brief</span>
-          <span className={cn(SECTION_LABEL, 'tabular-nums truncate')}>
-            {time} <span className="hidden sm:inline">· {formatBriefDate(createdAt, false)}</span>
-            <span className="sm:hidden">· {formatBriefDate(createdAt, true)}</span>
-          </span>
-        </div>
+    <div className={cn(FOCUS_CARD_MAX, 'mx-auto space-y-12')}>
+      {hasOnDeck && (
+        <BriefSection label="ON DECK">
+          <ul className="divide-y divide-border/60">
+            {brief.cards.map((card, idx) => (
+              <BriefCardRow
+                key={`${card.subject.id}-${idx}`}
+                slug={slug}
+                card={card}
+                cardIndex={idx}
+                onAct={onAct}
+              />
+            ))}
+            {brief.tip && (
+              <BriefCardRow
+                key={`tip-${brief.tip.subject.id}`}
+                slug={slug}
+                card={brief.tip}
+                cardIndex={brief.cards.length}
+                onAct={onAct}
+              />
+            )}
+          </ul>
+        </BriefSection>
       )}
 
-      {brief.emptyState ? (
-        <>
-          <div className={cn(!bare && 'rounded-lg border border-border/70 bg-card', bare ? '' : 'px-6 py-10')}>
-            <h1
-              className="text-[24px] sm:text-[28px] leading-tight tracking-tight text-foreground"
-              style={TITLE_FONT}
-            >
-              {brief.headline}
-            </h1>
-            <p className={cn(BODY_MUTED, 'mt-3 max-w-md')}>{brief.emptyState.invitation}</p>
-            {showIntro && !bare && <IntroLine slug={slug} />}
-            <div className="mt-6">
-              <Link
-                href={`/s/${slug}/chippi`}
-                onClick={() => onAct()}
-                className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
-              >
-                Tell Chippi
-              </Link>
-            </div>
-          </div>
-          {(brief.momentum || brief.tomorrow) && (
-            <div className={cn('mt-6 space-y-1.5', !bare && 'px-6')}>
-              {brief.momentum && <p className={BODY_MUTED}>{brief.momentum}</p>}
-              {brief.tomorrow && <p className={BODY_MUTED}>{brief.tomorrow}</p>}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className={cn(!bare && 'rounded-lg border border-border/70 bg-card px-6 pt-6 pb-2')}>
-            <h1
-              className="text-[28px] sm:text-[34px] leading-snug tracking-tight text-foreground"
-              style={TITLE_FONT}
-            >
-              {brief.headline}
-            </h1>
-            {brief.subheadline && (
-              <p className={cn(BODY_MUTED, 'mt-2')}>{brief.subheadline}</p>
-            )}
-            {showIntro && !bare && <IntroLine slug={slug} />}
-
-            {brief.cards.length > 0 && (
-              <ul className="mt-6 divide-y divide-border/60">
-                {brief.cards.map((card, idx) => (
-                  <BriefCardRow
-                    key={`${card.subject.id}-${idx}`}
-                    slug={slug}
-                    card={card}
-                    cardIndex={idx}
-                    onAct={onAct}
-                  />
-                ))}
-                {brief.tip && (
-                  <BriefCardRow
-                    key={`tip-${brief.tip.subject.id}`}
-                    slug={slug}
-                    card={brief.tip}
-                    cardIndex={brief.cards.length}
-                    onAct={onAct}
-                  />
-                )}
-              </ul>
-            )}
-            {brief.cards.length === 0 && brief.tip && (
-              <div className="mt-6">
-                <Link
-                  href={deepLink(slug, brief.tip.subject.href)}
-                  onClick={() => onAct(0, brief.tip!.source, brief.tip!.kind)}
-                  className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
-                >
-                  Open
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {(brief.momentum || brief.tomorrow) && (
-            <div className={cn('mt-6 space-y-1.5', !bare && 'px-6')}>
-              {brief.momentum && <p className={BODY_MUTED}>{brief.momentum}</p>}
-              {brief.tomorrow && <p className={BODY_MUTED}>{brief.tomorrow}</p>}
-            </div>
-          )}
-        </>
+      {hasYourDay && (
+        <BriefSection label="YOUR DAY">
+          <YourDayList events={events} />
+        </BriefSection>
       )}
+
+      {hasPipeline && sections?.pipeline && (
+        <BriefSection label="PIPELINE">
+          <PipelineLine summary={sections.pipeline} tomorrow={brief.tomorrow} />
+        </BriefSection>
+      )}
+
+      {hasOvernight && sections?.overnight && (
+        <BriefSection label="OVERNIGHT">
+          <OvernightLine summary={sections.overnight} momentum={brief.momentum} />
+        </BriefSection>
+      )}
+
+      {!anySection && <QuietMorning slug={slug} onAct={onAct} />}
     </div>
   );
 }
 
-function IntroLine({ slug }: { slug: string }) {
+// ── Section primitive ────────────────────────────────────────────────────────
+
+function BriefSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <p className={cn(BODY_MUTED, 'mt-3 text-xs')}>
-      This is your morning brief. I&apos;ll have one ready by 7am every day.{' '}
-      <Link
-        href={`/s/${slug}/settings?tab=privacy#brief`}
-        className="underline underline-offset-2 hover:text-foreground"
-      >
-        Tune it in settings →
-      </Link>
-    </p>
+    <section className="space-y-3">
+      <h2 className={SECTION_LABEL}>{label}</h2>
+      {children}
+    </section>
   );
 }
 
-// ── Card row — mobile stacks tag above content, button drops to a second row ──
+// ── ON DECK card row — mobile stacks tag above content, button drops to a second row ──
 
 function BriefCardRow({
   slug,
@@ -447,6 +390,231 @@ function BriefCardRow({
       </div>
     </li>
   );
+}
+
+// ── YOUR DAY ─────────────────────────────────────────────────────────────────
+
+interface CalEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  htmlLink: string | null;
+}
+
+function YourDayList({ events }: { events: CalEvent[] }) {
+  return (
+    <ul className="space-y-2">
+      {events.map((e) => {
+        const time = e.allDay ? 'All day' : formatEventTime(e.start);
+        const Row = (
+          <>
+            <span className="text-sm tabular-nums text-muted-foreground w-16 shrink-0">{time}</span>
+            <span className="text-sm text-foreground truncate">{e.title}</span>
+          </>
+        );
+        return (
+          <li key={e.id} className="flex items-baseline gap-4">
+            {e.htmlLink ? (
+              <a
+                href={e.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-baseline gap-4 hover:opacity-80 transition-opacity flex-1 min-w-0"
+              >
+                {Row}
+              </a>
+            ) : (
+              Row
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function formatEventTime(iso: string): string {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '';
+  // "9:00a" / "2:30p" — same compact form the design spec calls for, half
+  // the width of "9:00 AM" so the time column stays a quiet vertical rail.
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const meridiem = h >= 12 ? 'p' : 'a';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${h12}${meridiem}` : `${h12}:${m.toString().padStart(2, '0')}${meridiem}`;
+}
+
+// ── PIPELINE ─────────────────────────────────────────────────────────────────
+
+function PipelineLine({
+  summary,
+  tomorrow,
+}: {
+  summary: PipelineSummary;
+  tomorrow: string | null;
+}) {
+  // active · closing this week · at risk — middot separated, tabular nums.
+  const parts: string[] = [`${summary.active} active`];
+  if (summary.closingThisWeek > 0) {
+    parts.push(`${summary.closingThisWeek} closing this week`);
+  }
+  if (summary.atRisk > 0) {
+    parts.push(`${summary.atRisk} at risk`);
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-foreground tabular-nums">{parts.join(' · ')}</p>
+      {tomorrow && <p className={BODY_MUTED}>{tomorrow}</p>}
+    </div>
+  );
+}
+
+// ── OVERNIGHT ────────────────────────────────────────────────────────────────
+
+function OvernightLine({
+  summary,
+  momentum,
+}: {
+  summary: OvernightSummary;
+  momentum: string | null;
+}) {
+  // Buckets render as "3 drafts ready · 1 deal advanced · 2 contacts updated".
+  // The labels are already plural; if a count is 1 we trim the trailing "s"
+  // from the noun (drafts → draft, contacts → contact, etc.). "ready" stays.
+  const parts = summary.buckets.map((b) => `${b.count} ${singularize(b.label, b.count)}`);
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-foreground tabular-nums">{parts.join(' · ')}</p>
+      {momentum && <p className={BODY_MUTED}>{momentum}</p>}
+    </div>
+  );
+}
+
+/**
+ * Trim "s" from the noun in a plural-bucket label when count is 1.
+ * Labels are shapes like "drafts ready", "deals advanced", "contacts updated",
+ * "messages sent", "reminders set", "tasks done", "updates".
+ * We trim the FIRST word's trailing s; the past-tense verb stays.
+ */
+function singularize(label: string, count: number): string {
+  if (count !== 1) return label;
+  const [head, ...rest] = label.split(' ');
+  if (head.endsWith('s')) {
+    return [head.slice(0, -1), ...rest].join(' ');
+  }
+  return label;
+}
+
+// ── QUIET MORNING ────────────────────────────────────────────────────────────
+
+/**
+ * Day-one realtor: no cards, no calendar events, no pipeline, no overnight
+ * activity. Single quiet sentence + the same "Tell Chippi" CTA the empty-
+ * state used to surface, so the brief stays actionable on a quiet morning.
+ */
+function QuietMorning({
+  slug,
+  onAct,
+}: {
+  slug: string;
+  onAct: (cardIndex?: number, source?: SignalSource, kind?: SignalKind) => void;
+}) {
+  return (
+    <div>
+      <p className={cn(BODY_MUTED, 'max-w-md')}>
+        Quiet morning. Nothing pulling at you.
+      </p>
+      <div className="mt-6">
+        <Link
+          href={`/s/${slug}/chippi`}
+          onClick={() => onAct()}
+          className={cn(PRIMARY_PILL, 'min-h-[44px] sm:min-h-0')}
+        >
+          Tell Chippi
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ── Data hooks ───────────────────────────────────────────────────────────────
+
+interface SectionsPayload {
+  pipeline: PipelineSummary | null;
+  overnight: OvernightSummary | null;
+}
+
+/**
+ * Fetch PIPELINE + OVERNIGHT in one round-trip. Returns null while loading
+ * and on failure — the surface omits the corresponding sections silently
+ * rather than rendering an error chrome. The brief still shows ON DECK + the
+ * greeting; pipeline + overnight just don't appear that morning.
+ */
+function useBriefSections(slug: string): SectionsPayload | null {
+  const [payload, setPayload] = useState<SectionsPayload | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/agent/brief/sections?slug=${encodeURIComponent(slug)}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as SectionsPayload;
+        if (!cancelled) setPayload(json);
+      } catch {
+        // silent — surface omits the sections
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+  return payload;
+}
+
+/**
+ * Pull today's events from the connected external calendar. Returns [] when
+ * not connected OR when no events fall in today's window. The surface omits
+ * the YOUR DAY section in both cases — no nag to connect, no empty header.
+ */
+function useTodaysCalendarEvents(slug: string): CalEvent[] {
+  const [events, setEvents] = useState<CalEvent[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/calendar/events?slug=${encodeURIComponent(slug)}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as
+          | { connected: false }
+          | { connected: true; events: CalEvent[] };
+        if (cancelled) return;
+        if (!json.connected) return;
+        const today = filterToToday(json.events);
+        setEvents(today);
+      } catch {
+        // silent — surface omits the section
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+  return events;
+}
+
+function filterToToday(events: CalEvent[]): CalEvent[] {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return events
+    .filter((e) => {
+      const t = new Date(e.start).getTime();
+      return !isNaN(t) && t >= start.getTime() && t < end.getTime();
+    })
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
 
 // ── Collapsed state ──────────────────────────────────────────────────────────
@@ -559,6 +727,11 @@ function YesterdayBrief({ slug, onCollapse }: { slug: string; onCollapse: () => 
     );
   }
 
+  // Yesterday's brief is a read-only echo. We collapse it to the same
+  // sectioned treatment minus PIPELINE/OVERNIGHT (those are state-of-now,
+  // not yesterday's snapshot). If there were ON DECK cards, name them
+  // briefly; otherwise quiet.
+  const hadCards = yBrief.cards.length > 0;
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
       <div className="flex items-baseline justify-between gap-2 mb-3">
@@ -571,9 +744,20 @@ function YesterdayBrief({ slug, onCollapse }: { slug: string; onCollapse: () => 
           Hide
         </button>
       </div>
-      <div className="rounded-lg border border-border/40 bg-card px-6 py-5">
-        <p className="text-sm text-muted-foreground">{yBrief.headline}</p>
-        {yBrief.subheadline && <p className={cn(BODY_MUTED, 'mt-1 text-xs')}>{yBrief.subheadline}</p>}
+      <div className="rounded-lg border border-border/40 bg-card px-6 py-5 space-y-2">
+        {hadCards ? (
+          <ul className="space-y-1.5">
+            {yBrief.cards.slice(0, 3).map((c, i) => (
+              <li key={i} className="text-sm text-muted-foreground truncate">
+                <span className={cn(SECTION_LABEL, 'mr-2')}>{ACTION_LABEL[c.kind]}</span>
+                {c.subject.name}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={BODY_MUTED}>Quiet day.</p>
+        )}
+        {yBrief.momentum && <p className={cn(BODY_MUTED, 'text-xs')}>{yBrief.momentum}</p>}
       </div>
     </div>
   );
