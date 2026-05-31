@@ -1,37 +1,99 @@
 /**
- * `/teams/analytics` — Team analytics (foundation stub).
+ * `/teams/analytics` — Team analytics.
  *
- * The polished version lands in PR `claude/marketing-teams-analytics` — that PR
- * replaces this stub. Don't refactor here; replace.
+ * The numbers a broker would ask for on Monday morning, on a single page.
+ * Hero → 3 tick-tock sections → quiet anchor → CTA. Each surface is its own
+ * decision; no card chrome, hairline borders, the serif Times title carries
+ * the focal weight. No brand orange — the agent's signature lives on the
+ * realtor surfaces; on marketing we let typography do the work.
  */
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
+import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 
-export const metadata = { title: 'Analytics — Chippi' };
+export const metadata = { title: 'Team analytics — Chippi for teams' };
 
 export default function TeamsAnalyticsPage() {
   return (
     <>
       <MarketingHero
-        eyebrow={'Team analytics'}
-        title={'See what the floor is closing.'}
-        sub={'Pipeline value, conversion rate, response time. The same numbers a broker would ask for on Monday morning, on a single page.'}
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'See all features', href: '/features' }}
+        eyebrow="FOR BROKERAGES · ANALYTICS"
+        title="See what the floor is closing."
+        sub="Pipeline value, conversion rate, response time. The numbers a broker would ask for on Monday morning, on a single page."
+        primaryCta={{ label: 'Talk to sales', href: '/about' }}
+        secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
         <MarketingMediaSlot
           aspect="video"
-          description={'Analytics dashboard — a paper-flat chart with this-week vs last-week numbers.'}
+          description="Analytics dashboard — paper-flat KPI tiles, weekly numbers tick in on load, no chart-junk."
         />
       </MarketingHero>
 
+      <MarketingSection
+        side="right"
+        eyebrow="THE NUMBERS"
+        title="Pipeline, response, and conversion."
+        sub="Pipeline by stage and by realtor. Response time per channel. Conversion by source. The metrics a broker actually cares about."
+        bullets={[
+          'Pipeline value live.',
+          'First-touch latency tracked.',
+          'Conversion by source + stage.',
+        ]}
+      >
+        <MarketingMediaSlot
+          aspect="square"
+          description="KPI grid — four tiles, big tabular numbers, small-caps labels."
+        />
+      </MarketingSection>
+
+      <MarketingSection
+        side="left"
+        eyebrow="BY REALTOR"
+        title="Performance, on one page."
+        sub="Sort by closed-this-month, deals-in-flight, response time. Spotlight is on the floor, not on the chart."
+        bullets={[
+          'Realtor leaderboard — sortable, transparent.',
+          'Drill into individual workload.',
+          'Coaching insights surfaced quietly.',
+        ]}
+      >
+        <MarketingMediaSlot
+          aspect="wide"
+          description="Leaderboard table — realtors ranked, columns for closed/in-flight/response, hairlines between rows."
+        />
+      </MarketingSection>
+
+      <MarketingSection
+        side="right"
+        eyebrow="BY DEAL"
+        title="Where the dollars are."
+        sub="Pipeline by stage. Aging deals flagged. Won/lost reasons captured in plain language so the next deal benefits."
+        bullets={[
+          'Stage-by-stage value totals.',
+          'Aging-deal alerts.',
+          'Win/loss reasons in plain English.',
+        ]}
+      >
+        <MarketingMediaSlot
+          aspect="square"
+          description="Pipeline funnel chart — paper-flat, no glow, hairline divisions."
+        />
+      </MarketingSection>
+
+      <MarketingSection
+        stacked
+        eyebrow="THE PROMISE"
+        title="Numbers that aren't lying to you."
+        sub="Every figure comes from the work the realtors are actually doing — not from a spreadsheet they updated last week. That's the difference."
+      />
+
       <MarketingCTA
-        title="Start your free trial."
-        sub="Seven days, no credit card. Bring your inbox and let Chippi do the rest."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales', href: '/about' }}
+        title="Bring your team to Chippi."
+        sub="Talk to us about migration and a 30-day pilot."
+        primaryCta={{ label: 'Talk to sales', href: '/about' }}
+        secondaryCta={{ label: 'See pricing', href: '/pricing' }}
       />
     </>
   );
