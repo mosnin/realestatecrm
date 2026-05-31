@@ -1,9 +1,34 @@
 'use client';
 
+/**
+ * Broker announcements — Chippi vocabulary.
+ *
+ * Divide-y row list (title + posted-by + timestamp) with tap-to-expand
+ * for the body. PRIMARY_PILL on the post action. AlertDialog (not
+ * window.confirm) on delete. Canonical dashed-card empty state.
+ */
+
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Plus, Trash2, Megaphone, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, X, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  BODY,
+  BODY_MUTED,
+  META,
+  PRIMARY_PILL,
+  GHOST_PILL,
+} from '@/lib/typography';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Announcement = {
   id: string;
@@ -39,6 +64,9 @@ export default function AnnouncementsClient() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -56,7 +84,7 @@ export default function AnnouncementsClient() {
         setAnnouncements(data);
       }
     } catch {
-      toast.error('Failed to load announcements');
+      toast.error('Couldn’t load announcements.');
     } finally {
       setLoading(false);
     }
@@ -68,9 +96,18 @@ export default function AnnouncementsClient() {
     setShowForm(false);
   }
 
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function handlePost() {
     if (!title.trim() || !body.trim()) {
-      toast.error('Title and body are required');
+      toast.error('Title and body are required.');
       return;
     }
 
@@ -84,160 +121,218 @@ export default function AnnouncementsClient() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to post announcement');
+        throw new Error(data.error || 'Couldn’t post the announcement.');
       }
 
       const newAnn = await res.json();
       setAnnouncements((prev) => [newAnn, ...prev]);
-      toast.success('Announcement posted');
+      toast.success('Announcement posted.');
       resetForm();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to post');
+      toast.error(err instanceof Error ? err.message : 'Couldn’t post.');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Delete this announcement?')) return;
-
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/broker/announcements?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete');
-      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-      toast.success('Announcement deleted');
+      const res = await fetch(`/api/broker/announcements?id=${deleteTarget.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('delete failed');
+      setAnnouncements((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      toast.success('Announcement deleted.');
+      setDeleteTarget(null);
     } catch {
-      toast.error('Failed to delete announcement');
+      toast.error('Couldn’t delete that one.');
+    } finally {
+      setDeleting(false);
     }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Announcements</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Team-wide announcements and updates
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus size={15} />
-          New Announcement
-        </button>
+      {/* Header action row */}
+      <div className="flex items-center justify-end">
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className={cn(PRIMARY_PILL)}
+          >
+            <Plus size={14} />
+            Post announcement
+          </button>
+        )}
       </div>
 
       {/* Post form */}
       {showForm && (
-        <Card>
-          <CardContent className="px-5 py-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Post Announcement</h2>
-              <button onClick={resetForm} className="text-muted-foreground hover:text-foreground">
-                <X size={16} />
+        <section className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-foreground">New announcement</p>
+            <button
+              onClick={resetForm}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="ann-title"
+                className="text-sm font-medium text-foreground"
+              >
+                Title
+              </label>
+              <input
+                id="ann-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="One sentence the team can scan."
+                className={cn(
+                  'w-full h-9 rounded-md border border-input bg-transparent px-3',
+                  'text-base md:text-sm placeholder:text-muted-foreground/70',
+                  'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+                  'transition-colors duration-150',
+                )}
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="ann-body"
+                className="text-sm font-medium text-foreground"
+              >
+                Details
+              </label>
+              <textarea
+                id="ann-body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="What you’d say if you walked into the room."
+                rows={5}
+                className={cn(
+                  'w-full rounded-md border border-input bg-transparent px-3 py-2',
+                  'text-base md:text-sm placeholder:text-muted-foreground/70 resize-none',
+                  'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+                  'transition-colors duration-150',
+                )}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className={cn(GHOST_PILL)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePost}
+                disabled={saving}
+                className={cn(PRIMARY_PILL, 'disabled:opacity-50')}
+              >
+                {saving && <Loader2 size={13} className="animate-spin" />}
+                {saving ? 'Posting…' : 'Post'}
               </button>
             </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Announcement title"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">Body</label>
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Write your announcement..."
-                  rows={5}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={resetForm}
-                  className="px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePost}
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {saving && <Loader2 size={13} className="animate-spin" />}
-                  Post
-                </button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
-      {/* Announcements list */}
+      {/* List */}
       {loading ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center">
-            <Loader2 size={20} className="animate-spin mx-auto text-muted-foreground" />
-          </CardContent>
-        </Card>
+        <p className={cn(BODY_MUTED)}>Pulling announcements.</p>
       ) : announcements.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center space-y-2">
-            <Megaphone size={24} className="mx-auto text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No announcements yet.</p>
-            <p className="text-xs text-muted-foreground/60">
-              Post announcements to keep your team informed.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className={cn(BODY)}>Quiet — nothing to broadcast yet.</p>
+          <p className={cn(BODY_MUTED, 'mt-1')}>
+            Post once when the whole team needs to hear it.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {announcements.map((ann) => (
-            <Card key={ann.id}>
-              <CardContent className="px-5 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Megaphone size={14} className="text-primary flex-shrink-0" />
-                      <h3 className="text-sm font-semibold truncate">{ann.title}</h3>
-                    </div>
-                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                      {ann.body}
-                    </p>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="font-medium">{ann.authorName}</span>
-                      <span>&middot;</span>
-                      <span>{relativeTime(ann.createdAt)}</span>
-                    </div>
-                  </div>
+        <ul className="divide-y divide-border/60 border-y border-border/60">
+          {announcements.map((ann) => {
+            const isOpen = expanded.has(ann.id);
+            return (
+              <li key={ann.id} className="py-3">
+                <div className="flex items-start gap-3">
                   <button
-                    onClick={() => handleDelete(ann.id)}
-                    className="p-1.5 rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 transition-colors flex-shrink-0"
+                    type="button"
+                    onClick={() => toggleExpanded(ann.id)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {ann.title}
+                    </p>
+                    <p className={cn(META, 'mt-0.5')}>
+                      <span className="text-muted-foreground">{ann.authorName}</span>
+                      <span aria-hidden className="mx-1 text-muted-foreground/40">
+                        ·
+                      </span>
+                      <span>{relativeTime(ann.createdAt)}</span>
+                    </p>
+                    {isOpen && (
+                      <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed mt-2">
+                        {ann.body}
+                      </p>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(ann)}
+                    className="p-1.5 rounded-md text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors flex-shrink-0"
                     title="Delete"
+                    aria-label={`Delete ${ann.title}`}
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => (!o && !deleting ? setDeleteTarget(null) : null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this announcement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `“${deleteTarget.title}” will be removed for the whole team.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
