@@ -20,11 +20,13 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { ArrowLeft, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ShimmerText } from '@/components/chippi/shimmer-text';
 import { cn } from '@/lib/utils';
+import { EASE_APPLE } from '@/lib/motion';
 import {
   H1,
   TITLE_FONT,
@@ -303,12 +305,19 @@ export function WhatsAppThreadView({
 }
 
 function Bubble({ message }: { message: WhatsAppMessage }) {
+  // Directional 4px fade — incoming drifts in from the left, outgoing from
+  // the right, mirroring the bubble's side. 180ms, Apple ease. Calm enough
+  // not to draw the eye away from the words.
+  const fromX = message.fromMe ? 4 : -4;
   return (
-    <div
+    <motion.div
       className={cn(
         'flex',
         message.fromMe ? 'justify-end' : 'justify-start',
       )}
+      initial={{ opacity: 0, x: fromX }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.18, ease: EASE_APPLE }}
     >
       <div
         className={cn(
@@ -321,6 +330,6 @@ function Bubble({ message }: { message: WhatsAppMessage }) {
         </p>
         <p className={cn(META, 'text-right')}>{formatTime(message.sentAt)}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
