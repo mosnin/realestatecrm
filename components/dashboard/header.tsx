@@ -23,7 +23,7 @@ import type { NavChild, NavItem } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
-import { SearchPill } from '@/components/dashboard/sidebar';
+import { SearchPill, WorkspaceSwitcher } from '@/components/dashboard/sidebar';
 import { SidebarFavorites } from '@/components/dashboard/sidebar-favorites';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
@@ -120,7 +120,6 @@ function isMobileChildActive(child: NavChild, pathname: string, base: string): b
 
 export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
-  const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
@@ -197,77 +196,25 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
               </SheetTitle>
-              {/* Workspace switcher dropdown */}
-              <div className="mt-2">
-                {isBroker && !isBrokerOnly ? (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMobileSwitcherOpen(!mobileSwitcherOpen)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border bg-card hover:bg-accent transition-colors text-left"
-                    >
-                      <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-                        {pathname.startsWith('/broker') ? <Building2 size={16} className="text-foreground" /> : <Briefcase size={16} className="text-foreground" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Team') : spaceName}</p>
-                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Team view' : 'My workspace'}</p>
-                      </div>
-                      <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', mobileSwitcherOpen && 'rotate-180')} />
-                    </button>
-                    {mobileSwitcherOpen && (
-                      <div className="absolute left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden">
-                        <Link
-                          href={base}
-                          onClick={() => { setMobileSwitcherOpen(false); setOpen(false); }}
-                          className={cn(
-                            'flex items-center gap-2.5 px-3 py-2.5 transition-colors',
-                            !pathname.startsWith('/broker') ? 'bg-accent' : 'hover:bg-accent'
-                          )}
-                        >
-                          <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-                            <Briefcase size={16} className="text-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{spaceName}</p>
-                            <p className="text-[10px] text-muted-foreground">My workspace</p>
-                          </div>
-                          {!pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
-                        </Link>
-                        <div className="border-t border-border">
-                          <p className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground">Teams</p>
-                          <Link
-                            href="/broker"
-                            onClick={() => { setMobileSwitcherOpen(false); setOpen(false); }}
-                            className={cn(
-                              'flex items-center gap-2.5 px-3 py-2.5 transition-colors',
-                              pathname.startsWith('/broker') ? 'bg-accent' : 'hover:bg-accent'
-                            )}
-                          >
-                            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-                              <Building2 size={16} className="text-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{brokerageName ?? 'Team'}</p>
-                              <p className="text-[10px] text-muted-foreground">{brokerageRole === 'broker_owner' ? 'Owner' : brokerageRole === 'broker_admin' ? 'Admin' : 'Member'}</p>
-                            </div>
-                            {pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border bg-card">
-                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-                      <Briefcase size={16} className="text-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{spaceName}</p>
-                      <p className="text-[10px] text-muted-foreground">My workspace</p>
-                    </div>
-                  </div>
-                )}
+              {/* Workspace switcher — uses the shared desktop component so the
+                  rich popover (email header, ⌘-shortcuts, "+ New" footer) is
+                  identical across viewports. Inside a Sheet the Radix Popover
+                  portals to document.body so it isn't clipped by the drawer. */}
+              <div className="mt-2 -mx-3">
+                <WorkspaceSwitcher
+                  currentName={pathname.startsWith('/broker') ? (brokerageName ?? 'Team') : spaceName}
+                  currentSubtitle={pathname.startsWith('/broker') ? 'Team' : 'My workspace'}
+                  currentIcon={pathname.startsWith('/broker') ? Building2 : Briefcase}
+                  slug={slug}
+                  spaceName={spaceName}
+                  brokerageMemberships={
+                    isBroker && brokerageName
+                      ? [{ id: 'current', name: brokerageName, role: brokerageRole ?? 'member' }]
+                      : []
+                  }
+                  isOnBrokerPage={pathname.startsWith('/broker')}
+                  userEmail={drawerEmail}
+                />
               </div>
             </SheetHeader>
             <div className="px-3 pt-3">

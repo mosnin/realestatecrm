@@ -59,6 +59,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '@/components/ui/popover';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -383,7 +388,7 @@ function QuickCreateMenu({ slug }: { slug: string }) {
 // Workspace switcher
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function WorkspaceSwitcher({
+export function WorkspaceSwitcher({
   currentName,
   currentSubtitle,
   currentIcon: Icon,
@@ -393,6 +398,7 @@ function WorkspaceSwitcher({
   isOnBrokerPage,
   collapsed = false,
   showQuickCreate = false,
+  userEmail = null,
 }: {
   currentName: string;
   currentSubtitle: string;
@@ -404,154 +410,179 @@ function WorkspaceSwitcher({
   collapsed?: boolean;
   /** Render the SquarePen "new" quick-create dropdown next to the switcher. */
   showQuickCreate?: boolean;
+  /** Current user's email, rendered as the popover header. */
+  userEmail?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const base = `/s/${slug}`;
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Hide the switcher chevron when there's nothing to switch to. Most solo
-  // realtors won't have a brokerage; in that case the workspace identity
-  // reads as a quiet label, not a teasing dropdown.
-  const hasSwitchTargets = brokerageMemberships.length > 0;
+  // Build the workspace list. The realtor's own workspace is always first;
+  // brokerage memberships follow. Each gets a ⌘1/⌘2/⌘3… shortcut so the
+  // popover doubles as a keyboard switcher — same shape as the inspiration.
+  const workspaces: {
+    key: string;
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    isCurrent: boolean;
+  }[] = [];
+  if (slug) {
+    workspaces.push({
+      key: 'solo',
+      name: spaceName,
+      href: base,
+      icon: Briefcase,
+      isCurrent: !isOnBrokerPage,
+    });
+  }
+  for (const b of brokerageMemberships) {
+    workspaces.push({
+      key: b.id,
+      name: b.name,
+      href: '/broker',
+      icon: Building2,
+      isCurrent: isOnBrokerPage,
+    });
+  }
 
   return (
-    <div ref={ref} className={cn('relative', collapsed ? 'flex justify-center' : 'mx-3')}>
+    <div className={cn(collapsed ? 'flex justify-center' : 'mx-3')}>
       <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-1')}>
-      <CollapsedTooltip
-        enabled={collapsed && !open}
-        label={hasSwitchTargets ? `${currentName} · Switch workspace` : currentName}
-      >
-        <button
-          onClick={() => hasSwitchTargets && setOpen(!open)}
-          disabled={!hasSwitchTargets}
-          className={cn(
-            'rounded-md text-left transition-colors',
-            collapsed
-              ? 'flex items-center justify-center w-9 h-9'
-              : 'flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5',
-            hasSwitchTargets ? 'hover:bg-foreground/[0.025] cursor-pointer' : 'cursor-default',
-          )}
-          aria-label={collapsed ? currentName : undefined}
-        >
-          <div
-            className={cn(
-              'rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0',
-              collapsed ? 'w-6 h-6' : 'w-6 h-6',
-            )}
-          >
-            <Icon size={12} className="text-foreground/80" />
-          </div>
-          {!collapsed && (
-            <>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium truncate text-foreground leading-tight">
-                  {currentName}
-                </p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
-                  {currentSubtitle}
-                </p>
-              </div>
-              {hasSwitchTargets && (
-                <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
-              )}
-            </>
-          )}
-        </button>
-      </CollapsedTooltip>
-      {!collapsed && showQuickCreate && (
-        <QuickCreateMenu slug={slug} />
-      )}
-      </div>
-
-      {open && (
-        <div
-          className={cn(
-            'z-50 rounded-lg border bg-popover shadow-lg overflow-hidden',
-            collapsed
-              ? 'absolute left-full top-0 ml-2 w-64'
-              : 'absolute left-0 right-0 top-full mt-1',
-          )}
-        >
-          {slug && (
-            <Link
-              href={base}
-              onClick={() => setOpen(false)}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-accent transition-colors',
-                !isOnBrokerPage && 'bg-accent',
-              )}
-            >
-              <Briefcase size={14} className="text-foreground flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{spaceName}</p>
-                <p className="text-[10px] text-muted-foreground">My workspace</p>
-              </div>
-              {!isOnBrokerPage && (
-                <Check size={14} className="text-foreground flex-shrink-0" />
-              )}
-            </Link>
-          )}
-
-          {brokerageMemberships.length > 0 && (
-            <>
-              <div className="border-t border-border" />
-              <p className={`${SECTION_LABEL} px-3 pt-2 pb-1`}>
-                Teams
-              </p>
-              {brokerageMemberships.map((b) => (
-                <Link
-                  key={b.id}
-                  href="/broker"
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-accent transition-colors',
-                    isOnBrokerPage && 'bg-accent',
-                  )}
-                >
-                  <Building2 size={14} className="text-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{b.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {b.role === 'broker_owner'
-                        ? 'Owner'
-                        : b.role === 'broker_admin'
-                          ? 'Admin'
-                          : 'Member'}
-                    </p>
-                  </div>
-                  {isOnBrokerPage && (
-                    <Check size={14} className="text-foreground flex-shrink-0" />
-                  )}
-                </Link>
-              ))}
-            </>
-          )}
-
-          {brokerageMemberships.length === 0 && !isOnBrokerPage && (
-            <>
-              <div className="border-t border-border" />
-              <Link
-                href="/brokerage"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        <Popover>
+          <CollapsedTooltip enabled={collapsed} label={`${currentName} · Switch workspace`}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md text-left transition-colors hover:bg-foreground/[0.025] cursor-pointer',
+                  collapsed
+                    ? 'flex items-center justify-center w-9 h-9'
+                    : 'flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5',
+                )}
+                aria-label={collapsed ? `${currentName} — switch workspace` : undefined}
               >
-                <Plus size={14} className="flex-shrink-0" />
-                <span>Create or join a team</span>
-              </Link>
-            </>
-          )}
+                <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6">
+                  <Icon size={12} className="text-foreground/80" />
+                </div>
+                {!collapsed && (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate text-foreground leading-tight">
+                        {currentName}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
+                        {currentSubtitle}
+                      </p>
+                    </div>
+                    <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
+                  </>
+                )}
+              </button>
+            </PopoverTrigger>
+          </CollapsedTooltip>
+          <WorkspaceSwitcherPopoverContent
+            workspaces={workspaces}
+            userEmail={userEmail}
+            hasTeam={brokerageMemberships.length > 0}
+            collapsed={collapsed}
+          />
+        </Popover>
+        {!collapsed && showQuickCreate && (
+          <QuickCreateMenu slug={slug} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceSwitcherPopoverContent({
+  workspaces,
+  userEmail,
+  hasTeam,
+  collapsed,
+}: {
+  workspaces: {
+    key: string;
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    isCurrent: boolean;
+  }[];
+  userEmail: string | null;
+  hasTeam: boolean;
+  collapsed: boolean;
+}) {
+  // The popover layout mirrors the inspiration: email header on top, a list
+  // of workspaces with monospaced ⌘N shortcuts and a check on the current
+  // one, and a footer row to add the next workspace. For solo realtors the
+  // footer reads "Create or join a team" — same affordance, accurate copy.
+  return (
+    <PopoverContent
+      side={collapsed ? 'right' : 'bottom'}
+      align="start"
+      sideOffset={8}
+      className="w-72 p-1 rounded-xl border border-border/70"
+    >
+      {userEmail && (
+        <div className="flex items-center gap-2 px-2.5 py-2">
+          <span className="flex-1 truncate text-[12px] text-foreground/85">
+            {userEmail}
+          </span>
+          <ChevronsUpDown
+            size={12}
+            strokeWidth={1.75}
+            className="text-muted-foreground/60 flex-shrink-0"
+          />
         </div>
       )}
-    </div>
+      {userEmail && <div className="my-1 mx-1 h-px bg-border/60" />}
+      <div className="space-y-0.5">
+        {workspaces.map((w, idx) => {
+          const Icon = w.icon;
+          const shortcut = `⌘${idx + 1}`;
+          return (
+            <Link
+              key={w.key}
+              href={w.href}
+              className={cn(
+                'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
+                w.isCurrent
+                  ? 'bg-foreground/[0.04] text-foreground'
+                  : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
+              )}
+            >
+              <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+                <Icon size={12} className="text-foreground/80" />
+              </div>
+              <span className="flex-1 truncate font-medium">{w.name}</span>
+              {w.isCurrent ? (
+                <Check
+                  size={13}
+                  strokeWidth={2}
+                  className="text-blue-500 flex-shrink-0"
+                />
+              ) : (
+                <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+                  {shortcut}
+                </kbd>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+      <div className="my-1 mx-1 h-px bg-border/60" />
+      <Link
+        href={hasTeam ? '/brokerage' : '/brokerage'}
+        className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
+      >
+        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
+        <span className="flex-1 text-left">
+          {hasTeam ? 'New team' : 'Create or join a team'}
+        </span>
+        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
+          ⌘A
+        </kbd>
+      </Link>
+    </PopoverContent>
   );
 }
 
@@ -1137,6 +1168,7 @@ export function Sidebar({
             spaceName={spaceName}
             brokerageMemberships={brokerageMemberships}
             isOnBrokerPage={isOnBrokerPage}
+            userEmail={userEmail}
           />
 
           <div className="mt-3">
@@ -1319,6 +1351,7 @@ function RealtorSidebarShell({
           isOnBrokerPage={isOnBrokerPage}
           collapsed={collapsed}
           showQuickCreate
+          userEmail={email}
         />
 
         {/* Search */}
