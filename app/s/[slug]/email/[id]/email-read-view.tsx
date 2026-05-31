@@ -28,7 +28,7 @@ import {
   PRIMARY_PILL,
   GHOST_PILL,
 } from '@/lib/typography';
-import { EmailComposeDialog } from '../email-inbox-view';
+import { EmailComposeDialog } from '@/components/communication/email-inbox-view';
 
 interface EmailMessage {
   id: string;
@@ -175,7 +175,7 @@ export function EmailReadView({
     <div className="h-full overflow-y-auto">
       <div className="w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-6 max-w-3xl">
         <Link
-          href={`/s/${slug}/email`}
+          href={`/s/${slug}/communication?tab=email`}
           className={cn(
             'inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors',
           )}
