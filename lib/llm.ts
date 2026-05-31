@@ -70,3 +70,52 @@ export function openaiModel(name: string): string {
 export const EMBEDDING_MODEL = isOpenRouterConfigured()
   ? 'openai/text-embedding-3-small'
   : 'text-embedding-3-small';
+
+/**
+ * Return the OpenRouter provider prefix from a model slug. Mirrors
+ * `detect_provider` in `agent/llm.py` — keep the two in sync.
+ *
+ *   'anthropic/claude-opus-4.7' -> 'anthropic'
+ *   'openai/gpt-5.5'            -> 'openai'
+ *   'x-ai/grok-4.3'             -> 'xai'   (dash normalized out)
+ *   'deepseek/deepseek-chat'    -> 'deepseek'
+ *   'google/gemini-2.5-pro'     -> 'google'
+ *   bare 'gpt-5'                -> 'openai' (OpenAI-direct fallback)
+ *
+ * Drives the ChatUsage.provider column and Usage page breakdown. Per-
+ * provider caching support on OpenRouter:
+ *   - anthropic: explicit `cache_control` markers, ~90% discount on
+ *     cached input after first hit.
+ *   - openai / deepseek: automatic on stable prefixes >1024 tokens,
+ *     ~50% discount.
+ *   - xai / google: no caching path today; Phase 1 trim is the only saving.
+ */
+export function detectProvider(model: string | null | undefined): string {
+  if (!model) return 'unknown';
+  if (!model.includes('/')) return 'openai';
+  const prefix = model.split('/', 1)[0].toLowerCase().replace(/-/g, '');
+  return prefix || 'unknown';
+}
+
+/**
+ * Human-friendly provider labels for the Usage page breakdown. Anything
+ * not in the table renders as the raw prefix.
+ */
+export const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic Claude',
+  openai: 'OpenAI',
+  xai: 'xAI Grok',
+  deepseek: 'DeepSeek',
+  google: 'Google Gemini',
+  moonshotai: 'Moonshot Kimi',
+  qwen: 'Qwen',
+  unknown: 'Other',
+};
+
+/**
+ * Providers where OpenRouter caches input tokens. The realtor should see
+ * a meaningful hit rate over time on these. xAI / Google fall back to
+ * Phase 1's prompt trim only, so a 0% rate there is correct — not a bug
+ * worth surfacing.
+ */
+export const CACHING_PROVIDERS = new Set(['anthropic', 'openai', 'deepseek']);
