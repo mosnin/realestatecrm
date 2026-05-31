@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,10 +15,11 @@ import { CollapsedTooltip } from '@/components/dashboard/sidebar-collapse';
 // expanded at a time) is naturally enforced without per-item bookkeeping.
 //
 // Behaviour contract:
-//   - Parents WITH children render a chevron at the right edge. Tapping
-//     anywhere on the row toggles expansion — the row IS the affordance,
-//     not a separate chevron-only target. The parent route itself is not
-//     navigable from the sidebar in this mode; the children are the doors.
+//   - Parents WITH children: the row's label + icon link to the parent
+//     route (Chippi → /chippi, Properties → /properties); a separate
+//     chevron button at the right edge toggles expansion. Tap the label
+//     to navigate (auto-expands on first navigate). Tap the chevron to
+//     collapse without leaving the page.
 //   - Parents WITHOUT children navigate to `item.href` on tap. No chevron.
 //   - Children animate in/out with height + opacity, standard app easing
 //     (220–260ms, [0.22, 1, 0.36, 1]).
@@ -64,27 +64,12 @@ export function SidebarNavItem({
   const hasChildren = !!(item.children && item.children.length > 0);
   const href = `${base}${item.href}`;
 
-  // Row click handler when the parent has children. The whole row is the
-  // toggle affordance — tap label, tap icon, tap chevron, all toggle.
-  // Single affordance, single outcome. Children are how the realtor
-  // navigates; the parent is the section header.
-  const handleParentToggle = useCallback(() => {
-    onToggle();
-  }, [onToggle]);
-
   const tooltipLabel = badgeText ? `${item.label} · ${badgeText}` : item.label;
 
-  // Shared inner content for the parent row (icon + label + badge + chevron).
-  // Rendered inside either a <button> (when the row toggles) or a <Link>
-  // (when the row navigates). Pulled out so both branches stay in sync.
-  const rowContent = (
+  // Shared inner content for the label/icon side of the parent row.
+  // Excludes the chevron — that lives in its own sibling button.
+  const linkContent = (
     <>
-      {isActive && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-        />
-      )}
       {item.isAI ? (
         <img
           src="/chip-avatar.png"
@@ -106,18 +91,19 @@ export function SidebarNavItem({
 
       {!collapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
       {!collapsed && badge}
+    </>
+  );
 
-      {!collapsed && hasChildren && (
-        <ChevronDown
-          size={12}
-          strokeWidth={1.75}
-          className={cn(
-            'flex-shrink-0 -mr-1 text-muted-foreground/60 transition-transform ease-out',
-            isExpanded && 'rotate-180',
-          )}
-          style={{ transitionDuration: `${CHEVRON_TRANSITION_MS}ms` }}
+  // Full row content for the no-children case (Link wraps everything).
+  const rowContent = (
+    <>
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
         />
       )}
+      {linkContent}
     </>
   );
 
@@ -135,18 +121,53 @@ export function SidebarNavItem({
     <div>
       <CollapsedTooltip enabled={collapsed} label={tooltipLabel}>
         {hasChildren && !collapsed ? (
-          // Parent with children → the entire row toggles expansion. No
-          // navigation on row tap. Per spec: "Tapping a parent row: if it
-          // has children, toggle expansion. If it has no children, navigate."
-          <button
-            type="button"
-            onClick={handleParentToggle}
-            aria-expanded={isExpanded}
-            aria-controls={`nav-children-${item.href}`}
-            className={cn(rowClasses, 'w-full')}
+          // Parent with children → label/icon link navigates to the parent
+          // route AND auto-expands; chevron is a separate button that
+          // toggles expansion without navigating. Two affordances, one row.
+          <div
+            className={cn(
+              'group relative rounded-md text-[13px] transition-colors duration-150',
+              'flex items-center h-9 pl-3 pr-1',
+              isActive
+                ? 'bg-foreground/[0.045] text-foreground font-medium'
+                : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+            )}
           >
-            {rowContent}
-          </button>
+            {isActive && (
+              <span
+                aria-hidden
+                className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+              />
+            )}
+            <Link
+              href={href}
+              onClick={() => {
+                onNavigate?.();
+                if (!isExpanded) onToggle();
+              }}
+              className="flex-1 flex items-center gap-2.5 min-w-0"
+            >
+              {linkContent}
+            </Link>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={isExpanded}
+              aria-controls={`nav-children-${item.href}`}
+              aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+              className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors"
+            >
+              <ChevronDown
+                size={12}
+                strokeWidth={1.75}
+                className={cn(
+                  'transition-transform ease-out',
+                  isExpanded && 'rotate-180',
+                )}
+                style={{ transitionDuration: `${CHEVRON_TRANSITION_MS}ms` }}
+              />
+            </button>
+          </div>
         ) : (
           // Parent without children (or collapsed rail) → plain navigation.
           // Rail-mode parents with children also fall here: the icon links
