@@ -268,7 +268,7 @@ export default async function BrokerLeadsPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Leads.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Leads
+          Your brokerage&rsquo;s intake
         </h1>
         <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>

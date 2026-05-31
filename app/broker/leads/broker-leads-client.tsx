@@ -1,28 +1,21 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
   Search,
   UserPlus,
   UserMinus,
   Check,
-  PhoneIncoming,
-  Users,
   CalendarClock,
   Handshake,
-  ArrowRight,
   Clock,
   MessageSquare,
   ChevronDown,
   ChevronUp,
   Loader2,
-  Home,
-  Key,
   Trash2,
+  Inbox,
 } from 'lucide-react';
 import {
   Dialog,
@@ -33,7 +26,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { formatCompact } from '@/lib/formatting';
+import { formatCompact, getInitials } from '@/lib/formatting';
+import {
+  BODY_MUTED,
+  GHOST_PILL,
+  PRIMARY_PILL,
+  SECTION_LABEL,
+} from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,35 +83,32 @@ interface Props {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function scoreBadge(label: string | null) {
+function scorePill(label: string | null) {
   if (!label) return null;
   const l = label.toLowerCase();
-  let className = 'bg-muted text-muted-foreground';
-  if (l === 'hot') className = 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400';
-  if (l === 'warm') className = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
-  if (l === 'cold') className = 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400';
+  const className =
+    l === 'hot'
+      ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
+      : l === 'warm'
+        ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+        : l === 'cold'
+          ? 'text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-500/15'
+          : 'text-muted-foreground bg-muted/60';
   return (
-    <Badge variant="secondary" className={className}>
+    <span
+      className={cn(
+        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+        className,
+      )}
+    >
       {label}
-    </Badge>
+    </span>
   );
 }
 
-function leadTypeBadge(leadType: 'rental' | 'buyer' | null) {
-  if (leadType === 'buyer') {
-    return (
-      <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
-        <Key size={10} className="mr-1" />
-        Buyer
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="secondary" className="bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">
-      <Home size={10} className="mr-1" />
-      Rental
-    </Badge>
-  );
+function leadTypeLabel(leadType: 'rental' | 'buyer' | null) {
+  if (!leadType) return null;
+  return leadType === 'buyer' ? 'Buyer' : 'Rental';
 }
 
 function formatDate(iso: string) {
@@ -120,15 +117,6 @@ function formatDate(iso: string) {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-function initials(name: string | null, email: string | null) {
-  const str = name || email || '?';
-  return str
-    .split(/[\s@]+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 function relativeTime(iso: string | null) {
@@ -144,42 +132,27 @@ function relativeTime(iso: string | null) {
   return formatDate(iso);
 }
 
-function stageBadge(stage: AssignedLeadProgress['currentStage']) {
+function stagePill(stage: AssignedLeadProgress['currentStage']) {
   const styles: Record<string, string> = {
-    QUALIFICATION: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-    TOUR: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
-    APPLICATION: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',
+    QUALIFICATION: 'text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-500/15',
+    TOUR: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15',
+    APPLICATION:
+      'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
   };
   const labels: Record<string, string> = {
-    QUALIFICATION: 'Qualification',
+    QUALIFICATION: 'Qualifying',
     TOUR: 'Tour',
-    APPLICATION: 'Application',
+    APPLICATION: 'Applied',
   };
   return (
-    <Badge variant="secondary" className={styles[stage] ?? 'bg-muted text-muted-foreground'}>
+    <span
+      className={cn(
+        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+        styles[stage] ?? 'text-muted-foreground bg-muted/60',
+      )}
+    >
       {labels[stage] ?? stage}
-    </Badge>
-  );
-}
-
-function stageProgress(stage: AssignedLeadProgress['currentStage']) {
-  const stages = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
-  const idx = stages.indexOf(stage);
-  return (
-    <div className="flex items-center gap-1">
-      {stages.map((s, i) => (
-        <div key={s} className="flex items-center gap-1">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              i <= idx ? 'bg-primary' : 'bg-muted-foreground/20'
-            }`}
-          />
-          {i < stages.length - 1 && (
-            <div className={`w-3 h-px ${i < idx ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
-          )}
-        </div>
-      ))}
-    </div>
+    </span>
   );
 }
 
@@ -211,16 +184,20 @@ function RealtorPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          type="button"
           disabled={disabled}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+          className={cn(
+            PRIMARY_PILL,
+            'h-8 px-3 text-xs disabled:opacity-50 disabled:pointer-events-none',
+          )}
         >
-          <UserPlus size={13} />
-          Assign
+          <UserPlus size={12} />
+          Route
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-0">
-        <div className="p-2 border-b border-border">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/50">
+        <div className="border-b border-border/60 px-2 py-1.5">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
             <Search size={13} className="text-muted-foreground flex-shrink-0" />
             <input
               type="text"
@@ -232,22 +209,25 @@ function RealtorPicker({
             />
           </div>
         </div>
-        <div className="max-h-52 overflow-y-auto py-1">
+        <div className="max-h-60 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-muted-foreground text-center">No realtors match.</p>
+            <p className="px-4 py-3 text-xs text-muted-foreground text-center">
+              No realtors match.
+            </p>
           ) : (
             filtered.map((r) => (
               <button
                 key={r.userId}
+                type="button"
                 onClick={() => {
                   onSelect(r);
                   setOpen(false);
                   setSearch('');
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
               >
-                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-semibold flex-shrink-0">
-                  {initials(r.name, r.email)}
+                <div className="w-7 h-7 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-[10px] font-semibold flex-shrink-0">
+                  {getInitials(r.name ?? r.email)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{r.name ?? r.email}</p>
@@ -303,14 +283,14 @@ function LeadNotes({ contactId }: { contactId: string }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "We couldn't save that note.");
+        throw new Error(data.error || "I couldn't save that note.");
       }
       const data = await res.json();
       setNotes(data.updatedNotes);
       if (textareaRef.current) textareaRef.current.value = '';
       toast.success('Note saved.');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "We couldn't save that note.");
+      toast.error(err instanceof Error ? err.message : "I couldn't save that note.");
     } finally {
       setSaving(false);
     }
@@ -325,7 +305,7 @@ function LeadNotes({ contactId }: { contactId: string }) {
           ref={textareaRef}
           placeholder="Add a note…"
           rows={2}
-          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs resize-none placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+          className="flex-1 rounded-md border border-border/70 bg-background px-3 py-2 text-xs resize-none placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -334,11 +314,12 @@ function LeadNotes({ contactId }: { contactId: string }) {
           }}
         />
         <button
+          type="button"
           disabled={saving}
           onClick={() => {
             if (textareaRef.current) handleAddNote(textareaRef.current.value);
           }}
-          className="self-end px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className={cn(PRIMARY_PILL, 'self-end h-8 px-3 text-xs disabled:opacity-50')}
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
         </button>
@@ -386,11 +367,11 @@ function UnassignedRow({
     setDeleting(true);
     try {
       const res = await fetch(`/api/contacts/${lead.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error("We couldn't delete that lead.");
+      if (!res.ok) throw new Error("I couldn't delete that lead.");
       toast.success('Lead deleted.');
       onDeleted(lead.id);
     } catch {
-      toast.error("We couldn't delete that lead.");
+      toast.error("I couldn't delete that lead.");
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
@@ -407,84 +388,107 @@ function UnassignedRow({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "We couldn't assign that lead.");
+        throw new Error(data.error || "I couldn't route that lead.");
       }
       toast.success(`Routed to ${realtor.name ?? realtor.email}.`);
       onAssigned(lead.id, realtor);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "We couldn't assign that lead.");
+      toast.error(err instanceof Error ? err.message : "I couldn't route that lead.");
     } finally {
       setAssigning(false);
     }
   }
 
+  const typeLabel = leadTypeLabel(lead.leadType);
+
   return (
-    <div className="border-b border-border last:border-b-0">
-      <div className="flex items-center gap-4 px-4 py-3">
-        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
-          {initials(lead.name, lead.email)}
+    <li>
+      <div className="group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-muted/30 transition-colors">
+        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+          {getInitials(lead.name || lead.email || '?')}
         </div>
 
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
-            {leadTypeBadge(lead.leadType)}
-            {scoreBadge(lead.scoreLabel)}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-foreground truncate">
+              {lead.name || 'Unnamed'}
+            </span>
+            {scorePill(lead.scoreLabel)}
+            {typeLabel && (
+              <span className="text-[10px] font-medium text-muted-foreground/80 flex-shrink-0">
+                {typeLabel}
+              </span>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-            {lead.email && <span>{lead.email}</span>}
-            {lead.phone && <span>{lead.phone}</span>}
-            {lead.budget != null && <span>{formatCompact(lead.budget)} budget</span>}
-            <span>{relativeTime(lead.createdAt)}</span>
-          </div>
+          {(lead.email || lead.phone || lead.budget != null) && (
+            <div className="mt-0.5 text-xs text-muted-foreground truncate">
+              {lead.email && <span>{lead.email}</span>}
+              {lead.email && lead.phone && (
+                <span className="text-muted-foreground/40"> · </span>
+              )}
+              {lead.phone && <span className="tabular-nums">{lead.phone}</span>}
+              {(lead.email || lead.phone) && lead.budget != null && (
+                <span className="text-muted-foreground/40"> · </span>
+              )}
+              {lead.budget != null && (
+                <span className="tabular-nums">{formatCompact(lead.budget)}</span>
+              )}
+            </div>
+          )}
         </div>
 
-        <button
-          onClick={() => setShowNotes(!showNotes)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
-          title="Notes"
-        >
-          <MessageSquare size={13} />
-          {showNotes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-        </button>
-
-        <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
-
-        {confirmDelete ? (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-2 py-1 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-            >
-              {deleting ? '…' : 'Yes'}
-            </button>
-            <button
-              onClick={() => setConfirmDelete(false)}
-              className="px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-muted"
-            >
-              No
-            </button>
-          </div>
-        ) : (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="hidden sm:inline text-[11px] text-muted-foreground tabular-nums">
+            {relativeTime(lead.createdAt)}
+          </span>
           <button
-            onClick={() => setConfirmDelete(true)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-            title="Delete lead"
+            type="button"
+            onClick={() => setShowNotes(!showNotes)}
+            aria-label="Toggle notes"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            <Trash2 size={13} />
+            <MessageSquare size={13} />
           </button>
-        )}
+          <RealtorPicker realtors={realtors} onSelect={handleAssign} disabled={assigning} />
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-2 h-7 text-[11px] font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleting ? '…' : 'Delete'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="px-2 h-7 text-[11px] font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              >
+                Keep
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              aria-label={`Delete ${lead.name}`}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-opacity opacity-0 group-hover/row:opacity-100"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {showNotes && (
-        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
-          <div className="rounded-lg bg-muted/40 border border-border p-3">
+        <div className="pb-3 pl-[calc(32px+0.75rem)]">
+          <div className="rounded-lg bg-muted/30 border border-border/60 p-3">
             <LeadNotes contactId={lead.id} />
           </div>
         </div>
       )}
-    </div>
+    </li>
   );
 }
 
@@ -516,100 +520,126 @@ function AssignedRow({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "We couldn't unassign that lead.");
+        throw new Error(data.error || "I couldn't pull that lead back.");
       }
       toast.success(`Pulled back from ${realtorName}.`);
       setConfirmOpen(false);
       onUnassigned?.(lead.id, realtorName);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "We couldn't unassign that lead.");
+      toast.error(err instanceof Error ? err.message : "I couldn't pull that lead back.");
     } finally {
       setUnassigning(false);
     }
   }
 
+  const canExpand = !!progress;
+  const typeLabel = leadTypeLabel(lead.leadType);
+
   return (
-    <div className="border-b border-border last:border-b-0">
+    <li>
       <div
-        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
-        onClick={() => progress && setExpanded(!expanded)}
+        role={canExpand ? 'button' : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        onClick={() => canExpand && setExpanded(!expanded)}
+        onKeyDown={(e) => {
+          if (canExpand && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+        className={cn(
+          'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors',
+          canExpand ? 'cursor-pointer hover:bg-muted/30' : 'hover:bg-muted/30',
+        )}
       >
-        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
-          {initials(lead.name, lead.email)}
+        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+          {getInitials(lead.name || lead.email || '?')}
         </div>
 
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
-            {leadTypeBadge(lead.leadType)}
-            {progress ? stageBadge(progress.currentStage) : scoreBadge(lead.scoreLabel)}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-foreground truncate">
+              {lead.name || 'Unnamed'}
+            </span>
+            {progress ? stagePill(progress.currentStage) : scorePill(lead.scoreLabel)}
             {progress?.hasDeal && (
-              <Badge
-                variant="secondary"
-                className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
-              >
-                <Handshake size={10} className="mr-1" />
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15 flex-shrink-0">
+                <Handshake size={9} />
                 Deal
-              </Badge>
+              </span>
+            )}
+            {typeLabel && (
+              <span className="text-[10px] font-medium text-muted-foreground/80 flex-shrink-0">
+                {typeLabel}
+              </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-            {(progress?.realtorName ?? lead.assignedTo) && (
-              <span className="inline-flex items-center gap-1">
-                <Check size={10} className="text-green-600" />
-                {progress?.realtorName ?? lead.assignedTo}
-              </span>
-            )}
-            {progress && stageProgress(progress.currentStage)}
+          <div className="mt-0.5 text-xs text-muted-foreground truncate flex items-center gap-1.5">
+            <Check size={10} className="text-emerald-600 flex-shrink-0" />
+            <span className="truncate">{realtorName}</span>
             {progress?.lastActivityAt && (
-              <span className="inline-flex items-center gap-1">
-                <Clock size={10} />
-                {relativeTime(progress.lastActivityAt)}
-              </span>
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <Clock size={10} className="flex-shrink-0" />
+                <span>{relativeTime(progress.lastActivityAt)}</span>
+              </>
             )}
             {progress?.hasFollowUp && (
-              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                <CalendarClock size={10} />
-                Follow-up set
-              </span>
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <CalendarClock size={10} className="text-amber-600 flex-shrink-0" />
+                <span className="text-amber-700 dark:text-amber-400">Follow-up set</span>
+              </>
             )}
-            {!progress && lead.assignedAt && <span>Assigned {formatDate(lead.assignedAt)}</span>}
+            {!progress && lead.assignedAt && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span>Routed {formatDate(lead.assignedAt)}</span>
+              </>
+            )}
           </div>
         </div>
 
-        {!progress && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!progress && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowNotes(!showNotes);
+              }}
+              aria-label="Toggle notes"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <MessageSquare size={13} />
+            </button>
+          )}
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setShowNotes(!showNotes);
+              setConfirmOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
-            title="Notes"
+            disabled={unassigning}
+            className={cn(
+              GHOST_PILL,
+              'h-8 px-3 text-xs hover:text-destructive disabled:opacity-50 disabled:pointer-events-none',
+            )}
+            title="Pull back"
           >
-            <MessageSquare size={13} />
-            {showNotes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            <UserMinus size={12} />
+            <span className="hidden sm:inline">Pull back</span>
           </button>
-        )}
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setConfirmOpen(true);
-          }}
-          disabled={unassigning}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 hover:border-red-300 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-          title="Pull back"
-        >
-          <UserMinus size={12} />
-          <span className="hidden sm:inline">Pull back</span>
-        </button>
-
-        {progress && (
-          <ArrowRight
-            size={14}
-            className={`text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
-          />
-        )}
+          {canExpand && (
+            <ChevronDown
+              size={14}
+              className={cn(
+                'text-muted-foreground/60 transition-transform flex-shrink-0',
+                expanded && 'rotate-180',
+              )}
+            />
+          )}
+        </div>
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -617,21 +647,23 @@ function AssignedRow({
           <DialogHeader>
             <DialogTitle>Pull this lead back?</DialogTitle>
             <DialogDescription>
-              {lead.name || 'This lead'} will be removed from {realtorName}&rsquo;s CRM and returned to the unassigned queue.
+              {lead.name || 'This lead'} comes off {realtorName}&rsquo;s plate and lands back in the unassigned queue.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <button
+              type="button"
               onClick={() => setConfirmOpen(false)}
               disabled={unassigning}
-              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+              className={cn(GHOST_PILL, 'disabled:opacity-50')}
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleUnassign}
               disabled={unassigning}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              className={cn(PRIMARY_PILL, 'disabled:opacity-50')}
             >
               {unassigning ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
               Pull back
@@ -641,54 +673,59 @@ function AssignedRow({
       </Dialog>
 
       {expanded && progress && (
-        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
-          <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-3">
+        <div className="pb-3 pl-[calc(32px+0.75rem)]">
+          <div className="rounded-lg bg-muted/30 border border-border/60 p-3 space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Realtor</p>
-                <p className="font-medium">{progress.realtorName}</p>
+                <p className={SECTION_LABEL}>Realtor</p>
+                <p className="mt-0.5 font-medium text-foreground">{progress.realtorName}</p>
               </div>
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Stage</p>
-                <p className="font-medium">
+                <p className={SECTION_LABEL}>Stage</p>
+                <p className="mt-0.5 font-medium text-foreground">
                   {progress.currentStage.charAt(0) + progress.currentStage.slice(1).toLowerCase()}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Score</p>
-                <p className="font-medium">
+                <p className={SECTION_LABEL}>Score</p>
+                <p className="mt-0.5 font-medium text-foreground">
                   {progress.currentScore != null ? progress.currentScore : '—'}
                   {progress.currentScoreLabel && (
-                    <span className="ml-1 text-muted-foreground">({progress.currentScoreLabel})</span>
+                    <span className="ml-1 text-muted-foreground font-normal">
+                      ({progress.currentScoreLabel})
+                    </span>
                   )}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Assigned</p>
-                <p className="font-medium">{formatDate(progress.assignedAt)}</p>
+                <p className={SECTION_LABEL}>Routed</p>
+                <p className="mt-0.5 font-medium text-foreground">{formatDate(progress.assignedAt)}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Last activity</p>
-                <p className="font-medium">
+                <p className={SECTION_LABEL}>Last activity</p>
+                <p className="mt-0.5 font-medium text-foreground">
                   {progress.lastActivityAt ? relativeTime(progress.lastActivityAt) : 'Nothing yet'}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Follow-up</p>
-                <p className="font-medium">
+                <p className={SECTION_LABEL}>Follow-up</p>
+                <p className="mt-0.5 font-medium text-foreground">
                   {progress.followUpAt ? formatDate(progress.followUpAt) : 'None scheduled'}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground font-medium mb-0.5">Deal</p>
-                <p className="font-medium">{progress.hasDeal ? 'Open' : 'None'}</p>
+                <p className={SECTION_LABEL}>Deal</p>
+                <p className="mt-0.5 font-medium text-foreground">
+                  {progress.hasDeal ? 'Open' : 'None'}
+                </p>
               </div>
             </div>
 
-            <div className="border-t border-border pt-3">
+            <div className="border-t border-border/60 pt-3">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowNotes(!showNotes);
@@ -706,12 +743,32 @@ function AssignedRow({
       )}
 
       {showNotes && !progress && (
-        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
-          <div className="rounded-lg bg-muted/40 border border-border p-3">
+        <div className="pb-3 pl-[calc(32px+0.75rem)]">
+          <div className="rounded-lg bg-muted/30 border border-border/60 p-3">
             <LeadNotes contactId={lead.id} />
           </div>
         </div>
       )}
+    </li>
+  );
+}
+
+// ── Section header — SECTION_LABEL with count and optional hint ───────────────
+
+function SectionHeader({
+  label,
+  count,
+  hint,
+}: {
+  label: string;
+  count: number;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+      <h2 className={SECTION_LABEL}>{label}</h2>
+      <span className="text-[11px] text-muted-foreground tabular-nums">{count}</span>
+      {hint && <span className="ml-auto text-[11px] text-muted-foreground">{hint}</span>}
     </div>
   );
 }
@@ -726,7 +783,6 @@ export function BrokerLeadsClient({
 }: Props) {
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
-  const [tab, setTab] = useState(unassignedLeads.length > 0 ? 'unassigned' : 'assigned');
   const [search, setSearch] = useState('');
 
   const applySearch = useCallback(
@@ -758,7 +814,6 @@ export function BrokerLeadsClient({
       },
       ...prev,
     ]);
-    setTab('assigned');
   }
 
   function handleUnassigned(leadId: string) {
@@ -769,98 +824,105 @@ export function BrokerLeadsClient({
       { ...lead, assignedTo: null, assignedAt: null },
       ...prev,
     ]);
-    setTab('unassigned');
   }
 
+  const hasAnyLeads = unassigned.length > 0 || assigned.length > 0;
+  const isSearching = !!search.trim();
+
   return (
-    <div className="space-y-4">
-      {/* Search — the only chrome. View toggles, sort dropdown, lead type filter,
-          score pills, and "Add Lead" button all cut. Brokers don't manually add
-          leads; intake forms do. */}
-      <div className="relative w-full sm:w-80">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search by name, email, or phone…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </div>
+    <div className="space-y-8 pb-56 md:pb-24">
+      {/* Search — the only chrome. View toggles, sort dropdown, lead type
+          filter, score pills, and "Add Lead" button all cut. Brokers don't
+          manually add leads; intake forms do. */}
+      {hasAnyLeads && (
+        <div className="relative w-full sm:w-80">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
+          <input
+            type="text"
+            placeholder="Search by name, email, or phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-md border border-border/70 bg-background pl-9 pr-3 h-9 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+      )}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="unassigned" className="gap-1.5">
-            <PhoneIncoming size={14} />
-            Unassigned
-            {filteredUnassigned.length > 0 && (
-              <span className="ml-1 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold tabular-nums">
-                {filteredUnassigned.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="assigned" className="gap-1.5">
-            <Users size={14} />
-            Assigned
-            {filteredAssigned.length > 0 && (
-              <span className="ml-1 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-semibold tabular-nums">
-                {filteredAssigned.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+      {/* Fresh-brokerage empty state — no leads at all. Canonical dashed card,
+          one sentence, first-person Chippi voice. */}
+      {!hasAnyLeads && (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+          <Inbox size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+          <p className="text-base text-foreground">No leads yet.</p>
+          <p className={cn(BODY_MUTED, 'mt-1.5')}>
+            Your intake form will land them here — I&rsquo;ll route them to your team.
+          </p>
+        </div>
+      )}
 
-        <TabsContent value="unassigned">
+      {/* Unassigned — the one demanding routing. Shown first so it's the
+          first thing the broker reaches for. */}
+      {hasAnyLeads && (
+        <section className="space-y-2">
+          <SectionHeader
+            label="Unassigned"
+            count={filteredUnassigned.length}
+            hint={filteredUnassigned.length > 0 ? 'Route to a realtor' : undefined}
+          />
           {filteredUnassigned.length === 0 ? (
-            <Card>
-              <CardContent className="px-5 py-10 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {search.trim() ? 'No matches.' : 'Inbox empty. Every lead is on someone’s plate.'}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+              <p className="text-sm text-foreground">
+                {isSearching
+                  ? 'No matches in the unassigned queue.'
+                  : "Caught up. Every lead is on someone's plate."}
+              </p>
+            </div>
           ) : (
-            <Card>
-              <CardContent className="p-0">
-                {filteredUnassigned.map((lead) => (
-                  <UnassignedRow
-                    key={lead.id}
-                    lead={lead}
-                    realtors={realtors}
-                    onAssigned={handleAssigned}
-                    onDeleted={(id) => setUnassigned((prev) => prev.filter((l) => l.id !== id))}
-                  />
-                ))}
-              </CardContent>
-            </Card>
+            <ul className="divide-y divide-border/60">
+              {filteredUnassigned.map((lead) => (
+                <UnassignedRow
+                  key={lead.id}
+                  lead={lead}
+                  realtors={realtors}
+                  onAssigned={handleAssigned}
+                  onDeleted={(id) =>
+                    setUnassigned((prev) => prev.filter((l) => l.id !== id))
+                  }
+                />
+              ))}
+            </ul>
           )}
-        </TabsContent>
+        </section>
+      )}
 
-        <TabsContent value="assigned">
+      {/* Routed — what your team is working on. Quieter section. */}
+      {hasAnyLeads && (
+        <section className="space-y-2">
+          <SectionHeader label="Routed" count={filteredAssigned.length} />
           {filteredAssigned.length === 0 ? (
-            <Card>
-              <CardContent className="px-5 py-10 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {search.trim() ? 'No matches.' : 'Nothing routed yet.'}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+              <p className="text-sm text-foreground">
+                {isSearching
+                  ? 'No matches in the routed list.'
+                  : "Nothing on a realtor's plate yet."}
+              </p>
+            </div>
           ) : (
-            <Card>
-              <CardContent className="p-0">
-                {filteredAssigned.map((lead) => (
-                  <AssignedRow
-                    key={lead.id}
-                    lead={lead}
-                    progress={assignedLeadProgress[lead.id]}
-                    onUnassigned={handleUnassigned}
-                  />
-                ))}
-              </CardContent>
-            </Card>
+            <ul className="divide-y divide-border/60">
+              {filteredAssigned.map((lead) => (
+                <AssignedRow
+                  key={lead.id}
+                  lead={lead}
+                  progress={assignedLeadProgress[lead.id]}
+                  onUnassigned={handleUnassigned}
+                />
+              ))}
+            </ul>
           )}
-        </TabsContent>
-      </Tabs>
+        </section>
+      )}
     </div>
   );
 }
