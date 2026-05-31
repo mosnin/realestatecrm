@@ -377,7 +377,13 @@ async def chat_turn(item: dict):
     from chippi import make_chippi_agent
     from chippi_broker import make_broker_agent
     from config import settings
-    from llm import extract_usage_with_cache, fallback_models, make_chat_model, resolve_chat_model
+    from llm import (
+        decide_reasoning_effort,
+        extract_usage_with_cache,
+        fallback_models,
+        make_chat_model,
+        resolve_chat_model,
+    )
     from tools.base import result_is_ok
 
     agent_settings = AgentSettings.model_validate(sr.data)
@@ -542,12 +548,16 @@ async def chat_turn(item: dict):
             input_items.append({"role": role, "content": str(content)})
     input_items.append({"role": "user", "content": user_content})
 
+    # Reasoning effort — "low" by default (Phase 1 / PR #155). Phase 3
+    # escalates to "medium" when the user message smells like planning or
+    # research ("build a plan", "step by step", "compare X to Y", "audit
+    # my pipeline"). See agent/llm.py:decide_reasoning_effort.
+    reasoning_effort = decide_reasoning_effort(message)
     run_config = RunConfig(
         # Tracing exports only reach OpenAI's backend; disable on a pure-
         # OpenRouter deploy, which may carry no OpenAI key at all.
         tracing_disabled=bool(settings.openrouter_api_key),
-        # low default; planner/research skills can escalate later via Phase 2.
-        model_settings=ModelSettings(reasoning=Reasoning(effort="low")),
+        model_settings=ModelSettings(reasoning=Reasoning(effort=reasoning_effort)),
     )
 
     # Load this realtor's connected-toolkit tools (Gmail, Slack, HubSpot,

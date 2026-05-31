@@ -38,7 +38,13 @@ from schemas import AgentSettings, Space
 from security.budget import acquire_run_lock, check_budget, record_usage, release_run_lock
 from security.context import AgentContext
 from chippi import load_ai_profile, make_chippi_agent
-from llm import extract_usage, fallback_models, make_chat_model, resolve_chat_model
+from llm import (
+    decide_reasoning_effort,
+    extract_usage_with_cache,
+    fallback_models,
+    make_chat_model,
+    resolve_chat_model,
+)
 from tools.streaming import publish_event
 from tools.base import result_is_ok
 from trajectories import normalize_tool_call, record_trajectory
@@ -550,22 +556,33 @@ async def _run_locked(
     )
     prompt = _build_opening_prompt(space, memory_context, triggers, instruction)
 
+    # Reasoning effort — parity with the chat path. Default "low" (Phase 1
+    # PR #155 stopped paying reasoning tokens on routine sweeps); escalate
+    # to "medium" when the routine instruction reads like planning ("build
+    # a plan", "step by step", etc). Sweep mode passes "" and stays "low".
+    # See agent/llm.py:decide_reasoning_effort.
+    reasoning_effort = decide_reasoning_effort(instruction or "")
     run_config = RunConfig(
         max_turns=settings.coordinator_max_turns,
         # Tracing exports only reach OpenAI's backend; disable on a pure-
         # OpenRouter deploy, which may carry no OpenAI key at all.
         tracing_disabled=bool(settings.openrouter_api_key),
+        # truncation="auto" was a Responses-API thing — OpenRouter speaks
+        # Chat Completions and ignores it. Dropped in Phase 3 (it was dead
+        # weight; the chat path dropped it in Phase 1 PR #155).
         model_settings=ModelSettings(
             max_tokens=settings.max_output_tokens,
-            truncation="auto",
-            # Parity with the chat path. Autonomous runs make unsupervised
-            # judgement calls — they need reasoning effort at least as much
-            # as chat, where it was already set to "medium".
-            reasoning=Reasoning(effort="medium"),
+            reasoning=Reasoning(effort=reasoning_effort),
         ),
     )
 
     total_tokens = 0
+    # Phase 3: cached-input tokens served from the provider's prompt cache,
+    # and the provider prefix derived from the model slug at end-of-run.
+    # Mirrors record_chat_usage's cachedTokens/provider so the autonomous
+    # surface can show the same cache-hit-rate stat as the chat surface.
+    cached_tokens = 0
+    provider_used = "unknown"
     final_summary: str | None = None
 
     # Per-tool stream emitter — publishes each tool call/result to Redis so
@@ -599,18 +616,18 @@ async def _run_locked(
         )
 
     # Initialize before the try so exception handlers (and the success-path
-    # log on line 602) can reference it without raising NameError. If
-    # _run_with_fallback or extract_usage throws before line 601's
-    # reassignment fires, the trajectory write at 622 / 658 would otherwise
-    # blow up — losing the run's audit trail on the very failure that
-    # mattered most.
+    # log below) can reference it without raising NameError. If
+    # _run_with_fallback or extract_usage_with_cache throws before the
+    # reassignment fires, the trajectory write in the except blocks would
+    # otherwise blow up — losing the run's audit trail on the very failure
+    # that mattered most.
     model_slug = "unknown"
     try:
         # Run with automatic fallback through cheaper models on a 429.
         # Streaming mode so on_event fires per tool call / result.
         result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
 
-        _, _, total_tokens = extract_usage(result)
+        _, _, total_tokens, cached_tokens = extract_usage_with_cache(result)
         ctx.tokens_used = total_tokens
 
         final_output = getattr(result, "final_output", None)
@@ -622,7 +639,17 @@ async def _run_locked(
         # writes — asyncpg can't encode the SDK object into a TEXT column,
         # so every record_trajectory call silently failed before this fix.
         model_slug = getattr(chippi.model, "model", str(chippi.model))
-        log.info("agent_run_completed", total_tokens=total_tokens, model_used=model_slug)
+        # Lazy import to keep llm's detect_provider in one place (and to
+        # avoid pulling it at module import where the test stubs don't reach).
+        from llm import detect_provider
+        provider_used = detect_provider(model_slug)
+        log.info(
+            "agent_run_completed",
+            total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
+            provider=provider_used,
+            model_used=model_slug,
+        )
 
     except InputGuardrailTripwireTriggered as exc:
         info = exc.guardrail_result.output.output_info or {}
@@ -644,6 +671,8 @@ async def _run_locked(
             trigger=(triggers[0] if triggers else None),
             model=model_slug,
             total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
+            provider=provider_used,
             tool_calls=trajectory_tool_calls,
             extra={"pending_drafts": pending},
         )
@@ -680,6 +709,8 @@ async def _run_locked(
             trigger=(triggers[0] if triggers else None),
             model=model_slug,
             total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
+            provider=provider_used,
             tool_calls=trajectory_tool_calls,
             extra={"error": str(exc)[:500]},
         )
@@ -718,6 +749,8 @@ async def _run_locked(
         trigger=(triggers[0] if triggers else None),
         model=model_slug,
         total_tokens=total_tokens,
+        cached_tokens=cached_tokens,
+        provider=provider_used,
         tool_calls=trajectory_tool_calls,
         final_summary=final_summary,
     )
