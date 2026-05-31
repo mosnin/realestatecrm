@@ -419,7 +419,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                     </div>
                   ))}
                 </>
-              ) : (
+              ) : secondaryNavItems.length > 0 ? (
                 <>
                   <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                     Account
@@ -445,7 +445,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                     );
                   })}
                 </>
-              ))}
+              ) : null)}
               <div className="flex items-center gap-2 px-3 pt-3">
                 <BrandLogo className="h-4" alt="Chippi" />
               </div>

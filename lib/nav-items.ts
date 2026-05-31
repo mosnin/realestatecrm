@@ -134,10 +134,12 @@ export const realtorNavItems: NavItem[] = [
 export const realtorMoreNavItems: NavItem[] = [];
 
 // ── Header right-side menu ───────────────────────────────────────────────────
-
-export const secondaryNavItems = [
-  { href: '/settings', label: 'Settings', icon: Settings },
-] as const;
+//
+// Intentionally empty. Settings already lives in `realtorNavItems` as a
+// primary nav row; surfacing it again in a separate "Account" section in
+// the mobile drawer was a duplicate. Kept as an extension point — add
+// Billing, Profile, or other account-level routes here when they earn it.
+export const secondaryNavItems: { href: string; label: string; icon: LucideIcon }[] = [];
 
 /** Primary items with shorter labels for the mobile bottom bar. */
 export const mobileNavItems = [
