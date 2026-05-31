@@ -1094,9 +1094,28 @@ export function ChippiWorkspace({
 
       {/* ── Today view (no active conversation) ───────────────────── */}
       {isLoadingConversation ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          One moment.
-        </div>
+        /* Skeleton mirrors the empty-state hero shape below — a centered
+           greeting-sized placeholder + a composer-sized rectangle pinned to
+           the bottom. Same shapes as app/s/[slug]/chippi/loading.tsx so the
+           in-component transition between conversations and the route-level
+           Suspense fallback feel like one calm fade, not two surfaces. */
+        <>
+          <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20">
+            <div className="w-full max-w-2xl flex flex-col items-center">
+              <div
+                className="h-10 w-2/3 max-w-md rounded-lg bg-muted/40 animate-pulse"
+                aria-hidden
+              />
+            </div>
+          </div>
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div
+              className="h-14 w-full rounded-2xl bg-muted/40 animate-pulse"
+              aria-hidden
+            />
+          </div>
+          <span className="sr-only">Loading conversation…</span>
+        </>
       ) : (
         <>
           {/* Empty-state hero. Previously wrapped in AnimatePresence with
