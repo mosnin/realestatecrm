@@ -34,6 +34,69 @@ export function ChippiBar({ slug }: Props) {
   const pathname = usePathname() ?? '';
   const onChippiPage = pathname.endsWith(`/s/${slug}/chippi`) || pathname.startsWith(`/s/${slug}/chippi/`);
 
+  // ── First-load flash fix ────────────────────────────────────────────────
+  // Soft-navigating from any workspace page to /chippi runs the route
+  // change inside Next.js' `router.push`, which is wrapped in
+  // `startTransition` (see node_modules/next/dist/client/components/
+  // app-router-instance.js:302-307). That defers the `usePathname()`
+  // context update into transition lanes, so this bar — mounted in the
+  // persistent layout chrome — keeps rendering the floating pill until
+  // the new tree's Suspense fallback commits. To the realtor that reads
+  // as "the bottom input from other pages flashed before the chat page
+  // took over." PR #139's loading.tsx covers the suspense window *after*
+  // commit; this catches the layout-chrome window *before* commit.
+  //
+  // A capture-phase document click listener notices clicks on `<a>` tags
+  // pointing at /s/<slug>/chippi and flips `hidingForChippiNav` to true
+  // synchronously, outside any transition. React processes that sync
+  // state update ahead of the route transition, so the bar is gone from
+  // the DOM by the time the navigation lands. Reset the flag once
+  // pathname catches up — or after a short safety timeout in case the
+  // click was prevented downstream.
+  const [hidingForChippiNav, setHidingForChippiNav] = useState(false);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      // Anything other than a plain left click leaves the page intact —
+      // ⌘/Ctrl-click opens a new tab, middle-click too, modifier keys
+      // change browser behavior. Pre-hiding the bar in any of those
+      // cases would hide it on the page the realtor stayed on.
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.defaultPrevented) return;
+
+      const target = e.target as HTMLElement | null;
+      const link = target?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!link) return;
+      if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+      const href = link.getAttribute('href') || '';
+      const chippiBase = `/s/${slug}/chippi`;
+      const isChippiLink =
+        href === chippiBase ||
+        href.startsWith(`${chippiBase}/`) ||
+        href.startsWith(`${chippiBase}?`);
+      if (isChippiLink) setHidingForChippiNav(true);
+    }
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [slug]);
+
+  // Clear the pre-hide flag once usePathname catches up to /chippi — at
+  // that point onChippiPage handles the hide on its own. Safety net for
+  // the rare case where the click was cancelled by a downstream handler
+  // after our capture-phase listener saw it (without this, the bar would
+  // stay hidden forever on the current page). 500ms is well past any
+  // real navigation commit but tight enough that a stuck bar is brief.
+  useEffect(() => {
+    if (!hidingForChippiNav) return;
+    if (onChippiPage) {
+      setHidingForChippiNav(false);
+      return;
+    }
+    const timer = setTimeout(() => setHidingForChippiNav(false), 500);
+    return () => clearTimeout(timer);
+  }, [hidingForChippiNav, onChippiPage]);
+
   const contextPlaceholder = useMemo(() => {
     if (pathname.includes('/contacts') || pathname.includes('/people')) {
       return 'Ask about a contact or draft a follow-up…';
@@ -178,7 +241,9 @@ export function ChippiBar({ slug }: Props) {
     isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
   // Only render the bar inside a workspace, and not on /chippi itself.
-  if (onChippiPage) return null;
+  // `hidingForChippiNav` covers the pre-commit window during a soft nav
+  // to /chippi — see the long comment up top.
+  if (onChippiPage || hidingForChippiNav) return null;
 
   // The most recent few messages — keep the panel light. Full thread lives
   // in /chippi.
