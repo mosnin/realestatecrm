@@ -82,7 +82,7 @@ export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disa
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-72 z-30 rounded-lg border border-border bg-card shadow-xl overflow-hidden">
+        <div className="absolute right-0 mt-1 w-72 z-30 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden">
           <div className="px-3 py-2 border-b border-border flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {channel} templates

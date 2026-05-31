@@ -843,7 +843,7 @@ export function TeamChatClient({
               {commandOpen && filteredCommands.length > 0 && (
                 <div
                   ref={commandListRef}
-                  className="absolute bottom-full mb-1 left-0 z-50 w-80 max-h-72 overflow-auto rounded-lg border bg-popover shadow-lg"
+                  className="absolute bottom-full mb-1 left-0 z-50 w-80 max-h-72 overflow-auto rounded-md border border-border/70 bg-popover shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
                 >
                   <div className="px-3 py-2 border-b border-border/50">
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -886,7 +886,7 @@ export function TeamChatClient({
               {mentionOpen && filteredMentions.length > 0 && (
                 <div
                   ref={mentionListRef}
-                  className="absolute bottom-full mb-1 left-0 z-50 w-80 max-h-64 overflow-auto rounded-lg border bg-popover shadow-lg"
+                  className="absolute bottom-full mb-1 left-0 z-50 w-80 max-h-64 overflow-auto rounded-md border border-border/70 bg-popover shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
                 >
                   {/* Section: Team Members */}
                   {filteredMentions.some((m) => m.type === 'member') && (
