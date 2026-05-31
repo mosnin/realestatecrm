@@ -289,7 +289,7 @@ function FlatNavItem({
  * pill triggers it via a synthetic KeyboardEvent so we don't need to plumb
  * a context. Detects platform for the kbd hint.
  */
-function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
+export function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
   const [isMac, setIsMac] = useState(true);
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
