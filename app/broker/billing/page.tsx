@@ -7,7 +7,7 @@ import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Billing — Broker Dashboard — Chippi' };
+export const metadata: Metadata = { title: 'Billing — Teams — Chippi' };
 
 export default async function BrokerBillingPage() {
   const { userId } = await auth();

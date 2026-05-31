@@ -5,7 +5,7 @@ import { TeamChatClient } from './team-chat-client';
 import type { ChatContact, TeamMember } from './team-chat-client';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Team Chat — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Team Chat — Teams' };
 
 export default async function TeamChatPage() {
   const ctx = await getBrokerMemberContext();

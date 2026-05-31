@@ -5,7 +5,7 @@ import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
 import { ResponseTimesClient, type RealtorResponseData, type WaitingLead } from './response-times-client';
 
-export const metadata: Metadata = { title: 'Response Times — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Response Times — Teams' };
 
 export default async function BrokerResponseTimesPage() {
   let ctx;

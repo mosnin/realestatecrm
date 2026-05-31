@@ -7,7 +7,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 
-export const metadata: Metadata = { title: 'Conversion Analytics — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Conversion Analytics — Teams' };
 
 export default async function BrokerAnalyticsPage() {
   let ctx;

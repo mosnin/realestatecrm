@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import ImportExportClient from './import-export-client';
 
-export const metadata = { title: 'Import / Export — Broker Dashboard' };
+export const metadata = { title: 'Import / Export — Teams' };
 
 export default async function ImportExportPage() {
   const ctx = await getBrokerContext();

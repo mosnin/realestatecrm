@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { PAGE_MAX } from '@/lib/geometry';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Broker Dashboard — Chippi' };
+export const metadata: Metadata = { title: 'Teams — Chippi' };
 
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();

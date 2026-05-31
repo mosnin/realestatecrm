@@ -7,7 +7,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
-export const metadata: Metadata = { title: 'Leads — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Leads — Teams' };
 
 export default async function BrokerLeadsPage() {
   let ctx;

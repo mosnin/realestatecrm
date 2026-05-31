@@ -138,7 +138,7 @@ function BrokerMobileNav({ pathname, slug, isBrokerOnly }: { pathname: string; s
         height: BAR_HEIGHT,
         bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       }}
-      aria-label="Brokerage"
+      aria-label="Team"
     >
       {!isBrokerOnly && slug && (
         <Link

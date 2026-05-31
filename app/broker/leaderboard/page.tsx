@@ -5,7 +5,7 @@ import { getSpaceByOwnerId } from '@/lib/space';
 import { LeaderboardClient } from './leaderboard-client';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Leaderboard — Broker Dashboard' };
+export const metadata: Metadata = { title: 'Leaderboard — Teams' };
 
 export type RealtorStats = {
   userId: string;

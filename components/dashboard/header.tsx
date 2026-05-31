@@ -202,8 +202,8 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                         {pathname.startsWith('/broker') ? <Building2 size={16} className="text-foreground" /> : <Briefcase size={16} className="text-foreground" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Brokerage') : spaceName}</p>
-                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Brokerage view' : 'My workspace'}</p>
+                        <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Team') : spaceName}</p>
+                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Team view' : 'My workspace'}</p>
                       </div>
                       <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', mobileSwitcherOpen && 'rotate-180')} />
                     </button>
@@ -227,7 +227,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                           {!pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
                         </Link>
                         <div className="border-t border-border">
-                          <p className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground">Brokerages</p>
+                          <p className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground">Teams</p>
                           <Link
                             href="/broker"
                             onClick={() => { setMobileSwitcherOpen(false); setOpen(false); }}
@@ -240,7 +240,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                               <Building2 size={16} className="text-foreground" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{brokerageName ?? 'Brokerage'}</p>
+                              <p className="text-sm font-medium truncate">{brokerageName ?? 'Team'}</p>
                               <p className="text-[10px] text-muted-foreground">{brokerageRole === 'broker_owner' ? 'Owner' : brokerageRole === 'broker_admin' ? 'Admin' : 'Member'}</p>
                             </div>
                             {pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}

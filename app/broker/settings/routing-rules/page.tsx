@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import type { DealRoutingRuleRow } from '@/lib/routing-rule-schema';
 import RulesClient from './rules-client';
 
-export const metadata = { title: 'Routing rules — Broker Dashboard' };
+export const metadata = { title: 'Routing rules — Teams' };
 
 type BrokerageMember = { userId: string; role: string; name: string | null; email: string };
 
