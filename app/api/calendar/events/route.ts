@@ -1,21 +1,23 @@
 /**
- * GET /api/calendar/events?slug=xxx
+ * GET  /api/calendar/events?slug=xxx
+ * POST /api/calendar/events    (manual event creation)
  *
- * Returns the next 30 days of events from the realtor's connected
+ * GET: returns the next 30 days of events from the realtor's connected
  * external calendar (Google Calendar via Composio). On-demand fetch —
  * no background sync, no webhook receiver, no cache layer beyond a
  * thin 60s memoization to absorb the page's own re-renders.
+ *
+ * POST: realtor-initiated manual event creation. Validates ownership,
+ * connection presence, and the payload shape; pushes to the provider
+ * via `writeEventThrough` (same helper tour booking uses) so the event
+ * appears in their actual Google Calendar AND a CalendarEventMirror
+ * row lands for forensics. Returns the created event in the same
+ * shape GET emits so the client can splice it into the visible view.
  *
  * The Chippi calendar surface is a thin read view; the realtor's
  * external calendar is the truth. If nothing's connected we return
  * `{ connected: false }` so the UI renders the connect prompt without
  * a separate roundtrip.
- *
- * Why not POST/DELETE on this route: the old chippi-owned events
- * surface had CRUD here. That surface is deleted. Events are now
- * created via tour booking (write-through to Composio) or directly in
- * the realtor's calendar — Chippi doesn't have its own "add event"
- * verb anymore.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,7 +27,12 @@ import { executeToolForEntity } from '@/lib/integrations/composio';
 import {
   PROVIDER_TOOL_SLUGS,
   findCalendarConnection,
+  writeEventThrough,
 } from '@/lib/calendar/mirror';
+import {
+  validateCreatePayload,
+  type CreateEventBody,
+} from '@/lib/calendar/event-validation';
 
 export const runtime = 'nodejs';
 // 30s is generous — the Composio call is typically <1s, but Google's
@@ -205,4 +212,94 @@ export async function GET(req: NextRequest) {
   };
   memo.set(space.id, { expiresAt: Date.now() + MEMO_TTL_MS, payload });
   return NextResponse.json(payload);
+}
+
+/* ── POST ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Manual event creation. Validates the realtor owns the space, has an
+ * active calendar connection, and that the payload makes sense; then
+ * fires `writeEventThrough` (same helper tour booking uses) so the event
+ * lands in their actual calendar and a forensic mirror row gets written.
+ */
+
+
+export async function POST(req: NextRequest) {
+  let body: CreateEventBody;
+  try {
+    body = (await req.json()) as CreateEventBody;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const slug = typeof body.slug === 'string' ? body.slug : '';
+  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+
+  const auth = await requireSpaceOwner(slug);
+  if (auth instanceof NextResponse) return auth;
+  const { space } = auth;
+
+  const validated = validateCreatePayload(body);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+
+  const connection = await findCalendarConnection(space.id);
+  if (!connection) {
+    return NextResponse.json(
+      { error: 'Connect a calendar first.' },
+      { status: 400 },
+    );
+  }
+
+  const v = validated.value;
+  const result = await writeEventThrough({
+    spaceId: space.id,
+    connection,
+    title: v.title,
+    description: v.description,
+    startsAt: v.startsAt,
+    endsAt: v.endsAt,
+    attendees: v.attendees,
+    createdBy: 'realtor',
+  });
+
+  if (!result.externalOk) {
+    // The mirror row landed (forensics) but the realtor's calendar
+    // didn't get the event. Tell them honestly — the optimistic UI
+    // shouldn't show success when the calendar doesn't have it.
+    return NextResponse.json(
+      { error: 'Could not reach your calendar. Try again.' },
+      { status: 502 },
+    );
+  }
+
+  // Invalidate the 60s memo so a refetch picks up the new event from
+  // the source of truth. Cheap; the next GET re-hits Composio once.
+  memo.delete(space.id);
+
+  // Return the event in the same shape GET emits — the client can splice
+  // it directly into local state without a refetch.
+  const event: CalendarEventOut = {
+    id: result.externalEventId ?? `mirror-${result.mirrorId}`,
+    title: v.title,
+    description: v.description,
+    start: v.startsAt,
+    end: v.endsAt,
+    allDay: v.allDay,
+    htmlLink: null,
+    attendees: v.attendees.map((a) => ({
+      email: a.email,
+      name: null,
+      responseStatus: null,
+    })),
+  };
+
+  logger.info('[api/calendar/events] manual event created', {
+    spaceId: space.id,
+    provider: connection.toolkit,
+    externalEventId: result.externalEventId,
+  });
+
+  return NextResponse.json({ connected: true, provider: connection.toolkit, event });
 }
