@@ -19,8 +19,12 @@
  */
 
 import { useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Star, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+/** Apple ease-out cubic — entrances, reorders. */
+const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 interface Props {
   value: string[];
@@ -35,6 +39,10 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  // URL of the tile the realtor just promoted to position 0 — drives a brief
+  // 200ms cross-fade on the swapped image so the swap reads as a deliberate
+  // beat, not a jump. Cleared after the animation completes.
+  const [promotedUrl, setPromotedUrl] = useState<string | null>(null);
 
   const remaining = Math.max(0, max - value.length);
   const atCap = remaining === 0;
@@ -88,6 +96,10 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
     const [picked] = next.splice(idx, 1);
     next.unshift(picked);
     onChange(next);
+    // Trigger the cross-fade beat on the swapped tile. The clear lines up with
+    // the 200ms reorder animation so the next swap starts from a clean state.
+    setPromotedUrl(picked);
+    setTimeout(() => setPromotedUrl(null), 240);
   }
 
   function remove(idx: number) {
@@ -134,77 +146,98 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
         </button>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {value.map((url, idx) => {
-            const isFeatured = idx === 0;
-            return (
-              <div
-                key={`${url}-${idx}`}
-                className={cn(
-                  'group relative aspect-square overflow-hidden rounded-md border bg-muted',
-                  isFeatured ? 'border-foreground' : 'border-border/70',
-                )}
-              >
-                {/* The whole tile is a click target for "set as featured" —
-                    except the featured tile, where the click is a no-op and
-                    we drop the cursor hint to make that obvious. */}
-                <button
-                  type="button"
-                  onClick={() => setFeatured(idx)}
-                  disabled={isFeatured}
-                  aria-label={isFeatured ? 'Featured photo' : 'Set as featured photo'}
+          <AnimatePresence initial={false}>
+            {value.map((url, idx) => {
+              const isFeatured = idx === 0;
+              const isPromoted = promotedUrl === url;
+              return (
+                <motion.div
+                  key={url}
+                  layout
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.22, ease: EASE_APPLE }}
                   className={cn(
-                    'block h-full w-full',
-                    !isFeatured && 'cursor-pointer',
+                    'group relative aspect-square overflow-hidden rounded-md border bg-muted',
+                    isFeatured ? 'border-foreground' : 'border-border/70',
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={isFeatured ? 'Featured property photo' : `Property photo ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </button>
+                  {/* The whole tile is a click target for "set as featured" —
+                      except the featured tile, where the click is a no-op and
+                      we drop the cursor hint to make that obvious. */}
+                  <button
+                    type="button"
+                    onClick={() => setFeatured(idx)}
+                    disabled={isFeatured}
+                    aria-label={isFeatured ? 'Featured photo' : 'Set as featured photo'}
+                    className={cn(
+                      'block h-full w-full',
+                      !isFeatured && 'cursor-pointer',
+                    )}
+                  >
+                    {/* Image cross-fade dip on promote — 1 → 0.7 → 1 over the
+                        200ms layout swap so the eye registers the position
+                        change as a deliberate beat, not a jump. */}
+                    <motion.img
+                      src={url}
+                      alt={isFeatured ? 'Featured property photo' : `Property photo ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      animate={isPromoted ? { opacity: [1, 0.7, 1] } : { opacity: 1 }}
+                      transition={{ duration: 0.2, ease: EASE_APPLE }}
+                    />
+                  </button>
 
-                {/* Featured star — always shown on photos[0]. On hover for
-                    non-featured tiles, a faint star appears as the "tap to
-                    set as featured" hint. */}
-                <span
-                  className={cn(
-                    'pointer-events-none absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full transition-opacity duration-150',
-                    isFeatured
-                      ? 'bg-foreground text-background opacity-100'
-                      : 'bg-foreground/70 text-background opacity-0 group-hover:opacity-100',
-                  )}
-                  aria-hidden
-                >
-                  <Star size={11} className={isFeatured ? 'fill-current' : ''} />
-                </span>
+                  {/* Featured star — always shown on photos[0]. On hover for
+                      non-featured tiles, a faint star appears as the "tap to
+                      set as featured" hint. The motion.span keyed by
+                      isFeatured re-mounts on toggle and plays a 0.9 → 1.0
+                      scale pulse, 180ms — confirms the action without a
+                      flash of color. */}
+                  <motion.span
+                    key={isFeatured ? 'featured' : 'idle'}
+                    initial={isFeatured ? { scale: 0.9 } : false}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.18, ease: EASE_APPLE }}
+                    className={cn(
+                      'pointer-events-none absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full transition-opacity duration-150',
+                      isFeatured
+                        ? 'bg-foreground text-background opacity-100'
+                        : 'bg-foreground/70 text-background opacity-0 group-hover:opacity-100',
+                    )}
+                    aria-hidden
+                  >
+                    <Star size={11} className={isFeatured ? 'fill-current' : ''} />
+                  </motion.span>
 
-                {/* Delete X — hover-only, top-right. */}
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); remove(idx); }}
-                  aria-label="Remove photo"
-                  className={cn(
-                    'absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full',
-                    'bg-foreground/70 text-background opacity-0 transition-opacity duration-150',
-                    'hover:bg-foreground group-hover:opacity-100 focus-visible:opacity-100',
-                  )}
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            );
-          })}
+                  {/* Delete X — hover-only, top-right. */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); remove(idx); }}
+                    aria-label="Remove photo"
+                    className={cn(
+                      'absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full',
+                      'bg-foreground/70 text-background opacity-0 transition-opacity duration-150',
+                      'hover:bg-foreground group-hover:opacity-100 focus-visible:opacity-100',
+                    )}
+                  >
+                    <X size={11} />
+                  </button>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
 
           {/* Add-more tile — same footprint as the photo tiles so the grid
               never reflows on upload. Disappears at cap. */}
           {!atCap && (
-            <button
+            <motion.button
+              layout
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
+              transition={{ duration: 0.22, ease: EASE_APPLE }}
               className={cn(
                 'flex aspect-square flex-col items-center justify-center gap-1 rounded-md',
                 'border border-dashed border-border/70 bg-muted/20 text-muted-foreground',
@@ -220,7 +253,7 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
                   <span className="text-[10px]">Add more</span>
                 </>
               )}
-            </button>
+            </motion.button>
           )}
         </div>
       )}

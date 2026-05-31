@@ -10,6 +10,7 @@ import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX, PRIMARY_PILL } from '@/lib/typogr
 import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { PropertyStatusBadge } from '@/components/properties/property-status-badge';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 export default async function PropertiesPage({
   params,
@@ -108,14 +109,14 @@ export default async function PropertiesPage({
            a working register, not a gallery; rows let the realtor scan
            facts horizontally without the 4-column grid feeling like a
            spreadsheet export. */
-        <ul className="divide-y divide-border/60">
+        <StaggerList stagger={0.03} className="divide-y divide-border/60">
           {properties.map((property) => {
             const addr = formatPropertyAddress(property);
             const facts = formatPropertyFacts(property);
             const cover = property.photos[0];
 
             return (
-              <li key={property.id}>
+              <StaggerItem key={property.id}>
                 <Link
                   href={`/s/${slug}/properties/${property.id}`}
                   className="flex items-center gap-4 py-4 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
@@ -165,10 +166,10 @@ export default async function PropertiesPage({
                     )}
                   </div>
                 </Link>
-              </li>
+              </StaggerItem>
             );
           })}
-        </ul>
+        </StaggerList>
       )}
     </div>
   );

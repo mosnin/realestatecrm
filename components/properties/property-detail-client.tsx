@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2,
@@ -16,6 +17,9 @@ import { Button } from '@/components/ui/button';
 import { PropertyForm } from './property-form';
 import { PropertyShareDialog } from './property-share-dialog';
 import { PropertyStatusBadge } from './property-status-badge';
+
+/** Apple ease-out cubic — entrances. */
+const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 interface Props {
   slug: string;
@@ -90,11 +94,16 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
           (not a coloured block). */}
       <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          // Hero entrance — tiny 1.02→1 settle + fade-in over 250ms. The
+          // scale is intentionally below the spec ceiling so the photo
+          // never reads as "zooming in" — only as landing into place.
+          <motion.img
             src={cover}
             alt={addr}
             className="aspect-video w-full object-cover"
+            initial={{ opacity: 0, scale: 1.02 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.25, ease: EASE_APPLE }}
           />
         ) : (
           <div className="aspect-video w-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
