@@ -1,21 +1,23 @@
 /**
- * GET /api/calendar/events?slug=xxx
+ * GET  /api/calendar/events?slug=xxx
+ * POST /api/calendar/events    (manual event creation)
  *
- * Returns the next 30 days of events from the realtor's connected
+ * GET: returns the next 30 days of events from the realtor's connected
  * external calendar (Google Calendar via Composio). On-demand fetch —
  * no background sync, no webhook receiver, no cache layer beyond a
  * thin 60s memoization to absorb the page's own re-renders.
+ *
+ * POST: realtor-initiated manual event creation. Validates ownership,
+ * connection presence, and the payload shape; pushes to the provider
+ * via `writeEventThrough` (same helper tour booking uses) so the event
+ * appears in their actual Google Calendar AND a CalendarEventMirror
+ * row lands for forensics. Returns the created event in the same
+ * shape GET emits so the client can splice it into the visible view.
  *
  * The Chippi calendar surface is a thin read view; the realtor's
  * external calendar is the truth. If nothing's connected we return
  * `{ connected: false }` so the UI renders the connect prompt without
  * a separate roundtrip.
- *
- * Why not POST/DELETE on this route: the old chippi-owned events
- * surface had CRUD here. That surface is deleted. Events are now
- * created via tour booking (write-through to Composio) or directly in
- * the realtor's calendar — Chippi doesn't have its own "add event"
- * verb anymore.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,6 +27,7 @@ import { executeToolForEntity } from '@/lib/integrations/composio';
 import {
   PROVIDER_TOOL_SLUGS,
   findCalendarConnection,
+  writeEventThrough,
 } from '@/lib/calendar/mirror';
 
 export const runtime = 'nodejs';
@@ -205,4 +208,217 @@ export async function GET(req: NextRequest) {
   };
   memo.set(space.id, { expiresAt: Date.now() + MEMO_TTL_MS, payload });
   return NextResponse.json(payload);
+}
+
+/* ── POST ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Manual event creation. Validates the realtor owns the space, has an
+ * active calendar connection, and that the payload makes sense; then
+ * fires `writeEventThrough` (same helper tour booking uses) so the event
+ * lands in their actual calendar and a forensic mirror row gets written.
+ */
+
+interface CreateEventBody {
+  slug?: unknown;
+  title?: unknown;
+  description?: unknown;
+  startDate?: unknown; // "YYYY-MM-DD"
+  startTime?: unknown; // "HH:MM" (omitted/ignored when allDay)
+  endDate?: unknown; // "YYYY-MM-DD"
+  endTime?: unknown; // "HH:MM"
+  allDay?: unknown;
+  attendees?: unknown; // string[] of emails
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^\d{2}:\d{2}$/;
+
+export interface ValidatedCreate {
+  title: string;
+  description: string | null;
+  allDay: boolean;
+  /** ISO 8601 with local timezone offset for timed; YYYY-MM-DD for all-day. */
+  startsAt: string;
+  /** Same shape as startsAt. For all-day Google wants end EXCLUSIVE (next day). */
+  endsAt: string;
+  attendees: { email: string }[];
+}
+
+/**
+ * Pure validator — exported for unit testing. Returns the normalized
+ * payload or an error string explaining what's wrong. No throws.
+ */
+export function validateCreatePayload(body: CreateEventBody): { ok: true; value: ValidatedCreate } | { ok: false; error: string } {
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  if (!title) return { ok: false, error: 'Title is required.' };
+  if (title.length > 250) return { ok: false, error: 'Title too long.' };
+
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+
+  const allDay = body.allDay === true;
+
+  const startDate = typeof body.startDate === 'string' ? body.startDate : '';
+  if (!DATE_RE.test(startDate)) return { ok: false, error: 'Start date required.' };
+  const endDate = typeof body.endDate === 'string' && body.endDate ? body.endDate : startDate;
+  if (!DATE_RE.test(endDate)) return { ok: false, error: 'End date invalid.' };
+
+  let startsAt: string;
+  let endsAt: string;
+
+  if (allDay) {
+    // `writeEventThrough` posts via Composio's `start_datetime` /
+    // `end_datetime` fields, which want a datetime string. Represent an
+    // all-day event as a 24-hour timed event from local midnight to the
+    // next day's midnight — Google renders this visually identical to a
+    // true all-day event for the realtor, and we avoid a fragile date-
+    // only path through the Composio wrapper. v2 can branch to true
+    // all-day when we extend `writeEventThrough`.
+    if (endDate < startDate) return { ok: false, error: 'End date is before start.' };
+    startsAt = toLocalISO(startDate, '00:00');
+    const [ey, em, ed] = endDate.split('-').map(Number);
+    const nextDay = new Date(ey, em - 1, ed + 1, 0, 0, 0, 0);
+    const ny = nextDay.getFullYear();
+    const nm = String(nextDay.getMonth() + 1).padStart(2, '0');
+    const nd = String(nextDay.getDate()).padStart(2, '0');
+    endsAt = toLocalISO(`${ny}-${nm}-${nd}`, '00:00');
+  } else {
+    const startTime = typeof body.startTime === 'string' ? body.startTime : '';
+    const endTime = typeof body.endTime === 'string' ? body.endTime : '';
+    if (!TIME_RE.test(startTime)) return { ok: false, error: 'Start time required.' };
+    if (!TIME_RE.test(endTime)) return { ok: false, error: 'End time required.' };
+
+    // Local ISO with offset — match what Google expects for timed events.
+    startsAt = toLocalISO(startDate, startTime);
+    endsAt = toLocalISO(endDate, endTime);
+    if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      return { ok: false, error: 'End must be after start.' };
+    }
+  }
+
+  // Attendees: optional, each must be a valid email. Reject the whole
+  // form if any one is malformed — realtor needs to know which line to
+  // fix, but a single error message is fine; the modal surfaces it.
+  const attendeesRaw = Array.isArray(body.attendees) ? body.attendees : [];
+  if (attendeesRaw.length > 50) return { ok: false, error: 'Too many attendees.' };
+  const attendees: { email: string }[] = [];
+  for (const raw of attendeesRaw) {
+    if (typeof raw !== 'string') return { ok: false, error: 'Invalid attendee.' };
+    const email = raw.trim();
+    if (!email) continue;
+    if (!EMAIL_RE.test(email)) return { ok: false, error: `Invalid email: ${email}` };
+    attendees.push({ email });
+  }
+
+  return {
+    ok: true,
+    value: {
+      title,
+      description: description || null,
+      allDay,
+      startsAt,
+      endsAt,
+      attendees,
+    },
+  };
+}
+
+/** Build an ISO 8601 timestamp with the server's local timezone offset.
+ *  Server clock matches the realtor's intent only when this runs in their
+ *  region; in serverless that's not guaranteed, so the client also sends
+ *  the IANA-formatted strings to be safe. For v1 we accept server tz —
+ *  the realtor's calendar is the truth, Google will display it correctly
+ *  for them either way once it lands. */
+function toLocalISO(dateStr: string, timeStr: string): string {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  const local = new Date(y, mo - 1, d, hh, mm, 0, 0);
+  const offsetMin = -local.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMin);
+  const offH = String(Math.floor(abs / 60)).padStart(2, '0');
+  const offM = String(abs % 60).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${y}-${pad(mo)}-${pad(d)}T${pad(hh)}:${pad(mm)}:00${sign}${offH}:${offM}`;
+}
+
+export async function POST(req: NextRequest) {
+  let body: CreateEventBody;
+  try {
+    body = (await req.json()) as CreateEventBody;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const slug = typeof body.slug === 'string' ? body.slug : '';
+  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+
+  const auth = await requireSpaceOwner(slug);
+  if (auth instanceof NextResponse) return auth;
+  const { space } = auth;
+
+  const validated = validateCreatePayload(body);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+
+  const connection = await findCalendarConnection(space.id);
+  if (!connection) {
+    return NextResponse.json(
+      { error: 'Connect a calendar first.' },
+      { status: 400 },
+    );
+  }
+
+  const v = validated.value;
+  const result = await writeEventThrough({
+    spaceId: space.id,
+    connection,
+    title: v.title,
+    description: v.description,
+    startsAt: v.startsAt,
+    endsAt: v.endsAt,
+    attendees: v.attendees,
+    createdBy: 'realtor',
+  });
+
+  if (!result.externalOk) {
+    // The mirror row landed (forensics) but the realtor's calendar
+    // didn't get the event. Tell them honestly — the optimistic UI
+    // shouldn't show success when the calendar doesn't have it.
+    return NextResponse.json(
+      { error: 'Could not reach your calendar. Try again.' },
+      { status: 502 },
+    );
+  }
+
+  // Invalidate the 60s memo so a refetch picks up the new event from
+  // the source of truth. Cheap; the next GET re-hits Composio once.
+  memo.delete(space.id);
+
+  // Return the event in the same shape GET emits — the client can splice
+  // it directly into local state without a refetch.
+  const event: CalendarEventOut = {
+    id: result.externalEventId ?? `mirror-${result.mirrorId}`,
+    title: v.title,
+    description: v.description,
+    start: v.startsAt,
+    end: v.endsAt,
+    allDay: v.allDay,
+    htmlLink: null,
+    attendees: v.attendees.map((a) => ({
+      email: a.email,
+      name: null,
+      responseStatus: null,
+    })),
+  };
+
+  logger.info('[api/calendar/events] manual event created', {
+    spaceId: space.id,
+    provider: connection.toolkit,
+    externalEventId: result.externalEventId,
+  });
+
+  return NextResponse.json({ connected: true, provider: connection.toolkit, event });
 }
