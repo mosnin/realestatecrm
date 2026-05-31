@@ -33,14 +33,12 @@ async def find_deals(
     closing_within_days: int | None = None,
     limit: int = 30,
 ) -> list[dict[str, Any]]:
-    """Find deals in this space. One tool, many filters.
-
-    deal_id: return that one deal (returns [] if not found / cross-space).
-    status: 'active' | 'won' | 'lost' | 'on_hold' (default 'active').
-    stalled_days: e.g. 14 → only deals not updated in 14+ days.
-    closing_within_days: e.g. 14 → only deals with closeDate in the next 14 days.
-    limit: 1-50.
-    """
+    """Find deals in this space with optional filters."""
+    # deal_id: single-deal lookup (returns [] if missing).
+    # status: active|won|lost|on_hold (default active).
+    # stalled_days: filter to deals untouched in N+ days.
+    # closing_within_days: filter to deals with closeDate in next N days.
+    # limit: 1-50.
     space_id = ctx.context.space_id
     db = await supabase()
     limit = max(1, min(50, limit))
@@ -106,13 +104,9 @@ async def update_deal(
     follow_up_date: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
-    """Update a deal. Pass only the fields you want to change.
-
-    probability: 0–100 close probability.
-    follow_up_date: ISO date string for next follow-up.
-    note: short agent note (<1000 chars) prepended to deal description with date.
-    reason: required short string; logged on the activity row.
-    """
+    """Update a deal; pass only the fields you want to change."""
+    # probability: 0-100. follow_up_date: ISO date. note: <1000 chars (prepended w/ date).
+    # reason: required, logged on the DealActivity row.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()
@@ -220,20 +214,10 @@ async def advance_deal_stage(
     target_stage_id: str | None = None,
     new_probability: int | None = None,
 ) -> dict[str, Any]:
-    """Move a deal to a different stage in the workspace pipeline.
-
-    Pass exactly one of:
-      target_stage_name — case-insensitive match on a DealStage in this
-                          workspace, e.g. "Under Contract", "Closed Won".
-      target_stage_id   — when you already have the stage id.
-
-    Optional:
-      new_probability — 0-100. Set when the stage move warrants a
-                        probability change (e.g. "Under Contract" → 80).
-
-    reason: required short string; logs a DealActivity row so the realtor
-    can audit who moved the deal and why.
-    """
+    """Move a deal to a different stage in the workspace pipeline."""
+    # Pass exactly one of target_stage_name (case-insensitive) or target_stage_id.
+    # new_probability: 0-100 if the stage move warrants a probability change.
+    # reason: required, logged on DealActivity.
     if not target_stage_name and not target_stage_id:
         agent_err = from_supabase_error({"message": "Pass either target_stage_name or target_stage_id", "code": None})
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
@@ -371,22 +355,10 @@ async def create_deal(
     close_date: str | None = None,
     contact_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a new deal in a pipeline stage.
-
-    title: short label shown on the kanban card. Required.
-    stage_id: target DealStage.id. Optional — if omitted the deal lands in the
-      first stage of the buyer pipeline when a buyer contact is linked, otherwise
-      the first stage of the seller pipeline.
-    description: optional deal notes / description.
-    value: deal value in dollars.
-    address: property address if relevant.
-    priority: 'LOW' | 'MEDIUM' | 'HIGH'. Defaults to MEDIUM.
-    close_date: ISO 8601 date/datetime string for expected close.
-    contact_ids: list of Contact.id values to link to this deal.
-
-    Use when the realtor says "create a deal", "add a deal", "start a deal",
-    "open a deal for [name]", etc.
-    """
+    """Create a new deal in a pipeline stage."""
+    # title required. stage_id optional (auto-picks first buyer/seller pipeline stage).
+    # value: dollars. priority: LOW|MEDIUM|HIGH (default MEDIUM). close_date: ISO 8601.
+    # contact_ids: linked Contact.id values; buyer leads auto-route to buyer pipeline.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()
@@ -563,16 +535,9 @@ async def request_deal_review(
     deal_id: str,
     reason: str,
 ) -> dict[str, Any]:
-    """Flag a deal up to the brokerage for human review.
-
-    Use when something looks off — a stalled high-value deal, an unusual
-    commission split, a client raising legal concerns. Creates a
-    DealReviewRequest visible to brokers in the brokerage.
-
-    Only works for spaces inside a brokerage. Solo realtors get an error.
-
-    reason: required, 10+ chars. Surfaces verbatim to the broker.
-    """
+    """Flag a deal up to the brokerage for human review."""
+    # reason: required, 10+ chars, surfaces verbatim to the broker.
+    # Brokerage-only; solo realtors get an error.
     if not reason or len(reason.strip()) < 10:
         agent_err = from_supabase_error({"message": "reason must be at least 10 characters", "code": None})
         return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}

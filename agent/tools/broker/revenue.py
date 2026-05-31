@@ -51,22 +51,9 @@ async def commission_report(
     ctx: RunContextWrapper[AgentContext],
     period: str = "mtd",
 ) -> dict[str, Any]:
-    """Read commission revenue across the brokerage, broken out by realtor
-    and rolled up to a brokerage total, for the chosen window.
-
-    Use when the broker asks "how much did we close this month?", "what's
-    our YTD?", or "how is everyone tracking?".
-
-    period — 'mtd' (month-to-date, default), 'ytd' (year-to-date), or
-    'last_30d' (rolling 30 days back from now). Unknown values fall back to
-    'mtd' silently so the chat keeps moving.
-
-    GCI calc — value * commissionRate / 100. A deal with either value or
-    commissionRate missing contributes zero (we don't guess). A deal that
-    closed during the window is identified by status='won' and updatedAt
-    in the window — the same convention the realtor and broker morning
-    routes use.
-    """
+    """Commission revenue across the brokerage, broken out by realtor + total."""
+    # period: 'mtd' (default) | 'ytd' | 'last_30d'; unknown values fall back to mtd.
+    # GCI = value * commissionRate / 100 over status='won' with updatedAt in window.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 

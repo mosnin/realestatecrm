@@ -34,19 +34,12 @@ async def find_contacts(
     no_followup_quiet_days: int | None = None,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """Find contacts in this space. One tool, many filters.
-
-    contact_id: return that one contact (returns [] if not found / cross-space).
-    name_contains: case-insensitive substring match on name.
-    lead_type: 'rental' | 'buyer'.
-    overdue_followup_only: True → only contacts with followUpAt in the past.
-    no_followup_quiet_days: e.g. 7 → contacts with no follow-up scheduled who
-      haven't been contacted in 7+ days. Used for the autonomous sweep.
-    limit: cap on results (1-100).
-
-    When contact_id is set, full record is returned (notes, scoreSummary,
-    preferences). Otherwise a slimmer list view is returned.
-    """
+    """Find contacts in this space with optional filters."""
+    # contact_id: single-contact lookup returns full record (notes, preferences).
+    # name_contains: case-insensitive substring. lead_type: rental|buyer.
+    # overdue_followup_only: only contacts with followUpAt in the past.
+    # no_followup_quiet_days: QUALIFICATION contacts with no follow-up + quiet N+ days.
+    # limit: 1-100.
     space_id = ctx.context.space_id
     db = await supabase()
     limit = max(1, min(100, limit))
@@ -112,6 +105,7 @@ async def get_contact_activity(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Most recent activity entries for a contact."""
+    # limit: cap on rows returned, ordered newest first.
     space_id = ctx.context.space_id
     db = await supabase()
 
@@ -143,20 +137,10 @@ async def create_contact(
     notes: str | None = None,
     tags: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a new contact (person) in the workspace.
-
-    name: full name. Required.
-    lead_type: 'buyer' | 'rental' | 'seller'. Default 'buyer'.
-    email: email address if known.
-    phone: phone number in any format.
-    budget: dollars. For rentals this is monthly; for buyers, purchase price.
-    preferences: free-form — neighborhood, bedrooms, must-haves, etc.
-    notes: any initial notes stored verbatim on the contact record.
-    tags: optional labels. Use 'new-lead' for fresh leads.
-
-    Use when the realtor says "add a lead", "log a new contact", "create a
-    person", etc. Never store in memory when you can create the actual record.
-    """
+    """Create a new contact (person) in the workspace."""
+    # name required. lead_type: buyer|rental|seller (default buyer).
+    # budget: dollars (monthly for rental, purchase price for buyer).
+    # tags: optional; use 'new-lead' for fresh leads.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()
@@ -248,19 +232,12 @@ async def update_contact(
     score_explanation: str | None = None,
     re_engaged_signal: str | None = None,
 ) -> dict[str, Any]:
-    """Update a contact. Pass only the fields you want to change.
-
-    add_tags: up to 5 tags to merge into existing tags.
-    new_pipeline_type: 'QUALIFICATION' | 'TOUR' | 'APPLICATION' (logs activity).
-    follow_up_date: ISO date string (e.g. '2026-04-25') to schedule a follow-up.
-    brief: 2-3 sentence agent summary stored as a high-importance memory.
-    score_explanation: plain-English reason for the contact's current lead score.
-    re_engaged_signal: short string like 'replied to SMS' — boosts lead score
-      by ~12 points and logs the re-engagement.
-
-    reason: required short string explaining why the change is being made;
-    surfaces in the activity log so the realtor can audit.
-    """
+    """Update a contact; pass only the fields you want to change."""
+    # add_tags: up to 5 merged with existing. new_pipeline_type: QUALIFICATION|TOUR|APPLICATION.
+    # follow_up_date: ISO date. brief: 2-3 sentence agent summary (high-importance memory).
+    # score_explanation: plain-English reason for lead score (stored as memory).
+    # re_engaged_signal: short string; boosts lead score +12 and logs re-engagement.
+    # reason: required, logged on ContactActivity.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()

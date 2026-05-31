@@ -37,29 +37,9 @@ async def create_plan(
     task: str,
     steps: list[PlanStep],
 ) -> dict[str, Any]:
-    """Announce a structured execution plan before carrying out a complex task.
-
-    Call this ONLY when the task requires 3 or more distinct tool calls across
-    multiple contacts, deals, or calendar events. Skip for simple lookups.
-
-    task: one-sentence description of the overall goal.
-    steps: ordered list of steps, each with:
-      - "title"       — short label shown to the realtor (e.g. "Find stale leads")
-      - "description" — one sentence explaining what will happen in this step
-
-    Returns the plan as JSON so the agent can reference it in its final reply.
-
-    Example:
-      create_plan(
-          task="Run a weekly pipeline sweep and follow up on stalled deals",
-          steps=[
-              {"title": "Find stale contacts", "description": "Query contacts with no follow-up in 7+ days."},
-              {"title": "Find stalled deals",  "description": "Query deals with no update in 14+ days."},
-              {"title": "Draft follow-ups",    "description": "Draft a follow-up message for each contact found."},
-              {"title": "Log activity",        "description": "Record the run summary to the activity log."},
-          ],
-      )
-    """
+    """Announce a structured execution plan before a multi-step task (3+ tool calls)."""
+    # task: one-sentence overall goal. steps: ordered [{title, description}].
+    # Skip for simple lookups.
     if not task or not isinstance(task, str):
         return {"error": "task must be a non-empty string"}
     if not steps:

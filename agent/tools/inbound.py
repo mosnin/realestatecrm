@@ -30,14 +30,8 @@ async def process_inbound_message(
     content: str,
     draft_id: str | None = None,
 ) -> dict[str, Any]:
-    """Process a reply received from a contact.
-
-    channel: 'sms' | 'email'
-    content: the message body received
-    draft_id: the AgentDraft this is a reply to, if known
-
-    Returns: { "recorded": true, "intent": str, "sentiment": str, "score_boosted": bool }
-    """
+    """Record a contact reply, mark draft outcome, detect intent, boost score."""
+    # channel: sms|email. draft_id: AgentDraft this replies to, if known.
     space_id = ctx.context.space_id
     db = await supabase()
 

@@ -191,14 +191,8 @@ async def get_intake_form(
     ctx: RunContextWrapper[AgentContext],
     lead_type: LeadType,
 ) -> dict[str, Any]:
-    """Fetch the current intake form config for this space.
-
-    lead_type: 'rental' or 'buyer'.
-
-    Returns the full IntakeFormConfig object with all sections and questions.
-    If the realtor has not yet created a custom form, returns the default
-    template (Name, Email, Phone system fields).
-    """
+    """Fetch the current intake form config for this space."""
+    # lead_type: 'rental' | 'buyer'. Returns default template if none saved.
     space_id = ctx.context.space_id
     try:
         db = await supabase()
@@ -220,20 +214,10 @@ async def add_intake_question(
     required: bool,
     options: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Add a new question to the intake form.
-
-    lead_type: 'rental' or 'buyer'.
-    section_title: The title of the section to add the question to.  If no
-      section with that title exists, a new section is created.
-    question_label: The visible label for the question, e.g. 'Move-in date'.
-    question_type: One of: text, textarea, email, phone, number, select,
-      multi_select, radio, checkbox, date.
-    required: Whether the question must be answered before submission.
-    options: Required for select / multi_select / radio questions.  Provide a
-      list of option strings, e.g. ['Studio', '1BR', '2BR'].
-
-    Returns the updated section with its new question list.
-    """
+    """Add a new question to the intake form."""
+    # section_title creates the section if missing.
+    # question_type: text|textarea|email|phone|number|select|multi_select|radio|checkbox|date.
+    # options required for select|multi_select|radio.
     space_id = ctx.context.space_id
 
     # Validate question type
@@ -346,14 +330,8 @@ async def remove_intake_question(
     lead_type: LeadType,
     question_label: str,
 ) -> dict[str, Any]:
-    """Remove a question from the intake form by its label.
-
-    lead_type: 'rental' or 'buyer'.
-    question_label: The exact (case-insensitive) label of the question to remove.
-
-    System fields (Name, Email, Phone) cannot be removed.
-    Returns an error if the label is not found.
-    """
+    """Remove a question from the intake form by its label."""
+    # question_label: case-insensitive match. System fields (Name/Email/Phone) cannot be removed.
     space_id = ctx.context.space_id
 
     clean_label = question_label.strip()
@@ -427,19 +405,9 @@ async def update_intake_question(
     new_options: list[str] | None = None,
     new_required: bool | None = None,
 ) -> dict[str, Any]:
-    """Update an existing question on the intake form. Pass only the fields to change.
-
-    lead_type: 'rental' or 'buyer'.
-    question_label: The current (case-insensitive) label of the question to update.
-    new_label: Rename the question to this label.  Cannot rename to a system
-      field label (Name, Email, Phone).
-    new_options: Replace the question's options.  Provide a list of option
-      strings.  Only valid for select, multi_select, and radio questions.
-    new_required: Change whether the question is required.  System fields
-      remain required regardless.
-
-    Returns an error if question_label is not found.
-    """
+    """Update an existing intake form question; pass only fields to change."""
+    # question_label: case-insensitive match. Cannot rename to a system field label.
+    # new_options only valid for select|multi_select|radio. System fields stay required.
     space_id = ctx.context.space_id
 
     if new_label is None and new_options is None and new_required is None:
@@ -563,40 +531,9 @@ async def save_intake_form(
     lead_type: LeadType,
     form_config: str,
 ) -> dict[str, Any]:
-    """Replace the entire intake form config with the provided structure.
-
-    Use this when you have built or heavily restructured the form and want
-    to write the complete new config in one operation.  For targeted edits,
-    prefer add_intake_question / remove_intake_question / update_intake_question.
-
-    lead_type: 'rental' or 'buyer'.
-    form_config: A JSON-encoded string of the complete IntakeFormConfig:
-      {
-        "version": 1,
-        "leadType": "rental" | "buyer",
-        "sections": [
-          {
-            "id": "<uuid>",
-            "title": "...",
-            "position": 0,
-            "questions": [
-              {
-                "id": "<uuid>",
-                "type": "text",
-                "label": "...",
-                "required": true,
-                "position": 0
-              },
-              ...
-            ]
-          },
-          ...
-        ]
-      }
-
-    The form must contain the three system fields (Name, Email, Phone).
-    Returns an error if the config is structurally invalid.
-    """
+    """Replace the entire intake form config in one write; prefer add/remove/update for targeted edits."""
+    # form_config: JSON-encoded IntakeFormConfig {version, leadType, sections[{id,title,position,questions[]}]}.
+    # Must include the three system fields (Name, Email, Phone).
     space_id = ctx.context.space_id
 
     try:
