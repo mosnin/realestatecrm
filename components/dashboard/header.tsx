@@ -1,6 +1,6 @@
 'use client';
 
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useUser } from '@clerk/nextjs';
 import { Sun, Moon, X } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useState, useEffect } from 'react';
@@ -24,6 +24,9 @@ import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SearchPill } from '@/components/dashboard/sidebar';
+import { SidebarFavorites } from '@/components/dashboard/sidebar-favorites';
+import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
+import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -124,6 +127,11 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
   const isOnChippi = pathname.startsWith(`${base}/chippi`);
+  const { user } = useUser();
+  const drawerDisplayName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
+    : 'My Account';
+  const drawerEmail = user?.primaryEmailAddress?.emailAddress ?? null;
 
   // Accordion expansion state for the mobile drawer — same contract as the
   // desktop sidebar: at most one parent open at a time, auto-expand the
@@ -298,6 +306,17 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                     })}
                   </div>
 
+                  {/* Favorites — same component as the desktop sidebar so the
+                      localStorage state is shared. Closes the drawer on
+                      navigate. */}
+                  {slug && (
+                    <SidebarFavorites
+                      slug={slug}
+                      base={base}
+                      onNavigate={closeDrawer}
+                    />
+                  )}
+
                   {/* Chat history — animates in/out below the primary nav
                       when the route enters/leaves /chippi. Same motion
                       params as the desktop sidebar's chippi section so the
@@ -383,6 +402,22 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                   );
                 })}
               </div>
+            )}
+            {/* What's new + user-menu chip — same components the desktop
+                sidebar uses so localStorage state is shared (dismissals,
+                favorites, etc.). Only renders for the realtor workspace —
+                the broker drawer keeps its existing team/account footer. */}
+            {!isBrokerOnly && !showBrokerMobileNavOnly && slug && (
+              <>
+                <SidebarWhatsNew />
+                <div className="border-t border-sidebar-border" />
+                <SidebarUserMenu
+                  slug={slug}
+                  displayName={drawerDisplayName}
+                  email={drawerEmail}
+                  imageUrl={user?.imageUrl ?? null}
+                />
+              </>
             )}
             <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
               {!showBrokerMobileNavOnly && ((pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`)) ? (
