@@ -210,12 +210,12 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                       <Timer size={14} />
                     </button>
                     {snoozeOpen === contact.id && (
-                      <div className="absolute right-0 top-8 z-50 w-36 rounded-md border bg-popover text-popover-foreground shadow-md py-1">
+                      <div className="absolute right-0 top-8 z-50 w-36 rounded-md border border-border/70 bg-popover text-popover-foreground shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] py-1">
                         {SNOOZE_OPTIONS.map((opt) => (
                           <button
                             key={opt.hours}
                             type="button"
-                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-foreground/[0.04] hover:text-foreground transition-colors"
                             onClick={() => handleSnooze(contact.id, opt.hours)}
                           >
                             {opt.label}
