@@ -85,11 +85,15 @@ function formatRecipientLine(
 
 function buildQuotedReply(msg: EmailMessage): string {
   const sentLine = `On ${formatExact(msg.sentAt)}, ${msg.fromName || msg.fromAddress || 'they'} wrote:`;
-  const quoted = msg.body
-    .split('\n')
-    .map((line) => `> ${line}`)
-    .join('\n');
-  return `\n\n\n${sentLine}\n${quoted}`;
+  // Don't prefix every line with "> " — on long HTML-stripped automated
+  // emails (webhooks, marketing) that produces a wall of `>` chars. Single
+  // em-dashed separator + raw body reads cleaner; realtor can trim or
+  // delete what they don't want. Cap at 2000 chars so the composer doesn't
+  // open with 50 screens of newsletter noise.
+  const MAX = 2000;
+  const body =
+    msg.body.length > MAX ? msg.body.slice(0, MAX).trimEnd() + '\n\n[…]' : msg.body;
+  return `\n\n\n──── ${sentLine}\n\n${body}`;
 }
 
 function buildReplySubject(subject: string | null): string {
