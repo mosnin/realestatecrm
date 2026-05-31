@@ -1,11 +1,13 @@
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import { TeamChatClient } from './team-chat-client';
 import type { ChatContact, TeamMember } from './team-chat-client';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Team Chat — Teams' };
+export const metadata: Metadata = { title: 'Team chat — Teams' };
 
 export default async function TeamChatPage() {
   const ctx = await getBrokerMemberContext();
@@ -62,12 +64,28 @@ export default async function TeamChatPage() {
     }));
   }
 
+  // One calm status sentence about who's in the room.
+  const subtitle =
+    teamMembers.length <= 1
+      ? 'Invite your team to start the conversation.'
+      : `${teamMembers.length} on the team. Type / for commands, @ to tag someone.`;
+
   return (
-    <TeamChatClient
-      contacts={contacts}
-      teamMembers={teamMembers}
-      brokerageId={brokerage.id}
-      currentUserId={ctx.dbUserId}
-    />
+    <div className="space-y-6 pb-56 md:pb-24">
+      <header className="space-y-1.5">
+        <p className={cn(BODY_MUTED)}>Team chat.</p>
+        <h1 className={cn(H1)} style={TITLE_FONT}>
+          The room
+        </h1>
+        <p className={cn(BODY_MUTED)}>{subtitle}</p>
+      </header>
+
+      <TeamChatClient
+        contacts={contacts}
+        teamMembers={teamMembers}
+        brokerageId={brokerage.id}
+        currentUserId={ctx.dbUserId}
+      />
+    </div>
   );
 }

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Copy,
-  FileText,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -14,7 +13,6 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +39,14 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import {
+  BODY,
+  BODY_MUTED,
+  META,
+  SECTION_LABEL,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -427,17 +433,15 @@ export default function TemplatesClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Template library</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Share message templates across your team and publish new versions to every agent.
-          </p>
-        </div>
-        <Button onClick={openCreate} size="sm" className="gap-1.5">
-          <Plus size={15} />
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={openCreate}
+          className={cn(PRIMARY_PILL)}
+        >
+          <Plus size={14} />
           New template
-        </Button>
+        </button>
       </div>
 
       {loading ? (
@@ -452,16 +456,16 @@ export default function TemplatesClient() {
             const items = grouped[cat];
             if (items.length === 0) return null;
             return (
-              <section key={cat} className="space-y-3">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              <section key={cat} className="space-y-2">
+                <p className={cn(SECTION_LABEL)}>
                   {CATEGORY_LABEL[cat]}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground/70">
+                  <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
                     {items.length}
                   </span>
-                </h2>
-                <div className="grid gap-3">
+                </p>
+                <ul className="divide-y divide-border/60 border-y border-border/60">
                   {items.map((t) => (
-                    <TemplateCard
+                    <TemplateRow
                       key={t.id}
                       template={t}
                       onEdit={() => openEdit(t)}
@@ -470,7 +474,7 @@ export default function TemplatesClient() {
                       onDelete={() => setDeleteTarget(t)}
                     />
                   ))}
-                </div>
+                </ul>
               </section>
             );
           })}
@@ -506,10 +510,10 @@ export default function TemplatesClient() {
 }
 
 // ---------------------------------------------------------------------------
-// Card
+// Row
 // ---------------------------------------------------------------------------
 
-type TemplateCardProps = {
+type TemplateRowProps = {
   template: BrokerageTemplate;
   onEdit: () => void;
   onPublish: () => void;
@@ -517,95 +521,97 @@ type TemplateCardProps = {
   onDelete: () => void;
 };
 
-function TemplateCard({ template: t, onEdit, onPublish, onDuplicate, onDelete }: TemplateCardProps) {
+function TemplateRow({ template: t, onEdit, onPublish, onDuplicate, onDelete }: TemplateRowProps) {
   const status = publishStatus(t);
   const meta = statusMeta(status);
 
   return (
-    <Card>
-      <CardContent className="px-5 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                aria-label={meta.label}
-                title={meta.label}
-                className={`inline-block size-2 rounded-full ${meta.dot}`}
-              />
-              <p className="text-sm font-semibold truncate">{t.name}</p>
-              <Badge variant="secondary" className={CHANNEL_CHIP_CLASS[t.channel]}>
-                {CHANNEL_LABEL[t.channel]}
+    <li className="group py-3 hover:bg-foreground/[0.04] transition-colors -mx-2 px-2">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex-1 min-w-0 text-left"
+          aria-label={`Edit ${t.name}`}
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              aria-label={meta.label}
+              title={meta.label}
+              className={`inline-block size-2 rounded-full ${meta.dot}`}
+            />
+            <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
+            <Badge variant="secondary" className={CHANNEL_CHIP_CLASS[t.channel]}>
+              {CHANNEL_LABEL[t.channel]}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] font-mono tabular-nums">
+              v{t.version}
+            </Badge>
+            {t.publishedCount > 0 && (
+              <Badge
+                variant="outline"
+                className="text-[10px] tabular-nums text-muted-foreground"
+                title={`Pushed to ${t.publishedCount} agent${t.publishedCount === 1 ? '' : 's'}`}
+              >
+                {t.publishedCount} {t.publishedCount === 1 ? 'use' : 'uses'}
               </Badge>
-              <Badge variant="outline" className="text-[10px] font-mono">
-                v{t.version}
-              </Badge>
-            </div>
-
-            {t.channel === 'email' && t.subject && (
-              <p className="text-xs text-muted-foreground truncate">
-                <span className="font-medium">Subject:</span> {t.subject}
-              </p>
             )}
-
-            <p className="text-xs text-muted-foreground/90 font-mono whitespace-pre-wrap line-clamp-3">
-              {previewBody(t.body)}
-            </p>
-
-            <div className="text-[11px] text-muted-foreground/70 flex items-center gap-2 flex-wrap">
-              {t.publishedAt ? (
-                <>
-                  <span>Last published {formatRelative(t.publishedAt)}</span>
-                  {t.publishedCount > 0 && (
-                    <>
-                      <span aria-hidden className="text-muted-foreground/40">
-                        ·
-                      </span>
-                      <span>
-                        pushed to {t.publishedCount} agent{t.publishedCount === 1 ? '' : 's'}
-                      </span>
-                    </>
-                  )}
-                </>
-              ) : (
-                <span>Never published</span>
-              )}
-            </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Actions for ${t.name}`}
-                className="shrink-0"
-              >
-                <MoreHorizontal size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={onEdit}>
-                <Pencil size={14} />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onPublish}>
-                <Send size={14} />
-                Publish to agents
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onDuplicate}>
-                <Copy size={14} />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={onDelete} variant="destructive">
-                <Trash2 size={14} />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardContent>
-    </Card>
+          {t.channel === 'email' && t.subject && (
+            <p className="text-xs text-muted-foreground truncate mt-1">
+              <span className="font-medium">Subject:</span> {t.subject}
+            </p>
+          )}
+
+          <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap line-clamp-2 mt-1.5 leading-relaxed">
+            {previewBody(t.body)}
+          </p>
+
+          <p className={cn(META, 'mt-1.5')}>
+            <span>Edited {formatRelative(t.updatedAt)}</span>
+            <span aria-hidden className="mx-1 text-muted-foreground/40">·</span>
+            <span>
+              {t.publishedAt
+                ? `Published ${formatRelative(t.publishedAt)}`
+                : 'Never published'}
+            </span>
+          </p>
+        </button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${t.name}`}
+              className="shrink-0"
+            >
+              <MoreHorizontal size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={onEdit}>
+              <Pencil size={14} />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onPublish}>
+              <Send size={14} />
+              Publish to agents
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDuplicate}>
+              <Copy size={14} />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onDelete} variant="destructive">
+              <Trash2 size={14} />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </li>
   );
 }
 
@@ -855,25 +861,22 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-8" aria-busy>
       {[0, 1].map((i) => (
-        <div key={i} className="space-y-3">
-          <Skeleton className="h-4 w-24" />
-          <div className="grid gap-3">
+        <div key={i} className="space-y-2">
+          <Skeleton className="h-3 w-24" />
+          <ul className="divide-y divide-border/60 border-y border-border/60">
             {[0, 1].map((j) => (
-              <Card key={j}>
-                <CardContent className="px-5 py-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="size-2 rounded-full" />
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-5 w-12 rounded-full" />
-                    <Skeleton className="h-5 w-8 rounded-full" />
-                  </div>
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-4/5" />
-                  <Skeleton className="h-3 w-1/3" />
-                </CardContent>
-              </Card>
+              <li key={j} className="py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="size-2 rounded-full" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-1/3" />
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       ))}
     </div>
@@ -882,34 +885,31 @@ function LoadingSkeleton() {
 
 function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <Card>
-      <CardContent className="px-5 py-12 text-center space-y-3">
-        <p className="text-sm font-medium text-foreground">Couldn&apos;t load templates</p>
-        <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+      <p className={cn(BODY)}>Couldn’t load templates.</p>
+      <p className={cn(BODY_MUTED, 'mt-1')}>{message}</p>
+      <div className="mt-4">
         <Button variant="outline" size="sm" onClick={onRetry}>
           Try again
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <Card>
-      <CardContent className="px-5 py-12 text-center space-y-3">
-        <FileText size={28} className="mx-auto text-muted-foreground/40" />
-        <div className="space-y-1">
-          <p className="text-sm font-medium">No templates yet.</p>
-          <p className="text-sm text-muted-foreground">
-            Create one to share a message across your team.
-          </p>
-        </div>
-        <Button onClick={onCreate} size="sm" className="gap-1.5">
-          <Plus size={15} />
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+      <p className={cn(BODY)}>No templates yet.</p>
+      <p className={cn(BODY_MUTED, 'mt-1')}>
+        Write a message once. Push it to every agent.
+      </p>
+      <div className="mt-4 inline-flex">
+        <button type="button" onClick={onCreate} className={cn(PRIMARY_PILL)}>
+          <Plus size={14} />
           New template
-        </Button>
-      </CardContent>
-    </Card>
+        </button>
+      </div>
+    </div>
   );
 }
