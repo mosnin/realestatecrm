@@ -53,8 +53,12 @@ interface PostBody {
   message: string;
 }
 
-/** Cap on history messages fed to the model. Same as the realtor route. */
-const HISTORY_LIMIT = 20;
+/** Cap on history messages fed to the model. Mirrors the realtor route's
+ *  HISTORY_LIMIT — Phase 1 PR #155 dropped that from 20 to 8 to stop
+ *  paying for 12 stale turns every request; Phase 3 mirrors the same cut
+ *  here. The broker chat surface answers about brokerage state, not a
+ *  many-turn conversation, so 8 is plenty. */
+const HISTORY_LIMIT = 8;
 
 /** Title prefix used to mark broker-Chippi conversations on the broker_owner's
  *  Space — keeps them out of the realtor's own conversation list (the realtor

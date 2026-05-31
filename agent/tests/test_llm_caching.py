@@ -18,16 +18,32 @@ import sys
 
 import pytest
 
-# Stub env so config.py doesn't blow up before we import llm.
+# Stub env so config.py doesn't blow up before we import llm. The OpenAI
+# keys are required by the AsyncOpenAI constructor, which make_chat_model
+# instantiates — without them the SDK refuses to build the client.
 os.environ.setdefault("NEXT_PUBLIC_SUPABASE_URL", "stub")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
+os.environ.setdefault("OPENAI_API_KEY", "stub-openai")
+os.environ.setdefault("OPENROUTER_API_KEY", "stub-openrouter")
 
 # Test runs from agent/, but pytest sometimes invokes from repo root.
 _AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _AGENT_DIR not in sys.path:
     sys.path.insert(0, _AGENT_DIR)
 
-from llm import _apply_anthropic_cache_markers, detect_provider  # noqa: E402
+from llm import (  # noqa: E402
+    _CACHE_MARKER_PROVIDERS,
+    _apply_cache_markers,
+    decide_reasoning_effort,
+    detect_provider,
+    make_chat_model,
+)
+
+# Back-compat alias — keep the old test entry points referring to the
+# renamed helper. Phase 2's tests used _apply_anthropic_cache_markers;
+# Phase 3 renamed it once the marker shape was confirmed identical for
+# Gemini. The alias prevents regressions for any external import.
+_apply_anthropic_cache_markers = _apply_cache_markers
 
 
 # ── detect_provider ────────────────────────────────────────────────────────
@@ -142,3 +158,116 @@ def test_cache_markers_no_system_no_crash():
     }
     _apply_anthropic_cache_markers(kwargs)
     assert kwargs["tools"][0]["cache_control"] == {"type": "ephemeral"}
+
+
+# ── Phase 3: Gemini joins the cache-marker provider set ────────────────────
+
+
+def test_cache_marker_providers_include_anthropic_and_google():
+    """OpenRouter's docs confirm Gemini explicit caching uses the same
+    cache_control shape as Anthropic — Phase 3 extended the marker proxy
+    accordingly. xAI / OpenAI / DeepSeek / Moonshot / Qwen are not in the
+    set: OpenAI/DeepSeek auto-cache without markers; the rest have no
+    OpenRouter caching path today.
+    """
+    assert "anthropic" in _CACHE_MARKER_PROVIDERS
+    assert "google" in _CACHE_MARKER_PROVIDERS
+    assert "openai" not in _CACHE_MARKER_PROVIDERS
+    assert "deepseek" not in _CACHE_MARKER_PROVIDERS
+    assert "xai" not in _CACHE_MARKER_PROVIDERS
+    assert "moonshotai" not in _CACHE_MARKER_PROVIDERS
+    assert "qwen" not in _CACHE_MARKER_PROVIDERS
+
+
+def test_make_chat_model_wraps_google_slug_in_caching_proxy():
+    """A google/gemini-* slug must route through _CachingChatModel so the
+    cache_control markers land on the wire. Locks the wiring against a
+    drift that would silently send Gemini turns without the marker.
+    """
+    from llm import _CachingChatModel
+
+    model = make_chat_model("google/gemini-2.5-pro")
+    assert isinstance(model, _CachingChatModel)
+
+
+def test_make_chat_model_wraps_anthropic_slug_in_caching_proxy():
+    """Anthropic stays wrapped after the Phase 3 rename."""
+    from llm import _CachingChatModel
+
+    model = make_chat_model("anthropic/claude-opus-4.7")
+    assert isinstance(model, _CachingChatModel)
+
+
+def test_make_chat_model_does_not_wrap_non_cache_providers():
+    """xAI / Moonshot / Qwen / bare OpenAI slugs get the plain SDK model.
+    The wrapper costs nothing at runtime but the test pins the gating so
+    we don't accidentally bypass OpenAI's auto-cache by wrapping it.
+    """
+    from agents import OpenAIChatCompletionsModel
+    from llm import _CachingChatModel
+
+    for slug in ("x-ai/grok-4.3", "moonshotai/kimi-k2.6", "qwen/qwen3.6-flash"):
+        m = make_chat_model(slug)
+        assert isinstance(m, OpenAIChatCompletionsModel)
+        assert not isinstance(m, _CachingChatModel)
+
+
+# ── decide_reasoning_effort (Phase 3) ──────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        # Trivial / short turns stay low.
+        ("hi", "low"),
+        ("set a reminder for 3pm", "low"),
+        ("draft a follow-up to sarah", "low"),
+        ("", "low"),
+        (None, "low"),
+        # Planning signals escalate.
+        ("build a plan for the week", "medium"),
+        ("Build me a plan to nurture stale leads", "medium"),
+        ("create a plan for Q3 outreach", "medium"),
+        ("walk me through what happened last week", "medium"),
+        ("compare these two deals side by side", "medium"),
+        ("analyze my pipeline", "medium"),
+        ("audit my recent activity", "medium"),
+        ("research what comparable homes sold for", "medium"),
+        ("strategy for converting these leads", "medium"),
+        ("should I refinance the listing terms", "medium"),
+        # "step-by-step" and "step by step" both lift.
+        ("walk me step-by-step through this", "medium"),
+        ("explain step by step what to do next", "medium"),
+        # Mixed case is normalised.
+        ("BUILD A PLAN PLEASE", "medium"),
+        # Trailing-space signals avoid false matches on substrings.
+        # "audited" should NOT match because the signal is "audit ".
+        ("I audited the pipeline yesterday", "low"),
+        ("researched comparables already", "low"),
+    ],
+)
+def test_decide_reasoning_effort_heuristic(message, expected):
+    # Ensure env override doesn't bleed in from the test runner.
+    os.environ.pop("CHIPPI_REASONING_EFFORT", None)
+    assert decide_reasoning_effort(message) == expected
+
+
+def test_decide_reasoning_effort_env_override_low(monkeypatch):
+    """A cost emergency can force every turn to "low" via the env var,
+    even a turn that would normally escalate. The env var wins."""
+    monkeypatch.setenv("CHIPPI_REASONING_EFFORT", "low")
+    assert decide_reasoning_effort("build a plan for the week") == "low"
+
+
+def test_decide_reasoning_effort_env_override_high(monkeypatch):
+    """An investor demo can force every turn to "high"."""
+    monkeypatch.setenv("CHIPPI_REASONING_EFFORT", "high")
+    assert decide_reasoning_effort("hi") == "high"
+
+
+def test_decide_reasoning_effort_invalid_env_falls_through(monkeypatch):
+    """A typo in the env var must not break every turn. Bad values are
+    ignored and the heuristic still answers."""
+    monkeypatch.setenv("CHIPPI_REASONING_EFFORT", "extreme")
+    assert decide_reasoning_effort("hi") == "low"
+    assert decide_reasoning_effort("build a plan") == "medium"

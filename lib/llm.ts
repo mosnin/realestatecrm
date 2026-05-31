@@ -86,9 +86,12 @@ export const EMBEDDING_MODEL = isOpenRouterConfigured()
  * provider caching support on OpenRouter:
  *   - anthropic: explicit `cache_control` markers, ~90% discount on
  *     cached input after first hit.
+ *   - google (Phase 3): same `cache_control` markers as Anthropic on
+ *     OpenRouter, ~75% discount. Min cache write ~4096 tokens.
  *   - openai / deepseek: automatic on stable prefixes >1024 tokens,
  *     ~50% discount.
- *   - xai / google: no caching path today; Phase 1 trim is the only saving.
+ *   - xai / moonshotai / qwen: no caching path today; Phase 1 trim is
+ *     the only saving.
  */
 export function detectProvider(model: string | null | undefined): string {
   if (!model) return 'unknown';
@@ -114,8 +117,15 @@ export const PROVIDER_LABELS: Record<string, string> = {
 
 /**
  * Providers where OpenRouter caches input tokens. The realtor should see
- * a meaningful hit rate over time on these. xAI / Google fall back to
- * Phase 1's prompt trim only, so a 0% rate there is correct — not a bug
- * worth surfacing.
+ * a meaningful hit rate over time on these. xAI / Moonshot / Qwen fall
+ * back to Phase 1's prompt trim only, so a 0% rate there is correct —
+ * not a bug worth surfacing. Google Gemini was added in Phase 3 once the
+ * cache_control proxy was extended to forward Anthropic-shape markers
+ * to Gemini on OpenRouter.
  */
-export const CACHING_PROVIDERS = new Set(['anthropic', 'openai', 'deepseek']);
+export const CACHING_PROVIDERS = new Set([
+  'anthropic',
+  'openai',
+  'deepseek',
+  'google',
+]);

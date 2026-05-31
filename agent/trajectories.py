@@ -79,6 +79,8 @@ async def record_trajectory(
     trigger: dict | None = None,
     model: str | None = None,
     total_tokens: int = 0,
+    cached_tokens: int = 0,
+    provider: str = "unknown",
     tool_calls: list[dict] | None = None,
     final_summary: str | None = None,
     extra: dict | None = None,
@@ -90,11 +92,19 @@ async def record_trajectory(
     JSONB payload. A run that emits >200 tool events is either a bug
     or a runaway loop; capping here keeps the table sane and gives the
     kill switch something visible to grep against.
+
+    Phase 3 telemetry: `cached_tokens` is the share of `total_tokens`
+    served from the provider prompt cache (Anthropic/Gemini explicit,
+    OpenAI/DeepSeek automatic). `provider` is the OpenRouter prefix
+    ('anthropic' | 'openai' | 'google' | 'xai' | ...). Both default to
+    safe zero/unknown for callers that don't know — pre-Phase-3 rows
+    pass through cleanly with no surface change.
     """
     pool = await get_pool()
 
     capped_tool_calls = (tool_calls or [])[:_MAX_TOOL_CALLS]
     truncated_summary = _truncate(final_summary, 280)
+    cached_tokens = max(0, min(int(cached_tokens or 0), int(total_tokens or 0)))
 
     try:
         async with pool.acquire() as conn:
@@ -102,14 +112,17 @@ async def record_trajectory(
                 """
                 INSERT INTO "AgentTrajectory"
                   ("runId", "spaceId", "startedAt", "endedAt", "status",
-                   "trigger", "model", "totalTokens", "toolCalls",
-                   "finalSummary", "extra")
-                VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::jsonb, $10, $11::jsonb)
+                   "trigger", "model", "totalTokens", "cachedTokens",
+                   "provider", "toolCalls", "finalSummary", "extra")
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10,
+                        $11::jsonb, $12, $13::jsonb)
                 ON CONFLICT ("runId") DO UPDATE SET
                   "endedAt"      = EXCLUDED."endedAt",
                   "status"       = EXCLUDED."status",
                   "model"        = EXCLUDED."model",
                   "totalTokens"  = EXCLUDED."totalTokens",
+                  "cachedTokens" = EXCLUDED."cachedTokens",
+                  "provider"     = EXCLUDED."provider",
                   "toolCalls"    = EXCLUDED."toolCalls",
                   "finalSummary" = EXCLUDED."finalSummary",
                   "extra"        = EXCLUDED."extra"
@@ -122,6 +135,8 @@ async def record_trajectory(
                 json.dumps(trigger) if trigger else None,
                 model,
                 total_tokens,
+                cached_tokens,
+                provider or "unknown",
                 json.dumps(capped_tool_calls),
                 truncated_summary,
                 json.dumps(extra or {}),

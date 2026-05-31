@@ -13,16 +13,21 @@ Fallback: when `OPENROUTER_API_KEY` is absent everything falls back to
 calling OpenAI directly with `OPENAI_API_KEY`, so a deploy without the
 OpenRouter secret keeps working.
 
-Prompt caching (Phase 2):
+Prompt caching (Phase 2 + Phase 3):
   Provider detection drives caching strategy per turn.
   - anthropic: explicit `cache_control: {type: 'ephemeral'}` markers
     attached to the system message and the last tool. ~90% input-token
     discount on cached prefixes after first hit.
+  - google (Phase 3): SAME `cache_control: {type: 'ephemeral'}` shape on
+    OpenRouter — confirmed in OpenRouter's prompt-caching docs (Gemini
+    explicit caching uses Anthropic-compatible breakpoints). ~75% discount.
+    Min cache write is ~4096 tokens (vs Anthropic's 1024) so smaller turns
+    may not cache, but the marker is harmless.
   - openai / deepseek: automatic on stable prefixes >1024 tokens. Phase 1
     already keeps the system prompt + tool list stable, so the provider
     caches without explicit markers. ~50% discount on cached input.
-  - xai / google / unknown: no caching path on OpenRouter today. Phase 1's
-    prompt trim is the only saving.
+  - xai / moonshotai / qwen / unknown: no caching path on OpenRouter today.
+    Phase 1's prompt trim is the only saving.
 
 Keep CHAT_MODELS / DEFAULT_CHAT_MODEL in sync with lib/llm.ts.
 """
@@ -170,6 +175,92 @@ def resolve_chat_model(model: str | None) -> str:
     return DEFAULT_CHAT_MODEL
 
 
+# ---------------------------------------------------------------------------
+# Reasoning-effort routing (Phase 3)
+# ---------------------------------------------------------------------------
+#
+# Phase 1 (PR #155) dropped the global default from "medium" to "low" to
+# stop paying for reasoning tokens on trivial turns ("hey", "set a reminder
+# for 3pm"). That was the right move, but it left the model under-resourced
+# on the few turns that genuinely need to think — planning, comparison,
+# audit, multi-step research.
+#
+# decide_reasoning_effort() looks at the user message and returns "medium"
+# when the request smells like real planning, "low" otherwise. Single source
+# of truth — chat and autonomous-run callers both go through here.
+
+import os
+
+# Per-deploy override. Wins over the heuristic when set to a valid value.
+# Useful when a deploy needs to flip the floor globally (e.g. cost emergency
+# → force "low"; investor demo → force "medium"). Bad values silently
+# fall through to the heuristic so a typo can't break every turn.
+_VALID_EFFORTS = ("low", "medium", "high")
+
+
+# Lowercased keyword signals that lift a turn from "low" to "medium". The
+# bar is intentionally narrow — these are phrases that imply the realtor
+# wants the model to STRUCTURE its thinking, not just answer. Adding more
+# words here costs reasoning tokens on every turn that mentions them, so
+# new entries should buy demonstrable quality.
+_PLANNING_SIGNALS = (
+    "build a plan",
+    "build me a plan",
+    "make a plan",
+    "make me a plan",
+    "create a plan",
+    "plan out",
+    "plan this",
+    "step by step",
+    "step-by-step",
+    "walk me through",
+    "think through",
+    "research ",       # trailing space — "research" the verb, not "researched"
+    "deep research",
+    "investigate",
+    "audit ",          # trailing space — avoids "audited"
+    "compare ",
+    "analyze ",
+    "analyse ",
+    "evaluate ",
+    "assess ",
+    "diagnose",
+    "root cause",
+    "strategy for",
+    "should i ",       # "should I refinance X, Y, Z" → needs weighing
+)
+
+
+def decide_reasoning_effort(user_message: str | None = None) -> str:
+    """Return 'low' | 'medium' | 'high' for this turn.
+
+    Default is "low" — the cheap setting Phase 1 (PR #155) standardised on.
+    Escalates to "medium" when the message carries a planning / research
+    signal (see _PLANNING_SIGNALS).
+
+    The env var CHIPPI_REASONING_EFFORT, when set to "low"/"medium"/"high",
+    overrides the heuristic. Useful to flip the floor per deploy without
+    a code change (cost emergency → force "low"; investor demo → "medium").
+    Invalid values fall through silently so a typo can't break every turn.
+
+    Same function powers both the chat path (user message) and the
+    autonomous path (routine instruction or the opening prompt). Sweep
+    mode passes an empty string and gets "low" — sweeps are cheap and
+    routine; they don't need to think harder than a chat turn.
+    """
+    override = (os.environ.get("CHIPPI_REASONING_EFFORT") or "").strip().lower()
+    if override in _VALID_EFFORTS:
+        return override
+
+    if not user_message:
+        return "low"
+    text = user_message.lower()
+    for signal in _PLANNING_SIGNALS:
+        if signal in text:
+            return "medium"
+    return "low"
+
+
 def detect_provider(model: str | None) -> str:
     """Return the OpenRouter provider prefix from a model slug.
 
@@ -194,6 +285,14 @@ def detect_provider(model: str | None) -> str:
     return prefix or "unknown"
 
 
+# Providers where OpenRouter accepts explicit `cache_control` breakpoints.
+# Anthropic shipped first; Google Gemini explicit caching on OpenRouter uses
+# the SAME breakpoint shape per OpenRouter's docs (Phase 3). xAI/Moonshot/Qwen
+# have no caching path today. OpenAI/DeepSeek auto-cache on stable prefixes
+# and don't need markers.
+_CACHE_MARKER_PROVIDERS = frozenset({"anthropic", "google"})
+
+
 def make_chat_model(name: str):
     """Wrap a model slug in OpenAIChatCompletionsModel against our LLM client.
 
@@ -208,40 +307,43 @@ def make_chat_model(name: str):
     Completions endpoint, which is what OpenRouter speaks (it does not
     implement the Responses API).
 
-    For Anthropic models a thin subclass attaches `cache_control` markers
-    to the system message and the last tool just before the request goes
-    out. Every other provider gets the plain SDK model — OpenAI / DeepSeek
-    auto-cache on stable prefixes; xAI / Google / Moonshot / Qwen have no
-    OpenRouter caching path today.
+    For Anthropic AND Google Gemini models a thin proxy attaches
+    `cache_control` markers to the system message and the last tool just
+    before the request goes out. Every other provider gets the plain SDK
+    model — OpenAI / DeepSeek auto-cache on stable prefixes; xAI / Moonshot
+    / Qwen have no OpenRouter caching path today.
     """
     from agents import OpenAIChatCompletionsModel
 
-    if detect_provider(name) == "anthropic":
-        return _AnthropicCachingChatModel(model=name, openai_client=get_llm_client())
+    if detect_provider(name) in _CACHE_MARKER_PROVIDERS:
+        return _CachingChatModel(model=name, openai_client=get_llm_client())
     return OpenAIChatCompletionsModel(model=name, openai_client=get_llm_client())
 
 
-def _build_anthropic_cache_markers() -> dict[str, Any]:
-    """OpenRouter forwards Anthropic's `cache_control` extension verbatim.
+def _build_cache_marker() -> dict[str, Any]:
+    """OpenRouter forwards Anthropic-shape `cache_control` to both Anthropic
+    and Gemini per OpenRouter's prompt-caching docs.
 
-    The marker structure is identical to Anthropic's own API:
-    `{"type": "ephemeral"}` on the last content block of the cacheable region.
+    The marker structure is identical: `{"type": "ephemeral"}` on the last
+    content block of the cacheable region.
 
     Two markers cover the static input surface:
       1. SYSTEM — placed on the system-message content. Caches the
-         CHIPPI_INSTRUCTIONS (~3-5K tokens) + workspace_info + ai_profile.
-      2. TOOLS — placed on the LAST tool. Anthropic caches the entire tools
-         array up through any tool carrying a marker, so one marker on the
-         tail covers the full 30+ tool surface.
+         CHIPPI_INSTRUCTIONS (~1.5K tokens after Phase 1) + workspace_info
+         + ai_profile.
+      2. TOOLS — placed on the LAST tool. The provider caches the entire
+         tools array up through any tool carrying a marker, so one marker
+         on the tail covers the full 30+ tool surface.
 
     See: https://openrouter.ai/docs/features/prompt-caching
          https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+         https://ai.google.dev/gemini-api/docs/caching
     """
     return {"type": "ephemeral"}
 
 
-class _AnthropicCachingChatModel:
-    """OpenAIChatCompletionsModel wrapper that injects Anthropic cache markers.
+class _CachingChatModel:
+    """OpenAIChatCompletionsModel wrapper that injects cache markers.
 
     Wraps the SDK model rather than subclassing because the SDK builds the
     raw `messages` array and tools list inline inside `_fetch_response`,
@@ -256,7 +358,9 @@ class _AnthropicCachingChatModel:
         "cache_control": {"type": "ephemeral"}}]}.
       - The last entry of the `tools` array gets cache_control attached.
 
-    Non-Anthropic providers never reach this class.
+    Used for Anthropic and Google Gemini (Phase 3 — OpenRouter forwards
+    the same marker shape to both per their prompt-caching docs). Other
+    providers never reach this class.
     """
 
     def __init__(self, model: str, openai_client: AsyncOpenAI):
@@ -274,8 +378,8 @@ class _AnthropicCachingChatModel:
 
 
 class _CacheMarkerClient:
-    """Proxy wrapper around AsyncOpenAI that attaches Anthropic cache markers
-    on the way out. Forwards every other attribute unchanged.
+    """Proxy wrapper around AsyncOpenAI that attaches cache markers on the
+    way out. Forwards every other attribute unchanged.
 
     We wrap only `chat.completions.create` — the one entry point the agents
     SDK calls. Embeddings, files, etc. go through `get_llm_client()` directly
@@ -308,12 +412,12 @@ class _CacheMarkerCompletions:
 
     async def create(self, **kwargs: Any) -> Any:
         # Mutate in place — the SDK does not reuse the dict after dispatch.
-        _apply_anthropic_cache_markers(kwargs)
+        _apply_cache_markers(kwargs)
         return await self._inner.create(**kwargs)
 
 
-def _apply_anthropic_cache_markers(create_kwargs: dict[str, Any]) -> None:
-    """Mutate `messages` and `tools` to carry Anthropic cache_control markers.
+def _apply_cache_markers(create_kwargs: dict[str, Any]) -> None:
+    """Mutate `messages` and `tools` to carry cache_control markers.
 
     Idempotent: if the system message is already a block list with markers,
     or the last tool already carries cache_control, nothing changes. Safe
@@ -323,9 +427,9 @@ def _apply_anthropic_cache_markers(create_kwargs: dict[str, Any]) -> None:
     Rewrite the string to a single-block content array carrying the marker.
 
     Tools: the SDK passes tools as a list of dicts shaped like
-    {"type": "function", "function": {...}}. Anthropic on OpenRouter accepts
-    `cache_control` as a sibling of `function`. One marker on the last tool
-    covers every preceding tool.
+    {"type": "function", "function": {...}}. Anthropic and Gemini on
+    OpenRouter accept `cache_control` as a sibling of `function`. One
+    marker on the last tool covers every preceding tool.
     """
     messages = create_kwargs.get("messages")
     if isinstance(messages, list):
@@ -339,7 +443,7 @@ def _apply_anthropic_cache_markers(create_kwargs: dict[str, Any]) -> None:
                     {
                         "type": "text",
                         "text": msg["content"],
-                        "cache_control": _build_anthropic_cache_markers(),
+                        "cache_control": _build_cache_marker(),
                     }
                 ]
                 break  # Only one system message; first hit wins.
@@ -348,7 +452,11 @@ def _apply_anthropic_cache_markers(create_kwargs: dict[str, Any]) -> None:
     if isinstance(tools, list) and tools:
         last_tool = tools[-1]
         if isinstance(last_tool, dict) and "cache_control" not in last_tool:
-            last_tool["cache_control"] = _build_anthropic_cache_markers()
+            last_tool["cache_control"] = _build_cache_marker()
+
+
+# Back-compat alias for tests/external callers that imported the old name.
+_apply_anthropic_cache_markers = _apply_cache_markers
 
 
 _configured = False
