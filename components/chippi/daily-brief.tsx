@@ -39,6 +39,7 @@ import {
   formatProgress,
   formatLastOpened,
 } from './use-brief-lifecycle';
+import { ShimmerText } from './shimmer-text';
 
 interface Props {
   slug: string;
@@ -202,7 +203,17 @@ export function DailyBrief({ slug, initialBrief, alwaysLive = false }: Props) {
   if (loading) {
     return (
       <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
-        <p className={cn(BODY_MUTED, 'mb-4')}>{slow ? 'Reading your day…' : 'Looking at your day.'}</p>
+        <p className={cn(BODY_MUTED, 'mb-4')}>
+          <ShimmerText
+            messages={
+              timedOut
+                ? ['Still reading…']
+                : slow
+                  ? ['Reading your morning.', 'Catching up on overnight.', 'Putting it together.']
+                  : ['Reading your morning.', 'Catching up on overnight.']
+            }
+          />
+        </p>
         <div className="space-y-2 animate-pulse">
           <div className="h-3 w-full rounded bg-muted/40" />
           <div className="h-3 w-5/6 rounded bg-muted/40" />
@@ -704,7 +715,9 @@ function YesterdayBrief({ slug, onCollapse }: { slug: string; onCollapse: () => 
     return (
       <div className={cn(FOCUS_CARD_MAX, 'mx-auto')}>
         <p className={cn(SECTION_LABEL, 'mb-2')}>Yesterday</p>
-        <div className="h-3 w-2/3 rounded bg-muted/40 animate-pulse" />
+        <p className={cn(BODY_MUTED, 'text-xs')}>
+          <ShimmerText messages="Reading yesterday." />
+        </p>
       </div>
     );
   }
