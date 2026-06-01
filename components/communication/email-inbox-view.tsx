@@ -9,10 +9,15 @@
  * on desktop) and writes through to Gmail's STARRED label. Load more
  * pages in 30 at a time via Gmail's pageToken.
  *
+ * Search: a visible input in the toolbar. Typing debounces 300ms then
+ * fires /api/email?q=... which passes the query to Gmail's full-text
+ * search. Clearing the field (or pressing Escape) returns to the
+ * current filter view. Load more threads the q param through pagination.
+ *
  * Page chrome (scroll container, greeting, title, subtitle) is owned by
  * the parent CommunicationView. This component renders one toolbar row
- * (filter chips · New message) followed by the list / empty / loading
- * states for the email tab only.
+ * (filter chips · search · New message) followed by the list / empty /
+ * loading states for the email tab only.
  *
  * Compose stays a modal: writing is a focal task that earns a dialog.
  */
@@ -27,7 +32,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Mail, Plug, Plus, Send, Star } from 'lucide-react';
+import { Mail, Plug, Plus, Search, Send, Star, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -150,6 +155,12 @@ export function EmailInboxView({
   const [appendCursor, setAppendCursor] = useState(0);
   const filterRef = useRef<EmailFilter>('inbox');
 
+  // Search state: raw input, debounced query that actually fires.
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Hydrate filter from localStorage on mount.
   useEffect(() => {
     const stored = readStoredFilter(slug);
@@ -157,11 +168,33 @@ export function EmailInboxView({
     filterRef.current = stored;
   }, [slug]);
 
+  // Debounce: 300ms after the last keystroke, commit the search query.
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(value.trim());
+    }, 300);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('');
+    setSearchQuery('');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    searchInputRef.current?.focus();
+  }, []);
+
+  // Clean up debounce timer on unmount.
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
   const fetchPage = useCallback(
     async (args: {
       filter: EmailFilter;
       pageToken: string | null;
       append: boolean;
+      q?: string;
     }) => {
       if (!connected) {
         setLoading(false);
@@ -175,6 +208,7 @@ export function EmailInboxView({
       params.set('slug', slug);
       params.set('filter', args.filter);
       if (args.pageToken) params.set('pageToken', args.pageToken);
+      if (args.q) params.set('q', args.q);
 
       try {
         const res = await fetch(`/api/email?${params.toString()}`);
@@ -214,34 +248,46 @@ export function EmailInboxView({
     [connected, slug],
   );
 
-  // Fetch on filter change.
+  // Fetch whenever filter or search query changes. When a search query is
+  // present, pass it to Gmail's full-text search; label filtering is relaxed
+  // server-side. The filter-change handler always clears the search first so
+  // changing filters never fires this with both a filter and a query.
   useEffect(() => {
     filterRef.current = filter;
     if (!connected) {
       setLoading(false);
       return;
     }
-    fetchPage({ filter, pageToken: null, append: false });
-  }, [filter, connected, fetchPage]);
+    fetchPage({
+      filter,
+      pageToken: null,
+      append: false,
+      q: searchQuery || undefined,
+    });
+  }, [filter, searchQuery, connected, fetchPage]);
 
   const handleFilterChange = useCallback(
     (next: EmailFilter) => {
       writeStoredFilter(slug, next);
       setFilter(next);
+      // Switching filters clears the search so the user sees the real Inbox/Starred/Sent.
+      setSearchInput('');
+      setSearchQuery('');
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     },
     [slug],
   );
 
   const handleLoadMore = useCallback(() => {
     if (!nextPageToken || loadingMore) return;
-    fetchPage({ filter, pageToken: nextPageToken, append: true });
-  }, [fetchPage, filter, loadingMore, nextPageToken]);
+    fetchPage({ filter, pageToken: nextPageToken, append: true, q: searchQuery || undefined });
+  }, [fetchPage, filter, loadingMore, nextPageToken, searchQuery]);
 
   const handleSent = useCallback(() => {
     setComposeOpen(false);
     // Refetch the current view so the new outbound shows up if filter=sent.
-    fetchPage({ filter, pageToken: null, append: false });
-  }, [fetchPage, filter]);
+    fetchPage({ filter, pageToken: null, append: false, q: searchQuery || undefined });
+  }, [fetchPage, filter, searchQuery]);
 
   const handleStarToggle = useCallback(
     async (messageId: string, nextStarred: boolean) => {
@@ -286,12 +332,51 @@ export function EmailInboxView({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
+      {/* Toolbar: filter chips · search · New message */}
+      <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
         <FilterChips value={filter} onChange={handleFilterChange} />
+
+        {/* Search input — always visible at rest (DOET check 1). The
+         *  magnifying-glass is an icon signifier inside the field;
+         *  the X button appears only when there is text to clear. */}
+        <div className="relative flex-1 min-w-[160px] sm:min-w-[220px] max-w-xs">
+          <Search
+            size={14}
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70"
+            aria-hidden
+          />
+          <Input
+            ref={searchInputRef}
+            type="search"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                clearSearch();
+              }
+            }}
+            placeholder="Search mail"
+            aria-label="Search mail"
+            className="pl-8 pr-8 h-9 text-sm"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground transition-colors duration-150 p-0.5"
+            >
+              <X size={13} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => setComposeOpen(true)}
-          className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0')}
+          className={cn(PRIMARY_PILL, 'whitespace-nowrap shrink-0 ml-auto sm:ml-0')}
           aria-label="New message"
         >
           <Plus className="h-4 w-4" />
@@ -310,26 +395,27 @@ export function EmailInboxView({
       {!loading && errorMessage && (
         <Card>
           <CardContent className="p-5 space-y-2">
-            <p className={BODY}>I couldn’t reach your inbox just now.</p>
+            <p className={BODY}>I couldn't reach your inbox just now.</p>
             <p className={BODY_MUTED}>{errorMessage}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Cross-fade between filter datasets (Inbox / Starred / Sent). The
-       *  list inside is a stagger container; on filter change AnimatePresence
-       *  swaps the whole list cleanly. */}
+      {/* Cross-fade between filter/search datasets. The list inside is a
+       *  stagger container; on filter or query change AnimatePresence swaps
+       *  the whole list cleanly. The key includes the debounced query so
+       *  search results get a fresh entrance. */}
       <AnimatePresence mode="wait" initial={false}>
         {!loading && !errorMessage && (
           <motion.div
-            key={`feed-${filter}`}
+            key={`feed-${filter}-${searchQuery}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22, ease: EASE_APPLE }}
           >
             {items.length === 0 ? (
-              <EmptyFeed filter={filter} />
+              <EmptyFeed filter={filter} searchQuery={searchQuery} />
             ) : (
               <>
                 <motion.ul
@@ -403,7 +489,7 @@ function FilterChips({
   onChange: (next: EmailFilter) => void;
 }) {
   return (
-    <div className="flex items-center gap-2" role="tablist" aria-label="Filter">
+    <div className="flex items-center gap-2 shrink-0" role="tablist" aria-label="Filter">
       {FILTERS.map((f, idx) => (
         <span key={f.key} className="flex items-center gap-2">
           {idx > 0 && <span className={BODY_MUTED}>·</span>}
@@ -595,7 +681,20 @@ function EmailRow({
   );
 }
 
-function EmptyFeed({ filter }: { filter: EmailFilter }) {
+function EmptyFeed({ filter, searchQuery }: { filter: EmailFilter; searchQuery: string }) {
+  if (searchQuery) {
+    return (
+      <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 py-12 px-6 flex flex-col items-center text-center">
+        <div className="mb-3 w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center">
+          <Search size={16} strokeWidth={1.75} className="text-muted-foreground" />
+        </div>
+        <p className="text-sm font-medium text-foreground">No results.</p>
+        <p className="mt-1 text-[13px] text-muted-foreground max-w-[280px] leading-relaxed">
+          Nothing matched that search. Try a different term.
+        </p>
+      </div>
+    );
+  }
   const title =
     filter === 'starred'
       ? 'Nothing starred yet.'
@@ -625,7 +724,7 @@ function DisconnectedState({ slug }: { slug: string }) {
           </div>
           <div className="space-y-1.5">
             <p className={BODY}>
-              Bring your email here so the day’s threads live in one place.
+              Bring your email here so the day's threads live in one place.
             </p>
             <p className={BODY_MUTED}>Gmail is the fast path.</p>
           </div>

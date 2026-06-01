@@ -1,5 +1,5 @@
 /**
- * GET /api/email?slug=xxx&filter=inbox|starred|sent&pageToken=...
+ * GET /api/email?slug=xxx&filter=inbox|starred|sent&pageToken=...&q=...
  *
  * The realtor's email, channel-pure (no WhatsApp). Mirrors the calendar
  * pattern — connection presence is part of the payload so the page
@@ -13,7 +13,11 @@
  *   - starred → ['STARRED']
  *   - sent    → ['SENT']
  *
- * Pagination is Gmail's nativ `next_page_token`. We pass it through; the
+ * Search: pass `q` to run Gmail's full-text search. When q is present,
+ * label_ids is omitted so the search scans the whole mailbox (Gmail's
+ * own search syntax already supports from:/to:/subject: operators).
+ *
+ * Pagination is Gmail's native `next_page_token`. We pass it through; the
  * client tracks it for "Load more". 30 messages per page — enough to fill
  * a screen, small enough that the realtor isn't waiting on a 200-row
  * fetch when they only wanted the top dozen.
@@ -139,16 +143,29 @@ async function fetchGmailPage(args: {
   conn: MailConnection;
   filter: EmailFilter;
   pageToken: string | null;
+  /** Free-text search query. When set, label filtering is relaxed so the
+   *  search scans the whole mailbox — same as Gmail's own search bar. */
+  q?: string | null;
 }): Promise<{ items: EmailListItem[]; nextPageToken: string | null }> {
-  const labelIds = labelIdsFor(args.filter);
   // Composio's Gmail SDK accepts `label_ids` and `page_token`. We also
   // pass the camelCase counterparts in case the SDK adapter drifts.
+  // When a search query is present, skip the label filter so results
+  // surface from across the mailbox.
   const callArgs: Record<string, unknown> = {
     max_results: PAGE_SIZE,
-    label_ids: labelIds,
-    labelIds,
     include_payload: false,
   };
+
+  if (args.q) {
+    // Pass query under both key spellings in case the SDK adapter varies.
+    callArgs.query = args.q;
+    callArgs.q = args.q;
+  } else {
+    const labelIds = labelIdsFor(args.filter);
+    callArgs.label_ids = labelIds;
+    callArgs.labelIds = labelIds;
+  }
+
   if (args.pageToken) {
     callArgs.page_token = args.pageToken;
     callArgs.pageToken = args.pageToken;
@@ -231,6 +248,7 @@ export async function GET(req: NextRequest) {
 
   const filter = parseFilter(req.nextUrl.searchParams.get('filter'));
   const pageToken = req.nextUrl.searchParams.get('pageToken');
+  const q = req.nextUrl.searchParams.get('q') ?? null;
 
   if (conn.toolkit !== 'gmail') {
     const payload: ConnectedPayload = {
@@ -248,6 +266,7 @@ export async function GET(req: NextRequest) {
     conn,
     filter,
     pageToken,
+    q,
   });
 
   const payload: ConnectedPayload = {
