@@ -168,7 +168,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-2xl font-bold mt-1 tabular-nums">{value}</p>
+                  <p className="text-[25px] leading-tight tracking-tight mt-1 tabular-nums">{value}</p>
                 </div>
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Icon size={15} className={color} />

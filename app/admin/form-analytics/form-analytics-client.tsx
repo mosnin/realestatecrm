@@ -110,8 +110,8 @@ export function FormAnalyticsClient({
       label: 'Unqualified',
       value: distribution.unqualified,
       icon: BarChart3,
-      bar: 'bg-gray-400',
-      text: 'text-gray-600 dark:text-gray-400',
+      bar: 'bg-muted-foreground/40',
+      text: 'text-muted-foreground',
     },
   ];
 
@@ -202,7 +202,7 @@ export function FormAnalyticsClient({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                  <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{value}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
                 </div>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
@@ -273,7 +273,7 @@ export function FormAnalyticsClient({
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          className="h-full bg-foreground rounded-full transition-all duration-500"
                           style={{ width: `${Math.max(pct, 2)}%` }}
                         />
                       </div>

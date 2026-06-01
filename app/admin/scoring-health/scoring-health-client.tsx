@@ -173,7 +173,7 @@ export function ScoringHealthClient({
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground font-medium">{label}</p>
                   <p
-                    className={`text-2xl font-bold mt-0.5 tabular-nums ${
+                    className={`text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums ${
                       accent ? 'text-rose-600 dark:text-rose-400' : ''
                     }`}
                   >
@@ -201,14 +201,14 @@ export function ScoringHealthClient({
             <p className="text-xs text-muted-foreground font-medium">
               Failed (last {periodLabel})
             </p>
-            <p className="text-2xl font-bold mt-0.5 tabular-nums">{failedInPeriod}</p>
+            <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{failedInPeriod}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Rolling window</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
             <p className="text-xs text-muted-foreground font-medium">Failed (all time)</p>
-            <p className="text-2xl font-bold mt-0.5 tabular-nums">{stats.totalFailed}</p>
+            <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{stats.totalFailed}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Across all contacts</p>
           </CardContent>
         </Card>

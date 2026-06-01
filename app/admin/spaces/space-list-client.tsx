@@ -45,7 +45,7 @@ const statusColors: Record<string, string> = {
   canceled:
     'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
   inactive:
-    'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-500/15',
+    'bg-muted text-muted-foreground',
   unpaid:
     'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
 };

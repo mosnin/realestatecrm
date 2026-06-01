@@ -47,7 +47,7 @@ const ACTION_BADGE_STYLES: Record<string, string> = {
   CREATE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
   UPDATE: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
   DELETE: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-  ACCESS: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+  ACCESS: 'bg-muted text-muted-foreground',
   LOGIN: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400',
   LOGOUT: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400',
   ADMIN_ACTION: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
@@ -215,7 +215,7 @@ export function AuditLogClient({ logs, userMap }: AuditLogClientProps) {
                   const isExpanded = expandedRow === log.id;
                   const badgeStyle =
                     ACTION_BADGE_STYLES[log.action] ??
-                    'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
+                    'bg-muted text-muted-foreground';
 
                   return (
                     <Fragment key={log.id}>

@@ -266,7 +266,7 @@ export default async function AdminCohortsPage() {
                   <Cell count={r.onboarded} total={r.signups} color="bg-emerald-500" />
                   <Cell count={r.workspace} total={r.signups} color="bg-violet-500" />
                   <Cell count={r.trialing} total={r.signups} color="bg-blue-500" />
-                  <Cell count={r.paid} total={r.signups} color="bg-primary" />
+                  <Cell count={r.paid} total={r.signups} color="bg-foreground" />
                   <Cell count={r.churned} total={r.signups} color="bg-rose-500" />
                   <Cell count={r.active} total={r.signups} color="bg-emerald-600" />
                 </tr>
@@ -331,7 +331,7 @@ export default async function AdminCohortsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                    <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{value}</p>
                   </div>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
                     <Icon size={15} className={color} />

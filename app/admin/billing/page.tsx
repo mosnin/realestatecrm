@@ -23,7 +23,7 @@ const statusBarColors: Record<SubscriptionStatus, string> = {
   past_due: 'bg-amber-500',
   canceled: 'bg-red-500',
   unpaid: 'bg-red-400',
-  inactive: 'bg-gray-400',
+  inactive: 'bg-muted-foreground/40',
 };
 
 export default async function AdminBillingPage() {
