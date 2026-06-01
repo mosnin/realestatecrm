@@ -3,23 +3,35 @@
 /**
  * `<KanbanDragDiagram />` — a pipeline that updates itself.
  *
- * One beat: a deal card slides from Negotiating into Closed Won, and the
- * deal's side-panel fields auto-fill as a consequence. This is "drag a
- * card, Chippi keeps the rest in sync" demonstrated in one breath.
+ * One beat: a deal card leaves Negotiating and lands in Closed Won, the
+ * column counts tick (Negotiating 1→0, Closed won 0→1), and the card gains
+ * a "closed · today" confirmation as Chippi back-fills the close date.
+ * "Move a card, Chippi keeps the rest in sync" in one breath — told
+ * entirely on the board so it reads at every aspect with no side rail to
+ * overflow.
+ *
+ * Layout contract (the fluid-fit fix):
+ *   - Root is `w-full h-full flex flex-col min-h-0`.
+ *   - The 4 columns are a `grid-cols-4` that distributes width; each column
+ *     body is `flex-1 min-h-0 overflow-hidden` so it fills the available
+ *     height and never sums taller than the box.
+ *   - No fixed-px heights anywhere. The densest frame (two cards stacked in
+ *     Closed Won, the close confirmation expanded) fits the SHORTEST aspect
+ *     used — `wide` (21:9), ~504×290px inner after the shell's p-6.
+ *   - No secondary side panel: the field-sync story lives on the card, so
+ *     there's nothing to hide or clip when the box is short.
  *
  * Motion contract:
- *   - 8s cycle.
- *   - Pre-roll 700ms: board sits still.
- *   - Move: the card translates ~one column-width to the right, 320ms,
- *     EASE_APPLE, fading slightly mid-move so the eye reads "snap to
- *     the new home" not "card flying around".
- *   - 200ms after the card lands: column highlight on Closed Won decays.
- *     320ms after the card lands: first side-panel field ticks in
- *     ("Close date · Today"). 600ms after that: second field
- *     ("Final value · $475,000"). 700ms hold.
- *   - Reset: 200ms fade-out across the whole diagram, then re-arm.
+ *   - ~6.9s cycle, EASE_APPLE throughout. One beat, then a long hold.
+ *   - Pre-roll: board sits still.
+ *   - Leave: source card fades + drifts right as it exits Negotiating.
+ *   - Land: card fades in atop Closed Won; counts cross-fade; the column
+ *     gets a restrained highlight that decays.
+ *   - Confirm: "closed · today" + Chippi badge ticks in under the value.
+ *   - Hold, then a calm fade-out across the diagram, then re-arm.
  *
- * Reduced-motion: card sits in Closed Won, both side-panel fields visible.
+ * Reduced-motion: card already in Closed Won, counts settled, confirmation
+ * visible — the end state, no timers.
  */
 
 import { useEffect, useState } from 'react';
@@ -29,6 +41,7 @@ import { cn } from '@/lib/utils';
 import { EASE_APPLE } from '@/lib/motion';
 import {
   ChippiDiagramShell,
+  DiagramChippiBadge,
   useDiagramMotion,
 } from './chippi-diagram-shell';
 
@@ -37,70 +50,41 @@ interface KanbanDragDiagramProps {
   className?: string;
 }
 
-// 0 = pre-roll, 1 = card moving, 2 = card landed, 3 = field 1 in,
-// 4 = field 2 in, 5 = hold, 6 = fade-out (then reset to 0).
-type Phase = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+// 0 = pre-roll, 1 = card leaving, 2 = card landed + counts ticked,
+// 3 = close confirmation in, 4 = hold, 5 = fade-out (then reset to 0).
+type Phase = 0 | 1 | 2 | 3 | 4 | 5;
 
 const PHASE_TIMINGS_MS: { phase: Phase; at: number }[] = [
   { phase: 0, at: 0 },
-  { phase: 1, at: 800 },
-  { phase: 2, at: 1120 },
-  { phase: 3, at: 1440 },
-  { phase: 4, at: 2040 },
-  { phase: 5, at: 2740 },
-  { phase: 6, at: 4040 },
+  { phase: 1, at: 900 },
+  { phase: 2, at: 1240 },
+  { phase: 3, at: 1660 },
+  { phase: 4, at: 2360 },
+  { phase: 5, at: 6000 },
 ];
-const CYCLE_RESET_AT = 4500;
+const CYCLE_RESET_AT = 6400;
+const CYCLE_GAP_MS = 500;
 
 const COLUMNS = [
-  { name: 'New', cards: [{ name: 'Daniels family', tier: 'cold' as const }] },
-  { name: 'Qualifying', cards: [{ name: 'C. Park', tier: 'warm' as const }] },
+  { name: 'New', cards: [{ name: 'Daniels family' }] },
+  { name: 'Qualifying', cards: [{ name: 'C. Park' }] },
   { name: 'Negotiating', cards: [] }, // the moving card lives here at phase 0
   { name: 'Closed won', cards: [] },
 ];
 
-// Static "other" cards rendered as paper-flat tiles. The lead tier dot
-// uses the same lead-* tokens as the product so the diagram matches the
-// real card vocabulary.
-function StaticCard({
-  name,
-  tier,
-  value,
-  address,
-}: {
-  name: string;
-  tier: 'cold' | 'warm' | 'hot';
-  value?: string;
-  address?: string;
-}) {
+// Static "other" cards rendered as paper-flat tiles. The dot mirrors the
+// real `DealCard` health dot (emerald = on-track), NOT a lead tier — a deal
+// card communicates pipeline health, not lead temperature. These are calm
+// active deals, so all on-track; the diagram isn't telling a health story.
+function StaticCard({ name }: { name: string }) {
   return (
-    <div className="rounded-md border border-border/70 bg-background p-2.5">
+    <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
       <div className="flex items-center gap-1.5">
-        <span
-          className={cn(
-            'w-1.5 h-1.5 rounded-full flex-shrink-0',
-            tier === 'hot' && 'bg-lead-hot',
-            tier === 'warm' && 'bg-lead-warm',
-            tier === 'cold' && 'bg-lead-cold',
-          )}
-        />
-        <p className="text-[12px] font-medium leading-tight truncate text-foreground">
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-500" />
+        <p className="text-[11px] font-medium leading-tight truncate text-foreground">
           {name}
         </p>
       </div>
-      {address && (
-        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-          {address}
-        </p>
-      )}
-      {value && (
-        <p
-          className="text-[14px] tabular-nums text-foreground mt-1 leading-none"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          {value}
-        </p>
-      )}
     </div>
   );
 }
@@ -118,7 +102,7 @@ export function KanbanDragDiagram({
 
 function KanbanDragContent() {
   const { reduced } = useDiagramMotion();
-  const [phase, setPhase] = useState<Phase>(reduced ? 5 : 0);
+  const [phase, setPhase] = useState<Phase>(reduced ? 4 : 0);
 
   useEffect(() => {
     if (reduced) return;
@@ -137,7 +121,7 @@ function KanbanDragContent() {
         setTimeout(() => {
           if (cancelled) return;
           setPhase(0);
-          timers.push(setTimeout(runCycle, 500));
+          timers.push(setTimeout(runCycle, CYCLE_GAP_MS));
         }, CYCLE_RESET_AT),
       );
     }
@@ -148,20 +132,30 @@ function KanbanDragContent() {
     };
   }, [reduced]);
 
-  const cardInCW = phase >= 2 && phase <= 5;
-  // Card position: while moving, animate via x translation. When landed,
-  // we render it inside Closed Won column directly. Two render branches
-  // so layout stays predictable.
-  const cardMoving = phase === 1;
+  const cardInCW = phase >= 2 && phase <= 4;
+  const cardLeaving = phase === 1;
+  const fadingOut = phase === 5;
+  const confirmed = phase >= 3 && phase <= 4;
 
   return (
-    <div className="w-full h-full flex gap-4 min-h-0">
-      {/* Board — 4 columns, gap-3 between */}
-      <div className="flex-1 grid grid-cols-4 gap-3 min-h-0">
+    <motion.div
+      className="w-full h-full flex flex-col min-h-0"
+      animate={{ opacity: fadingOut ? 0 : 1 }}
+      transition={{ duration: 0.24, ease: EASE_APPLE }}
+    >
+      {/* Board — 4 columns. The grid distributes width; each column body
+          fills the remaining height with `flex-1 min-h-0` so nothing sums
+          taller than the box at any aspect. */}
+      <div className="flex-1 grid grid-cols-4 gap-2 min-h-0">
         {COLUMNS.map((col, idx) => {
+          const isNegotiating = idx === 2;
           const isCWCol = idx === 3;
           const showLanded = isCWCol && cardInCW;
+          const showSource = isNegotiating && (phase === 0 || phase === 1);
           const isHighlight = isCWCol && (phase === 2 || phase === 3);
+          // Count ticks the moment the card crosses over.
+          const count =
+            col.cards.length + (showLanded ? 1 : 0) + (showSource ? 1 : 0);
           return (
             <div
               key={col.name}
@@ -170,48 +164,45 @@ function KanbanDragContent() {
                 isHighlight && 'bg-foreground/[0.03]',
               )}
             >
-              <div className="px-1.5 pb-2 flex items-center justify-between">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground truncate">
+              <div className="px-1 pb-1.5 flex items-center justify-between gap-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate">
                   {col.name}
                 </p>
-                <span className="text-[10px] tabular-nums text-muted-foreground/70">
-                  {col.cards.length + (showLanded ? 1 : 0)}
+                <span className="text-[10px] tabular-nums text-muted-foreground/70 flex-shrink-0">
+                  {count}
                 </span>
               </div>
               <div
                 className={cn(
-                  'flex-1 rounded-md p-1.5 space-y-2 min-h-0',
+                  'flex-1 min-h-0 rounded-md p-1.5 space-y-1.5 overflow-hidden',
                   'bg-foreground/[0.02] border border-border/70',
                 )}
               >
                 {col.cards.map((c) => (
-                  <StaticCard key={c.name} name={c.name} tier={c.tier} />
+                  <StaticCard key={c.name} name={c.name} />
                 ))}
 
-                {/* Negotiating column starts with the moving deal card */}
-                {idx === 2 && (phase === 0 || phase === 1) && (
+                {/* Negotiating starts with the moving deal card. */}
+                {showSource && (
                   <motion.div
-                    layout={false}
                     initial={false}
                     animate={
-                      cardMoving
-                        ? { opacity: 0.4, x: 8 }
-                        : { opacity: 1, x: 0 }
+                      cardLeaving ? { opacity: 0, x: 10 } : { opacity: 1, x: 0 }
                     }
-                    transition={{ duration: 0.28, ease: EASE_APPLE }}
+                    transition={{ duration: 0.3, ease: EASE_APPLE }}
                   >
-                    <FocalDealCard />
+                    <FocalDealCard confirmed={false} />
                   </motion.div>
                 )}
 
-                {/* Closed Won column receives the card at phase 2+ */}
+                {/* Closed Won receives the card at phase 2+. */}
                 {showLanded && (
                   <motion.div
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.22, ease: EASE_APPLE }}
+                    transition={{ duration: 0.24, ease: EASE_APPLE }}
                   >
-                    <FocalDealCard />
+                    <FocalDealCard confirmed={confirmed} />
                   </motion.div>
                 )}
               </div>
@@ -219,94 +210,59 @@ function KanbanDragContent() {
           );
         })}
       </div>
-
-      {/* Side preview panel — same vocabulary as the deal quick-panel:
-          hairline-divided rows, label muted, value foreground. Two rows
-          tick in after the card lands. */}
-      <div className="hidden md:flex w-[180px] shrink-0 flex-col min-h-0">
-        <div className="rounded-lg border border-border/70 bg-card flex flex-col overflow-hidden">
-          <div className="px-3 pt-2.5 pb-2 border-b border-border/60">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Deal
-            </p>
-            <p
-              className="mt-1 text-[15px] tracking-tight text-foreground leading-snug"
-              style={{ fontFamily: 'var(--font-title)' }}
-            >
-              415 Lexington
-            </p>
-          </div>
-          <ul className="divide-y divide-border/60">
-            <PanelRow
-              label="Stage"
-              value={cardInCW ? 'Closed won' : 'Negotiating'}
-            />
-            <PanelRow
-              label="Close date"
-              value="Today"
-              show={phase >= 3}
-            />
-            <PanelRow
-              label="Final value"
-              value="$475,000"
-              show={phase >= 4}
-            />
-          </ul>
-        </div>
-      </div>
-    </div>
+    </motion.div>
   );
 }
 
-function FocalDealCard() {
+/**
+ * The deal that moves. Carries the value (serif Times — the focal number).
+ * When it lands in Closed Won a "closed · today" line ticks in beneath the
+ * value with the Chippi badge: the field-sync consequence, told on the card
+ * itself rather than in a side rail that would overflow a short box. The
+ * row animates its own height so the card grows in place without nudging
+ * the column layout.
+ */
+function FocalDealCard({ confirmed }: { confirmed: boolean }) {
   return (
-    <div className="rounded-md border border-border/70 bg-background p-2.5">
-      <div className="flex items-start gap-1.5">
+    <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
+      <div className="flex items-start gap-1">
         <GripVertical
           size={11}
-          className="text-muted-foreground/40 mt-0.5 flex-shrink-0"
+          className="text-muted-foreground/40 mt-px flex-shrink-0"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-lead-hot" />
-            <p className="text-[12px] font-medium leading-tight truncate text-foreground">
-              M. Chen — 415 Lexington
+            {/* Health dot — emerald on-track, same vocabulary as the real
+                DealCard. The deal is active and closing cleanly. */}
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-500" />
+            <p className="text-[11px] font-medium leading-tight truncate text-foreground">
+              M. Chen · 415 Lex
             </p>
           </div>
           <p
-            className="text-[14px] tabular-nums text-foreground mt-1 leading-none"
+            className="text-[15px] tabular-nums text-foreground mt-0.5 leading-none"
             style={{ fontFamily: 'var(--font-title)' }}
           >
             $475,000
           </p>
+          <motion.div
+            className="overflow-hidden"
+            initial={false}
+            animate={{
+              height: confirmed ? 'auto' : 0,
+              opacity: confirmed ? 1 : 0,
+            }}
+            transition={{ duration: 0.24, ease: EASE_APPLE }}
+          >
+            <div className="flex items-center gap-1.5 pt-1.5">
+              <DiagramChippiBadge />
+              <span className="text-[10px] text-muted-foreground tabular-nums truncate">
+                closed · today
+              </span>
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
-  );
-}
-
-function PanelRow({
-  label,
-  value,
-  show = true,
-}: {
-  label: string;
-  value: string;
-  show?: boolean;
-}) {
-  return (
-    <li className="px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <motion.p
-        className="text-[12px] font-medium text-foreground tabular-nums mt-0.5"
-        initial={false}
-        animate={show ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
-        transition={{ duration: 0.22, ease: EASE_APPLE }}
-      >
-        {show ? value : ' '}
-      </motion.p>
-    </li>
   );
 }
