@@ -1,10 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Link2, Copy, Check, ExternalLink, ClipboardList, CalendarDays } from 'lucide-react';
+import {
+  Link2,
+  Copy,
+  Check,
+  ExternalLink,
+  ClipboardList,
+  CalendarDays,
+  UserCircle,
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { H3 } from '@/lib/typography';
+import { H3, BODY_MUTED, CAPTION, SECTION_LABEL } from '@/lib/typography';
 
 interface ShareLinksMenuProps {
   slug: string;
@@ -43,14 +51,14 @@ function LinkRow({ icon: Icon, label, description, url, previewHref }: LinkRowPr
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
-        <Icon size={13} strokeWidth={1.75} className="text-muted-foreground/70 flex-shrink-0" />
+        <Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-medium text-foreground leading-tight">{label}</p>
-          <p className="text-[10.5px] text-muted-foreground/70 leading-tight mt-0.5">{description}</p>
+          <p className="text-sm font-medium text-foreground leading-tight">{label}</p>
+          <p className={cn(CAPTION, 'leading-tight mt-0.5')}>{description}</p>
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <code className="flex-1 text-[11px] bg-foreground/[0.04] rounded px-2 py-1.5 font-mono text-muted-foreground border border-border/50 truncate">
+        <code className="flex-1 text-[11px] bg-foreground/[0.04] rounded-md px-2 py-1.5 font-mono text-muted-foreground border border-border/60 truncate">
           {url.replace(/^https?:\/\//, '')}
         </code>
         <button
@@ -91,8 +99,12 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
     }
   }, []);
 
+  // The realtor's three shareable surfaces. Public profile (the "link in bio"
+  // at /p/[slug]) leads — it's the personal link they put everywhere.
+  const profilePath = `/p/${slug}`;
   const intakePath = `/apply/${slug}`;
   const bookingPath = `/book/${slug}`;
+  const profileUrl = origin ? `${origin}${profilePath}` : profilePath;
   const intakeUrl = origin ? `${origin}${intakePath}` : intakePath;
   const bookingUrl = origin ? `${origin}${bookingPath}` : bookingPath;
 
@@ -110,13 +122,19 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 p-3 space-y-3">
         <div>
-          <p className={`${H3} leading-tight`}>Your links</p>
-          <p className="text-[11px] text-muted-foreground/80 leading-tight mt-0.5">
-            Share these with prospects.
-          </p>
+          <p className={cn(SECTION_LABEL)}>Your links</p>
+          <p className={cn(H3, 'leading-tight mt-1')}>Share with prospects</p>
         </div>
 
         <div className="h-px bg-border/60" />
+
+        <LinkRow
+          icon={UserCircle}
+          label="Public profile"
+          description="Your link-in-bio page — listings, contact, and booking"
+          url={profileUrl}
+          previewHref={profilePath}
+        />
 
         <LinkRow
           icon={ClipboardList}
