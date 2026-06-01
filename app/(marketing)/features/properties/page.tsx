@@ -10,6 +10,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { PropertyGridDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Properties — Chippi' };
 
@@ -23,10 +24,7 @@ export default function FeaturesPropertiesPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Properties grid — listing cards with status pills (Active, In Contract, Closed)."
-        />
+        <PropertyGridDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -40,10 +38,7 @@ export default function FeaturesPropertiesPage() {
           'Filter by price band, neighborhood, type.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Grid of listing cards."
-        />
+        <PropertyGridDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection

@@ -10,6 +10,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { TeamMembersDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Members — Chippi for teams' };
 
@@ -23,10 +24,7 @@ export default function TeamsMembersPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Members table — broker invites a new realtor, role pill toggles, last-active updates."
-        />
+        <TeamMembersDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -57,10 +55,7 @@ export default function TeamsMembersPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Role badges row — Owner, Admin, Member — paper-flat pills."
-        />
+        <TeamMembersDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection

@@ -11,6 +11,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { TeamChatDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Team chat — Chippi for teams' };
 
@@ -24,10 +25,7 @@ export default function TeamsChatPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Team chat — broker drops a question in the deal channel, Chippi answers with the lead's current state."
-        />
+        <TeamChatDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -41,10 +39,7 @@ export default function TeamsChatPage() {
           'Search across all deals.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Deal channel header — deal name, status pill, participants."
-        />
+        <TeamChatDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -58,10 +53,7 @@ export default function TeamsChatPage() {
           'Auto-context from the deal record.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Chat thread — '@chippi summarize today' → agent reply with bullet list."
-        />
+        <TeamChatDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
