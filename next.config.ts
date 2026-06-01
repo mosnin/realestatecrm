@@ -57,19 +57,28 @@ const nextConfig: NextConfig = {
 };
 
 /**
- * Wrap with Sentry. Sourcemaps upload only when SENTRY_AUTH_TOKEN + org/project
- * are present (Vercel injects them via the Sentry integration); locally and in
- * CI the wrap is inert, so builds never need Sentry credentials.
+ * Wrap with Sentry — but ONLY when the full build-plugin credential set is
+ * present (org + project + auth token). The Sentry↔Vercel integration injects
+ * SENTRY_AUTH_TOKEN automatically; if org/project aren't also set, the plugin
+ * still attempts an authenticated sourcemap upload and FAILS the production
+ * build. Gating on all three means: configured → upload sourcemaps; not
+ * configured → plain build that never fails on Sentry. The runtime SDK is
+ * independent of this (it loads via instrumentation*.ts, DSN-gated), so error
+ * capture still works whenever NEXT_PUBLIC_SENTRY_DSN is set.
  */
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  // Quiet during normal builds; verbose only in CI if needed.
-  silent: !process.env.CI,
-  // Upload a wider set of client files so stack frames resolve cleanly.
-  widenClientFileUpload: true,
-  // Strip the Sentry SDK's own logger from the client bundle in production.
-  disableLogger: true,
-  // Auto-instrument Vercel cron monitors.
-  automaticVercelMonitors: true,
-});
+const sentryBuildConfigured = Boolean(
+  process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT &&
+    process.env.SENTRY_AUTH_TOKEN,
+);
+
+export default sentryBuildConfigured
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      disableLogger: true,
+      automaticVercelMonitors: true,
+    })
+  : nextConfig;
