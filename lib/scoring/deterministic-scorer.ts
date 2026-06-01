@@ -52,7 +52,15 @@ export function computeDeterministicScore(
   answers: Answers,
 ): DeterministicScoringResult {
   const breakdown: DeterministicBreakdownItem[] = [];
-  let weightedPointsEarned = 0;
+  // Each question contributes (points / maxPoints) — a 0-1 fraction of ITS OWN
+  // scale — multiplied by its weight. Normalizing to each question's own max
+  // BEFORE applying weight is essential: otherwise a question whose mappings
+  // happen to top out at 100 points silently outweighs an equally-weighted
+  // question whose mappings top out at 10, letting raw point magnitude — not
+  // the configured weight — control relative influence.
+  let weightedFractionEarned = 0;
+  let totalWeightScored = 0;
+  // Retained for the returned `maxPossible` field (kept for contract stability).
   let weightedMaxPossible = 0;
   let hasRules = false;
 
@@ -95,12 +103,16 @@ export function computeDeterministicScore(
         matched: points > 0,
       });
 
-      weightedPointsEarned += points * weight;
+      // Normalize this question to its own 0-1 scale before weighting, so the
+      // configured weight is the sole control of relative influence.
+      const fraction = maxPoints > 0 ? points / maxPoints : 0;
+      weightedFractionEarned += fraction * weight;
+      totalWeightScored += weight;
       weightedMaxPossible += maxPoints * weight;
     }
   }
 
-  if (!hasRules || weightedMaxPossible === 0) {
+  if (!hasRules || totalWeightScored === 0) {
     return {
       score: 0,
       maxPossible: 0,
@@ -110,7 +122,7 @@ export function computeDeterministicScore(
     };
   }
 
-  const score = Math.round((weightedPointsEarned / weightedMaxPossible) * 100);
+  const score = Math.round((weightedFractionEarned / totalWeightScored) * 100);
 
   return {
     score: Math.max(0, Math.min(100, score)),

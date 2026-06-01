@@ -87,6 +87,40 @@ function formatCurrency(value: number | null) {
   return _formatCurrency(value);
 }
 
+/**
+ * Lead-score → tier. Thresholds mirror lib/dynamic-lead-scoring.ts
+ * (>=75 hot, >=45 warm, else cold). Null/unscored returns null so the card
+ * renders nothing rather than a misleading zero.
+ */
+function scoreTier(
+  score: number | null,
+): { label: string; dot: string; text: string } | null {
+  if (score == null || score <= 0) return null;
+  if (score >= 75) return { label: 'Hot', dot: 'bg-lead-hot', text: 'text-lead-hot' };
+  if (score >= 45) return { label: 'Warm', dot: 'bg-lead-warm', text: 'text-lead-warm' };
+  return { label: 'Cold', dot: 'bg-lead-cold', text: 'text-lead-cold' };
+}
+
+/**
+ * Lead-score chip — a tier dot + the score, scannable at a glance. The one
+ * piece of "who's hot" signal a realtor wants without sorting for it.
+ */
+function ScoreChip({ score }: { score: number | null }) {
+  const tier = scoreTier(score);
+  if (!tier) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 flex-shrink-0"
+      title={`${tier.label} lead · score ${score}`}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', tier.dot)} aria-hidden />
+      <span className={cn('text-[11px] font-semibold tabular-nums', tier.text)}>
+        {score}
+      </span>
+    </span>
+  );
+}
+
 interface ContactTableProps {
   slug: string;
 }
@@ -490,33 +524,46 @@ export function ContactTable({ slug }: ContactTableProps) {
           when there's data to filter. The chip count format matches the
           existing labels (All · New · Rental · Buyer). */}
       {!loading && !error && contacts.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
+        <div
+          role="tablist"
+          aria-label="Filter people"
+          className="flex items-center gap-5 border-b border-border/70 -mt-1"
+        >
           {leadTypeChips.map((chip) => {
             const active = leadTypeFilter === chip.key;
             return (
               <button
                 key={chip.key}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setLeadTypeFilter(chip.key)}
-                aria-pressed={active}
                 className={cn(
-                  // Cross-fade the active state at 150ms — Apple-soft so the
-                  // toggle reads as a single color shift, not a flash.
-                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150 ease-out',
+                  // Underline tab — the page's primary spine. The active tab
+                  // carries a 2px foreground rail, the rest recede to muted.
+                  'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
                   active
-                    ? 'bg-foreground text-background'
-                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                    ? 'text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground font-normal',
                 )}
               >
                 {chip.label}
                 <span
                   className={cn(
-                    'tabular-nums text-[11px] transition-opacity duration-150 ease-out',
-                    active ? 'opacity-70' : 'opacity-60',
+                    'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
+                    active
+                      ? 'bg-foreground/[0.06] text-foreground/70'
+                      : 'bg-foreground/[0.04] text-muted-foreground',
                   )}
                 >
                   {chip.count}
                 </span>
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full bg-foreground"
+                  />
+                )}
               </button>
             );
           })}
@@ -1248,6 +1295,8 @@ function ContactRow({
           to see it without hovering). The action icons hide until row
           hover at lg+; smaller screens fall back to a quiet chevron. */}
       <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Lead temperature — always visible, same signal as the cards. */}
+        <ScoreChip score={contact.leadScore} />
         {followUpDate && (
           <span
             className={cn(
@@ -1402,26 +1451,30 @@ function ContactCard({
               </Link>
             </div>
           </div>
-          {!selectMode && (
-            <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
-              <button
-                type="button"
-                onClick={onEdit}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                aria-label={`Edit ${contact.name}`}
-              >
-                <Pencil size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                aria-label={`Delete ${contact.name}`}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Lead temperature — always visible, the scannable signal. */}
+            <ScoreChip score={contact.leadScore} />
+            {!selectMode && (
+              <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  aria-label={`Edit ${contact.name}`}
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  aria-label={`Delete ${contact.name}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-1">
