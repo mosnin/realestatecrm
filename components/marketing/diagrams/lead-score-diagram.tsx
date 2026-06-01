@@ -7,17 +7,28 @@
  * itself so Hot is on top. The whole motion is one breath — score, score,
  * score, settle.
  *
+ * Layout contract (the fluid-fit fix):
+ *   - Root is `w-full h-full flex flex-col min-h-0`.
+ *   - One slim label line up top (NOT the three-line serif page-title block
+ *     it used to carry — a diagram is not a page, and the serif Times is
+ *     reserved for a page h1 / focal stat, used once). The leads are the
+ *     focal element; the chrome recedes to a single muted line.
+ *   - The list is `flex-1 min-h-0`, rows are compact and `flex-shrink-0`
+ *     on the score pill so the name truncates rather than overflowing.
+ *   - No fixed-px heights: three rows + the slim header fit the SHORTEST
+ *     aspect used — `video` (16:9), ~504×312px inner after the shell's p-6 —
+ *     as well as the roomier `square`.
+ *
  * Motion contract:
- *   - 8s cycle.
- *   - Each score pill fades + slides 4px right onto its card, 240ms apart,
- *     EASE_APPLE.
+ *   - ~7s cycle, EASE_APPLE throughout. One beat then a long hold.
+ *   - Each score pill fades + slides 4px onto its row, 300ms apart.
  *   - 360ms after the last pill lands, the rows reorder (Hot → Warm → Cold)
- *     via `motion.div` layout animation, 280ms, EASE_APPLE.
- *   - 1.5s hold, then everything fades to score-empty + original order
- *     and the cycle resumes.
+ *     via `motion.li layout`, 320ms.
+ *   - Hold, then everything fades to score-empty + original order and the
+ *     cycle resumes.
  *
  * Reduced-motion: render the END state — all three scored AND already
- * sorted Hot → Warm → Cold.
+ * sorted Hot → Warm → Cold, no timers.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -50,12 +61,12 @@ const INTAKE_ORDER: Lead[] = [
   { id: 'marcus', name: 'Marcus Chen', source: 'Open house · 415 Lex', tier: 'hot' },
 ];
 
-// Phase: -1 (none scored), 0/1/2 (that many scored), 3 (reordered),
-// 4 (fade-out before reset).
-const SCORE_TIMINGS = [400, 700, 1000];
-const REORDER_AT = 1500;
-const HOLD_END = 4400;
-const CYCLE_TOTAL = 4900;
+// Scored count ticks 0 → 1 → 2 → 3 across these, then the list reorders,
+// holds, and resets. Long hold so the settled state is the resting frame.
+const SCORE_TIMINGS = [500, 800, 1100];
+const REORDER_AT = 1600;
+const HOLD_END = 6400;
+const CYCLE_TOTAL = 6900;
 
 export function LeadScoreDiagram({
   aspect = 'square',
@@ -119,26 +130,18 @@ function LeadScoreContent() {
   }, [reordered]);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      {/* Quiet header — same status-sentence pattern as a product page. */}
-      <div className="pb-3">
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          New leads
-        </p>
-        <p
-          className="mt-1 text-[18px] tracking-tight text-foreground leading-snug"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Today’s arrivals
-        </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          Scored on arrival, sorted by who to call first.
-        </p>
-      </div>
+    <div className="w-full h-full flex flex-col min-h-0">
+      {/* One quiet label line — the leads are the focal element, the chrome
+          recedes. No serif page-title block here. */}
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground pb-2.5 flex-shrink-0">
+        New leads · scored on arrival
+      </p>
 
-      {/* The list — divide-y rows, matches the product's row vocabulary. */}
-      <ul className="flex-1 divide-y divide-border/60 border-y border-border/60">
-        {orderedLeads.map((lead, idx) => {
+      {/* The list — divide-y rows, matches the product's row vocabulary.
+          `flex-1 min-h-0` lets the rows distribute the remaining height and
+          keeps them from summing past the box. */}
+      <ul className="flex-1 min-h-0 flex flex-col justify-center divide-y divide-border/60 border-y border-border/60">
+        {orderedLeads.map((lead) => {
           // Find which intake index this lead originally had — that's the
           // score-reveal index. Score is visible once `scoredCount` reaches
           // intakeIndex + 1.
@@ -149,10 +152,10 @@ function LeadScoreContent() {
               key={lead.id}
               layout
               transition={{ duration: 0.32, ease: EASE_APPLE }}
-              className="py-3 flex items-center gap-3"
+              className="py-2.5 flex items-center gap-2.5 min-w-0"
             >
-              <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-                <span className="text-[11px] font-medium text-foreground/80">
+              <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+                <span className="text-[10px] font-medium text-foreground/80">
                   {lead.name
                     .split(' ')
                     .map((p) => p[0])
@@ -161,7 +164,7 @@ function LeadScoreContent() {
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-foreground leading-tight truncate">
+                <p className="text-[12px] font-medium text-foreground leading-tight truncate">
                   {lead.name}
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate mt-0.5">
@@ -188,7 +191,7 @@ function ScorePill({ tier }: { tier: Lead['tier'] }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.24, ease: EASE_APPLE }}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5',
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 flex-shrink-0',
         'text-[11px] font-medium tabular-nums',
         tier === 'hot' && 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
         tier === 'warm' && 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
