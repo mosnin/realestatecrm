@@ -162,15 +162,21 @@ export default async function AgentStatsPage({
   const dayOptions = [7, 30, 90];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Agent System Health</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Last {days} day{days !== 1 ? 's' : ''} · all spaces
+        <header className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">System.</p>
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Agent health
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Last {days} day{days !== 1 ? 's' : ''} · all spaces.
           </p>
-        </div>
+        </header>
         {/* Time range switcher */}
         <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
           {dayOptions.map((d) => (
@@ -179,7 +185,7 @@ export default async function AgentStatsPage({
               href={`/admin/agent-stats?days=${d}`}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 days === d
-                  ? 'bg-card text-foreground shadow-sm'
+                  ? 'bg-card text-foreground border border-border/70'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >

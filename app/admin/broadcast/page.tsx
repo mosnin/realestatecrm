@@ -87,13 +87,19 @@ export default async function AdminBroadcastPage() {
   }));
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Email broadcast</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Growth.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Email broadcast
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Send an email to a segment of users. Limited to 3 broadcasts per hour.
         </p>
-      </div>
+      </header>
       <BroadcastClient counts={counts} pastBroadcasts={pastBroadcasts} />
     </div>
   );

@@ -82,11 +82,17 @@ export default async function AdminUsersPage({
   const totalCount = count ?? 0;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{totalCount} total accounts</p>
-      </div>
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Management.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Users
+        </h1>
+        <p className="text-sm text-muted-foreground">{totalCount} total accounts.</p>
+      </header>
       <UserListClient users={users} query={query} filter={filter} resultCount={users.length} />
     </div>
   );

@@ -41,13 +41,17 @@ export default async function AdminSpacesPage() {
   const totalCount = spaces?.length ?? 0;
 
   return (
-    <div className="space-y-5 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Spaces</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {totalCount} total spaces
-        </p>
-      </div>
+    <div className="space-y-8 pb-12 max-w-5xl">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Management.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Spaces
+        </h1>
+        <p className="text-sm text-muted-foreground">{totalCount} total spaces.</p>
+      </header>
 
       <SpaceListClient
         spaces={(spaces ?? []).map((s) => ({
