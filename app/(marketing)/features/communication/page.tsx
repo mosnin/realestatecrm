@@ -7,10 +7,12 @@
  * into the draft Chippi has waiting, and out to the connectors.
  */
 
+import { Mail, AtSign, MessageCircle, MessageSquare, MessagesSquare, Plus } from 'lucide-react';
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
 
 export const metadata = { title: 'Communication — Chippi' };
 
@@ -81,22 +83,47 @@ export default function FeaturesCommunicationPage() {
         />
       </MarketingSection>
 
-      <MarketingSection
+      <MarketingIntegrations
         eyebrow="WHAT WE CONNECT"
-        title="Gmail and Outlook."
-        sub="OAuth in. Realtime in both directions. Send-from address stays yours; signatures stay yours."
-        bullets={[
-          'Gmail + Outlook out of the box.',
-          'Two-way sync.',
-          'Your signature, your domain, your reputation.',
+        title="Brings your inbox along."
+        sub="Connect once. Chippi reads, drafts, and sends from the address your contacts already know. Two-way sync, signature kept, reputation kept."
+        integrations={[
+          {
+            name: 'Gmail',
+            description: 'Read, draft, and send. Your address, your signature.',
+            icon: Mail,
+          },
+          {
+            name: 'Outlook',
+            description: 'Microsoft 365 and Outlook.com both supported.',
+            icon: AtSign,
+          },
+          {
+            name: 'WhatsApp Business',
+            description: 'Replies in the channel your buyers actually open.',
+            icon: MessageCircle,
+            comingSoon: true,
+          },
+          {
+            name: 'SMS',
+            description: 'Tour confirmations and lightweight follow-ups.',
+            icon: MessageSquare,
+            comingSoon: true,
+          },
+          {
+            name: 'Slack',
+            description: 'Notify the team channel when a deal moves.',
+            icon: MessagesSquare,
+            comingSoon: true,
+          },
+          {
+            name: 'And many more',
+            description: 'Composio underneath — hundreds of tools, one wire.',
+            icon: Plus,
+          },
         ]}
-        side="left"
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Connect screen — Gmail and Outlook tiles, connected state."
-        />
-      </MarketingSection>
+        learnMore={{ label: 'Connect your inbox', href: '/login/realtor?intent=signup' }}
+      />
 
       <MarketingSection
         eyebrow="THE PROMISE"
