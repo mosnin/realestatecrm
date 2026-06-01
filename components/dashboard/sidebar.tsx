@@ -52,6 +52,7 @@ import {
   Flag,
   History,
   SquarePen,
+  Shield,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ interface SidebarProps {
   brokerageName?: string | null;
   brokerageRole?: string | null;
   brokerageMemberships?: { id: string; name: string; role: string }[];
+  isPlatformAdmin?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -817,6 +819,58 @@ function SidebarNotificationSlot({ collapsed = false }: { collapsed?: boolean })
   return null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin console link — platform-admin only. Sits just above the user-footer
+// divider, separated by a hairline. Reads as "leave the realtor app to the
+// internal console" — same nav-row vocabulary (h-9, 13px, subtle hover) but
+// tonally quieter than a CTA: muted-foreground at rest, foreground on hover.
+// Renders in all three sidebar states: expanded, collapsed rail, and footer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AdminConsoleLink({ collapsed = false }: { collapsed?: boolean }) {
+  if (collapsed) {
+    return (
+      <div className="px-1 pb-1">
+        <CollapsedTooltip enabled label="Admin">
+          <Link
+            href="/admin"
+            aria-label="Admin console"
+            className={cn(
+              'group relative flex items-center justify-center w-9 h-9 mx-auto rounded-md transition-colors duration-150',
+              'text-muted-foreground/70 hover:bg-foreground/[0.025] hover:text-foreground',
+            )}
+          >
+            <Shield
+              size={15}
+              strokeWidth={1.75}
+              className="flex-shrink-0 transition-colors text-muted-foreground/55 group-hover:text-foreground"
+            />
+          </Link>
+        </CollapsedTooltip>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-1">
+      <Link
+        href="/admin"
+        className={cn(
+          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+          'text-muted-foreground/70 hover:bg-foreground/[0.025] hover:text-foreground',
+        )}
+      >
+        <Shield
+          size={15}
+          strokeWidth={1.75}
+          className="flex-shrink-0 transition-colors text-muted-foreground/55 group-hover:text-foreground"
+        />
+        <span className="flex-1 truncate">Admin</span>
+      </Link>
+    </div>
+  );
+}
+
 function RealtorNav({
   slug,
   base,
@@ -1128,6 +1182,7 @@ export function Sidebar({
   brokerageName = null,
   brokerageRole = null,
   brokerageMemberships = [],
+  isPlatformAdmin = false,
 }: SidebarProps) {
   const pathname = usePathname();
   // Read search params and keep in sync with URL changes
@@ -1308,6 +1363,7 @@ export function Sidebar({
         displayName={displayName}
         imageUrl={user?.imageUrl}
         email={userEmail}
+        isPlatformAdmin={isPlatformAdmin}
       />
     </SidebarCollapseProvider>
   );
@@ -1334,6 +1390,7 @@ function RealtorSidebarShell({
   displayName,
   imageUrl,
   email,
+  isPlatformAdmin = false,
 }: {
   slug: string;
   spaceName: string;
@@ -1349,6 +1406,7 @@ function RealtorSidebarShell({
   displayName: string;
   imageUrl?: string | null;
   email?: string | null;
+  isPlatformAdmin?: boolean;
 }) {
   const { collapsed, toggle } = useSidebarCollapsed();
 
@@ -1445,6 +1503,16 @@ function RealtorSidebarShell({
             `v1` suffix so future bumps re-show. Hidden entirely in
             collapsed rail mode (no horizontal room). */}
         <SidebarWhatsNew collapsed={collapsed} />
+
+        {/* Platform-admin console link — only rendered for isPlatformAdmin
+            accounts. Separated from the user footer by a hairline so it
+            reads as "this exits the realtor app." Calm; no CTA weight. */}
+        {isPlatformAdmin && (
+          <>
+            <div className="border-t border-border/60" />
+            <AdminConsoleLink collapsed={collapsed} />
+          </>
+        )}
 
         {/* User footer pinned at bottom, separated by a hairline. The chip
             opens an account-menu popover (Themes, Settings, Notifications,
