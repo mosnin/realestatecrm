@@ -24,10 +24,9 @@ import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SearchPill, WorkspaceSwitcher } from '@/components/dashboard/sidebar';
-import { SidebarFavorites } from '@/components/dashboard/sidebar-favorites';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -90,6 +89,7 @@ interface HeaderProps {
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
   brokerageRole?: string | null;
+  isPlatformAdmin?: boolean;
 }
 
 /** Returns true if the pathname belongs to this item or any of its children.
@@ -118,7 +118,7 @@ function isMobileChildActive(child: NavChild, pathname: string, base: string): b
   return pathname === fullHref || pathname.startsWith(`${fullHref}/`);
 }
 
-export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
+export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null, isPlatformAdmin = false }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
@@ -127,6 +127,11 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
   const isOnChippi = pathname.startsWith(`${base}/chippi`);
   const { user } = useUser();
+  // Admin console link — DB platformRole (server prop) OR Clerk metadata, so
+  // an admin set either way sees it. Matches the desktop sidebar.
+  const showAdminLink =
+    isPlatformAdmin ||
+    (user?.publicMetadata as { role?: string } | undefined)?.role === 'admin';
   const drawerDisplayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
     : 'My Account';
@@ -254,17 +259,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                     })}
                   </div>
 
-                  {/* Favorites — same component as the desktop sidebar so the
-                      localStorage state is shared. Closes the drawer on
-                      navigate. */}
-                  {slug && (
-                    <SidebarFavorites
-                      slug={slug}
-                      base={base}
-                      onNavigate={closeDrawer}
-                    />
-                  )}
-
                   {/* Chat history — animates in/out below the primary nav
                       when the route enters/leaves /chippi. Same motion
                       params as the desktop sidebar's chippi section so the
@@ -358,6 +352,19 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
             {!isBrokerOnly && !showBrokerMobileNavOnly && slug && (
               <>
                 <SidebarWhatsNew />
+                {showAdminLink && (
+                  <>
+                    <div className="border-t border-sidebar-border" />
+                    <Link
+                      href="/admin"
+                      onClick={closeDrawer}
+                      className="group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors"
+                    >
+                      <Shield size={16} strokeWidth={1.75} className="flex-shrink-0 opacity-70 group-hover:opacity-100" />
+                      Admin
+                    </Link>
+                  </>
+                )}
                 <div className="border-t border-sidebar-border" />
                 <SidebarUserMenu
                   slug={slug}
