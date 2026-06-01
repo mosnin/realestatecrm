@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * AdminShell — the chrome wrapper for every admin page.
+ *
+ * Visual language: matches the realtor sidebar exactly — FlatNavItem
+ * pattern, 2px foreground active rail, hairline borders, SECTION_LABEL
+ * token, h-9 rows. Paper-flat. No shadows on chrome.
+ */
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
@@ -21,6 +29,7 @@ import {
   Sun,
   Moon,
   Shield,
+  ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,8 +42,11 @@ import {
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
-import { PAGE_MAX } from '@/lib/geometry';
+import { PAGE_MAX, SIDEBAR_WIDTH } from '@/lib/geometry';
+import { SECTION_LABEL } from '@/lib/typography';
 import { useState } from 'react';
+
+// ── Nav structure (routes unchanged) ──────────────────────────────────────
 
 const navSections = [
   {
@@ -54,34 +66,45 @@ const navSections = [
       { href: '/admin/broadcast', label: 'Broadcast', icon: Send, exact: false },
       { href: '/admin/announcements', label: 'Announcements', icon: Megaphone, exact: false },
       { href: '/admin/cohorts', label: 'Cohorts', icon: LineChart, exact: false },
-      { href: '/admin/form-analytics', label: 'Form Analytics', icon: BarChart3, exact: false },
+      { href: '/admin/form-analytics', label: 'Form analytics', icon: BarChart3, exact: false },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/admin/scoring-health', label: 'Scoring Health', icon: Activity, exact: false },
-      { href: '/admin/agent-stats', label: 'Agent Health', icon: Bot, exact: false },
-      { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText, exact: false },
+      { href: '/admin/scoring-health', label: 'Scoring health', icon: Activity, exact: false },
+      { href: '/admin/agent-stats', label: 'Agent health', icon: Bot, exact: false },
+      { href: '/admin/audit-log', label: 'Audit log', icon: ScrollText, exact: false },
     ],
   },
+] as const;
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  exact: boolean;
+};
+
+const navItems: NavItem[] = navSections.flatMap((s) => s.items as unknown as NavItem[]);
+
+// Mobile bottom nav — highest-traffic pages only
+const mobileNavItems: NavItem[] = [
+  navSections[0].items[0] as unknown as NavItem, // Overview
+  navSections[0].items[1] as unknown as NavItem, // Users
+  navSections[0].items[2] as unknown as NavItem, // Brokerages
+  navSections[0].items[4] as unknown as NavItem, // Billing
+  navSections[2].items[2] as unknown as NavItem, // Audit log
 ];
 
-const navItems = navSections.flatMap((s) => s.items);
-const mobileNavItems = [
-  navSections[0].items[0], // Overview
-  navSections[0].items[1], // Users
-  navSections[0].items[2], // Brokerages
-  navSections[0].items[4], // Billing
-  navSections[2].items[1], // Audit Log
-];
+// ── NavLink — mirrors FlatNavItem from the realtor sidebar ─────────────────
 
 function NavLink({
   item,
   pathname,
   onClick,
 }: {
-  item: (typeof navItems)[number];
+  item: NavItem;
   pathname: string;
   onClick?: () => void;
 }) {
@@ -94,23 +117,74 @@ function NavLink({
       href={item.href}
       onClick={onClick}
       className={cn(
-        'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+        'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
         isActive
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+          ? 'bg-foreground/[0.045] text-foreground font-medium'
+          : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
       )}
     >
+      {/* Active rail — 2px foreground strip on the left edge. The one place
+          a 2px border appears; same signature as the realtor sidebar. */}
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+        />
+      )}
       <item.icon
-        size={16}
+        size={15}
+        strokeWidth={isActive ? 2.25 : 1.75}
         className={cn(
-          'flex-shrink-0',
-          isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80'
+          'flex-shrink-0 transition-colors',
+          isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
         )}
       />
-      <span className="truncate">{item.label}</span>
+      <span className="flex-1 truncate">{item.label}</span>
     </Link>
   );
 }
+
+// ── Section label — canonical SECTION_LABEL token ─────────────────────────
+
+function NavSectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className={cn(SECTION_LABEL, 'px-3 pt-5 pb-1.5 select-none')}>
+      {children}
+    </p>
+  );
+}
+
+// ── Sidebar nav — shared between desktop aside and mobile Sheet ────────────
+
+function SidebarNav({
+  pathname,
+  onItemClick,
+}: {
+  pathname: string;
+  onItemClick?: () => void;
+}) {
+  return (
+    <nav className="flex-1 px-3 pt-2 pb-2 overflow-y-auto">
+      {navSections.map((section) => (
+        <div key={section.label}>
+          <NavSectionLabel>{section.label}</NavSectionLabel>
+          <div className="space-y-0.5">
+            {(section.items as unknown as NavItem[]).map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                onClick={onItemClick}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+// ── AdminShell ─────────────────────────────────────────────────────────────
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -119,112 +193,103 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-theme flex min-h-screen bg-background text-foreground">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
-        {/* Admin header */}
-        <div className="px-4 py-5 border-b border-sidebar-border">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-base flex-shrink-0">
-              <Shield size={16} className="text-primary" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
-                Admin
-              </p>
-              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                Chippi Internal
-              </p>
-            </div>
+      {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
+      <aside
+        className={cn(
+          'hidden md:flex flex-col h-screen sticky top-0 bg-sidebar border-r border-border/70 shrink-0',
+          SIDEBAR_WIDTH,
+        )}
+      >
+        {/* Brand header: logo + "admin" small-cap label */}
+        <div className="px-4 pt-5 pb-3 flex items-center gap-2">
+          <BrandLogo className="h-5" alt="Chippi" />
+          <div className="flex items-center gap-1.5">
+            <Shield
+              size={11}
+              strokeWidth={1.75}
+              className="text-muted-foreground/50 flex-shrink-0"
+            />
+            <span className={cn(SECTION_LABEL, 'pt-px')}>admin</span>
           </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 pt-4 pb-2 space-y-4 overflow-y-auto">
-          {navSections.map((section) => (
-            <div key={section.label} className="space-y-0.5">
-              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                {section.label}
-              </p>
-              {section.items.map((item) => (
-                <NavLink key={item.href} item={item} pathname={pathname} />
-              ))}
-            </div>
-          ))}
-        </nav>
+        <SidebarNav pathname={pathname} />
 
-        {/* Footer */}
-        <div className="px-3 pb-4 border-t border-sidebar-border pt-3">
-          <Link
-            href="/"
-            className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-150"
-          >
-            <span className="opacity-55 group-hover:opacity-80">←</span>
-            Back to app
-          </Link>
-          <div className="flex items-center gap-2 px-3 pt-3">
-            <BrandLogo className="h-4" alt="Chippi" />
+        {/* Footer — hairline separator + Back to app link */}
+        <div className="border-t border-border/50">
+          <div className="px-3 py-2">
+            <Link
+              href="/"
+              className={cn(
+                'group flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                'text-foreground/55 hover:bg-foreground/[0.025] hover:text-foreground',
+              )}
+            >
+              <ArrowLeft
+                size={13}
+                strokeWidth={1.75}
+                className="flex-shrink-0 text-foreground/40 group-hover:text-foreground/70 transition-colors"
+              />
+              <span>Back to app</span>
+            </Link>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* ── Main column ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
+        {/* Header — sticky, quiet. Page titles live in the page body, not here. */}
+        <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
           <div className="flex items-center gap-3">
-            {/* Mobile menu */}
+            {/* Mobile menu trigger */}
             <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger className="md:hidden">
-                <Menu size={20} className="text-muted-foreground" />
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Open navigation"
+                  className="md:hidden flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+                >
+                  <Menu size={17} strokeWidth={1.75} />
+                </button>
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="w-64 p-0 bg-sidebar border-sidebar-border"
+                className="w-64 p-0 bg-sidebar border-r border-border/70"
               >
-                <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
-                  <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
-                    <Shield size={16} className="text-primary" />
-                    <span className="text-sm font-semibold">
-                      Admin
-                    </span>
-                  </SheetTitle>
+                <SheetHeader className="px-4 pt-5 pb-3 flex flex-row items-center gap-2">
+                  <BrandLogo className="h-5" alt="Chippi" />
+                  <div className="flex items-center gap-1.5">
+                    <Shield size={11} strokeWidth={1.75} className="text-muted-foreground/50" />
+                    <SheetTitle asChild>
+                      <span className={cn(SECTION_LABEL, 'pt-px')}>admin</span>
+                    </SheetTitle>
+                  </div>
                 </SheetHeader>
-                <nav className="px-3 py-4 space-y-4 overflow-y-auto">
-                  {navSections.map((section) => (
-                    <div key={section.label} className="space-y-0.5">
-                      <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                        {section.label}
-                      </p>
-                      {section.items.map((item) => (
-                        <NavLink
-                          key={item.href}
-                          item={item}
-                          pathname={pathname}
-                          onClick={() => setOpen(false)}
-                        />
-                      ))}
-                    </div>
-                  ))}
-                  <div className="border-t border-sidebar-border mt-3 pt-3">
+                <SidebarNav pathname={pathname} onItemClick={() => setOpen(false)} />
+                <div className="border-t border-border/50">
+                  <div className="px-3 py-2">
                     <Link
                       href="/"
                       onClick={() => setOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+                      className={cn(
+                        'group flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                        'text-foreground/55 hover:bg-foreground/[0.025] hover:text-foreground',
+                      )}
                     >
-                      ← Back to app
+                      <ArrowLeft size={13} strokeWidth={1.75} className="flex-shrink-0 opacity-50" />
+                      <span>Back to app</span>
                     </Link>
                   </div>
-                </nav>
+                </div>
               </SheetContent>
             </Sheet>
 
-            <span className="font-semibold text-sm md:hidden flex items-center gap-2">
-              <Shield size={14} className="text-primary" />
-              Admin
-            </span>
-
-            <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="font-medium text-foreground">Admin Dashboard</span>
+            {/* Mobile identity (visible only below md) */}
+            <div className="md:hidden flex items-center gap-1.5">
+              <BrandLogo className="h-4" alt="Chippi" />
+              <Shield size={11} strokeWidth={1.75} className="text-muted-foreground/50" />
+              <span className={cn(SECTION_LABEL, 'pt-px')}>admin</span>
             </div>
           </div>
 
@@ -233,24 +298,29 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
             >
-              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              {theme === 'dark' ? (
+                <Sun size={14} strokeWidth={1.75} />
+              ) : (
+                <Moon size={14} strokeWidth={1.75} />
+              )}
             </Button>
             <UserButton />
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-20 md:pb-7">
+        <main className="flex-1 px-4 py-8 md:px-8 md:py-10 pb-24 md:pb-12">
           <div className={cn('w-full mx-auto', PAGE_MAX)}>
-          {children}
+            {children}
           </div>
         </main>
       </div>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
+      {/* ── Mobile bottom nav ────────────────────────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border/70 flex safe-area-bottom">
         {mobileNavItems.map((item) => {
           const isActive = item.exact
             ? pathname === item.href
@@ -261,16 +331,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               className={cn(
                 'flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                isActive
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <div
                 className={cn(
-                  'w-9 h-6 rounded-full flex items-center justify-center transition-colors',
-                  isActive ? 'bg-primary/10' : ''
+                  'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
+                  isActive ? 'bg-foreground/[0.06]' : '',
                 )}
               >
-                <item.icon size={18} />
+                <item.icon size={16} strokeWidth={isActive ? 2.25 : 1.75} />
               </div>
               <span>{item.label}</span>
             </Link>

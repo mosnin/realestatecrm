@@ -1,6 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
   Users,
   CheckCircle2,
@@ -15,25 +13,35 @@ import {
   Flame,
   Thermometer,
   Snowflake,
-  Calendar,
-  Bell,
   BarChart3,
-  FileText,
-  LayoutGrid,
   Clock,
   AlertCircle,
   Moon,
+  Calendar,
+  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { SignupChart } from './components/signup-chart';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  SECTION_LABEL,
+  STAT_NUMBER,
+  STAT_NUMBER_COMPACT,
+  H3,
+  META,
+  CAPTION,
+} from '@/lib/typography';
 
 export default async function AdminOverviewPage() {
   const isAdmin = await isPlatformAdmin();
   if (!isAdmin) redirect('/');
-  // ── Parallel data fetches ────────────────────────────────────────────────
+  // ── Parallel data fetches (UNCHANGED) ───────────────────────────────────
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
@@ -339,7 +347,6 @@ export default async function AdminOverviewPage() {
       const nowIso = now.toISOString();
 
       const [trialRes, pastDueRes, oldSpacesRes] = await Promise.all([
-        // Trials ending within 7 days
         supabase
           .from('Space')
           .select('id, ownerId, stripePeriodEnd, User!inner(id, name, email)')
@@ -348,13 +355,11 @@ export default async function AdminOverviewPage() {
           .lte('stripePeriodEnd', sevenDaysFromNow)
           .gte('stripePeriodEnd', nowIso)
           .order('stripePeriodEnd', { ascending: true }),
-        // Past due spaces
         supabase
           .from('Space')
           .select('id, ownerId, stripePeriodEnd, User!inner(id, name, email)')
           .eq('stripeSubscriptionStatus', 'past_due')
           .order('stripePeriodEnd', { ascending: true }),
-        // Spaces older than 30 days (candidates for "inactive")
         supabase
           .from('Space')
           .select('id, ownerId, createdAt, User!inner(id, name, email)')
@@ -362,7 +367,6 @@ export default async function AdminOverviewPage() {
           .limit(500),
       ]);
 
-      // Trial ending soon
       const trialRows = (trialRes.data ?? []) as {
         id: string;
         ownerId: string;
@@ -382,7 +386,6 @@ export default async function AdminOverviewPage() {
         };
       });
 
-      // Past due
       const pastDueRows = (pastDueRes.data ?? []) as {
         id: string;
         ownerId: string;
@@ -402,7 +405,6 @@ export default async function AdminOverviewPage() {
         };
       });
 
-      // Inactive workspaces: space older than 30d and no contact created in last 30d
       const oldSpaceRows = (oldSpacesRes.data ?? []) as {
         id: string;
         ownerId: string;
@@ -422,25 +424,18 @@ export default async function AdminOverviewPage() {
             .filter(Boolean)
         );
 
-        // For spaces with NO recent contacts, find their most recent contact ever (for "days since")
         const inactiveSpaces = oldSpaceRows.filter((r) => !activeSpaceIds.has(r.id));
         inactiveWorkspacesTotal = inactiveSpaces.length;
 
-        const candidates = inactiveSpaces.slice(0, 10); // fetch more than 5, then sort
+        const candidates = inactiveSpaces.slice(0, 10);
         const lastContactMap = new Map<string, string | null>();
         if (candidates.length > 0) {
           const lastContactsRes = await supabase
             .from('Contact')
             .select('spaceId, createdAt')
-            .in(
-              'spaceId',
-              candidates.map((c) => c.id)
-            )
+            .in('spaceId', candidates.map((c) => c.id))
             .order('createdAt', { ascending: false });
-          for (const c of (lastContactsRes.data ?? []) as {
-            spaceId: string;
-            createdAt: string;
-          }[]) {
+          for (const c of (lastContactsRes.data ?? []) as { spaceId: string; createdAt: string }[]) {
             if (!lastContactMap.has(c.spaceId)) {
               lastContactMap.set(c.spaceId, c.createdAt);
             }
@@ -475,14 +470,12 @@ export default async function AdminOverviewPage() {
     console.error('[admin] DB queries failed', { error: err });
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            Couldn&apos;t load admin dashboard. This is usually temporary.
-          </p>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-8 py-12 text-center">
+          <p className="text-sm text-foreground font-medium">Couldn&apos;t load admin dashboard.</p>
+          <p className="text-xs text-muted-foreground mt-1">This is usually temporary.</p>
           <a
             href="/admin"
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="mt-4 inline-flex items-center justify-center rounded-md h-9 px-4 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
           >
             Try again
           </a>
@@ -492,7 +485,6 @@ export default async function AdminOverviewPage() {
   }
 
   const notOnboarded = totalUsers - onboardedUsers;
-  const noSpace = totalUsers - usersWithSpace;
   const onboardRate = totalUsers > 0 ? Math.round((onboardedUsers / totalUsers) * 100) : 0;
 
   const activityIcon = {
@@ -501,708 +493,488 @@ export default async function AdminOverviewPage() {
     deal: Briefcase,
     brokerage: Building2,
   };
-  const activityColor = {
-    signup: 'text-blue-500',
-    lead: 'text-emerald-500',
-    deal: 'text-cyan-500',
-    brokerage: 'text-violet-500',
-  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Chippi platform overview
-          </p>
-        </div>
-      </div>
+    <div className="space-y-12 pb-12">
+      {/* ── Page header (status-sentence pattern) ──────────────────────── */}
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Platform.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Chippi admin
+        </h1>
+        <p className={BODY_MUTED}>
+          {totalUsers} users · {activeSubscriptions} active · ${mrr.toLocaleString()} MRR.
+        </p>
+      </header>
 
-      {/* ── Quick Actions ────────────────────────────────────────────── */}
-      <Card className="rounded-xl border bg-card">
-        <CardContent className="px-5 py-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
-          <div className="flex flex-wrap gap-2">
-        <Link href="/admin/users">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Users size={14} />
-            View all users
-          </Button>
-        </Link>
-        <Link href="/admin/billing">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <CreditCard size={14} />
-            View billing
-          </Button>
-        </Link>
-        <Link href="/admin/audit-log">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <FileText size={14} />
-            View audit log
-          </Button>
-        </Link>
-        <Link href="/admin/spaces">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <LayoutGrid size={14} />
-            View spaces
-          </Button>
-        </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Platform Overview ────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Platform Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            {
-              label: 'Total users',
-              value: totalUsers,
-              sub: `+${signupsLast7} this week`,
-              icon: Users,
-              color: 'text-blue-500',
-              accent: false,
-            },
-            {
-              label: 'Onboarded',
-              value: onboardedUsers,
-              sub: `${onboardRate}% conversion`,
-              icon: CheckCircle2,
-              color: 'text-emerald-500',
-              accent: false,
-            },
-            {
-              label: 'Not onboarded',
-              value: notOnboarded,
-              sub: 'incomplete setup',
-              icon: AlertTriangle,
-              color: 'text-amber-500',
-              accent: notOnboarded > 0,
-            },
-            {
-              label: 'Brokerages',
-              value: totalBrokerages,
-              sub: `${activeBrokerages} active`,
-              icon: Building2,
-              color: 'text-violet-500',
-              accent: false,
-            },
-          ].map(({ label, value, sub, icon: Icon, color, accent }) => (
-            <Card
-              key={label}
-              className={`rounded-xl border bg-card h-full ${
-                accent
-                  ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5'
-                  : ''
-              }`}
+      {/* ── Primary pulse stats — hairline grid ───────────────────────── */}
+      {/*
+        8 numbers an admin actually checks on every visit.
+        Jobs lens: cut the 30-card wall. Keep the numbers that answer
+        "is the business healthy?" at a glance.
+      */}
+      <section
+        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+        aria-label="Key metrics"
+      >
+        {[
+          {
+            label: 'Total users',
+            value: totalUsers,
+            sub: `+${signupsLast7} this week`,
+          },
+          {
+            label: 'Onboarded',
+            value: onboardedUsers,
+            sub: `${onboardRate}% conversion`,
+          },
+          {
+            label: 'MRR',
+            value: `$${mrr.toLocaleString()}`,
+            sub: `${activeSubscriptions} active`,
+          },
+          {
+            label: 'Brokerages',
+            value: totalBrokerages,
+            sub: `${activeBrokerages} active`,
+          },
+          {
+            label: 'Total leads',
+            value: totalLeads,
+            sub: `+${leadsLast7} this week`,
+          },
+          {
+            label: 'Pipeline',
+            value: formatCompact(totalPipelineValue),
+            sub: `${totalDeals} deals`,
+          },
+          {
+            label: 'Trial users',
+            value: trialUsers,
+            sub: trialEndingSoonTotal > 0 ? `${trialEndingSoonTotal} expiring soon` : 'no expiries soon',
+          },
+          {
+            label: 'Past due',
+            value: pastDueUsers,
+            sub: pastDueUsers > 0 ? 'needs attention' : 'all clear',
+            alert: pastDueUsers > 0,
+          },
+        ].map(({ label, value, sub, alert }) => (
+          <div key={label} className="bg-background px-4 py-4 sm:px-5 sm:py-5">
+            <p className={cn(SECTION_LABEL, 'mb-2')}>{label}</p>
+            <p
+              className={cn(
+                STAT_NUMBER_COMPACT,
+                alert && 'text-amber-600 dark:text-amber-400',
+              )}
             >
-              <CardContent className="p-6 h-full flex flex-col justify-between">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p
-                      className={`text-2xl font-bold mt-0.5 tabular-nums ${
-                        accent ? 'text-amber-600 dark:text-amber-400' : ''
-                      }`}
-                    >
-                      {value}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+              {value}
+            </p>
+            <p className={cn(META, 'mt-1')}>{sub}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* ── At-risk (actionable) ──────────────────────────────────────── */}
+      <section className="space-y-6">
+        <p className={SECTION_LABEL}>At risk</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Trial ending soon */}
+          <AtRiskCard
+            title="Trial ending soon"
+            count={trialEndingSoonTotal}
+            empty="No trials expiring in the next 7 days."
+            viewAllHref="/admin/users?filter=trialing"
+          >
+            {trialEndingSoon.map((u) => (
+              <AtRiskRow
+                key={u.userId}
+                href={`/admin/users/${u.userId}`}
+                name={u.name || u.email}
+                email={u.email}
+                badge={`${u.daysLeft}d left`}
+                badgeClass="text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15"
+              />
+            ))}
+          </AtRiskCard>
+
+          {/* Past due */}
+          <AtRiskCard
+            title="Past due"
+            count={pastDueTotal}
+            empty="No past-due accounts."
+            viewAllHref="/admin/users?filter=past-due"
+          >
+            {pastDueList.map((u) => (
+              <AtRiskRow
+                key={u.userId}
+                href={`/admin/users/${u.userId}`}
+                name={u.name || u.email}
+                email={u.email}
+                badge={`${u.daysPastDue}d`}
+                badgeClass="text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15"
+              />
+            ))}
+          </AtRiskCard>
+
+          {/* Inactive workspaces */}
+          <AtRiskCard
+            title="Inactive workspaces"
+            count={inactiveWorkspacesTotal}
+            empty="No inactive workspaces."
+            viewAllHref="/admin/users?filter=inactive"
+          >
+            {inactiveWorkspaces.map((u) => (
+              <AtRiskRow
+                key={u.userId}
+                href={`/admin/users/${u.userId}`}
+                name={u.name || u.email}
+                email={u.email}
+                badge={
+                  u.daysSinceLastContact === null
+                    ? 'never'
+                    : `${u.daysSinceLastContact}d`
+                }
+                badgeClass="text-muted-foreground bg-muted"
+              />
+            ))}
+          </AtRiskCard>
+        </div>
+      </section>
+
+      {/* ── Growth chart + Conversion funnel ──────────────────────────── */}
+      <section className="space-y-6">
+        <p className={SECTION_LABEL}>Growth</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Signup chart — spans 2 columns */}
+          <div className="lg:col-span-2 rounded-xl border border-border/70 bg-card px-5 py-5">
+            <p className={H3}>User growth</p>
+            <p className={cn(CAPTION, 'mt-0.5 mb-4')}>
+              Signups over the last 30 days · {signupsLast30} total
+            </p>
+            <SignupChart data={signupsByDay} />
+          </div>
+
+          {/* Conversion funnel */}
+          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+            <p className={H3}>Conversion funnel</p>
+            <p className={cn(CAPTION, 'mt-0.5 mb-5')}>User journey breakdown</p>
+            <div className="space-y-4">
+              {[
+                { label: 'Signed up', value: totalUsers, pct: 100 },
+                { label: 'Onboarded', value: onboardedUsers, pct: onboardRate },
+                {
+                  label: 'Created workspace',
+                  value: usersWithSpace,
+                  pct: totalUsers > 0 ? Math.round((usersWithSpace / totalUsers) * 100) : 0,
+                },
+                {
+                  label: 'Has leads',
+                  value: totalLeads > 0 ? totalLeads : 0,
+                  pct:
+                    totalUsers > 0 && totalLeads > 0
+                      ? Math.min(Math.round((totalLeads / totalUsers) * 100), 100)
+                      : 0,
+                },
+              ].map(({ label, value, pct }) => (
+                <div key={label}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={CAPTION}>{label}</span>
+                    <span className={cn(META, 'text-foreground tabular-nums')}>
+                      {value}{' '}
+                      <span className="text-muted-foreground">({pct}%)</span>
+                    </span>
                   </div>
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      accent ? 'bg-amber-100 dark:bg-amber-500/10' : 'bg-muted'
-                    }`}
-                  >
-                    <Icon
-                      size={15}
-                      className={accent ? 'text-amber-600 dark:text-amber-400' : color}
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-foreground rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Revenue ──────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenue</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {[
-            {
-              label: 'MRR',
-              value: formatCompact(mrr),
-              sub: `${activeSubscriptions} active subs`,
-              icon: DollarSign,
-              color: 'text-emerald-500',
-            },
-            {
-              label: 'Active subscribers',
-              value: activeSubscriptions,
-              sub: 'paying customers',
-              icon: CheckCircle2,
-              color: 'text-emerald-500',
-            },
-            {
-              label: 'Trial users',
-              value: trialUsers,
-              sub: 'currently trialing',
-              icon: CreditCard,
-              color: 'text-blue-500',
-            },
-            {
-              label: 'Past due',
-              value: pastDueUsers,
-              sub: 'payment failed',
-              icon: CreditCard,
-              color: 'text-amber-500',
-            },
-            {
-              label: 'Churn rate',
-              value: `${churnRate}%`,
-              sub: `${canceledUsers} canceled`,
-              icon: DollarSign,
-              color: 'text-rose-500',
-            },
-          ].map(({ label, value, sub, icon: Icon, color }) => (
-            <Card key={label} className="rounded-xl border bg-card h-full">
-              <CardContent className="p-6 h-full flex flex-col justify-between">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                    <Icon size={15} className={color} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* ── At Risk ──────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">At Risk</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Trial ending soon */}
-          <Card className="rounded-xl border bg-card h-full">
-            <CardContent className="p-5 h-full flex flex-col">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-100 dark:bg-blue-500/15">
-                    <Clock size={15} className="text-blue-500" />
-                  </div>
-                  <p className="text-sm font-semibold truncate">Trial ending soon</p>
-                </div>
-                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15 tabular-nums">
-                  {trialEndingSoonTotal}
-                </span>
-              </div>
-              {trialEndingSoon.length === 0 ? (
-                <p className="text-xs text-muted-foreground flex-1">
-                  No trials ending in the next 7 days.
-                </p>
-              ) : (
-                <div className="flex-1 -mx-2">
-                  {trialEndingSoon.map((u) => (
-                    <Link
-                      key={u.userId}
-                      href={`/admin/users/${u.userId}`}
-                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold truncate">
-                          {u.name || u.email}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {u.email}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15 tabular-nums">
-                        {u.daysLeft}d left
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              <Link
-                href="/admin/users?filter=trialing"
-                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
-              >
-                View all →
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Past due */}
-          <Card className="rounded-xl border bg-card h-full">
-            <CardContent className="p-5 h-full flex flex-col">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-100 dark:bg-amber-500/15">
-                    <AlertCircle size={15} className="text-amber-500" />
-                  </div>
-                  <p className="text-sm font-semibold truncate">Past due</p>
-                </div>
-                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15 tabular-nums">
-                  {pastDueTotal}
-                </span>
-              </div>
-              {pastDueList.length === 0 ? (
-                <p className="text-xs text-muted-foreground flex-1">
-                  No past-due accounts. Nice.
-                </p>
-              ) : (
-                <div className="flex-1 -mx-2">
-                  {pastDueList.map((u) => (
-                    <Link
-                      key={u.userId}
-                      href={`/admin/users/${u.userId}`}
-                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold truncate">
-                          {u.name || u.email}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {u.email}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end flex-shrink-0">
-                        <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15 tabular-nums">
-                          {u.daysPastDue}d
-                        </span>
-                        <span className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                          ${formatCompact(97)}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              <Link
-                href="/admin/users?filter=past-due"
-                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
-              >
-                View all →
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Inactive workspaces */}
-          <Card className="rounded-xl border bg-card h-full">
-            <CardContent className="p-5 h-full flex flex-col">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-violet-100 dark:bg-violet-500/15">
-                    <Moon size={15} className="text-violet-500" />
-                  </div>
-                  <p className="text-sm font-semibold truncate">Inactive workspaces</p>
-                </div>
-                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15 tabular-nums">
-                  {inactiveWorkspacesTotal}
-                </span>
-              </div>
-              {inactiveWorkspaces.length === 0 ? (
-                <p className="text-xs text-muted-foreground flex-1">
-                  No inactive workspaces.
-                </p>
-              ) : (
-                <div className="flex-1 -mx-2">
-                  {inactiveWorkspaces.map((u) => (
-                    <Link
-                      key={u.userId}
-                      href={`/admin/users/${u.userId}`}
-                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold truncate">
-                          {u.name || u.email}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {u.email}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15 tabular-nums">
-                        {u.daysSinceLastContact === null
-                          ? 'never'
-                          : `${u.daysSinceLastContact}d`}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              <Link
-                href="/admin/users?filter=inactive"
-                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
-              >
-                View all →
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* ── Activity ─────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Activity</h2>
-        <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-          {[
-            {
-              label: 'Total leads',
-              value: totalLeads,
-              sub: `+${leadsLast7} this week`,
-              icon: PhoneIncoming,
-              color: 'text-cyan-500',
-            },
-            {
-              label: 'Pipeline value',
-              value: formatCompact(totalPipelineValue),
-              sub: `${totalDeals} deals`,
-              icon: TrendingUp,
-              color: 'text-rose-500',
-            },
-          ].map(({ label, value, sub, icon: Icon, color }) => (
-            <Card key={label} className="rounded-xl border bg-card h-full">
-              <CardContent className="p-6 h-full flex flex-col justify-between">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                    <Icon size={15} className={color} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Feature Usage + Lead Quality (side by side) ───────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Feature Usage */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Feature Adoption</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {/* ── Feature adoption + Lead quality ──────────────────────────── */}
+      <section className="space-y-6">
+        <p className={SECTION_LABEL}>Adoption</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Feature adoption */}
+          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+            <p className={H3}>Feature adoption</p>
+            <p className={cn(CAPTION, 'mt-0.5 mb-5')}>Spaces using each feature</p>
+            <div className="space-y-4">
               {[
-                {
-                  label: 'Spaces with leads',
-                  value: spacesWithLeads,
-                  total: totalSpaces,
-                  icon: PhoneIncoming,
-                  color: 'text-emerald-500',
-                },
-                {
-                  label: 'Spaces with deals',
-                  value: spacesWithDeals,
-                  total: totalSpaces,
-                  icon: Briefcase,
-                  color: 'text-cyan-500',
-                },
-                {
-                  label: 'Spaces with tours',
-                  value: spacesWithTours,
-                  total: totalSpaces,
-                  icon: Calendar,
-                  color: 'text-violet-500',
-                },
-                {
-                  label: 'Total tours booked',
-                  value: totalTours,
-                  total: null,
-                  icon: Calendar,
-                  color: 'text-blue-500',
-                },
-                {
-                  label: 'Follow-ups set',
-                  value: totalFollowUps,
-                  total: null,
-                  icon: Bell,
-                  color: 'text-amber-500',
-                },
-              ].map(({ label, value, total, icon: Icon, color }) => {
+                { label: 'Spaces with leads', value: spacesWithLeads, total: totalSpaces, icon: PhoneIncoming },
+                { label: 'Spaces with deals', value: spacesWithDeals, total: totalSpaces, icon: Briefcase },
+                { label: 'Spaces with tours', value: spacesWithTours, total: totalSpaces, icon: Calendar },
+                { label: 'Total tours booked', value: totalTours, total: null, icon: Calendar },
+                { label: 'Follow-ups set', value: totalFollowUps, total: null, icon: Bell },
+              ].map(({ label, value, total, icon: Icon }) => {
                 const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
                 return (
-                  <div key={label} className="space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                        <Icon size={13} className={color} />
-                      </div>
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={CAPTION}>{label}</span>
+                      <span className={cn(META, 'text-foreground')}>
+                        {value}
+                        {total !== null && (
+                          <span className="text-muted-foreground"> / {total}</span>
+                        )}
+                      </span>
                     </div>
-                    <p className="text-xl font-bold tabular-nums">
-                      {value}
-                      {total !== null && (
-                        <span className="text-sm font-normal text-muted-foreground">
-                          {' '}
-                          / {total}
-                        </span>
-                      )}
-                    </p>
                     {pct !== null && (
-                      <div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${Math.max(pct, 2)}%` }}
-                          />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-1">{pct}% of spaces</p>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-foreground/60 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(pct, 2)}%` }}
+                        />
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Lead Quality Distribution */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Lead Quality</h2>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Lead quality */}
+          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+            <p className={H3}>Lead quality</p>
+            <p className={cn(CAPTION, 'mt-0.5 mb-5')}>Scored lead distribution</p>
+            <div
+              className="grid grid-cols-2 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+              aria-label="Lead quality breakdown"
+            >
               {[
                 {
-                  label: 'Hot leads',
+                  label: 'Hot',
                   value: hotLeads,
-                  icon: Flame,
-                  badgeColor: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
-                  iconColor: 'text-red-500',
+                  pill: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
                 },
                 {
-                  label: 'Warm leads',
+                  label: 'Warm',
                   value: warmLeads,
-                  icon: Thermometer,
-                  badgeColor: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-                  iconColor: 'text-amber-500',
+                  pill: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
                 },
                 {
-                  label: 'Cold leads',
+                  label: 'Cold',
                   value: coldLeads,
-                  icon: Snowflake,
-                  badgeColor: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-                  iconColor: 'text-blue-500',
+                  pill: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
                 },
                 {
                   label: 'Unqualified',
                   value: unqualifiedLeads,
-                  icon: BarChart3,
-                  badgeColor:
-                    'text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-500/15',
-                  iconColor: 'text-gray-500',
+                  pill: 'text-muted-foreground bg-muted',
                 },
-              ].map(({ label, value, icon: Icon, badgeColor, iconColor }) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                      <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                      <span
-                        className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1 ${badgeColor}`}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                      <Icon size={15} className={iconColor} />
-                    </div>
-                  </div>
+              ].map(({ label, value, pill }) => (
+                <div key={label} className="bg-background px-4 py-4">
+                  <p className={SECTION_LABEL}>{label}</p>
+                  <p className={cn(STAT_NUMBER_COMPACT, 'mt-1.5')}>{value}</p>
+                  <span
+                    className={cn(
+                      'inline-flex mt-2 text-[10px] font-medium rounded-full px-2 py-0.5',
+                      pill,
+                    )}
+                  >
+                    {label.toLowerCase()}
+                  </span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Growth + Funnel row ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Signup chart */}
-        <div className="lg:col-span-2">
-          <Card className="rounded-xl border bg-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-sm font-semibold">User growth</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Signups over the last 30 days · {signupsLast30} total
-                  </p>
-                </div>
-              </div>
-              <SignupChart data={signupsByDay} />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Conversion funnel */}
-        <div>
-          <Card className="rounded-xl border bg-card h-full">
-            <CardContent className="p-6">
-              <p className="text-sm font-semibold mb-1">Conversion funnel</p>
-              <p className="text-xs text-muted-foreground mb-5">User journey breakdown</p>
-              <div className="space-y-5">
-                {[
-                  { label: 'Signed up', value: totalUsers, pct: 100 },
-                  {
-                    label: 'Onboarded',
-                    value: onboardedUsers,
-                    pct: onboardRate,
-                  },
-                  {
-                    label: 'Created workspace',
-                    value: usersWithSpace,
-                    pct: totalUsers > 0 ? Math.round((usersWithSpace / totalUsers) * 100) : 0,
-                  },
-                  {
-                    label: 'Has leads',
-                    value: totalLeads > 0 ? '—' : '0',
-                    pct: totalUsers > 0 && totalLeads > 0 ? Math.min(Math.round((totalLeads / totalUsers) * 100), 100) : 0,
-                  },
-                ].map(({ label, value, pct }) => (
-                  <div key={label}>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className="font-semibold tabular-nums">
-                        {typeof value === 'number' ? value : value}{' '}
-                        <span className="text-muted-foreground font-normal">({pct}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(pct, 2)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* ── Recent signups + Activity feed ────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent signups */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Signups</h2>
-            <Link
-              href="/admin/users"
-              className="text-xs text-primary font-medium hover:underline underline-offset-2"
-            >
-              View all →
-            </Link>
           </div>
-          {recentUsers.length === 0 ? (
-            <Card className="rounded-xl border bg-card">
-              <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No users yet.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="rounded-xl border bg-card">
-              <div className="divide-y divide-border">
-                {recentUsers.map((user) => (
-                  <Link key={user.id} href={`/admin/users/${user.id}`}>
-                    <div className="px-4 py-3 hover:bg-muted/50 transition-colors duration-150">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                            {(user.name || user.email || '?')
-                              .split(' ')
-                              .map((n: string) => n[0])
-                              .join('')
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate">
-                              {user.name || 'No name'}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {user.space?.slug && (
-                            <span className="hidden sm:inline-flex text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                              {user.space.slug}
-                            </span>
-                          )}
-                          <span
-                            className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 ${
-                              user.onboard
-                                ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-                                : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-                            }`}
-                          >
-                            {user.onboard ? 'Onboarded' : 'Pending'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
         </div>
+      </section>
 
-        {/* Activity feed */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Activity</h2>
-          {recentActivity.length === 0 ? (
-            <Card className="rounded-xl border bg-card">
-              <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No activity yet.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="rounded-xl border bg-card">
-              <div className="divide-y divide-border">
+      {/* ── Recent signups + Activity feed ──────────────────────────── */}
+      <section className="space-y-6">
+        <p className={SECTION_LABEL}>Recent</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Recent signups */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className={H3}>Recent signups</p>
+              <Link
+                href="/admin/users"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all →
+              </Link>
+            </div>
+            {recentUsers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No users yet.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+                {recentUsers.map((user) => (
+                  <li key={user.id}>
+                    <Link
+                      href={`/admin/users/${user.id}`}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors duration-150"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-semibold text-foreground/80 flex-shrink-0">
+                        {(user.name || user.email || '?')
+                          .split(' ')
+                          .map((n: string) => n[0])
+                          .join('')
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
+                          {user.name || 'No name'}
+                        </p>
+                        <p className={cn(CAPTION, 'truncate')}>{user.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {user.space?.slug && (
+                          <span className="hidden sm:inline-flex text-[10px] font-medium text-muted-foreground bg-foreground/[0.05] rounded-full px-2 py-0.5">
+                            {user.space.slug}
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            'inline-flex text-[10px] font-medium rounded-full px-2 py-0.5',
+                            user.onboard
+                              ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
+                              : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+                          )}
+                        >
+                          {user.onboard ? 'Onboarded' : 'Pending'}
+                        </span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Activity feed */}
+          <div className="space-y-3">
+            <p className={H3}>Recent activity</p>
+            {recentActivity.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No activity yet.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
                 {recentActivity.map((item, i) => {
                   const Icon = activityIcon[item.type];
-                  const color = activityColor[item.type];
                   const ago = timeAgo(item.time);
                   return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        <Icon size={14} className={color} />
+                    <li key={i} className="flex items-center gap-3 px-4 py-3">
+                      <div className="w-7 h-7 rounded-md bg-foreground/[0.05] flex items-center justify-center flex-shrink-0">
+                        <Icon size={13} strokeWidth={1.75} className="text-muted-foreground" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{item.label}</p>
-                        <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
+                        <p className={cn(CAPTION, 'truncate')}>{item.detail}</p>
                       </div>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">{ago}</span>
-                    </div>
+                      <span className={cn(META, 'flex-shrink-0')}>{ago}</span>
+                    </li>
                   );
                 })}
-              </div>
-            </Card>
-          )}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Last updated ────────────────────────────────────────────── */}
-      <div className="pt-4 border-t border-border">
-        <p className="text-xs text-muted-foreground text-center">
-          Last updated: {now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
-        </p>
-      </div>
+      {/* ── Footer timestamp ─────────────────────────────────────────── */}
+      <p className={cn(META, 'text-center border-t border-border/60 pt-4')}>
+        Updated{' '}
+        {now.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })}
+      </p>
     </div>
   );
 }
+
+// ── At-risk card ───────────────────────────────────────────────────────────
+
+function AtRiskCard({
+  title,
+  count,
+  empty,
+  viewAllHref,
+  children,
+}: {
+  title: string;
+  count: number;
+  empty: string;
+  viewAllHref: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-card px-5 py-5 flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <p className={H3}>{title}</p>
+        <span className={cn(META, 'tabular-nums text-foreground')}>{count}</span>
+      </div>
+      {count === 0 ? (
+        <p className={cn(CAPTION, 'flex-1')}>{empty}</p>
+      ) : (
+        <ul className="flex-1 -mx-2 divide-y divide-border/40">
+          {children}
+        </ul>
+      )}
+      <Link
+        href={viewAllHref}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-4 self-start"
+      >
+        View all →
+      </Link>
+    </div>
+  );
+}
+
+function AtRiskRow({
+  href,
+  name,
+  email,
+  badge,
+  badgeClass,
+}: {
+  href: string;
+  name: string;
+  email: string;
+  badge: string;
+  badgeClass: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-foreground/[0.04] transition-colors duration-150"
+      >
+        <div className="min-w-0">
+          <p className="text-xs font-medium truncate">{name}</p>
+          <p className={cn(META, 'truncate')}>{email}</p>
+        </div>
+        <span
+          className={cn(
+            'text-[10px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 tabular-nums',
+            badgeClass,
+          )}
+        >
+          {badge}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+// ── timeAgo (unchanged) ───────────────────────────────────────────────────
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

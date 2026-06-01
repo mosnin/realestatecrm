@@ -165,12 +165,18 @@ export function FormAnalyticsClient({
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Form Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+        <header className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">Growth.</p>
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Form analytics
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Conversion metrics across intake forms.
           </p>
-        </div>
+        </header>
         <div className="flex items-center gap-3 flex-wrap">
           <DateRangePresets value={days} onChange={setDays} />
           <div className="relative w-full sm:w-[280px]">

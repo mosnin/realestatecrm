@@ -40,13 +40,19 @@ export default async function AdminBrokeragesPage() {
   const suspended = (brokerages ?? []).filter((b) => b.status === 'suspended').length;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Brokerages</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {brokerages?.length ?? 0} total · {active} active · {suspended} suspended
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Management.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Brokerages
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {brokerages?.length ?? 0} total · {active} active · {suspended} suspended.
         </p>
-      </div>
+      </header>
 
       {!brokerages || brokerages.length === 0 ? (
         <Card>
@@ -93,8 +99,8 @@ export default async function AdminBrokeragesPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Building2 size={14} className="text-primary" />
+                          <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+                            <Building2 size={14} className="text-foreground/70" />
                           </div>
                           <p className="font-semibold truncate max-w-[200px]">{b.name}</p>
                         </div>

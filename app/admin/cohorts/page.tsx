@@ -184,15 +184,19 @@ export default async function AdminCohortsPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Cohort Analysis</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Weekly signup cohorts and their retention through the funnel
-          </p>
-        </div>
-      </div>
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Growth.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Cohort analysis
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Weekly signup cohorts and their retention through the funnel.
+        </p>
+      </header>
 
       <Card className="rounded-xl border bg-card">
         <CardContent className="px-5 py-4">

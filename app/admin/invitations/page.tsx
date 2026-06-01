@@ -42,13 +42,19 @@ export default async function AdminInvitationsPage() {
   const roleLabel = (r: string) => r === 'broker_admin' ? 'Admin' : 'Realtor';
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Invitations</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {invs.length} invitation{invs.length !== 1 ? 's' : ''} across all brokerages
+    <div className="space-y-8 pb-12 max-w-5xl">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Management.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Invitations
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {invs.length} invitation{invs.length !== 1 ? 's' : ''} across all brokerages.
         </p>
-      </div>
+      </header>
 
       {invs.length === 0 ? (
         <Card>

@@ -37,13 +37,17 @@ export default async function AuditLogPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Audit Log</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Platform-wide activity log for SOC 2 compliance
-        </p>
-      </div>
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">System.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Audit log
+        </h1>
+        <p className="text-sm text-muted-foreground">Platform-wide activity log for SOC 2 compliance.</p>
+      </header>
       <AuditLogClient logs={logs} userMap={userMap} />
     </div>
   );
