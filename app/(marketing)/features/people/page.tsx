@@ -32,8 +32,8 @@ export default function FeaturesPeoplePage() {
 
       <MarketingSection
         eyebrow="THE RECORD"
-        title="More than a row in a spreadsheet."
-        sub="Names, numbers, budgets, neighborhoods, household, preferences. Captured at intake, kept current as the deal moves."
+        title="Captured once. Kept current."
+        sub="Names, numbers, budgets, neighborhoods, household, preferences. The record fills at intake and stays fresh as the deal moves."
         bullets={[
           'Structured fields at intake.',
           'Free-form notes alongside.',

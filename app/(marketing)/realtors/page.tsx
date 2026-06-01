@@ -25,7 +25,7 @@ export default function RealtorsPage() {
       <MarketingHero
         eyebrow="FOR SOLO REALTORS"
         title="Your second brain. With opposable thumbs."
-        sub="Chippi reads your inbox, replies on your behalf, schedules tours, and keeps your deals current. You stay in the driver's seat — every send still goes through you."
+        sub="Chippi reads your inbox, drafts the reply, books the tour, updates the deal. Every send still goes through you."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >

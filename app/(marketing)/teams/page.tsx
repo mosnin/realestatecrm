@@ -12,12 +12,9 @@
  * teach, not sell.
  */
 
-import { Briefcase, Users, BarChart3, FileText, MessageCircle } from 'lucide-react';
-
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
-import { MarketingFeatureGrid } from '@/components/marketing/marketing-feature-grid';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import {
   LeadRoutingDiagram,
@@ -113,50 +110,8 @@ export default function TeamsPage() {
         eyebrow="THE PROMISE"
         title="Realtors keep their workspace. You see the room."
         sub="Every realtor still has their own dashboard. Brokers see the rollup — without ever taking the workspace away from the people doing the work."
+        learnMore={{ label: 'Manage your team members', href: '/teams/members' }}
       />
-
-      <MarketingSection
-        stacked
-        eyebrow="EXPLORE TEAMS"
-        title="What's in here."
-        sub="Five surfaces, one floor."
-      >
-        <MarketingFeatureGrid
-          columns={3}
-          items={[
-            {
-              title: 'Lead distribution',
-              description: 'Every lead, the right realtor.',
-              href: '/teams/leads',
-              icon: Briefcase,
-            },
-            {
-              title: 'Members',
-              description: 'Manage who belongs.',
-              href: '/teams/members',
-              icon: Users,
-            },
-            {
-              title: 'Analytics',
-              description: 'See what the floor is closing.',
-              href: '/teams/analytics',
-              icon: BarChart3,
-            },
-            {
-              title: 'Templates',
-              description: 'Write the reply once.',
-              href: '/teams/templates',
-              icon: FileText,
-            },
-            {
-              title: 'Team chat',
-              description: 'Talk shop, on the same page.',
-              href: '/teams/chat',
-              icon: MessageCircle,
-            },
-          ]}
-        />
-      </MarketingSection>
 
       <MarketingCTA
         title="Bring your team to Chippi."
