@@ -18,7 +18,6 @@ import {
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { SidebarFavorites } from '@/components/dashboard/sidebar-favorites';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { PulseNumber } from '@/components/ui/pulse-number';
@@ -1051,13 +1050,6 @@ function RealtorNav({
             No header above this bucket: Chippi is the brand mark; it
             doesn't need a category to belong to. */}
         {aiItems.map(renderItem)}
-
-        {/* FAVORITES — collapsible, realtor-curated quick links. v1 stores
-            in localStorage per-slug; no DB, no API. Hidden in collapsed
-            rail mode. Sits between Chippi (AI top) and Records to match
-            the inspiration: the agent up top, the realtor's personal
-            shortlist next, then the canonical record types. */}
-        <SidebarFavorites slug={slug} base={base} collapsed={collapsed} />
 
         {/* RECORDS — daily work surfaces (the realtor's book of business:
             People, Deals, Properties, etc.). Labeled to match the
