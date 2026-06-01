@@ -8,16 +8,20 @@
  * Usage:
  *   export const GET = withObservability(async (req, ctx) => { ... }, 'api.sync');
  */
-import type { NextRequest } from 'next/server';
 import { captureError, withSpan } from '@/lib/observability';
 
-type RouteContext = { params?: Promise<Record<string, string>> };
-type RouteHandler = (req: NextRequest, ctx: RouteContext) => Promise<Response>;
-
-export function withObservability(handler: RouteHandler, opName: string): RouteHandler {
-  return async (req: NextRequest, ctx: RouteContext): Promise<Response> => {
+/**
+ * Generic over the handler's exact argument tuple so the wrapped export keeps
+ * the SAME signature Next.js generated route-type validation expects — works
+ * for both static routes `(req)` and dynamic ones `(req, { params })`.
+ */
+export function withObservability<A extends unknown[]>(
+  handler: (...args: A) => Promise<Response> | Response,
+  opName: string,
+): (...args: A) => Promise<Response> {
+  return async (...args: A): Promise<Response> => {
     try {
-      return await withSpan(opName, 'http.server', () => handler(req, ctx));
+      return await withSpan(opName, 'http.server', async () => handler(...args));
     } catch (err) {
       captureError(err, { route: opName });
       throw err;
