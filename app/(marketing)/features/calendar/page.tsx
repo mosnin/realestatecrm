@@ -7,10 +7,12 @@
  * inline booking from a reply, the two-way sync, and the follow-up stack.
  */
 
+import { Calendar, CalendarDays, CalendarClock, Video, Home, Plus } from 'lucide-react';
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
 
 export const metadata = { title: 'Calendar — Chippi' };
 
@@ -64,22 +66,47 @@ export default function FeaturesCalendarPage() {
         />
       </MarketingSection>
 
-      <MarketingSection
+      <MarketingIntegrations
         eyebrow="THE SYNC"
-        title="Both directions, always."
-        sub="Anything Chippi adds shows up in your Google or Outlook calendar. Anything you add there shows up here."
-        bullets={[
-          'Google + Outlook OAuth.',
-          'Two-way realtime sync.',
-          'Conflicts surfaced, not buried.',
+        title="Connects to the calendars you already keep."
+        sub="OAuth once. Two-way sync, realtime. Tours land in the calendar your phone already pings."
+        integrations={[
+          {
+            name: 'Google Calendar',
+            description: 'Read and write across primary and shared calendars.',
+            icon: Calendar,
+          },
+          {
+            name: 'Microsoft Calendar',
+            description: 'Outlook.com and Microsoft 365 — both included.',
+            icon: CalendarDays,
+          },
+          {
+            name: 'iCloud Calendar',
+            description: 'For the realtor running an Apple stack.',
+            icon: CalendarClock,
+            comingSoon: true,
+          },
+          {
+            name: 'Zoom',
+            description: 'Auto-attach a meeting link to every virtual tour.',
+            icon: Video,
+            comingSoon: true,
+          },
+          {
+            name: 'ShowingTime',
+            description: 'Showings booked through the MLS, surfaced here.',
+            icon: Home,
+            comingSoon: true,
+          },
+          {
+            name: 'And many more',
+            description: 'Composio underneath — hundreds of tools, one wire.',
+            icon: Plus,
+          },
         ]}
-        side="right"
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Sync diagram — Chippi calendar ↔ Google calendar."
-        />
-      </MarketingSection>
+        learnMore={{ label: 'Connect your calendar', href: '/login/realtor?intent=signup' }}
+      />
 
       <MarketingSection
         eyebrow="THE FOLLOW-UP"
