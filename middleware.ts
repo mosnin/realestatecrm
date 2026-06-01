@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { captureError } from '@/lib/observability';
 
 const isProtectedRoute = createRouteMatcher([
   '/s/(.*)',
@@ -87,6 +88,7 @@ const isFullyPublicRoute = createRouteMatcher([
 const SAFE_REDIRECT_PREFIXES = ['/s/', '/broker', '/admin', '/authorize', '/invite/', '/subscribe', '/billing-required'];
 
 export default clerkMiddleware(async (auth, request) => {
+  try {
   const { pathname } = request.nextUrl;
 
   // Fast-path: public-facing pages skip the Clerk auth() call entirely.
@@ -199,6 +201,10 @@ export default clerkMiddleware(async (auth, request) => {
       headers: requestHeaders,
     },
   });
+  } catch (err) {
+    captureError(err, { mw: true });
+    throw err;
+  }
 });
 
 export const config = {

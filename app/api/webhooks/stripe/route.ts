@@ -4,6 +4,7 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
 async function notifySubscriptionChange(subscriptionId: string, newStatus: string) {
@@ -242,7 +243,7 @@ async function updateBrokerageFromSubscription(
   return true;
 }
 
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   const stripe = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -529,6 +530,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true });
 }
+
+export const POST = withObservability(POSTHandler, 'api.webhooks.stripe');
 
 /** Map Stripe subscription status to our DB enum. */
 function mapStatus(
