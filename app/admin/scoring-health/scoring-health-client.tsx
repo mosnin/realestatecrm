@@ -293,7 +293,7 @@ export function ScoringHealthClient({
                         {lead.spaceSlug && (
                           <Link
                             href={`/spaces/${lead.spaceSlug}`}
-                            className="text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5 hover:underline"
+                            className="text-[10px] font-medium text-foreground/70 bg-foreground/[0.06] rounded-full px-2 py-0.5 hover:underline"
                           >
                             {lead.spaceSlug}
                           </Link>

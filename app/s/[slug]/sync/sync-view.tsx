@@ -145,9 +145,13 @@ export function SyncView({ slug }: SyncViewProps) {
             <button
               type="button"
               onClick={() => setRefreshKey((k) => k + 1)}
-              className={cn(BODY_MUTED, 'text-foreground/70 hover:text-foreground transition-colors text-sm mt-1')}
+              className={cn(
+                'mt-1 inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-medium',
+                'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',
+              )}
             >
-              Try again.
+              <RefreshCw size={11} strokeWidth={1.75} />
+              Try again
             </button>
           </CardContent>
         </Card>
@@ -243,7 +247,7 @@ function ConnectPanel({ slug }: { slug: string }) {
       <p className={CAPTION}>
         Connect more apps in{' '}
         <a
-          href={`/s/${slug}/settings/integrations`}
+          href={`/s/${slug}/settings?tab=connections`}
           className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
         >
           Integrations settings
@@ -337,7 +341,7 @@ function RecordsList({
             <RefreshCw size={13} strokeWidth={1.75} />
           </button>
           <a
-            href={`/s/${slug}/settings/integrations`}
+            href={`/s/${slug}/settings?tab=connections`}
             className={cn(
               'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-medium',
               'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',
@@ -451,7 +455,7 @@ function ConnectedEmptyState({
             <RefreshCw size={13} strokeWidth={1.75} />
           </button>
           <a
-            href={`/s/${slug}/settings/integrations`}
+            href={`/s/${slug}/settings?tab=connections`}
             className={cn(
               'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-medium',
               'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',

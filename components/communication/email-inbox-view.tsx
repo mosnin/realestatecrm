@@ -395,7 +395,7 @@ export function EmailInboxView({
       {!loading && errorMessage && (
         <Card>
           <CardContent className="p-5 space-y-2">
-            <p className={BODY}>I couldn't reach your inbox just now.</p>
+            <p className={BODY}>I couldn&apos;t reach your inbox just now.</p>
             <p className={BODY_MUTED}>{errorMessage}</p>
           </CardContent>
         </Card>
@@ -724,7 +724,7 @@ function DisconnectedState({ slug }: { slug: string }) {
           </div>
           <div className="space-y-1.5">
             <p className={BODY}>
-              Bring your email here so the day's threads live in one place.
+              Bring your email here so the day&apos;s threads live in one place.
             </p>
             <p className={BODY_MUTED}>Gmail is the fast path.</p>
           </div>
