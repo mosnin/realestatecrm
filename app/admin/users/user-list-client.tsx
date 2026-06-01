@@ -237,10 +237,10 @@ export function UserListClient({
             key={f.value}
             onClick={() => navigate(search, f.value)}
             className={cn(
-              'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+              'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors duration-150',
               filter === f.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card text-muted-foreground border-border hover:bg-muted',
+                ? 'bg-foreground text-background border-foreground'
+                : 'bg-card text-muted-foreground border-border/70 hover:bg-foreground/[0.04] hover:text-foreground',
             )}
           >
             {f.label}
@@ -310,7 +310,7 @@ export function UserListClient({
                       {/* User */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-semibold text-foreground/70 flex-shrink-0">
                             {(user.name || user.email || '?')
                               .split(' ')
                               .map((n) => n[0])
@@ -353,7 +353,7 @@ export function UserListClient({
                       {/* Workspace */}
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {user.space ? (
-                          <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5 truncate max-w-[120px] inline-block">
+                          <span className="text-xs font-medium text-muted-foreground bg-foreground/[0.05] rounded-full px-2 py-0.5 truncate max-w-[120px] inline-block">
                             {user.space.slug}
                           </span>
                         ) : (

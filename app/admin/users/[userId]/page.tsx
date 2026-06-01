@@ -255,7 +255,7 @@ export default async function AdminUserDetailPage({
       <div className="rounded-xl border border-border bg-card px-5 py-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-base font-semibold text-primary flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-foreground/[0.06] flex items-center justify-center text-base font-semibold text-foreground/70 flex-shrink-0">
               {(fullUser.name || fullUser.email || '?')
                 .split(' ')
                 .map((n: string) => n[0])

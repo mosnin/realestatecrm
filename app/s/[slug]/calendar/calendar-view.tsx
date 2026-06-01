@@ -29,7 +29,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -240,6 +240,10 @@ export function CalendarView({
   // The grid's focal date — drives Month/Week/Day cursors. Today on mount.
   const [cursor, setCursor] = useState<Date>(() => startOfLocalDay(new Date()));
 
+  // Search query — client-side filter of loaded events. Empty = normal view.
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Add-event modal state.
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPrefill, setModalPrefill] = useState<{ date: Date; hour?: number } | null>(null);
@@ -396,6 +400,9 @@ export function CalendarView({
             onNext={goNext}
             onToday={goToday}
             onAdd={() => openAddModal(startOfLocalDay(new Date()))}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchInputRef={searchInputRef}
           />
         )}
 
@@ -413,42 +420,49 @@ export function CalendarView({
         )}
 
         {connected && !loading && !errorMessage && (
-          // Cross-fade the body when the realtor flips Month/Week/Day/Agenda.
-          // 180ms with the Apple ease — no jump-cut, no slide. The view key
-          // forces remount so each grid gets a clean entrance pass.
+          // Cross-fade the body when the realtor flips Month/Week/Day/Agenda,
+          // or when entering/leaving search mode.
+          // 180ms with the Apple ease — no jump-cut, no slide. The key
+          // changes on view or searchQuery so each state gets a clean entrance.
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={view}
+              key={searchQuery ? `search-${searchQuery}` : view}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: DUR_QUICK, ease: EASE }}
             >
-              {view === 'month' && (
-                <MonthView
-                  cursor={cursor}
-                  events={events}
-                  onCellTap={(day) => {
-                    setCursor(day);
-                    setViewPersisted('day');
-                  }}
-                />
+              {searchQuery ? (
+                <SearchResultsView events={events} query={searchQuery} />
+              ) : (
+                <>
+                  {view === 'month' && (
+                    <MonthView
+                      cursor={cursor}
+                      events={events}
+                      onCellTap={(day) => {
+                        setCursor(day);
+                        setViewPersisted('day');
+                      }}
+                    />
+                  )}
+                  {view === 'week' && (
+                    <WeekView
+                      cursor={cursor}
+                      events={events}
+                      onSlotTap={(day, hour) => openAddModal(day, hour)}
+                    />
+                  )}
+                  {view === 'day' && (
+                    <DayView
+                      cursor={cursor}
+                      events={events}
+                      onSlotTap={(hour) => openAddModal(cursor, hour)}
+                    />
+                  )}
+                  {view === 'agenda' && <AgendaView events={events} />}
+                </>
               )}
-              {view === 'week' && (
-                <WeekView
-                  cursor={cursor}
-                  events={events}
-                  onSlotTap={(day, hour) => openAddModal(day, hour)}
-                />
-              )}
-              {view === 'day' && (
-                <DayView
-                  cursor={cursor}
-                  events={events}
-                  onSlotTap={(hour) => openAddModal(cursor, hour)}
-                />
-              )}
-              {view === 'agenda' && <AgendaView events={events} />}
             </motion.div>
           </AnimatePresence>
         )}
@@ -479,6 +493,9 @@ function ToggleRow({
   onNext,
   onToday,
   onAdd,
+  searchQuery,
+  onSearchChange,
+  searchInputRef,
 }: {
   view: ViewMode;
   onViewChange: (next: ViewMode) => void;
@@ -488,6 +505,9 @@ function ToggleRow({
   onNext: () => void;
   onToday: () => void;
   onAdd: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   // Two stacked rows on mobile (toggle then nav+add); single row on `sm:+`.
   // The label has a tight floor on mobile (110px) so the chevrons stay
@@ -519,6 +539,46 @@ function ToggleRow({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 sm:ml-auto flex-wrap">
+        {/* Search input — always visible at rest (DOET check 1). Escape
+         *  clears the query and returns to the current view. */}
+        <div className="relative flex-1 min-w-[140px] sm:min-w-[200px] max-w-[260px]">
+          <Search
+            size={14}
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70"
+            aria-hidden
+          />
+          <Input
+            ref={searchInputRef}
+            type="search"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                onSearchChange('');
+                searchInputRef.current?.blur();
+              }
+            }}
+            placeholder="Search events"
+            aria-label="Search events"
+            className="pl-8 pr-8 h-8 text-sm"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                onSearchChange('');
+                searchInputRef.current?.focus();
+              }}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground transition-colors duration-150 p-0.5"
+            >
+              <X size={13} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+
         {showNav && (
           <div className="flex items-center gap-1 min-w-0">
             {/* Chevron press: 10° tilt on press, snap back. 180ms each leg.
@@ -1048,6 +1108,70 @@ function EventChip({ event, reduced }: { event: CalendarEventOut; reduced: boole
     );
   }
   return body;
+}
+
+/* ── Search results view ─────────────────────────────────────────────── */
+/* Client-side filter of the already-loaded 30-day event window. Matches
+ * against title, location (description), and attendee emails/names — the
+ * same fields a realtor would want to search. Renders as an Agenda-style
+ * list so it reuses the same vocabulary without inventing a new surface. */
+
+function matchesQuery(ev: CalendarEventOut, q: string): boolean {
+  const lower = q.toLowerCase();
+  if (ev.title.toLowerCase().includes(lower)) return true;
+  if (ev.description && ev.description.toLowerCase().includes(lower)) return true;
+  for (const a of ev.attendees) {
+    if (a.email.toLowerCase().includes(lower)) return true;
+    if (a.name && a.name.toLowerCase().includes(lower)) return true;
+  }
+  return false;
+}
+
+function SearchResultsView({ events, query }: { events: CalendarEventOut[]; query: string }) {
+  const results = useMemo(
+    () => events.filter((ev) => matchesQuery(ev, query))
+           .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+    [events, query],
+  );
+
+  if (results.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-12 text-center">
+        <div className="mx-auto mb-3 w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center">
+          <Search size={16} strokeWidth={1.75} className="text-muted-foreground" />
+        </div>
+        <p className={BODY}>No events matched.</p>
+        <p className={`${BODY_MUTED} mt-1`}>Try a different term.</p>
+      </div>
+    );
+  }
+
+  // Group by local day, same vocabulary as AgendaView.
+  const grouped = new Map<string, CalendarEventOut[]>();
+  for (const ev of results) {
+    const key = localDayKey(new Date(ev.start));
+    const arr = grouped.get(key) ?? [];
+    arr.push(ev);
+    grouped.set(key, arr);
+  }
+  const dayKeys = Array.from(grouped.keys()).sort();
+
+  return (
+    <div className="space-y-10">
+      {dayKeys.map((dayKey) => (
+        <section key={dayKey} className="space-y-3">
+          <p className={SECTION_LABEL}>{formatDayHeading(dayKey)}</p>
+          <ul className="divide-y divide-border/60 border-y border-border/60">
+            {grouped.get(dayKey)!.map((ev) => (
+              <li key={ev.id} className="py-4">
+                <EventRow event={ev} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
 }
 
 /* ── Agenda view (preserves original list rendering) ────────────────── */

@@ -142,99 +142,75 @@ export default async function AdminBillingPage() {
   const displayStatuses: SubscriptionStatus[] = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Subscription metrics and revenue overview
-        </p>
-      </div>
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Management.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Billing
+        </h1>
+        <p className="text-sm text-muted-foreground">Subscription metrics and revenue overview.</p>
+      </header>
 
-      {/* ── KPI Cards ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* ── KPI strip — hairline grid ────────────────────────────── */}
+      <section
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+        aria-label="Billing key metrics"
+      >
         {[
           {
             label: 'MRR',
             value: `$${mrr.toLocaleString()}`,
-            sub: `${statusCounts.active} active x $${PRICE_PER_SEAT}`,
-            icon: DollarSign,
-            color: 'text-emerald-500',
-            accent: false,
+            sub: `${statusCounts.active} active × $${PRICE_PER_SEAT}`,
+            alert: false,
           },
           {
-            label: 'Active Subscribers',
+            label: 'Active',
             value: statusCounts.active,
-            sub: totalSpaces > 0 ? `${Math.round((statusCounts.active / totalSpaces) * 100)}% of spaces` : '0%',
-            icon: CreditCard,
-            color: 'text-emerald-500',
-            accent: false,
+            sub: totalSpaces > 0 ? `${Math.round((statusCounts.active / totalSpaces) * 100)}% of spaces` : '—',
+            alert: false,
           },
           {
-            label: 'Trial Users',
+            label: 'Trialing',
             value: statusCounts.trialing,
             sub: `${trialExpiringSoon.length} expiring soon`,
-            icon: Clock,
-            color: 'text-blue-500',
-            accent: false,
+            alert: false,
           },
           {
-            label: 'Past Due',
+            label: 'Past due',
             value: statusCounts.past_due,
-            sub: 'needs attention',
-            icon: AlertTriangle,
-            color: 'text-amber-500',
-            accent: statusCounts.past_due > 0,
+            sub: statusCounts.past_due > 0 ? 'needs attention' : 'all clear',
+            alert: statusCounts.past_due > 0,
           },
           {
             label: 'Churned',
             value: statusCounts.canceled,
-            sub: totalSpaces > 0 ? `${Math.round((statusCounts.canceled / totalSpaces) * 100)}% churn rate` : '0%',
-            icon: XCircle,
-            color: 'text-red-500',
-            accent: statusCounts.canceled > 0,
+            sub: totalSpaces > 0 ? `${Math.round((statusCounts.canceled / totalSpaces) * 100)}% churn` : '—',
+            alert: statusCounts.canceled > 0,
           },
-        ].map(({ label, value, sub, icon: Icon, color, accent }) => (
-          <Card
-            key={label}
-            className={
-              accent
-                ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5'
-                : ''
-            }
-          >
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p
-                    className={`text-2xl font-bold mt-0.5 tabular-nums ${
-                      accent ? 'text-amber-600 dark:text-amber-400' : ''
-                    }`}
-                  >
-                    {value}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    accent ? 'bg-amber-100 dark:bg-amber-500/10' : 'bg-muted'
-                  }`}
-                >
-                  <Icon
-                    size={15}
-                    className={accent ? 'text-amber-600 dark:text-amber-400' : color}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        ].map(({ label, value, sub, alert }) => (
+          <div key={label} className="bg-background px-4 py-4">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+              {label}
+            </p>
+            <p
+              className={`text-[25px] leading-tight tracking-tight tabular-nums ${
+                alert ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
+              }`}
+            >
+              {value}
+            </p>
+            <p className="text-[11px] tabular-nums text-muted-foreground mt-1">{sub}</p>
+          </div>
         ))}
-      </div>
+      </section>
 
       {/* ── Subscription Breakdown ──────────────────────────────── */}
       <Card>
         <CardContent className="px-5 py-4">
-          <p className="text-sm font-semibold mb-4">Subscription Breakdown</p>
+          <p className="text-[17px] font-semibold leading-snug text-foreground mb-4">Subscription breakdown</p>
 
           {/* Visual bar */}
           <div className="h-4 rounded-full overflow-hidden flex bg-muted mb-4">
@@ -295,7 +271,7 @@ export default async function AdminBillingPage() {
             <div className="space-y-2">
               {trialExpiringSoon.map((space) => (
                 <Link key={space.id} href={`/admin/users/${space.ownerId}`}>
-                  <div className="rounded-xl border border-border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150">
+                  <div className="rounded-xl border border-border/70 bg-card px-4 py-3 hover:bg-foreground/[0.04] transition-colors duration-150">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{space.name}</p>
@@ -321,7 +297,7 @@ export default async function AdminBillingPage() {
 
       {/* ── Recent Subscriptions ────────────────────────────────── */}
       <div>
-        <p className="text-sm font-semibold mb-3">Recent Subscriptions</p>
+        <p className="text-[17px] font-semibold leading-snug text-foreground mb-3">Recent subscriptions</p>
         {recentSubscriptions.length === 0 ? (
           <Card>
             <CardContent className="px-5 py-8 text-center">

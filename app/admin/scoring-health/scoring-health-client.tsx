@@ -142,12 +142,18 @@ export function ScoringHealthClient({
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Scoring Health</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+        <header className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">System.</p>
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Scoring health
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Monitor AI scoring failures and retry from a single place.
           </p>
-        </div>
+        </header>
         <DateRangePresets value={days} onChange={setDays} />
       </div>
 
@@ -287,7 +293,7 @@ export function ScoringHealthClient({
                         {lead.spaceSlug && (
                           <Link
                             href={`/spaces/${lead.spaceSlug}`}
-                            className="text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5 hover:underline"
+                            className="text-[10px] font-medium text-foreground/70 bg-foreground/[0.06] rounded-full px-2 py-0.5 hover:underline"
                           >
                             {lead.spaceSlug}
                           </Link>

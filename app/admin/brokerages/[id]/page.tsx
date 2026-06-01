@@ -132,7 +132,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
             <Building2 size={20} className="text-primary" />
           </div>
           <div>
@@ -212,7 +212,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                         <tr key={m.id} className="border-b border-border last:border-0">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[11px] font-semibold text-foreground/70 flex-shrink-0">
                                 {initials}
                               </div>
                               <div className="min-w-0">
