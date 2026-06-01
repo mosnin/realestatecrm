@@ -12,6 +12,12 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import {
+  ComposerDraftDiagram,
+  KanbanDragDiagram,
+  CalendarBookingDiagram,
+  TeamLeaderboardDiagram,
+} from '@/components/marketing/diagrams';
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -56,10 +62,7 @@ export default async function MarketingHomePage() {
         learnMore={{ label: 'Meet Chippi', href: '/features/chippi' }}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Chippi composer with a draft reply card — agent badge in serif orange, the kind of screenshot you'd put on a billboard."
-        />
+        <ComposerDraftDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -74,10 +77,7 @@ export default async function MarketingHomePage() {
         learnMore={{ label: 'See people + deals', href: '/features/people' }}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Deals kanban — card dragged from Negotiating to Closed Won, sidebar fields auto-fill."
-        />
+        <KanbanDragDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection
@@ -92,10 +92,7 @@ export default async function MarketingHomePage() {
         learnMore={{ label: 'See communication', href: '/features/communication' }}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Thread view → Chippi drafts reply → tour booked → calendar updates, in one continuous flow."
-        />
+        <CalendarBookingDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection
@@ -110,10 +107,7 @@ export default async function MarketingHomePage() {
         learnMore={{ label: 'See teams', href: '/teams' }}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Split: broker leaderboard left, realtor daily brief right."
-        />
+        <TeamLeaderboardDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingCTA

@@ -27,6 +27,10 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import {
+  ComposerDraftDiagram,
+  LeadScoreDiagram,
+} from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Chippi — the agent' };
 
@@ -40,10 +44,7 @@ export default function FeaturesChippiPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Chippi hero — autoplay-mute-loop, ~25s, calm pace: shows an inbound lead arriving, a lead score appearing, a draft reply card rising, then the realtor tapping Send. Paper-flat product UI, no fake-screen mockups."
-        />
+        <ComposerDraftDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -57,10 +58,7 @@ export default function FeaturesChippiPage() {
           "Quiet when nothing's worth surfacing.",
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Inbox view with lead score pills."
-        />
+        <LeadScoreDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -74,10 +72,7 @@ export default function FeaturesChippiPage() {
           'Always asks before sending.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Composer with a Chippi draft card — Send and Discard visible, agent badge in orange."
-        />
+        <ComposerDraftDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection

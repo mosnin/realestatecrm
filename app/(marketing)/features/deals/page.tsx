@@ -11,6 +11,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { KanbanDragDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Deals — Chippi' };
 
@@ -24,10 +25,7 @@ export default function FeaturesDealsPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Kanban — card dragged from Negotiating to Closed Won, side panel auto-fills with closing details."
-        />
+        <KanbanDragDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -41,10 +39,7 @@ export default function FeaturesDealsPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Four-column kanban — paper-flat cards, no shadows."
-        />
+        <KanbanDragDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection

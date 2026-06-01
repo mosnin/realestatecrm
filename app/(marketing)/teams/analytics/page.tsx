@@ -12,6 +12,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { TeamLeaderboardDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Team analytics — Chippi for teams' };
 
@@ -25,10 +26,7 @@ export default function TeamsAnalyticsPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Analytics dashboard — paper-flat KPI tiles, weekly numbers tick in on load, no chart-junk."
-        />
+        <TeamLeaderboardDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -59,10 +57,7 @@ export default function TeamsAnalyticsPage() {
           'Coaching insights surfaced quietly.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Leaderboard table — realtors ranked, columns for closed/in-flight/response, hairlines between rows."
-        />
+        <TeamLeaderboardDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
