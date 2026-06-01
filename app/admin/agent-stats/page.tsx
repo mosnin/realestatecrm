@@ -202,7 +202,7 @@ export default async function AgentStatsPage({
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Total Tasks</p>
+                <p className="text-xs text-muted-foreground font-medium">Total tasks</p>
                 <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{fmt(stats.totalTasks)}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {fmt(stats.tasksByStatus['completed'] ?? 0)} completed
@@ -220,7 +220,7 @@ export default async function AgentStatsPage({
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Success Rate</p>
+                <p className="text-xs text-muted-foreground font-medium">Success rate</p>
                 <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {successRate.toFixed(1)}%
                 </p>
@@ -241,7 +241,7 @@ export default async function AgentStatsPage({
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
+                <p className="text-xs text-muted-foreground font-medium">Total cost</p>
                 <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {fmtCost(stats.totalCostUsd)}
                 </p>
@@ -259,7 +259,7 @@ export default async function AgentStatsPage({
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Avg Cost / Task</p>
+                <p className="text-xs text-muted-foreground font-medium">Avg cost / task</p>
                 <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {fmtCost(stats.avgCostUsd)}
                 </p>
@@ -278,8 +278,8 @@ export default async function AgentStatsPage({
         {/* Status breakdown */}
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-              Tasks by Status
+            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
+              Tasks by status
             </h2>
             {stats.totalTasks === 0 ? (
               <p className="text-sm text-muted-foreground">No tasks in this period.</p>
@@ -330,8 +330,8 @@ export default async function AgentStatsPage({
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <Zap size={14} className="text-amber-500" />
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Top Tools
+              <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                Top tools
               </h2>
             </div>
             {stats.topTools.length === 0 ? (
@@ -374,8 +374,8 @@ export default async function AgentStatsPage({
       <Card className="rounded-xl border bg-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Tasks by Space
+            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Tasks by space
             </h2>
             <span className="text-xs text-muted-foreground">Top 20 by task count</span>
           </div>

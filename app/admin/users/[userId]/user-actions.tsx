@@ -426,7 +426,7 @@ export function UserActions({
 
   return (
     <div>
-      <p className="text-sm font-semibold mb-3">Support actions</p>
+      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Support actions</p>
       <Card>
         <CardContent className="px-5 py-4 space-y-4">
           {/* Copy actions */}
