@@ -68,6 +68,12 @@ const isFullyPublicRoute = createRouteMatcher([
   '/.well-known/(.*)',
   '/invite/(.*)/sign-up(.*)',
   '/invite/(.*)/sign-in(.*)',
+  // Client portal — a fully separate end-user app (applicants / tour-bookers).
+  // Skips Clerk entirely (no ClerkProvider, no realtor session); the portal
+  // enforces its OWN email+password session in app/clients/layout.tsx.
+  '/clients',
+  '/clients/(.*)',
+  '/api/clients/(.*)',
   // Marketing site — every URL under app/(marketing)/ except `/` itself,
   // which keeps Clerk middleware so the homepage can detect auth users
   // and redirect them to their workspace (see `app/(marketing)/page.tsx`).
