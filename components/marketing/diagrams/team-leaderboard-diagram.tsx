@@ -9,15 +9,22 @@
  * realtor sees the rank change in calm.
  *
  * Motion contract:
- *   - 8s cycle.
- *   - 1.0s hold on initial order.
- *   - Row reorder via Framer `layout` — 340ms, EASE_APPLE.
+ *   - ≈8s cycle.
+ *   - 1.1s hold on initial order.
  *   - 200ms before reorder, the rising row's pipeline value snaps to its
  *     new value (single fade-swap, no count-up animation per stylesheet).
- *   - 3.5s hold on the new order.
- *   - 220ms fade-out across rank + values, 700ms pause, restart.
+ *   - Row reorder via Framer `layout` — 340ms, EASE_APPLE.
+ *   - hold on the new order, then values + order reset, a pause, restart.
  *
  * Reduced-motion: render in the END state — Dom is #1 with the larger value.
+ *
+ * FLUID-FIT: root is `w-full h-full flex flex-col`; the row list is a
+ * `flex-1 min-h-0` column whose four rows each take `flex-1`, so they divide
+ * the available height evenly and FILL the box at every aspect — no fixed
+ * row height summing taller than the frame, no clumping at the top, no
+ * overflow at the short `video`/`wide` frames. Four rows is the cap; a
+ * fifth would overflow the shortest frame, so the diagram shows the floor's
+ * top four and lets the reshuffle be the single beat.
  */
 
 import { useEffect, useState } from 'react';
@@ -46,7 +53,8 @@ interface RealtorRow {
 
 // Order is by pipeline value descending. After Dom closes the 415
 // Lexington deal his pipeline ticks up past Kira's — the only row that
-// changes.
+// changes. Capped at four: the shortest frame (video / wide section) can
+// hold four rows that fill it; a fifth would overflow.
 const ROWS: RealtorRow[] = [
   {
     id: 'kira',
@@ -137,9 +145,9 @@ function TeamLeaderboardContent() {
   const ordered = (() => {
     const withVal = ROWS.map((r) => {
       const pipelineStr = advanced ? r.pipelineAfter : r.pipelineBefore;
-      const pipelineNum = parseFloat(
-        pipelineStr.replace(/[^0-9.]/g, ''),
-      ) * (pipelineStr.endsWith('M') ? 1000 : 1);
+      const pipelineNum =
+        parseFloat(pipelineStr.replace(/[^0-9.]/g, '')) *
+        (pipelineStr.endsWith('M') ? 1000 : 1);
       return {
         ...r,
         pipelineNum,
@@ -151,14 +159,14 @@ function TeamLeaderboardContent() {
   })();
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full min-h-0 flex flex-col">
       {/* Quiet header */}
-      <div className="pb-3">
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex-shrink-0 pb-2.5">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-none">
           May · this month
         </p>
         <p
-          className="mt-1 text-[18px] tracking-tight text-foreground leading-snug"
+          className="mt-1.5 text-[17px] tracking-tight text-foreground leading-none"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           By the floor
@@ -166,15 +174,16 @@ function TeamLeaderboardContent() {
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[24px_1fr_auto_auto] gap-3 px-1 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex-shrink-0 grid grid-cols-[20px_1fr_auto_auto] gap-3 px-1 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
         <span></span>
         <span>Realtor</span>
         <span className="text-right">Closed</span>
         <span className="text-right">Pipeline</span>
       </div>
 
-      {/* Rows — sortable list via layout animation */}
-      <ul className="flex-1 divide-y divide-border/60 border-y border-border/60 min-h-0">
+      {/* Rows — sortable list via layout animation. flex-1 rows divide the
+          remaining height evenly so the list FILLS the box at every aspect. */}
+      <ul className="flex-1 min-h-0 flex flex-col divide-y divide-border/60 border-y border-border/60">
         <AnimatePresence initial={false}>
           {ordered.map((r, idx) => {
             const rank = idx + 1;
@@ -184,7 +193,7 @@ function TeamLeaderboardContent() {
                 key={r.id}
                 layout
                 transition={{ duration: 0.34, ease: EASE_APPLE }}
-                className="grid grid-cols-[24px_1fr_auto_auto] gap-3 items-center py-2.5 px-1"
+                className="flex-1 min-h-0 grid grid-cols-[20px_1fr_auto_auto] gap-3 items-center px-1"
               >
                 <span className="text-[11px] tabular-nums text-muted-foreground">
                   {rank}
