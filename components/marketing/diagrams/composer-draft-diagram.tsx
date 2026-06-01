@@ -3,10 +3,15 @@
 /**
  * `<ComposerDraftDiagram />` — Chippi drafts the reply.
  *
- * One beat: a Chippi-authored draft fills in below a real-looking email
- * composer, then a Send pill appears. The realtor sees the agent typing
- * the email they were going to type anyway. That's the whole pitch in
- * one card.
+ * One beat: a Chippi-authored draft fills in inside a real-looking email
+ * composer, then a Send pill appears in the draft card's action row. The
+ * realtor sees the agent writing the email they were going to type anyway.
+ * That's the whole pitch in one card.
+ *
+ * Layout is fully fluid: the draft card is the single flex-1 region, so the
+ * diagram fills the shell at `square` (tall) and stays inside it at `video`
+ * (short) with no clipping. The header strip and the in-card action row are
+ * the only fixed-height (shrink-0) chrome.
  *
  * Motion contract:
  *   - 6.8s cycle, ~1.3s tail hold before reset.
@@ -118,54 +123,65 @@ function ComposerDraftContent() {
   }, [reduced]);
 
   return (
-    <div className="w-full h-full flex flex-col">
+    // Root fills the shell. The composer card takes the whole box; inside it,
+    // the Chippi draft is the one flex-1 region that absorbs the available
+    // height — so the diagram grows tall at `square` and shrinks at the short
+    // `video` aspect without ever summing past the box.
+    <div className="w-full h-full flex flex-col min-h-0">
       {/* Composer card. Hairline border, paper-flat. Same vocabulary as
           the product's email read view (subject as headline, sender below). */}
-      <div className="flex-1 rounded-xl border border-border/70 bg-background overflow-hidden flex flex-col">
-        {/* Header strip: Re: subject + meta. Subject does NOT animate. */}
-        <div className="px-5 pt-4 pb-3 border-b border-border/60">
+      <div className="flex-1 min-h-0 rounded-xl border border-border/70 bg-background overflow-hidden flex flex-col">
+        {/* Header strip: Re: subject + meta. Subject does NOT animate.
+            Fixed-height chrome (shrink-0) — the only non-fluid block. */}
+        <div className="shrink-0 px-4 sm:px-5 pt-3.5 pb-3 border-b border-border/60">
           <p
-            className="text-[15px] tracking-tight text-foreground leading-snug"
+            className="text-[14px] sm:text-[15px] tracking-tight text-foreground leading-snug truncate"
             style={{ fontFamily: 'var(--font-title)' }}
           >
             Re: 415 Lexington, tour Saturday
           </p>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-1.5 text-[11px] text-muted-foreground truncate">
             To <span className="text-foreground/80">Marcus Chen</span>
           </p>
         </div>
 
-        {/* Body area — empty above the draft card; the draft is the only
-            thing the eye lands on. */}
-        <div className="flex-1 px-5 py-4 flex flex-col gap-3">
+        {/* Body area — the draft card is the only thing the eye lands on and
+            the only fluid region. It fills whatever height is left. */}
+        <div className="flex-1 min-h-0 p-3 sm:p-4 flex">
           {/* Chippi draft card. Left rail tinted with the agent border
               treatment so the block reads as "this came from Chippi". */}
-          <div className="rounded-xl border border-border/70 bg-card overflow-hidden">
-            <div className="px-3.5 py-2.5 border-b border-border/60 flex items-center justify-between">
+          <div className="flex-1 min-h-0 rounded-xl border border-border/70 bg-card overflow-hidden flex flex-col">
+            {/* Card header: authorship + Draft tag. shrink-0. */}
+            <div className="shrink-0 px-3.5 py-2.5 border-b border-border/60 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <DiagramChippiBadge />
                 <span className="text-[11px] text-muted-foreground truncate">
                   Drafted just now.
                 </span>
               </div>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/80">
                 Draft
               </span>
             </div>
-            <div className={brandOrange('AGENT_BADGE', 'px-3.5 py-3 border-l-2 border-orange-400 dark:border-orange-500/60')}>
-              <div className="space-y-1.5 min-h-[64px]">
+
+            {/* Draft body — fills the card. The orange left rail is the agent
+                signature. Lines reveal in sequence; the region flexes so a
+                tall box just adds breathing room above the action row. */}
+            <div
+              className={brandOrange(
+                'AGENT_BADGE',
+                'flex-1 min-h-0 px-3.5 py-3 border-l-2 border-orange-400 dark:border-orange-500/60 flex flex-col',
+              )}
+            >
+              <div className="space-y-1.5">
                 {DRAFT_LINES.map((line, i) => {
                   const visible = phase >= i;
                   return (
                     <motion.p
                       key={i}
-                      className="text-[13px] leading-snug text-foreground"
+                      className="text-[12px] sm:text-[13px] leading-snug text-foreground"
                       initial={false}
-                      animate={
-                        visible
-                          ? { opacity: 1, y: 0 }
-                          : { opacity: 0, y: 6 }
-                      }
+                      animate={visible ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
                       transition={{ duration: 0.22, ease: EASE_APPLE }}
                     >
                       {line}
@@ -173,31 +189,28 @@ function ComposerDraftContent() {
                   );
                 })}
               </div>
-              <p className="mt-2.5 text-[11px] text-muted-foreground">
-                Drafted from the last thread.
-              </p>
             </div>
-          </div>
 
-          {/* Send pill — appears once the draft has fully landed. Paper-flat
-              foreground pill, same as the product's PRIMARY_PILL vocabulary. */}
-          <div className="flex items-center justify-end pt-1">
-            <motion.span
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[11px] font-medium',
-                'bg-foreground text-background',
-              )}
-              initial={false}
-              animate={
-                phase >= 4
-                  ? { opacity: 1, y: 0 }
-                  : { opacity: 0, y: 4 }
-              }
-              transition={{ duration: 0.22, ease: EASE_APPLE }}
-            >
-              <Send size={11} strokeWidth={2} />
-              Send
-            </motion.span>
+            {/* Action row — lives INSIDE the draft card, hairline-divided,
+                so the Send pill never stacks a separate row that overflows
+                the box. Pill fades in once the draft has fully landed. */}
+            <div className="shrink-0 px-3.5 py-2.5 border-t border-border/60 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground truncate">
+                Drafted from the last thread.
+              </span>
+              <motion.span
+                className={cn(
+                  'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[11px] font-medium',
+                  'bg-foreground text-background',
+                )}
+                initial={false}
+                animate={phase >= 4 ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+                transition={{ duration: 0.22, ease: EASE_APPLE }}
+              >
+                <Send size={11} strokeWidth={2} />
+                Send
+              </motion.span>
+            </div>
           </div>
         </div>
       </div>
