@@ -19,6 +19,7 @@ import {
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { BrokerageActions } from './brokerage-actions';
+import { H1, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -136,7 +137,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
             <Building2 size={20} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">{brokerage.name}</h1>
+            <h1 className={H1} style={TITLE_FONT}>{brokerage.name}</h1>
             <p className="text-sm text-muted-foreground">
               {owner?.name ?? owner?.email ?? 'Unknown owner'} · Created {createdAt}
             </p>
@@ -182,7 +183,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: members table */}
         <div className="lg:col-span-2 space-y-3">
-          <p className="text-sm font-semibold">Members</p>
+          <p className={SECTION_LABEL}>Members</p>
           <Card>
             {members.length === 0 ? (
               <CardContent className="px-5 py-8 text-center">
@@ -266,7 +267,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
         <div className="space-y-4">
           {/* Info card */}
           <div className="space-y-2">
-            <p className="text-sm font-semibold">Details</p>
+            <p className={SECTION_LABEL}>Details</p>
             <Card>
               <CardContent className="px-4 py-3 space-y-3">
                 <div className="flex items-start gap-2.5">
@@ -319,7 +320,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
 
           {/* Admin actions */}
           <div className="space-y-2">
-            <p className="text-sm font-semibold">Admin Actions</p>
+            <p className={SECTION_LABEL}>Admin actions</p>
             <Card>
               <CardContent className="px-4 py-4 space-y-2">
                 <BrokerageActions
@@ -340,7 +341,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
 
       {/* Invitations */}
       <div className="space-y-3">
-        <p className="text-sm font-semibold">Invitations</p>
+        <p className={SECTION_LABEL}>Invitations</p>
         {invitations.length === 0 ? (
           <Card>
             <CardContent className="px-5 py-8 text-center">

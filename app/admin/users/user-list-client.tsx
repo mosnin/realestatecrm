@@ -262,7 +262,7 @@ export function UserListClient({
       {/* Empty state */}
       {initialUsers.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-5 py-12 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
             <Users size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold mb-1">No users found</p>

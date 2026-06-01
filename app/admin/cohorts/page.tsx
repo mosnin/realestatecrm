@@ -278,7 +278,7 @@ export default async function AdminCohortsPage() {
 
       {/* ── Top-level stats ──────────────────────────────────────────── */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
           Overall
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-7 gap-4">
