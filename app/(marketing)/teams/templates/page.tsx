@@ -11,6 +11,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { TemplateAdaptDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Templates — Chippi for teams' };
 
@@ -24,10 +25,7 @@ export default function TeamsTemplatesPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Template library — broker writes a template; Chippi adapts it for a specific lead in the next clip."
-        />
+        <TemplateAdaptDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -58,10 +56,7 @@ export default function TeamsTemplatesPage() {
           'Diff preview before send.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Side-by-side: template skeleton on left, Chippi-adapted draft on right, the realtor approves with one tap."
-        />
+        <TemplateAdaptDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection

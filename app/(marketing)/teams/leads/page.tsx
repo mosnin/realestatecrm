@@ -10,6 +10,10 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import {
+  LeadRoutingDiagram,
+  LeadScoreDiagram,
+} from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Lead distribution — Chippi for teams' };
 
@@ -23,10 +27,7 @@ export default function TeamsLeadsPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See all team features', href: '/teams' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Lead routing — incoming inquiry hits the routing engine, realtor pill animates from queue to assigned. Paper-flat, no UI mockup of a fake CRM."
-        />
+        <LeadRoutingDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -40,10 +41,7 @@ export default function TeamsLeadsPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Routing rules editor — rule list, drag handles, save state."
-        />
+        <LeadRoutingDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -74,10 +72,7 @@ export default function TeamsLeadsPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Realtor inbox — new lead notification → opens lead → suggested reply shown."
-        />
+        <LeadScoreDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection

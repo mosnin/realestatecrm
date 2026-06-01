@@ -13,6 +13,7 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
+import { ComposerDraftDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Communication — Chippi' };
 
@@ -26,10 +27,7 @@ export default function FeaturesCommunicationPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Inbox to read view to Chippi draft — one continuous flow."
-        />
+        <ComposerDraftDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -77,10 +75,7 @@ export default function FeaturesCommunicationPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Composer with Chippi draft card — agent badge, Send and Discard buttons."
-        />
+        <ComposerDraftDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingIntegrations

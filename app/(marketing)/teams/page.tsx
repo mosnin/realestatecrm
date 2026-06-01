@@ -19,6 +19,10 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingFeatureGrid } from '@/components/marketing/marketing-feature-grid';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import {
+  LeadRoutingDiagram,
+  TeamLeaderboardDiagram,
+} from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'For brokerages and teams — Chippi' };
 
@@ -50,10 +54,7 @@ export default function TeamsPage() {
         ]}
         learnMore={{ label: 'See lead distribution', href: '/teams/leads' }}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Routing diagram — incoming intake → routing engine card → assigned realtor pill."
-        />
+        <LeadRoutingDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
@@ -68,10 +69,7 @@ export default function TeamsPage() {
         ]}
         learnMore={{ label: 'See analytics', href: '/teams/analytics' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Analytics dashboard — paper-flat KPI tiles, this-week vs last-week numbers tick in."
-        />
+        <TeamLeaderboardDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection

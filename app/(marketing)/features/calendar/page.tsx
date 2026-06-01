@@ -13,6 +13,7 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
+import { CalendarBookingDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Calendar — Chippi' };
 
@@ -26,10 +27,7 @@ export default function FeaturesCalendarPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Calendar week view — tour blocks already placed, Chippi-drafted invite arrives."
-        />
+        <CalendarBookingDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -43,10 +41,7 @@ export default function FeaturesCalendarPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Week view — calmly laid out blocks, tour blocks distinct from focus blocks."
-        />
+        <CalendarBookingDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
@@ -60,10 +55,7 @@ export default function FeaturesCalendarPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Inline tour booking from the composer."
-        />
+        <CalendarBookingDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingIntegrations
