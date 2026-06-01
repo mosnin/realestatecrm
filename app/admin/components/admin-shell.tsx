@@ -10,7 +10,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   Users,
@@ -148,9 +148,41 @@ function NavLink({
 
 function NavSectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className={cn(SECTION_LABEL, 'px-3 pt-5 pb-1.5 select-none')}>
+    <p className={cn(SECTION_LABEL, 'px-3 pt-6 pb-2 select-none')}>
       {children}
     </p>
+  );
+}
+
+// ── User footer chip — mirrors the realtor sidebar's UserFooter ────────────
+// Avatar + name + email pinned to the bottom of the sidebar. The Clerk
+// UserButton is the avatar and carries the account menu (manage, sign out),
+// so identity lives in the same place as the rest of the app.
+
+function AdminUserFooter() {
+  const { user } = useUser();
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+    user?.username ||
+    'Admin';
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+
+  return (
+    <div className="p-2">
+      <div className="group flex items-center gap-2.5 h-9 pl-1.5 pr-2.5 rounded-md hover:bg-foreground/[0.025] transition-colors duration-150">
+        <UserButton
+          appearance={{ elements: { userButtonAvatarBox: 'w-7 h-7' } }}
+        />
+        <div className="flex-1 min-w-0 leading-tight">
+          <p className="text-[13px] font-medium text-foreground truncate">
+            {displayName}
+          </p>
+          {email && (
+            <p className="text-[11px] text-muted-foreground truncate">{email}</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -216,7 +248,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <SidebarNav pathname={pathname} />
 
-        {/* Footer — hairline separator + Back to app link */}
+        {/* Footer — Back to app link, hairline, then the user identity chip
+            (pinned to the bottom, matching the realtor sidebar). */}
         <div className="border-t border-border/50">
           <div className="px-3 py-2">
             <Link
@@ -233,6 +266,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               />
               <span>Back to app</span>
             </Link>
+          </div>
+          <div className="border-t border-border/50">
+            <AdminUserFooter />
           </div>
         </div>
       </aside>
@@ -281,6 +317,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                       <span>Back to app</span>
                     </Link>
                   </div>
+                  <div className="border-t border-border/50">
+                    <AdminUserFooter />
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
@@ -307,7 +346,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <Moon size={14} strokeWidth={1.75} />
               )}
             </Button>
-            <UserButton />
+            {/* Identity lives in the sidebar footer (desktop) / drawer footer
+                (mobile), matching the realtor dashboard — not in the header. */}
           </div>
         </header>
 

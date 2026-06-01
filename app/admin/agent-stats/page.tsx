@@ -203,7 +203,7 @@ export default async function AgentStatsPage({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground font-medium">Total Tasks</p>
-                <p className="text-2xl font-bold mt-0.5 tabular-nums">{fmt(stats.totalTasks)}</p>
+                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{fmt(stats.totalTasks)}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {fmt(stats.tasksByStatus['completed'] ?? 0)} completed
                 </p>
@@ -221,7 +221,7 @@ export default async function AgentStatsPage({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground font-medium">Success Rate</p>
-                <p className="text-2xl font-bold mt-0.5 tabular-nums">
+                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {successRate.toFixed(1)}%
                 </p>
                 <div className="mt-1">
@@ -242,7 +242,7 @@ export default async function AgentStatsPage({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
-                <p className="text-2xl font-bold mt-0.5 tabular-nums">
+                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {fmtCost(stats.totalCostUsd)}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">USD, all spaces</p>
@@ -260,7 +260,7 @@ export default async function AgentStatsPage({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground font-medium">Avg Cost / Task</p>
-                <p className="text-2xl font-bold mt-0.5 tabular-nums">
+                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
                   {fmtCost(stats.avgCostUsd)}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">per task run</p>
@@ -299,7 +299,7 @@ export default async function AgentStatsPage({
                       queued: 'bg-slate-400',
                       paused: 'bg-amber-400',
                       failed: 'bg-red-500',
-                      cancelled: 'bg-gray-400',
+                      cancelled: 'bg-muted-foreground/40',
                     };
                     return (
                       <div key={status}>
