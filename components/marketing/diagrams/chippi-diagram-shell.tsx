@@ -35,6 +35,27 @@ const ASPECT_CLASSES: Record<Aspect, string> = {
   tall: 'aspect-[3/4]',
 };
 
+/**
+ * Minimum height floor per aspect. `aspect-ratio` alone derives height from
+ * the rendered WIDTH — and in a two-column marketing grid the media column
+ * is only ~520px wide, so `aspect-video` collapses to ~290px and
+ * `aspect-[21/9]` to ~220px. That's shorter than the diagrams' content, so
+ * `overflow-hidden` was clipping every one of them.
+ *
+ * The floor lets the short, wide aspects grow tall enough to hold the
+ * diagram. `min-height` wins over the aspect-ratio-computed height, so the
+ * box becomes a touch taller than 16:9 at narrow widths and snaps back to
+ * the true ratio once the column is wide enough for the ratio to exceed the
+ * floor. Square/tall don't need a floor — they're already tall for a given
+ * width.
+ */
+const ASPECT_MIN_H: Record<Aspect, string> = {
+  video: 'min-h-[320px] md:min-h-[360px]',
+  wide: 'min-h-[300px] md:min-h-[340px]',
+  square: '',
+  tall: '',
+};
+
 interface ChippiDiagramMotionContextValue {
   /** True when `prefers-reduced-motion: reduce` is set. Children should
    *  render in their end state and skip internal timers when true. */
@@ -85,10 +106,11 @@ export function ChippiDiagramShell({
           'border border-border/60 bg-background',
           'flex flex-col',
           ASPECT_CLASSES[aspect],
+          ASPECT_MIN_H[aspect],
           className,
         )}
       >
-        <div className={cn('relative flex-1 flex items-stretch justify-stretch', padClass)}>
+        <div className={cn('relative flex-1 min-h-0 flex', padClass)}>
           {children}
         </div>
         {caption && (
