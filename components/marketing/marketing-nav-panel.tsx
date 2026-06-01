@@ -21,7 +21,7 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { EASE_APPLE } from '@/lib/motion';
 import { cn } from '@/lib/utils';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
+import { ComposerDraftDiagram } from '@/components/marketing/diagrams';
 import {
   SURFACE_LINKS,
   TEAM_LINKS,
@@ -201,15 +201,18 @@ function PlainColumn({
   );
 }
 
-/** The media-slot column — no label above so the slot reads as the
- *  panel's emotional anchor, not as one more list of stuff. Wrapped in
- *  `space-y-4` with an empty header spacer so vertical alignment with
- *  the labeled columns is honest (label heights vary in dark mode). */
-function MediaColumn({ description }: { description: string }) {
+/** The media column — no label above so the visual reads as the panel's
+ *  emotional anchor, not as one more list of stuff. A live
+ *  `<ComposerDraftDiagram>` (Chippi drafting a reply) carries the one
+ *  motion beat in the nav. Wrapped in `space-y-4` with an empty header
+ *  spacer so vertical alignment with the labeled columns is honest (label
+ *  heights vary in dark mode). The diagram honors reduced-motion and fills
+ *  its shell at `aspect="tall"`. */
+function MediaColumn() {
   return (
     <div className="space-y-4">
       <div aria-hidden className={cn(COLUMN_LABEL, 'invisible')}>&nbsp;</div>
-      <MarketingMediaSlot aspect="tall" description={description} />
+      <ComposerDraftDiagram aspect="tall" />
     </div>
   );
 }
@@ -220,7 +223,7 @@ function FeaturesPanelContent({ onNavigate }: { onNavigate?: () => void }) {
       <LeafColumn label="By surface" links={SURFACE_LINKS} onNavigate={onNavigate} />
       <LeafColumn label="For teams" links={TEAM_LINKS} onNavigate={onNavigate} />
       <PlainColumn label="Also" links={FEATURES_ALSO_LINKS} onNavigate={onNavigate} />
-      <MediaColumn description="Feature mega-menu visual — 4:5 image of Chippi-at-work that sets the tone of the panel (kept here as a slot the user will fill)." />
+      <MediaColumn />
     </div>
   );
 }
@@ -238,7 +241,7 @@ function TeamsPanelContent({ onNavigate }: { onNavigate?: () => void }) {
       <LeafColumn label="For teams" links={teamsLeft} onNavigate={onNavigate} />
       <LeafColumn label="" links={teamsRight} onNavigate={onNavigate} />
       <PlainColumn label="Also" links={TEAMS_ALSO_LINKS} onNavigate={onNavigate} />
-      <MediaColumn description="Teams mega-menu visual." />
+      <MediaColumn />
     </div>
   );
 }
