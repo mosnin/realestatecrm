@@ -12,6 +12,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { MarketingLogoStrip } from '@/components/marketing/marketing-logo-strip';
 import {
   ComposerDraftDiagram,
   KanbanDragDiagram,
@@ -40,15 +41,19 @@ export default async function MarketingHomePage() {
         />
       </MarketingHero>
 
-      <MarketingSection
-        title="Used by real estate pros."
-        stacked
-      >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Customer logo strip — 5-6 greyscale brokerage logos, evenly spaced, single row."
-        />
-      </MarketingSection>
+      {/* Trusted-by row — six greyscale slots until real brokerage logos
+          land. Paper-flat, static, no marquee. The slots themselves are
+          the placeholder until customers ship us assets we can use. */}
+      <MarketingLogoStrip
+        items={[
+          { name: 'Brokerage 1' },
+          { name: 'Brokerage 2' },
+          { name: 'Brokerage 3' },
+          { name: 'Brokerage 4' },
+          { name: 'Brokerage 5' },
+          { name: 'Brokerage 6' },
+        ]}
+      />
 
       <MarketingSection
         eyebrow="Chippi"

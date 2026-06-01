@@ -10,6 +10,7 @@ import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { MarketingScrollNarrative } from '@/components/marketing/marketing-scroll-narrative';
 
 export const metadata = { title: 'Studio — Chippi' };
 
@@ -29,56 +30,37 @@ export default function FeaturesStudioPage() {
         />
       </MarketingHero>
 
-      <MarketingSection
-        side="right"
-        eyebrow="CREATE"
-        title="Generate. Preview. Approve."
-        sub="From a property record, Chippi drafts the listing copy, the email blast, and the social post. You edit; you approve; you schedule."
-        bullets={[
-          'Listing copy from property data.',
-          'Email blast templates.',
-          'Social posts per channel.',
+      {/* The Studio workflow renders as a sequenced narrative — STEP 01
+          (create), STEP 02 (edit), STEP 03 (schedule) — instead of the
+          standard tick-tock. Studio is the most linear surface in Chippi
+          and benefits from the numbered cadence. Audit recommendation:
+          vary the rhythm so the marketing site doesn't read as nineteen
+          identical pages. */}
+      <MarketingScrollNarrative
+        steps={[
+          {
+            eyebrow: 'CREATE',
+            title: 'Generate. Preview. Approve.',
+            sub: 'From a property record, Chippi drafts the listing copy, the email blast, and the social post. You edit; you approve; you schedule.',
+            mediaDescription:
+              'Generate panel — input field, generate button, preview panel sliding in with the drafted copy.',
+          },
+          {
+            eyebrow: 'EDIT',
+            title: 'The polished version, side-by-side.',
+            sub: 'Generated copy on the left. Your edits on the right. Diff highlighted so you see exactly what changed.',
+            mediaDescription:
+              'Two-pane editor — generated vs edited, diff markers between, per-channel character limits ticking.',
+          },
+          {
+            eyebrow: 'SCHEDULE',
+            title: 'When to post. Where to post.',
+            sub: "Schedule to Instagram, Facebook, LinkedIn, and your email list. Calendar view shows what's queued.",
+            mediaDescription:
+              'Schedule panel — calendar week view, channels checkbox column, queue visualization with the post scheduled into a slot.',
+          },
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Generate panel — input field, generate button, preview panel."
-        />
-      </MarketingSection>
-
-      <MarketingSection
-        side="left"
-        eyebrow="EDIT"
-        title="The polished version, side-by-side."
-        sub="Generated copy on the left. Your edits on the right. Diff highlighted so you see exactly what changed."
-        bullets={[
-          'Inline editor with diff.',
-          'Per-channel character limits enforced.',
-          'Tone slider for voice.',
-        ]}
-      >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Two-pane editor — generated vs edited, with diff markers."
-        />
-      </MarketingSection>
-
-      <MarketingSection
-        side="right"
-        eyebrow="SCHEDULE"
-        title="When to post. Where to post."
-        sub="Schedule to Instagram, Facebook, LinkedIn, and your email list. Calendar view shows what's queued."
-        bullets={[
-          'Multi-channel scheduling.',
-          'Calendar view of queue.',
-          'Auto-reschedule if a channel rejects.',
-        ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Schedule panel — calendar, channels checkboxes, queue visualization."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked
