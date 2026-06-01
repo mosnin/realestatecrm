@@ -23,7 +23,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Plug, RefreshCw, User } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { EASE_APPLE, DURATION_BASE, STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
   H1,
   TITLE_FONT,
@@ -32,7 +32,6 @@ import {
   CAPTION,
   META,
   SECTION_LABEL,
-  PRIMARY_PILL,
 } from '@/lib/typography';
 import type { SyncRecord, SyncResponse } from '@/app/api/sync/route';
 
