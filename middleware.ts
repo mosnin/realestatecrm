@@ -77,6 +77,9 @@ const isFullyPublicRoute = createRouteMatcher([
   '/features/(.*)',
   '/pricing',
   '/about',
+  '/status',                 // marketing system-status page
+  '/legal',                  // legal hub + the documents under it
+  '/legal/(.*)',
 ]);
 
 // Routes that should NEVER be passed as redirect_url after login.
