@@ -4,24 +4,30 @@
  * `<CalendarBookingDiagram />` — booked from the reply.
  *
  * One beat: an empty calendar week view; a TOUR block fades into the
- * Wednesday 2pm slot; a small "Confirmed with M. Chen" pill appears
- * below the block, anchored by the Chippi badge.
+ * Wednesday 2pm slot; a small "Confirmed with M. Chen" row appears
+ * below the grid, anchored by the Chippi badge.
+ *
+ * Layout is fully fluid: the grid is the single flex-1 region and splits its
+ * height into equal `grid-rows-4` fractions, so it fills the shell at every
+ * aspect (`video`, `wide` 21:9, `square`) with no clipping. Four hours, not
+ * six, so each row stays tall enough to hold the tour block's three lines at
+ * the shortest (`wide`) box. The confirmation row is shrink-0 and truncates.
  *
  * Motion contract:
  *   - 7.5s cycle.
  *   - 800ms hold on empty grid.
  *   - Tour block: opacity 0 → 1 + 6px y-translate up, 280ms, EASE_APPLE.
- *   - 600ms after block lands, confirmation pill fades in (220ms).
+ *   - 600ms after block lands, confirmation row fades in (220ms).
  *   - 2.2s hold. Then 200ms fade-out across both, 700ms pause, restart.
  *
- * Reduced-motion: render tour block + confirmation pill visible.
+ * Reduced-motion: render tour block + confirmation row visible.
  *
  * Visual vocabulary matches the product calendar:
  *   - Hairline border around the whole grid (`border-border/60`).
  *   - Header row with day labels (`bg-muted/20`).
  *   - Hour rows separated by `border-t border-border/60`.
- *   - Event block: `bg-muted/40 rounded text-[11px] font-medium`.
- *   - Time-of-day labels: `text-[11px] tabular-nums text-muted-foreground`.
+ *   - Tour block: hairline-bordered tile, `text-[10px] font-medium`.
+ *   - Time-of-day labels: `text-[10px] tabular-nums text-muted-foreground`.
  */
 
 import { useEffect, useState } from 'react';
@@ -41,7 +47,10 @@ interface CalendarBookingDiagramProps {
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const HOURS = ['10', '11', '12', '1', '2', '3'];
+// Four hours, not six: enough to stage a 2pm tour with context above (12, 1)
+// and below (3) while leaving each row tall enough to hold the tour block's
+// three lines at the shortest aspect (`wide`, ~56px/row at the md 2-col width).
+const HOURS = ['12', '1', '2', '3'];
 
 // Phase: 0 empty, 1 tour visible, 2 tour + confirm visible, 3 fade-out.
 const TOUR_AT = 900;
@@ -92,33 +101,36 @@ function CalendarBookingContent() {
   const confirmVisible = phase === 2;
 
   return (
-    <div className="w-full h-full flex flex-col gap-3 min-h-0">
-      {/* Calendar week grid — matches product calendar vocabulary. */}
-      <div className="flex-1 border border-border/60 rounded-md overflow-hidden bg-background flex flex-col min-h-0">
-        {/* Header row: time-column gutter + day labels */}
-        <div className="grid grid-cols-[40px_repeat(5,minmax(0,1fr))] border-b border-border/60 bg-muted/20">
+    <div className="w-full h-full flex flex-col gap-2.5 min-h-0">
+      {/* Calendar week grid — matches product calendar vocabulary. Fills all
+          available height; rows distribute as equal fractions so the tour
+          block always has room at every aspect. */}
+      <div className="flex-1 min-h-0 border border-border/60 rounded-md overflow-hidden bg-background flex flex-col">
+        {/* Header row: time-column gutter + day labels. shrink-0. */}
+        <div className="shrink-0 grid grid-cols-[36px_repeat(5,minmax(0,1fr))] border-b border-border/60 bg-muted/20">
           <div />
-          {DAYS.map((d) => (
+          {DAYS.map((d, i) => (
             <div
               key={d}
-              className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"
+              className="px-1.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"
             >
               {d}
-              <span className="block text-[12px] tabular-nums text-foreground/80 leading-tight mt-0.5">
-                {DAYS.indexOf(d) + 4}
+              <span className="block text-[11px] tabular-nums text-foreground/80 leading-tight mt-0.5">
+                {i + 4}
               </span>
             </div>
           ))}
         </div>
 
-        {/* Hour grid */}
-        <div className="flex-1 grid grid-cols-[40px_repeat(5,minmax(0,1fr))] grid-rows-6 min-h-0">
+        {/* Hour grid — flex-1 fills the card; grid-rows-4 splits the height
+            into equal fractions so each hour row grows/shrinks with the box. */}
+        <div className="flex-1 min-h-0 grid grid-cols-[36px_repeat(5,minmax(0,1fr))] grid-rows-4">
           {HOURS.map((h, rowIdx) => (
             <div key={h} className="contents">
               {/* Time gutter cell */}
               <div
                 className={cn(
-                  'px-1.5 py-1 text-[10px] tabular-nums text-muted-foreground/80 text-right',
+                  'px-1 py-1 text-[10px] tabular-nums text-muted-foreground/80 text-right',
                   rowIdx > 0 && 'border-t border-border/60',
                 )}
               >
@@ -130,7 +142,7 @@ function CalendarBookingContent() {
                   <div
                     key={`${d}-${h}`}
                     className={cn(
-                      'relative border-l border-border/60',
+                      'relative min-h-0 border-l border-border/60',
                       rowIdx > 0 && 'border-t border-border/60',
                     )}
                   >
@@ -144,20 +156,20 @@ function CalendarBookingContent() {
                         }
                         transition={{ duration: 0.28, ease: EASE_APPLE }}
                         className={cn(
-                          'absolute inset-x-1 top-1 bottom-1 rounded',
+                          'absolute inset-x-1 top-1 bottom-1 rounded overflow-hidden',
                           'bg-foreground/[0.06] border border-foreground/15',
-                          'px-1.5 py-1 flex flex-col justify-between',
+                          'px-1.5 py-1 flex flex-col justify-between gap-0.5',
                         )}
                       >
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-foreground/70 leading-none">
+                        <div className="min-w-0">
+                          <p className="text-[9px] uppercase tracking-wider text-foreground/70 leading-none">
                             Tour
                           </p>
-                          <p className="text-[10px] font-medium text-foreground leading-tight mt-1 truncate">
+                          <p className="text-[10px] font-medium text-foreground leading-tight mt-0.5 truncate">
                             415 Lexington
                           </p>
                         </div>
-                        <p className="text-[10px] tabular-nums text-muted-foreground leading-none">
+                        <p className="text-[9px] tabular-nums text-muted-foreground leading-none truncate">
                           2 – 2:45p
                         </p>
                       </motion.div>
@@ -170,21 +182,22 @@ function CalendarBookingContent() {
         </div>
       </div>
 
-      {/* Confirmation strip — quiet hairline-divided row below the grid.
-          Sits at the foot of the diagram; the Chippi badge anchors the
-          authorship. */}
+      {/* Confirmation strip — quiet row below the grid; the Chippi badge
+          anchors the authorship. shrink-0 so the grid above stays fluid.
+          The day + time live on the grid block already, so the strip says
+          one thing — Chippi booked it — and truncates rather than wrapping
+          at the narrowest (`wide`) width. */}
       <motion.div
         initial={false}
         animate={confirmVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
         transition={{ duration: 0.24, ease: EASE_APPLE }}
-        className="flex items-center gap-2.5 text-[11px]"
+        className="shrink-0 flex items-center gap-2 text-[11px]"
       >
         <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-foreground/[0.04] flex-shrink-0">
           <CalendarCheck size={12} strokeWidth={1.75} className="text-foreground/80" />
         </span>
-        <span className="text-foreground">Confirmed with M. Chen</span>
-        <span className="text-muted-foreground tabular-nums">Wed · 2pm</span>
-        <span className="ml-auto">
+        <span className="min-w-0 truncate text-foreground">Confirmed with M. Chen</span>
+        <span className="ml-auto shrink-0">
           <DiagramChippiBadge label="Chippi" />
         </span>
       </motion.div>
