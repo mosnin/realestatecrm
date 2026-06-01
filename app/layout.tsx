@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { MotionProvider } from '@/components/motion/motion-provider';
 import { Toaster } from '@/components/ui/sonner';
+import { SentryUser } from '@/components/observability/sentry-user';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -74,5 +75,10 @@ export default async function RootLayout({
   );
 
   if (isPublicPage) return renderShell(children);
-  return <ClerkProvider>{renderShell(children)}</ClerkProvider>;
+  return (
+    <ClerkProvider>
+      <SentryUser />
+      {renderShell(children)}
+    </ClerkProvider>
+  );
 }

@@ -20,6 +20,7 @@ import { encrypt } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { verifyApiKey } from '@/lib/integrations/follow-up-boss';
 import { findActive, insertConnection, setStatus } from '@/lib/integrations/connections';
+import { withObservability } from '@/lib/with-observability';
 
 export const runtime = 'nodejs';
 export const maxDuration = 20;
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ connected: Boolean(row), label: row?.label ?? null });
 }
 
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   let payload: { slug?: string; apiKey?: string };
   try {
     payload = (await req.json()) as { slug?: string; apiKey?: string };
@@ -84,6 +85,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, label: inserted.label });
 }
+
+export const POST = withObservability(POSTHandler, 'api.integrations.follow-up-boss');
 
 export async function DELETE(req: NextRequest) {
   let payload: { slug?: string };
