@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Aperture,
   RefreshCw,
+  Gift,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -125,6 +126,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/intake',
     label: 'Intake form',
     icon: ClipboardList,
+  },
+  {
+    href: '/affiliate',
+    label: 'Affiliate',
+    icon: Gift,
   },
   {
     href: '/settings',

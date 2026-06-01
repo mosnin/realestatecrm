@@ -14,6 +14,7 @@ import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
+import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 
 
 export default async function DashboardLayout({
@@ -260,6 +261,9 @@ export default async function DashboardLayout({
       <MobileNav slug={slug} isBroker={isBroker} />
       <ChippiBar slug={slug} />
       <CommandPalette slug={slug} />
+      {/* FirstPromoter attribution — fires fpr('referral', { email }) once per
+          session for the authenticated user. No-ops when CID is not set. */}
+      <ReferralTracker />
     </div>
   );
 }
