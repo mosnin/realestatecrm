@@ -235,9 +235,10 @@ export function FilesPanel() {
         </div>
       )}
 
-      {/* Tabs + Upload button */}
+      {/* Tabs + Upload button. The tab row scrolls horizontally on narrow
+          screens instead of clipping the last tab off the edge. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto no-scrollbar -mx-1 px-1">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -247,7 +248,7 @@ export function FilesPanel() {
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 h-8 text-[12.5px] font-medium transition-colors',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 h-8 text-[12.5px] font-medium transition-colors whitespace-nowrap',
                   active
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',

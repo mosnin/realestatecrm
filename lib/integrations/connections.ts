@@ -24,6 +24,9 @@ export interface IntegrationConnectionRow {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Encrypted credential for native (non-Composio) integrations, e.g. a
+   *  Follow Up Boss API key. Null/absent for every Composio-backed row. */
+  secretCiphertext?: string | null;
 }
 
 /**
@@ -192,6 +195,9 @@ export async function insertConnection(args: {
   toolkit: string;
   composioConnectionId: string;
   label?: string;
+  /** Encrypted credential for native integrations (e.g. a Follow Up Boss
+   *  API key). Omit for Composio-backed connections. */
+  secretCiphertext?: string;
 }): Promise<IntegrationConnectionRow | null> {
   const { data, error } = await supabase
     .from('IntegrationConnection')
@@ -202,6 +208,7 @@ export async function insertConnection(args: {
       composioConnectionId: args.composioConnectionId,
       label: args.label ?? null,
       status: 'active',
+      ...(args.secretCiphertext ? { secretCiphertext: args.secretCiphertext } : {}),
     })
     .select('*')
     .single();

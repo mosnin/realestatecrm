@@ -21,6 +21,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { findActive } from '@/lib/integrations/connections';
 import { executeToolForEntity } from '@/lib/integrations/composio';
+import { decrypt } from '@/lib/crypto';
+import { listPeople as fubListPeople } from '@/lib/integrations/follow-up-boss';
 import { logger } from '@/lib/logger';
 
 /** The CRM toolkits that have live Composio connectors. */
@@ -151,6 +153,30 @@ export async function GET(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { userId, space } = auth;
+
+  // Native (non-Composio) CRMs take priority — Follow Up Boss reads straight
+  // from its REST API with the encrypted key we stored on connect.
+  const fub = await findActive({ spaceId: space.id, userId, toolkit: 'follow_up_boss' });
+  if (fub?.secretCiphertext) {
+    try {
+      const { ok, records } = await fubListPeople(decrypt(fub.secretCiphertext), 50);
+      return NextResponse.json<SyncResponse>({
+        connected: true,
+        source: 'follow_up_boss',
+        records: ok ? records : [],
+      });
+    } catch (err) {
+      logger.error('[sync] follow up boss read failed', {
+        spaceId: space.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json<SyncResponse>({
+        connected: true,
+        source: 'follow_up_boss',
+        records: [],
+      });
+    }
+  }
 
   // Find the first active CRM connection (prefer hubspot > salesforce > pipedrive > zoho).
   let connectedToolkit: LiveCrmToolkit | null = null;

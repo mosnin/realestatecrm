@@ -20,8 +20,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowUpRight, Plug, RefreshCw, User } from 'lucide-react';
+import { ArrowUpRight, Plug, RefreshCw, Unplug, User } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
@@ -42,14 +51,17 @@ interface CrmEntry {
   name: string;
   blurb: string;
   comingSoon?: boolean;
+  /** Native (non-Composio) connect — opens the API-key dialog instead of OAuth. */
+  native?: boolean;
 }
 
 /** CRM + real-estate entries surfaced on this page, in display order.
- *  Follow Up Boss leads the real-estate group. General CRMs follow.
- *  Coming-soon entries render as disabled pills — no fake connect path. */
+ *  Follow Up Boss leads the real-estate group (native API-key connect).
+ *  General CRMs follow (Composio OAuth). Coming-soon entries render as
+ *  disabled pills — no fake connect path. */
 const CRM_ENTRIES: CrmEntry[] = [
-  // Real-estate CRMs — Follow Up Boss first-class
-  { toolkit: 'follow_up_boss', name: 'Follow Up Boss', blurb: 'Sync your Follow Up Boss pipeline.', comingSoon: true },
+  // Real-estate CRMs — Follow Up Boss connects natively via API key
+  { toolkit: 'follow_up_boss', name: 'Follow Up Boss', blurb: 'Paste your API key — Chippi mirrors your people.', native: true },
   { toolkit: 'compass', name: 'Compass', blurb: 'Mirror your Compass pipeline.', comingSoon: true },
   { toolkit: 'boomtown', name: 'BoomTown', blurb: 'Pull BoomTown leads here.', comingSoon: true },
   { toolkit: 'kvcore', name: 'kvCORE', blurb: 'Pull kvCORE leads and tasks.', comingSoon: true },
@@ -159,7 +171,7 @@ export function SyncView({ slug }: SyncViewProps) {
 
       {/* ── Not connected → calm connect prompt ── */}
       {!loading && !errorMessage && data && !data.connected && (
-        <ConnectPanel slug={slug} />
+        <ConnectPanel slug={slug} onConnected={() => setRefreshKey((k) => k + 1)} />
       )}
 
       {/* ── Connected + records ── */}
@@ -183,11 +195,12 @@ export function SyncView({ slug }: SyncViewProps) {
 
 /* ── Connect panel (not connected) ──────────────────────────────────── */
 
-function ConnectPanel({ slug }: { slug: string }) {
+function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => void }) {
   const [busyToolkit, setBusyToolkit] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [fubOpen, setFubOpen] = useState(false);
 
-  async function handleConnect(toolkit: string) {
+  async function handleOAuthConnect(toolkit: string) {
     setBusyToolkit(toolkit);
     setConnectError(null);
     try {
@@ -205,8 +218,9 @@ function ConnectPanel({ slug }: { slug: string }) {
     }
   }
 
-  const realEstate = CRM_ENTRIES.filter((e) => e.comingSoon);
-  const live = CRM_ENTRIES.filter((e) => !e.comingSoon);
+  // Real-estate CRMs (native FUB + coming-soon) lead; general OAuth CRMs follow.
+  const realEstate = CRM_ENTRIES.filter((e) => e.native || e.comingSoon);
+  const live = CRM_ENTRIES.filter((e) => !e.native && !e.comingSoon);
 
   return (
     <div className="space-y-8">
@@ -214,7 +228,7 @@ function ConnectPanel({ slug }: { slug: string }) {
         <p className="text-sm text-destructive">{connectError}</p>
       )}
 
-      {/* Real-estate CRMs — coming soon, shown first */}
+      {/* Real-estate CRMs — Follow Up Boss connects natively, the rest soon */}
       <section className="space-y-3">
         <p className={SECTION_LABEL}>Real estate CRMs</p>
         <ul className="divide-y divide-border/60">
@@ -223,7 +237,9 @@ function ConnectPanel({ slug }: { slug: string }) {
               key={entry.toolkit}
               entry={entry}
               busy={busyToolkit === entry.toolkit}
-              onConnect={() => handleConnect(entry.toolkit)}
+              onConnect={() =>
+                entry.native ? setFubOpen(true) : handleOAuthConnect(entry.toolkit)
+              }
             />
           ))}
         </ul>
@@ -238,7 +254,7 @@ function ConnectPanel({ slug }: { slug: string }) {
               key={entry.toolkit}
               entry={entry}
               busy={busyToolkit === entry.toolkit}
-              onConnect={() => handleConnect(entry.toolkit)}
+              onConnect={() => handleOAuthConnect(entry.toolkit)}
             />
           ))}
         </ul>
@@ -254,7 +270,130 @@ function ConnectPanel({ slug }: { slug: string }) {
         </a>
         .
       </p>
+
+      <FubConnectDialog
+        slug={slug}
+        open={fubOpen}
+        onOpenChange={setFubOpen}
+        onConnected={() => {
+          setFubOpen(false);
+          onConnected();
+        }}
+      />
     </div>
+  );
+}
+
+/* ── Follow Up Boss — native API-key connect dialog ──────────────────── */
+
+function FubConnectDialog({
+  slug,
+  open,
+  onOpenChange,
+  onConnected,
+}: {
+  slug: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConnected: () => void;
+}) {
+  const [apiKey, setApiKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const key = apiKey.trim();
+    if (!key) {
+      setError('Enter your Follow Up Boss API key.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/integrations/follow-up-boss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, apiKey: key }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? 'Could not connect Follow Up Boss.');
+        setBusy(false);
+        return;
+      }
+      setApiKey('');
+      setBusy(false);
+      onConnected();
+    } catch {
+      setError('Could not reach Follow Up Boss. Try again.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle style={TITLE_FONT}>Connect Follow Up Boss.</DialogTitle>
+          <DialogDescription className={BODY_MUTED}>
+            Paste your API key and Chippi mirrors your people here. Find it in
+            Follow Up Boss → Admin → API.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 pt-1">
+          <Label htmlFor="fub-api-key" className={SECTION_LABEL}>
+            API key
+          </Label>
+          <Input
+            id="fub-api-key"
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              if (error) setError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="fka_live_…"
+            disabled={busy}
+            className="rounded-full"
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+            className={cn(
+              'inline-flex items-center h-9 px-4 rounded-full text-sm font-medium',
+              'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150 disabled:opacity-50',
+            )}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-medium',
+              'bg-foreground text-background hover:bg-foreground/90 transition-colors duration-150 disabled:opacity-50',
+            )}
+          >
+            {busy ? <RefreshCw size={13} className="animate-spin" /> : <Plug size={13} />}
+            {busy ? 'Connecting' : 'Connect'}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -310,6 +449,82 @@ function CrmConnectRow({
   );
 }
 
+/* ── Shared connected-state toolbar ──────────────────────────────────── */
+
+/**
+ * Source label + refresh + a manage/disconnect action. Native sources
+ * (Follow Up Boss) disconnect right here — there's no Composio connection
+ * for Settings to manage. Composio sources link out to Settings instead.
+ */
+function SyncToolbar({
+  source,
+  slug,
+  onRefresh,
+}: {
+  source: string | null;
+  slug: string;
+  onRefresh: () => void;
+}) {
+  const isNative = source === 'follow_up_boss';
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  async function disconnect() {
+    setDisconnecting(true);
+    try {
+      await fetch('/api/integrations/follow-up-boss', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      onRefresh();
+    } catch {
+      setDisconnecting(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <p className={SECTION_LABEL}>{sourceLabel(source)}</p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="h-7 w-7 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+          aria-label="Refresh contacts"
+          title="Refresh contacts"
+        >
+          <RefreshCw size={13} strokeWidth={1.75} />
+        </button>
+        {isNative ? (
+          <button
+            type="button"
+            onClick={() => void disconnect()}
+            disabled={disconnecting}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-medium',
+              'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150 disabled:opacity-50',
+            )}
+          >
+            <Unplug size={11} strokeWidth={1.75} />
+            {disconnecting ? 'Disconnecting' : 'Disconnect'}
+          </button>
+        ) : (
+          <a
+            href={`/s/${slug}/settings?tab=connections`}
+            className={cn(
+              'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-medium',
+              'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',
+            )}
+          >
+            Manage
+            <ArrowUpRight size={11} strokeWidth={1.75} />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Records list (connected + records) ─────────────────────────────── */
 
 function RecordsList({
@@ -327,31 +542,7 @@ function RecordsList({
 }) {
   return (
     <div className="space-y-5">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <p className={SECTION_LABEL}>{sourceLabel(source)}</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="h-7 w-7 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
-            aria-label="Refresh contacts"
-            title="Refresh contacts"
-          >
-            <RefreshCw size={13} strokeWidth={1.75} />
-          </button>
-          <a
-            href={`/s/${slug}/settings?tab=connections`}
-            className={cn(
-              'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-medium',
-              'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',
-            )}
-          >
-            Manage
-            <ArrowUpRight size={11} strokeWidth={1.75} />
-          </a>
-        </div>
-      </div>
+      <SyncToolbar source={source} slug={slug} onRefresh={onRefresh} />
 
       {/* Staggered record list */}
       <motion.ul
@@ -442,30 +633,7 @@ function ConnectedEmptyState({
 }) {
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <p className={SECTION_LABEL}>{sourceLabel(source)}</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="h-7 w-7 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
-            aria-label="Refresh contacts"
-            title="Refresh contacts"
-          >
-            <RefreshCw size={13} strokeWidth={1.75} />
-          </button>
-          <a
-            href={`/s/${slug}/settings?tab=connections`}
-            className={cn(
-              'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-medium',
-              'border border-border/70 text-muted-foreground hover:text-foreground transition-colors duration-150',
-            )}
-          >
-            Manage
-            <ArrowUpRight size={11} strokeWidth={1.75} />
-          </a>
-        </div>
-      </div>
+      <SyncToolbar source={source} slug={slug} onRefresh={onRefresh} />
 
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
         <p className={BODY}>Nothing in your {sourceLabel(source)} yet.</p>

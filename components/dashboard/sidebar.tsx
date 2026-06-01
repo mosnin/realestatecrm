@@ -1204,6 +1204,15 @@ export function Sidebar({
   const base = `/s/${slug}`;
   const { user } = useUser();
 
+  // Admin console link visibility. The server passes isPlatformAdmin from the
+  // DB platformRole; we OR it with the Clerk publicMetadata.role so an admin
+  // set via the Clerk Dashboard (before the DB role propagates) still sees the
+  // link. Rendered in every shell — realtor AND broker — because a platform
+  // admin is often also a broker/owner and would otherwise never see it.
+  const showAdminLink =
+    isPlatformAdmin ||
+    (user?.publicMetadata as { role?: string } | undefined)?.role === 'admin';
+
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
     : 'My Account';
@@ -1253,6 +1262,12 @@ export function Sidebar({
           ))}
         </nav>
 
+        {showAdminLink && (
+          <>
+            <div className="border-t border-border/60" />
+            <AdminConsoleLink />
+          </>
+        )}
         <div className="mx-4 border-t border-border" />
         <UserFooter
           href={slug ? `${base}/profile` : '/broker/settings'}
@@ -1334,6 +1349,12 @@ export function Sidebar({
           })}
         </nav>
 
+          {showAdminLink && (
+            <>
+              <div className="border-t border-border/60" />
+              <AdminConsoleLink />
+            </>
+          )}
           <div className="border-t border-border/50" />
           <UserFooter
             href={slug ? `${base}/profile` : '/broker/settings'}
@@ -1363,7 +1384,7 @@ export function Sidebar({
         displayName={displayName}
         imageUrl={user?.imageUrl}
         email={userEmail}
-        isPlatformAdmin={isPlatformAdmin}
+        isPlatformAdmin={showAdminLink}
       />
     </SidebarCollapseProvider>
   );

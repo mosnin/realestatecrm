@@ -359,7 +359,7 @@ export function EmailInboxView({
             }}
             placeholder="Search mail"
             aria-label="Search mail"
-            className="pl-8 pr-8 h-9 text-sm"
+            className="pl-9 pr-9 h-9 text-sm rounded-full"
           />
           {searchInput && (
             <button
