@@ -14,6 +14,8 @@ import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
+import { ReferralTracker } from '@/components/affiliate/referral-tracker';
+import { FprScript } from '@/components/affiliate/fpr-script';
 
 
 export default async function DashboardLayout({
@@ -260,6 +262,13 @@ export default async function DashboardLayout({
       <MobileNav slug={slug} isBroker={isBroker} />
       <ChippiBar slug={slug} />
       <CommandPalette slug={slug} />
+      {/* FirstPromoter attribution. FprScript loads fpr.js here (the dashboard
+          context where ReferralTracker runs); without it, fpr('referral') would
+          have no library to call. The _fprom_tid cookie set during the visitor's
+          marketing visit persists across the same domain, so fpr.js reads it here
+          and attributes the signup. Both no-op when CID is not set. */}
+      <FprScript />
+      <ReferralTracker />
     </div>
   );
 }

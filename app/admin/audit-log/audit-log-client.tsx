@@ -2,6 +2,8 @@
 
 import { useState, useMemo, Fragment } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, ChevronDown, ChevronRight } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -125,42 +127,40 @@ export function AuditLogClient({ logs, userMap }: AuditLogClientProps) {
             size={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
-          <input
+          <Input
             type="text"
             placeholder="Search by email, name, or resource ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 h-9 text-sm rounded-md border border-input bg-transparent focus:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 transition-colors"
+            className="pl-9"
           />
         </div>
 
         {/* Action filter */}
-        <select
-          value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All actions</option>
-          {ACTION_TYPES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <Select value={actionFilter || '_all'} onValueChange={(v) => setActionFilter(v === '_all' ? '' : v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="All actions" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">All actions</SelectItem>
+            {ACTION_TYPES.map((a) => (
+              <SelectItem key={a} value={a}>{a}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Resource filter */}
-        <select
-          value={resourceFilter}
-          onChange={(e) => setResourceFilter(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">All resources</option>
-          {RESOURCE_TYPES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        <Select value={resourceFilter || '_all'} onValueChange={(v) => setResourceFilter(v === '_all' ? '' : v)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="All resources" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">All resources</SelectItem>
+            {RESOURCE_TYPES.map((r) => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Results count */}

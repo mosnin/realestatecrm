@@ -18,11 +18,12 @@ import {
   sendEmailThrough,
 } from '@/lib/communication/connect';
 import { validateSendPayload } from '@/lib/communication/validation';
+import { withObservability } from '@/lib/with-observability';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -85,3 +86,5 @@ export async function POST(req: NextRequest) {
     externalMessageId: result.externalMessageId,
   });
 }
+
+export const POST = withObservability(POSTHandler, 'api.email.send');

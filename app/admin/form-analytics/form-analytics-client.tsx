@@ -218,7 +218,7 @@ export function FormAnalyticsClient({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Score distribution
             </h2>
             {totalScored === 0 ? (
@@ -255,7 +255,7 @@ export function FormAnalyticsClient({
 
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Submissions by source
             </h2>
             {perSource.length === 0 ? (
@@ -351,7 +351,7 @@ export function FormAnalyticsClient({
       {/* Top tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             Top brokerages
           </h2>
           {filteredBrokerages.length === 0 ? (
@@ -384,7 +384,7 @@ export function FormAnalyticsClient({
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             Top spaces
           </h2>
           {filteredSpaces.length === 0 ? (

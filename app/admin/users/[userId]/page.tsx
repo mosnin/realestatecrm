@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { UserActions } from './user-actions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { H1, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
 
 const clerkAdmin = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
@@ -264,7 +265,7 @@ export default async function AdminUserDetailPage({
                 .slice(0, 2)}
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">
+              <h1 className={H1} style={TITLE_FONT}>
                 {fullUser.name || 'No name'}
               </h1>
               <p className="text-sm text-muted-foreground">{fullUser.email}</p>
@@ -308,9 +309,7 @@ export default async function AdminUserDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Account details */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Account
-          </p>
+          <p className={cn(SECTION_LABEL, 'mb-2')}>Account</p>
           <Card>
             <CardContent className="px-5 py-1 divide-y divide-border">
               <InfoRow icon={Mail} label="Email" value={fullUser.email} />
@@ -346,9 +345,7 @@ export default async function AdminUserDetailPage({
 
         {/* Workspace */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Workspace
-          </p>
+          <p className={cn(SECTION_LABEL, 'mb-2')}>Workspace</p>
           {fullUser.space ? (
             <Card>
               <CardContent className="px-5 py-1 divide-y divide-border">
@@ -424,9 +421,7 @@ export default async function AdminUserDetailPage({
       {/* Recent leads table */}
       {fullUser.space && (
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Recent Leads
-          </p>
+          <p className={cn(SECTION_LABEL, 'mb-2')}>Recent leads</p>
           {recentLeads.length === 0 ? (
             <Card>
               <CardContent className="px-5 py-8 text-center">

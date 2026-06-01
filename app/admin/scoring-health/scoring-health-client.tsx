@@ -216,7 +216,7 @@ export function ScoringHealthClient({
 
       {/* Per-space failures */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
           Top spaces by failure count
         </h2>
         {perSpace.length === 0 ? (
@@ -259,7 +259,7 @@ export function ScoringHealthClient({
       {/* Failed leads */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             Recent failed leads
           </h2>
           <span className="text-xs text-muted-foreground">
@@ -292,7 +292,7 @@ export function ScoringHealthClient({
                         </p>
                         {lead.spaceSlug && (
                           <Link
-                            href={`/spaces/${lead.spaceSlug}`}
+                            href={`/s/${lead.spaceSlug}`}
                             className="text-[10px] font-medium text-foreground/70 bg-foreground/[0.06] rounded-full px-2 py-0.5 hover:underline"
                           >
                             {lead.spaceSlug}

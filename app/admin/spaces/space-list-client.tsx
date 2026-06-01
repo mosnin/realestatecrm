@@ -136,7 +136,7 @@ export function SpaceListClient({
             className={cn(
               'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
               statusFilter === f.value
-                ? 'bg-primary text-primary-foreground border-primary'
+                ? 'bg-foreground text-background border-foreground'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted'
             )}
           >
