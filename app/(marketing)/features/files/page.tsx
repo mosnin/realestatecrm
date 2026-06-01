@@ -16,23 +16,21 @@ export const metadata = { title: 'Files — Chippi' };
 export default function FeaturesFilesPage() {
   return (
     <>
+      {/* Silent hero — Files is the quietest surface in Chippi. Apple varies
+          the rhythm by letting some pages land with type alone; this is that
+          page. The grid + previews below carry the visual weight. */}
       <MarketingHero
         eyebrow="FILES"
         title="A file room for the deal."
         sub="Documents, photos, contracts, signed PDFs — organized per-deal, searchable, with version history."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
-      >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Files browser — folder list left, file grid right."
-        />
-      </MarketingHero>
+      />
 
       <MarketingSection
         side="right"
         eyebrow="THE BROWSER"
-        title="Drive, in product."
+        title="Folders that follow the deal."
         sub="Folders per deal, files per touchpoint. Grid view or list view. Searchable across the whole workspace."
         bullets={[
           'Grid or list.',

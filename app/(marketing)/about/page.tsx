@@ -25,7 +25,6 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingQuote } from '@/components/marketing/marketing-quote';
-import { MarketingStatRow } from '@/components/marketing/marketing-stat-row';
 
 export const metadata = { title: 'About — Chippi' };
 
@@ -96,14 +95,15 @@ export default function AboutPage() {
         />
       </MarketingSection>
 
-      {/* 7. Stat row — serif numbers, small-caps labels, hairline verticals. */}
-      <MarketingStatRow
-        stats={[
-          { number: '10×', label: 'First-touch faster' },
-          { number: '45 min', label: 'Saved per realtor per day' },
-          { number: '98%', label: 'Approval rate on Chippi drafts' },
-          { number: '0', label: "Tabs you'll need to keep open" },
-        ]}
+      {/* 7. Fourth belief — replaces the made-up stat row. We don't ship
+              marketing-claim numbers dressed as data; when there's a number
+              worth quoting, we'll measure it and footnote it. Until then,
+              the page closes with another belief. */}
+      <MarketingSection
+        stacked
+        eyebrow="WHAT WE BELIEVE"
+        title="No numbers we can't defend."
+        sub="No 10× headline. No 45-minutes-saved-per-day claim. The day Chippi can prove a number against a customer's own data, we'll quote it — and footnote it. Until then, we let the agent do the talking."
       />
 
       {/* 8. CTA */}

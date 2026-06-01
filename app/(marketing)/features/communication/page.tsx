@@ -49,7 +49,7 @@ export default function FeaturesCommunicationPage() {
 
       <MarketingSection
         eyebrow="THE READ VIEW"
-        title="The body of the page IS the body of the email."
+        title="The page is the email."
         sub="Subject is the headline. Sender recedes below. Recipients tuck into a single line. The body reads like a page, not a chat bubble."
         bullets={[
           'Serif subject as headline.',

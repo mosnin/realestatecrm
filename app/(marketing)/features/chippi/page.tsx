@@ -64,12 +64,12 @@ export default function FeaturesChippiPage() {
       <MarketingSection
         side="left"
         eyebrow="DRAFTING"
-        title="Drafts replies in your voice."
-        sub="Trained on how you actually write. Chippi composes the reply you would have typed — then waits for your tap before sending."
+        title="Drafts in your voice. Never sends without your tap."
+        sub="Trained on how you actually write. Chippi composes the reply you would have typed — then stops. Approval-first by default; per-tool autonomy is yours to grant."
         bullets={[
           'Per-realtor voice training.',
-          'Per-template adaptation.',
-          'Always asks before sending.',
+          'Approval-first on every send.',
+          'Per-tool autonomy when you trust it.',
         ]}
       >
         <ComposerDraftDiagram aspect="video" />
@@ -106,23 +106,6 @@ export default function FeaturesChippiPage() {
         <MarketingMediaSlot
           aspect="video"
           description="Kanban — side panel auto-fills as the realtor moves a card."
-        />
-      </MarketingSection>
-
-      <MarketingSection
-        side="right"
-        eyebrow="ASKING"
-        title="Asks before any send."
-        sub="By default, Chippi never acts autonomously. Every outbound message, every booking, every record change is yours to approve. You can grant per-tool autonomy later."
-        bullets={[
-          'Approval-first by default.',
-          'Per-tool autonomy toggles.',
-          'Full audit trail in the activity log.',
-        ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Approval panel — pending action card with Approve and Decline buttons."
         />
       </MarketingSection>
 
