@@ -15,6 +15,8 @@
  * phone numbers, or email addresses — use redacted context objects instead.
  */
 
+import { reportLog } from '@/lib/observability';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
@@ -70,6 +72,14 @@ function emit(level: LogLevel, message: string, context?: Record<string, unknown
 
   const ctx = redact(context);
   const errObj = err !== undefined ? serializeError(err) : undefined;
+
+  // Forward to Sentry (Logs stream + Issues for errors). Context is already
+  // PII-redacted above. Best-effort: telemetry must never break logging.
+  try {
+    reportLog(level, message, ctx, err);
+  } catch {
+    /* swallow */
+  }
 
   if (process.env.NODE_ENV === 'production') {
     const payload = {
