@@ -10,6 +10,7 @@ import {
   Building2,
   FolderOpen,
   Aperture,
+  RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -78,6 +79,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/communication',
     label: 'Communication',
     icon: MessageSquare,
+  },
+  {
+    href: '/sync',
+    label: 'Smart sync',
+    icon: RefreshCw,
   },
   {
     href: '/properties',
