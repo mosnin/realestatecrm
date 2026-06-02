@@ -121,10 +121,8 @@ describe('runDirectChat — wiring', () => {
     expect(imgBlock).toBeTruthy();
   });
 
-  it('emits a fallbackNote for Grok with image attachment', async () => {
-    createMock.mockResolvedValue(happyResponse(
-      'I can\'t see images directly — try a model with vision.',
-    ));
+  it('sends an image_url block to Grok (no longer dropped) with no fallback note', async () => {
+    createMock.mockResolvedValue(happyResponse('Looks like a 3-bed listing.'));
     const result = await runDirectChat({
       model: 'x-ai/grok-4.3',
       systemMessage: 'sys',
@@ -134,8 +132,54 @@ describe('runDirectChat — wiring', () => {
         { id: 'a', filename: 'p.png', mimeType: 'image/png', url: 'https://x/p.png' },
       ],
     });
-    expect(result.fallbackNote).toMatch(/Grok/i);
+    const call = createMock.mock.calls[0][0];
+    const userMsg = call.messages.at(-1);
+    const imgBlock = (userMsg.content as Array<{ type: string }>).find(
+      (b) => b.type === 'image_url',
+    );
+    expect(imgBlock).toBeTruthy();
+    expect(result.fallbackNote).toBe('');
     expect(result.provider).toBe('xai');
+  });
+
+  it('attaches the file-parser plugin when a PDF is sent to Grok', async () => {
+    createMock.mockResolvedValue(happyResponse('That contract closes on the 15th.'));
+    // Stub fetch so the PDF path can base64-inline the bytes.
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([0x25, 0x50, 0x44, 0x46]).buffer,
+    } as unknown as Response)));
+    await runDirectChat({
+      model: 'x-ai/grok-4.3',
+      systemMessage: 'sys',
+      history: [],
+      userMessage: 'Summarize this contract.',
+      attachments: [
+        { id: 'a', filename: 'c.pdf', mimeType: 'application/pdf', url: 'https://x/c.pdf' },
+      ],
+    });
+    const call = createMock.mock.calls[0][0];
+    expect(call.plugins).toEqual([
+      { id: 'file-parser', pdf: { engine: 'pdf-text' } },
+    ]);
+    const userMsg = call.messages.at(-1);
+    const fileBlock = (userMsg.content as Array<{ type: string }>).find(
+      (b) => b.type === 'file',
+    );
+    expect(fileBlock).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it('omits the plugins param on a plain (no-PDF) turn', async () => {
+    createMock.mockResolvedValue(happyResponse('Sure.'));
+    await runDirectChat({
+      model: 'x-ai/grok-4.3',
+      systemMessage: 'sys',
+      history: [],
+      userMessage: 'hi',
+    });
+    const call = createMock.mock.calls[0][0];
+    expect(call.plugins).toBeUndefined();
   });
 });
 

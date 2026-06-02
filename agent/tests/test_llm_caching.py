@@ -198,18 +198,74 @@ def test_make_chat_model_wraps_anthropic_slug_in_caching_proxy():
     assert isinstance(model, _CachingChatModel)
 
 
-def test_make_chat_model_does_not_wrap_non_cache_providers():
-    """xAI / Moonshot / Qwen / bare OpenAI slugs get the plain SDK model.
-    The wrapper costs nothing at runtime but the test pins the gating so
-    we don't accidentally bypass OpenAI's auto-cache by wrapping it.
+def test_make_chat_model_wraps_all_providers_for_file_parser():
+    """Every slug now routes through the request-mutating proxy so the
+    OpenRouter file-parser plugin can be injected when a PDF `file` block is
+    present — that's what lets Grok et al. read PDFs. Non-cache providers
+    still get the proxy with cache markers DISABLED (the next test pins
+    that), so OpenAI's auto-cache prefix is untouched.
     """
-    from agents import OpenAIChatCompletionsModel
     from llm import _CachingChatModel
 
     for slug in ("x-ai/grok-4.3", "moonshotai/kimi-k2.6", "qwen/qwen3.6-flash"):
         m = make_chat_model(slug)
-        assert isinstance(m, OpenAIChatCompletionsModel)
-        assert not isinstance(m, _CachingChatModel)
+        assert isinstance(m, _CachingChatModel)
+
+
+@pytest.mark.asyncio
+async def test_non_cache_provider_proxy_skips_cache_markers():
+    """The create-interceptor for a non-cache provider must NOT apply
+    cache_control markers (which xAI/Moonshot/Qwen would reject) — only the
+    file-parser plugin. A cache provider DOES apply them. Tested on the
+    interceptor directly so it doesn't depend on SDK client internals.
+    """
+    from llm import _CacheMarkerCompletions
+
+    class _Recorder:
+        def __init__(self):
+            self.last = None
+
+        async def create(self, **kwargs):
+            self.last = kwargs
+            return None
+
+    # Non-cache provider: markers disabled — system message stays a plain str.
+    rec = _Recorder()
+    grok_proxy = _CacheMarkerCompletions(rec, apply_cache_markers=False)
+    await grok_proxy.create(messages=[{"role": "system", "content": "sys"}])
+    assert rec.last["messages"][0]["content"] == "sys"
+
+    # Cache provider: markers enabled — system message rewritten to a block.
+    rec2 = _Recorder()
+    gem_proxy = _CacheMarkerCompletions(rec2, apply_cache_markers=True)
+    await gem_proxy.create(messages=[{"role": "system", "content": "sys"}])
+    assert isinstance(rec2.last["messages"][0]["content"], list)
+
+
+def test_apply_file_parser_plugin_only_when_pdf_block_present():
+    """The file-parser plugin rides in extra_body only when a PDF `file`
+    content block is in the messages — omitted on plain turns."""
+    from llm import _apply_file_parser_plugin
+
+    plain = {"messages": [{"role": "user", "content": "hi"}]}
+    _apply_file_parser_plugin(plain)
+    assert "extra_body" not in plain
+
+    with_pdf = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "read this"},
+                    {"type": "file", "file": {"filename": "c.pdf", "file_data": "data:..."}},
+                ],
+            }
+        ]
+    }
+    _apply_file_parser_plugin(with_pdf)
+    assert with_pdf["extra_body"]["plugins"] == [
+        {"id": "file-parser", "pdf": {"engine": "pdf-text"}}
+    ]
 
 
 # ── decide_reasoning_effort (Phase 3) ──────────────────────────────────────

@@ -401,6 +401,49 @@ async def chat_turn(item: dict):
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────
 
+    # Inline text/markdown/csv formats — already text, so we read them
+    # directly into the prompt instead of forcing a read_attachment round-
+    # trip. Mirrors lib/chat/multimodal.ts:isInlineTextMime.
+    _INLINE_TEXT_MIMES = ("text/plain", "text/markdown", "text/csv")
+    _MAX_INLINE_TEXT_CHARS = 200_000
+    _MAX_PDF_BYTES = 20 * 1024 * 1024
+
+    def _fetch_text_inline(url: str) -> str | None:
+        """Fetch a text/md/csv attachment and return its (truncated) contents."""
+        try:
+            import httpx
+
+            resp = httpx.get(url, timeout=20.0)
+            if resp.status_code != 200:
+                return None
+            contents = resp.text
+            if len(contents) > _MAX_INLINE_TEXT_CHARS:
+                contents = (
+                    contents[:_MAX_INLINE_TEXT_CHARS]
+                    + "\n\n[truncated — file was longer than I can read here]"
+                )
+            return contents
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _fetch_pdf_data_url(url: str) -> str | None:
+        """Fetch a PDF and return a base64 data URL for the OpenRouter file
+        content block. None when the fetch fails or the file is oversized."""
+        try:
+            import base64
+            import httpx
+
+            resp = httpx.get(url, timeout=30.0)
+            if resp.status_code != 200:
+                return None
+            data = resp.content
+            if len(data) > _MAX_PDF_BYTES:
+                return None
+            b64 = base64.b64encode(data).decode("ascii")
+            return f"data:application/pdf;base64,{b64}"
+        except Exception:  # noqa: BLE001
+            return None
+
     def attach_message(text: str, atts: list[dict[str, Any]]) -> str:
         if not atts:
             return text
@@ -411,16 +454,25 @@ async def chat_turn(item: dict):
             mime = (a.get("mime_type") or "").lower()
             if mime.startswith("image/"):
                 continue  # vision path handles images directly below
+            if mime == "application/pdf":
+                continue  # PDF flows through the file block in build_user_input
             filename = a.get("filename", "attachment")
             extracted = a.get("extracted_text")
             if extracted:
                 parts.append(f"\n\n[Attached {filename}]\n{extracted}")
-            else:
-                att_id = a.get("id", "")
-                parts.append(
-                    f"\n\n[Attached {filename} — id {att_id}; "
-                    "call read_attachment to retrieve if needed]"
-                )
+                continue
+            # text/markdown/csv — inline the bytes directly so the agent reads
+            # them without a tool call.
+            if mime in _INLINE_TEXT_MIMES and a.get("public_url"):
+                inlined = _fetch_text_inline(a["public_url"])
+                if inlined is not None:
+                    parts.append(f"\n\n[Attached {filename}]\n{inlined}")
+                    continue
+            att_id = a.get("id", "")
+            parts.append(
+                f"\n\n[Attached {filename} — id {att_id}; "
+                "call read_attachment to retrieve if needed]"
+            )
         return "".join(parts)
 
     def build_user_input(text: str, atts: list[dict[str, Any]]):
@@ -432,11 +484,42 @@ async def chat_turn(item: dict):
             and (a.get("mime_type") or "").lower().startswith("image/")
             and a.get("public_url")
         ]
-        if not image_atts:
+        pdf_atts = [
+            a for a in atts
+            if isinstance(a, dict)
+            and (a.get("mime_type") or "").lower() == "application/pdf"
+            and a.get("public_url")
+        ]
+        if not image_atts and not pdf_atts:
             return text
         content: list[dict[str, Any]] = [{"type": "input_text", "text": text}]
         for a in image_atts:
             content.append({"type": "input_image", "image_url": a["public_url"]})
+        # PDFs: emit the OpenRouter `file` content block (base64 data URL).
+        # OpenRouter's file-parser plugin parses these server-side for any
+        # model when the request carries the plugin (see agent/llm.py). If we
+        # couldn't fetch the bytes, fall back to the read_attachment tool note.
+        for a in pdf_atts:
+            data_url = _fetch_pdf_data_url(a["public_url"])
+            filename = a.get("filename", "document.pdf")
+            if data_url:
+                content.append(
+                    {
+                        "type": "file",
+                        "file": {"filename": filename, "file_data": data_url},
+                    }
+                )
+            else:
+                att_id = a.get("id", "")
+                content.append(
+                    {
+                        "type": "input_text",
+                        "text": (
+                            f"\n\n[Attached {filename} — id {att_id}; "
+                            "call read_attachment to retrieve if needed]"
+                        ),
+                    }
+                )
         return content
 
     def safe_json_loads(value: Any) -> Any:

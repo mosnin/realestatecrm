@@ -330,9 +330,17 @@ def make_chat_model(name: str):
     """
     from agents import OpenAIChatCompletionsModel
 
-    if detect_provider(name) in _CACHE_MARKER_PROVIDERS:
-        return _CachingChatModel(model=name, openai_client=get_llm_client())
-    return OpenAIChatCompletionsModel(model=name, openai_client=get_llm_client())
+    apply_cache = detect_provider(name) in _CACHE_MARKER_PROVIDERS
+    # Every model now routes through the request-mutating proxy: it injects
+    # the OpenRouter `file-parser` plugin whenever the outgoing messages carry
+    # a PDF `file` content block (so Grok et al. can read PDFs), and — only
+    # for cache providers — attaches cache_control markers. Non-cache
+    # providers get the proxy too but skip the markers (which they'd choke on).
+    return _CachingChatModel(
+        model=name,
+        openai_client=get_llm_client(),
+        apply_cache_markers=apply_cache,
+    )
 
 
 def _build_cache_marker() -> dict[str, Any]:
@@ -378,11 +386,18 @@ class _CachingChatModel:
     providers never reach this class.
     """
 
-    def __init__(self, model: str, openai_client: AsyncOpenAI):
+    def __init__(
+        self,
+        model: str,
+        openai_client: AsyncOpenAI,
+        apply_cache_markers: bool = True,
+    ):
         from agents import OpenAIChatCompletionsModel
         self._inner = OpenAIChatCompletionsModel(
             model=model,
-            openai_client=_CacheMarkerClient(openai_client),
+            openai_client=_CacheMarkerClient(
+                openai_client, apply_cache_markers=apply_cache_markers
+            ),
         )
 
     def __getattr__(self, name: str) -> Any:
@@ -393,42 +408,94 @@ class _CachingChatModel:
 
 
 class _CacheMarkerClient:
-    """Proxy wrapper around AsyncOpenAI that attaches cache markers on the
-    way out. Forwards every other attribute unchanged.
+    """Proxy wrapper around AsyncOpenAI that mutates the outgoing chat
+    completion payload. Forwards every other attribute unchanged.
+
+    Two mutations, both at request time on the kwargs the agents SDK built:
+      1. file-parser plugin — ALWAYS: when the messages carry a PDF `file`
+         content block, attach the OpenRouter file-parser plugin so the PDF
+         is parsed server-side for ANY model (Grok included).
+      2. cache_control markers — only when `apply_cache_markers` (Anthropic /
+         Gemini); other providers would choke on the marker.
 
     We wrap only `chat.completions.create` — the one entry point the agents
     SDK calls. Embeddings, files, etc. go through `get_llm_client()` directly
     and never see this proxy.
     """
 
-    def __init__(self, inner: AsyncOpenAI):
+    def __init__(self, inner: AsyncOpenAI, apply_cache_markers: bool = True):
         self._inner = inner
-        self.chat = _CacheMarkerChat(inner.chat)
+        self.chat = _CacheMarkerChat(inner.chat, apply_cache_markers=apply_cache_markers)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
 
 
 class _CacheMarkerChat:
-    def __init__(self, inner: Any):
+    def __init__(self, inner: Any, apply_cache_markers: bool = True):
         self._inner = inner
-        self.completions = _CacheMarkerCompletions(inner.completions)
+        self.completions = _CacheMarkerCompletions(
+            inner.completions, apply_cache_markers=apply_cache_markers
+        )
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
 
 
 class _CacheMarkerCompletions:
-    def __init__(self, inner: Any):
+    def __init__(self, inner: Any, apply_cache_markers: bool = True):
         self._inner = inner
+        self._apply_cache_markers = apply_cache_markers
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
 
     async def create(self, **kwargs: Any) -> Any:
         # Mutate in place — the SDK does not reuse the dict after dispatch.
-        _apply_cache_markers(kwargs)
+        _apply_file_parser_plugin(kwargs)
+        if self._apply_cache_markers:
+            _apply_cache_markers(kwargs)
         return await self._inner.create(**kwargs)
+
+
+def _messages_have_pdf_file_block(messages: Any) -> bool:
+    """True when any message content array carries a PDF `file` block —
+    i.e. build_user_input emitted one for an attached PDF."""
+    if not isinstance(messages, list):
+        return False
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "file":
+                return True
+    return False
+
+
+def _apply_file_parser_plugin(create_kwargs: dict[str, Any]) -> None:
+    """Attach the OpenRouter file-parser plugin when the request carries a
+    PDF `file` content block. OpenRouter parses the PDF server-side and feeds
+    it to ANY model — so Grok et al. read PDFs without native file support.
+
+    The `plugins` field is an OpenRouter request-body extension the OpenAI
+    SDK doesn't type, so it rides in `extra_body` (the SDK's supported
+    passthrough for unknown body fields). Idempotent and omitted on turns
+    with no PDF. Engine mirrors lib/chat/multimodal.ts:PDF_PARSER_ENGINE
+    ('pdf-text'; switch to 'mistral-ocr' for scanned-PDF OCR — paid).
+    """
+    if not _messages_have_pdf_file_block(create_kwargs.get("messages")):
+        return
+    extra_body = create_kwargs.get("extra_body")
+    if not isinstance(extra_body, dict):
+        extra_body = {}
+    if "plugins" not in extra_body:
+        extra_body["plugins"] = [
+            {"id": "file-parser", "pdf": {"engine": "pdf-text"}}
+        ]
+    create_kwargs["extra_body"] = extra_body
 
 
 def _apply_cache_markers(create_kwargs: dict[str, Any]) -> None:

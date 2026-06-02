@@ -25,6 +25,7 @@ import OpenAI from 'openai';
 import { getLLMClient, detectProvider } from '@/lib/llm';
 import {
   buildMultimodalContent,
+  PDF_PARSER_ENGINE,
   type MultimodalAttachment,
   type ContentBlock,
 } from './multimodal';
@@ -110,7 +111,7 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
   const client = getLLMClient();
   const provider = detectProvider(input.model);
 
-  const userBlocks = buildContent(input);
+  const userBlocks = await buildContent(input);
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'system', content: input.systemMessage },
@@ -127,18 +128,34 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
     },
   ];
 
-  const res = await client.chat.completions.create(
-    {
-      model: input.model,
-      messages,
-      // No tools — that's the whole point of the direct path.
-      // Modest cap to keep direct answers tight; the full agent has higher
-      // ceilings for long-form drafts.
-      max_tokens: 800,
-      stream: false,
-    },
-    { signal: input.signal },
-  );
+  const createParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+    model: input.model,
+    messages,
+    // No tools — that's the whole point of the direct path.
+    // Modest cap to keep direct answers tight; the full agent has higher
+    // ceilings for long-form drafts.
+    max_tokens: 800,
+    stream: false,
+  };
+
+  // OpenRouter extension: when a PDF `file` block was emitted, attach the
+  // file-parser plugin so OpenRouter parses the PDF server-side and feeds it
+  // to ANY model (including Grok). The field is an OpenRouter-only request-
+  // body param the OpenAI SDK doesn't type — attach it via a cast so the
+  // rest of the call stays strictly typed. Omitted on plain turns so we
+  // never send the plugin when there's no PDF.
+  if (userBlocks.needsFileParser) {
+    // `plugins` is an OpenRouter request-body extension the OpenAI Node SDK
+    // doesn't type. The Node SDK serializes the whole params object into the
+    // request body, so an extra field rides through to OpenRouter intact —
+    // we only have to widen the type to attach it without disturbing the
+    // strict typing of every other field.
+    (createParams as unknown as Record<string, unknown>).plugins = [
+      { id: 'file-parser', pdf: { engine: PDF_PARSER_ENGINE } },
+    ];
+  }
+
+  const res = await client.chat.completions.create(createParams, { signal: input.signal });
 
   const choice = res.choices[0];
   const text = choice?.message?.content;
@@ -172,11 +189,12 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
   };
 }
 
-function buildContent(input: DirectChatInput): {
+async function buildContent(input: DirectChatInput): Promise<{
   blocks: ContentBlock[];
   fallbackNote: string;
-} {
-  const built = buildMultimodalContent(
+  needsFileParser: boolean;
+}> {
+  const built = await buildMultimodalContent(
     input.model,
     input.userMessage,
     input.attachments ?? [],
@@ -192,5 +210,9 @@ function buildContent(input: DirectChatInput): {
         `${orig}\n\n[Note: ${built.fallbackNote}]`;
     }
   }
-  return { blocks: built.blocks, fallbackNote: built.fallbackNote };
+  return {
+    blocks: built.blocks,
+    fallbackNote: built.fallbackNote,
+    needsFileParser: built.needsFileParser,
+  };
 }
