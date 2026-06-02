@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PushToggle } from '@/components/push/push-toggle';
 import {
   BODY,
   BODY_MUTED,
@@ -80,6 +81,8 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
         </div>
         <Switch checked={notifications} onCheckedChange={setNotifications} />
       </div>
+
+      <PushToggle slug={slug} />
 
       <div className="flex items-center gap-3 pt-1">
         <button

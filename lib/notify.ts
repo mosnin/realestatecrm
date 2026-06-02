@@ -20,6 +20,7 @@ import { sendNewLeadNotification } from '@/lib/email';
 import { sendNewDealNotification } from '@/lib/email';
 import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
+import { sendPushToSpace } from '@/lib/push';
 import { formatCompact } from '@/lib/formatting';
 import { logger } from '@/lib/logger';
 
@@ -36,6 +37,8 @@ interface SpaceOwnerInfo {
   notifyTourBookings: boolean;
   notifyNewDeals: boolean;
   notifyFollowUps: boolean;
+  // Web push master toggle
+  pushEnabled: boolean;
 }
 
 /**
@@ -48,7 +51,7 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
       supabase
         .from('SpaceSetting')
-        .select('notifications, smsNotifications, phoneNumber, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps')
+        .select('notifications, smsNotifications, phoneNumber, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, notifyPush')
         .eq('spaceId', spaceId)
         .maybeSingle(),
     ]);
@@ -81,6 +84,7 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       notifyTourBookings: settings?.notifyTourBookings ?? true,
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
+      pushEnabled: settings?.notifyPush ?? true,
     };
   } catch (err) {
     logger.error('[notify] failed to fetch space owner info', { spaceId }, err);
@@ -150,6 +154,18 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
     );
   }
 
+  // Push notification
+  if (info.pushEnabled) {
+    const score = params.scoreLabel ? ` (${params.scoreLabel})` : '';
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: `New lead: ${params.name}${score}`,
+        body: `Open ${info.spaceName} to review.`,
+        url: `/s/${info.spaceSlug}/people/${params.contactId}`,
+      }).catch((err) => logger.error('[notify] lead push failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
   await Promise.allSettled(promises);
 }
 
@@ -192,6 +208,20 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
           phone: info.ownerPhone,
         })
       ).catch((err) => logger.error('[notify] tour SMS failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  // Push notification
+  if (info.pushEnabled) {
+    const d = new Date(params.tourData.startsAt);
+    const when = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    const prop = params.tourData.propertyAddress ? ` at ${params.tourData.propertyAddress}` : '';
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: `New tour: ${params.tourData.guestName}`,
+        body: `${when}${prop}.`,
+        url: `/s/${info.spaceSlug}/calendar`,
+      }).catch((err) => logger.error('[notify] tour push failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -246,6 +276,18 @@ export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> 
           phone: info.ownerPhone,
         })
       ).catch((err) => logger.error('[notify] deal SMS failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  // Push notification
+  if (info.pushEnabled) {
+    const val = params.dealValue != null ? ` (${formatCompact(params.dealValue)})` : '';
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: `New deal: ${params.dealTitle}${val}`,
+        body: `Open ${info.spaceName} to manage it.`,
+        url: `/s/${info.spaceSlug}/deals`,
+      }).catch((err) => logger.error('[notify] deal push failed', { spaceId: params.spaceId }, err))
     );
   }
 
