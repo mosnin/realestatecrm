@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendFollowUpDigest } from '@/lib/email';
 import { sendSMS, followUpReminderSMS } from '@/lib/sms';
+import { sendPushToSpace } from '@/lib/push';
 import { redis } from '@/lib/redis';
 
 /**
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     const { data: setting } = await supabase
       .from('SpaceSetting')
-      .select('notifications, smsNotifications, phoneNumber, notifyFollowUps')
+      .select('notifications, smsNotifications, phoneNumber, notifyFollowUps, notifyPush')
       .eq('spaceId', spaceId)
       .maybeSingle();
     // Skip if follow-up notifications are disabled, or all channels are off
@@ -109,6 +110,19 @@ export async function GET(req: NextRequest) {
           ).catch((err) => console.error('[cron] SMS follow-up failed', err))
         );
         await Promise.allSettled(smsPromises);
+      }
+
+      // Push reminder (one digest notification per space)
+      if (setting?.notifyPush !== false) {
+        const count = spaceContacts.length;
+        await sendPushToSpace(spaceId, {
+          title: `${count} follow-up${count === 1 ? '' : 's'} due today`,
+          body:
+            count === 1
+              ? `Follow up with ${spaceContacts[0].name}.`
+              : `Open ${space.name} to review your follow-ups.`,
+          url: `/s/${space.slug}/people`,
+        }).catch((err) => console.error('[cron] push follow-up failed', err));
       }
 
       sent++;

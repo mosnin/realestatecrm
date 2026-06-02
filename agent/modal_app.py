@@ -734,7 +734,25 @@ async def chat_turn(item: dict):
                     or "does not exist" in lower
                     or "invalid model" in lower
                 )
-                if (is_rate_limited or is_bad_model) and not streamed and attempt < len(models) - 1:
+                # Transient provider failure (5xx, timeout, dropped socket) —
+                # the most common error in practice, previously surfaced with
+                # zero retry. Safe to fall forward: gated on `not streamed`, so
+                # nothing is on the wire yet.
+                is_transient = (
+                    "500" in err_str
+                    or "502" in err_str
+                    or "503" in err_str
+                    or "504" in err_str
+                    or "timeout" in lower
+                    or "timed out" in lower
+                    or "connection error" in lower
+                    or "overloaded" in lower
+                )
+                if (
+                    (is_rate_limited or is_bad_model or is_transient)
+                    and not streamed
+                    and attempt < len(models) - 1
+                ):
                     logger.warning(
                         "chat_turn_model_falling_back",
                         model=model,

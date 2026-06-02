@@ -73,7 +73,29 @@ Rules:
         max_tokens=1000,
     )
     plan_text = response.choices[0].message.content or "{}"
-    return json.loads(plan_text)
+    # The planner LLM is asked for JSON (response_format=json_object), but a
+    # provider that ignores the format or truncates the response would crash
+    # the entire swarm on an unguarded parse. Degrade to a single auto-assigned
+    # task covering the whole goal so the run still produces something.
+    try:
+        plan = json.loads(plan_text)
+        if not isinstance(plan, dict) or not isinstance(plan.get("tasks"), list) or not plan["tasks"]:
+            raise ValueError("planner returned no tasks")
+        return plan
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("swarm_plan_parse_failed", error=str(exc)[:200])
+        return {
+            "tasks": [
+                {
+                    "name": "Complete goal",
+                    "role": "General-purpose agent",
+                    "task": goal,
+                    "agentIndex": -1,
+                    "wave": 1,
+                }
+            ],
+            "rationale": "Planner output was unparseable; running goal as a single task.",
+        }
 
 
 async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None:

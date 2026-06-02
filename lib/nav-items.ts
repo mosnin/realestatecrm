@@ -12,6 +12,8 @@ import {
   Aperture,
   RefreshCw,
   Gift,
+  Phone,
+  FileBarChart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -82,6 +84,11 @@ export const realtorNavItems: NavItem[] = [
     icon: MessageSquare,
   },
   {
+    href: '/calls',
+    label: 'Calls',
+    icon: Phone,
+  },
+  {
     href: '/sync',
     label: 'Smart sync',
     icon: RefreshCw,
@@ -95,6 +102,11 @@ export const realtorNavItems: NavItem[] = [
       { href: '/properties/new', label: 'Add property' },
       { href: '/properties/commissions', label: 'Commissions' },
     ],
+  },
+  {
+    href: '/cma',
+    label: 'CMA',
+    icon: FileBarChart,
   },
   {
     href: '/studio',
@@ -115,6 +127,7 @@ export const realtorNavItems: NavItem[] = [
     icon: FolderOpen,
     children: [
       { href: '/documents', label: 'Documents' },
+      { href: '/signatures', label: 'Signatures' },
     ],
   },
   {
