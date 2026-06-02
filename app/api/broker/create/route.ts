@@ -59,14 +59,21 @@ export async function POST(req: Request) {
   // Resolve internal user id
   const { data: user, error: userErr } = await supabase
     .from('User')
-    .select('id, onboard, accountType')
+    .select('id, onboard, accountType, platformRole')
     .eq('clerkId', clerkId)
     .maybeSingle();
   if (userErr || !user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+  // Platform admins bypass the onboarding/account-type gates below. An admin is
+  // usually a realtor who was promoted, so their accountType is 'realtor' — which
+  // was tripping the "upgrade to a broker account" 403 and blocking them from
+  // creating brokerages at all. Admins are superusers; let them through.
+  const isAdmin = user.platformRole === 'admin';
+
   // Broker-only users are marked onboard during setup even without a Space
-  if (!user.onboard) return NextResponse.json({ error: 'Complete onboarding first' }, { status: 403 });
+  if (!user.onboard && !isAdmin) return NextResponse.json({ error: 'Complete onboarding first' }, { status: 403 });
   // Only users who selected broker role during onboarding can create a brokerage
-  if (user.accountType === 'realtor') {
+  if (user.accountType === 'realtor' && !isAdmin) {
     return NextResponse.json({ error: 'Upgrade to a broker account to create a brokerage' }, { status: 403 });
   }
 
