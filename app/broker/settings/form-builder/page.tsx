@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Loader2,
   Save,
   RotateCcw,
@@ -13,11 +23,10 @@ import {
   Home,
   Key,
   Send,
-  CheckCircle2,
-  AlertCircle,
-  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
@@ -48,6 +57,10 @@ export default function BrokerFormBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  // Confirmation dialogs (replace native confirm()).
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [pushConfirmOpen, setPushConfirmOpen] = useState(false);
 
   // Load existing configs
   useEffect(() => {
@@ -169,12 +182,6 @@ export default function BrokerFormBuilderPage() {
 
   const handleReset = useCallback(async () => {
     const label = activeLeadType === 'rental' ? 'rental' : 'buyer';
-    if (
-      !confirm(
-        `Reset the ${label} form to the standard Chippi default? Your custom brokerage form will be removed.`,
-      )
-    )
-      return;
     try {
       const res = await fetch('/api/broker/form-config', {
         method: 'DELETE',
@@ -203,14 +210,11 @@ export default function BrokerFormBuilderPage() {
     }
   }, [activeLeadType]);
 
+  const memberLabel = memberCount != null
+    ? `${memberCount} member${memberCount === 1 ? '' : 's'}`
+    : 'all member realtors';
+
   const handlePushToMembers = useCallback(async () => {
-    const memberLabel = memberCount != null ? `${memberCount} member${memberCount === 1 ? '' : 's'}` : 'all member realtors';
-    if (
-      !confirm(
-        `This will override BOTH rental and buyer form settings for ${memberLabel} with the brokerage forms. Their formConfigSource will be set to "brokerage". Continue?`,
-      )
-    )
-      return;
     setPushing(true);
     try {
       const res = await fetch('/api/broker/form-config/push', {
@@ -242,113 +246,104 @@ export default function BrokerFormBuilderPage() {
     );
   }
 
+  const activeFormName = activeLeadType === 'rental' ? 'Rental application' : 'Buyer inquiry';
+
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">Brokerage Intake Form</h1>
-            <p className="text-muted-foreground text-sm">
-              Design standard rental and buyer intake forms for your brokerage and push them to all members.
+          <header className="space-y-1.5">
+            <p className={BODY_MUTED}>Settings.</p>
+            <h1 className={H1} style={TITLE_FONT}>
+              Brokerage intake form
+            </h1>
+            <p className={BODY_MUTED}>
+              {hasChanges
+                ? 'Unsaved changes. Save to update your brokerage standard.'
+                : hasSavedConfig
+                  ? 'Saved as your brokerage standard.'
+                  : 'Design the standard rental and buyer forms, then push them to your team.'}
             </p>
-          </div>
+          </header>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {hasChanges ? (
-              <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 gap-1.5">
-                <AlertCircle size={12} />
-                Unsaved changes
-              </Badge>
-            ) : hasSavedConfig ? (
-              <Badge variant="outline" className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/10 gap-1.5">
-                <CheckCircle2 size={12} />
-                Saved
-              </Badge>
-            ) : null}
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RotateCcw size={14} className="mr-1.5" /> Reset to Default
+            <Button variant="outline" size="sm" onClick={() => setResetConfirmOpen(true)}>
+              <RotateCcw size={14} className="mr-1.5" /> Reset to default
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
               {saving ? (
-                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving…</>
               ) : (
-                <><Save size={14} className="mr-1.5" /> Save Form</>
+                <><Save size={14} className="mr-1.5" /> Save form</>
               )}
             </Button>
           </div>
         </div>
 
-        {/* ── Primary tabs: Rental Form / Buyer Form ── */}
-        <div className="flex gap-2">
+        {/* ── Primary tabs: Rental / Buyer — segmented control vocabulary.
+            Active = foreground (never orange); inactive recedes to muted. ── */}
+        <div className="inline-flex gap-1 rounded-full bg-foreground/[0.04] p-1 self-start">
           <button
             type="button"
             onClick={() => setActiveLeadType('rental')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+            className={cn(
+              'flex items-center gap-2 px-4 h-9 rounded-full text-sm font-medium transition-colors',
               activeLeadType === 'rental'
-                ? 'border-orange-400 dark:border-orange-500/50 bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 shadow-sm'
-                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-            }`}
+                ? 'bg-background border border-border/70 text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            <Home size={16} />
-            Rental Form
+            <Home size={15} />
+            Rental form
             {rentalHasChanges && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
             )}
           </button>
           <button
             type="button"
             onClick={() => setActiveLeadType('buyer')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+            className={cn(
+              'flex items-center gap-2 px-4 h-9 rounded-full text-sm font-medium transition-colors',
               activeLeadType === 'buyer'
-                ? 'border-blue-400 dark:border-blue-500/50 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 shadow-sm'
-                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-            }`}
+                ? 'bg-background border border-border/70 text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            <Key size={16} />
-            Buyer Form
+            <Key size={15} />
+            Buyer form
             {buyerHasChanges && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
             )}
           </button>
         </div>
 
-        {/* ── Active form status bar ── */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-semibold">
-                  Editing: {activeLeadType === 'rental' ? 'Rental Application' : 'Buyer Inquiry'}
-                </span>
-              </div>
-              {hasSavedConfig ? (
-                <Badge variant="secondary" className="text-[10px]">Custom</Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px]">Not configured</Badge>
-              )}
-            </div>
+        {/* ── Active form status — calm hairline section ── */}
+        <div className="space-y-1.5 border-b border-border/60 pb-4">
+          <div className="flex items-center gap-2">
+            <Pencil size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-sm font-medium">Editing {activeFormName}</span>
+            {hasSavedConfig ? (
+              <Badge variant="secondary" className="text-[10px]">Custom</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">Not configured</Badge>
+            )}
           </div>
-
           {!hasSavedConfig && (
-            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 dark:bg-blue-500/5 flex items-start gap-2">
-              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                No custom brokerage {activeLeadType === 'rental' ? 'rental' : 'buyer'} form is configured yet. Customize the fields below and save to create your brokerage standard form.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              No custom brokerage {activeLeadType === 'rental' ? 'rental' : 'buyer'} form yet. Customize the fields below and save to create your brokerage standard.
+            </p>
           )}
         </div>
       </div>
 
-      {/* ── Push to members ── */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* ── Push to members — calm hairline section ── */}
+      <div className="space-y-2 border-b border-border/60 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="space-y-0.5">
-            <p className="text-sm font-semibold">Push to All Members</p>
+            <p className="text-sm font-medium">Push to all members</p>
             <p className="text-xs text-muted-foreground">
               Apply both rental and buyer forms to {memberCount != null ? (
-                <span className="font-medium">{memberCount} member{memberCount === 1 ? '' : 's'}</span>
+                <span className="font-medium text-foreground">{memberCount} member{memberCount === 1 ? '' : 's'}</span>
               ) : (
                 'all member realtors'
               )}. Their individual form settings will be overridden.
@@ -357,28 +352,26 @@ export default function BrokerFormBuilderPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handlePushToMembers}
+            onClick={() => setPushConfirmOpen(true)}
             disabled={pushing || anyHasChanges || !eitherHasSavedConfig}
             className="flex-shrink-0"
           >
             {pushing ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Pushing...</>
+              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Pushing…</>
             ) : (
-              <><Send size={14} className="mr-1.5" /> Push to Members</>
+              <><Send size={14} className="mr-1.5" /> Push to members</>
             )}
           </Button>
         </div>
         {anyHasChanges && (
-          <div className="px-5 py-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 flex items-start gap-2">
-            <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-amber-700 dark:text-amber-400">Save your changes before pushing to members.</p>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Save your changes before pushing to members.
+          </p>
         )}
         {!eitherHasSavedConfig && !anyHasChanges && (
-          <div className="px-5 py-2 border-t border-border bg-blue-50/50 dark:bg-blue-500/5 flex items-start gap-2">
-            <Info size={12} className="text-blue-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-blue-700 dark:text-blue-300">Save a custom brokerage form first before pushing to members.</p>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Save a custom brokerage form first before pushing to members.
+          </p>
         )}
       </div>
 
@@ -401,6 +394,55 @@ export default function BrokerFormBuilderPage() {
           <FormPreview config={config} />
         </TabsContent>
       </Tabs>
+
+      {/* ── Reset confirmation ── */}
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Reset the {activeLeadType === 'rental' ? 'rental' : 'buyer'} form?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This restores the standard Chippi default and removes your custom brokerage {activeLeadType === 'rental' ? 'rental' : 'buyer'} form.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn('bg-destructive text-white hover:bg-destructive/90')}
+              onClick={() => {
+                setResetConfirmOpen(false);
+                void handleReset();
+              }}
+            >
+              Reset to default
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Push confirmation ── */}
+      <AlertDialog open={pushConfirmOpen} onOpenChange={setPushConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Push forms to {memberLabel}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This overrides both the rental and buyer form settings for {memberLabel} with your brokerage forms. Their form source switches to the brokerage standard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setPushConfirmOpen(false);
+                void handlePushToMembers();
+              }}
+            >
+              Push to members
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

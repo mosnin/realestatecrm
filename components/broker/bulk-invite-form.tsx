@@ -129,8 +129,8 @@ export function BulkInviteForm({ seatUsage }: BulkInviteFormProps = {}) {
       <CardContent className="px-5 py-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Upload size={15} className="text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+              <Upload size={15} className="text-foreground/70" />
             </div>
             <div>
               <p className="text-sm font-semibold">Bulk invite</p>
@@ -169,7 +169,7 @@ export function BulkInviteForm({ seatUsage }: BulkInviteFormProps = {}) {
 
         {/* Textarea for pasting */}
         <textarea
-          className="w-full h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full h-24 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="Enter emails, one per line or comma-separated"
           value={emails.join('\n')}
           onChange={(e) => handlePaste(e.target.value)}

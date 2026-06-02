@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toastError } from '@/lib/toast-helpers';
 
 interface RevokeInviteButtonProps {
   invitationId: string;
@@ -25,10 +26,10 @@ export function RevokeInviteButton({ invitationId }: RevokeInviteButtonProps) {
         window.location.reload();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? 'Failed to cancel invitation.');
+        toastError(data.error ?? 'Failed to cancel invitation.');
       }
     } catch {
-      alert("Couldn't reach the server — usually temporary.");
+      toastError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setConfirming(false);

@@ -8,18 +8,14 @@ import {
   CheckCircle2,
   XCircle,
   Users,
-  Mail,
-  Briefcase,
-  TrendingUp,
   Hash,
   Globe,
   Calendar,
-  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { BrokerageActions } from './brokerage-actions';
-import { H1, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
+import { H1, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT } from '@/lib/typography';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -134,7 +130,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-            <Building2 size={20} className="text-primary" />
+            <Building2 size={20} className="text-muted-foreground" />
           </div>
           <div>
             <h1 className={H1} style={TITLE_FONT}>{brokerage.name}</h1>
@@ -156,111 +152,92 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Stat cards — hairline-divider snapshot grid, neutral throughout */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
         {[
-          { label: 'Members',         value: members.length,              icon: Users,     color: 'text-blue-500'   },
-          { label: 'Pending invites', value: pendingInviteCount.count ?? 0, icon: Mail,    color: 'text-amber-500'  },
-          { label: 'Active deals',    value: totalDeals,                  icon: Briefcase, color: 'text-cyan-500'   },
-          { label: 'Pipeline value',  value: formatCompact(totalPipeline),icon: TrendingUp,color: 'text-rose-500'   },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-[25px] leading-tight tracking-tight mt-1 tabular-nums">{value}</p>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Icon size={15} className={color} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          { label: 'Members',         value: members.length },
+          { label: 'Pending invites', value: pendingInviteCount.count ?? 0 },
+          { label: 'Active deals',    value: totalDeals },
+          { label: 'Pipeline value',  value: formatCompact(totalPipeline) },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-background px-4 py-4">
+            <p className={SECTION_LABEL}>{label}</p>
+            <p className={`${STAT_NUMBER_COMPACT} mt-1`} style={TITLE_FONT}>{value}</p>
+          </div>
         ))}
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left: members table */}
-        <div className="lg:col-span-2 space-y-3">
-          <p className={SECTION_LABEL}>Members</p>
-          <Card>
-            {members.length === 0 ? (
-              <CardContent className="px-5 py-8 text-center">
-                <p className="text-sm text-muted-foreground">No members yet.</p>
-              </CardContent>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Member</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Role</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden md:table-cell">Joined</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((m) => {
-                      const user = m.User;
-                      const initials = (user?.name ?? user?.email ?? '?')
-                        .split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-                      const joined = new Date(m.createdAt).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      });
-                      return (
-                        <tr key={m.id} className="border-b border-border last:border-0">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[11px] font-semibold text-foreground/70 flex-shrink-0">
-                                {initials}
-                              </div>
-                              <div className="min-w-0">
-                                <Link
-                                  href={`/admin/users/${m.userId}`}
-                                  className="font-medium text-xs hover:text-primary hover:underline underline-offset-2 truncate block"
-                                >
-                                  {user?.name ?? 'No name'}
-                                </Link>
-                                <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                              {roleLabel(m.role)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{joined}</td>
-                          <td className="px-4 py-3 text-right">
-                            {user?.onboard ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                                <CheckCircle2 size={9} /> Active
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                                <AlertCircle size={9} /> Pending
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {m.role !== 'broker_owner' && (
-                              <BrokerageActions
-                                action="remove-member"
-                                membershipId={m.id}
-                                label={user?.name ?? user?.email ?? 'this member'}
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
+        {/* Left: members */}
+        <div className="lg:col-span-2 space-y-2">
+          <p className={SECTION_LABEL}>
+            Members
+            <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+              {members.length}
+            </span>
+          </p>
+          {members.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+              <p className="text-sm text-foreground">Nobody here yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Members show up once invitations are accepted.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border/60 border-y border-border/60">
+              {members.map((m) => {
+                const user = m.User;
+                const initials = (user?.name ?? user?.email ?? '?')
+                  .split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+                const joined = new Date(m.createdAt).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                });
+                return (
+                  <li key={m.id} className="flex items-center gap-3 py-3">
+                    <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[11px] font-semibold text-foreground/70 flex-shrink-0">
+                      {initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <Link
+                          href={`/admin/users/${m.userId}`}
+                          className="text-sm font-medium text-foreground hover:underline underline-offset-2 truncate"
+                        >
+                          {user?.name ?? 'No name'}
+                        </Link>
+                        <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 flex-shrink-0">
+                          {roleLabel(m.role)}
+                        </span>
+                        {user?.onboard ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                            <CheckCircle2 size={10} /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {user?.email}
+                        <span aria-hidden className="mx-1.5 text-muted-foreground/40">·</span>
+                        Joined {joined}
+                      </p>
+                    </div>
+                    {m.role !== 'broker_owner' && (
+                      <div className="flex-shrink-0">
+                        <BrokerageActions
+                          action="remove-member"
+                          membershipId={m.id}
+                          label={user?.name ?? user?.email ?? 'this member'}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         {/* Right: brokerage info + actions */}
@@ -273,17 +250,17 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                 <div className="flex items-start gap-2.5">
                   <Hash size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">ID</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">ID</p>
                     <p className="text-xs font-mono break-all">{brokerage.id}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5">
                   <Users size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Owner</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Owner</p>
                     <Link
                       href={`/admin/users/${owner?.id}`}
-                      className="text-xs hover:text-primary hover:underline underline-offset-2"
+                      className="text-xs text-foreground hover:underline underline-offset-2"
                     >
                       {owner?.name ?? owner?.email ?? '—'}
                     </Link>
@@ -293,7 +270,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                   <div className="flex items-start gap-2.5">
                     <Hash size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Join Code</p>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Join Code</p>
                       <p className="text-xs font-mono">{brokerage.joinCode}</p>
                     </div>
                   </div>
@@ -302,7 +279,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                   <div className="flex items-start gap-2.5">
                     <Globe size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Website</p>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Website</p>
                       <p className="text-xs truncate">{brokerage.websiteUrl}</p>
                     </div>
                   </div>
@@ -310,7 +287,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                 <div className="flex items-start gap-2.5">
                   <Calendar size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Created</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Created</p>
                     <p className="text-xs">{createdAt}</p>
                   </div>
                 </div>
@@ -340,69 +317,62 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       </div>
 
       {/* Invitations */}
-      <div className="space-y-3">
-        <p className={SECTION_LABEL}>Invitations</p>
+      <div className="space-y-2">
+        <p className={SECTION_LABEL}>
+          Invitations
+          <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+            {invitations.length}
+          </span>
+        </p>
         {invitations.length === 0 ? (
-          <Card>
-            <CardContent className="px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No invitations sent yet.</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <p className="text-sm text-foreground">No invitations sent.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Invitations this brokerage sends will show up here.
+            </p>
+          </div>
         ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Email</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Role</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden md:table-cell">Sent</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden md:table-cell">Expires</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invitations.map((inv) => {
-                    const sent = new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    const expires = new Date(inv.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    return (
-                      <tr key={inv.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-3 text-xs font-medium">{inv.email}</td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                          <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                            {inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{sent}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{expires}</td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${
-                            inv.status === 'accepted'
-                              ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-                              : inv.status === 'pending'
-                                ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-                                : 'text-muted-foreground bg-muted'
-                          }`}>
-                            {statusLabel(inv.status)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {inv.status === 'pending' && (
-                            <BrokerageActions
-                              action="revoke-invite"
-                              invitationId={inv.id}
-                              label={inv.email}
-                            />
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <ul className="divide-y divide-border/60 border-y border-border/60">
+            {invitations.map((inv) => {
+              const sent = new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              const expires = new Date(inv.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              const statusPill =
+                inv.status === 'accepted'
+                  ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
+                  : inv.status === 'pending'
+                    ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+                    : 'text-muted-foreground bg-muted';
+              return (
+                <li key={inv.id} className="flex items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="text-sm font-medium text-foreground truncate">{inv.email}</span>
+                      <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 flex-shrink-0">
+                        {inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}
+                      </span>
+                      <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 ${statusPill}`}>
+                        {statusLabel(inv.status)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Sent {sent}
+                      <span aria-hidden className="mx-1.5 text-muted-foreground/40">·</span>
+                      Expires {expires}
+                    </p>
+                  </div>
+                  {inv.status === 'pending' && (
+                    <div className="flex-shrink-0">
+                      <BrokerageActions
+                        action="revoke-invite"
+                        invitationId={inv.id}
+                        label={inv.email}
+                      />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </div>

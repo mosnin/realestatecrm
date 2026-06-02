@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CommissionsClient, type LedgerRow } from './commissions-client';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const metadata: Metadata = { title: 'Commissions — Teams' };
 
@@ -134,14 +135,21 @@ export default async function BrokerCommissionsPage() {
   const defaultAgentRate = typeof b.defaultAgentRate === 'number' ? b.defaultAgentRate : 0.03;
   const defaultBrokerRate = typeof b.defaultBrokerRate === 'number' ? b.defaultBrokerRate : 0.02;
 
+  const rowCount = ledger.length;
+  const statusSentence =
+    rowCount === 0
+      ? 'No won deals on the ledger yet.'
+      : `${rowCount} ${rowCount === 1 ? 'deal' : 'deals'} on the ledger, snapshotted at close.`;
+
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Commissions</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Commission ledger for won deals &middot; {brokerage.name}
-        </p>
-      </div>
+    <div className={`max-w-5xl mx-auto ${SECTION_RHYTHM} w-full pb-12`}>
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>{brokerage.name}.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Commissions
+        </h1>
+        <p className={BODY_MUTED}>{statusSentence}</p>
+      </header>
 
       <CommissionsClient
         ledger={ledger}

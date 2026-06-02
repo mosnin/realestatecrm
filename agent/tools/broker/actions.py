@@ -670,13 +670,15 @@ async def send_team_announcement(
     # ── Best-effort notification: broker queue gets a copy so the broker
     # bell shows their own outbound. The realtor side reads announcements
     # by pulling /broker/announcements — same convention as the TS POST,
-    # which is pull-based (no per-realtor fanout). Using the review_requested
-    # type for the bell because BrokerNotification.type is text + the
-    # existing union doesn't have an 'announcement' verb yet; the metadata
-    # below disambiguates for downstream renderers.
+    # which is pull-based (no per-realtor fanout). BrokerNotification.type
+    # is plain `text NOT NULL` with no CHECK constraint (supabase/schema.sql),
+    # so a dedicated "announcement" type is accepted by the DB. The bell
+    # renderer (components/broker/notification-bell.tsx) maps unknown types
+    # to a Bell icon — exactly right for an announcement — so this surfaces
+    # correctly instead of masquerading as a flagged review.
     await _notify_broker_queue(
         brokerage_id=brokerage_id,
-        notification_type="review_requested",
+        notification_type="announcement",
         title=f"Announcement sent: {clean_title}",
         body=clean_message[:400],
         metadata={
@@ -1100,8 +1102,9 @@ async def set_routing_rule(
 
 
 # ── Module-level export ─────────────────────────────────────────────────────
-# The coordinating agent extends BROKER_TOOLS in __init__.py with this list
-# after Phase 2 + Phase 3 have both landed. Do NOT edit __init__.py here.
+# __init__.py extends BROKER_TOOLS with this WRITE_TOOLS list; it's live in
+# the broker agent's catalog alongside the read tools. Do NOT edit __init__.py
+# here.
 
 WRITE_TOOLS = [
     reassign_lead,
