@@ -101,10 +101,19 @@ export async function POST(req: NextRequest) {
     contactId = contact.id;
   }
 
-  // The agent's own number — what Telnyx rings first. Space.phoneNumber is the
-  // realtor's number; TELNYX_AGENT_NUMBER is a deploy-wide fallback.
+  // The agent's own number — what Telnyx rings first. It lives on
+  // SpaceSetting.phoneNumber (the same place notify.ts reads it), NOT on the
+  // Space row — getSpaceFromSlug never selects it, so the old `space.phoneNumber`
+  // cast was always undefined and every call silently fell through to the env
+  // fallback. TELNYX_AGENT_NUMBER stays as a deploy-wide fallback.
+  const { data: settingRow } = await supabase
+    .from('SpaceSetting')
+    .select('phoneNumber')
+    .eq('spaceId', space.id)
+    .maybeSingle();
   const agentNumber = toE164(
-    (space as { phoneNumber?: string | null }).phoneNumber ?? process.env.TELNYX_AGENT_NUMBER,
+    (settingRow as { phoneNumber?: string | null } | null)?.phoneNumber ??
+      process.env.TELNYX_AGENT_NUMBER,
   );
   const fromNumber = process.env.TELNYX_FROM_NUMBER ?? '';
 
