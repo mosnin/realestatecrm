@@ -38,6 +38,7 @@ export default async function DashboardLayout({
   // shows the generic "Application error" page).
   let dbUser: {
     id: string;
+    name: string | null;
     onboard: boolean;
     isPlatformAdmin: boolean;
     space: { id: string } | null;
@@ -45,7 +46,7 @@ export default async function DashboardLayout({
   try {
     const { data: row, error } = await supabase
       .from('User')
-      .select('id, onboard, platformRole')
+      .select('id, onboard, platformRole, name')
       .eq('clerkId', userId)
       .maybeSingle();
     if (error) throw error;
@@ -57,6 +58,7 @@ export default async function DashboardLayout({
         .maybeSingle();
       dbUser = {
         id: row.id as string,
+        name: (row.name as string | null) ?? null,
         onboard: row.onboard as boolean,
         isPlatformAdmin: row.platformRole === 'admin',
         space: spaceRow ? { id: spaceRow.id as string } : null,
@@ -248,9 +250,17 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      {/* First-paint splash — the Chippi wordmark draws on, then fades into the
-          dashboard. Plays every time the app/PWA is opened. */}
-      <ChippiSplash />
+      {/* First-paint splash — greets the realtor by name (varied each open),
+          shows a snapshot of what's new, then dissolves into the dashboard.
+          Plays every time the app/PWA is opened. */}
+      <ChippiSplash
+        firstName={(dbUser.name ?? '').trim().split(/\s+/)[0] ?? ''}
+        snapshot={{
+          newLeads: unreadLeadCount,
+          followUpsDue: overdueFollowUpCount,
+          draftsReady: pendingDraftCount,
+        }}
+      />
       {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
           sidebar/header/chat-bar via CSS. Mount near the root so the
           flag is set before any layout reads it. */}
