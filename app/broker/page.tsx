@@ -8,11 +8,13 @@ import {
   Inbox,
   ChevronRight,
   ArrowRight,
+  ArrowUpRight,
   Mail,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
-import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
+import { SECTION_LABEL, TITLE_FONT, CHIPPI_PILL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
@@ -293,6 +295,34 @@ export default async function BrokerOverviewPage() {
         <BrokerMorningStory />
       </header>
 
+      {/* Chippi — the focal entry. The broker's chief of staff is the home of
+          this page, not its fourth section. A calm, paper-flat doorway: serif
+          name, one line of what it does, a quiet pill into /broker/chippi.
+          No orange wash, no shadow — the surface stays out of the way and the
+          invitation is the loud note. */}
+      <Link
+        href="/broker/chippi"
+        className="group/chippi block rounded-xl border border-border/70 bg-card px-5 py-5 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex-1 min-w-0 space-y-1">
+            <p
+              className="text-[21px] leading-snug tracking-tight text-foreground"
+              style={TITLE_FONT}
+            >
+              Talk to Chippi
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ask about team health, reassign a lead, flag a deal, send an announcement.
+            </p>
+          </div>
+          <span className={cn(CHIPPI_PILL, 'flex-shrink-0')}>
+            Open
+            <ArrowUpRight size={15} />
+          </span>
+        </div>
+      </Link>
+
       {/* First-run nudge — only when the team hasn't been set up yet.
           Neutral icon: this is a settings affordance, not Chippi speaking,
           so orange would be unearned. */}
@@ -485,8 +515,12 @@ export default async function BrokerOverviewPage() {
             {memberRows.map(({ member, leads, deals, drafts, apps }) => {
               const name = member.User?.name ?? 'Unnamed realtor';
               const initial = name.charAt(0).toUpperCase();
-              const space = member.Space;
-              const href = space?.slug ? `/s/${space.slug}/chippi` : '#';
+              // A teammate row opens the broker-scoped realtor detail page.
+              // /s/<slug>/* requires owning that space, so a broker can't open a
+              // teammate's own dashboard — it 404s. /broker/realtors/<userId> is
+              // the broker's view of that realtor (the same link the Realtors
+              // list uses). The broker's own chief of staff lives at /broker/chippi.
+              const href = member.userId ? `/broker/realtors/${member.userId}` : '#';
               const role =
                 member.role === 'broker_owner'
                   ? 'Owner'

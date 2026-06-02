@@ -116,12 +116,18 @@ export default async function BrokerActivityPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Activity log</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Everything your team has done in the CRM.
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Activity.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          What the team&apos;s been doing
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Every action across your brokerage, newest first.
         </p>
-      </div>
+      </header>
       <ActivityClient
         initialRows={initialRows}
         initialCursor={nextCursor}

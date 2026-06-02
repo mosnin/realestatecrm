@@ -5,20 +5,21 @@ agent's `agent/chippi.py:make_chippi_agent` toolbelt. Where the realtor side
 acts on a single workspace's CRM, the broker side reads across the whole
 brokerage's swarm of realtor spaces.
 
-Phase 1 (commit 3dbdc54) shipped this registry empty — the point was wiring:
-broker chat surface → registry → broker system prompt → permission gates.
+BROKER_TOOLS now carries the FULL chief-of-staff catalog — 13 tools across
+five groups. The registry is NOT empty; the agent reads + writes across the
+brokerage through these.
 
-Phase 2 (this commit) lands the seven read tools:
+Read tools (7):
   - team_health, realtor_performance, read_realtor_morning_story (team.py)
   - find_stuck_deals, find_unassigned_leads (pipeline.py)
   - commission_report (revenue.py)
   - audit_response_times (performance.py)
 
-Phase 3 (commit 32eadb5) lands the six write tools:
+Write tools (6 — the "command your team" suite, every one audit-gated):
   - reassign_lead, flag_deal_for_broker_review (actions.py)
   - send_team_announcement (actions.py)
   - change_member_role, offboard_member (actions.py — both with confirmation gates)
-  - set_routing_rule (actions.py — needs migration 20260607000010)
+  - set_routing_rule (actions.py)
 
 Adding a new broker tool:
   1. Create or open `agent/tools/broker/<group>.py` and add a coroutine

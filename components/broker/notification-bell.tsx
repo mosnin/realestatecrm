@@ -66,7 +66,7 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={handleToggle}
-        className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+        className="relative p-2 rounded-md hover:bg-foreground/[0.04] transition-colors"
         title="Notifications"
       >
         <Bell size={16} className="text-muted-foreground" />
@@ -78,8 +78,8 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-80 rounded-xl border border-border bg-card shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="absolute right-0 top-full mt-1 w-80 rounded-xl border border-border/70 bg-card z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
             <p className="text-sm font-semibold">Notifications</p>
             <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
               <X size={14} />
@@ -87,9 +87,9 @@ export function NotificationBell() {
           </div>
           <div className="max-h-[320px] overflow-y-auto">
             {loading ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">Loading...</div>
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</div>
             ) : notifications.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">No notifications yet</div>
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">No notifications yet.</div>
             ) : (
               notifications.map((n) => {
                 const Icon = typeIcon[n.type] ?? Bell;
@@ -98,12 +98,12 @@ export function NotificationBell() {
                   <div
                     key={n.id}
                     className={cn(
-                      'px-4 py-3 border-b border-border last:border-0 flex gap-3',
-                      !n.read && 'bg-primary/5'
+                      'px-4 py-3 border-b border-border/60 last:border-0 flex gap-3',
+                      !n.read && 'bg-foreground/[0.03]'
                     )}
                   >
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Icon size={13} className="text-primary" />
+                    <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon size={13} className="text-muted-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium leading-snug">{n.title}</p>

@@ -29,7 +29,6 @@ import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
-import { BrokerHelpGuide } from '@/components/broker/help-guide';
 import { ShareLinksMenu } from './share-links-menu';
 import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
@@ -496,7 +495,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
         {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
-        {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
         <button
           type="button"

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Copy, Check, Trash2, Plus, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toastError } from '@/lib/toast-helpers';
 import {
   H3,
   SECTION_LABEL,
@@ -125,10 +126,10 @@ export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
         ]);
         setNewKeyName('');
       } else {
-        alert(data.error ?? "Couldn't create that key. Try again.");
+        toastError(data.error ?? "Couldn't create that key. Try again.");
       }
     } catch {
-      alert('I lost the connection. Try again.');
+      toastError('I lost the connection. Try again.');
     } finally {
       setCreating(false);
     }
@@ -147,10 +148,10 @@ export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
         setKeys((prev) => prev.filter((k) => k.id !== id));
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Couldn't delete that key. Try again.");
+        toastError(data.error ?? "Couldn't delete that key. Try again.");
       }
     } catch {
-      alert('I lost the connection. Try again.');
+      toastError('I lost the connection. Try again.');
     } finally {
       setDeletingId(null);
     }

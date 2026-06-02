@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
 import { ResponseTimesClient, type RealtorResponseData, type WaitingLead } from './response-times-client';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const metadata: Metadata = { title: 'Response Times — Teams' };
 
@@ -170,14 +171,20 @@ export default async function BrokerResponseTimesPage() {
     ? allTimes.reduce((a, b) => a + b, 0) / allTimes.length
     : null;
 
+  const statusSentence =
+    waitingLeads.length > 0
+      ? `${waitingLeads.length} ${waitingLeads.length === 1 ? 'lead is' : 'leads are'} still waiting for first contact.`
+      : 'Every assigned lead has been contacted.';
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Response Times</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Track how quickly realtors contact assigned leads &middot; {brokerage.name}
-        </p>
-      </div>
+    <div className={`max-w-5xl mx-auto ${SECTION_RHYTHM} pb-12`}>
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>{brokerage.name}.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Response times
+        </h1>
+        <p className={BODY_MUTED}>{statusSentence}</p>
+      </header>
 
       <ResponseTimesClient
         realtorData={realtorData}

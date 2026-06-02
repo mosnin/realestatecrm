@@ -1,23 +1,18 @@
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { formatCompact } from '@/lib/formatting';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  PhoneIncoming,
-  Briefcase,
-  TrendingUp,
-  Users,
   CheckCircle2,
   AlertCircle,
-  Flame,
   Calendar,
   Mail as MailIcon,
   Phone,
 } from 'lucide-react';
 import type { Metadata } from 'next';
+import { SECTION_LABEL, STAT_NUMBER_COMPACT, TITLE_FONT } from '@/lib/typography';
 
 export const metadata: Metadata = { title: 'Realtor Detail — Teams' };
 
@@ -132,6 +127,15 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     return 'text-muted-foreground bg-muted';
   };
 
+  const stats: Array<{ label: string; value: string | number }> = [
+    { label: 'People', value: totalContacts },
+    { label: 'New people', value: newLeads },
+    { label: 'Hot people', value: hotLeads },
+    { label: 'Active deals', value: activeDeals },
+    { label: 'Pipeline', value: formatCompact(pipelineValue) },
+    { label: 'Won', value: `${wonDeals} (${formatCompact(wonValue)})` },
+  ];
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Back link */}
@@ -144,12 +148,14 @@ export default async function RealtorDrilldownPage({ params }: Params) {
 
       {/* Profile header */}
       <div className="flex items-start gap-4">
-        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary flex-shrink-0">
+        <div className="w-14 h-14 rounded-full bg-foreground/[0.06] text-foreground/70 flex items-center justify-center text-lg font-semibold flex-shrink-0">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-semibold tracking-tight">{user.name ?? 'No name'}</h1>
+            <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+              {user.name ?? 'No name'}
+            </h1>
             {user.onboard ? (
               <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
                 <CheckCircle2 size={11} /> Active
@@ -163,164 +169,153 @@ export default async function RealtorDrilldownPage({ params }: Params) {
               {roleLabel}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
+          <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Joined {joinedAt}
-            {space?.slug && <> · Workspace: <span className="font-mono text-primary">/{space.slug}</span></>}
+            {space?.slug && <> · Workspace <span className="font-mono text-muted-foreground">/{space.slug}</span></>}
           </p>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'People', value: totalContacts, icon: Users },
-          { label: 'New people', value: newLeads, icon: PhoneIncoming },
-          { label: 'Hot people', value: hotLeads, icon: Flame },
-          { label: 'Active deals', value: activeDeals, icon: Briefcase },
-          { label: 'Pipeline', value: formatCompact(pipelineValue), icon: TrendingUp },
-          { label: 'Won', value: `${wonDeals} (${formatCompact(wonValue)})`, icon: CheckCircle2 },
-        ].map(({ label, value, icon: Icon }) => (
-          <Card key={label}>
-            <CardContent className="px-3 py-3">
-              <p className="text-xs text-muted-foreground font-medium">{label}</p>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-lg font-bold tabular-nums">{value}</p>
-                <Icon size={14} className="text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
+      {/* Stats — hairline-divider snapshot grid */}
+      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+        {stats.map(({ label, value }) => (
+          <div key={label} className="bg-background px-4 py-4">
+            <p className={SECTION_LABEL}>{label}</p>
+            <p className={`${STAT_NUMBER_COMPACT} mt-1`} style={TITLE_FONT}>
+              {value}
+            </p>
+          </div>
         ))}
-      </div>
+      </section>
 
       {!space ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center">
-            <p className="text-sm text-muted-foreground">This realtor hasn&apos;t set up their workspace yet.</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">No workspace yet.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            This realtor hasn&apos;t set up their workspace.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Recent Contacts */}
-          <div className="space-y-3">
-            <p className="text-sm font-semibold">Recent Contacts ({totalContacts})</p>
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Name</th>
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Contact</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contacts.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-muted-foreground">No contacts yet</td>
-                      </tr>
-                    ) : (
-                      contacts.slice(0, 20).map((c) => (
-                        <tr key={c.id} className="border-b border-border last:border-0">
-                          <td className="px-4 py-2.5">
-                            <p className="text-xs font-medium truncate max-w-[150px]">{c.name}</p>
-                            {c.followUpAt && (
-                              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
-                                <Calendar size={11} /> {new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 hidden sm:table-cell">
-                            <div className="space-y-0.5">
-                              {c.email && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[140px]">
-                                  <MailIcon size={11} /> {c.email}
-                                </p>
-                              )}
-                              {c.phone && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Phone size={11} /> {c.phone}
-                                </p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            {c.scoreLabel && (
-                              <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 capitalize ${scoreBadge(c.scoreLabel)}`}>
-                                {c.leadScore != null ? Math.round(c.leadScore) : ''} {c.scoreLabel}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+          <div className="space-y-2">
+            <p className={SECTION_LABEL}>
+              People
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+                {totalContacts}
+              </span>
+            </p>
+            {contacts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No people yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  New contacts will show up here.
+                </p>
               </div>
-              {contacts.length > 20 && (
-                <div className="px-4 py-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground text-center">Showing 20 of {contacts.length} contacts</p>
-                </div>
-              )}
-            </Card>
+            ) : (
+              <>
+                <ul className="divide-y divide-border/60 border-y border-border/60">
+                  {contacts.slice(0, 20).map((c) => (
+                    <li key={c.id} className="flex items-start gap-3 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                        <div className="mt-0.5 space-y-0.5">
+                          {c.email && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                              <MailIcon size={11} className="shrink-0" /> {c.email}
+                            </p>
+                          )}
+                          {c.phone && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Phone size={11} className="shrink-0" /> {c.phone}
+                            </p>
+                          )}
+                          {c.followUpAt && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                              <Calendar size={11} className="shrink-0" />
+                              Follow up {new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {c.scoreLabel && (
+                        <span className={`inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 capitalize shrink-0 ${scoreBadge(c.scoreLabel)}`}>
+                          {c.leadScore != null ? Math.round(c.leadScore) : ''} {c.scoreLabel}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {contacts.length > 20 && (
+                  <p className="text-xs text-muted-foreground text-center pt-1">
+                    Showing 20 of {contacts.length}.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Deals Pipeline */}
-          <div className="space-y-3">
-            <p className="text-sm font-semibold">Deals ({totalDeals})</p>
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Deal</th>
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Stage</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deals.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-muted-foreground">No deals yet</td>
-                      </tr>
-                    ) : (
-                      deals.slice(0, 20).map((d) => {
-                        const stage = stageMap[d.stageId];
-                        const statusColor = d.status === 'won' ? 'text-emerald-600' : d.status === 'lost' ? 'text-red-500 dark:text-red-400' : d.status === 'on_hold' ? 'text-amber-500 dark:text-amber-400' : '';
-                        return (
-                          <tr key={d.id} className="border-b border-border last:border-0">
-                            <td className="px-4 py-2.5">
-                              <p className="text-xs font-medium truncate max-w-[150px]">{d.title}</p>
-                              {d.closeDate && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Close: {new Date(d.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span
-                                className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 ${statusColor}`}
-                                style={stage ? { backgroundColor: `${stage.color}15`, color: stage.color } : undefined}
-                              >
-                                {stage?.name ?? d.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-xs font-semibold tabular-nums">
-                              {d.value != null ? formatCompact(d.value) : '—'}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+          <div className="space-y-2">
+            <p className={SECTION_LABEL}>
+              Deals
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+                {totalDeals}
+              </span>
+            </p>
+            {deals.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No deals yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Deals in this workspace will show up here.
+                </p>
               </div>
-              {deals.length > 20 && (
-                <div className="px-4 py-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground text-center">Showing 20 of {deals.length} deals</p>
-                </div>
-              )}
-            </Card>
+            ) : (
+              <>
+                <ul className="divide-y divide-border/60 border-y border-border/60">
+                  {deals.slice(0, 20).map((d) => {
+                    const stage = stageMap[d.stageId];
+                    const statusColor =
+                      d.status === 'won'
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : d.status === 'lost'
+                          ? 'text-destructive'
+                          : d.status === 'on_hold'
+                            ? 'text-amber-700 dark:text-amber-400'
+                            : 'text-muted-foreground';
+                    return (
+                      <li key={d.id} className="flex items-start gap-3 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
+                          <div className="mt-1 flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${statusColor}`}
+                              style={stage ? { backgroundColor: `${stage.color}15`, color: stage.color } : undefined}
+                            >
+                              {stage?.name ?? d.status}
+                            </span>
+                            {d.closeDate && (
+                              <span className="text-xs text-muted-foreground">
+                                Close {new Date(d.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums shrink-0 text-foreground">
+                          {d.value != null ? formatCompact(d.value) : '—'}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {deals.length > 20 && (
+                  <p className="text-xs text-muted-foreground text-center pt-1">
+                    Showing 20 of {deals.length}.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

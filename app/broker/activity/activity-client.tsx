@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -100,13 +99,16 @@ function formatRelative(iso: string): string {
 
 // Action badge palette. Tuned to match existing broker pages — muted greys for
 // read/auth events, saturated for mutating operations.
+// Action badge palette. Sanctioned status-pill tone vocabulary
+// (STYLESHEET.md §Badges & pills) — tone for MEANING only: mutating ops
+// carry weight, read/auth events recede to muted. No raw -100 saturation.
 const ACTION_BADGE: Record<string, string> = {
-  CREATE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-  UPDATE: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-  DELETE: 'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300',
-  OFFBOARD: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300',
-  ADMIN_ACTION: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-300',
-  ACCESS: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300',
+  CREATE: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+  UPDATE: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  DELETE: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
+  OFFBOARD: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
+  ADMIN_ACTION: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+  ACCESS: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
   LOGIN: 'bg-muted text-muted-foreground',
   LOGOUT: 'bg-muted text-muted-foreground',
 };
@@ -321,7 +323,7 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
               onClick={() => setWin(w.key)}
               className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
                 win === w.key
-                  ? 'bg-background text-foreground shadow-sm'
+                  ? 'bg-background text-foreground border border-border/70'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -356,93 +358,91 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
         />
       ) : (
         <>
-          <div className="space-y-1.5">
+          <ul className="divide-y divide-border/60 border-y border-border/60">
             {visibleRows.map((r) => {
               const isOpen = expanded.has(r.id);
               const shortRes = shortenId(r.resourceId);
               const spaceSlug = r.space?.slug ?? null;
               return (
-                <Card key={r.id}>
-                  <CardContent className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(r.id)}
-                      className="w-full text-left flex items-center gap-3 min-w-0"
-                      aria-expanded={isOpen}
+                <li key={r.id} className="py-3 -mx-2 px-2 hover:bg-foreground/[0.04] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(r.id)}
+                    className="w-full text-left flex items-center gap-3 min-w-0"
+                    aria-expanded={isOpen}
+                  >
+                    <span className="text-muted-foreground/70 shrink-0">
+                      {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground w-24 shrink-0 tabular-nums">
+                      {formatRelative(r.createdAt)}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className={`shrink-0 font-mono text-[10px] ${actionBadgeClass(r.action)}`}
                     >
-                      <span className="text-muted-foreground/70 shrink-0">
-                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </span>
-                      <span className="text-xs text-muted-foreground w-24 shrink-0 tabular-nums">
-                        {formatRelative(r.createdAt)}
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className={`shrink-0 font-mono text-[10px] ${actionBadgeClass(r.action)}`}
-                      >
-                        {r.action}
-                      </Badge>
-                      <span className="text-sm font-medium truncate shrink-0 max-w-[180px]">
-                        {actorLabel(r)}
-                      </span>
-                      <span className="text-muted-foreground text-xs shrink-0">·</span>
-                      <span className="text-sm text-muted-foreground truncate min-w-0">
-                        {r.resource}
-                        {shortRes && (
-                          <span className="font-mono text-xs text-muted-foreground/70">
-                            {' / '}
-                            {shortRes}
-                          </span>
-                        )}
-                      </span>
-                      {spaceSlug ? (
-                        <span className="ml-auto text-[11px] text-muted-foreground/80 font-mono shrink-0">
-                          {spaceSlug}
+                      {r.action}
+                    </Badge>
+                    <span className="text-sm font-medium truncate shrink-0 max-w-[180px]">
+                      {actorLabel(r)}
+                    </span>
+                    <span className="text-muted-foreground text-xs shrink-0">·</span>
+                    <span className="text-sm text-muted-foreground truncate min-w-0">
+                      {r.resource}
+                      {shortRes && (
+                        <span className="font-mono text-xs text-muted-foreground/70">
+                          {' / '}
+                          {shortRes}
                         </span>
-                      ) : r.spaceId === null ? (
-                        <span className="ml-auto text-[11px] text-muted-foreground/70 shrink-0 italic">
-                          brokerage-wide
+                      )}
+                    </span>
+                    {spaceSlug ? (
+                      <span className="ml-auto text-[11px] text-muted-foreground/80 font-mono shrink-0">
+                        {spaceSlug}
+                      </span>
+                    ) : r.spaceId === null ? (
+                      <span className="ml-auto text-[11px] text-muted-foreground/70 shrink-0">
+                        brokerage-wide
+                      </span>
+                    ) : null}
+                  </button>
+                  {isOpen && (
+                    <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+                      <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1 text-xs">
+                        <span className="text-muted-foreground">Timestamp</span>
+                        <span className="font-mono">
+                          {new Date(r.createdAt).toISOString()}
                         </span>
-                      ) : null}
-                    </button>
-                    {isOpen && (
-                      <div className="mt-3 pt-3 border-t border-border space-y-2">
-                        <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1 text-xs">
-                          <span className="text-muted-foreground">Timestamp</span>
-                          <span className="font-mono">
-                            {new Date(r.createdAt).toISOString()}
-                          </span>
-                          <span className="text-muted-foreground">Actor clerkId</span>
-                          <span className="font-mono truncate">{r.clerkId ?? '—'}</span>
-                          <span className="text-muted-foreground">IP</span>
-                          <span className="font-mono">{r.ipAddress ?? '—'}</span>
-                          <span className="text-muted-foreground">Resource</span>
-                          <span className="font-mono truncate">
-                            {r.resource}
-                            {r.resourceId ? ` / ${r.resourceId}` : ''}
-                          </span>
-                          <span className="text-muted-foreground">Space</span>
-                          <span className="font-mono truncate">
-                            {r.spaceId
-                              ? `${r.space?.slug ?? '(no slug)'} · ${r.spaceId}`
-                              : '— (brokerage-wide)'}
-                          </span>
-                        </div>
-                        {r.metadata && (
-                          <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground">Metadata</p>
-                            <pre className="text-[11px] font-mono bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
-                              {JSON.stringify(r.metadata, null, 2)}
-                            </pre>
-                          </div>
-                        )}
+                        <span className="text-muted-foreground">Actor clerkId</span>
+                        <span className="font-mono truncate">{r.clerkId ?? '—'}</span>
+                        <span className="text-muted-foreground">IP</span>
+                        <span className="font-mono">{r.ipAddress ?? '—'}</span>
+                        <span className="text-muted-foreground">Resource</span>
+                        <span className="font-mono truncate">
+                          {r.resource}
+                          {r.resourceId ? ` / ${r.resourceId}` : ''}
+                        </span>
+                        <span className="text-muted-foreground">Space</span>
+                        <span className="font-mono truncate">
+                          {r.spaceId
+                            ? `${r.space?.slug ?? '(no slug)'} · ${r.spaceId}`
+                            : '— (brokerage-wide)'}
+                        </span>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      {r.metadata && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Metadata</p>
+                          <pre className="text-[11px] font-mono bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+                            {JSON.stringify(r.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
               );
             })}
-          </div>
+          </ul>
           {cursor && (
             <div className="flex justify-center pt-2">
               <Button
@@ -465,35 +465,33 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-1.5" aria-busy>
+    <ul className="divide-y divide-border/60 border-y border-border/60" aria-busy>
       {[0, 1, 2, 3, 4].map((i) => (
-        <Card key={i}>
-          <CardContent className="px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-3 w-3 rounded-sm" />
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-4 w-14 rounded-full" />
-              <Skeleton className="h-3 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </CardContent>
-        </Card>
+        <li key={i} className="py-3">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-3 w-3 rounded-sm" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-4 w-14 rounded-full" />
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
 function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <Card>
-      <CardContent className="px-5 py-12 text-center space-y-3">
-        <p className="text-sm font-medium text-foreground">Couldn&apos;t load activity</p>
-        <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+      <p className="text-sm text-foreground">Couldn&apos;t load activity.</p>
+      <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">{message}</p>
+      <div className="mt-4 inline-flex">
         <Button variant="outline" size="sm" onClick={onRetry}>
           Try again
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -502,14 +500,15 @@ function EmptyState({ hasSearch, windowLabel }: { hasSearch: boolean; windowLabe
   // not the whole history. Missing that context made "no matches" misread
   // as "this actor has never done anything".
   return (
-    <Card>
-      <CardContent className="px-5 py-12 text-center">
-        <p className="text-sm text-muted-foreground">
-          {hasSearch
-            ? `No activity matches that search in "${windowLabel}". Try a different name or widen the date range.`
-            : `Nothing logged in "${windowLabel}". Try widening the date range.`}
-        </p>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+      <p className="text-sm text-foreground">
+        {hasSearch ? 'Nobody matches.' : 'Quiet — nothing logged yet.'}
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">
+        {hasSearch
+          ? `No activity in ${windowLabel.toLowerCase()}. Try a different name or widen the date range.`
+          : `Nothing in ${windowLabel.toLowerCase()}. Try widening the date range.`}
+      </p>
+    </div>
   );
 }
