@@ -1,12 +1,13 @@
 /**
- * Runtime flag is the gate that decides whether a chat request is proxied to
- * the Modal Python sandbox (default) or runs on the in-process TypeScript SDK
- * runtime (opt-in via `CHIPPI_CHAT_RUNTIME=ts`).
+ * Runtime flag is the gate that decides whether a chat request runs on the
+ * in-process TypeScript SDK runtime (default) or is proxied to the Modal
+ * Python sandbox (opt-in via `CHIPPI_CHAT_RUNTIME=modal`).
  *
- * Modal owns the prod path: it's the known-good runtime (gpt-5-mini). The in-app
- * TS runtime is reachable behind the flag while its production hang is
- * diagnosed. The contract is: any value other than the exact string `"ts"`
- * routes to Modal — including unset, empty, and case variants.
+ * The in-process TS runtime owns the prod path now: it runs on the app-wide
+ * LLM client (OpenRouter-first) with no Modal cold start. Modal stays reachable
+ * for deep/swarm work (via delegate_task) and as a whole-turn fallback behind
+ * the flag. The contract is: any value other than the exact string `"modal"`
+ * routes to the TS runtime — including unset, empty, and case variants.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -20,40 +21,40 @@ describe('chatRuntime', () => {
     else process.env.CHIPPI_CHAT_RUNTIME = ORIGINAL;
   });
 
-  it('returns "modal" when the env var is unset (production default)', () => {
+  it('returns "ts" when the env var is unset (production default)', () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
-    expect(chatRuntime()).toBe('modal');
+    expect(chatRuntime()).toBe('ts');
   });
 
-  it('returns "modal" when the env var is empty', () => {
+  it('returns "ts" when the env var is empty', () => {
     process.env.CHIPPI_CHAT_RUNTIME = '';
-    expect(chatRuntime()).toBe('modal');
+    expect(chatRuntime()).toBe('ts');
   });
 
-  it('returns "modal" for any value other than the exact string "ts"', () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'TS';
-    expect(chatRuntime()).toBe('modal');
-    process.env.CHIPPI_CHAT_RUNTIME = ' ts ';
-    expect(chatRuntime()).toBe('modal');
+  it('returns "ts" for any value other than the exact string "modal"', () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'MODAL';
+    expect(chatRuntime()).toBe('ts');
+    process.env.CHIPPI_CHAT_RUNTIME = ' modal ';
+    expect(chatRuntime()).toBe('ts');
     process.env.CHIPPI_CHAT_RUNTIME = 'true';
-    expect(chatRuntime()).toBe('modal');
+    expect(chatRuntime()).toBe('ts');
     process.env.CHIPPI_CHAT_RUNTIME = '1';
-    expect(chatRuntime()).toBe('modal');
-    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
-    expect(chatRuntime()).toBe('modal');
-  });
-
-  it('returns "ts" only when the env var is exactly "ts"', () => {
+    expect(chatRuntime()).toBe('ts');
     process.env.CHIPPI_CHAT_RUNTIME = 'ts';
     expect(chatRuntime()).toBe('ts');
+  });
+
+  it('returns "modal" only when the env var is exactly "modal"', () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    expect(chatRuntime()).toBe('modal');
   });
 
   it('reads the env var at call time, not at module load', () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
-    expect(chatRuntime()).toBe('ts');
     process.env.CHIPPI_CHAT_RUNTIME = 'modal';
     expect(chatRuntime()).toBe('modal');
+    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
+    expect(chatRuntime()).toBe('ts');
     delete process.env.CHIPPI_CHAT_RUNTIME;
-    expect(chatRuntime()).toBe('modal');
+    expect(chatRuntime()).toBe('ts');
   });
 });

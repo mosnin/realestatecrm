@@ -53,6 +53,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Agent } from '@openai/agents';
+import type { Model } from '@openai/agents';
 import { toSdkTool } from '../sdk-bridge';
 import { ALL_TOOLS } from '../tools';
 import type { ToolContext, ToolDefinition } from '../types';
@@ -254,13 +255,18 @@ function pickTools(names: readonly string[], slug: string): ToolDefinition[] {
 export function buildSkillAgent(
   slug: string,
   ctx: ToolContext,
-  opts: { model?: string } = {},
+  opts: { model?: string | Model } = {},
 ): Agent {
   const def = loadSkillDefinitions().find((d) => d.slug === slug);
   if (!def) {
     throw new Error(`skill loader: no skill found with slug "${slug}"`);
   }
   const tools = pickTools(def.frontmatter.tools ?? [], slug).map((t) => toSdkTool(t, ctx));
+  // A `Model` instance (passed by the chat runtime) carries our OpenRouter-
+  // first client; a bare slug string would resolve against the SDK's default
+  // (keyless OpenAI) provider and fail on OpenRouter-only deploys. Prefer the
+  // instance the caller hands us; fall back to the frontmatter slug only when
+  // no model was threaded through.
   return new Agent({
     name: def.frontmatter.name,
     instructions: def.body,

@@ -16,7 +16,7 @@
  * is the source of truth either way.
  */
 
-import type { Agent } from '@openai/agents';
+import type { Agent, Model } from '@openai/agents';
 import { buildSkillAgent } from './skills/loader';
 import type { ToolContext } from './types';
 
@@ -24,7 +24,7 @@ import type { ToolContext } from './types';
  *  quiet hot persons, and overdue follow-ups in one paragraph. */
 export function buildPipelineAnalystAgent(
   ctx: ToolContext,
-  opts: { model?: string } = {},
+  opts: { model?: string | Model } = {},
 ): Agent {
   return buildSkillAgent('pipeline-analyst', ctx, opts);
 }
@@ -33,7 +33,7 @@ export function buildPipelineAnalystAgent(
  *  recommends the next reasonable action. */
 export function buildContactResearcherAgent(
   ctx: ToolContext,
-  opts: { model?: string } = {},
+  opts: { model?: string | Model } = {},
 ): Agent {
   return buildSkillAgent('contact-researcher', ctx, opts);
 }
@@ -42,7 +42,7 @@ export function buildContactResearcherAgent(
  *  plan and surfaces it via `create_plan` before any domain tools run. */
 export function buildPlannerAgent(
   ctx: ToolContext,
-  opts: { model?: string } = {},
+  opts: { model?: string | Model } = {},
 ): Agent {
   return buildSkillAgent('planner', ctx, opts);
 }

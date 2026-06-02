@@ -37,6 +37,7 @@ import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
+import type { MultimodalAttachment } from '@/lib/chat/multimodal';
 
 const COMPACTION_THRESHOLD_CHARS = 80_000;
 
@@ -51,6 +52,10 @@ interface StreamTsChatTurnInput {
   userMessage: string;
   /** Prior history, already deduped against the just-saved user turn. */
   history: HistoryRow[];
+  /** Workspace chat model slug. Resolved to the active provider downstream. */
+  model?: string;
+  /** Attachments for this turn (images / PDFs), hydrated to signed URLs. */
+  attachments?: MultimodalAttachment[];
   abortController: AbortController;
 }
 
@@ -92,6 +97,8 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         ctx: input.ctx,
         userMessage: input.userMessage,
         history,
+        model: input.model,
+        attachments: input.attachments,
       });
       return { result: result as unknown as SdkResultLike };
     },

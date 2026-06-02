@@ -17,6 +17,9 @@
 
 import OpenAI from 'openai';
 
+// Local binding for use in this module (the block below only RE-exports it).
+import { DEFAULT_CHAT_MODEL } from './chat-models';
+
 export {
   CHAT_MODELS,
   DEFAULT_CHAT_MODEL,
@@ -60,6 +63,39 @@ export function hasLLMKey(): boolean {
  */
 export function openaiModel(name: string): string {
   return isOpenRouterConfigured() ? `openai/${name}` : name;
+}
+
+/**
+ * The model the in-app chat agent falls back to when ONLY an OpenAI key is
+ * configured (no OpenRouter). Must be a real OpenAI model that supports tool
+ * calling AND vision. gpt-4o-mini is the most universally-available such model.
+ */
+export const OPENAI_FALLBACK_CHAT_MODEL = 'gpt-4o-mini';
+
+/**
+ * Pick a chat model the ACTIVE provider can actually serve — the fix for the
+ * keystone failure mode where the default model (`x-ai/grok-4.3`, an OpenRouter
+ * slug) was shipped to `api.openai.com` (which has no such model) and every
+ * turn 500'd.
+ *
+ * - OpenRouter configured → any slug is fine; return the requested model (or
+ *   the default) verbatim.
+ * - OpenAI-only → a vendor-prefixed slug (`x-ai/…`, `anthropic/…`, `moonshotai/…`)
+ *   or any non-`gpt` model cannot be served by OpenAI; substitute the OpenAI
+ *   fallback so the request CANNOT 404 on a wrong-provider model. A bare
+ *   `gpt-*` model passes through unchanged.
+ *
+ * This makes the provider/model mismatch structurally impossible regardless of
+ * which key the deployment has.
+ */
+export function resolveChatModel(requested?: string | null): string {
+  const wanted = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  if (isOpenRouterConfigured()) return wanted;
+  // OpenAI-only path: only bare gpt-* models are servable.
+  if (wanted.includes('/') || !wanted.toLowerCase().startsWith('gpt')) {
+    return OPENAI_FALLBACK_CHAT_MODEL;
+  }
+  return wanted;
 }
 
 /**

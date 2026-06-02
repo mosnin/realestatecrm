@@ -4,8 +4,8 @@
  *
  * The bar:
  *   - Auth required (401 without).
- *   - 404 when the runtime flag is off (the endpoint shouldn't exist
- *     under the modal default).
+ *   - 404 when CHIPPI_CHAT_RUNTIME=modal (paused runs only originate in the
+ *     in-process TS runtime, so the resume endpoint is meaningless there).
  *   - 404 when no row.
  *   - 403 when the row belongs to another user.
  *   - 409 when the row is already resumed/cancelled/expired.

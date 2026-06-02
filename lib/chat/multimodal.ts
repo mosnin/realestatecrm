@@ -106,6 +106,45 @@ export function providerSupportsPdfs(provider: string): boolean {
 }
 
 /**
+ * The model a turn is upgraded to when its attachments need vision/PDF support
+ * the chosen model lacks. Claude is the one registry model that reliably reads
+ * BOTH images and PDFs through OpenRouter, so it's the universal upgrade
+ * target. Keep this slug in sync with lib/chat-models.ts.
+ */
+export const VISION_FALLBACK_MODEL = 'anthropic/claude-opus-4.7';
+
+/**
+ * Pick the model for a turn so multimodal "just works." If the turn carries
+ * attachments the chosen model's provider can't consume, upgrade THAT turn to
+ * a vision-capable model instead of silently dropping the file. Only upgrades
+ * when the caller can pick any provider (OpenRouter configured) — on an
+ * OpenAI-only deploy the model is already a vision-capable GPT, and there's no
+ * Claude to reach for, so we leave it (the builder drops + notes unsupported
+ * types). Pure function — no I/O.
+ *
+ * Returns the (possibly upgraded) model slug and whether an upgrade happened.
+ */
+export function pickModelForAttachments(
+  model: string,
+  attachments: MultimodalAttachment[],
+  canPickAnyProvider: boolean,
+): { model: string; upgraded: boolean } {
+  if (!attachments || attachments.length === 0) return { model, upgraded: false };
+
+  const provider = detectProvider(model);
+  const needsImg = attachments.some((a) => isImageMime(a.mimeType));
+  const needsPdf = attachments.some((a) => isPdfMime(a.mimeType));
+  const imgOk = !needsImg || providerSupportsImages(provider);
+  const pdfOk = !needsPdf || providerSupportsPdfs(provider);
+  if (imgOk && pdfOk) return { model, upgraded: false };
+
+  // The current model can't see something attached. Upgrade if we can.
+  if (!canPickAnyProvider) return { model, upgraded: false };
+  if (model === VISION_FALLBACK_MODEL) return { model, upgraded: false };
+  return { model: VISION_FALLBACK_MODEL, upgraded: true };
+}
+
+/**
  * Build the content blocks for a single user-message turn.
  *
  * Always returns at least one text block (the raw user message); image /
@@ -174,6 +213,104 @@ export function buildMultimodalContent(
   }
 
   return { blocks, unsupported, fallbackNote };
+}
+
+// ── SDK-native content (in-process @openai/agents runtime) ──────────────────
+//
+// The direct path (runDirectChat) talks to the OpenAI SDK's chat.completions
+// directly, so it uses the raw OpenRouter block shapes above. The agent path
+// runs through @openai/agents, whose `UserContent` is a DIFFERENT shape:
+// `input_text` / `input_image` (image = URL string) / `input_file`
+// (file = { url }). The SDK's chat-completions converter turns these into the
+// provider blocks under the hood. This builder produces that SDK-native shape
+// so an attachment+action turn ("add this person from the business card")
+// can be SEEN by the agent instead of being force-routed to Modal or dropped.
+
+/** A content part in the @openai/agents `UserContent` shape. */
+export type SdkContentPart =
+  | { type: 'input_text'; text: string }
+  | { type: 'input_image'; image: string }
+  | { type: 'input_file'; file: { url: string }; filename?: string };
+
+export interface SdkBuildResult {
+  /** Content parts for the SDK user message. Always ≥1 (the text part). */
+  content: SdkContentPart[];
+  /** Attachments the active provider can't consume. */
+  unsupported: MultimodalAttachment[];
+  /** One calm Chippi-voice line when attachments were dropped; '' otherwise. */
+  fallbackNote: string;
+}
+
+/**
+ * Build the SDK-native user-message content for the in-process agent runtime.
+ * Mirrors `buildMultimodalContent`'s provider gating (images for vision-
+ * capable providers, PDFs only where they reliably work) but emits the
+ * `@openai/agents` content shape instead of raw OpenRouter blocks.
+ */
+export function buildSdkUserContent(
+  model: string,
+  userText: string,
+  attachments: MultimodalAttachment[],
+): SdkBuildResult {
+  const provider = detectProvider(model);
+  const content: SdkContentPart[] = [];
+  const unsupported: MultimodalAttachment[] = [];
+
+  if (userText && userText.trim()) {
+    content.push({ type: 'input_text', text: userText });
+  }
+
+  const supportsImg = providerSupportsImages(provider);
+  const supportsPdf = providerSupportsPdfs(provider);
+
+  for (const a of attachments) {
+    if (!a.url) {
+      unsupported.push(a);
+      continue;
+    }
+    if (isImageMime(a.mimeType)) {
+      if (!supportsImg) {
+        unsupported.push(a);
+        continue;
+      }
+      content.push({ type: 'input_image', image: a.url });
+      continue;
+    }
+    if (isPdfMime(a.mimeType)) {
+      if (!supportsPdf) {
+        unsupported.push(a);
+        continue;
+      }
+      content.push({ type: 'input_file', file: { url: a.url }, filename: a.filename });
+      continue;
+    }
+    unsupported.push(a);
+  }
+
+  const fallbackNote =
+    unsupported.length > 0 ? composeFallbackNote(provider, unsupported) : '';
+
+  // Splice the fallback note onto the text part so the model has an explicit
+  // reason an attachment is missing instead of pretending it saw something.
+  if (fallbackNote) {
+    const textPart = content.find((c) => c.type === 'input_text') as
+      | { type: 'input_text'; text: string }
+      | undefined;
+    if (textPart) {
+      textPart.text = `${textPart.text}\n\n[Note: ${fallbackNote}]`;
+    }
+  }
+
+  // Never hand the SDK an empty content array (it rejects it). A pure-
+  // attachment turn with no text gets an implicit prompt so every provider
+  // sees a well-shaped message.
+  if (content.length === 0) {
+    content.push({ type: 'input_text', text: 'Take a look at this.' });
+  } else if (!content.some((c) => c.type === 'input_text')) {
+    content.unshift({ type: 'input_text', text: 'Take a look at this.' });
+  }
+
+  return { content, unsupported, fallbackNote };
 }
 
 function encodeImage(provider: string, a: MultimodalAttachment): ContentBlock[] {
