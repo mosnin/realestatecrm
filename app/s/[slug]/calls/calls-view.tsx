@@ -16,6 +16,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Phone, PhoneOff, ChevronDown } from 'lucide-react';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { toastSuccess, toastError } from '@/lib/toast-helpers';
 import { cn } from '@/lib/utils';
 import {
   H1,
@@ -102,6 +105,8 @@ export function CallsView({ slug }: { slug: string }) {
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [number, setNumber] = useState('');
+  const [placing, setPlacing] = useState(false);
 
   const fetchCalls = useCallback(async () => {
     try {
@@ -123,6 +128,46 @@ export function CallsView({ slug }: { slug: string }) {
     fetchCalls();
   }, [fetchCalls]);
 
+  const placeCall = async () => {
+    const to = number.trim();
+    if (!to) {
+      toastError('Enter a number to call.');
+      return;
+    }
+    setPlacing(true);
+    try {
+      const res = await fetch('/api/calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, toNumber: to }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        configured?: boolean;
+        message?: string;
+      };
+      // Validation / auth / rate-limit failures are non-2xx.
+      if (!res.ok) {
+        toastError(data.error ?? 'Could not place the call.');
+        return;
+      }
+      // The route returns 200 even when voice isn't set up; the signal is
+      // `configured: false`. Show the reason and refresh the log either way.
+      if (data.configured === false) {
+        toastError(data.message ?? 'Calling is not set up for this workspace yet.');
+        fetchCalls();
+        return;
+      }
+      setNumber('');
+      toastSuccess('Calling — your phone rings first, then we connect you.');
+      fetchCalls();
+    } catch {
+      toastError('Could not place the call.');
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 pb-12 space-y-12">
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -133,6 +178,33 @@ export function CallsView({ slug }: { slug: string }) {
         </h1>
         <p className={cn(BODY_MUTED)}>{statusSentence(calls)}</p>
       </header>
+
+      {/* ── Start a call ───────────────────────────────────────────────── */}
+      <section className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-3">
+        <p className={cn(SECTION_LABEL)}>Start a call</p>
+        <div className="flex items-center gap-2">
+          <Input
+            type="tel"
+            inputMode="tel"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !placing) placeCall();
+            }}
+            placeholder="+1 (555) 123-4567"
+            className="flex-1"
+            disabled={placing}
+          />
+          <Button onClick={placeCall} disabled={placing || !number.trim()}>
+            <Phone size={14} strokeWidth={2} className="mr-1.5" />
+            {placing ? 'Calling…' : 'Call'}
+          </Button>
+        </div>
+        <p className={cn(CAPTION)}>
+          Your phone rings first; once you pick up, we connect you to the contact and record the
+          call. Chippi summarizes it when it ends.
+        </p>
+      </section>
 
       {/* ── List ───────────────────────────────────────────────────────── */}
       <section className="space-y-3">
