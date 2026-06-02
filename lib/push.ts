@@ -18,7 +18,10 @@
  * Generate a keypair with:  npx web-push generate-vapid-keys
  */
 
-import 'server-only';
+// NB: intentionally no `import 'server-only'` — this module is only ever
+// imported server-side (notify.ts + API routes), and `server-only` isn't
+// resolvable under vitest, which broke the tool-registry tests that reach this
+// file transitively through notify.ts. Matches the sibling lib/sms.ts.
 import webpush from 'web-push';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
