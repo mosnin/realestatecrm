@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { toastError } from '@/lib/toast-helpers';
 import {
   Download,
   Upload,
@@ -61,7 +62,7 @@ export default function ImportExportClient({ totalLeads }: { totalLeads: number 
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed.');
+      toastError(err instanceof Error ? err.message : 'Export failed.');
     } finally {
       setExporting(false);
     }

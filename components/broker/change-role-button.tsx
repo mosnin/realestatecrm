@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { toastError } from '@/lib/toast-helpers';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,10 +46,10 @@ export function ChangeRoleButton({
         window.location.reload();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? 'Failed to change role.');
+        toastError(data.error ?? 'Failed to change role.');
       }
     } catch {
-      alert("Couldn't reach the server — usually temporary.");
+      toastError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
     }

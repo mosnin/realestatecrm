@@ -22,8 +22,8 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
         <CardContent className="px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Building2 size={15} className="text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+                <Building2 size={15} className="text-foreground/70" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{existingBrokerageName}</p>
@@ -71,8 +71,8 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
     <Card>
       <CardContent className="px-5 py-4 space-y-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Building2 size={15} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+            <Building2 size={15} className="text-foreground/70" />
           </div>
           <div>
             <p className="text-sm font-semibold">Create a brokerage</p>
@@ -87,7 +87,7 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
-            className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <Button type="submit" size="sm" disabled={loading || !name.trim()}>
             {loading ? 'Creating…' : 'Create'}

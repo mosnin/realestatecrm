@@ -164,9 +164,9 @@ const brokerSettingsNavSections = [
     ],
   },
   {
-    label: 'Lead Management',
+    label: 'Lead management',
     items: [
-      { href: '/broker/settings/auto-assignment', label: 'Auto-Assignment', icon: Shuffle, exact: false },
+      { href: '/broker/settings/auto-assignment', label: 'Auto-assignment', icon: Shuffle, exact: false },
       { href: '/broker/settings/routing-rules', label: 'Routing rules', icon: GitBranch, exact: false },
     ],
   },

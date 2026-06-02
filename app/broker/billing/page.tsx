@@ -1,4 +1,4 @@
-import { redirect, notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
@@ -37,9 +37,12 @@ export default async function BrokerBillingPage() {
   if (!spaceRow) {
     return (
       <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">No workspace found for billing</p>
+        <BillingHeader status="No workspace is set up for billing yet." />
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">No workspace found.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Set up a workspace before managing a subscription.
+          </p>
         </div>
       </div>
     );
@@ -50,10 +53,11 @@ export default async function BrokerBillingPage() {
   if (!isBrokerOwner) {
     return (
       <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">
-            Billing is managed by the brokerage owner.
+        <BillingHeader status="The brokerage owner manages billing." />
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">Billing lives with the owner.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Ask the brokerage owner to make changes to the subscription.
           </p>
         </div>
       </div>
@@ -108,16 +112,13 @@ export default async function BrokerBillingPage() {
   if (stripeError) {
     return (
       <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">Manage your subscription and payment details</p>
-        </div>
-        <div className="rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">
-            Unable to load billing information
+        <BillingHeader status="Manage your subscription and payment details." />
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-10 text-center">
+          <p className="text-sm font-medium text-destructive">
+            Couldn&apos;t load billing.
           </p>
-          <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1 max-w-[320px] mx-auto">
-            Couldn&apos;t reach Stripe — usually temporary. Try again in a bit, or contact support if it sticks.
+          <p className="text-xs text-muted-foreground mt-1 max-w-[320px] mx-auto">
+            We couldn&apos;t reach Stripe — usually temporary. Try again in a bit, or contact support if it sticks.
           </p>
         </div>
       </div>
@@ -126,10 +127,7 @@ export default async function BrokerBillingPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground">Manage your subscription and payment details</p>
-      </div>
+      <BillingHeader status="Manage your subscription and payment details." />
       <BillingPage
         slug={slug}
         subscriptionStatus={subscriptionStatus}
@@ -139,6 +137,23 @@ export default async function BrokerBillingPage() {
         invoices={invoices}
       />
     </div>
+  );
+}
+
+// Serif H1 + status-sentence header, shared across every billing state so the
+// page reads as one product whether Stripe loads, errors, or is read-only.
+function BillingHeader({ status }: { status: string }) {
+  return (
+    <header className="space-y-1.5">
+      <p className="text-sm text-muted-foreground">Billing.</p>
+      <h1
+        className="text-3xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        Your subscription
+      </h1>
+      <p className="text-sm text-muted-foreground">{status}</p>
+    </header>
   );
 }
 

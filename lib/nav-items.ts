@@ -101,6 +101,7 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/properties/new', label: 'Add property' },
       { href: '/properties/commissions', label: 'Commissions' },
+      { href: '/cma', label: 'CMA' },
     ],
   },
   {

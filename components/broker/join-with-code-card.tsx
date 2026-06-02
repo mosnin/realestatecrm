@@ -43,7 +43,7 @@ export function JoinWithCodeCard() {
         <CardContent className="px-5 py-4">
           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 size={16} />
-            <p className="text-sm font-medium">Joined {joined}! Redirecting…</p>
+            <p className="text-sm font-medium">Joined {joined}. Redirecting…</p>
           </div>
         </CardContent>
       </Card>
@@ -54,8 +54,8 @@ export function JoinWithCodeCard() {
     <Card>
       <CardContent className="px-5 py-4 space-y-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Hash size={15} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+            <Hash size={15} className="text-foreground/70" />
           </div>
           <div>
             <p className="text-sm font-semibold">Join a brokerage</p>
@@ -70,7 +70,7 @@ export function JoinWithCodeCard() {
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={9}
-            className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <Button type="submit" size="sm" disabled={loading || !code.trim()}>
             {loading ? 'Joining…' : 'Join'}

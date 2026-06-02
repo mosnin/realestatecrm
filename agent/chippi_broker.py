@@ -2,12 +2,16 @@
 
 Parallel to `agent/chippi.py:make_chippi_agent` but with:
   - A different system prompt (chief-of-staff voice, brokerage-wide scope).
-  - A different tool catalog (`agent/tools/broker.BROKER_TOOLS`), empty in
-    Phase 1 by design.
+  - A different tool catalog (`agent/tools/broker.BROKER_TOOLS`) — the full
+    13-tool chief-of-staff set: TEAM, PIPELINE, REVENUE, and PERFORMANCE
+    read tools plus the WRITE suite (reassign_lead, flag_deal_for_broker_review,
+    send_team_announcement, change_member_role, offboard_member,
+    set_routing_rule), each gated through `_guards.require_broker_role` and
+    audit-logged.
   - No realtor-side native tools and no realtor-side Composio integrations —
     the broker doesn't get to draft a follow-up to a realtor's contact from
-    their own chat surface. Cross-realtor mutations land via dedicated
-    broker tools (Phase 3) that always confirm in chat first.
+    their own chat surface. Cross-realtor mutations land via the dedicated
+    broker write tools, which confirm in chat before any destructive move.
 
 The factory is intentionally minimal — same shape as `make_chippi_agent` so
 the runtime's selection in `modal_app.py:chat_turn` is a flat branch, not a
@@ -109,9 +113,11 @@ def make_broker_agent(
     Mirrors `chippi.py:make_chippi_agent` in shape so the chat_turn dispatch
     is a flat branch. Distinct from the realtor factory in three ways:
 
-      1. Loads `BROKER_TOOLS` (empty in Phase 1) instead of native realtor
-         tools — the broker does NOT get find_contacts / draft_message /
-         etc. Cross-realtor mutations belong to dedicated broker tools.
+      1. Loads `BROKER_TOOLS` (the full broker catalog — TEAM, PIPELINE,
+         REVENUE, PERFORMANCE reads plus the WRITE suite) instead of native
+         realtor tools — the broker does NOT get find_contacts /
+         draft_message / etc. Cross-realtor mutations run through the broker
+         write tools, each role-gated and audited.
       2. Does NOT accept `extra_tools` (Composio integrations) — the broker
          doesn't draft on a realtor's behalf from their chat surface.
       3. Uses BROKER_INSTRUCTIONS for the system prompt.
@@ -120,17 +126,16 @@ def make_broker_agent(
     ----------
     workspace_info:
         Optional per-brokerage context block (brokerage name, member counts,
-        last-7d roll-up). Wired in Phase 2 once the broker has read tools to
-        derive it from. Pass None in Phase 1.
+        last-7d roll-up) prepended to the system prompt when provided.
     model:
         Workspace-picked chat model slug, resolved via `resolve_chat_model`.
 
     Returns
     -------
     Agent
-        Single-agent broker variant. The `pending_drafts_guardrail` is
-        retained for symmetry — once Phase 3 ships broker draft tools, the
-        same approval gate applies.
+        Single-agent broker variant carrying the full BROKER_TOOLS catalog.
+        The `pending_drafts_guardrail` applies the same approval gate the
+        realtor agent uses before any draft-bearing turn.
     """
     configure_agents_sdk()
     parts: list[str] = [BROKER_INSTRUCTIONS]
@@ -142,9 +147,10 @@ def make_broker_agent(
         name="Chippi (broker)",
         model=make_chat_model(resolve_chat_model(model)),
         instructions=instructions,
-        # BROKER_TOOLS is empty in Phase 1 — the agent answers from the
-        # system prompt alone. Phase 2/3 tools land in tools/broker/ and
-        # are appended to the BROKER_TOOLS list, no change required here.
+        # BROKER_TOOLS carries the full 13-tool chief-of-staff catalog
+        # (TEAM / PIPELINE / REVENUE / PERFORMANCE reads + the WRITE suite),
+        # assembled in tools/broker/__init__.py. Adding a tool there flows
+        # through here with no change required.
         tools=list(BROKER_TOOLS),
         input_guardrails=[pending_drafts_guardrail],
     )

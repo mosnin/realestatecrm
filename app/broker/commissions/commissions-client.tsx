@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,15 +27,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  DollarSign,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
   Download,
   MoreHorizontal,
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { STAT_NUMBER, CAPTION, SECTION_LABEL } from '@/lib/typography';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -323,7 +320,7 @@ function EditRowDialog({ row, onClose, onSaved }: EditDialogProps) {
               rows={3}
               value={fields.notes}
               onChange={(e) => setFields((p) => ({ ...p, notes: e.target.value }))}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background transition-colors duration-150"
             />
           </div>
 
@@ -335,7 +332,7 @@ function EditRowDialog({ row, onClose, onSaved }: EditDialogProps) {
               {saving ? (
                 <>
                   <Loader2 size={14} className="mr-1.5 animate-spin" />
-                  Saving...
+                  Saving…
                 </>
               ) : (
                 'Save changes'
@@ -575,137 +572,97 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
         </Button>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <DollarSign size={15} className="text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(summary.totalCommissions)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Total Commissions</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Clock size={15} className="text-amber-600 dark:text-amber-400" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
-              {formatCurrency(summary.pendingPayouts)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Pending (broker)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <CheckCircle2 size={15} className="text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">
-              {formatCurrency(summary.paidThisMonth)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Paid (broker)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <TrendingUp size={15} className="text-primary" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.totalValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total Deal Value</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary — hairline stat grid (printed-paper vocabulary). */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+        <div className="bg-background px-4 py-4">
+          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.totalCommissions)}</p>
+          <p className={cn(CAPTION, 'mt-1')}>Total commissions</p>
+        </div>
+        <div className="bg-background px-4 py-4">
+          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.pendingPayouts)}</p>
+          <p className={cn(CAPTION, 'mt-1')}>Pending (broker)</p>
+        </div>
+        <div className="bg-background px-4 py-4">
+          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.paidThisMonth)}</p>
+          <p className={cn(CAPTION, 'mt-1')}>Paid (broker)</p>
+        </div>
+        <div className="bg-background px-4 py-4">
+          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.totalValue)}</p>
+          <p className={cn(CAPTION, 'mt-1')}>Total deal value</p>
+        </div>
+      </section>
 
       {/* Per-agent summary */}
-      <div>
-        <h2 className="text-sm font-semibold mb-3">Per-Agent Commissions</h2>
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deals</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Value</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent Owed</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Broker Earned</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {byAgent.map((a) => (
-                  <tr key={a.agentUserId} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                          {initials(a.name, a.email)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{a.name}</p>
-                          <p className="text-[11px] text-muted-foreground truncate">{a.email}</p>
-                        </div>
+      <div className="space-y-3">
+        <p className={cn(SECTION_LABEL)}>Per-agent commissions</p>
+        <div className="overflow-x-auto rounded-xl border border-border/60">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Agent</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Deals</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Total value</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Agent owed</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Broker earned</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60 bg-card">
+              {byAgent.map((a) => (
+                <tr key={a.agentUserId} className="hover:bg-foreground/[0.04] transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
+                        {initials(a.name, a.email)}
                       </div>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-semibold">{a.dealsClosed}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.totalValue)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.agentCommission)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(a.brokerCommission)}
-                    </td>
-                  </tr>
-                ))}
-                {byAgent.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      No ledger rows for the selected month/status.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{a.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{a.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-xs font-medium">{a.dealsClosed}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.totalValue)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.agentCommission)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-xs font-medium">
+                    {formatCurrency(a.brokerCommission)}
+                  </td>
+                </tr>
+              ))}
+              {byAgent.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    No ledger rows for the selected month and status.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Ledger detail table */}
-      <div>
-        <h2 className="text-sm font-semibold mb-3">Ledger</h2>
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deal</th>
-                  <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Closed</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Value</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent %</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Broker %</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Broker $</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-                  <th className="w-10 px-2 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {filtered.map((row) => (
+      <div className="space-y-3">
+        <p className={cn(SECTION_LABEL)}>Ledger</p>
+        <div className="overflow-x-auto rounded-xl border border-border/60">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Deal</th>
+                <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground">Agent</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Closed</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Value</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Agent %</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Broker %</th>
+                <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Broker $</th>
+                <th className="text-center px-3 py-3 text-xs font-medium text-muted-foreground">Status</th>
+                <th className="w-10 px-2 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60 bg-card">
+              {filtered.map((row) => (
                   <tr
                     key={row.id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="hover:bg-foreground/[0.04] transition-colors cursor-pointer"
                     onClick={(e) => {
                       // Ignore clicks that originated on the row-action dropdown.
                       const target = e.target as HTMLElement;
@@ -726,7 +683,7 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                     <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(row.dealValue)}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-xs">{decimalToPct(row.agentRate)}%</td>
                     <td className="px-3 py-3 text-right tabular-nums text-xs">{decimalToPct(row.brokerRate)}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <td className="px-3 py-3 text-right tabular-nums text-xs font-medium">
                       {formatCurrency(row.brokerAmount)}
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -776,17 +733,16 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      No ledger rows for the selected filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    No ledger rows for the selected filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -804,9 +760,9 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
 
 function StatusPill({ status }: { status: LedgerStatus }) {
   const styles: Record<LedgerStatus, string> = {
-    pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    void: 'bg-muted text-muted-foreground',
+    pending: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+    paid: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+    void: 'text-muted-foreground bg-muted',
   };
   const label: Record<LedgerStatus, string> = {
     pending: 'Pending',
@@ -814,7 +770,7 @@ function StatusPill({ status }: { status: LedgerStatus }) {
     void: 'Void',
   };
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${styles[status]}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
       {label[status]}
     </span>
   );

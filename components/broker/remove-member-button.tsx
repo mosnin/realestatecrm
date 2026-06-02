@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toastError } from '@/lib/toast-helpers';
 
 interface RemoveMemberButtonProps {
   membershipId: string;
@@ -23,10 +24,10 @@ export function RemoveMemberButton({ membershipId, memberName }: RemoveMemberBut
         window.location.reload();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? 'Failed to remove member.');
+        toastError(data.error ?? 'Failed to remove member.');
       }
     } catch {
-      alert("Couldn't reach the server — usually temporary.");
+      toastError("Couldn't reach the server — usually temporary.");
     } finally {
       setLoading(false);
       setConfirming(false);

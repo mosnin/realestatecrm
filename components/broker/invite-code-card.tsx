@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, RefreshCw, Hash } from 'lucide-react';
+import { toastError } from '@/lib/toast-helpers';
 
 export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
   const [code, setCode] = useState<string | null>(null);
@@ -25,9 +26,9 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
       const res = await fetch('/api/broker/join-code', { method: 'POST' });
       const data = await res.json();
       if (res.ok) setCode(data.joinCode);
-      else alert(data.error ?? 'Failed to generate code.');
+      else toastError(data.error ?? 'Failed to generate code.');
     } catch {
-      alert("Couldn't reach the server — usually temporary.");
+      toastError("Couldn't reach the server — usually temporary.");
     } finally {
       setGenerating(false);
     }
@@ -45,8 +46,8 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
     <Card>
       <CardContent className="px-5 py-4 space-y-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Hash size={15} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+            <Hash size={15} className="text-foreground/70" />
           </div>
           <div>
             <p className="text-sm font-semibold">Invite code</p>
@@ -55,15 +56,15 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
         </div>
 
         {loading ? (
-          <div className="h-9 rounded-lg bg-muted animate-pulse" />
+          <div className="h-9 rounded-md bg-muted animate-pulse" />
         ) : code ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-9 rounded-lg border border-input bg-muted/40 px-3 flex items-center">
+            <div className="flex-1 h-9 rounded-md border border-input bg-muted/40 px-3 flex items-center">
               <span className="text-sm font-mono font-semibold tracking-widest">{code}</span>
             </div>
             <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleCopy}>
               {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-              {copied ? 'Copied!' : 'Copy link'}
+              {copied ? 'Copied.' : 'Copy link'}
             </Button>
             {isOwner && (
               <Button

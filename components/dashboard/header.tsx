@@ -29,7 +29,6 @@ import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
-import { BrokerHelpGuide } from '@/components/broker/help-guide';
 import { ShareLinksMenu } from './share-links-menu';
 import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
@@ -445,10 +444,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           </SheetContent>
         </Sheet>
 
-        <span className="font-semibold text-sm md:hidden flex items-center gap-2">
-          <BrandLogo className="h-5" alt="Chippi" />
-        </span>
-
         {/* Desktop breadcrumb — small, monospaced separator, no chunky pills.
             The current section reads as the focal label; the workspace name
             is quiet context. Quick-switch is a borderless link, not a chip. */}
@@ -500,7 +495,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
         {slug && !isOnBrokerPage && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
-        {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
         <button
           type="button"
