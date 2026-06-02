@@ -48,7 +48,11 @@ export function getAgentOpenAIClient(): OpenAI {
   if (cachedClient) return cachedClient;
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new MissingAgentKeyError();
-  cachedClient = new OpenAI({ apiKey: key });
+  // Per-request timeout so a stalled OpenAI call rejects instead of parking
+  // the turn until Vercel's 300s lambda wall. Pairs with the stream-pump
+  // watchdog in sdk-chat-stream.ts — together they guarantee a wedged run
+  // surfaces an error rather than hanging silently with nothing in the logs.
+  cachedClient = new OpenAI({ apiKey: key, timeout: 120_000, maxRetries: 2 });
   return cachedClient;
 }
 

@@ -135,14 +135,29 @@ EMBEDDING_MODEL = (
 )
 
 
+# Per-request HTTP timeout on every LLM call. Without it the SDK default
+# (effectively unbounded for our purposes) lets a hung provider request ride
+# the full 600s Modal container budget, at which point the container is killed
+# mid-stream with no terminal SSE frame — the browser then hangs forever. A
+# 120s cap means a stalled call RAISES (caught by the fallback/error paths,
+# which emit a terminal frame) long before the container dies. Generous enough
+# for legitimate long reasoning turns; short enough that a wedged socket can't
+# silently eat a turn.
+LLM_REQUEST_TIMEOUT_SECONDS = 120.0
+
+
 def get_llm_client() -> AsyncOpenAI:
     """Build the shared LLM client — OpenRouter when configured, else OpenAI."""
     if settings.openrouter_api_key:
         return AsyncOpenAI(
             base_url=OPENROUTER_BASE_URL,
             api_key=settings.openrouter_api_key,
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS,
         )
-    return AsyncOpenAI(api_key=settings.openai_api_key)
+    return AsyncOpenAI(
+        api_key=settings.openai_api_key,
+        timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+    )
 
 
 def openai_model(name: str) -> str:

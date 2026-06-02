@@ -130,6 +130,56 @@ export function streamTsResumeTurn(input: StreamResumeInput): Response {
 
 // ── Internals ──────────────────────────────────────────────────────────────
 
+/**
+ * Idle watchdog for the stream pump. If the SDK stream yields no event and
+ * the run never completes for this long, treat the turn as wedged. This is
+ * the guard against the production failure where a stalled run parked
+ * `reader.read()` / `result.completed` forever with no thrown error, riding
+ * the lambda to its 300s wall with nothing in the logs. 90s is generous for a
+ * legitimate reasoning gap (the LLM client also has its own 120s per-request
+ * timeout) and well under maxDuration.
+ */
+const PUMP_IDLE_TIMEOUT_MS = 90_000;
+
+/** Distinct from AbortError on purpose: the catch in the pump suppresses the
+ *  error event only for client aborts. A stall MUST surface as an error so the
+ *  browser stops waiting, so it carries its own name. */
+class StreamStalledError extends Error {
+  constructor() {
+    super('Agent stream stalled — no activity within the idle timeout.');
+    this.name = 'StreamStalledError';
+  }
+}
+
+/**
+ * Race a pump await against the idle watchdog. On timeout, abort the
+ * underlying run (so it stops burning resources) and reject with
+ * StreamStalledError, which the pump's catch turns into a terminal error
+ * event. A settled `p` clears the timer so a healthy stream pays nothing.
+ */
+function withIdleTimeout<T>(p: Promise<T>, abortController: AbortController): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      try {
+        abortController.abort();
+      } catch {
+        /* already aborted */
+      }
+      reject(new StreamStalledError());
+    }, PUMP_IDLE_TIMEOUT_MS);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 interface BuildStreamInput {
   ctx: ToolContext;
   conversationId: string;
@@ -312,14 +362,17 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         const stream = result.toStream() as { getReader(): ReadableStreamDefaultReader<unknown> };
         const reader = stream.getReader();
         while (true) {
-          const { done, value } = await reader.read();
+          // Each read is raced against the idle watchdog — a stalled stream
+          // rejects with StreamStalledError instead of parking forever.
+          const { done, value } = await withIdleTimeout(reader.read(), input.abortController);
           if (done) break;
           const mapped = mapSdkEvent(value as SdkStreamEventLike, ALL_TOOLS);
           if (mapped) pushEvent(mapped);
         }
         // Block until the SDK declares the run complete so result.interruptions
-        // and result.state are stable before we read them.
-        await result.completed;
+        // and result.state are stable before we read them. Same watchdog — the
+        // SDK can finish the stream yet never resolve `completed`.
+        await withIdleTimeout(result.completed, input.abortController);
 
         // Pause path: if the run paused for approval, persist the state,
         // emit permission_required with the AgentPausedRun id as requestId,

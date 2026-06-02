@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 
 import structlog
 from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
-from openai import APIStatusError, RateLimitError
+from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 from openai.types.shared import Reasoning
 
 from config import settings
@@ -131,6 +131,7 @@ async def _run_with_fallback(
     run_config: RunConfig,
     context,
     on_event=None,
+    max_turns: int = 10,
 ) -> object:
     """Run the agent, falling back through _FALLBACK_MODELS on 429/404 errors.
 
@@ -159,8 +160,16 @@ async def _run_with_fallback(
             # (`x-ai/`, `anthropic/`, `moonshotai/`, etc.) route via our client
             # instead of the SDK's prefix dispatcher.
             agent.model = make_chat_model(model)
+            # `max_turns` is a Runner.run_streamed parameter, NOT a RunConfig
+            # field — passing it to RunConfig raises TypeError on construction
+            # in openai-agents 0.0.x and killed every autonomous run before it
+            # started. Pass it where the SDK actually reads it.
             result = Runner.run_streamed(
-                agent, input=input_data, run_config=run_config, context=context
+                agent,
+                input=input_data,
+                run_config=run_config,
+                context=context,
+                max_turns=max_turns,
             )
             async for event in result.stream_events():
                 if not tools_ran and _translate_tool_event(event) is not None:
@@ -172,15 +181,19 @@ async def _run_with_fallback(
                         # Telemetry must never break the run.
                         pass
             return result
-        except (RateLimitError, APIStatusError) as exc:
+        except (RateLimitError, APIStatusError, APITimeoutError, APIConnectionError) as exc:
             status = getattr(exc, "status_code", None)
             err_str = str(exc)
             lower = err_str.lower()
-            # Fall through on a 429 (rate limit) OR a 404/model-not-found — a
-            # stale model slug must not hard-fail the whole run.
+            # Fall through on a 429 (rate limit), a 404/model-not-found (a
+            # stale slug must not hard-fail the run), OR a transient
+            # 5xx/timeout/connection blip — the single most common provider
+            # failure, which previously surfaced immediately with no retry.
+            # Safe to retry: gated on `not tools_ran`, so no side effect has
+            # committed yet.
             should_fallback = (
-                isinstance(exc, RateLimitError)
-                or status in (429, 404)
+                isinstance(exc, (RateLimitError, APITimeoutError, APIConnectionError))
+                or status in (429, 404, 500, 502, 503, 504)
                 or "429" in err_str
                 or "model_not_found" in lower
                 or "does not exist" in lower
@@ -563,7 +576,6 @@ async def _run_locked(
     # See agent/llm.py:decide_reasoning_effort.
     reasoning_effort = decide_reasoning_effort(instruction or "")
     run_config = RunConfig(
-        max_turns=settings.coordinator_max_turns,
         # Tracing exports only reach OpenAI's backend; disable on a pure-
         # OpenRouter deploy, which may carry no OpenAI key at all.
         tracing_disabled=bool(settings.openrouter_api_key),
@@ -625,7 +637,14 @@ async def _run_locked(
     try:
         # Run with automatic fallback through cheaper models on a 429.
         # Streaming mode so on_event fires per tool call / result.
-        result = await _run_with_fallback(chippi, prompt, run_config, ctx, on_event=on_event)
+        result = await _run_with_fallback(
+            chippi,
+            prompt,
+            run_config,
+            ctx,
+            on_event=on_event,
+            max_turns=settings.coordinator_max_turns,
+        )
 
         _, _, total_tokens, cached_tokens = extract_usage_with_cache(result)
         ctx.tokens_used = total_tokens

@@ -272,6 +272,12 @@ function proxyModalStream({
       // dropping. Before this only the `done` path saved, so any mid-stream
       // Modal failure erased the whole assistant turn from history.
       let persisted = false;
+      // Track whether a terminal browser event (turn_complete | error) ever
+      // reached the wire. Modal can be killed mid-stream (600s container
+      // timeout, dropped socket) and end the SSE with NO `done`/`error`
+      // frame — the browser's EventSource then sits open forever. The
+      // `finally` below uses this to guarantee exactly one terminal frame.
+      let sentTerminal = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
         persisted = true;
@@ -391,12 +397,14 @@ function proxyModalStream({
                   : textChunks.join('');
               await persistOnce(finalText);
               push(controller, { type: 'turn_complete', reason: 'complete' });
+              sentTerminal = true;
 
             } else if (type === 'error') {
               // Persist whatever streamed before the failure so a mid-turn
               // Modal error doesn't erase the assistant message the user saw.
               await persistOnce();
               push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+              sentTerminal = true;
             }
           }
         }
@@ -414,6 +422,7 @@ function proxyModalStream({
                     : textChunks.join('');
                 await persistOnce(finalText);
                 push(controller, { type: 'turn_complete', reason: 'complete' });
+                sentTerminal = true;
               }
             } catch {
               // ignore malformed trailing line
@@ -424,11 +433,20 @@ function proxyModalStream({
         if (!abortController.signal.aborted) {
           logger.error('[ai/task] modal stream read error', { spaceId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          sentTerminal = true;
         }
       } finally {
         // Safety net — the stream ended with no `done`/`error` event (Modal
-        // crash, dropped connection). Idempotent via the `persisted` flag.
+        // crash, dropped connection, 600s container kill mid-stream). Persist
+        // whatever streamed (idempotent via `persisted`) AND guarantee the
+        // browser sees exactly one terminal frame so its EventSource closes
+        // instead of hanging open forever. Skip when the client aborted —
+        // there's no one listening.
         await persistOnce();
+        if (!sentTerminal && !abortController.signal.aborted) {
+          logger.warn('[ai/task] modal stream ended with no terminal event', { spaceId });
+          push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+        }
         controller.close();
         reader.releaseLock();
       }
