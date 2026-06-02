@@ -14,6 +14,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/brand-logo';
+import { cn } from '@/lib/utils';
+import {
+  H1,
+  H2,
+  H3,
+  TITLE_FONT,
+  BODY_MUTED,
+  SECTION_LABEL,
+  CAPTION,
+} from '@/lib/typography';
 
 interface BrokerageSetupClientProps {
   spaceSlug: string;
@@ -54,9 +64,7 @@ function CreateForm() {
   return (
     <form onSubmit={handleCreate} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1.5">
-          Brokerage name
-        </label>
+        <label className={cn(SECTION_LABEL, 'block mb-1.5')}>Brokerage name</label>
         <input
           type="text"
           required
@@ -64,7 +72,7 @@ function CreateForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={120}
-          className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full h-10 rounded-lg border border-border/70 bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -112,7 +120,7 @@ function JoinForm() {
     return (
       <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 py-2">
         <CheckCircle2 size={16} />
-        <p className="text-sm font-medium">Joined {joined}! Redirecting…</p>
+        <p className="text-sm font-medium">Joined {joined}. Redirecting…</p>
       </div>
     );
   }
@@ -120,9 +128,7 @@ function JoinForm() {
   return (
     <form onSubmit={handleJoin} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1.5">
-          Invite code
-        </label>
+        <label className={cn(SECTION_LABEL, 'block mb-1.5')}>Invite code</label>
         <input
           type="text"
           required
@@ -130,9 +136,9 @@ function JoinForm() {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           maxLength={9}
-          className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full h-10 rounded-lg border border-border/70 bg-background px-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        <p className="text-xs text-muted-foreground mt-1.5">
+        <p className={cn(CAPTION, 'mt-1.5')}>
           Ask your broker for the 8-character code from their dashboard.
         </p>
       </div>
@@ -142,6 +148,26 @@ function JoinForm() {
         {!loading && <ArrowRight size={15} className="ml-2" />}
       </Button>
     </form>
+  );
+}
+
+/** Neutral, paper-flat icon square — no brand tint. */
+function IconSquare({
+  icon: Icon,
+  size = 'md',
+}: {
+  icon: typeof Building2;
+  size?: 'md' | 'lg';
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg bg-foreground/[0.06] text-foreground/70 flex items-center justify-center flex-shrink-0',
+        size === 'lg' ? 'w-12 h-12' : 'w-10 h-10',
+      )}
+    >
+      <Icon size={size === 'lg' ? 22 : 18} strokeWidth={1.75} />
+    </div>
   );
 }
 
@@ -155,7 +181,7 @@ export function BrokerageSetupClient({
   if (existingBrokerageName) {
     return (
       <div className="app-theme min-h-screen bg-background flex flex-col">
-        <header className="px-6 py-5 border-b border-border">
+        <header className="px-6 py-5 border-b border-border/70">
           <Link href="/" aria-label="Chippi home">
             <BrandLogo className="h-6 w-auto" alt="Chippi" />
           </Link>
@@ -163,13 +189,15 @@ export function BrokerageSetupClient({
 
         <main className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="w-full max-w-md text-center">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <Building2 size={26} className="text-primary" />
+            <div className="mb-6 flex justify-center">
+              <IconSquare icon={Building2} size="lg" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">You&apos;re already set up</h1>
-            <p className="mt-3 text-muted-foreground">
+            <h1 className={cn(H1)} style={TITLE_FONT}>
+              You&apos;re already set up
+            </h1>
+            <p className={cn(BODY_MUTED, 'mt-3')}>
               You&apos;re a member of{' '}
-              <span className="font-semibold text-foreground">{existingBrokerageName}</span>.
+              <span className="font-medium text-foreground">{existingBrokerageName}</span>.
             </p>
 
             <div className="mt-8 flex flex-col gap-3">
@@ -188,7 +216,7 @@ export function BrokerageSetupClient({
 
   return (
     <div className="app-theme min-h-screen bg-background flex flex-col">
-      <header className="px-6 py-5 border-b border-border flex items-center justify-between">
+      <header className="px-6 py-5 border-b border-border/70 flex items-center justify-between">
         <Link href="/" aria-label="Chippi home">
           <BrandLogo className="h-6 w-auto" alt="Chippi" />
         </Link>
@@ -203,31 +231,31 @@ export function BrokerageSetupClient({
 
       <main className="flex-1 flex items-start justify-center px-6 py-16">
         <div className="w-full max-w-4xl">
-          {/* Page header */}
-          <div className="mb-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-4">
-              <Building2 size={11} />
-              Brokerage
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">Set up your brokerage</h1>
-            <p className="mt-2 text-muted-foreground">
-              Create your own brokerage to manage a team of realtors, or join one with a code from your broker.
+          {/* Page header — quiet eyebrow, serif Times h1, one-line sub. */}
+          <header className="mb-10 space-y-1.5">
+            <p className={cn(SECTION_LABEL)}>Brokerage</p>
+            <h1 className={cn(H1)} style={TITLE_FONT}>
+              Set up your brokerage
+            </h1>
+            <p className={cn(BODY_MUTED, 'max-w-xl')}>
+              Create your own brokerage to manage a team of realtors, or join one
+              with a code from your broker.
             </p>
-          </div>
+          </header>
 
           {mode === 'choose' && (
-            <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid md:grid-cols-2 gap-4">
               {/* Create card */}
               <button
                 onClick={() => setMode('create')}
-                className="group text-left rounded-2xl border border-border bg-card p-7 hover:border-primary/40 hover:shadow-[0_4px_24px_-8px_rgba(13,148,136,0.2)] transition-all"
+                className="group text-left rounded-xl border border-border/70 bg-card p-6 hover:border-border hover:bg-muted/30 transition-colors duration-150"
               >
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/15 transition-colors">
-                  <Building2 size={20} className="text-primary" />
-                </div>
-                <h2 className="text-lg font-semibold mb-2">Create a brokerage</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-                  Start your own brokerage. Invite realtors to join, manage their leads, and get team-wide visibility from a central broker dashboard.
+                <IconSquare icon={Building2} />
+                <h2 className={cn(H3, 'mt-5 mb-2')}>Create a brokerage</h2>
+                <p className={cn(BODY_MUTED, 'leading-relaxed mb-5')}>
+                  Start your own brokerage. Invite realtors to join, manage their
+                  leads, and get team-wide visibility from a central broker
+                  dashboard.
                 </p>
                 <div className="space-y-2 mb-6">
                   {[
@@ -235,28 +263,32 @@ export function BrokerageSetupClient({
                     { icon: BarChart3, label: 'Team-wide lead and pipeline analytics' },
                     { icon: Mail, label: 'Manage brokerage invitations' },
                   ].map((f) => (
-                    <div key={f.label} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <f.icon size={13} className="text-primary flex-shrink-0" />
+                    <div key={f.label} className={cn(BODY_MUTED, 'flex items-center gap-2')}>
+                      <f.icon
+                        size={13}
+                        strokeWidth={1.75}
+                        className="text-muted-foreground/70 flex-shrink-0"
+                      />
                       {f.label}
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-primary group-hover:gap-3 transition-all">
-                  Create a brokerage <ArrowRight size={14} />
+                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground transition-all duration-150 group-hover:gap-2.5">
+                  Create a brokerage <ArrowRight size={14} strokeWidth={2} />
                 </div>
               </button>
 
               {/* Join card */}
               <button
                 onClick={() => setMode('join')}
-                className="group text-left rounded-2xl border border-border bg-card p-7 hover:border-primary/40 hover:shadow-[0_4px_24px_-8px_rgba(13,148,136,0.2)] transition-all"
+                className="group text-left rounded-xl border border-border/70 bg-card p-6 hover:border-border hover:bg-muted/30 transition-colors duration-150"
               >
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/15 transition-colors">
-                  <Hash size={20} className="text-primary" />
-                </div>
-                <h2 className="text-lg font-semibold mb-2">Join a brokerage</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-                  Enter the invite code your broker shared with you. You&apos;ll keep your own workspace, leads, and pipeline — this just connects you to the brokerage network.
+                <IconSquare icon={Hash} />
+                <h2 className={cn(H3, 'mt-5 mb-2')}>Join a brokerage</h2>
+                <p className={cn(BODY_MUTED, 'leading-relaxed mb-5')}>
+                  Enter the invite code your broker shared with you. You&apos;ll keep
+                  your own workspace, leads, and pipeline — this just connects you
+                  to the brokerage network.
                 </p>
                 <div className="space-y-2 mb-6">
                   {[
@@ -264,14 +296,18 @@ export function BrokerageSetupClient({
                     { icon: CheckCircle2, label: 'Your broker gets team-level visibility' },
                     { icon: CheckCircle2, label: 'Works instantly with an 8-character code' },
                   ].map((f) => (
-                    <div key={f.label} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <f.icon size={13} className="text-primary flex-shrink-0" />
+                    <div key={f.label} className={cn(BODY_MUTED, 'flex items-center gap-2')}>
+                      <f.icon
+                        size={13}
+                        strokeWidth={1.75}
+                        className="text-muted-foreground/70 flex-shrink-0"
+                      />
                       {f.label}
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-primary group-hover:gap-3 transition-all">
-                  Join with a code <ArrowRight size={14} />
+                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground transition-all duration-150 group-hover:gap-2.5">
+                  Join with a code <ArrowRight size={14} strokeWidth={2} />
                 </div>
               </button>
             </div>
@@ -285,13 +321,12 @@ export function BrokerageSetupClient({
               >
                 <ArrowLeft size={14} /> Back
               </button>
-              <div className="rounded-2xl border border-border bg-card p-7">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-                  <Building2 size={20} className="text-primary" />
-                </div>
-                <h2 className="text-xl font-semibold mb-1">Create a brokerage</h2>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Give your brokerage a name. You can invite realtors after it&apos;s created.
+              <div className="rounded-xl border border-border/70 bg-card p-6">
+                <IconSquare icon={Building2} />
+                <h2 className={cn(H2, 'mt-5 mb-1')}>Create a brokerage</h2>
+                <p className={cn(BODY_MUTED, 'mb-6')}>
+                  Give your brokerage a name. You can invite realtors after it&apos;s
+                  created.
                 </p>
                 <CreateForm />
               </div>
@@ -306,14 +341,15 @@ export function BrokerageSetupClient({
               >
                 <ArrowLeft size={14} /> Back
               </button>
-              <div className="rounded-2xl border border-border bg-card p-7">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-                  <Hash size={20} className="text-primary" />
-                </div>
-                <h2 className="text-xl font-semibold mb-1">Join a brokerage</h2>
-                <p className="text-sm text-muted-foreground mb-6">
+              <div className="rounded-xl border border-border/70 bg-card p-6">
+                <IconSquare icon={Hash} />
+                <h2 className={cn(H2, 'mt-5 mb-1')}>Join a brokerage</h2>
+                <p className={cn(BODY_MUTED, 'mb-6')}>
                   Enter the code from your broker&apos;s dashboard. It looks like{' '}
-                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">ABCD-EF23</code>.
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                    ABCD-EF23
+                  </code>
+                  .
                 </p>
                 <JoinForm />
               </div>
