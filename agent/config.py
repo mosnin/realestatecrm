@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Model for the swarm orchestrator's fan-out workers (the swarm sub-
     # agents). The main Chippi agent's model is the per-workspace pick
     # (see chippi.py / llm.py); this is swarm-only.
-    worker_model: str = Field(default="gpt-5-mini")
+    worker_model: str = Field(default="x-ai/grok-4.3")
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection
