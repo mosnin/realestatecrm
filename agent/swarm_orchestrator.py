@@ -195,7 +195,7 @@ async def run_swarm(payload: dict) -> None:
         for task_def in plan.get("tasks", []):
             if not isinstance(task_def, dict):
                 continue
-            # The planning LLM (gpt-4o-mini via OpenRouter) routinely returns
+            # The planning LLM (gpt-5-mini) routinely returns
             # `agentIndex` as a string or null even though the prompt asks for
             # an int — a comparison against len() then raises TypeError and
             # the entire swarm run flips to 'failed'. Coerce defensively.
