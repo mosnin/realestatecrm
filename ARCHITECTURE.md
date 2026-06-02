@@ -24,7 +24,7 @@ System map for Chippi. Based on actual repository contents.
 | Auth | Clerk (`@clerk/nextjs@^7.0.1`) | Middleware-based route protection |
 | Database | Supabase PostgreSQL (`@supabase/supabase-js@^2.99.1`) | Service-role key, server-side only |
 | AI - scoring | OpenAI (`openai@^6.26.0`) | `gpt-4o-mini`, structured JSON output (scoring only) |
-| AI - assistant | OpenAI Agents SDK (Python `agents` + TS `@openai/agents`) running in **Modal sandbox** | `gpt-5-mini` with reasoning, tool-calling loop, fallback chain |
+| AI - assistant | OpenAI Agents SDK — **in-app TS `@openai/agents` runtime is the DEFAULT** (direct OpenAI, no cold start); Python runtime in **Modal sandbox** is opt-in via `CHIPPI_CHAT_RUNTIME=modal` + the target for delegated sub-agents | `gpt-5-mini`; in-app agent has a `delegate_task` tool that spawns deeper Modal sub-agent runs (swarm) streamed inline in chat |
 | AI - embeddings | OpenAI `text-embedding-3-small` | 1536-dim vectors |
 | Vector DB | Supabase pgvector (`DocumentEmbedding` table) | Per-space rows, HNSW index, COSINE metric via `match_documents` RPC |
 | Cache/legacy | Upstash Redis (`@upstash/redis@^1.34.9`) | Slug metadata, admin path |

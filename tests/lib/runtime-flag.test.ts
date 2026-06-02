@@ -1,11 +1,11 @@
 /**
- * Runtime flag is the gate that decides whether a chat request goes
- * through the legacy Modal Python sandbox (default in production) or the
- * in-process TypeScript SDK fallback (opt-in via `CHIPPI_CHAT_RUNTIME=ts`).
+ * Runtime flag is the gate that decides whether a chat request is proxied to
+ * the Modal Python sandbox (default) or runs on the in-process TypeScript SDK
+ * runtime (opt-in via `CHIPPI_CHAT_RUNTIME=ts`).
  *
- * Modal owns the prod path because of sandbox isolation, autonomous chains,
- * and model fallback. TS is the local-dev fallback when Modal isn't
- * deployed. The contract is: any value other than the exact string `"ts"`
+ * Modal owns the prod path: it's the known-good runtime (gpt-5-mini). The in-app
+ * TS runtime is reachable behind the flag while its production hang is
+ * diagnosed. The contract is: any value other than the exact string `"ts"`
  * routes to Modal — including unset, empty, and case variants.
  */
 

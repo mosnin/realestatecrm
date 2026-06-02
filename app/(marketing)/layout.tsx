@@ -12,6 +12,7 @@
 
 import { MarketingNav } from '@/components/marketing/marketing-nav';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
+import { FprScript } from '@/components/affiliate/fpr-script';
 
 export default function MarketingLayout({
   children,
@@ -20,6 +21,8 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
+      {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}
+      <FprScript />
       <MarketingNav />
       <main className="flex-1">{children}</main>
       <MarketingFooter />

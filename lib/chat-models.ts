@@ -47,6 +47,17 @@ export const CHAT_MODELS: ChatModelOption[] = [
 /** The model used when a workspace hasn't picked one. */
 export const DEFAULT_CHAT_MODEL = 'x-ai/grok-4.3';
 
+/**
+ * The fixed model the IN-APP agent runtime runs on (direct OpenAI, no
+ * OpenRouter). This is intentionally NOT in CHAT_MODELS: the realtor's model
+ * picker drives the Modal / direct-stream path, but the primary in-process
+ * agent turn is hardwired to gpt-5-mini for latency. The authoritative client
+ * + wrapper live in `lib/ai-tools/agent-model.ts` (AGENT_CHAT_MODEL). This
+ * mirror exists so anyone reading the model registry sees the agent's model
+ * without importing the SDK.
+ */
+export const AGENT_RUNTIME_MODEL = 'gpt-5-mini';
+
 /** Allowlist check — gate user-supplied model slugs before persisting. */
 export function isValidChatModel(value: unknown): value is string {
   return typeof value === 'string' && CHAT_MODELS.some((m) => m.id === value);

@@ -6,6 +6,7 @@ import { TextBlockView } from './text-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
 import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
+import { SubagentTaskBlockView } from './subagent-task-block-view';
 import { ReasoningBlockView } from './reasoning-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
@@ -99,13 +100,18 @@ export function Transcript({
     | { kind: 'reasoning'; block: Extract<MessageBlock, { type: 'reasoning' }> }
     | { kind: 'tool-single'; block: ToolCallBlock }
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
-    | { kind: 'subagent'; block: ToolCallBlock };
+    | { kind: 'subagent'; block: ToolCallBlock }
+    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> };
 
   const items: RenderItem[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (block.type === 'reasoning') {
       items.push({ kind: 'reasoning', block });
+      continue;
+    }
+    if (block.type === 'subagent_task') {
+      items.push({ kind: 'subagent-task', block });
       continue;
     }
     if (block.type === 'tool_call') {
@@ -175,6 +181,13 @@ export function Transcript({
                 key={`subagent-${item.block.callId}`}
                 block={item.block}
                 live={liveCallIds?.has(item.block.callId)}
+              />
+            );
+          case 'subagent-task':
+            return (
+              <SubagentTaskBlockView
+                key={`subagent-task-${item.block.runId}`}
+                block={item.block}
               />
             );
           case 'reasoning':

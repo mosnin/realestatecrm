@@ -22,6 +22,7 @@ export type AgentEvent =
   | PermissionRequiredEvent
   | PermissionResolvedEvent
   | PlanCreatedEvent
+  | SubagentSpawnedEvent
   | TurnCompleteEvent
   | ErrorEvent
   | SystemEvent;
@@ -134,6 +135,24 @@ export interface PlanCreatedEvent extends BaseEvent {
     title: string;
     description: string;
   }>;
+}
+
+/**
+ * The agent called `delegate_task` and a Modal sub-agent run has started. The
+ * client renders a live task card that subscribes to /api/swarm/{runId}/stream
+ * and updates as the sub-agents plan → work → complete. Persisted as a
+ * `subagent` block so a reloaded conversation still shows the delegated task
+ * (the card re-subscribes if the run is still in-progress, or shows the final
+ * result if it finished).
+ */
+export interface SubagentSpawnedEvent extends BaseEvent {
+  type: 'subagent_spawned';
+  /** SwarmRun id the card streams. */
+  runId: string;
+  /** The task brief the agent handed the sub-agent. */
+  goal: string;
+  /** The originating tool call, so the card can sit where the tool ran. */
+  callId: string;
 }
 
 /** End-of-turn marker. Client disables the input until the user types again. */

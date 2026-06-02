@@ -582,9 +582,20 @@ export function PublicProfile({
             </section>
           )}
 
+          {/* Already applied? A quiet way back into the client portal — never
+              competes with the Apply / Book CTAs above. */}
+          <div className="mt-12 text-center">
+            <a
+              href="/clients/login"
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Already applied? Check your status.
+            </a>
+          </div>
+
           {/* Powered by Chippi — free tier only; paid plans are white-label. */}
           {!hidePoweredBy && (
-            <footer className="mt-12 flex items-center justify-center gap-1.5 opacity-40">
+            <footer className="mt-6 flex items-center justify-center gap-1.5 opacity-40">
               <span className="text-[10px] text-muted-foreground">Powered by</span>
               <BrandLogo className="h-3" />
             </footer>

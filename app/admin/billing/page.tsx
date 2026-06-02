@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
+import { H3 } from '@/lib/typography';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
@@ -210,7 +211,7 @@ export default async function AdminBillingPage() {
       {/* ── Subscription Breakdown ──────────────────────────────── */}
       <Card>
         <CardContent className="px-5 py-4">
-          <p className="text-[17px] font-semibold leading-snug text-foreground mb-4">Subscription breakdown</p>
+          <p className={`${H3} mb-4`}>Subscription breakdown</p>
 
           {/* Visual bar */}
           <div className="h-4 rounded-full overflow-hidden flex bg-muted mb-4">
@@ -261,11 +262,11 @@ export default async function AdminBillingPage() {
 
       {/* ── Trial Expiring Soon ─────────────────────────────────── */}
       {trialExpiringSoon.length > 0 && (
-        <Card className="border-blue-300/50 bg-blue-50/30 dark:border-blue-500/20 dark:bg-blue-500/5">
+        <Card className="border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5">
           <CardContent className="px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <Clock size={15} className="text-blue-500" />
-              <p className="text-sm font-semibold">Trial Expiring Soon</p>
+              <Clock size={15} className="text-amber-500" />
+              <p className="text-sm font-semibold">Trial expiring soon</p>
               <span className="text-[11px] text-muted-foreground">({trialExpiringSoon.length} within 7 days)</span>
             </div>
             <div className="space-y-2">
@@ -297,7 +298,7 @@ export default async function AdminBillingPage() {
 
       {/* ── Recent Subscriptions ────────────────────────────────── */}
       <div>
-        <p className="text-[17px] font-semibold leading-snug text-foreground mb-3">Recent subscriptions</p>
+        <p className={`${H3} mb-3`}>Recent subscriptions</p>
         {recentSubscriptions.length === 0 ? (
           <Card>
             <CardContent className="px-5 py-8 text-center">

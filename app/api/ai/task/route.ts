@@ -580,69 +580,93 @@ export async function POST(req: NextRequest) {
 
   const hydratedAttachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
 
-  // ── TS fallback (local dev without Modal) ────────────────────────────────
-  // The TS runtime is full-agent (no router). Skipping the router here keeps
-  // local dev's behavior identical to pre-Phase-4 — the dual path is a
-  // production optimization, not a local concern.
-  if (chatRuntime() === 'ts') {
-    logger.info('[ai/task] using in-process TS runtime (CHIPPI_CHAT_RUNTIME=ts)', { spaceSlug });
-    return streamTsChatTurn({
+  // ── Modal path (opt-in, reversible) ──────────────────────────────────────
+  // Default is the in-process TS runtime below. Set CHIPPI_CHAT_RUNTIME=modal
+  // to route the WHOLE turn through Modal again — preserved verbatim so the
+  // owner can fall back to the sandbox or run heavy turns there. This is the
+  // pre-flip dual-path router (direct fast path vs Modal agent).
+  if (chatRuntime() === 'modal') {
+    // The router decides direct (fast path, no tools) vs agent (Modal, full
+    // tool surface). Attachments + the parsed message both feed the decision.
+    // Errors → 'agent' (router safe default), so a router bug can never
+    // silently drop an action.
+    const routerAttachments = hydratedAttachments.map((a) => ({
+      id: a.id,
+      mimeType: a.mime_type,
+    }));
+    const route = decideRoute(message, routerAttachments);
+
+    // Direct path: load the workspace's preferred model + skip Modal entirely.
+    if (route === 'direct') {
+      const model = await loadWorkspaceModel(ctx.space.id);
+      logger.info('[ai/task] router → direct', { spaceSlug, model });
+      return streamDirectTurn({
+        spaceId: ctx.space.id,
+        userId: ctx.userId,
+        conversationId,
+        model,
+        userMessage: message,
+        history: history.map((h) => ({ role: h.role, content: h.content })),
+        attachments: hydratedAttachments.map<MultimodalAttachment>((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mimeType: a.mime_type,
+          url: a.public_url,
+        })),
+        abortController,
+        // Escalation hook — when the direct model's reply triggers
+        // shouldEscalate(), we hand off to the agent path. For v1 we
+        // surface escalation to the caller via a soft signal; the actual
+        // agent call still ships in the same Response is deferred. Returning
+        // false means "commit the direct answer".
+        onEscalate: async () => false,
+      });
+    }
+
+    // Agent path (Modal) — full tool surface.
+    logger.info('[ai/task] router → agent (Modal)', { spaceSlug });
+    return callModalAgent({
       ctx,
       conversationId,
-      userMessage: message,
+      message,
       history,
+      hydratedAttachments,
       abortController,
+      spaceSlug,
     });
   }
 
-  // ── Phase 4 dual-path router ─────────────────────────────────────────────
-  // The router decides direct (fast path, no tools) vs agent (Modal, full
-  // tool surface). Attachments + the parsed message both feed the decision.
-  // Errors → 'agent' (router safe default), so a router bug can never
-  // silently drop an action.
-  const routerAttachments = hydratedAttachments.map((a) => ({
-    id: a.id,
-    mimeType: a.mime_type,
-  }));
-  const route = decideRoute(message, routerAttachments);
-
-  // Direct path: load the workspace's preferred model + skip Modal entirely.
-  if (route === 'direct') {
-    const model = await loadWorkspaceModel(ctx.space.id);
-    logger.info('[ai/task] router → direct', { spaceSlug, model });
-    return streamDirectTurn({
-      spaceId: ctx.space.id,
-      userId: ctx.userId,
+  // Attachment turns still go to Modal when it's configured: the in-process
+  // TS runtime is text-only (runChatTurn takes no multimodal input), so
+  // routing a photo/PDF turn through it would silently drop the file. Modal's
+  // chat_turn hydrates + reads attachments. If Modal isn't configured, fall
+  // through to TS (the file is dropped, same as the pre-flip `=ts` behavior) —
+  // better than failing the turn outright.
+  if (hydratedAttachments.length > 0 && process.env.MODAL_CHAT_URL) {
+    logger.info('[ai/task] attachment turn → Modal (TS runtime is text-only)', { spaceSlug });
+    return callModalAgent({
+      ctx,
       conversationId,
-      model,
-      userMessage: message,
-      history: history.map((h) => ({ role: h.role, content: h.content })),
-      attachments: hydratedAttachments.map<MultimodalAttachment>((a) => ({
-        id: a.id,
-        filename: a.filename,
-        mimeType: a.mime_type,
-        url: a.public_url,
-      })),
+      message,
+      history,
+      hydratedAttachments,
       abortController,
-      // Escalation hook — when the direct model's reply triggers
-      // shouldEscalate(), we hand off to the agent path. For v1 we
-      // surface escalation to the caller via a soft signal; the actual
-      // agent call still ships in the same Response is deferred. Returning
-      // false means "commit the direct answer".
-      onEscalate: async () => false,
+      spaceSlug,
     });
   }
 
-  // Agent path (Modal) — full tool surface.
-  logger.info('[ai/task] router → agent', { spaceSlug });
-  return callModalAgent({
+  // ── Default: in-process TS runtime (PRIMARY) ─────────────────────────────
+  // Direct OpenAI gpt-5-mini, full Chippi tool set, approval gates, rate
+  // limits, tool-call logging, and the delegate_task orchestrator tool. No
+  // Modal cold start — first token is fast. Sub-agents for deep work are
+  // spawned ON Modal via delegate_task and streamed back inline.
+  logger.info('[ai/task] in-process TS runtime (default)', { spaceSlug });
+  return streamTsChatTurn({
     ctx,
     conversationId,
-    message,
+    userMessage: message,
     history,
-    hydratedAttachments,
     abortController,
-    spaceSlug,
   });
 }
 

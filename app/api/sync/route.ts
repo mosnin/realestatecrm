@@ -24,6 +24,7 @@ import { executeToolForEntity } from '@/lib/integrations/composio';
 import { decrypt } from '@/lib/crypto';
 import { listPeople as fubListPeople } from '@/lib/integrations/follow-up-boss';
 import { logger } from '@/lib/logger';
+import { withObservability } from '@/lib/with-observability';
 
 /** The CRM toolkits that have live Composio connectors. */
 const LIVE_CRM_TOOLKITS = ['hubspot', 'salesforce', 'pipedrive', 'zoho'] as const;
@@ -144,7 +145,7 @@ function mapToRecords(toolkit: LiveCrmToolkit, raw: unknown[]): SyncRecord[] {
     });
 }
 
-export async function GET(req: NextRequest) {
+async function GETHandler(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) {
     return NextResponse.json({ error: 'slug is required' }, { status: 400 });
@@ -267,3 +268,5 @@ export async function GET(req: NextRequest) {
     });
   }
 }
+
+export const GET = withObservability(GETHandler, 'api.sync');

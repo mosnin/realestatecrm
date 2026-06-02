@@ -336,6 +336,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       case 'tool_call_start': {
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
+        // delegate_task is represented by its own live task card (mounted on
+        // the subagent_spawned event), not a generic tool row — skip the
+        // tool_call block so the realtor sees one clean card, not both.
+        if (event.name === 'delegate_task') return;
         setLiveCallIds((s) => {
           const next = new Set(s);
           next.add(event.callId);
@@ -419,6 +423,31 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       case 'plan_created': {
         setActivePlan({ task: event.task, steps: event.steps });
+        return;
+      }
+
+      case 'subagent_spawned': {
+        // A delegate_task call started a Modal sub-agent run. Drop a
+        // subagent_task block into the streaming assistant turn; its view
+        // subscribes to /api/swarm/{runId}/stream and renders live progress.
+        const targetId = streamingMsgIdRef.current;
+        if (!targetId) return;
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== targetId) return m;
+            // Idempotent — never mount two cards for the same run.
+            if (m.blocks.some((b) => b.type === 'subagent_task' && b.runId === event.runId)) {
+              return m;
+            }
+            const block: MessageBlock = {
+              type: 'subagent_task',
+              callId: event.callId,
+              runId: event.runId,
+              goal: event.goal,
+            };
+            return { ...m, blocks: [...m.blocks, block] };
+          }),
+        );
         return;
       }
 

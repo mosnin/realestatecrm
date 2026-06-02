@@ -174,7 +174,7 @@ export function BroadcastClient({
     <div className="space-y-6">
       {/* Segment picker */}
       <section>
-        <h2 className="text-sm font-semibold mb-2">1. Choose a segment</h2>
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">1. Choose a segment</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {SEGMENT_ORDER.map((key) => {
             const info = SEGMENT_LABELS[key];
@@ -190,7 +190,7 @@ export function BroadcastClient({
                 className={cn(
                   'text-left rounded-xl border px-4 py-3 transition-colors',
                   selected
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    ? 'border-foreground bg-foreground/[0.04] ring-1 ring-foreground/20'
                     : 'border-border bg-card hover:bg-muted/40',
                 )}
               >
@@ -199,7 +199,7 @@ export function BroadcastClient({
                   <span
                     className={cn(
                       'text-xs font-semibold rounded-full px-2 py-0.5',
-                      selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                      selected ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     {counts[key]}
@@ -216,7 +216,7 @@ export function BroadcastClient({
 
       {/* Composer */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">2. Compose</h2>
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">2. Compose</p>
         <div>
           <div className="flex items-center justify-between mb-1">
             <label htmlFor="subject" className="text-xs font-medium text-muted-foreground">
@@ -261,7 +261,7 @@ export function BroadcastClient({
       {/* Preview */}
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">3. Preview recipients</h2>
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">3. Preview recipients</p>
           <Button
             type="button"
             size="sm"
@@ -326,7 +326,7 @@ export function BroadcastClient({
 
       {/* Past broadcasts */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold">Past broadcasts</h2>
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Past broadcasts</p>
         {pastBroadcasts.length === 0 ? (
           <div className="rounded-xl border border-border bg-card px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">No broadcasts yet.</p>
