@@ -127,7 +127,6 @@ export const realtorNavItems: NavItem[] = [
     icon: FolderOpen,
     children: [
       { href: '/documents', label: 'Documents' },
-      { href: '/signatures', label: 'Signatures' },
     ],
   },
   {
