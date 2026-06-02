@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { PublicSurfaceFrame } from '@/components/public-surface-frame';
 import { safeHref } from '@/lib/utils';
@@ -111,8 +112,18 @@ export function PublicPageShell({
       {/* ── Sticky hairline header ───────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/70">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          {/* Left: agent identity */}
+          {/* Left: optional back-to-profile link + agent identity */}
           <div className="flex items-center gap-2.5 min-w-0">
+            {profileHref && (
+              <a
+                href={profileHref}
+                aria-label={`Back to ${businessName}`}
+                title={`Back to ${businessName}`}
+                className="-ml-1 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+              >
+                <ArrowLeft size={16} strokeWidth={1.75} />
+              </a>
+            )}
             {agentPhoto && (
               <img
                 src={agentPhoto}
@@ -157,6 +168,21 @@ export function PublicPageShell({
 
       {/* ── Page content ─────────────────────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-4 pt-8 sm:pt-10">
+        {/* Cover photo — the realtor's brand banner. Was only ever used as a
+            48px desktop blur backdrop; render it visibly so the page actually
+            shows their cover, consistent with /p/[slug]. */}
+        {coverPhotoUrl && (
+          <div className="mb-7 overflow-hidden rounded-2xl border border-border/60">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverPhotoUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="h-32 w-full object-cover sm:h-44"
+            />
+          </div>
+        )}
         {/* Title + intro */}
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground" style={TITLE_FONT}>
