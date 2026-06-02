@@ -27,6 +27,11 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { runChatTurn, resumeChatTurn } from '@/lib/ai-tools/sdk-chat';
 import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-mapper';
+import {
+  DELEGATE_TASK_TOOL_NAME,
+  parseSubagentRunId,
+  stripSubagentMarker,
+} from '@/lib/ai-tools/tools/delegate-task';
 import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
@@ -167,6 +172,16 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // back to the row we inserted on tool_call_start.
       const callIdToStepId = new Map<string, string>();
 
+      // Maps callId → tool name, so on tool_call_result (which carries no
+      // name) we can recognize a delegate_task result and lift the SwarmRun
+      // id out of its summary marker.
+      const callIdToToolName = new Map<string, string>();
+
+      // Sub-agent task blocks spawned this turn (via delegate_task). Persisted
+      // alongside the assistant text so a reloaded conversation re-shows the
+      // live task card.
+      const subagentBlocks: MessageBlock[] = [];
+
       // Drain any events that were queued before the stream opened
       // (e.g. compaction notice assembled in streamTsChatTurn).
       // We define pushEvent first and call it immediately after.
@@ -213,6 +228,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // the second one is empty — that's honest.
           reasoningBuffer = '';
 
+          // Remember the tool name so the result branch can recognize a
+          // delegate_task call.
+          callIdToToolName.set(event.callId, event.name);
+
           // Fire-and-forget ExecutionStep logging. Never awaited — must not
           // block or affect the stream in any way.
           void logToolCallStart(
@@ -233,6 +252,29 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
               void logToolCallComplete(stepId, event.summary).catch(() => {});
             } else {
               void logToolCallError(stepId, event.error ?? event.summary).catch(() => {});
+            }
+          }
+
+          // delegate_task landed → lift the SwarmRun id out of the summary
+          // marker, strip the marker so the realtor sees clean text, push a
+          // persistable subagent_task block, and emit subagent_spawned so the
+          // client mounts the live task card.
+          const toolName = callIdToToolName.get(event.callId);
+          callIdToToolName.delete(event.callId);
+          if (toolName === DELEGATE_TASK_TOOL_NAME && event.ok) {
+            const runId = parseSubagentRunId(event.summary);
+            event.summary = stripSubagentMarker(event.summary);
+            if (runId) {
+              const goal = event.summary
+                .replace(/^Delegated to a sub-agent\.\s*Working on it now:\s*/i, '')
+                .trim();
+              subagentBlocks.push({
+                type: 'subagent_task',
+                callId: event.callId,
+                runId,
+                goal,
+              });
+              pushEvent({ type: 'subagent_spawned', runId, goal, callId: event.callId });
             }
           }
         }
@@ -347,8 +389,14 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // backoff cover the transient-network failure mode; a permanent
         // failure surfaces as an error event so the realtor knows the
         // history is stale and can copy what they need before refreshing.
-        if (textBuffer.trim()) {
-          const blocks: MessageBlock[] = [{ type: 'text', content: textBuffer }];
+        if (textBuffer.trim() || subagentBlocks.length > 0) {
+          // Order: the assistant's prose first, then any delegated task cards
+          // it spawned this turn (so the transcript reads "here's what I did,
+          // and here's the deeper job I kicked off").
+          const blocks: MessageBlock[] = [
+            ...(textBuffer.trim() ? [{ type: 'text', content: textBuffer } as MessageBlock] : []),
+            ...subagentBlocks,
+          ];
           let saved = false;
           let lastError: unknown;
           for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
