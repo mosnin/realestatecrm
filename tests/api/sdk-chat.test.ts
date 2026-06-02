@@ -2,11 +2,12 @@
  * Route-level integration test for `POST /api/ai/task` — the runtime
  * branch.
  *
- * The bar (post-flip — in-app TS runtime is the DEFAULT):
- *   - When CHIPPI_CHAT_RUNTIME is unset/empty/anything-other-than-modal,
- *     the route MUST run the in-process TS streamer (no Modal hop).
- *   - When CHIPPI_CHAT_RUNTIME=modal, the route MUST use the dual-path
- *     router (direct fast path vs Modal agent) — the reversible fallback.
+ * The bar (Modal is the DEFAULT; the in-app TS runtime is opt-in):
+ *   - When CHIPPI_CHAT_RUNTIME is unset/empty/anything-other-than-ts,
+ *     the route MUST use the dual-path router (direct fast path vs Modal
+ *     agent) — the known-good production path.
+ *   - When CHIPPI_CHAT_RUNTIME=ts, the route MUST run the in-process TS
+ *     streamer (no Modal hop) — the opt-in runtime.
  *   - Auth + space resolution + user-message persistence happen on
  *     BOTH paths, so we don't write them twice.
  *
@@ -197,19 +198,28 @@ describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=modal opt-in
   });
 });
 
-describe('POST /api/ai/task — runtime branch (default = in-app TS)', () => {
-  it('routes to streamTsChatTurn by default (CHIPPI_CHAT_RUNTIME unset)', async () => {
+describe('POST /api/ai/task — runtime branch (default = Modal)', () => {
+  it('routes to the Modal/router path by default (CHIPPI_CHAT_RUNTIME unset)', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
+    // Default makeRequest message is an action verb → Modal agent branch.
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
-    expect(tsStreamMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).not.toHaveBeenCalled();
+    // Default → Modal/router path; the in-process TS streamer is NOT hit.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).not.toHaveBeenCalled();
   });
 
-  it('routes to the TS streamer for any value other than the exact string "modal"', async () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'MODAL'; // wrong case → still TS
+  it('treats any value other than the exact string "ts" as Modal', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'TS'; // wrong case → Modal default
     await POST(makeRequest());
-    expect(tsStreamMock).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('routes to the in-app TS streamer only when CHIPPI_CHAT_RUNTIME=ts', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
+    await POST(makeRequest());
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -221,8 +231,8 @@ describe('POST /api/ai/task — runtime branch (default = in-app TS)', () => {
     );
   });
 
-  it('passes ctx + conversationId + userMessage to the streamer', async () => {
-    delete process.env.CHIPPI_CHAT_RUNTIME;
+  it('passes ctx + conversationId + userMessage to the TS streamer (=ts)', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
     await POST(makeRequest({ message: 'hi' }));
     const call = tsStreamMock.mock.calls[0]?.[0] as unknown as {
       ctx: { space: { slug: string } };
