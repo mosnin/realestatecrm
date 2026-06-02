@@ -445,10 +445,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           </SheetContent>
         </Sheet>
 
-        <span className="font-semibold text-sm md:hidden flex items-center gap-2">
-          <BrandLogo className="h-5" alt="Chippi" />
-        </span>
-
         {/* Desktop breadcrumb — small, monospaced separator, no chunky pills.
             The current section reads as the focal label; the workspace name
             is quiet context. Quick-switch is a borderless link, not a chip. */}

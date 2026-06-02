@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
+import { History, X, AlertCircle, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -16,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
@@ -180,7 +179,6 @@ export function ChippiWorkspace({
     initialConversationId,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
   // Server-driven loading: pending during the soft-nav so we can show the
   // "One moment" placeholder instead of the previous conversation's
   // transcript flashing for a beat. `useTransition` is the natural fit —
@@ -971,7 +969,6 @@ export function ChippiWorkspace({
         placeholder="Message Chippi, or press / for skills…"
         onSend={handleSend}
         onMentionSearch={handleMentionSearch}
-        onVoiceStart={() => setVoiceOpen(true)}
         onAbort={abort}
         disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
         isLoading={isStreaming}
@@ -1087,10 +1084,6 @@ export function ChippiWorkspace({
                   Run now
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onSelect={() => setVoiceOpen((v) => !v)} className="cursor-pointer">
-                <Mic size={14} className="mr-2" />
-                Voice mode
-              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/s/${slug}/chippi/memory`} className="cursor-pointer">
                   <NotebookText size={14} className="mr-2" />
@@ -1527,26 +1520,6 @@ export function ChippiWorkspace({
         )}
       </div>{/* end split panel container */}
 
-      {/* Voice mode realtime session is space-scoped (realtor-only).
-          Broker variant disables it in Phase 1; the button above is also
-          hidden. */}
-      {!isBroker && (
-        <VoiceMode
-          open={voiceOpen}
-          onClose={() => setVoiceOpen(false)}
-          slug={slug}
-          onTranscript={(role, text) => {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                role,
-                blocks: [{ type: 'text', content: text }],
-              },
-            ]);
-          }}
-        />
-      )}
     </div>
   );
 }
