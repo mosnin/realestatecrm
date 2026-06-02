@@ -1,9 +1,12 @@
 /**
- * TypeScript in-process chat runtime (fallback). Active when CHIPPI_CHAT_RUNTIME=ts.
+ * TypeScript in-process chat runtime — the PRIMARY chat backend.
  *
- * The primary runtime is Modal (agent/modal_app.py). This module is the fallback when
- * `CHIPPI_CHAT_RUNTIME=ts` is set. The flag default is `'modal'`, so this
- * code is dormant until explicitly activated — see `runtime-flag.ts`.
+ * Runs the realtor-facing turn in-process on `@openai/agents` against the
+ * app-wide LLM client (`getLLMClient()`, OpenRouter-first) via chat
+ * completions — no Modal cold start. This is the default; Modal is reached
+ * only for deep / swarm work spawned via `delegate_task`, or when
+ * `CHIPPI_CHAT_RUNTIME=modal` proxies the whole turn to the sandbox. See
+ * `runtime-flag.ts`.
  *
  * Two entry points:
  *
@@ -30,6 +33,8 @@ import {
   type ApprovalDecision,
 } from './sdk-bridge';
 import { getAgentModel } from './agent-model';
+import { resolveChatModel } from '@/lib/llm';
+import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multimodal';
 import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
@@ -41,14 +46,6 @@ import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
 import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-
-/** Bare model slug for the in-process skill sub-agents (analyze_pipeline,
- *  research_person, planner). They run as `Agent.asTool()` children of the
- *  chat agent; passing the slug string lets the SDK resolve them against its
- *  configured client. The TOP-LEVEL chat agent uses `getAgentModel()` — a
- *  direct-OpenAI gpt-5-mini wrapper — so the realtor-facing turn never hits
- *  OpenRouter. See lib/ai-tools/agent-model.ts. */
-const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Cap on generated output tokens per turn.
@@ -91,9 +88,21 @@ const MAX_TURNS_PER_TURN = 15;
  */
 export function buildChatAgent(
   ctx: ToolContext,
-  opts: { model?: string | Model; integrationTools?: SdkTool[]; instructions?: string } = {},
+  opts: {
+    model?: string | Model;
+    modelSlug?: string | null;
+    integrationTools?: SdkTool[];
+    instructions?: string;
+  } = {},
 ): Agent {
   const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+
+  // The model every agent in this turn runs on. Either an explicit override
+  // (tests / A-B), or the realtor's workspace model resolved to the active
+  // provider via getAgentModel(). One instance, shared by the top-level chat
+  // agent AND the skill sub-agents below — so they all run on OpenRouter (or
+  // the configured fallback), never the SDK's keyless default OpenAI client.
+  const agentModel: string | Model = opts.model ?? getAgentModel(opts.modelSlug);
 
   // delegate_task — the orchestration tool. Lets the agent spawn a deeper
   // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
@@ -102,12 +111,10 @@ export function buildChatAgent(
   const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
 
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  // These take the bare slug — they're cheap in-process children, not the
-  // realtor-facing top-level turn.
-  const skillModel = typeof opts.model === 'string' ? opts.model : undefined;
-  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: skillModel });
-  const contactResearcher = buildContactResearcherAgent(ctx, { model: skillModel });
-  const planner = buildPlannerAgent(ctx, { model: skillModel });
+  // They share the parent's Model instance so they hit the same provider/key.
+  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: agentModel });
+  const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel });
+  const planner = buildPlannerAgent(ctx, { model: agentModel });
 
   const skillTools = [
     pipelineAnalyst.asTool({
@@ -135,14 +142,13 @@ export function buildChatAgent(
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
     tools: [delegateTool, ...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
-    // Default to the direct-OpenAI gpt-5-mini wrapper. Tests / A-B can still
-    // pass a slug or a Model instance via opts.model to override.
-    model: opts.model ?? getAgentModel(),
-    // gpt-5-mini is a reasoning model on the Responses API. `low` effort keeps
-    // chat turns snappy (high effort makes the first token crawl and can eat
-    // the whole output budget on reasoning tokens). maxTokens maps to
-    // max_output_tokens, which covers reasoning + answer.
-    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS, reasoning: { effort: 'low' } },
+    model: agentModel,
+    // Chat completions across every OpenRouter provider. maxTokens caps the
+    // pre-charge (see DEFAULT_MAX_TOKENS). No `reasoning` setting: that's a
+    // Responses-API concept — on chat completions it's ignored at best and
+    // 400s on non-reasoning models (Grok) at worst, which is what wedged the
+    // old Responses-API path.
+    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
   });
 }
 
@@ -290,10 +296,18 @@ export interface RunChatTurnInput {
    */
   history?: ChatHistoryRow[];
   /**
-   * Optional override for the model (tests, A/B). When omitted, the agent
-   * runs on the direct-OpenAI gpt-5-mini wrapper from `agent-model.ts`.
+   * The realtor's workspace chat model slug (e.g. `x-ai/grok-4.3`). Resolved
+   * to the active provider via `getAgentModel()`. When omitted, the default
+   * chat model is used.
    */
-  model?: string | Model;
+  model?: string;
+  /**
+   * Attachments for this turn (images / PDFs), already hydrated to signed
+   * URLs by the route. Encoded into SDK-native multimodal content so the
+   * agent can SEE them — an attachment+action turn ("add this person from
+   * the card") no longer has to detour through Modal.
+   */
+  attachments?: MultimodalAttachment[];
 }
 
 /**
@@ -310,10 +324,21 @@ export async function runChatTurn(input: RunChatTurnInput) {
     buildPersonalizedSystemPrompt(input.ctx),
   ]);
   const agent = buildChatAgent(input.ctx, {
-    model: input.model,
+    modelSlug: input.model,
     integrationTools,
     instructions,
   });
+
+  // The trailing user turn. With attachments, encode SDK-native multimodal
+  // content (gated by what the resolved model's provider can actually see);
+  // otherwise a plain string. The builder splices a calm note onto the text
+  // when an attachment can't be shown, so the model never pretends it saw
+  // something it didn't.
+  let userContent: unknown = input.userMessage;
+  if (input.attachments && input.attachments.length > 0) {
+    const resolved = resolveChatModel(input.model);
+    userContent = buildSdkUserContent(resolved, input.userMessage, input.attachments).content;
+  }
 
   // Build the SDK input as history + new user message. The SDK accepts
   // either a string OR an `AgentInputItem[]`; we use the array form so
@@ -323,7 +348,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
       role: row.role,
       content: row.content,
     })),
-    { role: 'user', content: input.userMessage },
+    { role: 'user', content: userContent },
   ] as unknown as AgentInputItem[];
 
   const result = await run(agent, items, {

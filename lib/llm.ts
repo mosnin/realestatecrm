@@ -1,14 +1,29 @@
 /**
  * LLM provider — OpenRouter.
  *
- * Every model call in the app (chat agent, autonomous runs, embeddings,
- * lead-scoring enhancement, the legacy RAG route) goes through one OpenAI
- * client built here. OpenRouter is OpenAI-API-compatible, so the only
- * difference from calling OpenAI directly is the base URL + key.
+ * # The provider boundary (read this before adding a model call)
  *
- * Fallback: when `OPENROUTER_API_KEY` is absent the client falls back to
- * calling OpenAI directly with `OPENAI_API_KEY`, so a deploy that hasn't
- * set the OpenRouter key keeps working.
+ * There is ONE rule, and it keeps OpenAI-API and OpenRouter cleanly separate:
+ *
+ *   - **All text/LLM work** — chat agent, autonomous runs, embeddings, lead
+ *     scoring, scoring-model generation, form optimization, compaction,
+ *     summaries — goes through `getLLMClient()` here. That client points at
+ *     OpenRouter whenever `OPENROUTER_API_KEY` is set (the configured default)
+ *     and only falls back to the OpenAI API (`OPENAI_API_KEY`) when OpenRouter
+ *     is absent. Model slugs for this path MUST be provider-correct: use
+ *     `openaiModel(name)` / `resolveChatModel()` so a bare `gpt-*` slug becomes
+ *     `openai/gpt-*` on OpenRouter. NEVER `new OpenAI(...)` directly for LLM
+ *     work — that bypasses OpenRouter and breaks OpenRouter-only deploys.
+ *
+ *   - **Audio only** — Whisper transcription, TTS, and the Realtime API —
+ *     talks to the OpenAI API directly (`process.env.OPENAI_API_KEY`), because
+ *     OpenRouter does not expose those endpoints. Those routes
+ *     (`app/api/ai/transcribe|speak|realtime-session`, the Telnyx voice
+ *     webhook) are the ONLY sanctioned direct-OpenAI callers. If you find a
+ *     direct OpenAI client anywhere else doing text completion, it's a bug.
+ *
+ * OpenRouter is OpenAI-API-compatible, so the only difference from calling
+ * OpenAI directly is the base URL + key.
  *
  * The Python agent has its own equivalent at `agent/llm.py`. The chat
  * model registry lives in `./chat-models` (pure data, client-safe) and is
@@ -16,6 +31,9 @@
  */
 
 import OpenAI from 'openai';
+
+// Local binding for use in this module (the block below only RE-exports it).
+import { DEFAULT_CHAT_MODEL } from './chat-models';
 
 export {
   CHAT_MODELS,
@@ -60,6 +78,39 @@ export function hasLLMKey(): boolean {
  */
 export function openaiModel(name: string): string {
   return isOpenRouterConfigured() ? `openai/${name}` : name;
+}
+
+/**
+ * The model the in-app chat agent falls back to when ONLY an OpenAI key is
+ * configured (no OpenRouter). Must be a real OpenAI model that supports tool
+ * calling AND vision. gpt-4o-mini is the most universally-available such model.
+ */
+export const OPENAI_FALLBACK_CHAT_MODEL = 'gpt-4o-mini';
+
+/**
+ * Pick a chat model the ACTIVE provider can actually serve — the fix for the
+ * keystone failure mode where the default model (`x-ai/grok-4.3`, an OpenRouter
+ * slug) was shipped to `api.openai.com` (which has no such model) and every
+ * turn 500'd.
+ *
+ * - OpenRouter configured → any slug is fine; return the requested model (or
+ *   the default) verbatim.
+ * - OpenAI-only → a vendor-prefixed slug (`x-ai/…`, `anthropic/…`, `moonshotai/…`)
+ *   or any non-`gpt` model cannot be served by OpenAI; substitute the OpenAI
+ *   fallback so the request CANNOT 404 on a wrong-provider model. A bare
+ *   `gpt-*` model passes through unchanged.
+ *
+ * This makes the provider/model mismatch structurally impossible regardless of
+ * which key the deployment has.
+ */
+export function resolveChatModel(requested?: string | null): string {
+  const wanted = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  if (isOpenRouterConfigured()) return wanted;
+  // OpenAI-only path: only bare gpt-* models are servable.
+  if (wanted.includes('/') || !wanted.toLowerCase().startsWith('gpt')) {
+    return OPENAI_FALLBACK_CHAT_MODEL;
+  }
+  return wanted;
 }
 
 /**

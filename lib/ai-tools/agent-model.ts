@@ -1,74 +1,54 @@
 /**
- * Agent-scoped model client — direct OpenAI, gpt-5-mini.
+ * Agent-scoped model wrapper for the in-process chat runtime.
  *
- * The interactive chat agent runs on OpenAI DIRECT (not OpenRouter). This is
- * deliberate and scoped: only the in-app agent runtime resolves its model
- * here. Every OTHER caller — draft-writing, lead-scoring, embeddings, the
- * legacy RAG route — still goes through `lib/llm.ts` (OpenRouter-first).
+ * The interactive chat agent runs on the SAME provider the rest of the app
+ * uses — `getLLMClient()` from `lib/llm.ts`, which is OpenRouter-first and
+ * falls back to OpenAI direct. This is the fix for the keystone failure mode:
+ * the old version hardcoded `gpt-5-mini` on the OpenAI **Responses API** with
+ * a direct-OpenAI client, so every chat turn on an OpenRouter-only deploy
+ * threw `MissingAgentKeyError` before a single token streamed — and even with
+ * an OpenAI key, the realtor's chosen model (`x-ai/grok-4.3`) was ignored.
  *
- * Why a separate path: OpenRouter adds a network hop and a cold-start tax on
- * the first token of every chat turn. The agent is the one surface where that
- * latency is felt directly by the realtor mid-conversation, so we cut the hop
- * and talk to OpenAI directly with `gpt-5-mini`. We do NOT flip the app-wide
- * client — that would silently re-route scoring/embeddings/drafts and break
- * the pinned 1536-dim embedding corpus.
+ * Now:
+ *   - One client, the app-wide `getLLMClient()` (OpenRouter or OpenAI).
+ *   - The realtor's workspace model, resolved through `resolveChatModel()` so
+ *     a provider/model mismatch is structurally impossible.
+ *   - `OpenAIChatCompletionsModel` (chat completions), NOT the Responses API.
+ *     Chat completions streams reliably across every OpenRouter provider
+ *     (Grok, Claude, Gemini, GPT) and never wedges on a reasoning-model
+ *     `max_output_tokens` mismatch — the prior hang.
  *
  * We hand the SDK an `OpenAIChatCompletionsModel` built against our own client
  * rather than mutating the SDK's global default client. Local instance = no
  * cross-request bleed, no global state, fully reversible.
  */
 
-import OpenAI from 'openai';
-import { OpenAIResponsesModel } from '@openai/agents';
+import { OpenAIChatCompletionsModel } from '@openai/agents';
 import type { Model } from '@openai/agents';
-
-/** The model the in-app chat agent runs on. Direct OpenAI slug (bare, no
- *  vendor prefix — that prefixing is an OpenRouter convention). */
-export const AGENT_CHAT_MODEL = 'gpt-5-mini';
-
-/** Cache the client + model wrapper across turns. The OpenAI client is
- *  stateless per-request and safe to share; rebuilding it per turn would
- *  re-pay TLS/agent setup for no benefit. */
-let cachedClient: OpenAI | null = null;
-let cachedModel: Model | null = null;
-
-export class MissingAgentKeyError extends Error {
-  constructor() {
-    super('OPENAI_API_KEY is not set — the in-app chat agent needs it for gpt-5-mini.');
-    this.name = 'MissingAgentKeyError';
-  }
-}
+import { getLLMClient, resolveChatModel } from '@/lib/llm';
 
 /**
- * Build (or reuse) the direct-OpenAI client the agent runtime uses. Throws
- * `MissingAgentKeyError` when `OPENAI_API_KEY` is absent so the route can
- * surface a clear 503 instead of a generic SDK failure.
+ * Cache one Model wrapper per resolved model slug. The OpenAI client is
+ * stateless per-request and safe to share; rebuilding the wrapper per turn
+ * would re-pay client setup for no benefit. Keyed by slug so a workspace that
+ * switches models (or a deploy that flips provider) gets a fresh wrapper
+ * instead of a stale one.
  */
-export function getAgentOpenAIClient(): OpenAI {
-  if (cachedClient) return cachedClient;
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new MissingAgentKeyError();
-  // Per-request timeout so a stalled OpenAI call rejects instead of parking
-  // the turn until Vercel's 300s lambda wall. Pairs with the stream-pump
-  // watchdog in sdk-chat-stream.ts — together they guarantee a wedged run
-  // surfaces an error rather than hanging silently with nothing in the logs.
-  cachedClient = new OpenAI({ apiKey: key, timeout: 120_000, maxRetries: 2 });
-  return cachedClient;
-}
+const cache = new Map<string, Model>();
 
 /**
- * The SDK `Model` the agent runs on: `gpt-5-mini` over the direct-OpenAI
- * client, via the **Responses API** (OpenAIResponsesModel). GPT-5 is a
- * reasoning model — it must run on the Responses API, not chat completions:
- * chat completions sends `max_tokens` (gpt-5 only accepts
- * `max_completion_tokens`) and doesn't surface reasoning, which made every
- * turn hang and then error. The Responses path handles reasoning + the
- * `maxTokens` → `max_output_tokens` mapping correctly. Cached so every turn
- * reuses one wrapper.
+ * The SDK `Model` the agent runs on: the realtor's workspace model (resolved
+ * to something the active provider can actually serve) over the app-wide LLM
+ * client, via chat completions.
+ *
+ * @param modelSlug The workspace's configured chat model. When omitted, the
+ *   default chat model is used. Always passed through `resolveChatModel()`.
  */
-export function getAgentModel(): Model {
-  if (cachedModel) return cachedModel;
-  const client = getAgentOpenAIClient();
-  cachedModel = new OpenAIResponsesModel(client, AGENT_CHAT_MODEL);
-  return cachedModel;
+export function getAgentModel(modelSlug?: string | null): Model {
+  const resolved = resolveChatModel(modelSlug);
+  const cached = cache.get(resolved);
+  if (cached) return cached;
+  const model = new OpenAIChatCompletionsModel(getLLMClient(), resolved);
+  cache.set(resolved, model);
+  return model;
 }

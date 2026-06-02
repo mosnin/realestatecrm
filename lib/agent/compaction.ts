@@ -1,4 +1,5 @@
 import { getOpenAIClient } from '@/lib/ai-tools/openai-client';
+import { openaiModel } from '@/lib/llm';
 
 export interface CompactionInput {
   messages: Array<{ role: string; content: string }>;
@@ -32,7 +33,11 @@ export async function compactContext(input: CompactionInput): Promise<{
   const { client } = getOpenAIClient();
 
   const completion = await client.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    // `getOpenAIClient()` is the OpenRouter-first client, so the slug must be
+    // provider-correct: `openai/gpt-4.1-mini` on OpenRouter, bare on OpenAI
+    // direct. A bare slug 404'd on OpenRouter (the default provider) — which,
+    // wrapped in the caller's try/catch, silently skipped compaction.
+    model: openaiModel('gpt-4.1-mini'),
     messages: [
       {
         role: 'user',
