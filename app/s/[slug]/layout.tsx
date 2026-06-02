@@ -15,6 +15,7 @@ import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
@@ -254,7 +255,7 @@ export default async function DashboardLayout({
           shows a snapshot of what's new, then dissolves into the dashboard.
           Plays every time the app/PWA is opened. */}
       <ChippiSplash
-        firstName={(dbUser.name ?? '').trim().split(/\s+/)[0] ?? ''}
+        greeting={pickGreeting((dbUser.name ?? '').trim().split(/\s+/)[0] ?? '')}
         snapshot={{
           newLeads: unreadLeadCount,
           followUpsDue: overdueFollowUpCount,
