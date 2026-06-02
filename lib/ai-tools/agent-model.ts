@@ -19,7 +19,7 @@
  */
 
 import OpenAI from 'openai';
-import { OpenAIChatCompletionsModel } from '@openai/agents';
+import { OpenAIResponsesModel } from '@openai/agents';
 import type { Model } from '@openai/agents';
 
 /** The model the in-app chat agent runs on. Direct OpenAI slug (bare, no
@@ -54,12 +54,17 @@ export function getAgentOpenAIClient(): OpenAI {
 
 /**
  * The SDK `Model` the agent runs on: `gpt-5-mini` over the direct-OpenAI
- * client. Pass the result straight into `new Agent({ model })`. Cached so
- * every turn reuses one wrapper.
+ * client, via the **Responses API** (OpenAIResponsesModel). GPT-5 is a
+ * reasoning model — it must run on the Responses API, not chat completions:
+ * chat completions sends `max_tokens` (gpt-5 only accepts
+ * `max_completion_tokens`) and doesn't surface reasoning, which made every
+ * turn hang and then error. The Responses path handles reasoning + the
+ * `maxTokens` → `max_output_tokens` mapping correctly. Cached so every turn
+ * reuses one wrapper.
  */
 export function getAgentModel(): Model {
   if (cachedModel) return cachedModel;
   const client = getAgentOpenAIClient();
-  cachedModel = new OpenAIChatCompletionsModel(client, AGENT_CHAT_MODEL);
+  cachedModel = new OpenAIResponsesModel(client, AGENT_CHAT_MODEL);
   return cachedModel;
 }

@@ -138,7 +138,11 @@ export function buildChatAgent(
     // Default to the direct-OpenAI gpt-5-mini wrapper. Tests / A-B can still
     // pass a slug or a Model instance via opts.model to override.
     model: opts.model ?? getAgentModel(),
-    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
+    // gpt-5-mini is a reasoning model on the Responses API. `low` effort keeps
+    // chat turns snappy (high effort makes the first token crawl and can eat
+    // the whole output budget on reasoning tokens). maxTokens maps to
+    // max_output_tokens, which covers reasoning + answer.
+    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS, reasoning: { effort: 'low' } },
   });
 }
 
