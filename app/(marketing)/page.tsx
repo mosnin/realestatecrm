@@ -8,9 +8,8 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { MarketingHero } from '@/components/marketing/marketing-hero';
+import { MarketingHeroHome } from '@/components/marketing/marketing-hero-home';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingLogoStrip } from '@/components/marketing/marketing-logo-strip';
 import {
@@ -28,18 +27,13 @@ export default async function MarketingHomePage() {
 
   return (
     <>
-      <MarketingHero
+      <MarketingHeroHome
         eyebrow="The agentic OS for real estate"
         title="Chippi runs your workspace."
-        sub="An AI agent that qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current. So you can focus on the deals that matter."
+        sub="An AI agent that qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current — so you can focus on the deals that matter."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See how it works', href: '/features/chippi' }}
-      >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Homepage hero video — autoplay-mute-loop, ~30s, showing Chippi at work across the workspace (inbound lead → draft → tour scheduled → deal updated). 16:9, paper-flat product UI, no fake screen mockups."
-        />
-      </MarketingHero>
+      />
 
       {/* Trusted-by row — six greyscale slots until real brokerage logos
           land. Paper-flat, static, no marquee. The slots themselves are
