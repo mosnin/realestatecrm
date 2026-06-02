@@ -32,6 +32,8 @@ import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
 import { ClientPortalPanel } from '@/components/contacts/client-portal-panel';
 import { ContactDetailFrame, ContactDetailFocal } from './detail-client';
+import { SendForSignature, type SignatureRequestLite } from '@/components/esign/send-for-signature';
+import { isDocusignConnected } from '@/lib/esign';
 import {
   buildPeopleDetailActions,
   type PersonStateForActions,
@@ -128,6 +130,33 @@ export default async function ClientDetailPage({
 
   const hasOpenApp = !!app && (contact.applicationStatus === 'received' || contact.applicationStatus == null);
   const hasOpenDeals = contact.dealContacts.length > 0;
+
+  // E-signature — let the realtor send a document from this person's linked
+  // deals out for signature, prefilled to the person, and watch its status.
+  // Documents are deal-scoped, so we pull the docs from the contact's deals.
+  const dealIds = contact.dealContacts.map((dc) => dc.deal.id);
+  let signableDocs: { id: string; label: string; dealId: string }[] = [];
+  let contactSignatureRequests: SignatureRequestLite[] = [];
+  if (dealIds.length > 0) {
+    const { data: docRows } = await supabase
+      .from('DealDocument')
+      .select('id, label, dealId')
+      .in('dealId', dealIds)
+      .eq('spaceId', space.id)
+      .order('createdAt', { ascending: false });
+    signableDocs = (docRows ?? []) as { id: string; label: string; dealId: string }[];
+  }
+  {
+    const { data: sigRows } = await supabase
+      .from('SignatureRequest')
+      .select('id, documentId, status, signerEmail, signerName, subject, createdAt')
+      .eq('contactId', contact.id)
+      .eq('spaceId', space.id)
+      .order('createdAt', { ascending: false });
+    contactSignatureRequests = (sigRows ?? []) as SignatureRequestLite[];
+  }
+  const docusignConnected = await isDocusignConnected(userId);
+  const latestContactRequest = contactSignatureRequests[0] ?? null;
 
   return (
     <ContactDetailFrame className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -343,6 +372,69 @@ export default async function ClientDetailPage({
               </li>
             ))}
           </ul>
+        </details>
+      )}
+
+      {/* Send a document to sign — pull a document from this person's deals,
+          send it to them on the realtor's connected DocuSign, watch status.
+          Renders only when the person is on a deal with documents (nothing to
+          send otherwise). Open when there's an in-flight request to track. */}
+      {signableDocs.length > 0 && (
+        <details
+          {...(latestContactRequest && latestContactRequest.status !== 'completed'
+            ? { open: true }
+            : {})}
+          className="group border-t border-border/60 pt-4"
+        >
+          <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+            <span>Signatures</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Send a document from {contact.name.split(' ')[0]}&apos;s deals out for signature.
+              </p>
+              <SendForSignature
+                slug={slug}
+                connected={docusignConnected}
+                documents={signableDocs.map((d) => ({ id: d.id, label: d.label }))}
+                contactId={contact.id}
+                defaultSignerEmail={contact.email ?? undefined}
+                defaultSignerName={contact.name}
+              />
+            </div>
+            {contactSignatureRequests.length > 0 && (
+              <ul className="divide-y divide-border/60 border border-border rounded-lg overflow-hidden bg-card">
+                {contactSignatureRequests.map((r) => (
+                  <li key={r.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{r.subject}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {r.signerEmail}
+                        {' · '}
+                        {new Date(r.createdAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <SendForSignature
+                      slug={slug}
+                      connected={docusignConnected}
+                      contactId={contact.id}
+                      initialRequest={r}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </details>
       )}
 

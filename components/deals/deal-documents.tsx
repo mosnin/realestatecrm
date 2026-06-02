@@ -32,9 +32,18 @@ import {
   type DealDocument,
   type DealDocumentKind,
 } from '@/lib/deals/documents';
+import {
+  SendForSignature,
+  type SignatureRequestLite,
+} from '@/components/esign/send-for-signature';
 
 interface DealDocumentsProps {
   dealId: string;
+  slug: string;
+  /** True when the realtor has DocuSign connected (server-resolved). */
+  docusignConnected?: boolean;
+  /** Latest signature request per documentId, for the inline status pill. */
+  signatureRequests?: SignatureRequestLite[];
   initial?: DealDocument[];
   pipelineType?: string | null;
 }
@@ -44,7 +53,19 @@ interface DealDocumentsProps {
  * signed-URL download. Deliberately minimal — the win here is having a
  * typed, labeled place to store these files at all, not a full DMS.
  */
-export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocumentsProps) {
+export function DealDocuments({
+  dealId,
+  slug,
+  docusignConnected = false,
+  signatureRequests = [],
+  initial = [],
+  pipelineType,
+}: DealDocumentsProps) {
+  // Latest request keyed by documentId — the inline pill reads from here.
+  const requestByDoc = new Map<string, SignatureRequestLite>();
+  for (const r of signatureRequests) {
+    if (r.documentId && !requestByDoc.has(r.documentId)) requestByDoc.set(r.documentId, r);
+  }
   const [docs, setDocs] = useState<DealDocument[]>(initial);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -227,6 +248,17 @@ export function DealDocuments({ dealId, initial = [], pipelineType }: DealDocume
                   {' · '}
                   {new Date(doc.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
+              </div>
+              <div className="flex-shrink-0">
+                <SendForSignature
+                  slug={slug}
+                  connected={docusignConnected}
+                  documentId={doc.id}
+                  documentLabel={doc.label}
+                  dealId={dealId}
+                  initialRequest={requestByDoc.get(doc.id) ?? null}
+                  compact
+                />
               </div>
               <button
                 type="button"
