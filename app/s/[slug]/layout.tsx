@@ -14,6 +14,7 @@ import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
+import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
@@ -247,6 +248,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      {/* First-paint splash — the Chippi wordmark draws on, then fades into the
+          dashboard. Plays every time the app/PWA is opened. */}
+      <ChippiSplash />
       {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
           sidebar/header/chat-bar via CSS. Mount near the root so the
           flag is set before any layout reads it. */}
