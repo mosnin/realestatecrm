@@ -30,6 +30,7 @@ import { ContactActionPills } from '@/components/contacts/contact-action-pills';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
+import { ClientPortalPanel } from '@/components/contacts/client-portal-panel';
 import { ContactDetailFrame, ContactDetailFocal } from './detail-client';
 import {
   buildPeopleDetailActions,
@@ -232,6 +233,10 @@ export default async function ClientDetailPage({
       </details>
 
       <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
+
+      {/* Client portal — the applicant's own thread, uploads, and a
+          "request info" action. Lazily loaded on open so the page stays fast. */}
+      <ClientPortalPanel contactId={contact.id} />
 
       {/* Score — open when scored, since "why is this person hot" is often
           the realtor's next question. Closed when no score yet. */}
