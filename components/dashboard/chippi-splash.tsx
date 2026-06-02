@@ -50,7 +50,7 @@ export function ChippiSplash() {
           aria-hidden
         >
           <ChippiHelloEffect
-            className="h-16 text-foreground sm:h-20"
+            className="h-16 w-auto px-8 text-foreground sm:h-24"
             onAnimationComplete={() => {
               // Hold the finished wordmark for a beat, then fade out.
               setTimeout(() => setShow(false), 550);
