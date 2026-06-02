@@ -9,12 +9,9 @@ import {
   Moon,
   Settings,
   Bell,
-  Keyboard,
-  Download,
   Gift,
   CreditCard,
-  HelpCircle,
-  Trash2,
+  LifeBuoy,
   LogOut,
   ChevronRight,
   ChevronDown,
@@ -29,10 +26,10 @@ import { useTheme } from '@/components/theme-provider';
 // actions. The trigger is the WHOLE chip on the avatar+name region; the ⋯ is
 // purely a visual hint. Tapping anywhere on the chip opens the menu.
 //
-// Wired live: Settings → /s/${slug}/settings, Themes → toggleTheme(),
-// Log out → Clerk's signOut.
-// Stubs: Notifications → /s/${slug}/settings?tab=notifications,
-// Hotkeys, Apps, Referrals, Plans, Help, Trash → no-op or external link.
+// Every row is wired to something real — no dead stubs. Themes → toggleTheme(),
+// Settings → /settings, Notifications → /settings?tab=notifications,
+// Affiliate → /affiliate (the referral program), Plans → /billing,
+// Help → /support (the in-app support-ticket center), Log out → Clerk signOut.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface SidebarUserMenuProps {
@@ -103,24 +100,10 @@ export function SidebarUserMenu({
       divider: true,
     },
     {
-      label: 'Hotkeys',
-      icon: Keyboard,
-      rightIcon: ChevronRight,
-      // Stub — no hotkeys page yet.
-      onClick: () => {},
-    },
-    {
-      label: 'Download apps',
-      icon: Download,
-      rightIcon: ChevronRight,
-      onClick: () => {},
-      divider: true,
-    },
-    {
-      label: 'Referrals',
+      label: 'Affiliate',
       icon: Gift,
       rightLabel: 'New',
-      onClick: () => {},
+      href: `${base}/affiliate`,
     },
     {
       label: 'Plans',
@@ -131,15 +114,9 @@ export function SidebarUserMenu({
     },
     {
       label: 'Help',
-      icon: HelpCircle,
+      icon: LifeBuoy,
       rightIcon: ChevronRight,
-      href: 'https://www.chippi.app/help',
-      external: true,
-    },
-    {
-      label: 'Trash',
-      icon: Trash2,
-      onClick: () => {},
+      href: `${base}/support`,
       divider: true,
     },
     {
