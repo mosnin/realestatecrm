@@ -24,7 +24,7 @@ dependencies = [
   "httpx>=0.28.0,<1",
   "upstash-redis>=1.3.0,<2",
   "python-dotenv>=1.1.0,<2",
-  "modal>=0.73.0,<1",
+  "modal>=1.0,<2",
   "structlog>=25.1.0,<26",
   # Attachment extraction (read_attachment tool)
   "pypdf>=5.0.0,<6",
