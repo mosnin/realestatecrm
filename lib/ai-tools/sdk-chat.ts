@@ -22,13 +22,15 @@
  *     bridge stay pure and testable.
  */
 
-import { Agent, run, type RunState, type Tool as SdkTool, type AgentInputItem } from '@openai/agents';
+import { Agent, run, type RunState, type Tool as SdkTool, type AgentInputItem, type Model } from '@openai/agents';
 import {
   toSdkTool,
   restoreRunState,
   applyApprovalDecision,
   type ApprovalDecision,
 } from './sdk-bridge';
+import { getAgentModel } from './agent-model';
+import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
@@ -40,7 +42,12 @@ import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
-/** Same model the bridge defaults to. Cheap enough to absorb chat traffic. */
+/** Bare model slug for the in-process skill sub-agents (analyze_pipeline,
+ *  research_person, planner). They run as `Agent.asTool()` children of the
+ *  chat agent; passing the slug string lets the SDK resolve them against its
+ *  configured client. The TOP-LEVEL chat agent uses `getAgentModel()` — a
+ *  direct-OpenAI gpt-5-mini wrapper — so the realtor-facing turn never hits
+ *  OpenRouter. See lib/ai-tools/agent-model.ts. */
 const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
@@ -84,14 +91,23 @@ const MAX_TURNS_PER_TURN = 15;
  */
 export function buildChatAgent(
   ctx: ToolContext,
-  opts: { model?: string; integrationTools?: SdkTool[]; instructions?: string } = {},
+  opts: { model?: string | Model; integrationTools?: SdkTool[]; instructions?: string } = {},
 ): Agent {
   const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
 
+  // delegate_task — the orchestration tool. Lets the agent spawn a deeper
+  // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
+  // its progress back inline. See tools/delegate-task.ts + the system prompt's
+  // "when to delegate" guidance.
+  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
+
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: opts.model });
-  const contactResearcher = buildContactResearcherAgent(ctx, { model: opts.model });
-  const planner = buildPlannerAgent(ctx, { model: opts.model });
+  // These take the bare slug — they're cheap in-process children, not the
+  // realtor-facing top-level turn.
+  const skillModel = typeof opts.model === 'string' ? opts.model : undefined;
+  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: skillModel });
+  const contactResearcher = buildContactResearcherAgent(ctx, { model: skillModel });
+  const planner = buildPlannerAgent(ctx, { model: skillModel });
 
   const skillTools = [
     pipelineAnalyst.asTool({
@@ -118,8 +134,10 @@ export function buildChatAgent(
   return new Agent({
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
-    tools: [...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
-    model: opts.model ?? DEFAULT_MODEL,
+    tools: [delegateTool, ...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
+    // Default to the direct-OpenAI gpt-5-mini wrapper. Tests / A-B can still
+    // pass a slug or a Model instance via opts.model to override.
+    model: opts.model ?? getAgentModel(),
     modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
   });
 }
@@ -268,10 +286,10 @@ export interface RunChatTurnInput {
    */
   history?: ChatHistoryRow[];
   /**
-   * Optional override for the model (tests, A/B). The default
-   * `gpt-5-mini` matches the bridge.
+   * Optional override for the model (tests, A/B). When omitted, the agent
+   * runs on the direct-OpenAI gpt-5-mini wrapper from `agent-model.ts`.
    */
-  model?: string;
+  model?: string | Model;
 }
 
 /**
@@ -326,7 +344,7 @@ export interface ResumeChatTurnInput {
    * it on the resume request body for a multi-pending scenario).
    */
   callId: string;
-  model?: string;
+  model?: string | Model;
 }
 
 /**

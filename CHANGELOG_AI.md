@@ -53,6 +53,37 @@ Copy this template for each new entry:
 
 ## Log
 
+## [2026-06-02] In-app agent runtime default + delegate_task orchestration with inline sub-agent progress
+
+- **Task**: Make the in-process TS agent runtime the DEFAULT chat path on direct OpenAI `gpt-5-mini` (kill cold start), give the agent a `delegate_task` tool to spawn deeper Modal sub-agents on its own, and stream those sub-agents' progress inline in the chat thread. Keep Modal reachable + reversible. (Owner explicitly authorized the agent runtime/model change per AGENTS.md §5.)
+- **Summary**:
+  - New agent-scoped model client: direct OpenAI `gpt-5-mini` wrapped as an SDK `OpenAIChatCompletionsModel`, used only by the in-app agent. Non-agent callers (scoring, embeddings, drafts, RAG) still go through `lib/llm.ts` (OpenRouter-first) unchanged.
+  - Flipped `CHIPPI_CHAT_RUNTIME` default from `modal` → `ts`. `/api/ai/task` now runs the in-process runtime by default; `=modal` routes the whole turn through Modal (reversible). Attachment turns auto-route to Modal (TS runtime is text-only) when `MODAL_CHAT_URL` is set.
+  - New `delegate_task` tool: the agent calls it for in-depth / multi-step work. It creates a `SwarmRun` and fires the existing Modal swarm runner (`MODAL_SWARM_URL`), returning a run handle. System prompt teaches when to delegate vs answer inline.
+  - Inline progress: new `subagent_spawned` SSE event + `subagent_task` MessageBlock + `SubagentTaskBlockView` that subscribes to the existing `/api/swarm/[runId]/stream` and renders a live, self-updating task card in the chat thread (persists + re-subscribes on reload).
+- **Files touched**:
+  - `lib/ai-tools/agent-model.ts` — NEW: direct-OpenAI gpt-5-mini SDK model wrapper (agent-only).
+  - `lib/ai-tools/tools/delegate-task.ts` — NEW: the orchestration tool + runId marker helpers.
+  - `components/ai/blocks/subagent-task-block-view.tsx` — NEW: live inline task card.
+  - `lib/ai-tools/sdk-chat.ts` — agent runs on `getAgentModel()`; injects `delegate_task`; model opts accept `string | Model`.
+  - `lib/ai-tools/runtime-flag.ts` — default flipped to `ts`; `modal` is opt-in.
+  - `app/api/ai/task/route.ts` — TS runtime is default; Modal/router path gated behind `=modal`; attachment turns → Modal.
+  - `lib/ai-tools/sdk-chat-stream.ts` — detects delegate_task results, strips runId marker, emits `subagent_spawned`, persists `subagent_task` blocks.
+  - `lib/ai-tools/events.ts`, `lib/ai-tools/blocks.ts` — new event + block types.
+  - `components/ai/hooks/use-agent-task.ts` — handles `subagent_spawned`; suppresses the generic tool row for delegate_task.
+  - `components/ai/blocks/transcript.tsx` — renders `subagent_task` blocks.
+  - `lib/ai-tools/system-prompt.ts` — "when to delegate" guidance.
+  - `lib/chat-models.ts` — documents the fixed agent model (`AGENT_RUNTIME_MODEL`).
+  - `.env.example`, `ARCHITECTURE.md` — runtime default + delegate docs.
+- **Reason**: The Modal proxy added a cold-start tax on every normal turn. In-app gpt-5-mini removes it; delegation preserves depth for hard tasks without blocking the chat.
+- **Risks**: Core chat path touched. In-app runtime is text-only — attachment turns depend on Modal (guarded). Modal sub-agents (`agent/swarm_orchestrator.py`) currently run research-style LLM calls WITHOUT the full Chippi tool catalog or approval gates — delegated sub-agents do not yet act on workspace state; the orchestrator (where the realtor is) keeps all approval gates. Wiring full tools+approvals into Modal sub-agents is a separate Python-side change.
+- **Manual tests**:
+  - `npx tsc --noEmit` — clean.
+  - `npx next build` — see report.
+  - `npx vitest run` — see report.
+  - Live Modal/OpenAI calls NOT exercised (no creds in this environment).
+- **Rollback notes**: Set `CHIPPI_CHAT_RUNTIME=modal` to instantly restore the Modal-primary path with zero code change. Full revert: revert this branch's commits; delete `agent-model.ts`, `delegate-task.ts`, `subagent-task-block-view.tsx`.
+
 ### [PLACEHOLDER] Example entry — replace with real entries
 
 ## [2026-04-24] Add AI_AGENT_SPEC.md

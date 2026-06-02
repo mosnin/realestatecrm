@@ -115,7 +115,7 @@ _patch_openai_event_schemas()
 
 
 # The model a workspace gets when it hasn't picked one. OpenRouter slug.
-DEFAULT_CHAT_MODEL = "x-ai/grok-4.3"
+DEFAULT_CHAT_MODEL = "gpt-5-mini"
 
 # Allowlist of realtor-selectable models — mirrors CHAT_MODELS in lib/llm.ts.
 CHAT_MODELS: tuple[str, ...] = (
@@ -169,7 +169,7 @@ def resolve_chat_model(model: str | None) -> str:
     direct fallback collapses to a single known-good model.
     """
     if not settings.openrouter_api_key:
-        return "gpt-5"
+        return "gpt-5-mini"
     if model and model in CHAT_MODELS:
         return model
     return DEFAULT_CHAT_MODEL

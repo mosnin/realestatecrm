@@ -11,7 +11,12 @@
 
 import type { ToolResult } from './types';
 
-export type MessageBlock = TextBlock | ToolCallBlock | PermissionBlock | ReasoningBlock;
+export type MessageBlock =
+  | TextBlock
+  | ToolCallBlock
+  | PermissionBlock
+  | ReasoningBlock
+  | SubagentTaskBlock;
 
 export interface TextBlock {
   type: 'text';
@@ -71,6 +76,23 @@ export interface ReasoningBlock {
   type: 'reasoning';
   content: string;
   durationMs?: number;
+}
+
+/**
+ * A delegated sub-agent task spawned via `delegate_task`. Persisted so a
+ * reloaded conversation re-shows the task card; the card re-subscribes to
+ * /api/swarm/{runId}/stream to render live progress (or the final result if
+ * the run already finished). Conceptually distinct from a tool call — it's a
+ * whole sub-agent run, not a single verb — so it gets its own block + view.
+ */
+export interface SubagentTaskBlock {
+  type: 'subagent_task';
+  /** The call_id of the delegate_task tool call that spawned it. */
+  callId: string;
+  /** SwarmRun id the card streams. */
+  runId: string;
+  /** The task brief handed to the sub-agent. */
+  goal: string;
 }
 
 /**

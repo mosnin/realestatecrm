@@ -67,7 +67,7 @@ Rules:
 - wave=1 for first-wave parallel tasks, wave=2 for tasks that depend on wave-1 results
 """
     response = await client.chat.completions.create(
-        model=openai_model("gpt-4o-mini"),
+        model=openai_model("gpt-5-mini"),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         max_tokens=1000,
@@ -159,7 +159,7 @@ Synthesize these results into a clear, comprehensive final answer.
 Format with markdown headers for readability."""
 
     response = await client.chat.completions.create(
-        model=openai_model("gpt-4o-mini"),
+        model=openai_model("gpt-5-mini"),
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
     )

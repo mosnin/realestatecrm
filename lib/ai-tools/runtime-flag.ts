@@ -1,21 +1,26 @@
 /**
  * Runtime flag that selects which chat backend handles a request.
  *
- * `'modal'` — **default**. Proxies chat turns to the Modal Python sandbox
- * running Chippi via the OpenAI Agents SDK. Provides secure isolation,
- * autonomous long-running chains, background execution, and model fallback.
- * Requires MODAL_CHAT_URL in env. Deploy with `modal deploy agent/modal_app.py`.
+ * `'ts'` — **default**. The in-process TypeScript runtime built on
+ * `@openai/agents`, running on direct OpenAI gpt-5-mini (see
+ * `lib/ai-tools/agent-model.ts`). This is the primary path: no Modal cold
+ * start, first token arrives fast. It carries the full Chippi tool set, the
+ * draft/approval gates, rate limits, tool-call logging, AND the orchestrator's
+ * `delegate_task` tool — which spins deeper work out to Modal sub-agents when
+ * the agent judges a task needs depth.
  *
- * `'ts'` — in-process TypeScript fallback built on `@openai/agents`. Useful
- * for local dev when you don't have a Modal deployment running. Set
- * CHIPPI_CHAT_RUNTIME=ts to activate. Not recommended for production — lacks
- * sandbox isolation and background execution.
+ * `'modal'` — opt-in. Proxies the WHOLE chat turn to the Modal Python sandbox
+ * (MODAL_CHAT_URL). Kept fully reachable and reversible: set
+ * CHIPPI_CHAT_RUNTIME=modal to route every turn through Modal again (e.g. to
+ * fall back if the in-app path has a problem, or to run heavy turns entirely
+ * in the sandbox). Requires MODAL_CHAT_URL; deploy with
+ * `modal deploy agent/modal_app.py`.
  *
- * Reads at call time so an env flip doesn't require a redeploy.
+ * Reads at call time so an env flip takes effect without a redeploy.
  */
 export type ChatRuntime = 'modal' | 'ts';
 
 export function chatRuntime(): ChatRuntime {
   const v = process.env.CHIPPI_CHAT_RUNTIME;
-  return v === 'ts' ? 'ts' : 'modal';
+  return v === 'modal' ? 'modal' : 'ts';
 }
