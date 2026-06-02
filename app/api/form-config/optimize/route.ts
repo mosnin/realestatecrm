@@ -9,6 +9,7 @@ import {
   setCachedSuggestions,
 } from '@/lib/form-optimization';
 import type { IntakeFormConfig } from '@/lib/types';
+import { hasLLMKey } from '@/lib/llm';
 
 const MIN_SUBMISSIONS = 10;
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasLLMKey()) {
     return NextResponse.json(
       { error: 'AI optimization is not configured on this server.' },
       { status: 503 },

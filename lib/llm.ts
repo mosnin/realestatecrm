@@ -1,14 +1,29 @@
 /**
  * LLM provider — OpenRouter.
  *
- * Every model call in the app (chat agent, autonomous runs, embeddings,
- * lead-scoring enhancement, the legacy RAG route) goes through one OpenAI
- * client built here. OpenRouter is OpenAI-API-compatible, so the only
- * difference from calling OpenAI directly is the base URL + key.
+ * # The provider boundary (read this before adding a model call)
  *
- * Fallback: when `OPENROUTER_API_KEY` is absent the client falls back to
- * calling OpenAI directly with `OPENAI_API_KEY`, so a deploy that hasn't
- * set the OpenRouter key keeps working.
+ * There is ONE rule, and it keeps OpenAI-API and OpenRouter cleanly separate:
+ *
+ *   - **All text/LLM work** — chat agent, autonomous runs, embeddings, lead
+ *     scoring, scoring-model generation, form optimization, compaction,
+ *     summaries — goes through `getLLMClient()` here. That client points at
+ *     OpenRouter whenever `OPENROUTER_API_KEY` is set (the configured default)
+ *     and only falls back to the OpenAI API (`OPENAI_API_KEY`) when OpenRouter
+ *     is absent. Model slugs for this path MUST be provider-correct: use
+ *     `openaiModel(name)` / `resolveChatModel()` so a bare `gpt-*` slug becomes
+ *     `openai/gpt-*` on OpenRouter. NEVER `new OpenAI(...)` directly for LLM
+ *     work — that bypasses OpenRouter and breaks OpenRouter-only deploys.
+ *
+ *   - **Audio only** — Whisper transcription, TTS, and the Realtime API —
+ *     talks to the OpenAI API directly (`process.env.OPENAI_API_KEY`), because
+ *     OpenRouter does not expose those endpoints. Those routes
+ *     (`app/api/ai/transcribe|speak|realtime-session`, the Telnyx voice
+ *     webhook) are the ONLY sanctioned direct-OpenAI callers. If you find a
+ *     direct OpenAI client anywhere else doing text completion, it's a bug.
+ *
+ * OpenRouter is OpenAI-API-compatible, so the only difference from calling
+ * OpenAI directly is the base URL + key.
  *
  * The Python agent has its own equivalent at `agent/llm.py`. The chat
  * model registry lives in `./chat-models` (pure data, client-safe) and is

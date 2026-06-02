@@ -38,6 +38,8 @@ import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
 import type { MultimodalAttachment } from '@/lib/chat/multimodal';
+import { recordChatUsage } from '@/lib/usage/record-chat-usage';
+import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
 
 const COMPACTION_THRESHOLD_CHARS = 80_000;
 
@@ -72,7 +74,10 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         const compacted = await compactContext({
           messages: history,
           maxContextChars: COMPACTION_THRESHOLD_CHARS,
-          model: 'gpt-5-mini',
+          // Compaction picks its own provider-correct summarizer model
+          // internally; this field is vestigial. Pass the workspace model so
+          // it's at least honest about the turn it's compacting for.
+          model: input.model ?? DEFAULT_CHAT_MODEL,
         });
         initialEvents.push({
           type: 'system',
@@ -91,6 +96,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
     conversationId: input.conversationId,
     abortController: input.abortController,
     initialEvents,
+    model: input.model,
     start: async () => {
       const history = await historyPromise;
       const { result } = await runChatTurn({
@@ -199,6 +205,9 @@ interface BuildStreamInput {
    * ReadableStream constructor ran (where pushEvent isn't yet available).
    */
   initialEvents?: PushableEvent[];
+  /** The model this turn ran on — for ChatUsage attribution + pricing.
+   *  Falls back to the default chat model (resume path doesn't carry it). */
+  model?: string;
 }
 
 /**
@@ -211,6 +220,43 @@ interface SdkResultLike {
   completed: Promise<void>;
   interruptions?: ReadonlyArray<unknown>;
   state?: { toString(): string };
+  /** Per-model-call responses; each carries a `usage` block once the call
+   *  settles. Summed across the turn for ChatUsage. Public getter on the
+   *  SDK's streamed result. */
+  rawResponses?: ReadonlyArray<{
+    usage?: {
+      inputTokens?: number;
+      outputTokens?: number;
+      inputTokensDetails?: Record<string, number> | Array<Record<string, number>>;
+    };
+  }>;
+}
+
+/** Sum token usage across every model call in the turn. Returns zeros when
+ *  the provider didn't report usage (recordChatUsage no-ops on all-zero, so
+ *  this is safe to call unconditionally). Reads the cached-input count from
+ *  inputTokensDetails in either the object or array shape the SDK uses. */
+function sumTurnUsage(result: SdkResultLike): {
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+} {
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let cachedTokens = 0;
+  for (const r of result.rawResponses ?? []) {
+    const u = r?.usage;
+    if (!u) continue;
+    promptTokens += u.inputTokens ?? 0;
+    completionTokens += u.outputTokens ?? 0;
+    const d = u.inputTokensDetails;
+    const details = Array.isArray(d) ? d : d ? [d] : [];
+    for (const entry of details) {
+      cachedTokens +=
+        Number(entry?.cached_tokens ?? entry?.cachedTokens ?? 0) || 0;
+    }
+  }
+  return { promptTokens, completionTokens, cachedTokens };
 }
 
 function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
@@ -380,6 +426,29 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // and result.state are stable before we read them. Same watchdog — the
         // SDK can finish the stream yet never resolve `completed`.
         await withIdleTimeout(result.completed, input.abortController);
+
+        // Record token usage for this turn — the in-process agent path's
+        // equivalent of what the direct path (record-chat-usage) and the Modal
+        // path (record_chat_usage) already do. WITHOUT this, the now-default
+        // runtime's tokens never hit ChatUsage, so the Usage page misses agent
+        // turns AND the daily token budget (which sums ChatUsage) is silently
+        // bypassed. Fire-and-forget: usage accounting must never block or fail
+        // the stream. recordChatUsage no-ops when the provider reported no
+        // usage (all-zero), so this is safe to call unconditionally.
+        {
+          const usage = sumTurnUsage(result);
+          void recordChatUsage({
+            spaceId: input.ctx.space.id,
+            userId: input.ctx.userId,
+            conversationId: input.conversationId,
+            model: input.model ?? DEFAULT_CHAT_MODEL,
+            promptTokens: usage.promptTokens,
+            completionTokens: usage.completionTokens,
+            cachedTokens: usage.cachedTokens,
+            route: 'agent',
+            runtime: 'ts',
+          }).catch(() => {});
+        }
 
         // Pause path: if the run paused for approval, persist the state,
         // emit permission_required with the AgentPausedRun id as requestId,

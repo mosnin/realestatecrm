@@ -38,14 +38,15 @@ function isScorableQuestion(q: {
   return true;
 }
 
-// ── Lazy OpenAI import ──────────────────────────────────────────────────────
+// ── LLM client (OpenRouter-first, via the shared factory) ─────────────────
+// Same separation as the rest of the app: LLM work goes through `lib/llm.ts`
+// (OpenRouter when configured), not a standalone OpenAI client. Lazy-imported
+// to keep the openai SDK out of bundles that don't need it. Returns the
+// provider-correct model slug with the client.
 
-async function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY missing');
-  }
-  const { default: OpenAIClient } = await import('openai');
-  return new OpenAIClient({ apiKey: process.env.OPENAI_API_KEY });
+async function getScoringClient() {
+  const { getLLMClient, openaiModel } = await import('@/lib/llm');
+  return { client: getLLMClient(), model: openaiModel('gpt-4.1-mini') };
 }
 
 // ── Build the input payload for the AI ──────────────────────────────────────
@@ -289,10 +290,10 @@ export async function generateScoringModel(
   }
 
   try {
-    const openai = await getOpenAIClient();
+    const { client: openai, model } = await getScoringClient();
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model,
       temperature: 0,
       max_tokens: 2000,
       response_format: {

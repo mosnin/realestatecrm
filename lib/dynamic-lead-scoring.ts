@@ -53,14 +53,16 @@ function tierToLabel(tier: string): 'hot' | 'warm' | 'cold' | 'unscored' {
   return 'unscored';
 }
 
-// ── Lazy OpenAI import (same pattern as enhance.ts) ──────────────────────
+// ── LLM client (OpenRouter-first, via the shared factory) ─────────────────
+// Routes through `lib/llm.ts` like every other LLM call in the app, so lead
+// scoring runs on OpenRouter when configured (the default provider) instead
+// of demanding a separate OpenAI API key. Lazy-imported to keep the openai
+// SDK out of bundles that only need the deterministic scorer. Returns the
+// provider-correct model slug alongside the client.
 
-async function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY missing');
-  }
-  const { default: OpenAIClient } = await import('openai');
-  return new OpenAIClient({ apiKey: process.env.OPENAI_API_KEY });
+async function getScoringClient() {
+  const { getLLMClient, openaiModel } = await import('@/lib/llm');
+  return { client: getLLMClient(), model: openaiModel('gpt-4.1-mini') };
 }
 
 // ── AI scoring call ──────────────────────────────────────────────────────
@@ -72,7 +74,7 @@ async function getAIScore(input: {
   deterministicScore: number | null;
 }): Promise<AIScoreResponse | null> {
   try {
-    const openai = await getOpenAIClient();
+    const { client: openai, model } = await getScoringClient();
 
     const userPrompt = buildDynamicScoringPrompt({
       formConfig: input.formConfig,
@@ -86,7 +88,7 @@ async function getAIScore(input: {
     });
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model,
       temperature: 0,
       max_tokens: 400,
       response_format: {

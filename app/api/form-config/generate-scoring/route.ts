@@ -5,6 +5,7 @@ import { formConfigSchema } from '@/lib/form-config-schema';
 import { generateScoringModel } from '@/lib/scoring/generate-scoring-model';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { hasLLMKey } from '@/lib/llm';
 
 /**
  * POST /api/form-config/generate-scoring
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   const formConfig = parsed.data;
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasLLMKey()) {
     return NextResponse.json(
       { error: 'AI scoring is not configured on this server.' },
       { status: 503 },

@@ -1,9 +1,12 @@
 /**
- * TypeScript in-process chat runtime (fallback). Active when CHIPPI_CHAT_RUNTIME=ts.
+ * TypeScript in-process chat runtime — the PRIMARY chat backend.
  *
- * The primary runtime is Modal (agent/modal_app.py). This module is the fallback when
- * `CHIPPI_CHAT_RUNTIME=ts` is set. The flag default is `'modal'`, so this
- * code is dormant until explicitly activated — see `runtime-flag.ts`.
+ * Runs the realtor-facing turn in-process on `@openai/agents` against the
+ * app-wide LLM client (`getLLMClient()`, OpenRouter-first) via chat
+ * completions — no Modal cold start. This is the default; Modal is reached
+ * only for deep / swarm work spawned via `delegate_task`, or when
+ * `CHIPPI_CHAT_RUNTIME=modal` proxies the whole turn to the sandbox. See
+ * `runtime-flag.ts`.
  *
  * Two entry points:
  *
