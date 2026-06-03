@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
+  Activity,
   Upload,
   ArrowLeft,
   Settings,
@@ -114,7 +115,7 @@ const brokerAdminNavSections = [
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Agent activity', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
@@ -254,19 +255,26 @@ function FlatNavItem({
   icon: Icon,
   isActive,
   badge,
+  isAI = false,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   isActive: boolean;
   badge?: React.ReactNode;
+  /**
+   * When true the item renders the chip avatar (chip-avatar.png) instead of
+   * the icon — matches the realtor sidebar's top-pinned Chippi treatment.
+   * Use for the broker's Chippi nav entry only.
+   */
+  isAI?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={cn(
-        // 36px row instead of 44px — desktop-mouse driven, not mobile-touch.
-        // Tighter row reads as "list of decisions" not "list of items".
+        // h-9 row, same height as the realtor nav rows and canonical button
+        // default so every row in the sidebar aligns optically.
         'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
         isActive
           ? 'bg-foreground/[0.045] text-foreground font-medium'
@@ -274,22 +282,31 @@ function FlatNavItem({
       )}
     >
       {/* Active accent bar — 2px on the left, foreground tone, rounded
-          corner on the inner edge. The signature distinguishing active
-          from hover beyond the background tint. */}
+          corner on the inner edge. Matches the realtor sidebar's active
+          rail exactly (STYLESHEET §Border & radius — Active rail). */}
       {isActive && (
         <span
           aria-hidden
           className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
         />
       )}
-      <Icon
-        size={15}
-        strokeWidth={isActive ? 2.25 : 1.75}
-        className={cn(
-          'flex-shrink-0 transition-colors',
-          isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-        )}
-      />
+      {isAI ? (
+        /* Chip avatar — same 16×16 rounded-full as the realtor Chippi row */
+        <img
+          src="/chip-avatar.png"
+          alt=""
+          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+        />
+      ) : (
+        <Icon
+          size={15}
+          strokeWidth={isActive ? 2.25 : 1.75}
+          className={cn(
+            'flex-shrink-0 transition-colors',
+            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+          )}
+        />
+      )}
       <span className="flex-1 truncate">{label}</span>
       {badge}
     </Link>
@@ -723,6 +740,152 @@ function UserFooter({
           className="flex-shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors"
         />
       </Link>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BrokerSidebarConversations — slim broker conversation history rendered when
+// on the broker Chippi page (/broker). Mirrors the realtor SidebarConversations
+// structure (CHAT HISTORY label + New button + recent list + active rail) but
+// calls the broker-scoped conversations API and links into /broker?conversationId=…
+// instead of /s/[slug]/chippi. Bounded to 6 rows + "See all →" link.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function BrokerSidebarConversations() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeId = searchParams.get('conversationId');
+
+  const [conversations, setConversations] = useState<
+    { id: string; title: string; preview?: string | null; updatedAt: string }[] | null
+  >(null);
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/broker/conversations');
+      if (!res.ok) { setConversations([]); return; }
+      const data = await res.json();
+      setConversations(Array.isArray(data) ? data : []);
+    } catch {
+      setConversations([]);
+    }
+  }, []);
+
+  useEffect(() => { void fetchConversations(); }, [fetchConversations]);
+
+  const handleNew = useCallback(async () => {
+    const res = await fetch('/api/broker/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return;
+    const conv = await res.json();
+    setConversations((prev) => (prev ? [conv, ...prev] : [conv]));
+    router.push(`/broker?conversationId=${conv.id}`);
+  }, [router]);
+
+  const LIMIT = 6;
+  const visible = conversations ? conversations.slice(0, LIMIT) : conversations;
+  const hasMore = conversations !== null && conversations.length > LIMIT;
+
+  function timeAgo(date: string): string {
+    const diff = (Date.now() - new Date(date).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`;
+    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className={cn(SECTION_LABEL, 'px-3 pt-6 pb-2 select-none')}>
+        Chat history
+      </p>
+
+      <button
+        type="button"
+        onClick={() => void handleNew()}
+        className="group w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+      >
+        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
+        <span className="flex-1 text-left">New conversation</span>
+      </button>
+
+      <div className="pt-1">
+        {conversations === null ? (
+          <div className="space-y-1 px-1">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-10 rounded-md bg-foreground/[0.04] animate-pulse" aria-hidden />
+            ))}
+          </div>
+        ) : conversations.length === 0 ? (
+          <p className="text-xs text-muted-foreground/60 px-3 py-4 leading-snug">
+            No chats yet. Say something below.
+          </p>
+        ) : (
+          <ul className="space-y-px">
+            {visible!.map((conv) => {
+              const isActive = activeId === conv.id;
+              return (
+                <li key={conv.id} className="relative">
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+                    />
+                  )}
+                  <div
+                    className={cn(
+                      'group/row flex items-center gap-1 rounded-md transition-colors duration-150',
+                      isActive ? 'bg-foreground/[0.045]' : 'hover:bg-foreground/[0.04]',
+                    )}
+                  >
+                    <Link
+                      href={`/broker?conversationId=${conv.id}`}
+                      className="flex-1 min-w-0 pl-2.5 pr-1 py-1.5"
+                    >
+                      <p
+                        className={cn(
+                          'text-[13px] truncate leading-tight',
+                          isActive ? 'font-medium text-foreground' : 'text-foreground/80',
+                        )}
+                        title={conv.title}
+                      >
+                        {conv.title.length > 24 ? conv.title.slice(0, 23).trimEnd() + '…' : conv.title}
+                      </p>
+                      {conv.preview ? (
+                        <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5 leading-tight">
+                          {conv.preview}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground/40 truncate mt-0.5 leading-tight">
+                          No messages yet
+                        </p>
+                      )}
+                      <p className="text-[11px] tabular-nums text-muted-foreground/60 leading-tight mt-0.5">
+                        {timeAgo(conv.updatedAt)}
+                      </p>
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {hasMore && (
+          <Link
+            href="/broker?view=history"
+            className="mt-1 flex items-center justify-between gap-1 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+          >
+            <span>See all</span>
+            <span aria-hidden className="text-muted-foreground/60">→</span>
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -1264,10 +1427,16 @@ export function Sidebar({
             <AdminConsoleLink />
           </>
         )}
-        <div className="mx-4 border-t border-border" />
-        <UserFooter
-          href={slug ? `${base}/profile` : '/broker/settings'}
+        {/* What's New + user menu chip — same footer slot as the realtor and
+            the main broker sidebar. Settings sub-nav is still an in-app
+            screen, not a separate product, so the same update card and
+            user menu belong here. */}
+        <SidebarWhatsNew />
+        <div className="border-t border-border/50" />
+        <SidebarUserMenu
+          slug={slug}
           displayName={displayName}
+          email={userEmail}
           imageUrl={user?.imageUrl}
         />
       </aside>
@@ -1304,46 +1473,83 @@ export function Sidebar({
             <SearchPill />
           </div>
 
-          <nav className="flex-1 px-3 pb-2 mt-1 space-y-0.5 overflow-y-auto">
-          {(brokerageRole === 'realtor_member'
-            ? brokerMemberNavSections
-            : brokerAdminNavSections
-          ).map((section) => {
-            const visibleItems = section.items.filter(
-              (item) =>
-                !item.adminOnly ||
-                brokerageRole === 'broker_owner' ||
-                brokerageRole === 'broker_admin',
-            );
-            if (visibleItems.length === 0) return null;
-            return (
-              <div key={section.label}>
-                <SectionLabel>{section.label}</SectionLabel>
-                {visibleItems.map((item) => {
-                  const isActive = item.exact
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
-                  const highlightBadge =
-                    'highlight' in item &&
-                    (item as any).highlight &&
-                    !isActive ? (
-                      <span className="inline-flex h-2 w-2 rounded-full bg-lead-hot shrink-0" />
-                    ) : undefined;
-                  return (
-                    <FlatNavItem
-                      key={item.href}
-                      href={item.href}
-                      label={item.label}
-                      icon={item.icon}
-                      isActive={isActive}
-                      badge={highlightBadge}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
+          {/* Broker primary nav — same structural vocabulary as RealtorNav:
+              py-2 vertical breathing, space-y-3 between section groups,
+              overflow-y-auto so deep section lists don't push the footer off. */}
+          <nav className="flex-1 px-3 py-2 mt-1 space-y-3 overflow-y-auto">
+            <div className="space-y-0.5">
+              {(brokerageRole === 'realtor_member'
+                ? brokerMemberNavSections
+                : brokerAdminNavSections
+              ).map((section) => {
+                const visibleItems = section.items.filter(
+                  (item) =>
+                    !item.adminOnly ||
+                    brokerageRole === 'broker_owner' ||
+                    brokerageRole === 'broker_admin',
+                );
+                if (visibleItems.length === 0) return null;
+                return (
+                  <div key={section.label}>
+                    <SectionLabel>{section.label}</SectionLabel>
+                    {visibleItems.map((item) => {
+                      const isActive = item.exact
+                        ? pathname === item.href
+                        : pathname.startsWith(item.href);
+                      const highlightBadge =
+                        'highlight' in item &&
+                        (item as any).highlight &&
+                        !isActive ? (
+                          <span className="inline-flex h-2 w-2 rounded-full bg-lead-hot shrink-0" />
+                        ) : undefined;
+                      // The broker Chippi entry (/broker exact) gets the chip-avatar
+                      // treatment so it visually matches the realtor's top-pinned
+                      // Chippi row (same 16px rounded chip, same font weight on active).
+                      const isChippiEntry = item.href === '/broker' && item.exact === true;
+                      return (
+                        <FlatNavItem
+                          key={item.href}
+                          href={item.href}
+                          label={item.label}
+                          icon={item.icon}
+                          isActive={isActive}
+                          badge={highlightBadge}
+                          isAI={isChippiEntry}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Conversation history — mirrors the realtor sidebar's contextual
+                section. Slides in when on the broker Chippi page (/broker exact),
+                same AnimatePresence pattern. Shows broker conversations via the
+                broker-scoped conversations API. In collapsed rail mode (broker
+                sidebar is not collapsible today, but gated for safety) the section
+                falls back to a History icon link. */}
+            <AnimatePresence initial={false} mode="wait">
+              {pathname === '/broker' && (
+                <motion.div
+                  key="broker-chippi-history"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {/* Hairline divider — same as realtor sidebar (mx-3 to match) */}
+                  <div className="mx-3 mt-1 mb-2 h-px bg-border/60" aria-hidden />
+                  <BrokerSidebarConversations />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </nav>
+
+          {/* What's New card — same slot as the realtor sidebar. Broker users
+              see the same release notes. `collapsed` is false (broker sidebar
+              is not collapsible), so the card always renders until dismissed. */}
+          <SidebarWhatsNew />
 
           {showAdminLink && (
             <>
@@ -1351,10 +1557,14 @@ export function Sidebar({
               <AdminConsoleLink />
             </>
           )}
+          {/* User footer — matches the realtor's SidebarUserMenu chip (avatar +
+              name + email + popover with themes/settings/logout). The old
+              UserFooter was a plain link with no popover — swapped for parity. */}
           <div className="border-t border-border/50" />
-          <UserFooter
-            href={slug ? `${base}/profile` : '/broker/settings'}
+          <SidebarUserMenu
+            slug={slug}
             displayName={displayName}
+            email={userEmail}
             imageUrl={user?.imageUrl}
           />
         </div>

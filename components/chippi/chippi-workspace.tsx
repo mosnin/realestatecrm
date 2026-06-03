@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen } from 'lucide-react';
+import { History, X, AlertCircle, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -1029,6 +1029,51 @@ export function ChippiWorkspace({
           score-2 Discoverability failure. */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
         <ApprovalsPill />
+        {/* Brief / Drafts / History navigation dropdown — resolves to the
+            correct route family per variant. Realtor: /s/<slug>/chippi/*.
+            Broker: /broker/*. Never builds a broken /s//... href when
+            slug is empty on the broker variant. History opens the in-page
+            conversation drawer rather than navigating away so the chat
+            transcript is never left behind mid-conversation. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="Navigate"
+              aria-label="Brief, Drafts, and History"
+            >
+              <BookOpen size={15} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem asChild>
+              <Link
+                href={isBroker ? '/broker/brief' : `/s/${slug}/chippi/brief`}
+                className="cursor-pointer"
+              >
+                <BookOpen size={14} className="mr-2" />
+                Brief
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={isBroker ? '/broker/reviews' : `/s/${slug}/chippi/inbox`}
+                className="cursor-pointer"
+              >
+                <Inbox size={14} className="mr-2" />
+                Drafts
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => setDrawerOpen(true)}
+              className="cursor-pointer"
+            >
+              <History size={14} className="mr-2" />
+              History
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {/* New chat — the discoverable affordance. Sits left of History so
             the pair reads as "new ↔ old" — the same convention iMessage
             and the major chat apps use. */}

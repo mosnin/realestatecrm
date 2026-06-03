@@ -496,7 +496,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
       <div className="flex items-center gap-0.5">
-        {slug && !isOnBrokerPage && <ChippiPowerToggle />}
+        {slug && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
         {isBrokerOnly && !slug && <NotificationBell />}
