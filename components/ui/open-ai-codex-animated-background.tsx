@@ -3,18 +3,19 @@
 /**
  * UnicornStudio-backed animated WebGL background ("OpenAI Codex" scene).
  *
- * Lives in /components/ui because it's a reusable shadcn-style primitive.
- * `'use client'` is required — it reads `window` and mounts a WebGL canvas, so
- * it cannot render on the server. Consumers that care about SSR should import
- * it via `next/dynamic` with `ssr: false` (the marketing hero does).
+ * Uses the package's Next.js entry (`unicornstudio-react/next`) — it is marked
+ * `"use client"`, loads the SDK in a Next-aware way, and is the documented
+ * import for the App Router. The default `unicornstudio-react` entry does NOT
+ * initialize reliably under Next's bundler (you get a dead/black canvas).
  *
- * `projectId` defaults to the Codex scene but is a prop so the scene can be
- * swapped without editing this file.
+ * Renders an absolutely-positioned, full-size canvas so it can sit behind hero
+ * content. `projectId` is a prop (defaults to the Codex scene) so the scene can
+ * be swapped without editing this file.
  */
 
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import UnicornScene from 'unicornstudio-react';
+import { UnicornScene } from 'unicornstudio-react/next';
 
 export const useWindowSize = () => {
   const [windowSize, setWindowSize] = useState({
@@ -31,11 +32,7 @@ export const useWindowSize = () => {
     };
 
     window.addEventListener('resize', handleResize);
-
-    // Call handler right away so state gets updated with initial window size
     handleResize();
-
-    // Remove event listener on cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -54,9 +51,12 @@ export const Component = ({
 }: CodexAnimatedBackgroundProps = {}) => {
   const { width, height } = useWindowSize();
 
+  // Don't mount the scene until we have real dimensions (0×0 renders nothing).
+  if (!width || !height) return null;
+
   return (
-    <div className={cn('flex flex-col items-center', className)}>
-      <UnicornScene production={true} projectId={projectId} width={width} height={height} />
+    <div className={cn('absolute inset-0 flex items-center justify-center overflow-hidden', className)}>
+      <UnicornScene production projectId={projectId} width={width} height={height} />
     </div>
   );
 };

@@ -24,11 +24,13 @@ const securityHeaders = [
     key: 'Content-Security-Policy-Report-Only',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
+      // UnicornStudio (animated marketing hero) loads its SDK from jsDelivr and
+      // scene data/assets from unicorn.studio + the unicornstudio GCS bucket.
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com",
-      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com https://assets.unicorn.studio https://storage.googleapis.com",
+      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://cdn.jsdelivr.net https://assets.unicorn.studio https://unicorn.studio https://storage.googleapis.com",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "object-src 'none'",

@@ -72,25 +72,36 @@ export function MarketingHeroHome({
 
   return (
     <section className="relative flex h-[92vh] min-h-[600px] w-full items-center justify-center overflow-hidden">
-      {/* Background: a lively animated WebGL scene for motion users, the static
-          photo as the reduced-motion (and load-failure) fallback. The dark base
-          shows while the canvas warms up. Overlays are lighter than the photo's
-          original 55% so the animation breathes, while still protecting the
-          white serif headline's legibility. */}
+      {/* Background: a lively animated WebGL scene for motion users; the static
+          photo is the reduced-motion (and load-failure) fallback. The dark base
+          shows only for the instant the canvas warms up. The Codex scene is
+          already dark, so there is NO flat full-screen overlay — instead a
+          localized radial scrim sits behind the headline for legibility, and a
+          bottom gradient settles the scene into the page. The animation stays
+          visible everywhere else. */}
       <div className="absolute inset-0 overflow-hidden bg-neutral-950">
         {reduce ? (
           <div
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${imageUrl})` }}
-          />
-        ) : (
-          <div aria-hidden className="absolute inset-0">
-            <CodexAnimatedBackground />
+          >
+            <div className="absolute inset-0 bg-black/45" />
           </div>
+        ) : (
+          <CodexAnimatedBackground />
         )}
-        <div className="absolute inset-0 bg-black/45" />
+        {/* Legibility scrim concentrated behind the centered headline — darkens
+            the middle, leaves the edges showing the animation. */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 50% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.15) 70%, transparent 100%)',
+          }}
+        />
         {/* Settle the background into the page below the fold. */}
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-black/45" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-black/55" />
       </div>
 
       {/* Signature aero grid divider lines (asymmetric, framing the center). */}
