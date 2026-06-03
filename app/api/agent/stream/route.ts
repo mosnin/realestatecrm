@@ -12,6 +12,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { redis } from '@/lib/redis';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { getSpaceForUser } from '@/lib/space';
 
 const POLL_INTERVAL_MS = 600;
@@ -32,6 +33,16 @@ export async function GET(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) {
     return new Response('Forbidden', { status: 403 });
+  }
+
+  // Guard BEFORE opening the SSE stream — each connection holds a long-lived
+  // Redis poll loop, so connection churn is the abuse vector here.
+  const { allowed } = await checkRateLimit(`ai:agent-stream:${userId}`, 20, 60);
+  if (!allowed) {
+    return new Response(
+      JSON.stringify({ error: 'too many requests. try again shortly.' }),
+      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } },
+    );
   }
 
   const runId = req.nextUrl.searchParams.get('runId');

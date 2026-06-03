@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const MESSAGE_LIMIT = 50;
 
@@ -8,6 +9,14 @@ export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { allowed } = await checkRateLimit(`ai:messages:${userId}`, 20, 60);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'too many requests. try again shortly.' },
+        { status: 429, headers: { 'Retry-After': '60' } },
+      );
+    }
 
     const conversationId = req.nextUrl.searchParams.get('conversationId');
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });

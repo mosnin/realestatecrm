@@ -2,11 +2,21 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const rateLimited = () =>
+  NextResponse.json(
+    { error: 'too many requests. try again shortly.' },
+    { status: 429, headers: { 'Retry-After': '60' } },
+  );
 
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { allowed } = await checkRateLimit(`ai:conversations:${userId}`, 20, 60);
+    if (!allowed) return rateLimited();
 
     const slug = req.nextUrl.searchParams.get('slug');
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -74,6 +84,9 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { allowed } = await checkRateLimit(`ai:conversations:${userId}`, 20, 60);
+    if (!allowed) return rateLimited();
 
     const { slug } = await req.json();
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
