@@ -105,7 +105,13 @@ interface SidebarProps {
 // Leaderboard, Analytics, Import/Export. Invitations folds into Members.
 // Settings sub-pages (form-builder, tracking, MCP, auto-assignment, routing
 // rules) live behind /broker/settings's own in-page tab strip.
-const brokerAdminNavSections = [
+// Broker nav items extend the shared NavItem with the broker-only
+// `adminOnly` flag. Rendered through the shared SidebarNavItem accordion
+// (base=""), so children/exact behave exactly like the realtor nav.
+type BrokerNavItem = NavItem & { adminOnly?: boolean };
+type BrokerNavSection = { label: string; items: BrokerNavItem[] };
+
+const brokerAdminNavSections: BrokerNavSection[] = [
   {
     label: '',
     items: [
@@ -116,7 +122,22 @@ const brokerAdminNavSections = [
       // /broker/agent-activity entry was previously also labelled "Chippi"
       // — that one is the activity feed, not the chat surface; renamed
       // to "Agent activity" below to avoid two nav rows with the same name.
-      { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true, adminOnly: false },
+      {
+        href: '/broker',
+        label: 'Chippi',
+        icon: MessageCircle,
+        exact: true,
+        adminOnly: false,
+        isAI: true,
+        // Mirrors the realtor Chippi dropdown (Brief / Inbox / History).
+        // Brief and Reviews are real broker routes; "History" points at the
+        // chat home (/broker), where the conversation-history drawer lives.
+        children: [
+          { href: '/broker/brief', label: 'Brief' },
+          { href: '/broker/reviews', label: 'Inbox' },
+          { href: '/broker', label: 'History', exact: true },
+        ],
+      },
       { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
@@ -128,7 +149,22 @@ const brokerAdminNavSections = [
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
       { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
       { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
-      { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
+      {
+        href: '/broker/settings',
+        label: 'Settings',
+        icon: SlidersHorizontal,
+        exact: false,
+        adminOnly: true,
+        // Real settings sub-routes (form-builder, auto-assignment, routing
+        // rules, MCP all exist under app/broker/settings/). Dropdown gives
+        // brokers a direct door without first landing on the tab strip.
+        children: [
+          { href: '/broker/settings/form-builder', label: 'Form builder' },
+          { href: '/broker/settings/auto-assignment', label: 'Auto-assignment' },
+          { href: '/broker/settings/routing-rules', label: 'Routing rules' },
+          { href: '/broker/settings/mcp', label: 'MCP' },
+        ],
+      },
     ],
   },
   {
@@ -148,7 +184,7 @@ const brokerAdminNavSections = [
 // Phase 7 — realtor-members of a brokerage see their own work first.
 // Team-wide tools live one glance below in the More section; routes are
 // unchanged.
-const brokerMemberNavSections = [
+const brokerMemberNavSections: BrokerNavSection[] = [
   {
     label: '',
     items: [
@@ -234,6 +270,13 @@ function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean
         : pathname.startsWith(fullChildPath);
     });
     if (childMatch) return true;
+  }
+  // An `exact` parent only owns its own exact route — used by the broker
+  // Chippi entry (/broker), whose href is a prefix of every other broker
+  // route. Without this, a prefix match would light up Chippi on every
+  // broker page. Realtor parents don't set `exact`, so this is a no-op there.
+  if (item.exact) {
+    return pathname === `${base}${item.href}`;
   }
   return pathname.startsWith(`${base}${item.href}`);
 }
@@ -1372,6 +1415,39 @@ export function Sidebar({
   const base = `/s/${slug}`;
   const { user } = useUser();
 
+  // Broker nav accordion — one parent expanded at a time, same contract as
+  // RealtorNav. Declared here (not inside the broker branch) because that
+  // branch returns early and hooks must not live after a conditional return.
+  // base is "" for the broker nav (its hrefs are already absolute, e.g.
+  // /broker/leads), so doesItemOwnPath is called with base "" below.
+  const brokerSections =
+    brokerageRole === 'realtor_member'
+      ? brokerMemberNavSections
+      : brokerAdminNavSections;
+  const findBrokerActiveParentKey = (): string | null => {
+    for (const section of brokerSections) {
+      for (const item of section.items) {
+        if (item.children?.length && doesItemOwnPath(item, pathname, '')) {
+          return item.href;
+        }
+      }
+    }
+    return null;
+  };
+  const [brokerExpandedKey, setBrokerExpandedKey] = useState<string | null>(
+    findBrokerActiveParentKey,
+  );
+  useEffect(() => {
+    const next = findBrokerActiveParentKey();
+    // Same as RealtorNav: only auto-open when the route maps to a parent.
+    // Navigating to a leaf outside any parent leaves the user's last-opened
+    // section alone rather than collapsing it on every navigation.
+    if (next) setBrokerExpandedKey(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, brokerageRole]);
+  const handleBrokerToggle = (key: string) => () =>
+    setBrokerExpandedKey((prev) => (prev === key ? null : key));
+
   // Admin console link visibility. The server passes isPlatformAdmin from the
   // DB platformRole; we OR it with the Clerk publicMetadata.role so an admin
   // set via the Clerk Dashboard (before the DB role propagates) still sees the
@@ -1487,10 +1563,7 @@ export function Sidebar({
               overflow-y-auto so deep section lists don't push the footer off. */}
           <nav className="flex-1 px-3 py-2 mt-1 space-y-3 overflow-y-auto">
             <div className="space-y-0.5">
-              {(brokerageRole === 'realtor_member'
-                ? brokerMemberNavSections
-                : brokerAdminNavSections
-              ).map((section) => {
+              {brokerSections.map((section) => {
                 const visibleItems = section.items.filter(
                   (item) =>
                     !item.adminOnly ||
@@ -1502,28 +1575,30 @@ export function Sidebar({
                   <div key={section.label}>
                     <SectionLabel>{section.label}</SectionLabel>
                     {visibleItems.map((item) => {
-                      const isActive = item.exact
-                        ? pathname === item.href
-                        : pathname.startsWith(item.href);
+                      const isActive = doesItemOwnPath(item, pathname, '');
+                      const hasChildren = !!(item.children && item.children.length > 0);
                       const highlightBadge =
                         'highlight' in item &&
                         (item as any).highlight &&
                         !isActive ? (
                           <span className="inline-flex h-2 w-2 rounded-full bg-lead-hot shrink-0" />
                         ) : undefined;
-                      // The broker Chippi entry (/broker exact) gets the chip-avatar
-                      // treatment so it visually matches the realtor's top-pinned
-                      // Chippi row (same 16px rounded chip, same font weight on active).
-                      const isChippiEntry = item.href === '/broker' && item.exact === true;
+                      // Broker hrefs are already absolute, so base="". The
+                      // shared accordion row handles the chip-avatar (isAI),
+                      // chevron dropdown, indented children and active-child
+                      // highlight — identical to the realtor sidebar.
                       return (
-                        <FlatNavItem
+                        <SidebarNavItem
                           key={item.href}
-                          href={item.href}
-                          label={item.label}
-                          icon={item.icon}
+                          item={item}
+                          base=""
                           isActive={isActive}
+                          isExpanded={hasChildren && brokerExpandedKey === item.href}
+                          isChildActive={(child) =>
+                            isChildActive(child, pathname, '', searchParamsString)
+                          }
+                          onToggle={handleBrokerToggle(item.href)}
                           badge={highlightBadge}
-                          isAI={isChippiEntry}
                         />
                       );
                     })}
