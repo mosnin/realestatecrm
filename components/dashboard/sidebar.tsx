@@ -772,7 +772,7 @@ function BrokerSidebarConversations() {
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch('/api/broker/conversations');
+      const res = await fetch('/api/ai/broker-conversations');
       if (!res.ok) { setConversations([]); return; }
       const data = await res.json();
       setConversations(Array.isArray(data) ? data : []);
@@ -784,7 +784,7 @@ function BrokerSidebarConversations() {
   useEffect(() => { void fetchConversations(); }, [fetchConversations]);
 
   const handleNew = useCallback(async () => {
-    const res = await fetch('/api/broker/conversations', {
+    const res = await fetch('/api/ai/broker-conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),

@@ -392,12 +392,6 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className={SECTION_LABEL}>Announcements</h2>
-          <Link
-            href="/broker/announcements"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            View all <ArrowRight size={12} />
-          </Link>
         </div>
 
         {announcements.length === 0 ? (

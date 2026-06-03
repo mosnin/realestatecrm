@@ -114,13 +114,20 @@ export async function requireSpaceOwner(
     .maybeSingle();
 
   if (dbUser) {
-    // Check if the space belongs to a brokerage the user is admin/owner of
-    const { data: membership } = await supabase
+    // Check if the space belongs to a brokerage the user is admin/owner of.
+    // Fetch ALL broker-level memberships rather than .maybeSingle() — a user
+    // who owns/admins more than one brokerage would otherwise make
+    // .maybeSingle() throw (PostgREST errors on >1 row), 500ing a legitimate
+    // multi-brokerage admin. Mirror the context helpers in lib/permissions.ts:
+    // fetch all, then deterministically prefer broker_owner over broker_admin.
+    const { data: memberships } = await supabase
       .from('BrokerageMembership')
       .select('role, brokerageId')
       .eq('userId', dbUser.id)
-      .in('role', ['broker_owner', 'broker_admin'])
-      .maybeSingle();
+      .in('role', ['broker_owner', 'broker_admin']);
+
+    const membership =
+      memberships?.find((m) => m.role === 'broker_owner') ?? memberships?.[0];
 
     if (membership) {
       // Check if the space's owner is a member of the same brokerage

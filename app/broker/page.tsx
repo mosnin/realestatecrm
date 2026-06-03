@@ -25,7 +25,7 @@ const CONV_TITLE_PREFIX = '[BROKER_CHIPPI]';
 export default async function BrokerHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ conversationId?: string; prompt?: string }>;
+  searchParams: Promise<{ conversationId?: string; prompt?: string; prefill?: string }>;
 }) {
   const ctx = await getBrokerMemberContext();
   if (!ctx) redirect('/');
@@ -35,9 +35,13 @@ export default async function BrokerHomePage({
     return <MemberDashboard ctx={ctx} />;
   }
 
-  const { conversationId: urlConversationId, prompt: urlPrompt } = await searchParams;
+  const { conversationId: urlConversationId, prompt: urlPrompt, prefill: urlPrefill } = await searchParams;
   const initialPrefill =
-    typeof urlPrompt === 'string' && urlPrompt.trim().length > 0 ? urlPrompt : undefined;
+    typeof urlPrompt === 'string' && urlPrompt.trim().length > 0
+      ? urlPrompt
+      : typeof urlPrefill === 'string' && urlPrefill.trim().length > 0
+        ? urlPrefill
+        : undefined;
 
   // Conversations + Messages anchor on the broker_owner's personal Space.
   const { data: spaceRow } = await supabase

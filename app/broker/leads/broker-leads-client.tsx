@@ -366,7 +366,7 @@ function UnassignedRow({
   async function handleDelete() {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/contacts/${lead.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/broker/leads/${lead.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error("I couldn't delete that lead.");
       toast.success('Lead deleted.');
       onDeleted(lead.id);
