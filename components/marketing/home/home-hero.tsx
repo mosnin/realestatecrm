@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { Play } from 'lucide-react';
 import { Placeholder } from './home-kit';
+import { GradientBackground } from '@/components/ui/paper-design-shader-background';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -32,19 +33,21 @@ export function HomeHero() {
   };
 
   return (
-    <section className="relative overflow-hidden">
-      {/* Warm presence — the orange glow that says an intelligence is here.
-          A single soft radial, no photo. */}
+    <section className="relative overflow-hidden bg-[#f3f3f4] dark:bg-[#0a0a0b]">
+      {/* Animated grain-gradient shader (paper-design) — the warm "presence"
+          backdrop. Adapts colorBack per theme. */}
+      <GradientBackground />
+      {/* Adaptive scrim — mutes the shader to a soft wash so the headline
+          reads as dark-on-light / light-on-dark. `bg-background` flips with
+          the theme, so one class covers both modes. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-background/45" />
+      {/* Bottom fade into the page canvas so the shader doesn't hard-cut. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(70% 60% at 50% 0%, rgba(255,150,79,0.22), rgba(255,150,79,0.06) 38%, transparent 68%)',
-        }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#f3f3f4] dark:to-[#0a0a0b]"
       />
 
-      <div className="relative mx-auto max-w-7xl px-6 pt-20 pb-12 md:px-8 md:pt-28">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 pt-20 pb-12 md:px-8 md:pt-28">
         <motion.div
           variants={container}
           initial="hidden"
@@ -52,7 +55,7 @@ export function HomeHero() {
           className="mx-auto max-w-4xl text-center"
         >
           <motion.div variants={rise} transition={{ duration: 0.5, ease: EASE }}>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-foreground/70 ring-1 ring-black/[0.06]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-foreground/70 ring-1 ring-black/[0.06] dark:bg-white/10 dark:ring-white/15">
               <span className="h-1.5 w-1.5 rounded-full bg-[#ff964f]" />
               The agentic OS for real estate
             </span>
@@ -91,7 +94,7 @@ export function HomeHero() {
             </Link>
             <Link
               href="/features/chippi"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-foreground ring-1 ring-black/[0.08] transition-colors hover:bg-black/[0.02]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-foreground ring-1 ring-black/[0.08] transition-colors hover:bg-black/[0.02] dark:bg-white/10 dark:ring-white/15 dark:hover:bg-white/[0.16]"
             >
               <Play size={15} className="fill-current" /> Watch demo
             </Link>
@@ -124,7 +127,7 @@ export function HomeHero() {
               {c.side === 'right' && (
                 <span className="h-px w-8 bg-foreground/20" />
               )}
-              <span className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-foreground shadow-sm ring-1 ring-black/[0.06]">
+              <span className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-foreground shadow-sm ring-1 ring-black/[0.06] dark:bg-white/10 dark:ring-white/15">
                 {c.label}
               </span>
               {c.side === 'left' && <span className="h-px w-8 bg-foreground/20" />}
