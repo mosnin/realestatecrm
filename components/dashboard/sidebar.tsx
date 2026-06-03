@@ -58,6 +58,7 @@ import {
   Handshake,
   Plug,
   Gauge,
+  TrendingUp,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -120,6 +121,7 @@ const brokerAdminNavSections = [
       { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
       { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
       { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },

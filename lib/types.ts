@@ -53,6 +53,10 @@ export type Brokerage = {
   brokerageLicenseNumber: string | null;
   brokerageFairHousingNotice: string | null;
   brokerageShowEqualHousingMark: boolean;
+  // Speed-to-lead SLA policy (added in 20260612000000_lead_sla.sql)
+  slaEnabled: boolean;
+  slaFirstResponseMinutes: number;
+  slaEscalateMinutes: number;
 };
 
 export type BrokerageMembership = {

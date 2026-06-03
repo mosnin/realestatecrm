@@ -266,6 +266,7 @@ _ALL_TOOL_INPUTS: list[tuple[str, dict[str, Any]]] = [
     ("read_realtor_morning_story", {"realtor_id": "u_realtor"}),
     ("find_stuck_deals", {}),
     ("find_unassigned_leads", {}),
+    ("find_breached_leads", {}),
     ("commission_report", {}),
     ("audit_response_times", {}),
     ("reassign_lead", {"lead_id": "c_lead", "to_realtor_id": "u_realtor"}),
@@ -813,11 +814,11 @@ async def test_set_routing_rule_accepts_valid_enum(
         assert payload["autoAssignEnabled"] is True
 
 
-# ── Sanity: BROKER_TOOLS has all 13 tools registered ────────────────────────
+# ── Sanity: BROKER_TOOLS has all 14 tools registered ────────────────────────
 
 
-def test_broker_tools_registry_has_thirteen() -> None:
-    assert len(BROKER_TOOLS) == 13
+def test_broker_tools_registry_has_fourteen() -> None:
+    assert len(BROKER_TOOLS) == 14
     names = {t.name for t in BROKER_TOOLS}
     expected = {
         "team_health",
@@ -825,6 +826,7 @@ def test_broker_tools_registry_has_thirteen() -> None:
         "read_realtor_morning_story",
         "find_stuck_deals",
         "find_unassigned_leads",
+        "find_breached_leads",
         "commission_report",
         "audit_response_times",
         "reassign_lead",
