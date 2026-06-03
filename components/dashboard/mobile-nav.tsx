@@ -7,18 +7,21 @@ import { mobileNavItems } from '@/lib/nav-items';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  UserCircle,
   Users,
-  Briefcase,
   PhoneIncoming,
 } from 'lucide-react';
 
-const brokerMobileItems = [
-  { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true },
-  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
-  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
-];
+// IA: /broker = Chippi home (center affordance), /broker/brief = dashboard,
+//     /broker/leads = leads, /broker/realtors = realtors team list.
+const brokerSideItems = {
+  left: [
+    { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: true },
+    { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
+  ],
+  right: [
+    { href: '/broker/realtors', label: 'Realtors', icon: Users, exact: false },
+  ],
+};
 
 interface MobileNavProps {
   slug: string;
@@ -122,57 +125,36 @@ function BarShell({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Broker variant ───────────────────────────────────────────────────────────
+// Visual shape mirrors the realtor bar exactly:
+//   Brief · Leads · [Chippi center] · Realtors
+// Same BarShell, same SideTab, same ChippiTab — only the items differ.
 
-function BrokerMobileNav({ pathname, slug, isBrokerOnly }: { pathname: string; slug: string; isBrokerOnly: boolean }) {
-  const base = `/s/${slug}`;
+function BrokerMobileNav({ pathname }: { pathname: string }) {
+  const isActive = (href: string, exact: boolean) =>
+    exact ? pathname === href : pathname.startsWith(href);
+
   return (
-    <nav
-      data-dashboard-mobile-nav
-      className={cn(
-        'md:hidden fixed left-3 right-3 z-50',
-        'rounded-full flex items-stretch',
-        'bg-card border border-border',
-        'shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
-      )}
-      style={{
-        height: BAR_HEIGHT,
-        bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-      }}
-      aria-label="Team"
-    >
-      {!isBrokerOnly && slug && (
-        <Link
-          href={base}
-          aria-label="Workspace"
-          className="flex-1 flex items-center justify-center min-h-[44px] text-muted-foreground hover:text-foreground"
-        >
-          <Briefcase size={22} strokeWidth={1.75} />
-        </Link>
-      )}
-      {brokerMobileItems.map((item) => {
-        const isActive = item.exact
-          ? pathname === item.href
-          : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.label}
-            aria-current={isActive ? 'page' : undefined}
-            className="relative flex-1 flex items-center justify-center min-h-[44px] focus-visible:outline-none"
-          >
-            <span
-              className={cn(
-                'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
-                isActive ? 'bg-foreground/[0.08] text-foreground' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <item.icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
-            </span>
-          </Link>
-        );
-      })}
-    </nav>
+    <BarShell>
+      {brokerSideItems.left.map((item) => (
+        <SideTab
+          key={item.href}
+          href={item.href}
+          label={item.label}
+          icon={item.icon}
+          isActive={isActive(item.href, item.exact)}
+        />
+      ))}
+      <ChippiTab href="/broker" isActive={pathname === '/broker'} />
+      {brokerSideItems.right.map((item) => (
+        <SideTab
+          key={item.href}
+          href={item.href}
+          label={item.label}
+          icon={item.icon}
+          isActive={isActive(item.href, item.exact)}
+        />
+      ))}
+    </BarShell>
   );
 }
 
@@ -187,7 +169,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
 
   const isOnBrokerPage = pathname.startsWith('/broker');
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
-    return <BrokerMobileNav pathname={pathname} slug={slug} isBrokerOnly={isBrokerOnly} />;
+    return <BrokerMobileNav pathname={pathname} />;
   }
 
   // Visual order: People · Deals · Chippi · Calendar · Settings.

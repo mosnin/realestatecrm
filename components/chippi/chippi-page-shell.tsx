@@ -20,6 +20,12 @@
  *
  * If a page needs a section heading inside the body, use SECTION_LABEL
  * from lib/typography.ts — never hand-roll text classes.
+ *
+ * `variant` — 'realtor' (default) or 'broker'. Does not change the shell's
+ * visual structure today, but is forwarded so downstream consumers and the
+ * broker-home renderer can pass `variant="broker"` when composing sub-pages
+ * inside the broker surface. The ChippiWorkspace nav dropdown (Brief /
+ * Drafts / History) reads the same prop to resolve broker-correct routes.
  */
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -34,6 +40,19 @@ interface ChippiPageShellProps {
   /** Status-sentence subtitle. Optional: pair with title. */
   subtitle?: string;
   children: ReactNode;
+  /**
+   * Which Chippi surface this shell is embedded in.
+   *
+   * - `realtor` (default) — /s/[slug]/chippi/* sub-pages.
+   * - `broker` — /broker/* sub-pages.
+   *
+   * The shell's visual output is identical for both variants today. The prop
+   * is pinned on the interface so the broker-home renderer (and any future
+   * broker-specific sub-page) can declare intent clearly. The ChippiWorkspace
+   * control-cluster dropdown uses the same prop to resolve Brief / Drafts /
+   * History destinations to the correct route family.
+   */
+  variant?: 'realtor' | 'broker';
 }
 
 export function ChippiPageShell({
@@ -41,7 +60,9 @@ export function ChippiPageShell({
   title,
   subtitle,
   children,
+  variant = 'realtor',
 }: ChippiPageShellProps) {
+  void variant; // consumed by callers for route resolution — no visual branch today
   return (
     <div className="h-full overflow-y-auto">
       <div

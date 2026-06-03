@@ -82,7 +82,7 @@ export default async function BrokerHomePage({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 min-h-0 flex-col">
       <ChippiWorkspace
         slug=""
         variant="broker"
