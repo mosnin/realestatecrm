@@ -21,7 +21,7 @@ import { TryFreeCTA } from '@/components/marketing/home/try-free-cta';
 import { DeepFeatures } from '@/components/marketing/home/deep-features';
 import { StatsBand } from '@/components/marketing/home/stats-band';
 import { TestimonialMarquee } from '@/components/marketing/home/testimonial-marquee';
-import { ConnectDiagram } from '@/components/marketing/home/connect-diagram';
+import { IntegrationsBeam } from '@/components/marketing/home/integrations-beam';
 import { BlogTeaser } from '@/components/marketing/home/blog-teaser';
 import { HomeFooter } from '@/components/marketing/home/home-footer';
 
@@ -32,7 +32,7 @@ export default async function MarketingHomePage() {
   }
 
   return (
-    <div className="bg-[#f3f3f4] text-foreground">
+    <div className="bg-muted text-foreground">
       <HomeHero />
       <LogoMarquee />
       <CoreCards />
@@ -40,7 +40,7 @@ export default async function MarketingHomePage() {
       <DeepFeatures />
       <StatsBand />
       <TestimonialMarquee />
-      <ConnectDiagram />
+      <IntegrationsBeam />
       <BlogTeaser />
       <HomeFooter />
     </div>

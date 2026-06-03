@@ -33,7 +33,7 @@ function Row({ items, reverse }: { items: typeof QUOTES; reverse?: boolean }) {
           <figure
             key={i}
             className={cn(
-              'flex w-[340px] shrink-0 flex-col justify-between rounded-3xl bg-white p-6 ring-1 ring-black/[0.05]',
+              'flex w-[340px] shrink-0 flex-col justify-between rounded-3xl bg-card p-6 ring-1 ring-border/70',
             )}
           >
             <blockquote className="text-[15px] leading-relaxed text-foreground/80">
@@ -58,7 +58,7 @@ export function TestimonialMarquee() {
     <section className="py-24 md:py-32">
       <Reveal className="mx-auto mb-12 max-w-3xl px-6 text-center md:px-8">
         <Eyebrow>From the field</Eyebrow>
-        <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.025em] text-foreground">
+        <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-title leading-[1.04] tracking-[-0.02em] text-foreground">
           Loved by the people who carry the deals.
         </h2>
       </Reveal>

@@ -13,7 +13,7 @@ export function TryFreeCTA() {
   return (
     <section className="mx-auto max-w-7xl px-6 py-12 md:px-8 md:py-16">
       <Reveal>
-        <div className="relative overflow-hidden rounded-[2rem] bg-[#0c0d10] px-8 py-16 text-center md:px-16 md:py-24">
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#171310] px-8 py-16 text-center md:px-16 md:py-24">
           {/* warm wash bleeding up from the floor */}
           <div
             aria-hidden
@@ -24,7 +24,7 @@ export function TryFreeCTA() {
             }}
           />
           <div className="relative">
-            <h2 className="mx-auto max-w-3xl text-[clamp(2rem,5vw,3.75rem)] font-bold leading-[1.02] tracking-[-0.025em] text-white">
+            <h2 className="mx-auto max-w-3xl text-[clamp(2rem,5vw,3.75rem)] font-title leading-[1.04] tracking-[-0.02em] text-white">
               Bring your inbox. Chippi takes it from there.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">
@@ -32,7 +32,7 @@ export function TryFreeCTA() {
             </p>
             <Link
               href="/login/realtor?intent=signup"
-              className="mt-9 inline-flex h-12 items-center justify-center rounded-full bg-[#ff964f] px-8 text-[15px] font-semibold text-[#2a1402] transition-transform duration-150 active:scale-[0.98]"
+              className="mt-9 inline-flex h-12 items-center justify-center rounded-full bg-brand px-8 text-[15px] font-semibold text-[#2a1402] transition-transform duration-150 active:scale-[0.98]"
             >
               Start free
             </Link>

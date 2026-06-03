@@ -33,7 +33,10 @@ export function DeepFeatures() {
     <section className="mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
       <Reveal className="max-w-3xl">
         <Eyebrow>The rest of the workspace</Eyebrow>
-        <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.025em] text-foreground">
+        <h2
+          style={{ fontFamily: 'var(--font-title)' }}
+          className="mt-5 text-[clamp(2rem,4.6vw,3.5rem)] leading-[1.04] tracking-[-0.02em] text-foreground"
+        >
           One agent. Every corner of the job.
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
@@ -47,8 +50,8 @@ export function DeepFeatures() {
           const Icon = f.icon;
           return (
             <StaggerItem key={f.title}>
-              <div className="flex h-full flex-col rounded-3xl bg-white p-7 ring-1 ring-black/[0.05] md:p-8">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ff964f]/12 text-[#d2691e]">
+              <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                   <Icon size={20} strokeWidth={1.75} />
                 </span>
                 <h3 className="mt-5 text-xl font-semibold tracking-tight text-foreground">
@@ -65,7 +68,7 @@ export function DeepFeatures() {
 
       <Stagger className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5" amount={0.15}>
         <StaggerItem>
-          <div className="flex h-full flex-col rounded-3xl bg-white p-7 ring-1 ring-black/[0.05] md:p-8">
+          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
             <h3 className="text-xl font-semibold tracking-tight text-foreground">
               Speak; your workspace responds.
             </h3>
@@ -77,7 +80,7 @@ export function DeepFeatures() {
           </div>
         </StaggerItem>
         <StaggerItem>
-          <div className="flex h-full flex-col rounded-3xl bg-white p-7 ring-1 ring-black/[0.05] md:p-8">
+          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
             <h3 className="text-xl font-semibold tracking-tight text-foreground">
               Approval-first, always.
             </h3>

@@ -7,6 +7,7 @@
  */
 
 import Link from 'next/link';
+import { BrandLogo } from '@/components/brand-logo';
 import { Reveal } from './home-kit';
 
 const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
@@ -51,11 +52,11 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function HomeFooter() {
   return (
-    <footer className="relative bg-white">
+    <footer className="relative bg-card border-t border-border/60">
       <div className="mx-auto max-w-7xl px-6 pt-20 md:px-8 md:pt-28">
         {/* last CTA */}
         <Reveal className="flex flex-col items-start justify-between gap-8 border-b border-black/[0.08] pb-16 md:flex-row md:items-end">
-          <h2 className="max-w-2xl text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="max-w-2xl text-[clamp(2rem,4.5vw,3.5rem)] font-title leading-[1.04] tracking-[-0.02em] text-foreground">
             Ready to let the busywork run itself?
           </h2>
           <div className="flex gap-3">
@@ -77,8 +78,8 @@ export function HomeFooter() {
         {/* link map */}
         <div className="grid grid-cols-2 gap-8 py-16 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="text-2xl font-bold tracking-tight text-foreground">
-              Chippi<span className="text-[#ff964f]">.</span>
+            <Link href="/" aria-label="Chippi home" className="inline-flex items-center">
+              <BrandLogo className="h-6" alt="Chippi" />
             </Link>
             <p className="mt-4 max-w-[16rem] text-[14px] leading-relaxed text-foreground/50">
               The agentic OS for real estate. You close; Chippi does the rest.
@@ -108,7 +109,10 @@ export function HomeFooter() {
 
       {/* oversized wordmark */}
       <div aria-hidden className="overflow-hidden px-6 md:px-8">
-        <div className="select-none text-[clamp(4rem,20vw,16rem)] font-bold leading-[0.8] tracking-[-0.04em] text-foreground/[0.05]">
+        <div
+          style={{ fontFamily: 'var(--font-title)' }}
+          className="select-none text-[clamp(4rem,20vw,16rem)] leading-[0.8] tracking-[-0.03em] text-foreground/[0.06]"
+        >
           Chippi
         </div>
       </div>

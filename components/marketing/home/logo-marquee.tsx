@@ -33,7 +33,7 @@ export function LogoMarquee() {
               key={`${name}-${i}`}
               className={cn(
                 'flex h-16 w-44 shrink-0 items-center justify-center rounded-2xl',
-                'bg-white ring-1 ring-black/[0.05]',
+                'bg-card ring-1 ring-border/70',
               )}
             >
               <span className="text-[13px] font-semibold uppercase tracking-wider text-foreground/30">

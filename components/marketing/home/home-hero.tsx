@@ -33,7 +33,7 @@ export function HomeHero() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-[#f3f3f4] dark:bg-[#0a0a0b]">
+    <section className="relative overflow-hidden bg-muted">
       {/* Animated grain-gradient shader (paper-design) — the warm "presence"
           backdrop. Adapts colorBack per theme. */}
       <GradientBackground />
@@ -44,7 +44,7 @@ export function HomeHero() {
       {/* Bottom fade into the page canvas so the shader doesn't hard-cut. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#f3f3f4] dark:to-[#0a0a0b]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-muted"
       />
 
       <div className="relative z-10 mx-auto max-w-7xl px-6 pt-20 pb-12 md:px-8 md:pt-28">
@@ -55,8 +55,8 @@ export function HomeHero() {
           className="mx-auto max-w-4xl text-center"
         >
           <motion.div variants={rise} transition={{ duration: 0.5, ease: EASE }}>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-foreground/70 ring-1 ring-black/[0.06] dark:bg-white/10 dark:ring-white/15">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ff964f]" />
+            <span className="inline-flex items-center gap-2 rounded-full bg-card px-3.5 py-1.5 text-[12px] font-medium text-foreground/70 ring-1 ring-border/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
               The agentic OS for real estate
             </span>
           </motion.div>
@@ -64,11 +64,12 @@ export function HomeHero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.6, ease: EASE }}
-            className="mt-7 text-[clamp(2.75rem,7vw,5.5rem)] font-bold leading-[0.98] tracking-[-0.03em] text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+            className="mt-7 text-[clamp(2.75rem,7.2vw,5.75rem)] leading-[0.98] tracking-[-0.02em] text-foreground"
           >
             You close the deals.
             <br />
-            <span className="text-[#ff964f]">Chippi does the rest.</span>
+            <span className="text-brand">Chippi does the rest.</span>
           </motion.h1>
 
           <motion.p
@@ -94,7 +95,7 @@ export function HomeHero() {
             </Link>
             <Link
               href="/features/chippi"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-foreground ring-1 ring-black/[0.08] transition-colors hover:bg-black/[0.02] dark:bg-white/10 dark:ring-white/15 dark:hover:bg-white/[0.16]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-card px-6 text-[15px] font-medium text-foreground ring-1 ring-border/70 transition-colors hover:bg-foreground/[0.03]"
             >
               <Play size={15} className="fill-current" /> Watch demo
             </Link>
@@ -127,7 +128,7 @@ export function HomeHero() {
               {c.side === 'right' && (
                 <span className="h-px w-8 bg-foreground/20" />
               )}
-              <span className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-foreground shadow-sm ring-1 ring-black/[0.06] dark:bg-white/10 dark:ring-white/15">
+              <span className="rounded-full bg-card px-3.5 py-1.5 text-[13px] font-medium text-foreground shadow-sm ring-1 ring-border/70">
                 {c.label}
               </span>
               {c.side === 'left' && <span className="h-px w-8 bg-foreground/20" />}

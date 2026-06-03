@@ -22,13 +22,13 @@ export function BlogTeaser() {
       <Reveal className="flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-2xl">
           <Eyebrow>From the team</Eyebrow>
-          <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-title leading-[1.04] tracking-[-0.02em] text-foreground">
             Thinking on the business of real estate.
           </h2>
         </div>
         <Link
           href="/blog"
-          className="inline-flex items-center gap-2 text-[15px] font-medium text-foreground transition-colors hover:text-[#d2691e]"
+          className="inline-flex items-center gap-2 text-[15px] font-medium text-foreground transition-colors hover:text-brand"
         >
           Read the blog <ArrowRight size={16} />
         </Link>
@@ -40,10 +40,10 @@ export function BlogTeaser() {
             <Link href="/blog" className="group block">
               <Placeholder label="Article cover" aspect="aspect-[16/10]" />
               <div className="mt-5">
-                <span className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#d2691e]">
+                <span className="text-[12px] font-medium uppercase tracking-[0.16em] text-brand">
                   {p.tag}
                 </span>
-                <h3 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-foreground transition-colors group-hover:text-[#d2691e]">
+                <h3 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-foreground transition-colors group-hover:text-brand">
                   {p.title}
                 </h3>
                 <p className="mt-2 text-[13px] text-foreground/45">{p.read}</p>

@@ -104,7 +104,7 @@ export function Eyebrow({
         'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em]',
         tone === 'default' && 'bg-foreground/[0.06] text-foreground/70',
         tone === 'onDark' && 'bg-white/10 text-white/80',
-        tone === 'brand' && 'bg-[#ff964f]/12 text-[#d2691e] dark:text-[#ff964f]',
+        tone === 'brand' && 'bg-brand/10 text-brand',
         className,
       )}
     >
