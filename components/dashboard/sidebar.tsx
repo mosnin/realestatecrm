@@ -111,7 +111,7 @@ interface SidebarProps {
 type BrokerNavItem = NavItem & { adminOnly?: boolean };
 type BrokerNavSection = { label: string; items: BrokerNavItem[] };
 
-const brokerAdminNavSections: BrokerNavSection[] = [
+export const brokerAdminNavSections: BrokerNavSection[] = [
   {
     label: '',
     items: [
@@ -184,7 +184,7 @@ const brokerAdminNavSections: BrokerNavSection[] = [
 // Phase 7 — realtor-members of a brokerage see their own work first.
 // Team-wide tools live one glance below in the More section; routes are
 // unchanged.
-const brokerMemberNavSections: BrokerNavSection[] = [
+export const brokerMemberNavSections: BrokerNavSection[] = [
   {
     label: '',
     items: [

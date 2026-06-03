@@ -23,74 +23,27 @@ import type { NavChild, NavItem } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
-import { SearchPill, WorkspaceSwitcher } from '@/components/dashboard/sidebar';
+import {
+  SearchPill,
+  WorkspaceSwitcher,
+  brokerAdminNavSections,
+  brokerMemberNavSections,
+} from '@/components/dashboard/sidebar';
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield, PhoneIncoming, BarChart3, Trophy, SlidersHorizontal, TrendingUp, HeartPulse, Flag, Activity, Gauge, Upload } from 'lucide-react';
+import { Building2, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, CreditCard, Settings, Check, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { ShareLinksMenu } from './share-links-menu';
 import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
-const brokerMobileNavItems = [
-  { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true },
-  { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false },
-  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
-  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
-];
-
-// Mobile broker drawer — mirrors the desktop admin sidebar's destinations,
-// hrefs, labels, and icons exactly (see brokerAdminNavSections in
-// components/dashboard/sidebar.tsx). The mobile grouping into titled sections
-// is a presentation choice; the destinations and their icons are the
-// authoritative desktop set. `adminOnly` items (Settings, Import / export)
-// are hidden from realtor_member, matching the desktop predicate.
-const brokerMobileNavSections = [
-  {
-    title: 'Overview',
-    items: [
-      { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true, adminOnly: false },
-      { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
-      { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-      { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
-      { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
-      { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
-      { href: '/broker/retention', label: 'Retention', icon: HeartPulse, exact: false, adminOnly: false },
-      { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
-      { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
-      { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    title: 'Team',
-    items: [
-      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
-      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
-      { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
-      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    title: 'Tools',
-    items: [
-      { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-      { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    title: 'Admin',
-    items: [
-      { href: '/broker/import-export', label: 'Import / export', icon: Upload, exact: false, adminOnly: true },
-      { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
-    ],
-  },
-];
+// Broker mobile nav is sourced from the SINGLE source of truth shared with the
+// desktop sidebar — `brokerAdminNavSections` / `brokerMemberNavSections` from
+// components/dashboard/sidebar.tsx — and rendered through the same
+// `SidebarNavItem` accordion. No separate flat copy here (that drifted: it lost
+// the Chippi chip + Brief/Inbox/History dropdown and used different icons).
 
 interface HeaderProps {
   slug: string;
@@ -175,6 +128,31 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   const handleToggle = (key: string) => () =>
     setExpandedKey((prev) => (prev === key ? null : key));
   const closeDrawer = () => setOpen(false);
+
+  // Broker drawer accordion — same contract as the realtor one above, driven by
+  // the shared broker nav sections (base="" since broker hrefs are absolute).
+  const brokerSections =
+    brokerageRole === 'realtor_member' ? brokerMemberNavSections : brokerAdminNavSections;
+  const findBrokerActiveParentKey = (): string | null => {
+    for (const section of brokerSections) {
+      for (const item of section.items) {
+        if (item.children?.length && doesItemOwnPath(item, pathname, '')) {
+          return item.href;
+        }
+      }
+    }
+    return null;
+  };
+  const [brokerExpandedKey, setBrokerExpandedKey] = useState<string | null>(
+    findBrokerActiveParentKey,
+  );
+  useEffect(() => {
+    const next = findBrokerActiveParentKey();
+    if (next) setBrokerExpandedKey(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, brokerageRole]);
+  const handleBrokerToggle = (key: string) => () =>
+    setBrokerExpandedKey((prev) => (prev === key ? null : key));
 
   return (
     <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
@@ -299,12 +277,15 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                   </AnimatePresence>
                 </>
               )}
+              {/* Broker drawer — renders the SAME broker nav sections as the
+                  desktop sidebar through the SAME SidebarNavItem accordion, so
+                  the Chippi chip, Brief/Inbox/History dropdown, icons, and
+                  adminOnly gating are identical across viewports. Only shown on
+                  broker pages; brokerage links never bleed into the agent
+                  drawer (you switch workspaces with the switcher up top). */}
               {isBroker && showBrokerMobileNavOnly && (
-                <>
-                  {brokerMobileNavSections.map((section) => {
-                    // Mirror the desktop predicate: hide adminOnly items unless
-                    // the member is a broker_owner/broker_admin. A realtor_member
-                    // never sees Settings or Import / export.
+                <div className="space-y-3">
+                  {brokerSections.map((section) => {
                     const visibleItems = section.items.filter(
                       (item) =>
                         !item.adminOnly ||
@@ -313,65 +294,31 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                     );
                     if (visibleItems.length === 0) return null;
                     return (
-                    <div key={section.title} className="pb-2">
-                      <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
-                        {section.title}
-                      </p>
-                      {visibleItems.map((item) => {
-                        const isActive = item.exact
-                          ? pathname === item.href
-                          : pathname.startsWith(item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
-                              isActive
-                                ? 'bg-accent text-foreground font-medium'
-                                : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
-                            )}
-                          >
-                            <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
-                            {item.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
+                      <div key={section.label || 'primary'} className="space-y-0.5">
+                        {section.label ? (
+                          <p className={`${SECTION_LABEL} px-3 pb-1.5`}>{section.label}</p>
+                        ) : null}
+                        {visibleItems.map((item) => {
+                          const hasChildren = !!item.children?.length;
+                          return (
+                            <SidebarNavItem
+                              key={item.href}
+                              item={item}
+                              base=""
+                              isActive={doesItemOwnPath(item, pathname, '')}
+                              isExpanded={hasChildren && brokerExpandedKey === item.href}
+                              isChildActive={(child) => isMobileChildActive(child, pathname, '')}
+                              onToggle={handleBrokerToggle(item.href)}
+                              onNavigate={closeDrawer}
+                            />
+                          );
+                        })}
+                      </div>
                     );
                   })}
-                </>
+                </div>
               )}
             </nav>
-            {isBroker && !showBrokerMobileNavOnly && (
-              <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
-                <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
-                  Team
-                </p>
-                {brokerMobileNavItems.map((item) => {
-                  const isActive = item.exact
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
-                        isActive
-                          ? 'bg-accent text-foreground font-medium'
-                          : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
-                      )}
-                    >
-                      <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
             {/* What's new + user-menu chip — same components the desktop
                 sidebar uses so localStorage state is shared (dismissals,
                 favorites, etc.). Only renders for the realtor workspace —
