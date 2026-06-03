@@ -8,18 +8,30 @@
  * The homepage composes these; nothing here leaks into the product app.
  */
 
-import { motion, useReducedMotion, type Variants } from 'motion/react';
+import { useRef } from 'react';
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+  type Variants,
+} from 'motion/react';
 import { cn } from '@/lib/utils';
 import { EASE_APPLE } from '@/lib/motion';
 
 export const HOME_EASE = EASE_APPLE;
 
-/** Scroll-into-view reveal. Fades up once; reduced-motion shows instantly. */
+/**
+ * Scroll-into-view reveal — the homepage's signature entrance. Opacity +
+ * travel + a brief blur-in on the Apple curve. The blur is what makes it read
+ * as "focusing into place" rather than just sliding. Reduced-motion shows
+ * instantly.
+ */
 export function Reveal({
   children,
   className,
   delay = 0,
-  y = 16,
+  y = 26,
   once = true,
 }: {
   children: React.ReactNode;
@@ -32,24 +44,29 @@ export function Reveal({
   return (
     <motion.div
       className={className}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y, filter: 'blur(8px)' }}
+      whileInView={reduce ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
       viewport={{ once, amount: 0.25 }}
-      transition={{ duration: 0.6, ease: HOME_EASE, delay }}
+      transition={{ duration: 0.85, ease: HOME_EASE, delay }}
     >
       {children}
     </motion.div>
   );
 }
 
-/** Stagger container + item for revealing a grid/row in sequence. */
+/** Stagger container + item — same focus-into-place beat, sequenced. */
 export const staggerParent: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+  show: { transition: { staggerChildren: 0.11, delayChildren: 0.06 } },
 };
 export const staggerChild: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: HOME_EASE } },
+  hidden: { opacity: 0, y: 28, filter: 'blur(8px)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.8, ease: HOME_EASE },
+  },
 };
 
 export function Stagger({
@@ -83,6 +100,34 @@ export function StaggerItem({
 }) {
   return (
     <motion.div className={className} variants={staggerChild}>
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Parallax — scroll-linked vertical drift for layered depth (the hero
+ * product, section media). Content moves slower than the page as it passes
+ * through the viewport. Disabled for reduced-motion.
+ */
+export function Parallax({
+  children,
+  className,
+  distance = 60,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  distance?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'end start'],
+  });
+  const y = useTransform(scrollYProgress, [0, 1], [distance, -distance]);
+  return (
+    <motion.div ref={ref} style={reduce ? undefined : { y }} className={className}>
       {children}
     </motion.div>
   );

@@ -50,7 +50,7 @@ export function DeepFeatures() {
           const Icon = f.icon;
           return (
             <StaggerItem key={f.title}>
-              <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
+              <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)] md:p-8">
                 <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                   <Icon size={20} strokeWidth={1.75} />
                 </span>
@@ -68,7 +68,7 @@ export function DeepFeatures() {
 
       <Stagger className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5" amount={0.15}>
         <StaggerItem>
-          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
+          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)] md:p-8">
             <h3 className="text-xl font-semibold tracking-tight text-foreground">
               Speak; your workspace responds.
             </h3>
@@ -80,7 +80,7 @@ export function DeepFeatures() {
           </div>
         </StaggerItem>
         <StaggerItem>
-          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 md:p-8">
+          <div className="flex h-full flex-col rounded-3xl bg-card p-7 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)] md:p-8">
             <h3 className="text-xl font-semibold tracking-tight text-foreground">
               Approval-first, always.
             </h3>

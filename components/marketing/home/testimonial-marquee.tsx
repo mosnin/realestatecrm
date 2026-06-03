@@ -33,7 +33,7 @@ function Row({ items, reverse }: { items: typeof QUOTES; reverse?: boolean }) {
           <figure
             key={i}
             className={cn(
-              'flex w-[340px] shrink-0 flex-col justify-between rounded-3xl bg-card p-6 ring-1 ring-border/70',
+              'flex w-[340px] shrink-0 flex-col justify-between rounded-3xl bg-card p-6 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)]',
             )}
           >
             <blockquote className="text-[15px] leading-relaxed text-foreground/80">

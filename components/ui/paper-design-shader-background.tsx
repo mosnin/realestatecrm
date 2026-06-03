@@ -55,16 +55,16 @@ export function GradientBackground({ className }: { className?: string }) {
         <GrainGradient
           style={{ height: '100%', width: '100%' }}
           colorBack={colorBack}
-          softness={0.76}
-          intensity={0.45}
+          softness={0.82}
+          intensity={0.5}
           noise={0}
           shape="corners"
           offsetX={0}
           offsetY={0}
           scale={1}
           rotation={0}
-          speed={1}
-          colors={['hsl(14, 100%, 57%)', 'hsl(45, 100%, 51%)', 'hsl(340, 82%, 52%)']}
+          speed={0.8}
+          colors={['hsl(24, 100%, 64%)', 'hsl(16, 96%, 56%)', 'hsl(34, 100%, 71%)']}
         />
       )}
     </div>

@@ -66,9 +66,11 @@ function BentoCard({
       <div className="pointer-events-none absolute inset-0">{background}</div>
 
       <div className="pointer-events-none relative z-10 mt-auto p-6 md:p-7">
-        <div className="flex transform-gpu flex-col gap-2 transition-transform duration-300 ease-out lg:group-hover:-translate-y-9">
-          <Icon className="h-7 w-7 origin-left text-foreground/70 transition-transform duration-300 ease-out group-hover:scale-90" strokeWidth={1.75} />
-          <h3 className="text-[19px] font-semibold tracking-tight text-foreground">{name}</h3>
+        <div className="flex transform-gpu flex-col gap-3 transition-transform duration-300 ease-out lg:group-hover:-translate-y-9">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/10 text-brand transition-transform duration-300 ease-out group-hover:scale-90">
+            <Icon className="h-5 w-5" strokeWidth={1.75} />
+          </span>
+          <h3 className="mt-1 text-[19px] font-semibold tracking-tight text-foreground">{name}</h3>
           <p className="max-w-md text-[14px] leading-relaxed text-muted-foreground">{description}</p>
         </div>
       </div>

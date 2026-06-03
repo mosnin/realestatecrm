@@ -20,7 +20,7 @@ export function StatsBand() {
       <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
         {STATS.map((s) => (
           <StaggerItem key={s.value}>
-            <div className="flex h-full flex-col justify-between rounded-3xl bg-card p-8 ring-1 ring-border/70">
+            <div className="flex h-full flex-col justify-between rounded-3xl bg-card p-8 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)]">
               <div className="text-[clamp(3rem,6vw,4.5rem)] font-title leading-none tracking-tight text-foreground">
                 {s.value}
               </div>
