@@ -12,9 +12,10 @@ import {
   Mail,
 } from 'lucide-react';
 import Link from 'next/link';
-import { formatCompact } from '@/lib/formatting';
-import { SECTION_LABEL, TITLE_FONT, CHIPPI_PILL } from '@/lib/typography';
+import { formatCompact, formatCurrency } from '@/lib/formatting';
+import { SECTION_LABEL, TITLE_FONT, CHIPPI_PILL, CAPTION, META, STAT_NUMBER_COMPACT } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { dealHealth } from '@/lib/deals/health';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
@@ -24,6 +25,51 @@ import {
   type DraftStatsRow,
 } from '@/lib/draft-stats';
 import { MemberDashboard } from '../member-dashboard';
+
+// ── Revenue forecast helpers (mirrors app/broker/forecast/page.tsx) ──────────
+//
+// Closing probability table:
+//   closeDate this month + on-track → 0.65 | at-risk → 0.40 | stuck → 0.15
+//   closeDate past (overdue)         → 0.10 (stuck → 0.05)
+//   no close date / future month    → on-track 0.20 | at-risk 0.10 | stuck 0.05
+
+function closingProbability(
+  closeDate: Date | null,
+  health: 'on-track' | 'at-risk' | 'stuck',
+  monthStart: Date,
+  monthEnd: Date,
+): number {
+  const now = new Date();
+  if (closeDate) {
+    if (closeDate < now) return health === 'stuck' ? 0.05 : 0.10;
+    if (closeDate >= monthStart && closeDate <= monthEnd) {
+      if (health === 'on-track') return 0.65;
+      if (health === 'at-risk') return 0.40;
+      return 0.15;
+    }
+  }
+  if (health === 'on-track') return 0.20;
+  if (health === 'at-risk') return 0.10;
+  return 0.05;
+}
+
+type ActiveDealRow = {
+  id: string;
+  spaceId: string;
+  title: string;
+  value: number | null;
+  commissionRate: number | null;
+  closeDate: string | null;
+  stageId: string | null;
+  status: string;
+  updatedAt: string;
+  stageChangedAt: string | null;
+  followUpAt: string | null;
+  nextAction: string | null;
+  nextActionDueAt: string | null;
+};
+
+// ── End revenue forecast helpers ─────────────────────────────────────────────
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -192,6 +238,82 @@ export default async function BrokerBriefPage() {
     const name = owner?.User?.name?.split(' ')[0] ?? owner?.User?.name ?? 'Realtor';
     topRealtorMtd = { name, amount: topAmount };
   }
+
+  // ── Revenue forecast (brief read) ─────────────────────────────────────────
+  // Reuses the forecast model from app/broker/forecast/page.tsx.
+  // Won GCI: same MTD window + defaultBrokerRate fallback already computed above.
+  // Active GCI: weighted by closingProbability × dealHealth — one extra query.
+
+  const b = brokerage as unknown as { defaultBrokerRate?: number | null };
+  const defaultBrokerRate =
+    typeof b.defaultBrokerRate === 'number' ? b.defaultBrokerRate : 0.02;
+
+  // Won GCI this month from the already-fetched wonYtdRows (filtered to MTD)
+  let revWonGci = 0;
+  for (const d of wonYtdRows) {
+    const updatedMs = new Date(d.updatedAt).getTime();
+    if (updatedMs >= mtdStartMs) {
+      const rate = d.commissionRate != null ? d.commissionRate / 100 : defaultBrokerRate;
+      revWonGci += (d.value ?? 0) * rate;
+    }
+  }
+
+  // Active deals with full fields needed for health + probability
+  const { data: revActiveRaw } = spaceIds.length > 0
+    ? await supabase
+        .from('Deal')
+        .select(
+          'id, spaceId, title, value, commissionRate, closeDate, stageId, status, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt',
+        )
+        .in('spaceId', spaceIds)
+        .eq('status', 'active')
+        .order('value', { ascending: false })
+        .limit(2000)
+    : { data: [] as ActiveDealRow[] };
+
+  const monthStart = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  const monthName = nowDate.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+
+  let revInFlightGci = 0;
+  let revTopDealTitle = '';
+  let revTopDealGci = 0;
+  let revTopDealId = '';
+  let revTopDealProb = 0;
+
+  for (const d of (revActiveRaw ?? []) as ActiveDealRow[]) {
+    const closeDate = d.closeDate ? new Date(d.closeDate) : null;
+    const healthResult = dealHealth({
+      status: d.status as 'active' | 'won' | 'lost' | 'on_hold',
+      stageChangedAt: d.stageChangedAt ? new Date(d.stageChangedAt) : null,
+      updatedAt: new Date(d.updatedAt),
+      closeDate,
+      followUpAt: d.followUpAt ? new Date(d.followUpAt) : null,
+      nextAction: d.nextAction,
+      nextActionDueAt: d.nextActionDueAt ? new Date(d.nextActionDueAt) : null,
+    });
+    const rate = d.commissionRate != null ? d.commissionRate / 100 : defaultBrokerRate;
+    const gci = (d.value ?? 0) * rate;
+    const prob = closingProbability(closeDate, healthResult.state, monthStart, monthEnd);
+    const projectedGci = gci * prob;
+    revInFlightGci += projectedGci;
+    if (projectedGci > revTopDealGci) {
+      revTopDealGci = projectedGci;
+      revTopDealTitle = d.title;
+      revTopDealId = d.id;
+      revTopDealProb = prob;
+    }
+  }
+
+  const revTotalForecast = revWonGci + revInFlightGci;
+  const revActiveCount = (revActiveRaw ?? []).length;
+  const revHasPipeline = revActiveCount > 0 || revWonGci > 0;
+
+  const revPaceSentence = revTotalForecast === 0
+    ? null
+    : `On pace for ${formatCurrency(revTotalForecast)}. ${formatCompact(revWonGci)} won, ${formatCompact(revInFlightGci)} in flight.`;
+
+  // ── End revenue forecast ────────────────────────────────────────────────────
 
   // Speed-to-lead SLA counts — only queried when slaEnabled is on.
   // Two numbers: leads currently breaching (needs action) + leads Chippi
@@ -483,6 +605,87 @@ export default async function BrokerBriefPage() {
           <p className="text-[13px] text-muted-foreground mt-3">
             Quiet — no deals closed this month yet.
           </p>
+        )}
+      </section>
+
+      {/* Revenue — projected GCI for the month at a glance.
+          Focal number in serif Times + one-line pace read + the single biggest
+          deal to watch. Computation mirrors app/broker/forecast/page.tsx. */}
+      <section>
+        <Link
+          href="/broker/forecast"
+          className="group/revenue flex items-center gap-3 pb-3 border-b border-border/60"
+        >
+          <h2 className={SECTION_LABEL}>Revenue</h2>
+          <ArrowRight
+            size={11}
+            className="text-muted-foreground/40 group-hover/revenue:text-muted-foreground transition-colors"
+          />
+        </Link>
+
+        {!revHasPipeline ? (
+          <p className="text-[13px] text-muted-foreground mt-3">
+            No active pipeline yet.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {/* Focal projected number */}
+            <div>
+              <p
+                className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')}
+                style={TITLE_FONT}
+              >
+                {formatCurrency(revTotalForecast)}
+              </p>
+              {revPaceSentence && (
+                <p className={cn(CAPTION, 'mt-1')}>
+                  {revPaceSentence}
+                </p>
+              )}
+            </div>
+
+            {/* Stat strip: won + in flight */}
+            <div className="grid grid-cols-2 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+              <div className="bg-background px-4 py-3">
+                <p className={SECTION_LABEL}>Won so far</p>
+                <p
+                  className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
+                  style={TITLE_FONT}
+                >
+                  {formatCompact(revWonGci)}
+                </p>
+              </div>
+              <div className="bg-background px-4 py-3">
+                <p className={SECTION_LABEL}>In flight (weighted)</p>
+                <p
+                  className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
+                  style={TITLE_FONT}
+                >
+                  {formatCompact(revInFlightGci)}
+                </p>
+              </div>
+            </div>
+
+            {/* Biggest deal to watch */}
+            {revTopDealTitle && (
+              <div className="flex items-center justify-between gap-4 pt-1">
+                <div className="min-w-0">
+                  <p className={SECTION_LABEL}>Biggest deal to watch</p>
+                  <p className="text-sm text-foreground mt-0.5 truncate">{revTopDealTitle}</p>
+                  <p className={cn(META, 'mt-0.5')}>
+                    {formatCompact(revTopDealGci)} projected &middot; {Math.round(revTopDealProb * 100)}% likely
+                  </p>
+                </div>
+                <Link
+                  href="/broker/forecast"
+                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                >
+                  Full forecast
+                  <ArrowUpRight size={11} />
+                </Link>
+              </div>
+            )}
+          </div>
         )}
       </section>
 

@@ -1,8 +1,15 @@
 """Broker read tools — response-time benchmarking across the team.
 
-One tool: audit_response_times(). Computes the per-realtor median hours
-from Contact.createdAt to first outbound activity, then bands realtors as
-'fast' / 'on_pace' / 'slow' against the team median.
+Two tools live here because they both answer "how is the team performing?":
+
+  audit_response_times()      — per-realtor median first-touch response time
+                                over 30d, banded vs team median (fast /
+                                on_pace / slow / no_data).
+  find_at_risk_agents()       — flight-risk signals per realtor: won-deal
+                                trend (this 30d vs prior 30d), days since last
+                                activity, un-worked assigned leads, and SLA-tag
+                                counts (sla-nudged / sla-escalated). Returns a
+                                ranked at-risk list + a plain-English summary.
 
 The classification is intentionally band-based, not absolute. The chief-of-
 staff voice (see `agent/chippi_broker.py:BROKER_INSTRUCTIONS`) frames every
@@ -242,7 +249,267 @@ async def audit_response_times(
     }
 
 
-PERFORMANCE_TOOLS: list = [audit_response_times]
+# ── Flight-risk / at-risk agent detection ──────────────────────────────────
+
+# How many days back each "period" covers for the won-deal trend comparison.
+_RISK_PERIOD_DAYS = 30
+
+# Silence threshold: if a realtor has had no activity (Contact or Deal
+# createdAt/updatedAt) for this many days, they surface as "going quiet".
+_QUIET_DAYS_THRESHOLD = 14
+
+# SLA tag names — must match the tags written by the SLA engine.
+_SLA_NUDGE_TAG = "sla-nudged"
+_SLA_ESCALATE_TAG = "sla-escalated"
+
+# Tag written by the broker assignment flow (same as find_breached_leads).
+_ASSIGNED_BY_BROKER_TAG = "assigned-by-broker"
 
 
-__all__ = ["audit_response_times", "PERFORMANCE_TOOLS"]
+@function_tool(strict_mode=False)
+async def find_at_risk_agents(
+    ctx: RunContextWrapper[AgentContext],
+) -> dict[str, Any]:
+    """Flight-risk signals per realtor: won-deal trend, silence days, un-worked leads, SLA hits."""
+    # Signals per realtor:
+    #   1. won_this_period / won_prior_period — deals with status='won' in each 30d window.
+    #   2. days_since_last_activity — max(Contact.createdAt, Deal.updatedAt) across the space.
+    #   3. unworked_assigned_leads — 'assigned-by-broker' contacts with lastContactedAt IS NULL.
+    #   4. sla_nudge_count / sla_escalate_count — contacts carrying the SLA tags.
+    # Realtors with ≥1 signal surface in the at_risk list, sorted by signal severity.
+    require_broker_role(ctx)
+    brokerage_id = ctx.context.brokerage_id
+
+    db = await supabase()
+    now = datetime.now(timezone.utc)
+    period_start = now - timedelta(days=_RISK_PERIOD_DAYS)
+    prior_start = now - timedelta(days=_RISK_PERIOD_DAYS * 2)
+
+    # ── 1. Resolve member spaces ────────────────────────────────────────────
+    spaces_res = await (
+        db.table("Space")
+        .select("id,ownerId,name")
+        .eq("brokerageId", brokerage_id)
+        .execute()
+    )
+    spaces = spaces_res.data or []
+    if not spaces:
+        return {
+            "ok": True,
+            "at_risk": [],
+            "summary": "No member spaces found for this brokerage.",
+        }
+
+    owner_ids = [s["ownerId"] for s in spaces if s.get("ownerId")]
+    users_by_id: dict[str, dict[str, Any]] = {}
+    if owner_ids:
+        users_res = await (
+            db.table("User")
+            .select("id,name,email")
+            .in_("id", owner_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_res.data or [])}
+
+    at_risk: list[dict[str, Any]] = []
+
+    for space in spaces:
+        space_id = space["id"]
+        owner_id = space.get("ownerId")
+        if not owner_id:
+            continue
+        user = users_by_id.get(owner_id) or {}
+        name = user.get("name") or user.get("email") or "Realtor"
+
+        # ── 2. Won-deal trend: this period vs prior period ──────────────────
+        # This period: status='won', updatedAt in [period_start, now]
+        won_this_res = await (
+            db.table("Deal")
+            .select("id")
+            .eq("spaceId", space_id)
+            .eq("status", "won")
+            .gte("updatedAt", period_start)
+            .lte("updatedAt", now)
+            .limit(2000)
+            .execute()
+        )
+        won_this = len(won_this_res.data or [])
+
+        # Prior period: status='won', updatedAt in [prior_start, period_start)
+        won_prior_res = await (
+            db.table("Deal")
+            .select("id")
+            .eq("spaceId", space_id)
+            .eq("status", "won")
+            .gte("updatedAt", prior_start)
+            .lte("updatedAt", period_start)
+            .limit(2000)
+            .execute()
+        )
+        won_prior = len(won_prior_res.data or [])
+
+        # ── 3. Days since last activity ─────────────────────────────────────
+        # Most recent Contact created in this space.
+        last_contact_res = await (
+            db.table("Contact")
+            .select("createdAt")
+            .eq("spaceId", space_id)
+            .order("createdAt", desc=True)
+            .limit(1)
+            .execute()
+        )
+        last_contact_rows = last_contact_res.data or []
+
+        # Most recent Deal touched in this space.
+        last_deal_res = await (
+            db.table("Deal")
+            .select("updatedAt")
+            .eq("spaceId", space_id)
+            .order("updatedAt", desc=True)
+            .limit(1)
+            .execute()
+        )
+        last_deal_rows = last_deal_res.data or []
+
+        # Parse and compare; take the most recent of the two.
+        def _parse_ts(raw: Any) -> datetime | None:
+            if isinstance(raw, datetime):
+                return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+            if isinstance(raw, str):
+                try:
+                    dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    return None
+            return None
+
+        candidates: list[datetime] = []
+        if last_contact_rows:
+            ts = _parse_ts(last_contact_rows[0].get("createdAt"))
+            if ts:
+                candidates.append(ts)
+        if last_deal_rows:
+            ts = _parse_ts(last_deal_rows[0].get("updatedAt"))
+            if ts:
+                candidates.append(ts)
+
+        last_activity: datetime | None = max(candidates) if candidates else None
+        days_quiet: int | None = (
+            (now - last_activity).days if last_activity is not None else None
+        )
+
+        # ── 4. Un-worked assigned leads ─────────────────────────────────────
+        # Over-fetch and filter in Python; same pattern as find_breached_leads.
+        unworked_res = await (
+            db.table("Contact")
+            .select("id,tags")
+            .eq("spaceId", space_id)
+            .is_("lastContactedAt", None)
+            .limit(2000)
+            .execute()
+        )
+        unworked_count = sum(
+            1
+            for c in (unworked_res.data or [])
+            if _ASSIGNED_BY_BROKER_TAG in (c.get("tags") or [])
+        )
+
+        # ── 5. SLA tag counts ───────────────────────────────────────────────
+        sla_res = await (
+            db.table("Contact")
+            .select("id,tags")
+            .eq("spaceId", space_id)
+            .limit(5000)
+            .execute()
+        )
+        sla_nudge_count = 0
+        sla_escalate_count = 0
+        for c in (sla_res.data or []):
+            tags = c.get("tags") or []
+            if _SLA_NUDGE_TAG in tags:
+                sla_nudge_count += 1
+            if _SLA_ESCALATE_TAG in tags:
+                sla_escalate_count += 1
+
+        # ── 6. Evaluate risk signals ────────────────────────────────────────
+        reasons: list[str] = []
+
+        # Won-deal decline: prior > 0 and this period is lower.
+        won_pct_change: float | None = None
+        if won_prior > 0 and won_this < won_prior:
+            won_pct_change = round((won_this - won_prior) / won_prior * 100, 1)
+            reasons.append(
+                f"won deals down {abs(won_pct_change):.0f}% "
+                f"({won_this} this 30d vs {won_prior} prior 30d)"
+            )
+        elif won_prior == 0 and won_this == 0:
+            # No wins in either period — flag as a weaker signal (no output).
+            pass
+
+        if days_quiet is not None and days_quiet >= _QUIET_DAYS_THRESHOLD:
+            reasons.append(f"quiet for {days_quiet} day{'s' if days_quiet != 1 else ''}")
+
+        if unworked_count > 0:
+            reasons.append(
+                f"{unworked_count} assigned lead{'s' if unworked_count != 1 else ''} "
+                "never contacted"
+            )
+
+        if sla_escalate_count > 0:
+            reasons.append(f"{sla_escalate_count} lead{'s' if sla_escalate_count != 1 else ''} past escalation SLA")
+        elif sla_nudge_count > 0:
+            reasons.append(f"{sla_nudge_count} SLA nudge{'s' if sla_nudge_count != 1 else ''}")
+
+        if not reasons:
+            continue  # no signals — realtor is fine
+
+        # Risk score: escalated leads are heaviest, then silence, then won decline.
+        risk_score = (
+            sla_escalate_count * 10
+            + (days_quiet or 0)
+            + unworked_count * 3
+            + (abs(won_pct_change) if won_pct_change is not None else 0)
+        )
+
+        at_risk.append({
+            "id": owner_id,
+            "name": name,
+            "risk_score": round(risk_score, 1),
+            "reasons": reasons,
+            "metrics": {
+                "won_this_period": won_this,
+                "won_prior_period": won_prior,
+                "won_pct_change": won_pct_change,
+                "days_since_last_activity": days_quiet,
+                "unworked_assigned_leads": unworked_count,
+                "sla_nudge_count": sla_nudge_count,
+                "sla_escalate_count": sla_escalate_count,
+            },
+        })
+
+    # Sort descending by risk_score so the most urgent surfaces first.
+    at_risk.sort(key=lambda r: r["risk_score"], reverse=True)
+
+    # ── 7. Summary sentence ─────────────────────────────────────────────────
+    if not at_risk:
+        summary = "No agents are showing flight-risk signals right now — team looks engaged."
+    else:
+        top = at_risk[0]
+        top_reasons = "; ".join(top["reasons"])
+        summary = (
+            f"{len(at_risk)} agent{'s' if len(at_risk) != 1 else ''} showing "
+            f"flight-risk signals; {top['name']} has the strongest "
+            f"({top_reasons})."
+        )
+
+    return {
+        "ok": True,
+        "at_risk": at_risk,
+        "summary": summary,
+    }
+
+
+PERFORMANCE_TOOLS: list = [audit_response_times, find_at_risk_agents]
+
+
+__all__ = ["audit_response_times", "find_at_risk_agents", "PERFORMANCE_TOOLS"]
