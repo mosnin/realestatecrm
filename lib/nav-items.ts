@@ -3,17 +3,13 @@ import {
   UserCircle,
   Briefcase,
   MessageCircle,
-  MessageSquare,
+  Inbox,
   Settings,
   Calendar,
   ClipboardList,
   Building2,
   FolderOpen,
   Aperture,
-  RefreshCw,
-  Gift,
-  Phone,
-  FileBarChart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -67,6 +63,9 @@ export const realtorNavItems: NavItem[] = [
     label: 'People',
     icon: Users,
     badgeKey: 'leads',
+    children: [
+      { href: '/sync', label: 'Smart sync' },
+    ],
   },
   {
     href: '/deals',
@@ -80,18 +79,8 @@ export const realtorNavItems: NavItem[] = [
   },
   {
     href: '/communication',
-    label: 'Communication',
-    icon: MessageSquare,
-  },
-  {
-    href: '/calls',
-    label: 'Calls',
-    icon: Phone,
-  },
-  {
-    href: '/sync',
-    label: 'Smart sync',
-    icon: RefreshCw,
+    label: 'Mailbox',
+    icon: Inbox,
   },
   {
     href: '/properties',
@@ -103,11 +92,6 @@ export const realtorNavItems: NavItem[] = [
       { href: '/properties/commissions', label: 'Commissions' },
       { href: '/cma', label: 'CMA' },
     ],
-  },
-  {
-    href: '/cma',
-    label: 'CMA',
-    icon: FileBarChart,
   },
   {
     href: '/studio',
@@ -139,11 +123,6 @@ export const realtorNavItems: NavItem[] = [
     href: '/intake',
     label: 'Intake form',
     icon: ClipboardList,
-  },
-  {
-    href: '/affiliate',
-    label: 'Affiliate',
-    icon: Gift,
   },
   {
     href: '/settings',

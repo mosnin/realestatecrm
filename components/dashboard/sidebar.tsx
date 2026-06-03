@@ -13,7 +13,6 @@ import type { NavItem, NavChild } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED } from '@/lib/geometry';
 import {
-  SidebarCollapseProvider,
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
@@ -991,7 +990,7 @@ function EdgeCollapseHandle() {
 //
 // The buckets, top → bottom:
 //   • Chippi   → no header (top-pinned, AI)
-//   • WORKSPACE → daily work (People, Deals, Calendar, Communication, Properties, Studio, Files)
+//   • WORKSPACE → daily work (People, Deals, Calendar, Mailbox, Properties, Studio, Files)
 //   • SETUP    → once-and-done (Profile, Intake form)
 //   • Settings → no header (bottom-pinned)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1001,9 +1000,7 @@ const WORKSPACE_HREFS = new Set<string>([
   '/deals',
   '/calendar',
   '/communication',
-  '/calls',
   '/properties',
-  '/cma',
   '/studio',
   '/files',
 ]);
@@ -1414,6 +1411,9 @@ export function Sidebar({
   }, [pathname]);
   const base = `/s/${slug}`;
   const { user } = useUser();
+  // Shared collapse state (provided by the layout). The broker branch below
+  // uses it to rail like the realtor sidebar; the header panel toggle drives it.
+  const { collapsed: brokerCollapsed, toggle: brokerToggle } = useSidebarCollapsed();
 
   // Broker nav accordion — one parent expanded at a time, same contract as
   // RealtorNav. Declared here (not inside the broker branch) because that
@@ -1531,7 +1531,7 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside data-dashboard-sidebar className={cn('relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden', SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden transition-[width] duration-200 ease-out', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
@@ -1539,8 +1539,21 @@ export function Sidebar({
           className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
         />
         <div className="relative z-10 flex flex-col h-full">
-          <div className="px-4 pt-5 pb-3">
-            <BrandLogo className="h-5" alt="Chippi" />
+          {/* Brand mark — in collapsed rail mode it doubles as the expand
+              affordance, mirroring the realtor sidebar. */}
+          <div className={cn('pt-5 pb-3', brokerCollapsed ? 'flex justify-center px-2' : 'px-4')}>
+            {brokerCollapsed ? (
+              <button
+                type="button"
+                onClick={brokerToggle}
+                aria-label="Expand sidebar"
+                className="flex items-center justify-center w-10 h-10 rounded-md transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              >
+                <BrandLogo className="h-5" alt="Chippi" />
+              </button>
+            ) : (
+              <BrandLogo className="h-5" alt="Chippi" />
+            )}
           </div>
 
           <WorkspaceSwitcher
@@ -1551,11 +1564,12 @@ export function Sidebar({
             spaceName={spaceName}
             brokerageMemberships={brokerageMemberships}
             isOnBrokerPage={isOnBrokerPage}
+            collapsed={brokerCollapsed}
             userEmail={userEmail}
           />
 
           <div className="mt-3">
-            <SearchPill />
+            <SearchPill collapsed={brokerCollapsed} />
           </div>
 
           {/* Broker primary nav — same structural vocabulary as RealtorNav:
@@ -1573,7 +1587,7 @@ export function Sidebar({
                 if (visibleItems.length === 0) return null;
                 return (
                   <div key={section.label}>
-                    <SectionLabel>{section.label}</SectionLabel>
+                    {!brokerCollapsed && <SectionLabel>{section.label}</SectionLabel>}
                     {visibleItems.map((item) => {
                       const isActive = doesItemOwnPath(item, pathname, '');
                       const hasChildren = !!(item.children && item.children.length > 0);
@@ -1592,6 +1606,7 @@ export function Sidebar({
                           key={item.href}
                           item={item}
                           base=""
+                          collapsed={brokerCollapsed}
                           isActive={isActive}
                           isExpanded={hasChildren && brokerExpandedKey === item.href}
                           isChildActive={(child) =>
@@ -1610,11 +1625,10 @@ export function Sidebar({
             {/* Conversation history — mirrors the realtor sidebar's contextual
                 section. Slides in when on the broker Chippi page (/broker exact),
                 same AnimatePresence pattern. Shows broker conversations via the
-                broker-scoped conversations API. In collapsed rail mode (broker
-                sidebar is not collapsible today, but gated for safety) the section
-                falls back to a History icon link. */}
+                broker-scoped conversations API. Hidden in collapsed rail mode —
+                there's no room for a conversation list at 56px. */}
             <AnimatePresence initial={false} mode="wait">
-              {pathname === '/broker' && (
+              {!brokerCollapsed && pathname === '/broker' && (
                 <motion.div
                   key="broker-chippi-history"
                   initial={{ opacity: 0, y: 8 }}
@@ -1631,9 +1645,9 @@ export function Sidebar({
           </nav>
 
           {/* What's New card — same slot as the realtor sidebar. Broker users
-              see the same release notes. `collapsed` is false (broker sidebar
-              is not collapsible), so the card always renders until dismissed. */}
-          <SidebarWhatsNew />
+              see the same release notes. Collapses to an icon in rail mode,
+              matching the realtor shell. */}
+          <SidebarWhatsNew collapsed={brokerCollapsed} />
 
           {showAdminLink && (
             <>
@@ -1650,6 +1664,7 @@ export function Sidebar({
             displayName={displayName}
             email={userEmail}
             imageUrl={user?.imageUrl}
+            collapsed={brokerCollapsed}
           />
         </div>
       </aside>
@@ -1657,26 +1672,27 @@ export function Sidebar({
   }
 
   // ── Realtor workspace sidebar ────────────────────────────────────────────
+  // The SidebarCollapseProvider now lives in the layout (wrapping both this
+  // sidebar and the header), so the header's panel toggle and the sidebar
+  // share one collapse state.
   return (
-    <SidebarCollapseProvider>
-      <RealtorSidebarShell
-        slug={slug}
-        spaceName={spaceName}
-        base={base}
-        pathname={pathname}
-        searchParamsString={searchParamsString}
-        unreadLeadCount={unreadLeadCount}
-        overdueFollowUpCount={overdueFollowUpCount}
-        pendingDraftCount={pendingDraftCount}
-        activePropertyCount={activePropertyCount}
-        brokerageMemberships={brokerageMemberships}
-        isOnBrokerPage={isOnBrokerPage}
-        displayName={displayName}
-        imageUrl={user?.imageUrl}
-        email={userEmail}
-        isPlatformAdmin={showAdminLink}
-      />
-    </SidebarCollapseProvider>
+    <RealtorSidebarShell
+      slug={slug}
+      spaceName={spaceName}
+      base={base}
+      pathname={pathname}
+      searchParamsString={searchParamsString}
+      unreadLeadCount={unreadLeadCount}
+      overdueFollowUpCount={overdueFollowUpCount}
+      pendingDraftCount={pendingDraftCount}
+      activePropertyCount={activePropertyCount}
+      brokerageMemberships={brokerageMemberships}
+      isOnBrokerPage={isOnBrokerPage}
+      displayName={displayName}
+      imageUrl={user?.imageUrl}
+      email={userEmail}
+      isPlatformAdmin={showAdminLink}
+    />
   );
 }
 
