@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireRoutineRun } from '@/lib/routines';
+import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +34,7 @@ interface DueRoutine {
   instruction: string;
 }
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/routines] CRON_SECRET is not set — rejecting request');
@@ -156,3 +157,5 @@ export async function GET(req: NextRequest) {
   console.log('[cron/routines] Tick complete', summary);
   return NextResponse.json(summary);
 }
+
+export const GET = monitorCron('routines', { crontab: '0 * * * *' }, handler);

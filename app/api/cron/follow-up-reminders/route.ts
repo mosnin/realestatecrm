@@ -4,6 +4,7 @@ import { sendFollowUpDigest } from '@/lib/email';
 import { sendSMS, followUpReminderSMS } from '@/lib/sms';
 import { sendPushToSpace } from '@/lib/push';
 import { redis } from '@/lib/redis';
+import { monitorCron } from '@/lib/cron-monitor';
 
 /**
  * GET /api/cron/follow-up-reminders
@@ -15,7 +16,7 @@ import { redis } from '@/lib/redis';
  * (Vercel retry, manual re-trigger) from double-blasting every realtor
  * with two identical "you have 3 follow-ups today" notifications.
  */
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/follow-up-reminders] CRON_SECRET env var is not set — rejecting request');
@@ -133,3 +134,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ sent });
 }
+
+export const GET = monitorCron('follow-up-reminders', { crontab: '0 9 * * *' }, handler);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sweepAllBrokerages } from '@/lib/broker-sla';
 import { logger } from '@/lib/logger';
+import { monitorCron } from '@/lib/cron-monitor';
 
 /**
  * GET /api/cron/lead-sla — the speed-to-lead enforcement sweep.
@@ -16,7 +17,7 @@ import { logger } from '@/lib/logger';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/lead-sla] CRON_SECRET is not set — rejecting request');
@@ -43,3 +44,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 });
   }
 }
+
+export const GET = monitorCron('lead-sla', { crontab: '*/15 * * * *' }, handler);
