@@ -52,7 +52,11 @@ async def find_stuck_deals(
     min_days: int = 7,
 ) -> dict[str, Any]:
     """Find active deals across the brokerage stalled min_days+, ranked by days*value."""
-    # Stuck = status='active' AND updatedAt older than min_days. Returns top 20.
+    # Stuck = status='active' AND time-in-current-stage older than min_days.
+    # Staleness is measured from stageChangedAt (when the deal last advanced),
+    # NOT updatedAt — a note or value tweak bumps updatedAt and would hide a
+    # genuinely parked deal. Mirrors lib/deals/health.ts + the realtor/kanban
+    # path: fall back to updatedAt only when stageChangedAt is null. Returns top 20.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -76,12 +80,14 @@ async def find_stuck_deals(
     space_to_owner: dict[str, str] = {s["id"]: s.get("ownerId") for s in spaces if s.get("id")}
     space_ids = list(space_to_owner.keys())
 
+    # We can't push the staleness cutoff into SQL: the clock is stageChangedAt
+    # with an updatedAt fallback (COALESCE), and the QueryBuilder shim has no
+    # OR/COALESCE. So fetch active deals and apply the cutoff in Python below.
     deals_res = await (
         db.table("Deal")
-        .select("id,title,value,stageId,spaceId,status,updatedAt")
+        .select("id,title,value,stageId,spaceId,status,stageChangedAt,updatedAt")
         .in_("spaceId", space_ids)
         .eq("status", "active")
-        .lte("updatedAt", cutoff)
         .limit(5000)
         .execute()
     )
@@ -116,19 +122,25 @@ async def find_stuck_deals(
     # Build + score.
     scored: list[dict[str, Any]] = []
     for d in deals:
-        updated = d.get("updatedAt")
-        if isinstance(updated, str):
+        # Staleness clock = stageChangedAt (time in current stage), falling
+        # back to updatedAt only when stageChangedAt is null. Mirrors
+        # lib/deals/health.ts:68-70.
+        stale_raw = d.get("stageChangedAt") or d.get("updatedAt")
+        if isinstance(stale_raw, str):
             try:
-                updated_dt = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                stale_dt = datetime.fromisoformat(stale_raw.replace("Z", "+00:00"))
             except ValueError:
                 continue
-        elif isinstance(updated, datetime):
-            updated_dt = updated if updated.tzinfo else updated.replace(tzinfo=timezone.utc)
+        elif isinstance(stale_raw, datetime):
+            stale_dt = stale_raw if stale_raw.tzinfo else stale_raw.replace(tzinfo=timezone.utc)
         else:
             continue
-        if updated_dt.tzinfo is None:
-            updated_dt = updated_dt.replace(tzinfo=timezone.utc)
-        days_since = max(0, (now - updated_dt).days)
+        if stale_dt.tzinfo is None:
+            stale_dt = stale_dt.replace(tzinfo=timezone.utc)
+        # Apply the staleness cutoff in Python (couldn't be pushed to SQL).
+        if stale_dt > cutoff:
+            continue
+        days_since = max(0, (now - stale_dt).days)
         value = float(d.get("value") or 0)
         score = days_since * value
 
@@ -173,7 +185,12 @@ async def find_unassigned_leads(
         .eq("brokerageId", brokerage_id)
         .lte("createdAt", cutoff)
         .order("createdAt", desc=False)
-        .limit(_UNASSIGNED_LEAD_LIMIT * 2)  # over-fetch; filter tags in Python
+        # Over-fetch generously, then filter 'brokerage-lead' / 'assigned' in
+        # Python. A small cushion (was 2x) silently dropped genuine unassigned
+        # leads when many fetched rows were already assigned. 8x makes that far
+        # less likely. The real fix is a JSONB array-contains query in the db
+        # shim (out of scope here) so tag filtering happens in SQL.
+        .limit(_UNASSIGNED_LEAD_LIMIT * 8)
         .execute()
     )
     raw_leads = leads_res.data or []
@@ -333,6 +350,17 @@ async def find_breached_leads(
         .execute()
     )
     brokerage = brokerage_res.data or {}
+
+    # If the brokerage has SLA tracking turned off, there is no SLA to breach.
+    # Reporting "breaches" against the default window for an opted-out brokerage
+    # manufactures alerts they never asked for. Bail out cleanly.
+    if not brokerage.get("slaEnabled"):
+        return {
+            "ok": True,
+            "breached_leads": [],
+            "summary": "SLA tracking is not enabled for this brokerage — no breaches to report.",
+        }
+
     sla_first_minutes: int = int(
         brokerage.get("slaFirstResponseMinutes") or _DEFAULT_SLA_FIRST_RESPONSE_MINUTES
     )

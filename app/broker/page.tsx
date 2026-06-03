@@ -66,22 +66,38 @@ export default async function BrokerHomePage({
     conversations = (convData ?? []) as Conversation[];
 
     if (urlConversationId) {
-      initialConversationId = urlConversationId;
-      const { data: msgData } = await supabase
-        .from('Message')
-        .select('role, content, blocks')
-        .eq('conversationId', urlConversationId)
-        .order('createdAt', { ascending: true })
-        .limit(50);
-      initialMessages = ((msgData ?? []) as {
-        role: string;
-        content: string;
-        blocks: MessageBlock[] | null;
-      }[]).map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        blocks: m.blocks,
-      }));
+      // Ownership check: only load (and first-paint) messages for a
+      // conversation that actually belongs to THIS brokerage's space and
+      // carries the [BROKER_CHIPPI] <brokerageId> title prefix. Mirrors the
+      // scope in app/api/ai/broker-conversations/route.ts so the SSR path
+      // can't first-paint a foreign conversation's messages from an
+      // arbitrary ?conversationId=.
+      const { data: convRow } = await supabase
+        .from('Conversation')
+        .select('id')
+        .eq('id', urlConversationId)
+        .eq('spaceId', spaceRow.id)
+        .ilike('title', `${titlePrefix}%`)
+        .maybeSingle();
+
+      if (convRow) {
+        initialConversationId = urlConversationId;
+        const { data: msgData } = await supabase
+          .from('Message')
+          .select('role, content, blocks')
+          .eq('conversationId', urlConversationId)
+          .order('createdAt', { ascending: true })
+          .limit(50);
+        initialMessages = ((msgData ?? []) as {
+          role: string;
+          content: string;
+          blocks: MessageBlock[] | null;
+        }[]).map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          blocks: m.blocks,
+        }));
+      }
     }
   }
 

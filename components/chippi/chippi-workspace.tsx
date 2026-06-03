@@ -384,7 +384,14 @@ export function ChippiWorkspace({
   const loadConversation = useCallback(
     async (convId: string) => {
       try {
-        const res = await fetch(`/api/ai/messages?conversationId=${convId}`);
+        // Broker conversations live on the broker_OWNER's space, so the
+        // realtor `/api/ai/messages` route (Space.ownerId === caller) 403s a
+        // broker_admin. The broker-conversations GET re-reads broker
+        // membership and returns the same message shape.
+        const loadUrl = isBroker
+          ? `/api/ai/broker-conversations?conversationId=${convId}`
+          : `/api/ai/messages?conversationId=${convId}`;
+        const res = await fetch(loadUrl);
         if (!res.ok) {
           const errBody = await res.text().catch(() => '');
           console.error('[Chat] fetch failed', res.status, errBody);
@@ -402,7 +409,7 @@ export function ChippiWorkspace({
         });
       }
     },
-    [setMessages],
+    [setMessages, isBroker],
   );
 
   useEffect(() => {
@@ -498,10 +505,16 @@ export function ChippiWorkspace({
       // a page nav after the realtor walked away from the toast.
       for (const [id, timer] of pendingDeleteTimersRef.current.entries()) {
         clearTimeout(timer);
-        void fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+        void fetch(
+          isBroker
+            ? `/api/ai/broker-conversations?id=${id}`
+            : `/api/ai/conversations/${id}`,
+          { method: 'DELETE' },
+        );
       }
       pendingDeleteTimersRef.current.clear();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDeleteConversation(id: string) {
@@ -522,15 +535,17 @@ export function ChippiWorkspace({
       });
     }
 
-    // Broker conversations live under the same Conversation table — the
-    // existing /api/ai/conversations/[id] DELETE owns the row by id and
-    // auth-checks via Space ownership, which holds for broker rows too
-    // (they live on the broker_owner's space). Phase 1 reuses it; Phase
-    // 2 may revisit if cross-brokerage auth needs sharpening.
+    // Broker conversations live on the broker_OWNER's space, so the realtor
+    // /api/ai/conversations/[id] DELETE (Space.ownerId === caller) 403s a
+    // broker_admin. Route broker deletes through the broker-membership-gated
+    // broker-conversations DELETE (scoped to this brokerage's prefix).
+    const deleteUrl = isBroker
+      ? `/api/ai/broker-conversations?id=${id}`
+      : `/api/ai/conversations/${id}`;
     const timer = setTimeout(async () => {
       pendingDeleteTimersRef.current.delete(id);
       try {
-        const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+        const res = await fetch(deleteUrl, { method: 'DELETE' });
         if (!res.ok) {
           // Server rejected the delete — put the row back and tell the
           // realtor. They've already moved on by now, so the toast carries
@@ -584,11 +599,22 @@ export function ChippiWorkspace({
 
   async function handleRenameConversation(id: string, title: string) {
     try {
-      const res = await fetch(`/api/ai/conversations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
+      // Broker rename goes through the broker-membership-gated route, which
+      // PRESERVES the `[BROKER_CHIPPI] <brokerageId>` prefix and stores the
+      // human name after it. The realtor PATCH on /api/ai/conversations/[id]
+      // would strip that prefix wholesale → the chat drops out of the broker
+      // list and forks a new one on the next message.
+      const res = isBroker
+        ? await fetch('/api/ai/broker-conversations', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, title }),
+          })
+        : await fetch(`/api/ai/conversations/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title }),
+          });
       if (!res.ok) {
         toast.error("Couldn't rename that. Try again.", {
           action: { label: 'Retry', onClick: () => void handleRenameConversation(id, title) },

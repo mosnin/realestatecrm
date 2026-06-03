@@ -70,8 +70,10 @@ async function buildBrokerageSnapshot(brokerage: { id: string; name: string; own
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
 
   const [activeDeals, wonDeals, waitingLeads] = await Promise.all([
-    supabase.from('Deal').select('value').in('spaceId', spaceIds).eq('status', 'active').limit(5000),
-    supabase.from('Deal').select('value, updatedAt').in('spaceId', spaceIds).eq('status', 'won').gte('updatedAt', monthStart).limit(5000),
+    // Limit matches the broker dashboard (app/broker/realtors/page.tsx) so the
+    // two surfaces report the same totals for a large brokerage.
+    supabase.from('Deal').select('value').in('spaceId', spaceIds).eq('status', 'active').limit(10000),
+    supabase.from('Deal').select('value, updatedAt').in('spaceId', spaceIds).eq('status', 'won').gte('updatedAt', monthStart).limit(10000),
     supabase
       .from('Contact')
       .select('id', { count: 'exact', head: true })
@@ -80,19 +82,40 @@ async function buildBrokerageSnapshot(brokerage: { id: string; name: string; own
       .is('lastContactedAt', null),
   ]);
 
-  const active = (activeDeals.data ?? []) as { value: number | null }[];
-  const won = (wonDeals.data ?? []) as { value: number | null }[];
-  const activeValue = active.reduce((s, d) => s + (d.value ?? 0), 0);
-  const wonValue = won.reduce((s, d) => s + (d.value ?? 0), 0);
-  const waiting = waitingLeads.count ?? 0;
-
-  return [
+  // A failed query must NOT degrade to a confident "0". When a metric errors we
+  // omit it and note it could not be loaded, so the persona hedges instead of
+  // stating a fabricated zero.
+  const lines = [
     `Brokerage snapshot (${brokerage.name}), as of now:`,
     `- Realtors on the team: ${realtorCount}`,
-    `- Active deals: ${active.length} worth $${formatCompact(activeValue)} in pipeline`,
-    `- Won this month: ${won.length} worth $${formatCompact(wonValue)}`,
-    `- Leads routed but not yet contacted (waiting on a first response): ${waiting}`,
-  ].join('\n');
+  ];
+
+  if (activeDeals.error) {
+    logger.warn('[broker-direct] active deals query failed', { brokerageId: brokerage.id }, activeDeals.error);
+    lines.push(`- Active deals: (could not load)`);
+  } else {
+    const active = (activeDeals.data ?? []) as { value: number | null }[];
+    const activeValue = active.reduce((s, d) => s + (d.value ?? 0), 0);
+    lines.push(`- Active deals: ${active.length} worth $${formatCompact(activeValue)} in pipeline`);
+  }
+
+  if (wonDeals.error) {
+    logger.warn('[broker-direct] won deals query failed', { brokerageId: brokerage.id }, wonDeals.error);
+    lines.push(`- Won this month: (could not load)`);
+  } else {
+    const won = (wonDeals.data ?? []) as { value: number | null }[];
+    const wonValue = won.reduce((s, d) => s + (d.value ?? 0), 0);
+    lines.push(`- Won this month: ${won.length} worth $${formatCompact(wonValue)}`);
+  }
+
+  if (waitingLeads.error) {
+    logger.warn('[broker-direct] waiting leads query failed', { brokerageId: brokerage.id }, waitingLeads.error);
+    lines.push(`- Leads routed but not yet contacted (waiting on a first response): (could not load)`);
+  } else {
+    lines.push(`- Leads routed but not yet contacted (waiting on a first response): ${waitingLeads.count ?? 0}`);
+  }
+
+  return lines.join('\n');
 }
 
 interface SseEvent {

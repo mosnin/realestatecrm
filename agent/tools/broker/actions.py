@@ -495,6 +495,26 @@ async def flag_deal_for_broker_review(
         return {"ok": False, "summary": "That deal isn't in your brokerage."}
     realtor_user_id = space_res.data.get("ownerId")
 
+    # ── Resolve the broker's DB User.id from their Clerk id ──────────────
+    # ctx.context.user_id is the CLERK id on the Python side, but
+    # requestingUserId is a NOT NULL FK to User(id). Look up the User row by
+    # clerkId and use its .id. Fail closed if we can't resolve it — writing
+    # a Clerk id (or the flagged realtor's id) would either violate the FK or
+    # misattribute the actor.
+    clerk_id = ctx.context.user_id
+    if not clerk_id:
+        return {"ok": False, "summary": "Couldn't identify who's requesting the review."}
+    requester_res = await (
+        db.table("User")
+        .select("id")
+        .eq("clerkId", clerk_id)
+        .maybe_single()
+        .execute()
+    )
+    requesting_user_id = (requester_res.data or {}).get("id") if requester_res else None
+    if not requesting_user_id:
+        return {"ok": False, "summary": "Couldn't identify who's requesting the review."}
+
     # ── Insert DealReviewRequest. The partial unique index on (dealId)
     # WHERE status='open' will raise SQLSTATE 23505 on duplicates — match
     # the TS route's mapping to a friendly 409. asyncpg surfaces this via
@@ -505,10 +525,10 @@ async def flag_deal_for_broker_review(
             "id": review_id,
             "dealId": deal_id,
             # The broker is flagging the deal on behalf of themselves. The
-            # column is NOT NULL — use ctx.user_id (DB user id resolved by
-            # the API gate before Modal). If empty, fall back to the broker
-            # owner from the Brokerage row.
-            "requestingUserId": ctx.context.user_id or realtor_user_id,
+            # column is a NOT NULL FK to User(id), so we use the DB User.id
+            # resolved from the broker's Clerk id above — never the raw Clerk
+            # id and never the flagged realtor.
+            "requestingUserId": requesting_user_id,
             "brokerageId": brokerage_id,
             "status": "open",
             "reason": clean_reason,
@@ -578,11 +598,13 @@ async def send_team_announcement(
     message: str,
     urgency: Literal["normal", "urgent"] = "normal",
     title: str | None = None,
+    confirmed: bool = False,
 ) -> dict[str, Any]:
     """Post a team-wide announcement to the brokerage's /broker/announcements surface."""
     # message: 1-10000 chars.
     # urgency: 'normal' or 'urgent' (urgent may trigger SMS if Telnyx is set).
     # title: optional; defaults to first 80 chars of message.
+    # confirmed: false first call returns requires_confirmation, true sends.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -601,6 +623,33 @@ async def send_team_announcement(
         return {"ok": False, "summary": "Couldn't find the brokerage workspace."}
 
     db = await supabase()
+
+    # ── Count realtors so the confirmation + summary are honest ─────────
+    members_res = await (
+        db.table("BrokerageMembership")
+        .select("id,userId,role")
+        .eq("brokerageId", brokerage_id)
+        .execute()
+    )
+    members = members_res.data or []
+    # Realtors on the team (everyone, since broker owners/admins are also on
+    # the team). The N below is the headcount the message reaches.
+    member_count = len(members)
+
+    # ── Confirmation gate — a team-wide blast is destructive. ───────────
+    if not confirmed:
+        return {
+            "ok": False,
+            "requires_confirmation": True,
+            "summary": (
+                f"About to send a{' urgent' if clean_urgency == 'urgent' else ''} "
+                f"announcement \"{clean_title}\" to {member_count} team "
+                f"member{'s' if member_count != 1 else ''}. Confirm?"
+            ),
+            "title": clean_title,
+            "urgency": clean_urgency,
+            "recipients": member_count,
+        }
 
     # Author name for the rendered card.
     author_res = await (
@@ -633,18 +682,6 @@ async def send_team_announcement(
         }).execute()
     except Exception:
         return {"ok": False, "summary": "Couldn't save the announcement."}
-
-    # ── Count realtors so the summary is honest ─────────────────────────
-    members_res = await (
-        db.table("BrokerageMembership")
-        .select("id,userId,role")
-        .eq("brokerageId", brokerage_id)
-        .execute()
-    )
-    members = members_res.data or []
-    # Realtors on the team (everyone, since broker owners/admins are also on
-    # the team). The N below is the headcount the message reaches.
-    member_count = len(members)
 
     # ── Audit ───────────────────────────────────────────────────────────
     audit_ok = await _write_audit(

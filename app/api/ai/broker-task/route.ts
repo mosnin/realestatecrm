@@ -175,6 +175,11 @@ function proxyModalStream({
       const textChunks: string[] = [];
       const blocks: MessageBlock[] = [];
       let persisted = false;
+      // Track whether we've already pushed a terminal frame (turn_complete or
+      // error). If Modal's stream closes WITHOUT a done/error event (cold-start
+      // drop, OOM, truncated body), the finally block emits a fallback terminal
+      // frame so the client's bubble never hangs forever.
+      let terminalEmitted = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
         persisted = true;
@@ -268,9 +273,11 @@ function proxyModalStream({
                   : textChunks.join('');
               await persistOnce(finalText);
               push(controller, { type: 'turn_complete', reason: 'complete' });
+              terminalEmitted = true;
             } else if (type === 'error') {
               await persistOnce();
               push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+              terminalEmitted = true;
             }
           }
         }
@@ -288,6 +295,7 @@ function proxyModalStream({
                     : textChunks.join('');
                 await persistOnce(finalText);
                 push(controller, { type: 'turn_complete', reason: 'complete' });
+                terminalEmitted = true;
               }
             } catch {
               // ignore malformed trailing line
@@ -298,9 +306,22 @@ function proxyModalStream({
         if (!abortController.signal.aborted) {
           logger.error('[ai/broker-task] modal stream read error', { spaceId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          terminalEmitted = true;
         }
       } finally {
         await persistOnce();
+        // Guarantee a terminal frame. If Modal's stream closed cleanly without
+        // a done/error event (cold-start drop, OOM, truncated response), no
+        // turn_complete/error was pushed — the client would hang forever. Emit
+        // a fallback: turn_complete if we received any text (salvage the partial
+        // answer), otherwise an error so the bubble resolves. Skip on user abort.
+        if (!terminalEmitted && !abortController.signal.aborted) {
+          if (textChunks.join('').trim()) {
+            push(controller, { type: 'turn_complete', reason: 'complete' });
+          } else {
+            push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          }
+        }
         controller.close();
         reader.releaseLock();
       }
@@ -484,15 +505,35 @@ export async function POST(req: NextRequest) {
     broker_role: brokerCtx.brokerRole,
   };
 
+  // Bound the Modal cold start. The abort signal alone only fires on user
+  // cancel — a hung cold start would otherwise hold the connection until
+  // Vercel's 300s maxDuration. AbortSignal.any lets either the user abort OR
+  // a 75s timeout tear down the fetch; we keep a ref to the timeout signal so
+  // the catch can tell a timeout ("took too long") apart from a user cancel.
+  const MODAL_FETCH_TIMEOUT_MS = 75_000;
+  const fetchTimeoutSignal = AbortSignal.timeout(MODAL_FETCH_TIMEOUT_MS);
+
   let modalRes: Response;
   try {
     modalRes = await fetch(modalChatUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: abortController.signal,
+      signal: AbortSignal.any([abortController.signal, fetchTimeoutSignal]),
     });
   } catch (err) {
+    // Timeout: the cold start never produced headers within the bound. Surface
+    // a clean, distinct message. (User cancel is silent — no client to tell.)
+    if (fetchTimeoutSignal.aborted && !abortController.signal.aborted) {
+      logger.warn('[ai/broker-task] Modal fetch timed out', {
+        brokerageId: brokerCtx.brokerage.id,
+        timeoutMs: MODAL_FETCH_TIMEOUT_MS,
+      });
+      return NextResponse.json(
+        { error: 'Chippi took too long, try again.' },
+        { status: 504 },
+      );
+    }
     logger.error(
       '[ai/broker-task] Modal fetch failed',
       { brokerageId: brokerCtx.brokerage.id },

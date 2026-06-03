@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       .select('*')
       .eq('spaceId', space.id)
       .not('title', 'like', '[BROKERAGE_CHAT]%')
+      .not('title', 'like', '[BROKER_CHIPPI]%')
       .order('updatedAt', { ascending: false });
     if (error) return NextResponse.json({ error: 'Failed to load conversations' }, { status: 500 });
 

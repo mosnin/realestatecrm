@@ -597,6 +597,13 @@ async def test_flag_deal_writes_audit(fake_db: _FakeSupabase) -> None:
         "select",
         _FakeResult(data={"id": "s_realtor", "ownerId": "u_realtor", "brokerageId": "bk_a"}),
     )
+    # The tool resolves the requesting broker's DB User.id from their Clerk id
+    # (ctx.user_id) before writing the FK-constrained requestingUserId.
+    fake_db.set_for(
+        "User",
+        "select",
+        _FakeResult(data={"id": "u_broker"}),
+    )
 
     tool = _tool_by_name("flag_deal_for_broker_review")
     ctx = _ctx(broker_role="broker_owner")
@@ -642,7 +649,9 @@ async def test_send_team_announcement_writes_audit(fake_db: _FakeSupabase) -> No
 
     tool = _tool_by_name("send_team_announcement")
     ctx = _ctx(broker_role="broker_owner")
-    res = await _invoke(tool, ctx, {"message": "Standup at 9", "urgency": "normal"})
+    # A team-wide announcement is now a two-step confirm (like role-change /
+    # offboard); confirmed=True fires the actual send.
+    res = await _invoke(tool, ctx, {"message": "Standup at 9", "urgency": "normal", "confirmed": True})
     assert res["ok"] is True
     audits = [c for c in fake_db.log if c["table"] == "AuditLog" and c["op"] == "insert"]
     assert len(audits) == 1

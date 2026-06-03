@@ -370,7 +370,13 @@ async def chat_turn(item: dict):
     if not sr.data or not spr.data:
         return {"error": f"space or agent settings not found: {space_id}"}
 
-    from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
+    from agents import (
+        InputGuardrailTripwireTriggered,
+        MaxTurnsExceeded,
+        ModelSettings,
+        RunConfig,
+        Runner,
+    )
     from openai.types.shared import Reasoning
     from schemas import AgentSettings, Space
     from security.context import AgentContext
@@ -655,8 +661,21 @@ async def chat_turn(item: dict):
             # SDK's prefix dispatcher (which raises `Unknown prefix: x-ai`).
             chippi.model = make_chat_model(model)
             try:
+                # Per-turn agent-loop cap. The SDK default is 10; we raise it
+                # to 14 to leave room for legitimate multi-tool reasoning
+                # (e.g. lookup → read → draft → confirm) while still hard-
+                # stopping a runaway or injected turn long before Modal's 600s
+                # wall. Without this, a single turn could chain unbounded tool
+                # calls — including writes (reassign_lead, change_member_role,
+                # offboard_member). In the pinned SDK (openai-agents 0.0.19)
+                # `max_turns` lives on Runner.run_streamed(...), not RunConfig
+                # (RunConfig has no such field — passing it there raises).
                 result = Runner.run_streamed(
-                    chippi, input=input_items, context=ctx, run_config=run_config
+                    chippi,
+                    input=input_items,
+                    context=ctx,
+                    run_config=run_config,
+                    max_turns=14,
                 )
                 async for event in result.stream_events():
                     try:
@@ -719,6 +738,27 @@ async def chat_turn(item: dict):
                 info = exc.guardrail_result.output.output_info or {}
                 reason = info.get("reason", "Run blocked.")
                 err = json.dumps({"type": "error", "message": mask_secrets(reason)})
+                yield f"data: {err}\n\n"
+                return
+
+            except MaxTurnsExceeded:
+                # The agent loop hit the per-turn tool-call cap (max_turns
+                # above). This is a hard stop against a runaway or injected
+                # turn — not a transient fault — so we do NOT fall forward to
+                # another model (it would just hit the same wall). Surface a
+                # clean SSE error frame and end the turn.
+                logger.warning(
+                    "chat_turn_max_turns_exceeded",
+                    model=model,
+                    space_id=space_id,
+                )
+                err = json.dumps(
+                    {
+                        "type": "error",
+                        "message": "This request needed too many steps to complete. "
+                        "Try breaking it into smaller asks.",
+                    }
+                )
                 yield f"data: {err}\n\n"
                 return
 

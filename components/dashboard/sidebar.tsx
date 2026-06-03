@@ -881,6 +881,11 @@ function BrokerSidebarConversations() {
           <ul className="space-y-px">
             {visible!.map((conv) => {
               const isActive = activeId === conv.id;
+              // GET returns a CLEAN display title (the `[BROKER_CHIPPI]
+              // <brokerageId>` prefix stripped). It's empty for a chat that
+              // was never renamed — fall back to a human label instead of
+              // showing a blank row or the raw prefixed uuid.
+              const label = conv.title?.trim() ? conv.title : 'New conversation';
               return (
                 <li key={conv.id} className="relative">
                   {isActive && (
@@ -904,9 +909,9 @@ function BrokerSidebarConversations() {
                           'text-[13px] truncate leading-tight',
                           isActive ? 'font-medium text-foreground' : 'text-foreground/80',
                         )}
-                        title={conv.title}
+                        title={label}
                       >
-                        {conv.title.length > 24 ? conv.title.slice(0, 23).trimEnd() + '…' : conv.title}
+                        {label.length > 24 ? label.slice(0, 23).trimEnd() + '…' : label}
                       </p>
                       {conv.preview ? (
                         <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5 leading-tight">

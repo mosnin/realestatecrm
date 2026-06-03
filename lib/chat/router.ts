@@ -23,9 +23,9 @@
 
 /**
  * Imperative action verbs that signal the realtor wants Chippi to DO
- * something (mutation, send, schedule) — not just answer. Case insensitive,
- * matched as standalone words. Order doesn't matter; the alternation is
- * treated as a flat set.
+ * something (mutation, send, schedule, assign, route) — not just answer.
+ * Case insensitive, matched as standalone words. Order doesn't matter; the
+ * alternation is treated as a flat set.
  *
  * Curated from real chat traffic, not a thesaurus:
  *   - CRUD: add, create, set, update, change, edit, archive, mark, log, save
@@ -33,13 +33,37 @@
  *   - Reach-out variants: reach, contact, follow, follow-up, nudge, call
  *   - Schedule: schedule, book, set up, set-up, cancel, reschedule, move
  *   - Workflow: assign, route, qualify, advance, close, win, lose
- *   - Other: remind (when imperative: "remind me", "remind her")
+ *   - Assignment/handoff phrasings (the gap that was silently no-op'ing):
+ *       give, hand, handoff, pass, transfer, reassign, delegate, put ("put
+ *       Jordan on the deal"), take ("take Dana off that lead"), pull ("pull
+ *       her off"), drop, split (distribute leads), share, divvy, allocate,
+ *       distribute, rebalance
+ *   - Team/lifecycle: promote, demote, onboard, offboard, deactivate, disable,
+ *       enable, invite, approve, reject, announce, broadcast, publish, post
+ *   - Other: remind (when imperative: "remind me", "remind her"), set a rule
+ *
+ * Why expand: real broker/realtor actions are routinely phrased without a
+ * classic CRUD verb — "give Preston to Sarah", "take Dana off that lead",
+ * "split the new leads evenly", "hand this lead to Mike", "put Jordan on the
+ * Smith deal". Those used to fall through to the tool-less direct path and do
+ * NOTHING. A missed action (silent no-op) is strictly worse than a read that
+ * goes to the agent (just slower), so we lean toward catching actions.
+ *
+ * Guarding false positives: every added word is an imperative/transitive
+ * action verb, NOT an interrogative or read lead-in. Pure reads still go
+ * direct because they open with review|look|find|search|get|show|tell|list|
+ * what|how|why|who|when|which|are|is|do|does|can — none of which appear here.
+ * The ambiguous ones (set, share, post, take, put, drop) only fire when the
+ * word itself is present; "what's our take rate" still contains "take", but
+ * such reads are rare and the agent merely answers slower — acceptable per
+ * the bias above. We deliberately do NOT add high-collision read words like
+ * "see", "check", "view", "open", "read", "count", "summarize".
  *
  * Not on the list: review, look, find, search, get, show, tell, list, what,
- * how, why, who, when — those are READS. Reads go direct.
+ * how, why, who, when, which, see, check, view, count, summarize — READS.
  */
 const ACTION_VERBS_RE =
-  /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject)\b/i;
+  /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|reassign|delegate|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject|give|hand|handoff|pass|transfer|put|take|pull|drop|split|share|divvy|allocate|distribute|rebalance|promote|demote|onboard|offboard|deactivate|disable|enable|announce|broadcast|publish|post)\b/i;
 
 export type RouteDecision = 'direct' | 'agent';
 
