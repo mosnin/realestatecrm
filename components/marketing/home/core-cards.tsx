@@ -1,63 +1,43 @@
 'use client';
 
 /**
- * CoreCards — the four things Chippi does, as a Chippi-skinned MagicUI bento.
- *
- * Each card carries a composed "canvas": an app-window-framed media slot that
- * bleeds off the top-right edge (KAIRO/VPN card energy) plus a couple of real
- * UI accents (a Chippi draft pill, a lead-tier dot) built from our tokens — so
- * the cards read as the product, not stock art. The framed area itself is a
- * <Placeholder> to be swapped with real screenshots. Section heading is serif
- * Times (the brand flourish); card titles stay sans (scarcity).
+ * CoreCards — the five things Chippi does, as a Chippi-skinned MagicUI bento.
+ * Each card's background is its own abstract animation (pure geometry, one
+ * scarce brand-orange accent) — the idea made *felt*, not a literal UI mock.
+ * The animation lives in the top of the card and fades into the surface so the
+ * icon + title + description stay clean. Section heading is serif Times.
  */
 
-import { Mail, PenLine, CalendarCheck, KanbanSquare } from 'lucide-react';
+import { Mail, PenLine, Target, CalendarCheck, KanbanSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BentoGrid, BentoCard } from '@/components/ui/bento-grid';
-import { Reveal, Placeholder } from './home-kit';
+import { Reveal } from './home-kit';
+import { InboxTriageAnimation } from './animations/inbox-triage-animation';
+import { VoiceDraftAnimation } from './animations/voice-draft-animation';
+import { LeadScoreAnimation } from './animations/lead-score-animation';
+import { TourBookingAnimation } from './animations/tour-booking-animation';
+import { PipelineFlowAnimation } from './animations/pipeline-flow-animation';
 
-/** App-window-framed media slot, bleeding off the top so it reads as a live
- *  surface cropped by the card. Fades into the card so the title sits clean. */
-function CardCanvas({
-  label,
+/** Hosts an abstraction in the top of a bento card and fades it into the
+ *  surface so the title/description below stay legible. */
+function AnimCanvas({
+  children,
   tint = false,
-  accent,
 }: {
-  label: string;
+  children: React.ReactNode;
   tint?: boolean;
-  accent?: React.ReactNode;
 }) {
   return (
     <div className="absolute inset-0">
-      {tint && <div className="absolute inset-0 bg-brand-subtle/60" aria-hidden />}
-      <div className="absolute -right-8 left-6 top-6 overflow-hidden rounded-2xl bg-background ring-1 ring-border/70 shadow-[0_12px_32px_-16px_rgba(0,0,0,0.18)]">
-        <div className="flex h-8 items-center gap-1.5 border-b border-border/60 px-3.5">
-          <span className="h-2 w-2 rounded-full bg-foreground/15" aria-hidden />
-          <span className="h-2 w-2 rounded-full bg-foreground/15" aria-hidden />
-          <span className="h-2 w-2 rounded-full bg-foreground/15" aria-hidden />
-        </div>
-        <Placeholder label={label} aspect="aspect-[16/8]" className="rounded-none ring-0" />
-      </div>
-      {accent}
-      {/* fade into the card so the title/desc stay legible */}
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-card via-card/85 to-transparent" />
-    </div>
-  );
-}
-
-/** A small Chippi draft pill — the agent's orange+chip signature, the one
- *  branded accent allowed here. */
-function DraftPill({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        'absolute inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-[10px] font-medium text-brand ring-1 ring-brand/20',
-        className,
+      {tint && (
+        <div aria-hidden className="absolute inset-0 bg-brand-subtle/40" />
       )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
-      Chippi · draft ready
-    </span>
+      <div className={cn('absolute inset-x-4 top-4 bottom-[44%]')}>{children}</div>
+      <div
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-card via-card/80 to-transparent"
+      />
+    </div>
   );
 }
 
@@ -77,55 +57,71 @@ export function CoreCards() {
       <BentoGrid className="mt-12">
         <BentoCard
           name="Reads your inbox, surfaces what matters"
-          description="Gmail and Outlook plug in. Chippi reads every inbound, scores it against your live deals, and tells you who to call first."
+          description="Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first."
           Icon={Mail}
           href="/features/communication"
           cta="See the inbox"
           className="col-span-3 md:col-span-2"
           background={
-            <CardCanvas
-              label="Inbox triage"
-              accent={<DraftPill className="right-2 top-12" />}
-            />
+            <AnimCanvas>
+              <InboxTriageAnimation className="h-full w-full" />
+            </AnimCanvas>
           }
         />
 
         <BentoCard
           name="Drafts in your voice"
-          description="Every reply written before you open the thread. Read it, edit it, send it — or don't. Nothing leaves without your tap."
+          description="Every reply written before you open the thread. Read it, edit it, send it — or don't."
           Icon={PenLine}
           href="/features/chippi"
           cta="Meet Chippi"
           className="col-span-3 md:col-span-1"
-          background={<CardCanvas label="Chippi draft" tint accent={<DraftPill className="right-2 top-12" />} />}
+          background={
+            <AnimCanvas tint>
+              <VoiceDraftAnimation className="h-full w-full" />
+            </AnimCanvas>
+          }
+        />
+
+        <BentoCard
+          name="Knows who to call first"
+          description="Every lead scored against your deals, the hottest one rising out of the noise — so your morning starts with the right call."
+          Icon={Target}
+          href="/features/people"
+          cta="See people"
+          className="col-span-3 md:col-span-1"
+          background={
+            <AnimCanvas>
+              <LeadScoreAnimation className="h-full w-full" />
+            </AnimCanvas>
+          }
         />
 
         <BentoCard
           name="Books the tour"
-          description="Reply with a time; Chippi puts it on every calendar and writes it back to the deal. No tab-switching."
+          description="Reply with a time; Chippi puts it on every calendar and writes it back to the deal."
           Icon={CalendarCheck}
           href="/features/calendar"
           cta="See the calendar"
           className="col-span-3 md:col-span-1"
-          background={<CardCanvas label="Tour booking" />}
+          background={
+            <AnimCanvas>
+              <TourBookingAnimation className="h-full w-full" />
+            </AnimCanvas>
+          }
         />
 
         <BentoCard
           name="Keeps the pipeline honest"
-          description="Move a card; Chippi keeps the value, the dates, and the counterparty in sync everywhere. The board reflects reality, not last week."
+          description="Move a card; the value, the dates, the counterparty all stay in sync. The board reflects reality, not last week."
           Icon={KanbanSquare}
           href="/features/deals"
           cta="See the pipeline"
-          className="col-span-3 md:col-span-2"
+          className="col-span-3 md:col-span-1"
           background={
-            <CardCanvas
-              label="Pipeline board"
-              accent={
-                <span className="absolute right-2 top-12 inline-flex items-center gap-1 rounded-full bg-background px-2 py-1 text-[10px] font-medium text-foreground/70 ring-1 ring-border/70">
-                  <span className="h-1.5 w-1.5 rounded-full bg-lead-hot" aria-hidden /> Closing won
-                </span>
-              }
-            />
+            <AnimCanvas>
+              <PipelineFlowAnimation className="h-full w-full" />
+            </AnimCanvas>
           }
         />
       </BentoGrid>
