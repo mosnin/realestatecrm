@@ -42,7 +42,15 @@ const INTRO_TO_MARK = 2100;
 const INTRO_TO_GONE = 3700;
 const INTRO_SAFETY = 6000;
 
-export function OnboardingIntro({ onDone }: { onDone: () => void }) {
+export function OnboardingIntro({
+  onDone,
+  line = INTRO_LINE,
+}: {
+  onDone: () => void;
+  /** The cold-open title line. Defaults to the realtor copy; the brokerage
+   *  flow passes its own. */
+  line?: string;
+}) {
   const [stage, setStage] = useState<'line' | 'mark' | 'gone'>('line');
   const reduce = useReducedMotion();
 
@@ -93,7 +101,7 @@ export function OnboardingIntro({ onDone }: { onDone: () => void }) {
                 transition={{ duration: 0.8, ease: EASE }}
                 {...rise}
               >
-                {INTRO_LINE}
+                {line}
               </motion.h1>
             ) : (
               <motion.div
@@ -125,7 +133,17 @@ const READY_SAFETY_MS = 8000;
  * in and out one at a time - then the final line lands and the overlay
  * dissolves into whatever the parent renders next (the dashboard).
  */
-export function OnboardingReady({ onDone }: { onDone: () => void }) {
+export function OnboardingReady({
+  onDone,
+  words = READY_WORDS,
+  finalLine = READY_FINAL,
+}: {
+  onDone: () => void;
+  /** The working-words that flash one at a time. Defaults to the realtor set. */
+  words?: readonly string[];
+  /** The line that lands before the dissolve. Defaults to the realtor copy. */
+  finalLine?: string;
+}) {
   // -1 → not started; 0..n-1 → working words; n → final line; 'gone' handled
   // by `done`.
   const [index, setIndex] = useState(0);
@@ -137,22 +155,22 @@ export function OnboardingReady({ onDone }: { onDone: () => void }) {
     const wordMs = reduce ? 420 : WORD_MS;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    READY_WORDS.forEach((_, i) => {
+    words.forEach((_, i) => {
       timers.push(setTimeout(() => setIndex(i), i * wordMs));
     });
     // After the last word, show the final line.
-    timers.push(setTimeout(() => setShowFinal(true), READY_WORDS.length * wordMs));
+    timers.push(setTimeout(() => setShowFinal(true), words.length * wordMs));
     // Then dissolve.
     timers.push(
       setTimeout(
         () => setGone(true),
-        READY_WORDS.length * wordMs + (reduce ? 700 : FINAL_HOLD_MS),
+        words.length * wordMs + (reduce ? 700 : FINAL_HOLD_MS),
       ),
     );
     // Safety: never trap the redirect.
     timers.push(setTimeout(() => setGone(true), READY_SAFETY_MS));
     return () => timers.forEach(clearTimeout);
-  }, [reduce]);
+  }, [reduce, words]);
 
   useEffect(() => {
     if (gone) return;
@@ -192,7 +210,7 @@ export function OnboardingReady({ onDone }: { onDone: () => void }) {
                   className="text-3xl tracking-tight sm:text-[2.5rem]"
                   style={{ fontFamily: 'var(--font-title)' }}
                 >
-                  {READY_FINAL}
+                  {finalLine}
                 </p>
                 <BrandLogo className="h-5 opacity-80" alt="Chippi" />
               </motion.div>
@@ -204,7 +222,7 @@ export function OnboardingReady({ onDone }: { onDone: () => void }) {
                 transition={{ duration: 0.4, ease: EASE }}
                 {...rise}
               >
-                {READY_WORDS[index]}
+                {words[index]}
               </motion.p>
             )}
           </AnimatePresence>

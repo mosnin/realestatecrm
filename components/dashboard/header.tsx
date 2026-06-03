@@ -24,6 +24,7 @@ import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SearchPill, WorkspaceSwitcher } from '@/components/dashboard/sidebar';
+import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
@@ -458,6 +459,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
               {!isBrokerOnly && slug && (
                 <Link
                   href={base}
+                  onClick={() => triggerAccountSwitch()}
                   className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${spaceName}`}
                 >
@@ -476,6 +478,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
               {isBroker && brokerageName && (
                 <Link
                   href="/broker"
+                  onClick={() => triggerAccountSwitch()}
                   className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${brokerageName}`}
                 >

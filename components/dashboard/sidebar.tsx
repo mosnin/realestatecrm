@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
@@ -579,6 +580,7 @@ function WorkspaceSwitcherRows({
           <Link
             key={w.key}
             href={w.href}
+            onClick={() => { if (!w.isCurrent) triggerAccountSwitch(); }}
             className={cn(
               'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
               w.isCurrent

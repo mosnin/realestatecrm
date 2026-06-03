@@ -13,9 +13,9 @@ import {
   Users2,
   Wallet,
 } from 'lucide-react';
-import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { cn } from '@/lib/utils';
 import { OnboardingShell } from './onboarding-shell';
+import { OnboardingIntro, OnboardingReady } from './onboarding-cinematics';
 import {
   MultiFieldStep,
   PhotoStep,
@@ -25,6 +25,13 @@ import {
   TilesStep,
   type TileOption,
 } from './onboarding-steps';
+
+// ── Brokerage cinematics copy ───────────────────────────────────────────────
+// The brokerage flow gets its OWN bookend preloaders (separate from the
+// realtor cold open), built on the same OnboardingIntro / OnboardingReady
+// engine. Module-level so their array identity is stable across renders.
+const BROKER_INTRO_LINE = 'Introducing the future of brokerage software.';
+const BROKER_READY_WORDS = ['Building.', 'Wiring.', 'Done.'] as const;
 
 // ── Role ───────────────────────────────────────────────────────────────────
 
@@ -178,7 +185,6 @@ interface OnboardingFlowProps {
 
 export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: OnboardingFlowProps) {
   const router = useRouter();
-  const confettiRef = useRef<ConfettiRef>(null);
   const [values, setValues] = useState<FormValues>({
     name: defaultName || '',
     role: null,
@@ -202,6 +208,11 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
   });
   const [stepIndex, setStepIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  // Cinematic bookends. 'intro' plays the cold open, 'flow' is the form,
+  // 'ready' plays the closing preloader which then redirects.
+  const [phase, setPhase] = useState<'intro' | 'flow' | 'ready'>('intro');
+  const redirectRef = useRef<string | null>(null);
 
   const set = useCallback(
     <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
@@ -284,9 +295,8 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         });
         if (!completeRes.ok) throw await errorFrom(completeRes);
 
-        confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        await sleep(800);
-        router.push('/broker');
+        redirectRef.current = '/broker';
+        setPhase('ready');
         return;
       }
 
@@ -364,14 +374,10 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       });
       if (!completeRes.ok) throw await errorFrom(completeRes);
 
-      confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-      await sleep(800);
-      if (role === 'broker') {
-        router.push('/broker');
-      } else {
-        const finalSlug: string = spaceData.slug ?? values.slug;
-        router.push(`/s/${finalSlug}`);
-      }
+      redirectRef.current = role === 'broker'
+        ? '/broker'
+        : `/s/${(spaceData.slug as string) ?? values.slug}`;
+      setPhase('ready');
     } catch (err) {
       const msg = err instanceof Error ? err.message : "That tripped me up. Try again.";
       toast.error(msg);
@@ -379,15 +385,19 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
     }
   }
 
+  // Cold open — the brokerage cinematic preloader, before the form.
+  if (phase === 'intro') {
+    return <OnboardingIntro line={BROKER_INTRO_LINE} onDone={() => setPhase('flow')} />;
+  }
+
   return (
+    <>
     <OnboardingShell
       stepIndex={stepIndex}
       totalSteps={totalSteps}
       stepKey={stepId}
       onBack={stepIndex > 0 && !submitting ? goBack : undefined}
     >
-      <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] h-full w-full" />
-
       {stepId === 'role-and-timezone' && (
         <RoleAndTimezoneStep
           role={values.role}
@@ -592,6 +602,15 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         />
       )}
     </OnboardingShell>
+
+    {phase === 'ready' && (
+      <OnboardingReady
+        words={BROKER_READY_WORDS}
+        finalLine={values.role === 'realtor' ? 'Your account is ready.' : 'Your brokerage is ready.'}
+        onDone={() => { if (redirectRef.current) router.push(redirectRef.current); }}
+      />
+    )}
+    </>
   );
 }
 
@@ -728,8 +747,4 @@ function brokerCreateBody(v: FormValues) {
 async function errorFrom(res: Response) {
   const data = await res.json().catch(() => ({}));
   return new Error(data?.error || `Request failed (${res.status})`);
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
