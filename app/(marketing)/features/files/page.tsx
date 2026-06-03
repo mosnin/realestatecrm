@@ -8,8 +8,8 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import { FilesDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Files — Chippi' };
 
@@ -38,10 +38,7 @@ export default function FeaturesFilesPage() {
           'Full-text search.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Files browser — sidebar of folders, grid of files."
-        />
+        <FilesDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
@@ -55,14 +52,11 @@ export default function FeaturesFilesPage() {
           'Share link with expiry.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="File preview side panel — PDF rendered, annotation toolbar."
-        />
+        <FilesDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
-        side="right"
+        stacked
         eyebrow="HISTORY"
         title="Versioned, not overwritten."
         sub="Upload a new version; the old one stays. Open the version that matters. Pin the final."
@@ -71,12 +65,7 @@ export default function FeaturesFilesPage() {
           'Diff between versions.',
           'Pin the final version per deal.',
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Version list — old versions with timestamp, pinned-final marker."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked

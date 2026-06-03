@@ -9,7 +9,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TemplateAdaptDiagram } from '@/components/marketing/diagrams';
 
@@ -39,10 +38,7 @@ export default function TeamsTemplatesPage() {
           'Version history per template.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Template library list with category sidebar."
-        />
+        <TemplateAdaptDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -60,7 +56,7 @@ export default function TeamsTemplatesPage() {
       </MarketingSection>
 
       <MarketingSection
-        side="right"
+        stacked
         eyebrow="COMPLIANCE"
         title="Locked for the moments that matter."
         sub="Some replies have legal language. Lock the template; the realtors can fill the blanks but can't break the spine."
@@ -69,12 +65,7 @@ export default function TeamsTemplatesPage() {
           'Edit log per template.',
           'Required-fields enforcement.',
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="A locked template — fields highlighted as fillable, spine grayed."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked

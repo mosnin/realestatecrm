@@ -38,8 +38,11 @@ export interface MarketingScrollNarrativeStep {
   title: string;
   /** Optional one-sentence subtitle. */
   sub?: string;
-  /** Plain-language description of the media that belongs in the slot. */
-  mediaDescription: string;
+  /** Real media for the step — an animated diagram. Preferred. */
+  media?: React.ReactNode;
+  /** Fallback plain-language description, rendered as a placeholder slot
+   *  only when `media` is absent. A finished step ships `media`. */
+  mediaDescription?: string;
 }
 
 export interface MarketingScrollNarrativeProps {
@@ -117,10 +120,12 @@ export function MarketingScrollNarrative({
                   variants={MARKETING_REVEAL}
                   className={cn(side === 'right' ? 'md:order-2' : 'md:order-1')}
                 >
-                  <MarketingMediaSlot
-                    aspect="video"
-                    description={step.mediaDescription}
-                  />
+                  {step.media ?? (
+                    <MarketingMediaSlot
+                      aspect="video"
+                      description={step.mediaDescription ?? ''}
+                    />
+                  )}
                 </motion.div>
               </div>
             </div>

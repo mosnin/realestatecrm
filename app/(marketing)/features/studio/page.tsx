@@ -8,9 +8,13 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingScrollNarrative } from '@/components/marketing/marketing-scroll-narrative';
+import {
+  StudioDiagram,
+  TemplateAdaptDiagram,
+  CalendarBookingDiagram,
+} from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Studio — Chippi' };
 
@@ -24,10 +28,7 @@ export default function FeaturesStudioPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Studio — generate listing copy → preview → schedule to channels."
-        />
+        <StudioDiagram aspect="video" />
       </MarketingHero>
 
       {/* The Studio workflow renders as a sequenced narrative — STEP 01
@@ -42,22 +43,19 @@ export default function FeaturesStudioPage() {
             eyebrow: 'CREATE',
             title: 'Generate. Preview. Approve.',
             sub: 'From a property record, Chippi drafts the listing copy, the email blast, and the social post. You edit; you approve; you schedule.',
-            mediaDescription:
-              'Generate panel — input field, generate button, preview panel sliding in with the drafted copy.',
+            media: <StudioDiagram aspect="video" />,
           },
           {
             eyebrow: 'EDIT',
             title: 'The polished version, side-by-side.',
             sub: 'Generated copy on the left. Your edits on the right. Diff highlighted so you see exactly what changed.',
-            mediaDescription:
-              'Two-pane editor — generated vs edited, diff markers between, per-channel character limits ticking.',
+            media: <TemplateAdaptDiagram aspect="video" />,
           },
           {
             eyebrow: 'SCHEDULE',
             title: 'When to post. Where to post.',
             sub: "Schedule to Instagram, Facebook, LinkedIn, and your email list. Calendar view shows what's queued.",
-            mediaDescription:
-              'Schedule panel — calendar week view, channels checkbox column, queue visualization with the post scheduled into a slot.',
+            media: <CalendarBookingDiagram aspect="video" />,
           },
         ]}
       />

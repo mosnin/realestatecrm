@@ -10,10 +10,9 @@
 import { Mail, AtSign, MessageCircle, MessageSquare, MessagesSquare, Plus } from 'lucide-react';
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
-import { ComposerDraftDiagram } from '@/components/marketing/diagrams';
+import { ComposerDraftDiagram, InboxDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Communication — Chippi' };
 
@@ -41,10 +40,7 @@ export default function FeaturesCommunicationPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Inbox list — threads, star indicators, unread count."
-        />
+        <InboxDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -58,25 +54,15 @@ export default function FeaturesCommunicationPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Email read view — large serif subject, body below, action row above body."
-        />
+        <ComposerDraftDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
         eyebrow="THE DRAFT"
         title="Chippi drafts. You approve."
-        sub="Open a thread; Chippi has the reply ready. Read it, edit it, send it. Or discard."
-        bullets={[
-          'Pre-drafted on thread open.',
-          'Edit in the composer.',
-          'Agent never sends without your tap.',
-        ]}
-        side="right"
-      >
-        <ComposerDraftDiagram aspect="square" />
-      </MarketingSection>
+        sub="Open a thread; Chippi has the reply ready. Read it, edit it, send it — or discard. Nothing leaves without your tap."
+        stacked
+      />
 
       <MarketingIntegrations
         eyebrow="WHAT WE CONNECT"

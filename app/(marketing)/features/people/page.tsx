@@ -8,7 +8,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import {
   TimelineDiagram,
@@ -41,10 +40,7 @@ export default function FeaturesPeoplePage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Contact detail panel — info fields top, recent activity below."
-        />
+        <TimelineDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection

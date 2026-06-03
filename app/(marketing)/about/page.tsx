@@ -11,20 +11,19 @@
  * - No exclamation marks anywhere.
  * - No marketing-speak ("revolutionary", "transformative", "AI-powered").
  * - Brand orange does not decorate this page.
- * - All media is a MarketingMediaSlot — no stock photos, no posed founder
- *   headshots.
+ * - Media is the real animated product (the Chippi composer diagram) — no
+ *   stock photos, no posed founder headshots.
  *
- * The pull-quote and stat-row blocks use the shared marketing primitives
- * (`MarketingQuote`, `MarketingStatRow`) so every page renders the same
- * typographic moments the same way. The primitives carry their own
- * vertical breath — no extra section wrappers needed.
+ * The pull-quote uses the shared `MarketingQuote` primitive so every page
+ * renders the same typographic moment the same way. We deliberately ship no
+ * stat row here — there are no numbers we can defend yet (see belief #4).
  */
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingQuote } from '@/components/marketing/marketing-quote';
+import { ComposerDraftDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'About — Chippi' };
 
@@ -41,10 +40,7 @@ export default function AboutPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="About hero — a horizontal photograph of the team or the office. Calm, paper-flat, no posed corporate look."
-        />
+        <ComposerDraftDiagram aspect="wide" />
       </MarketingHero>
 
       {/* 2. The one idea — words are the point. */}
@@ -76,24 +72,16 @@ export default function AboutPage() {
         title="The agent asks before it acts."
         sub="Chippi never autonomously sends mail, books a tour, or changes a record. By default, every move is yours to approve. You can grant per-tool autonomy later — but the default is humans in the loop, and that's where the trust lives."
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Approval panel screenshot — pending action with Approve and Decline buttons."
-        />
+        <ComposerDraftDiagram aspect="square" />
       </MarketingSection>
 
-      {/* 6. Third belief — side-by-side with signature triptych. */}
+      {/* 6. Third belief — words carry it; the signature lives in the product. */}
       <MarketingSection
-        side="left"
+        stacked
         eyebrow="WHAT WE BELIEVE"
         title="Chippi has one voice."
         sub="Wherever Chippi appears — a draft card, a toast, an activity row — the same orange-on-serif signature carries through. Nothing else does. It's how the realtor learns to trust the agent across surfaces."
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Three small product moments side-by-side showing the Chippi signature — composer, toast, activity row."
-        />
-      </MarketingSection>
+      />
 
       {/* 7. Fourth belief — replaces the made-up stat row. We don't ship
               marketing-claim numbers dressed as data; when there's a number

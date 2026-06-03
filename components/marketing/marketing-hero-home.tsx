@@ -1,24 +1,34 @@
 'use client';
 
 /**
- * `<MarketingHeroHome>` — the full-bleed opening hero for the logged-out
- * homepage (`/`). Adapted from an "aero" hero reference (full-screen image,
- * dark overlay, vertical grid divider lines, centered headline, animated-arrow
- * CTA) but rebuilt ON-BRAND for Chippi: serif headline (--font-title), the
- * brand orange (--brand #ff964f) on the CTA, real-estate imagery, and our own
- * primitives — no @base-ui Button, no foreign theme tokens.
+ * `<MarketingHeroHome>` — the opening hero for the logged-out homepage (`/`).
  *
- * Lives in components/marketing/ (not /components/ui) because it's a marketing
- * composition, not a reusable shadcn primitive. The shared <MarketingHero>
- * (used on ~10 other marketing pages) is deliberately left untouched.
+ * Premium/luxury rebuild. The old hero was a full-bleed stock photo with a
+ * dark overlay and an orange CTA pill — the real-estate-website cliché, and a
+ * break of our own foreground-button rule. This replaces it with the move the
+ * best software sites make: lead with the product.
  *
- * Text is white over a dark-overlaid image, so it reads identically in light
- * and dark. Entrance fades up on the Apple curve; honors reduced-motion.
+ * The composition:
+ *   - Centered serif headline (--font-title) + one-sentence sub.
+ *   - A FOREGROUND primary CTA (PRIMARY_PILL) — no orange, per the brand rule.
+ *   - The live product surface floating below in an app-window frame: a real
+ *     animated Chippi diagram inside a hairline-bordered window with a soft
+ *     shadow and a gradient floor settling it into the page.
+ *
+ * No photo. No foreign theme tokens. Brand orange stays scarce — it appears
+ * only where Chippi authors something inside the product surface, never on the
+ * chrome. The backdrop is a single neutral radial so the product reads as lit,
+ * not decorated.
+ *
+ * Entrance fades up on the Apple curve; the window lands a beat after the
+ * words. Honors reduced-motion.
  */
 
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
+import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import { ComposerDraftDiagram } from '@/components/marketing/diagrams';
 
 export interface HeroCta {
   label: string;
@@ -31,15 +41,9 @@ export interface MarketingHeroHomeProps {
   sub?: string;
   primaryCta: HeroCta;
   secondaryCta?: HeroCta;
-  /** Full-bleed background image. Defaults to a modern-home photo. */
-  imageUrl?: string;
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-
-// A modern luxury home — served locally from /public (no external dependency,
-// satisfies the 'self' img-src CSP). Swap the file to rebrand the hero.
-const DEFAULT_IMAGE = '/marketing/home-hero.jpg';
 
 export function MarketingHeroHome({
   eyebrow,
@@ -47,7 +51,6 @@ export function MarketingHeroHome({
   sub,
   primaryCta,
   secondaryCta,
-  imageUrl = DEFAULT_IMAGE,
 }: MarketingHeroHomeProps) {
   const reduce = useReducedMotion();
 
@@ -58,99 +61,138 @@ export function MarketingHeroHome({
         show: { opacity: 1, y: 0 },
       };
   const container: Variants = {
-    show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+    show: { transition: { staggerChildren: 0.08, delayChildren: 0.04 } },
   };
+  const frameRise: Variants = reduce
+    ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
+    : { hidden: { opacity: 0, y: 28 }, show: { opacity: 1, y: 0 } };
 
   return (
-    <section className="relative flex h-[92vh] min-h-[600px] w-full items-center justify-center overflow-hidden">
-      {/* Background image + overlays */}
+    <section className="relative overflow-hidden">
+      {/* Backdrop — a single neutral radial spotlight so the product window
+          reads as lit. No photo, no orange, no gradient parade. */}
       <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${imageUrl})` }}
-      >
-        <div className="absolute inset-0 bg-black/55" />
-        {/* Settle the image into the page below the fold. */}
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-black/45" />
-      </div>
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(60% 55% at 50% 12%, rgba(120,120,128,0.10), transparent 70%)',
+        }}
+      />
+      {/* Faint top hairline grid — the only structural flourish, barely there. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-border/50"
+      />
 
-      {/* Signature aero grid divider lines (asymmetric, framing the center). */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-10">
-        <div className="grid h-full w-full grid-cols-12 divide-x divide-white/[0.12]">
-          <div className="col-span-1 h-full" />
-          <div className="col-span-3 h-full" />
-          <div className="col-span-4 h-full" />
-          <div className="col-span-3 h-full" />
-          <div className="col-span-1 h-full" />
-        </div>
-      </div>
-
-      {/* Content */}
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="relative z-20 mx-auto max-w-4xl px-6 text-center text-white"
-      >
-        {eyebrow && (
-          <motion.p
-            variants={rise}
-            transition={{ duration: 0.5, ease: EASE }}
-            className="mb-5 text-xs font-medium uppercase tracking-[0.22em] text-white/70"
-          >
-            {eyebrow}
-          </motion.p>
-        )}
-
-        <motion.h1
-          variants={rise}
-          transition={{ duration: 0.6, ease: EASE }}
-          className="text-balance text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl lg:text-7xl"
-          style={{ fontFamily: 'var(--font-title)' }}
+      <div className="relative mx-auto max-w-6xl px-6 md:px-8 pt-24 pb-16 md:pt-32 md:pb-24">
+        {/* Words */}
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="mx-auto max-w-3xl text-center"
         >
-          {title}
-        </motion.h1>
+          {eyebrow && (
+            <motion.p
+              variants={rise}
+              transition={{ duration: 0.5, ease: EASE }}
+              className="mb-5 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground"
+            >
+              {eyebrow}
+            </motion.p>
+          )}
 
-        {sub && (
-          <motion.p
+          <motion.h1
             variants={rise}
             transition={{ duration: 0.6, ease: EASE }}
-            className="mx-auto mt-6 max-w-2xl text-lg font-light text-white/85 md:text-xl"
+            style={TITLE_FONT}
+            className="text-balance text-[44px] leading-[1.04] tracking-[-0.02em] text-foreground sm:text-6xl md:text-[72px]"
           >
-            {sub}
-          </motion.p>
-        )}
+            {title}
+          </motion.h1>
 
-        <motion.div
-          variants={rise}
-          transition={{ duration: 0.6, ease: EASE }}
-          className="mt-10 flex flex-col items-center justify-center gap-5 sm:flex-row"
-        >
-          {/* Primary CTA — two-piece pill with the animated arrow swap, in
-              Chippi orange; inverts to near-black on hover. */}
-          <Link
-            href={primaryCta.href}
-            aria-label={primaryCta.label}
-            className="group flex items-center gap-1"
-          >
-            <span className="rounded-full bg-[#ff964f] px-7 py-3.5 font-medium text-[#1b1206] transition-colors duration-500 ease-in-out group-hover:bg-[#111113] group-hover:text-[#ff964f]">
-              {primaryCta.label}
-            </span>
-            <span className="relative flex h-[52px] w-[52px] items-center overflow-hidden rounded-full bg-[#ff964f] text-[#1b1206] transition-colors duration-500 ease-in-out group-hover:bg-[#111113] group-hover:text-[#ff964f]">
-              <ArrowUpRight className="absolute left-1/2 h-5 w-5 -translate-x-1/2 transition-transform duration-500 ease-in-out group-hover:translate-x-12" />
-              <ArrowUpRight className="absolute left-1/2 h-5 w-5 -translate-x-12 transition-transform duration-500 ease-in-out group-hover:-translate-x-1/2" />
-            </span>
-          </Link>
-
-          {secondaryCta && (
-            <Link
-              href={secondaryCta.href}
-              className="text-sm font-medium text-white/80 underline-offset-4 transition-colors hover:text-white hover:underline"
+          {sub && (
+            <motion.p
+              variants={rise}
+              transition={{ duration: 0.6, ease: EASE }}
+              className="mx-auto mt-6 max-w-2xl text-lg leading-snug text-muted-foreground md:text-xl"
             >
-              {secondaryCta.label}
-            </Link>
+              {sub}
+            </motion.p>
           )}
+
+          <motion.div
+            variants={rise}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            <Link href={primaryCta.href} className={PRIMARY_PILL}>
+              {primaryCta.label}
+            </Link>
+            {secondaryCta && (
+              <Link href={secondaryCta.href} className={GHOST_PILL}>
+                {secondaryCta.label} <span aria-hidden>→</span>
+              </Link>
+            )}
+          </motion.div>
         </motion.div>
-      </motion.div>
+
+        {/* Product surface — the hero's real subject. A live Chippi diagram
+            framed in an app window that floats above a gradient floor. */}
+        <motion.div
+          variants={frameRise}
+          initial="hidden"
+          animate="show"
+          transition={{ duration: 0.7, ease: EASE, delay: reduce ? 0 : 0.22 }}
+          className="relative mx-auto mt-16 max-w-4xl md:mt-20"
+        >
+          <ProductWindow>
+            <ComposerDraftDiagram
+              aspect="video"
+              className="rounded-none border-0"
+            />
+          </ProductWindow>
+          {/* Gradient floor — settles the window into the page so it doesn't
+              read as a clipped rectangle. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 -bottom-px h-24 bg-gradient-to-b from-transparent to-background"
+          />
+        </motion.div>
+      </div>
     </section>
+  );
+}
+
+/**
+ * `<ProductWindow>` — the app-window frame the hero product surface lives in.
+ * Hairline border, a slim top bar with the three traffic-light dots and a
+ * faux address, and the one soft shadow the marketing layer is allowed (the
+ * product chrome forbids shadows; this is marketing). The body is borderless
+ * so the framed diagram doesn't double-border.
+ */
+function ProductWindow({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-2xl border border-border/70 bg-background',
+        'shadow-2xl shadow-foreground/[0.08]',
+      )}
+    >
+      <div className="flex h-9 items-center gap-2 border-b border-border/60 px-4">
+        <span aria-hidden className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
+          <span className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
+          <span className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
+        </span>
+        <span className="mx-auto select-none rounded-md bg-foreground/[0.04] px-3 py-1 text-[11px] text-muted-foreground/80">
+          app.chippi.ai
+        </span>
+        {/* Balances the traffic lights so the address sits dead-center. */}
+        <span aria-hidden className="w-[42px]" />
+      </div>
+      {children}
+    </div>
   );
 }

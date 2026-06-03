@@ -27,3 +27,6 @@ export { TeamLeaderboardDiagram } from './team-leaderboard-diagram';
 export { PropertyGridDiagram } from './property-grid-diagram';
 export { TeamMembersDiagram } from './team-members-diagram';
 export { TeamChatDiagram } from './team-chat-diagram';
+export { InboxDiagram } from './inbox-diagram';
+export { FilesDiagram } from './files-diagram';
+export { StudioDiagram } from './studio-diagram';

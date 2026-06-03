@@ -8,7 +8,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import {
   LeadRoutingDiagram,
@@ -55,10 +54,7 @@ export default function TeamsLeadsPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Lead detail with assign-to dropdown open and a brief textarea below."
-        />
+        <LeadRoutingDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection

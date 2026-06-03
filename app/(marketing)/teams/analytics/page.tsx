@@ -10,7 +10,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TeamLeaderboardDiagram } from '@/components/marketing/diagrams';
 
@@ -40,10 +39,7 @@ export default function TeamsAnalyticsPage() {
           'Conversion by source + stage.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="KPI grid — four tiles, big tabular numbers, small-caps labels."
-        />
+        <TeamLeaderboardDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -61,7 +57,7 @@ export default function TeamsAnalyticsPage() {
       </MarketingSection>
 
       <MarketingSection
-        side="right"
+        stacked
         eyebrow="BY DEAL"
         title="Where the dollars are."
         sub="Pipeline by stage. Aging deals flagged. Won/lost reasons captured in plain language so the next deal benefits."
@@ -70,12 +66,7 @@ export default function TeamsAnalyticsPage() {
           'Aging-deal alerts.',
           'Win/loss reasons in plain English.',
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Pipeline funnel chart — paper-flat, no glow, hairline divisions."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked

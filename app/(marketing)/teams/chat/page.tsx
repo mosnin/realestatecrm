@@ -9,7 +9,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TeamChatDiagram } from '@/components/marketing/diagrams';
 
@@ -57,7 +56,7 @@ export default function TeamsChatPage() {
       </MarketingSection>
 
       <MarketingSection
-        side="right"
+        stacked
         eyebrow="OFF-DUTY"
         title="A team room. Without the noise."
         sub="General channels for the floor: industry news, banter, the deal-of-the-week post. Chippi stays out of channels it's not invited to."
@@ -66,12 +65,7 @@ export default function TeamsChatPage() {
           'Reactions and mentions.',
           'Quiet hours per channel.',
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Team chat sidebar — Deals section, General section, an Agents section. Hairline dividers."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked
