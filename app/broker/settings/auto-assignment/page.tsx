@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -32,6 +33,9 @@ type SettingsResponse = {
   lastAssignedUserId: string | null;
   lastAssignedUserName: string | null;
   realtorMemberCount: number;
+  slaEnabled?: boolean;
+  slaFirstResponseMinutes?: number;
+  slaEscalateMinutes?: number;
 };
 
 const METHOD_LABEL: Record<AssignmentMethod, string> = {
@@ -69,6 +73,9 @@ export default function BrokerSettingsAutoAssignmentPage() {
 
   const [enabled, setEnabled] = useState(false);
   const [method, setMethod] = useState<AssignmentMethod>('round_robin');
+  const [slaEnabled, setSlaEnabled] = useState(false);
+  const [slaFirst, setSlaFirst] = useState(60);
+  const [slaEscalate, setSlaEscalate] = useState(120);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -91,6 +98,9 @@ export default function BrokerSettingsAutoAssignmentPage() {
           ? data.assignmentMethod
           : 'round_robin';
       setMethod(nextMethod);
+      setSlaEnabled(Boolean(data.slaEnabled));
+      setSlaFirst(typeof data.slaFirstResponseMinutes === 'number' ? data.slaFirstResponseMinutes : 60);
+      setSlaEscalate(typeof data.slaEscalateMinutes === 'number' ? data.slaEscalateMinutes : 120);
     } catch {
       setLoadError('Network error.');
     } finally {
@@ -106,12 +116,21 @@ export default function BrokerSettingsAutoAssignmentPage() {
     setSaving(true);
     setSaved(false);
     try {
+      if (slaEnabled && slaEscalate < slaFirst) {
+        toast.error('Escalation window must be at least as long as the nudge window.');
+        setSaving(false);
+        return;
+      }
+
       const res = await fetch('/api/broker/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           autoAssignEnabled: enabled,
           assignmentMethod: method,
+          slaEnabled,
+          slaFirstResponseMinutes: slaFirst,
+          slaEscalateMinutes: slaEscalate,
         }),
       });
       if (res.ok) {
@@ -203,6 +222,73 @@ export default function BrokerSettingsAutoAssignmentPage() {
                 </div>
               </div>
             )}
+
+            <div className="pt-6 space-y-5 border-t border-border/60">
+              <p className={SECTION_LABEL}>Speed to lead</p>
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border/60">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium text-foreground">Enforce response times</Label>
+                  <p className={CAPTION}>
+                    Hold realtors to a first-response time. Chippi nudges them, then escalates to you if a lead stays cold.
+                  </p>
+                </div>
+                <Switch checked={slaEnabled} onCheckedChange={setSlaEnabled} />
+              </div>
+
+              {slaEnabled && (
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sla-first" className="text-sm font-medium text-foreground">
+                      Nudge the realtor after
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="sla-first"
+                        type="number"
+                        min={5}
+                        max={1440}
+                        value={slaFirst}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v)) setSlaFirst(Math.min(1440, Math.max(5, v)));
+                        }}
+                        className="w-24 tabular-nums"
+                      />
+                      <span className={CAPTION}>minutes</span>
+                    </div>
+                    <p className={CAPTION}>Between 5 and 1440 minutes (24 hours).</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sla-escalate" className="text-sm font-medium text-foreground">
+                      Escalate to me after
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="sla-escalate"
+                        type="number"
+                        min={5}
+                        max={1440}
+                        value={slaEscalate}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v)) setSlaEscalate(Math.min(1440, Math.max(5, v)));
+                        }}
+                        className="w-24 tabular-nums"
+                      />
+                      <span className={CAPTION}>minutes</span>
+                    </div>
+                    {slaEscalate < slaFirst ? (
+                      <p className="text-xs text-destructive">
+                        Escalation window must be at least as long as the nudge window.
+                      </p>
+                    ) : (
+                      <p className={CAPTION}>Must be at least as long as the nudge window.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="pt-2">
               <button
