@@ -1,6 +1,13 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const rateLimited = () =>
+  NextResponse.json(
+    { error: 'too many requests. try again shortly.' },
+    { status: 429, headers: { 'Retry-After': '60' } },
+  );
 
 async function getConversationAndVerifyOwner(conversationId: string, userId: string) {
   const { data: conv, error } = await supabase
@@ -29,6 +36,9 @@ export async function PATCH(
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { allowed } = await checkRateLimit(`ai:conversations:${userId}`, 20, 60);
+    if (!allowed) return rateLimited();
 
     const { id } = await params;
     const conv = await getConversationAndVerifyOwner(id, userId);
@@ -61,6 +71,9 @@ export async function DELETE(
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { allowed } = await checkRateLimit(`ai:conversations:${userId}`, 20, 60);
+    if (!allowed) return rateLimited();
 
     const { id } = await params;
     const conv = await getConversationAndVerifyOwner(id, userId);

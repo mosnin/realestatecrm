@@ -23,10 +23,17 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
 const CONV_TITLE_PREFIX = '[BROKER_CHIPPI]';
+
+const rateLimited = () =>
+  NextResponse.json(
+    { error: 'too many requests. try again shortly.' },
+    { status: 429, headers: { 'Retry-After': '60' } },
+  );
 
 /** Find the broker_owner's personal Space — broker conversations anchor here. */
 async function resolvePersistenceSpaceId(brokerageOwnerId: string): Promise<string | null> {
@@ -42,6 +49,9 @@ async function resolvePersistenceSpaceId(brokerageOwnerId: string): Promise<stri
 export async function GET(_req: NextRequest) {
   const brokerCtx = await resolveBrokerContext();
   if (!brokerCtx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { allowed } = await checkRateLimit(`ai:broker-conversations:${brokerCtx.brokerage.ownerId}`, 20, 60);
+  if (!allowed) return rateLimited();
 
   const spaceId = await resolvePersistenceSpaceId(brokerCtx.brokerage.ownerId);
   if (!spaceId) return NextResponse.json([]);
@@ -62,6 +72,9 @@ export async function GET(_req: NextRequest) {
 export async function POST(_req: NextRequest) {
   const brokerCtx = await resolveBrokerContext();
   if (!brokerCtx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { allowed } = await checkRateLimit(`ai:broker-conversations:${brokerCtx.brokerage.ownerId}`, 20, 60);
+  if (!allowed) return rateLimited();
 
   const spaceId = await resolvePersistenceSpaceId(brokerCtx.brokerage.ownerId);
   if (!spaceId) {

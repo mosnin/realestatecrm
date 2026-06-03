@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { scoreDynamicApplication } from '@/lib/dynamic-lead-scoring';
 import type { IntakeFormConfig } from '@/lib/types';
 
@@ -26,6 +27,14 @@ export async function POST(req: NextRequest) {
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
+
+  const { allowed } = await checkRateLimit(`ai:score-preview:${auth.userId}`, 20, 60);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'too many requests. try again shortly.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
 
   const formConfig = body.formConfig as IntakeFormConfig | undefined;
   const answers = body.answers as Record<string, string | string[] | number | boolean> | undefined;

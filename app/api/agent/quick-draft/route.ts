@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { getSpaceForUser } from '@/lib/space';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { audit } from '@/lib/audit';
@@ -76,6 +77,14 @@ export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const { allowed } = await checkRateLimit(`ai:quick-draft:${userId}`, 20, 60);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'too many requests. try again shortly.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
 
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
