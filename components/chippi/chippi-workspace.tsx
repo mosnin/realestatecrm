@@ -268,7 +268,7 @@ export function ChippiWorkspace({
       // lands on the same transcript. `replace` so the history doesn't
       // grow a step for every new chat. The base path differs per variant
       // — realtor sits at /s/<slug>/chippi, broker at /broker/chippi.
-      const newConvBase = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+      const newConvBase = isBroker ? '/broker' : `/s/${slug}/chippi`;
       router.replace(`${newConvBase}?conversationId=${id}`, { scroll: false });
     },
   });
@@ -375,7 +375,7 @@ export function ChippiWorkspace({
       const next = new URLSearchParams(searchParams.toString());
       next.delete('view');
       const qs = next.toString();
-      const baseUrl = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+      const baseUrl = isBroker ? '/broker' : `/s/${slug}/chippi`;
       router.replace(`${baseUrl}${qs ? `?${qs}` : ''}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -445,7 +445,7 @@ export function ChippiWorkspace({
 
   // Resolve the route base once. Same URL shape both variants — broker
   // sits at /broker/chippi, realtor at /s/<slug>/chippi.
-  const chippiBaseUrl = isBroker ? '/broker/chippi' : `/s/${slug}/chippi`;
+  const chippiBaseUrl = isBroker ? '/broker' : `/s/${slug}/chippi`;
 
   function handleSelectConversation(conv: Conversation) {
     setDrawerOpen(false);

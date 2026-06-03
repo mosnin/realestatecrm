@@ -35,7 +35,8 @@ import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
-  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true },
+  { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false },
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
@@ -45,7 +46,8 @@ const brokerMobileNavSections = [
   {
     title: 'Overview',
     items: [
-      { href: '/broker', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+      { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true },
+      { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false },
       { href: '/broker/leads', label: 'Leads', icon: Briefcase, exact: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: ListChecks, exact: false },
     ],
