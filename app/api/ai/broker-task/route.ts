@@ -38,6 +38,15 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
+import { z } from 'zod';
+import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
+
+/** Shape guard for the broker chat turn. Body-size cap runs first; this bounds
+ *  the field types. The pre-existing 8000-char message limit is preserved. */
+const brokerTaskBodySchema = z.object({
+  conversationId: z.string().max(200).nullish(),
+  message: z.string().max(20000),
+});
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
@@ -341,12 +350,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.aiText);
+  if (!read.ok) return read.response;
+  const parsed = parseOrBadRequest(brokerTaskBodySchema, read.data);
+  if (!parsed.ok) return parsed.response;
+  const body: PostBody = parsed.data;
 
   const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
   if (!rawMessage) return NextResponse.json({ error: 'message required' }, { status: 400 });

@@ -35,6 +35,7 @@ import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { enrichContext, type EnrichedContext } from '@/lib/ai-tools/context-enrichment';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import {
   composeQuickDraft,
   type Channel,
@@ -89,15 +90,15 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const body = read.data as Body;
 
   if (!body || !ALLOWED_CONTEXTS.includes(body.context) || typeof body.id !== 'string' || !body.id) {
     return NextResponse.json({ error: 'context and id are required' }, { status: 400 });
+  }
+  if (body.id.length > 200) {
+    return NextResponse.json({ error: 'invalid id' }, { status: 400 });
   }
   if (!ALLOWED_INTENTS.includes(body.intent)) {
     return NextResponse.json({ error: 'unknown intent' }, { status: 400 });
@@ -177,8 +178,14 @@ export async function POST(req: NextRequest) {
     if (typeof sendBody.body !== 'string' || sendBody.body.trim().length === 0) {
       return NextResponse.json({ error: 'body required' }, { status: 400 });
     }
+    if (sendBody.body.length > 20000) {
+      return NextResponse.json({ error: 'body too long' }, { status: 400 });
+    }
     if (sendBody.channel === 'email' && (typeof sendBody.subject !== 'string' || !sendBody.subject.trim())) {
       return NextResponse.json({ error: 'subject required for email' }, { status: 400 });
+    }
+    if (typeof sendBody.subject === 'string' && sendBody.subject.length > 1000) {
+      return NextResponse.json({ error: 'subject too long' }, { status: 400 });
     }
 
     // Insert an AgentDraft so the artifact exists in the same audit trail

@@ -54,6 +54,18 @@ import {
 } from '@/lib/chat/multimodal';
 import { resolveChatModel, isOpenRouterConfigured } from '@/lib/llm';
 import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
+import { z } from 'zod';
+import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
+
+/** Shape guard for the chat turn. The body-size cap (lib/validation) runs
+ *  first; this bounds the field types and array lengths. The pre-existing
+ *  8000-char message limit and "required" ordering are preserved below. */
+const taskBodySchema = z.object({
+  spaceSlug: z.string().min(1).max(200),
+  conversationId: z.string().max(200).nullish(),
+  message: z.string().max(20000),
+  attachmentIds: z.array(z.string().max(200)).max(20).optional(),
+});
 
 /** TTL for attachment URLs forwarded to Modal. The agent reads them within
  *  seconds of receiving the task; 30 minutes is plenty of headroom and short
@@ -475,12 +487,11 @@ function proxyModalStream({
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.aiText);
+  if (!read.ok) return read.response;
+  const parsed = parseOrBadRequest(taskBodySchema, read.data);
+  if (!parsed.ok) return parsed.response;
+  const body: PostBody = parsed.data;
   const spaceSlug = typeof body.spaceSlug === 'string' ? body.spaceSlug.trim() : '';
   const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
   if (!spaceSlug) return NextResponse.json({ error: 'spaceSlug required' }, { status: 400 });

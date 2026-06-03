@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
 import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
+
+/** TTS input is truncated to 4096 chars below; cap the field before that so a
+ *  multi-megabyte string can't be parsed into memory first. */
+const speakBodySchema = z.object({
+  text: z.string().min(1).max(8000),
+});
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -14,10 +22,11 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   try {
-    const { text } = await req.json();
-    if (!text || typeof text !== 'string') {
-      return NextResponse.json({ error: 'Text required' }, { status: 400 });
-    }
+    const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+    if (!read.ok) return read.response;
+    const parsed = parseOrBadRequest(speakBodySchema, read.data);
+    if (!parsed.ok) return parsed.response;
+    const { text } = parsed.data;
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
