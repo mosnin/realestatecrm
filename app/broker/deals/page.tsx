@@ -1,10 +1,18 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { supabase } from '@/lib/supabase';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM, SECTION_LABEL, META } from '@/lib/typography';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  SECTION_RHYTHM,
+  SECTION_LABEL,
+  META,
+} from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { Building2 } from 'lucide-react';
@@ -63,6 +71,56 @@ const STATUS_PILL: Record<string, { label: string; classes: string }> = {
   },
 };
 
+// Grouping — broker sees deals in attention order, not alphabetical.
+// Leading with deals that need eyes: stuck and at-risk active first,
+// then on-track active, then won/on-hold/lost at the bottom.
+type GroupKey = 'needs-attention' | 'active' | 'won' | 'on_hold' | 'lost';
+
+const GROUP_META: Record<
+  GroupKey,
+  { label: string; description: string }
+> = {
+  'needs-attention': {
+    label: 'Needs attention',
+    description: 'Stuck or at-risk active deals',
+  },
+  active: {
+    label: 'On track',
+    description: 'Active deals moving forward',
+  },
+  won: { label: 'Won', description: 'Closed and won' },
+  on_hold: { label: 'On hold', description: 'Paused or pending' },
+  lost: { label: 'Lost', description: 'Closed and lost' },
+};
+
+const GROUP_ORDER: GroupKey[] = [
+  'needs-attention',
+  'active',
+  'won',
+  'on_hold',
+  'lost',
+];
+
+// ── Enriched deal ────────────────────────────────────────────────────────────
+
+type EnrichedDeal = {
+  id: string;
+  title: string;
+  address: string | null;
+  value: number | null;
+  status: string;
+  stageName: string;
+  stageColor: string;
+  realtorName: string;
+  healthDotClass: string;
+  healthLabel: string;
+  healthReason: string;
+  healthState: 'on-track' | 'at-risk' | 'stuck';
+  closeDate: string | null;
+  createdAt: string;
+  group: GroupKey;
+};
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function BrokerDealsPage() {
@@ -72,22 +130,42 @@ export default async function BrokerDealsPage() {
 
   const { brokerage } = ctx;
 
-  // Resolve all realtor members (same pattern as broker pipeline).
-  const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
-  const members = allMembers.filter((m) => m.role === 'realtor_member');
+  // Resolve ALL brokerage members — same pattern as broker/people/page.tsx.
+  // Includes owners, admins, and realtor_members. The old filter that scoped
+  // only to realtor_member was silently dropping the owner's and admins' deals.
+  const allMembers = await getBrokerageMembers(brokerage.id, {
+    includeSpaceName: true,
+  });
 
-  const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
+  const memberSpaceIds = allMembers
+    .map((m) => m.Space?.id)
+    .filter(Boolean) as string[];
 
-  // Build spaceId → realtor name lookup.
-  const spaceToRealtor = new Map<string, string>();
-  for (const m of members) {
-    const name = m.User?.name ?? m.User?.email ?? 'Unknown';
-    if (m.Space?.id) {
-      spaceToRealtor.set(m.Space.id, name);
-    }
+  // Belt-and-suspenders: if the owner has a space not in memberships, include it.
+  const ownerSpaceIds: string[] = [];
+  if (memberSpaceIds.length === 0) {
+    const { data: ownerSpaces } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('ownerId', brokerage.ownerId)
+      .limit(10);
+    ownerSpaceIds.push(
+      ...((ownerSpaces ?? []).map((s: { id: string }) => s.id)),
+    );
   }
 
-  // Fetch all deals across member spaces — newest/active first, capped at 5000.
+  const spaceIds = [...new Set([...memberSpaceIds, ...ownerSpaceIds])];
+
+  // Build spaceId → realtor name lookup across all members.
+  const spaceToRealtor = new Map<string, string>();
+  for (const m of allMembers) {
+    const sid = m.Space?.id;
+    if (!sid) continue;
+    spaceToRealtor.set(sid, m.User?.name ?? m.User?.email ?? 'Unknown');
+  }
+
+  // Fetch all deals across member spaces. Active first so the broker sees
+  // live pipeline before closed/lost; capped at 5000.
   const { data: dealsRaw } = spaceIds.length > 0
     ? await supabase
         .from('Deal')
@@ -114,26 +192,12 @@ export default async function BrokerDealsPage() {
     stageMap.set(s.id, s);
   }
 
-  // ── Enrich deals ──────────────────────────────────────────────────────────
-
-  type EnrichedDeal = {
-    id: string;
-    title: string;
-    address: string | null;
-    value: number | null;
-    status: string;
-    stageName: string;
-    stageColor: string;
-    realtorName: string;
-    healthDotClass: string;
-    healthLabel: string;
-    closeDate: string | null;
-    createdAt: string;
-  };
+  // ── Enrich + classify deals ───────────────────────────────────────────────
 
   let totalValue = 0;
   let activeCount = 0;
   let wonCount = 0;
+  let needsAttentionCount = 0;
 
   const enriched: EnrichedDeal[] = [];
 
@@ -156,6 +220,20 @@ export default async function BrokerDealsPage() {
     if (d.status === 'active') activeCount += 1;
     if (d.status === 'won') wonCount += 1;
 
+    // Classify into attention group.
+    let group: GroupKey;
+    if (
+      d.status === 'active' &&
+      (health.state === 'stuck' || health.state === 'at-risk')
+    ) {
+      group = 'needs-attention';
+      needsAttentionCount += 1;
+    } else if (d.status === 'active') {
+      group = 'active';
+    } else {
+      group = d.status as GroupKey;
+    }
+
     enriched.push({
       id: d.id,
       title: d.title,
@@ -167,8 +245,30 @@ export default async function BrokerDealsPage() {
       realtorName: spaceToRealtor.get(d.spaceId) ?? 'Unknown',
       healthDotClass: healthMeta.dotClass,
       healthLabel: healthMeta.label,
+      healthReason: health.reason,
+      healthState: health.state,
       closeDate: d.closeDate,
       createdAt: d.createdAt,
+      group,
+    });
+  }
+
+  // Group and sort: within each group, at-risk/stuck precede on-track;
+  // within same health tier, higher value first.
+  const groups = new Map<GroupKey, EnrichedDeal[]>();
+  for (const g of GROUP_ORDER) groups.set(g, []);
+
+  for (const deal of enriched) {
+    groups.get(deal.group)?.push(deal);
+  }
+
+  // Sort within each group by health urgency then value descending.
+  const HEALTH_RANK: Record<string, number> = { stuck: 0, 'at-risk': 1, 'on-track': 2 };
+  for (const [, list] of groups) {
+    list.sort((a, b) => {
+      const hr = (HEALTH_RANK[a.healthState] ?? 2) - (HEALTH_RANK[b.healthState] ?? 2);
+      if (hr !== 0) return hr;
+      return (b.value ?? 0) - (a.value ?? 0);
     });
   }
 
@@ -182,20 +282,26 @@ export default async function BrokerDealsPage() {
         `${formatCompact(totalValue)} across ${activeCount} active ${activeCount === 1 ? 'deal' : 'deals'}`,
       );
     }
+    if (needsAttentionCount > 0) {
+      parts.push(
+        `${needsAttentionCount} ${needsAttentionCount === 1 ? 'deal needs' : 'deals need'} attention`,
+      );
+    }
     if (wonCount > 0) {
       parts.push(`${wonCount} won`);
     }
     if (parts.length === 0) return 'Every deal across your brokerage.';
-    return `${parts.join(' · ')}.`;
+    return `${parts.join(', ')}.`;
   })();
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   const isEmpty = enriched.length === 0;
+  const activeGroups = GROUP_ORDER.filter((g) => (groups.get(g)?.length ?? 0) > 0);
 
   return (
     <div className={cn('max-w-5xl mx-auto pb-56 md:pb-24', SECTION_RHYTHM)}>
-      {/* Status-sentence header — serif H1 + one-line status, per STYLESHEET §The status-sentence pattern */}
+      {/* Status-sentence header — per STYLESHEET §The status-sentence pattern */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Brokerage.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
@@ -205,7 +311,7 @@ export default async function BrokerDealsPage() {
       </header>
 
       {isEmpty ? (
-        /* Empty state — dashed-border house style per STYLESHEET §Empty states */
+        /* Empty state — per STYLESHEET §Empty states */
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <div className="flex justify-center mb-3">
             <Building2 size={24} className="text-muted-foreground/40" />
@@ -216,117 +322,144 @@ export default async function BrokerDealsPage() {
           </p>
         </div>
       ) : (
-        /* Row list — divide-y, paper-flat, StaggerList entrance per STYLESHEET §Motion */
-        <div>
-          {/* Column header */}
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 items-center px-1 pb-2">
-            <p className={cn(SECTION_LABEL)}>Deal</p>
-            <p className={cn(SECTION_LABEL, 'text-right w-28')}>Value</p>
-            <p className={cn(SECTION_LABEL, 'w-24')}>Stage</p>
-            <p className={cn(SECTION_LABEL, 'w-16')}>Status</p>
-            <p className={cn(SECTION_LABEL, 'w-32')}>Realtor</p>
-          </div>
+        <div className={SECTION_RHYTHM}>
+          {activeGroups.map((groupKey) => {
+            const deals = groups.get(groupKey) ?? [];
+            if (deals.length === 0) return null;
+            const meta = GROUP_META[groupKey];
 
-          <StaggerList className="divide-y divide-border/60">
-            {enriched.map((deal) => {
-              const statusPill = STATUS_PILL[deal.status] ?? STATUS_PILL.active;
-              const isActive = deal.status === 'active';
+            return (
+              <section key={groupKey}>
+                {/* Section label */}
+                <div className="flex items-baseline gap-2 pb-2 border-b border-border/60">
+                  <p className={SECTION_LABEL}>{meta.label}</p>
+                  <p className={cn(META, 'normal-case tracking-normal')}>
+                    {deals.length}
+                  </p>
+                </div>
 
-              return (
-                <StaggerItem key={deal.id}>
-                  <div
-                    className={cn(
-                      'grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 items-center py-3 px-1',
-                      'transition-colors duration-150 hover:bg-foreground/[0.04]',
-                      deal.status === 'lost' && 'opacity-55',
-                      deal.status === 'on_hold' && 'opacity-70',
-                    )}
-                  >
-                    {/* Deal name + address */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {/* Health dot — only on active deals, mirrors DealCard */}
-                        {isActive && (
-                          <span
-                            className={cn(
-                              'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                              deal.healthDotClass,
-                            )}
-                            title={deal.healthLabel}
-                            aria-label={`Health: ${deal.healthLabel}`}
-                          />
-                        )}
-                        <p
+                {/* Deal cards — card vocabulary per DealCard, paper-flat */}
+                <StaggerList
+                  key={groupKey}
+                  className="divide-y divide-border/60 mt-0"
+                >
+                  {deals.map((deal) => {
+                    const statusPill =
+                      STATUS_PILL[deal.status] ?? STATUS_PILL.active;
+                    const isActive = deal.status === 'active';
+
+                    // Drill-in: prefill the broker Chippi with an audit prompt.
+                    const auditPrompt = `Audit the deal "${deal.title}" owned by ${deal.realtorName}. What needs attention?`;
+                    const drillHref = `/broker?prompt=${encodeURIComponent(auditPrompt)}`;
+
+                    return (
+                      <StaggerItem key={deal.id}>
+                        <Link
+                          href={drillHref}
                           className={cn(
-                            'text-sm font-medium text-foreground truncate',
-                            deal.status === 'lost' && 'line-through text-muted-foreground',
+                            'flex items-start gap-3 py-3 px-1 rounded-sm',
+                            'transition-colors duration-150 hover:bg-foreground/[0.04]',
+                            deal.status === 'lost' && 'opacity-55',
+                            deal.status === 'on_hold' && 'opacity-70',
                           )}
                         >
-                          {deal.title}
-                        </p>
-                      </div>
-                      {deal.address && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {deal.address}
-                        </p>
-                      )}
-                    </div>
+                          {/* Health dot column — only on active deals */}
+                          <div className="flex-shrink-0 w-4 flex items-center justify-center pt-1">
+                            {isActive && (
+                              <span
+                                className={cn(
+                                  'w-1.5 h-1.5 rounded-full',
+                                  deal.healthDotClass,
+                                )}
+                                title={
+                                  deal.healthReason
+                                    ? `${deal.healthLabel}: ${deal.healthReason}`
+                                    : deal.healthLabel
+                                }
+                                aria-label={`Health: ${deal.healthLabel}${
+                                  deal.healthReason ? `, ${deal.healthReason}` : ''
+                                }`}
+                              />
+                            )}
+                          </div>
 
-                    {/* Value — serif tabular-nums, focal note per STYLESHEET */}
-                    <div className="text-right w-28">
-                      {deal.value != null ? (
-                        <p
-                          className="text-sm tabular-nums text-foreground font-medium"
-                          style={TITLE_FONT}
-                        >
-                          {formatCurrency(deal.value)}
-                        </p>
-                      ) : (
-                        <p className={META}>—</p>
-                      )}
-                    </div>
+                          {/* Main content — title, address, meta row */}
+                          <div className="flex-1 min-w-0">
+                            {/* Title */}
+                            <p
+                              className={cn(
+                                'text-sm font-medium text-foreground leading-snug truncate',
+                                deal.status === 'lost' &&
+                                  'line-through text-muted-foreground',
+                              )}
+                            >
+                              {deal.title}
+                            </p>
 
-                    {/* Stage name with color dot */}
-                    <div className="w-24">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: deal.stageColor }}
-                          aria-hidden
-                        />
-                        <p className="text-xs text-muted-foreground truncate">
-                          {deal.stageName}
-                        </p>
-                      </div>
-                    </div>
+                            {/* Address */}
+                            {deal.address && (
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                {deal.address}
+                              </p>
+                            )}
 
-                    {/* Status pill */}
-                    <div className="w-16">
-                      <span
-                        className={cn(
-                          'inline-flex text-xs font-medium rounded-full px-2 py-0.5',
-                          statusPill.classes,
-                        )}
-                      >
-                        {statusPill.label}
-                      </span>
-                    </div>
+                            {/* Meta row: stage dot + name, status pill, realtor */}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              {/* Stage dot + name */}
+                              <span className="inline-flex items-center gap-1 flex-shrink-0">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: deal.stageColor }}
+                                  aria-hidden
+                                />
+                                <span className="text-[11px] text-muted-foreground">
+                                  {deal.stageName}
+                                </span>
+                              </span>
 
-                    {/* Owning realtor */}
-                    <div className="w-32">
-                      <p className="text-xs text-muted-foreground truncate">
-                        {deal.realtorName}
-                      </p>
-                    </div>
-                  </div>
-                </StaggerItem>
-              );
-            })}
-          </StaggerList>
+                              {/* Status pill */}
+                              <span
+                                className={cn(
+                                  'inline-flex text-[10px] font-medium rounded-full px-1.5 py-0.5 flex-shrink-0',
+                                  statusPill.classes,
+                                )}
+                              >
+                                {statusPill.label}
+                              </span>
+
+                              {/* Realtor byline */}
+                              <span className={cn(META, 'normal-case tracking-normal truncate')}>
+                                {deal.realtorName}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Value — serif tabular-nums, focal note per STYLESHEET */}
+                          <div className="flex-shrink-0 text-right pl-2">
+                            {deal.value != null ? (
+                              <p
+                                className="text-sm tabular-nums text-foreground font-medium"
+                                style={TITLE_FONT}
+                              >
+                                {formatCurrency(deal.value)}
+                              </p>
+                            ) : (
+                              <p className={META}></p>
+                            )}
+                          </div>
+                        </Link>
+                      </StaggerItem>
+                    );
+                  })}
+                </StaggerList>
+              </section>
+            );
+          })}
 
           {/* Footer count */}
-          <p className={cn(META, 'pt-4 text-right')}>
-            {enriched.length.toLocaleString()} {enriched.length === 1 ? 'deal' : 'deals'} total
+          <p className={cn(META, 'pt-2 text-right')}>
+            {enriched.length.toLocaleString()}{' '}
+            {enriched.length === 1 ? 'deal' : 'deals'} total
           </p>
         </div>
       )}

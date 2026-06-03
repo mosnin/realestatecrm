@@ -301,7 +301,7 @@ export default async function BrokerBriefPage() {
           No orange wash, no shadow — the surface stays out of the way and the
           invitation is the loud note. */}
       <Link
-        href="/broker/chippi"
+        href="/broker"
         className="group/chippi block rounded-xl border border-border/70 bg-card px-5 py-5 hover:bg-muted/30 transition-colors"
       >
         <div className="flex items-center gap-4">

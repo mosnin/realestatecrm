@@ -8,6 +8,9 @@ import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { supabase } from '@/lib/supabase';
 import { PAGE_MAX } from '@/lib/geometry';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { pickGreeting } from '@/lib/greetings';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Teams — Chippi' };
@@ -134,23 +137,104 @@ export default async function BrokerLayout({ children }: { children: React.React
     }
   }
 
+  // ── Broker's first name (for greeting) ────────────────────────────────────
+  let brokerFirstName = '';
+  try {
+    const { data: brokerUserRow } = await supabase
+      .from('User')
+      .select('name')
+      .eq('id', ctx.dbUserId)
+      .maybeSingle();
+    brokerFirstName = (brokerUserRow?.name ?? '').trim().split(/\s+/)[0] ?? '';
+  } catch {
+    brokerFirstName = '';
+  }
+
+  // ── Brokerage-wide snapshot counts ────────────────────────────────────────
+  // Aggregate across all member spaces (including the owner's own space).
   let unreadLeadCount = 0;
-  if (spaceRow) {
-    try {
-      const { count, error: countError } = await supabase
-        .from('Contact')
-        .select('*', { count: 'exact', head: true })
-        .eq('spaceId', spaceRow.id)
-        .contains('tags', ['new-lead']);
-      if (countError) throw countError;
-      unreadLeadCount = count ?? 0;
-    } catch {
-      unreadLeadCount = 0;
+  let brokerFollowUpsDue = 0;
+  let brokerDraftsReady = 0;
+  try {
+    const allMembers = await getBrokerageMembers(ctx.brokerage.id, { includeSpaceName: true });
+    const memberSpaceIds = allMembers
+      .map((m) => m.Space?.id)
+      .filter((id): id is string => Boolean(id));
+
+    // Also include the owner's own space if not already captured.
+    if (spaceRow && !memberSpaceIds.includes(spaceRow.id as string)) {
+      memberSpaceIds.push(spaceRow.id as string);
     }
+
+    if (memberSpaceIds.length > 0) {
+      const now = new Date().toISOString();
+      const [leadResult, followUpResult, draftResult] = await Promise.all([
+        // new-lead contacts across all member spaces
+        supabase
+          .from('Contact')
+          .select('*', { count: 'exact', head: true })
+          .in('spaceId', memberSpaceIds)
+          .contains('tags', ['new-lead']),
+        // overdue follow-ups on Deal across all member spaces
+        supabase
+          .from('Deal')
+          .select('id', { count: 'exact', head: true })
+          .in('spaceId', memberSpaceIds)
+          .not('followUpAt', 'is', null)
+          .lte('followUpAt', now),
+        // pending AgentDrafts across all member spaces
+        supabase
+          .from('AgentDraft')
+          .select('id', { count: 'exact', head: true })
+          .in('spaceId', memberSpaceIds)
+          .eq('status', 'pending'),
+      ]);
+      unreadLeadCount = leadResult.count ?? 0;
+      brokerFollowUpsDue = followUpResult.count ?? 0;
+      brokerDraftsReady = draftResult.count ?? 0;
+    } else if (spaceRow) {
+      // Fallback: single owner space when member list is empty
+      const now = new Date().toISOString();
+      const [leadResult, followUpResult, draftResult] = await Promise.all([
+        supabase
+          .from('Contact')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', spaceRow.id)
+          .contains('tags', ['new-lead']),
+        supabase
+          .from('Deal')
+          .select('id', { count: 'exact', head: true })
+          .eq('spaceId', spaceRow.id)
+          .not('followUpAt', 'is', null)
+          .lte('followUpAt', now),
+        supabase
+          .from('AgentDraft')
+          .select('id', { count: 'exact', head: true })
+          .eq('spaceId', spaceRow.id)
+          .eq('status', 'pending'),
+      ]);
+      unreadLeadCount = leadResult.count ?? 0;
+      brokerFollowUpsDue = followUpResult.count ?? 0;
+      brokerDraftsReady = draftResult.count ?? 0;
+    }
+  } catch {
+    unreadLeadCount = 0;
+    brokerFollowUpsDue = 0;
+    brokerDraftsReady = 0;
   }
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      {/* First-paint splash — greets the broker by name, shows a brokerage-wide
+          snapshot of what's happening across member spaces, then dissolves. */}
+      <ChippiSplash
+        greeting={pickGreeting(brokerFirstName)}
+        snapshot={{
+          newLeads: unreadLeadCount,
+          followUpsDue: brokerFollowUpsDue,
+          draftsReady: brokerDraftsReady,
+        }}
+      />
       <AccountSwitchSwipe />
       <Sidebar
         slug={slug}
@@ -173,8 +257,8 @@ export default async function BrokerLayout({ children }: { children: React.React
             {children}
           </main>
         ) : (
-          <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
-            <div className={`w-full mx-auto ${PAGE_MAX}`}>
+          <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+            <div className={`w-full mx-auto ${PAGE_MAX} min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28`}>
               {children}
             </div>
           </main>
