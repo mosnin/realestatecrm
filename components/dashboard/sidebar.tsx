@@ -580,7 +580,7 @@ function WorkspaceSwitcherRows({
           <Link
             key={w.key}
             href={w.href}
-            onClick={() => { if (!w.isCurrent) triggerAccountSwitch(); }}
+            onClick={() => { if (!w.isCurrent && w.href === '/broker') triggerAccountSwitch(); }}
             className={cn(
               'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
               w.isCurrent
