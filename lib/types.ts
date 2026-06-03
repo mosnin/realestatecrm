@@ -400,6 +400,12 @@ export interface Property {
   listingUrl: string | null;
   photos: string[];
   notes: string | null;
+  /** Brokerage pool: set when this property belongs to a brokerage's central
+   *  pool (created by the broker). Null for a realtor's own property. */
+  brokerageId?: string | null;
+  /** Brokerage pool: the member realtor's Space this pool property is assigned
+   *  to. Null = unassigned (sitting in the pool). */
+  assignedSpaceId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

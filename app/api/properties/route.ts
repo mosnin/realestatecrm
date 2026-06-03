@@ -94,7 +94,9 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('Property')
     .select('*')
-    .eq('spaceId', space.id)
+    // The realtor's own properties PLUS any brokerage-pool property assigned
+    // to their space. space.id is a controlled UUID, safe in the or-filter.
+    .or(`spaceId.eq.${space.id},assignedSpaceId.eq.${space.id}`)
     .order('updatedAt', { ascending: false })
     .limit(500);
 
