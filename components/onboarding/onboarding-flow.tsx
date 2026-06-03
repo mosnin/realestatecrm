@@ -33,7 +33,7 @@ type Role = 'realtor' | 'broker' | 'broker_only';
 const ROLE_OPTIONS: TileOption<Role>[] = [
   { value: 'realtor',     label: 'Realtor',           description: 'Solo agent with a pipeline.',      icon: Home },
   { value: 'broker',      label: 'Broker + realtor',  description: 'Run a team and sell.',             icon: Briefcase },
-  { value: 'broker_only', label: 'Broker only',       description: 'Team lead — no personal pipeline.', icon: Building2 },
+  { value: 'broker_only', label: 'Broker only',       description: 'Team lead - no personal pipeline.', icon: Building2 },
 ];
 
 // ── Shared option sets ─────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ interface FormValues {
  * Step ids for the full catalog. Each role path picks a subset in order. A
  * string union rather than enum so typos surface at compile time.
  *
- * `role-and-timezone` is one screen that captures both — collapsing two earlier
+ * `role-and-timezone` is one screen that captures both - collapsing two earlier
  * friction steps into a single pill-pair. Pain-point survey was removed; Chippi
  * infers usage from behavior.
  */
@@ -139,7 +139,7 @@ type StepId =
  * role-dependent branches can be computed.
  *
  * User-narrative steps shrink from 5 (role, name, timezone, pain, hear) to 3
- * (role+timezone, name, hear) — the rest of the count depends on the path.
+ * (role+timezone, name, hear) - the rest of the count depends on the path.
  */
 function stepsFor(role: Role | null): StepId[] {
   if (!role) return ['role-and-timezone'];
@@ -169,7 +169,7 @@ interface OnboardingFlowProps {
   defaultName: string;
   /**
    * The signed-in user's Clerk avatar. Intentionally not used to prefill the
-   * business-logo step — a realtor's profile photo should not double as their
+   * business-logo step - a realtor's profile photo should not double as their
    * company logo. Accepted here so callers can pass it for a future
    * avatar-specific step.
    */
@@ -256,7 +256,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       if (role === 'broker_only') {
         // Broker-only: skip workspace creation.
         // User-level fields (timezone, hearAbout, etc.) aren't persisted in
-        // this path — save_profile doesn't accept them and there's no
+        // this path - save_profile doesn't accept them and there's no
         // create_space call. Pre-existing API limitation.
         const profileRes = await fetch('/api/onboarding', {
           method: 'POST',
@@ -305,7 +305,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       if (!profileRes.ok) throw await errorFrom(profileRes);
 
       // create_space persists space-level config AND User-level fields via its
-      // userUpdates block — so we send timezone, bio, and referralSource here
+      // userUpdates block - so we send timezone, bio, and referralSource here
       // (save_profile silently drops them). biggestPainPoint is intentionally
       // null: the survey step was removed; Chippi infers usage from behavior.
       const spaceRes = await fetch('/api/onboarding', {
@@ -439,7 +439,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       {stepId === 'about-you' && (
         <MultiFieldStep
           title="A little about you"
-          subtitle="Both optional — shown on your intake page and emails."
+          subtitle="Both optional - shown on your intake page and emails."
           fields={[
             {
               key: 'phone',
@@ -494,7 +494,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       {stepId === 'brokerage-contact' && (
         <MultiFieldStep
           title="Where should leads find you?"
-          subtitle="Optional — office address and a main phone line."
+          subtitle="Optional - office address and a main phone line."
           fields={[
             {
               key: 'officeAddress',
@@ -522,7 +522,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       {stepId === 'brokerage-logo' && (
         <PhotoStep
           title="Add your brokerage logo"
-          subtitle="Optional — goes on emails and shared packets."
+          subtitle="Optional - goes on emails and shared packets."
           value={values.brokerLogoUrl || null}
           onChange={(url) => set('brokerLogoUrl', url ?? '')}
           onNext={goNext}
@@ -606,7 +606,7 @@ interface RoleAndTimezoneStepProps {
 }
 
 /**
- * Single screen that captures both role and timezone — collapses what used to
+ * Single screen that captures both role and timezone - collapses what used to
  * be the first and seventh-or-so steps into one. Both required to advance.
  * Two pill groups side-by-side on wide screens, stacked on mobile. Uses the
  * same `motion.button` tile primitive as `TilesStep` for visual continuity.

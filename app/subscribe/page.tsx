@@ -1,14 +1,39 @@
 'use client';
 
+/**
+ * Subscribe — the commit moment, in the onboarding's voice.
+ *
+ * This is the same calm, paper-flat, Chippi-speaks aesthetic as the
+ * conversational onboarding: the brand-warm wash, a serif line in Chippi's
+ * first person, a hairline panel (no shadow, no animated border, no decorative
+ * orange), and a soft fade-in arrival. By the time a realtor reaches here
+ * they've met Chippi; this should feel like the next sentence, not a pivot to
+ * a loud SaaS pricing page.
+ *
+ * The billing logic is UNCHANGED — auth gate, slug resolution, and the
+ * /api/billing/checkout call are byte-for-byte what shipped before. Only the
+ * surface changed.
+ */
+
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { motion } from 'motion/react';
 import { Check, Loader2 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
-import { BackgroundPlus } from '@/components/ui/background-plus';
-import { BorderBeam } from '@/components/ui/border-beam';
+import { brandOrange } from '@/lib/colors';
+import { TITLE_FONT } from '@/lib/typography';
+
+const FEATURES = [
+  'I draft every follow-up. You approve.',
+  'AI lead scoring on every applicant.',
+  'Intake links that qualify leads for you.',
+  'Tours scheduled and booked.',
+  'Unlimited contacts and deals.',
+  'Notes, calendar, and analytics.',
+  'Connect Gmail, Slack, and more.',
+  'MCP access for Claude and Cursor.',
+];
 
 function SubscribeContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -17,16 +42,16 @@ function SubscribeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If no slug in URL, fetch it from the user's space
+  // If no slug in URL, fetch it from the user's space.
   useEffect(() => {
     if (slug || !isLoaded || !isSignedIn) return;
     fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(d => { if (d.slug) setSlug(d.slug); })
+      .then((r) => r.json())
+      .then((d) => { if (d.slug) setSlug(d.slug); })
       .catch(() => {});
   }, [slug, isLoaded, isSignedIn]);
 
-  // Redirect unauthenticated users
+  // Redirect unauthenticated users.
   if (isLoaded && !isSignedIn) {
     window.location.href = '/login/realtor';
     return null;
@@ -45,121 +70,113 @@ function SubscribeContent() {
       if (data.url) {
         window.location.href = data.url;
       } else if (data.redirect) {
-        // Server says go to billing instead (e.g. existing subscription with issues)
         window.location.href = data.redirect;
       } else {
         setError(data.error || 'Failed to start checkout');
         setLoading(false);
       }
     } catch {
-      setError("That didn't go through — usually temporary.");
+      setError("That didn't go through. Usually temporary.");
       setLoading(false);
     }
   }
 
-  const features = [
-    'AI-powered lead scoring',
-    'Unlimited contacts & deals',
-    'Custom intake forms',
-    'Tour scheduling & booking',
-    'Follow-up reminders',
-    'Notes, calendar & analytics',
-    'Voice AI assistant (Chip)',
-    'MCP integration for Claude',
-  ];
-
   if (!isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 overflow-hidden">
-      <BackgroundPlus plusColor="#ff964f" plusSize={60} />
-      <div className="relative z-10 w-full max-w-3xl space-y-6">
-        {/* Branding */}
-        <div className="flex justify-center">
-          <BrandLogo className="h-8" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-6 py-16 text-foreground">
+      {/* Brand-warm wash — same as the onboarding surface, one of the five
+          sanctioned orange contexts. */}
+      <div
+        aria-hidden
+        className={brandOrange(
+          'LOGO',
+          'pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]',
+        )}
+      />
+
+      <motion.div
+        className="relative z-10 w-full max-w-md"
+        initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div className="mb-8 flex justify-center">
+          <BrandLogo className="h-6 opacity-90" alt="Chippi" />
         </div>
 
-        {/* Split pricing card */}
-        <Card className="relative rounded-3xl border border-border shadow-xl overflow-hidden p-0">
-          <BorderBeam lightColor="#ff964f" lightWidth={300} duration={8} borderWidth={2} />
-          <div className="flex flex-col md:flex-row">
-            {/* Left side — Plan & Price */}
-            <div className="flex flex-col justify-center gap-6 bg-primary/5 p-8 md:p-10 md:w-5/12">
-              <div className="space-y-1">
-                <p className="text-sm font-medium uppercase tracking-widest text-primary">
-                  Chippi Pro
-                </p>
-                <div className="flex items-end gap-1">
-                  <span className="text-5xl font-bold tracking-tight">$97</span>
-                  <span className="text-muted-foreground text-lg mb-1">/mo</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  after 7-day free trial &middot; cancel anytime
-                </p>
-              </div>
+        {/* Chippi speaks — the focal element. */}
+        <header className="space-y-2 text-center">
+          <p className="text-sm text-muted-foreground">Chippi Pro.</p>
+          <h1 className="text-3xl leading-tight tracking-tight sm:text-[2.5rem]" style={TITLE_FONT}>
+            Let&apos;s keep working together.
+          </h1>
+          <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Everything you set up stays exactly as it is. Start your free trial and I&apos;ll keep going.
+          </p>
+        </header>
 
-              {/* Error */}
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
-              {/* CTA */}
-              <Button
-                onClick={handleStartTrial}
-                disabled={loading || !slug}
-                size="lg"
-                className="w-full rounded-full text-base font-semibold"
-              >
-                {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
-                {loading ? 'Redirecting to checkout...' : 'Start 7-day free trial'}
-              </Button>
-
-              <p className="text-xs text-muted-foreground">
-                No credit card upfront &middot; Cancel anytime
-              </p>
-            </div>
-
-            {/* Right side — Features */}
-            <div className="flex flex-col justify-center gap-6 p-8 md:p-10 md:w-7/12">
-              <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Everything you need
-              </p>
-              <ul className="grid grid-cols-1 gap-3">
-                {features.map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-sm">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Check size={12} className="text-primary" />
-                    </span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground">
-                Built for realtors and brokerages of all sizes
-              </p>
-            </div>
+        {/* Paper-flat panel — hairline border, no shadow. */}
+        <div className="mt-8 rounded-xl border border-border/70 bg-card p-6 sm:p-7">
+          {/* Price */}
+          <div className="flex items-end justify-center gap-1.5">
+            <span className="text-[2.75rem] leading-none tabular-nums tracking-tight" style={TITLE_FONT}>
+              $97
+            </span>
+            <span className="mb-1 text-base text-muted-foreground">/mo</span>
           </div>
-        </Card>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            7 days free, then $97 a month. Cancel anytime.
+          </p>
 
-        {/* Already subscribed? */}
-        <p className="text-center text-xs text-muted-foreground">
+          {/* Features */}
+          <ul className="mt-6 space-y-3 border-t border-border/60 pt-6">
+            {FEATURES.map((f) => (
+              <li key={f} className="flex items-start gap-3 text-sm leading-snug text-foreground">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06]">
+                  <Check size={11} className="text-foreground/70" />
+                </span>
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+
+          {error && (
+            <p className="mt-5 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              {error}
+            </p>
+          )}
+
+          {/* CTA */}
+          <button
+            type="button"
+            onClick={handleStartTrial}
+            disabled={loading || !slug}
+            className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {loading && <Loader2 size={15} className="animate-spin" />}
+            {loading ? 'Taking you to checkout.' : 'Start your 7 days free'}
+          </button>
+          <p className="mt-3 text-center text-xs text-muted-foreground">No card needed to start.</p>
+        </div>
+
+        {/* Already subscribed */}
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           Already subscribed?{' '}
           <a
             href={slug ? `/s/${slug}/billing` : '#'}
-            className="text-primary underline hover:text-primary/80"
+            className="text-foreground underline-offset-2 hover:underline"
           >
             Manage billing
           </a>
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -169,7 +186,7 @@ export default function SubscribePage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-background">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
         </div>
       }
     >

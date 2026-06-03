@@ -1,29 +1,29 @@
 'use client';
 
 /**
- * Realtor onboarding — V2, the conversational flow.
+ * Realtor onboarding - V2, the conversational flow.
  *
  * The realtor doesn't fill out a form; they have a conversation with Chippi,
  * inside an interface that looks and moves exactly like the chat their own
  * leads will use. Three acts:
  *
- *   Act I  (intro)  — a cinematic cold open (OnboardingIntro): a title line,
+ *   Act I  (intro)  - a cinematic cold open (OnboardingIntro): a title line,
  *                     the Chippi mark, then a blur-out into the chat.
- *   Act II (chat)   — Chippi types each question; the realtor answers through
+ *   Act II (chat)   - Chippi types each question; the realtor answers through
  *                     real inline inputs rendered as their own chat bubbles.
  *                     Same surface, same motion as the live intake chat.
- *   Act III (ready) — Chippi types a real first-touch draft (the payoff), then
+ *   Act III (ready) - Chippi types a real first-touch draft (the payoff), then
  *                     a closing preloader (OnboardingReady) flashes a few
  *                     working-words → "Your account is ready." → the dashboard.
  *
- * IMPORTANT — the persistence contract is UNCHANGED. Every `/api/onboarding`
+ * IMPORTANT - the persistence contract is UNCHANGED. Every `/api/onboarding`
  * call (check_slug, save_profile, create_space, save_realtor_profile,
  * complete) and the broker-create/space-patch sequence are byte-for-byte what
  * the prior stage-based V2 sent. This is a re-presentation of a protected
  * backend, not a change to it.
  *
  * Gated behind NEXT_PUBLIC_ONBOARDING_V2 (see app/setup/page.tsx). V1
- * (`onboarding-realtor.tsx`) stays the rollback path — don't refactor it.
+ * (`onboarding-realtor.tsx`) stays the rollback path - don't refactor it.
  */
 
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
@@ -124,7 +124,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
     setError(null);
   }, []);
 
-  // Greet has no input — once Chippi finishes saying hello, glide to the
+  // Greet has no input - once Chippi finishes saying hello, glide to the
   // first question after a short beat.
   useEffect(() => {
     if (current !== 'greet' || !typedDone) return;
@@ -220,7 +220,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       if (!spaceRes.ok) {
         if (spaceRes.status === 409) {
           setSlugState({ kind: 'taken' });
-          setError('That URL was just taken — pick another.');
+          setError('That URL was just taken. Pick another.');
           setSubmitting(false);
           goToStep('business');
           return;
@@ -237,7 +237,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       setSubmitting(false);
       advance();
     } catch {
-      setError("Couldn't save that — usually temporary.");
+      setError("Couldn't save that. Usually temporary.");
       setSubmitting(false);
     }
   }, [role, tenure, zipCode, businessName, slug, slugState, name, advance, goToStep]);
@@ -284,7 +284,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       redirectRef.current = `/s/${slug}/chippi`;
       setPhase('ready');
     } catch {
-      setError("Couldn't finish setup — usually temporary.");
+      setError("Couldn't finish setup. Usually temporary.");
       setSubmitting(false);
     }
   }, [saveProfilePartial, slug, role, businessName]);
@@ -293,16 +293,16 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
 
   const promptFor = useCallback((s: Step): string => {
     switch (s) {
-      case 'greet': return "I'm Chippi — your new companion. From here on, I'm working right alongside you.";
-      case 'name': return 'First — what should I call you?';
+      case 'greet': return "I'm Chippi, your new companion. From here on, I'm working right alongside you.";
+      case 'name': return 'First, what should I call you?';
       case 'role': return `Good to meet you, ${firstName}. What are you running?`;
       case 'business': return 'What should leads call your business?';
-      case 'where': return 'Where do you work — and how long have you been at it?';
+      case 'where': return 'Where do you work, and how long have you been at it?';
       case 'promise': return 'Before we go further, one promise: I draft, you approve. Nothing leaves without your name on it.';
-      case 'serve': return "Who do you work with most? Pick up to three — I'll tune everything to them.";
+      case 'serve': return "Who do you work with most? Pick up to three and I'll tune everything to them.";
       case 'voice': return 'A new lead just asked about a listing. Which reply sounds like you?';
-      case 'sources': return "Where do most of your leads come from? Pick your top one or two — that's where I'll watch first.";
-      case 'reveal': return `That's everything I need, ${firstName}. Watch — here's the first note I'd send a new lead.`;
+      case 'sources': return "Where do most of your leads come from? Pick your top one or two. That's where I'll watch first.";
+      case 'reveal': return `That's everything I need, ${firstName}. Now watch. Here's the first note I'd send a new lead.`;
     }
   }, [firstName]);
 
@@ -349,7 +349,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Brand-warm wash — same as the onboarding shell, one of the five
+        {/* Brand-warm wash - same as the onboarding shell, one of the five
             sanctioned orange contexts. */}
         <div
           aria-hidden
@@ -359,7 +359,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
           )}
         />
 
-        {/* Fixed brand mark — the chat's quiet header. */}
+        {/* Fixed brand mark - the chat's quiet header. */}
         <div className="pointer-events-none fixed inset-x-0 top-0 z-10 flex justify-center bg-gradient-to-b from-background to-transparent pt-6 pb-8">
           <BrandLogo className="h-5 opacity-80" alt="Chippi" />
         </div>
@@ -377,7 +377,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
               );
             })}
 
-            {/* Active turn — Chippi types, then the answer affordance fades in. */}
+            {/* Active turn - Chippi types, then the answer affordance fades in. */}
             <ChippiSays
               key={`active-${current}`}
               text={promptFor(current)}
@@ -623,7 +623,7 @@ function SlugHint({ state }: { state: SlugState }) {
   if (state.kind === 'idle') return null;
   if (state.kind === 'checking') return <p className="mt-1 text-xs text-muted-foreground">Checking…</p>;
   if (state.kind === 'available') return <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><Check size={12} /> Available</p>;
-  if (state.kind === 'taken') return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Taken — try another.</p>;
+  if (state.kind === 'taken') return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Taken. Try another.</p>;
   return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{state.message}</p>;
 }
 
@@ -706,7 +706,7 @@ function ServeAffordance({
         })}
       </div>
       <div>
-        <FieldLabel>Anything I should always say — or never say — to a lead? (optional)</FieldLabel>
+        <FieldLabel>Anything I should always say, or never say, to a lead? (optional)</FieldLabel>
         <textarea
           value={voiceGuidance}
           onChange={(e) => onChangeGuidance(e.target.value)}
@@ -731,8 +731,8 @@ function VoiceAffordance({
 }) {
   const firstName = (name.trim().split(/\s+/)[0]) || 'me';
   const business = businessName.trim() || 'our team';
-  const warm = `Hi! Yes, 1422 Pine is still available — great spot, I just walked through it on Saturday. Want me to send a few photos and find a time that works for you to take a look? No pressure either way. — ${firstName} at ${business}`;
-  const direct = `Hi — yes, 1422 Pine is available. Asking $625K, 3 bed / 2 bath, last open house had 11 groups through. I can hold a private tour Tue 5–7p or Wed 6–7p. Which works? — ${firstName}, ${business}`;
+  const warm = `Hi! Yes, 1422 Pine is still available, and it's a great spot. I just walked through it on Saturday. Want me to send a few photos and find a time that works for you to take a look? No pressure either way. ${firstName} at ${business}`;
+  const direct = `Hi, yes, 1422 Pine is available. Asking $625K, 3 bed / 2 bath, last open house had 11 groups through. I can hold a private tour Tue 5–7p or Wed 6–7p. Which works? ${firstName}, ${business}`;
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <VoiceCard label="Warm" body={warm} selected={tone === 'warm'} onClick={() => onPick('warm')} />
@@ -836,7 +836,7 @@ function RevealAffordance({
       {error && <ErrorLine message={error} />}
       <div className={cn('flex justify-end transition-opacity duration-500', typed ? 'opacity-100' : 'pointer-events-none opacity-0')}>
         <button type="button" onClick={onFinish} disabled={submitting} className={CHIPPI_PILL}>
-          {submitting ? <Loader2 size={14} className="animate-spin" /> : <>Looks good — take me in <ArrowRight size={14} /></>}
+          {submitting ? <Loader2 size={14} className="animate-spin" /> : <>Looks good, take me in <ArrowRight size={14} /></>}
         </button>
       </div>
     </div>

@@ -5,13 +5,13 @@
  *
  * Deliberately mirror the live intake chat (`components/intake-chat`) so
  * onboarding reads as the SAME conversation surface the realtor's own leads
- * will experience — just from the other side of the glass:
+ * will experience - just from the other side of the glass:
  *
  *   - The ACTIVE Chippi question is a focal serif line that types in.
  *   - PAST Chippi questions recede to small muted text.
  *   - The realtor's answers are right-aligned, softly-tinted bubbles.
  *
- * Nothing here talks to the network or owns onboarding state — it's pure
+ * Nothing here talks to the network or owns onboarding state - it's pure
  * presentation. The orchestration (steps, persistence, validation) lives in
  * `onboarding-realtor-v2.tsx`.
  */
@@ -58,7 +58,7 @@ export function ChippiSays({
   return (
     <motion.div
       {...turnRise}
-      className="text-2xl leading-snug tracking-tight text-foreground sm:text-[26px]"
+      className="text-xl leading-snug tracking-tight text-foreground sm:text-2xl"
       style={TITLE_FONT}
     >
       {typing ? (
@@ -70,7 +70,7 @@ export function ChippiSays({
   );
 }
 
-/** The realtor's answer — right-aligned, softly tinted bubble. Matches the
+/** The realtor's answer - right-aligned, softly tinted bubble. Matches the
  *  intake chat's `UserTurn` vocabulary (foreground tint here, since onboarding
  *  has no per-space accent color yet). */
 export function UserSays({ children }: { children: React.ReactNode }) {
@@ -122,7 +122,7 @@ export function Thread({
   signal,
 }: {
   children: React.ReactNode;
-  /** Changes only at the moments worth scrolling for — a new question
+  /** Changes only at the moments worth scrolling for - a new question
    *  arriving or the answer affordance revealing. Keyed on this so typing
    *  into an input never yanks the view. */
   signal?: string | number;

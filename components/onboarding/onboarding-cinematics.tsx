@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * Onboarding cinematics — the two bookend preloaders that wrap the
+ * Onboarding cinematics - the two bookend preloaders that wrap the
  * conversational onboarding.
  *
- *   OnboardingIntro  (Act I)  — the cold open. A title line blur-rises in,
+ *   OnboardingIntro  (Act I)  - the cold open. A title line blur-rises in,
  *                               holds, swaps to the Chippi mark, then the
  *                               whole overlay blurs out to reveal the chat.
- *   OnboardingReady  (Act III) — the build. A few working-words flash one at
+ *   OnboardingReady  (Act III) - the build. A few working-words flash one at
  *                               a time, then "Your account is ready.", then it
  *                               dissolves into the dashboard.
  *
@@ -30,7 +30,7 @@ import {
 } from 'motion/react';
 import { BrandLogo } from '@/components/brand-logo';
 
-// Same expo ease as the splash — fast start, long gentle settle.
+// Same expo ease as the splash - fast start, long gentle settle.
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 // ── Act I: the cold open ────────────────────────────────────────────────────
@@ -121,8 +121,8 @@ const FINAL_HOLD_MS = 1500; // "Your account is ready." holds
 const READY_SAFETY_MS = 8000;
 
 /**
- * The closing preloader. Each working-word lives on its own "page" — fading
- * in and out one at a time — then the final line lands and the overlay
+ * The closing preloader. Each working-word lives on its own "page" - fading
+ * in and out one at a time - then the final line lands and the overlay
  * dissolves into whatever the parent renders next (the dashboard).
  */
 export function OnboardingReady({ onDone }: { onDone: () => void }) {
