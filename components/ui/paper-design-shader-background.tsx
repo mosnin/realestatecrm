@@ -46,8 +46,10 @@ export function GradientBackground({ className }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // Only colorBack changes between modes; the blooms stay as authored.
-  const colorBack = isDark ? 'hsl(240, 9%, 4%)' : 'hsl(32, 60%, 98%)';
+  // Warm-only palette so the field can never bloom to black — a soft Chippi
+  // glow on a warm base. Dark mode uses a WARM near-black (not cold/pure
+  // black) so the hero stays orange-tinted in both themes.
+  const colorBack = isDark ? 'hsl(24, 36%, 7%)' : 'hsl(28, 55%, 98%)';
 
   return (
     <div className={cn('absolute inset-0', className)} aria-hidden>
@@ -55,8 +57,8 @@ export function GradientBackground({ className }: { className?: string }) {
         <GrainGradient
           style={{ height: '100%', width: '100%' }}
           colorBack={colorBack}
-          softness={0.82}
-          intensity={0.5}
+          softness={0.9}
+          intensity={0.3}
           noise={0}
           shape="corners"
           offsetX={0}
@@ -64,7 +66,7 @@ export function GradientBackground({ className }: { className?: string }) {
           scale={1}
           rotation={0}
           speed={0.8}
-          colors={['hsl(24, 100%, 64%)', 'hsl(16, 96%, 56%)', 'hsl(34, 100%, 71%)']}
+          colors={['hsl(26, 100%, 73%)', 'hsl(36, 100%, 84%)', 'hsl(20, 100%, 91%)']}
         />
       )}
     </div>

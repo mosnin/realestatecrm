@@ -33,10 +33,7 @@ export function DeepFeatures() {
     <section className="mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
       <Reveal className="max-w-3xl">
         <Eyebrow>The rest of the workspace</Eyebrow>
-        <h2
-          style={{ fontFamily: 'var(--font-title)' }}
-          className="mt-5 text-[clamp(2rem,4.6vw,3.5rem)] leading-[1.04] tracking-[-0.02em] text-foreground"
-        >
+        <h2 className="mt-5 text-[clamp(2rem,4.8vw,3.75rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground">
           One agent. Every corner of the job.
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">

@@ -45,10 +45,7 @@ export function CoreCards() {
   return (
     <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
       <Reveal className="max-w-3xl">
-        <h2
-          style={{ fontFamily: 'var(--font-title)' }}
-          className="text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.04] tracking-[-0.02em] text-foreground"
-        >
+        <h2 className="text-[clamp(2.25rem,4.8vw,4rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground">
           The work that used to eat your day,
           <span className="text-muted-foreground"> handled before you ask.</span>
         </h2>

@@ -21,7 +21,7 @@ export function StatsBand() {
         {STATS.map((s) => (
           <StaggerItem key={s.value}>
             <div className="flex h-full flex-col justify-between rounded-3xl bg-card p-8 ring-1 ring-border/70 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.10)]">
-              <div className="text-[clamp(3rem,6vw,4.5rem)] font-title leading-none tracking-tight text-foreground">
+              <div className="text-[clamp(3rem,6vw,4.5rem)] font-bold leading-none tracking-tight text-foreground">
                 {s.value}
               </div>
               <p className="mt-6 text-[15px] font-medium leading-snug text-foreground/55">
@@ -39,7 +39,7 @@ export function StatsBand() {
               <p className="text-[15px] font-medium uppercase tracking-[0.18em] text-white/45">
                 The whole job, one surface
               </p>
-              <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-title leading-[1.05] tracking-[-0.02em] text-white">
+              <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-white">
                 Stop paying for six tools that don&apos;t talk to each other.
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
@@ -49,7 +49,7 @@ export function StatsBand() {
             </div>
             <div className="shrink-0 text-right">
               <ArrowChip dir="up-right" className="ml-auto text-white/40" />
-              <div className="text-[clamp(3.5rem,9vw,6rem)] font-title leading-none tracking-tight text-brand">
+              <div className="text-[clamp(3.5rem,9vw,6rem)] font-bold leading-none tracking-tight text-brand">
                 6 → 1
               </div>
               <p className="mt-2 text-[13px] font-medium text-white/45">

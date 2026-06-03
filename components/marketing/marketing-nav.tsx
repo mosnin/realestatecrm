@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { MarketingNavPanel } from './marketing-nav-panel';
 import { MarketingNavMobile } from './marketing-nav-mobile';
+import { MarketingThemeToggle } from './marketing-theme-toggle';
 import { TOP_LEVEL_NAV } from './marketing-nav-links';
 
 type PanelKey = 'features' | 'teams';
@@ -171,8 +172,9 @@ export function MarketingNav() {
             })}
           </ul>
 
-          {/* Right cluster — desktop pills + mobile menu trigger */}
+          {/* Right cluster — theme toggle + desktop pills + mobile trigger */}
           <div className="flex items-center gap-2">
+            <MarketingThemeToggle onMouseEnter={scheduleClose} />
             <Link
               href="/login/realtor"
               onMouseEnter={scheduleClose}

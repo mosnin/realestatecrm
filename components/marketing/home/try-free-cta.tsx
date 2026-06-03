@@ -24,7 +24,7 @@ export function TryFreeCTA() {
             }}
           />
           <div className="relative">
-            <h2 className="mx-auto max-w-3xl text-[clamp(2rem,5vw,3.75rem)] font-title leading-[1.04] tracking-[-0.02em] text-white">
+            <h2 className="mx-auto max-w-3xl text-[clamp(2rem,5vw,3.75rem)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
               Bring your inbox. Chippi takes it from there.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">

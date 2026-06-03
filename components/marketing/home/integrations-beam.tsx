@@ -59,10 +59,7 @@ export function IntegrationsBeam() {
     <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
       <Reveal className="mx-auto max-w-3xl text-center">
         <Eyebrow tone="brand">One agent, everything connected</Eyebrow>
-        <h2
-          style={{ fontFamily: 'var(--font-title)' }}
-          className="mt-5 text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.04] tracking-[-0.02em] text-foreground"
-        >
+        <h2 className="mt-5 text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground">
           Your whole world, wired into one agent.
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
