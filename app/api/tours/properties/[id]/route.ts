@@ -38,6 +38,7 @@ export async function PATCH(
     .from('TourPropertyProfile')
     .update(update)
     .eq('id', id)
+    .eq('spaceId', ctx.space.id)
     .select()
     .single();
   if (error) throw error;
@@ -57,7 +58,11 @@ export async function DELETE(
   const ctx = await resolveProfile(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase.from('TourPropertyProfile').delete().eq('id', id);
+  const { error } = await supabase
+    .from('TourPropertyProfile')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', ctx.space.id);
   if (error) throw error;
 
   return NextResponse.json({ success: true });
