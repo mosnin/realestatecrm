@@ -76,6 +76,7 @@
     "svix": "^1.90.0",
     "tailwind-merge": "^3.3.0",
     "telnyx": "^6.26.0",
+    "unicornstudio-react": "^2.1.9",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },

@@ -17,8 +17,17 @@
  */
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { ArrowUpRight } from 'lucide-react';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
+
+// Animated WebGL background. It reads `window` and mounts a canvas, so it must
+// be client-only — load it with ssr:false. Reduced-motion users never mount it
+// (they get the static photo fallback below).
+const CodexAnimatedBackground = dynamic(
+  () => import('@/components/ui/open-ai-codex-animated-background').then((m) => m.Component),
+  { ssr: false },
+);
 
 export interface HeroCta {
   label: string;
@@ -63,13 +72,24 @@ export function MarketingHeroHome({
 
   return (
     <section className="relative flex h-[92vh] min-h-[600px] w-full items-center justify-center overflow-hidden">
-      {/* Background image + overlays */}
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${imageUrl})` }}
-      >
-        <div className="absolute inset-0 bg-black/55" />
-        {/* Settle the image into the page below the fold. */}
+      {/* Background: a lively animated WebGL scene for motion users, the static
+          photo as the reduced-motion (and load-failure) fallback. The dark base
+          shows while the canvas warms up. Overlays are lighter than the photo's
+          original 55% so the animation breathes, while still protecting the
+          white serif headline's legibility. */}
+      <div className="absolute inset-0 overflow-hidden bg-neutral-950">
+        {reduce ? (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${imageUrl})` }}
+          />
+        ) : (
+          <div aria-hidden className="absolute inset-0">
+            <CodexAnimatedBackground />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/45" />
+        {/* Settle the background into the page below the fold. */}
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-black/45" />
       </div>
 
