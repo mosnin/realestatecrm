@@ -42,6 +42,8 @@ import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
 import type { Property } from '@/lib/types';
+import { isDocusignConnected } from '@/lib/esign';
+import type { SignatureRequestLite } from '@/components/esign/send-for-signature';
 
 
 export default async function DealDetailPage({
@@ -79,6 +81,7 @@ export default async function DealDetailPage({
   let linkedProperty: Property | null = null;
   let hasOpenReview = false;
   let owner: { id: string; name: string | null; email: string; avatar: string | null } | null = null;
+  let signatureRequests: SignatureRequestLite[] = [];
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -160,6 +163,21 @@ export default async function DealDetailPage({
       };
     });
     activities = (activityResult.data ?? []) as DealActivity[];
+
+    // Signature requests for this deal — drives the inline status pill on each
+    // document row. A single indexed lookup; swallow errors so an as-yet-
+    // unapplied migration on another branch doesn't break the page.
+    try {
+      const { data: sigRows } = await supabase
+        .from('SignatureRequest')
+        .select('id, documentId, status, signerEmail, signerName, subject, createdAt')
+        .eq('dealId', id)
+        .eq('spaceId', space.id)
+        .order('createdAt', { ascending: false });
+      signatureRequests = (sigRows ?? []) as SignatureRequestLite[];
+    } catch (sigErr) {
+      console.warn('[deal-detail] signature lookup failed (ignored)', sigErr);
+    }
   } catch (err) {
     console.error('[deal-detail] DB queries failed', err);
     return (
@@ -203,6 +221,11 @@ export default async function DealDetailPage({
   const pipelineType = currentStage?.pipelineType ?? null;
   const gci =
     value != null && commissionRate != null ? (value * commissionRate) / 100 : null;
+
+  // Is DocuSign connected for this realtor? Drives whether the documents tab
+  // shows "Send for signature" or a quiet "Connect DocuSign" link. Gated +
+  // best-effort inside the helper — never throws.
+  const docusignConnected = await isDocusignConnected(userId);
 
   // Headline is the address when present; the deal title otherwise. Addresses
   // are how realtors actually talk about deals — "the Maple Ave place", not
@@ -582,7 +605,14 @@ export default async function DealDetailPage({
             )}
 
             {activeTab === 'documents' && (
-              <DealDocuments dealId={id} initial={documents} pipelineType={pipelineType} />
+              <DealDocuments
+                dealId={id}
+                slug={slug}
+                docusignConnected={docusignConnected}
+                signatureRequests={signatureRequests}
+                initial={documents}
+                pipelineType={pipelineType}
+              />
             )}
 
             {activeTab === 'contacts' && (
