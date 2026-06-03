@@ -14,8 +14,13 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
+import {
+  ComposerDraftDiagram,
+  LeadScoreDiagram,
+  CalendarBookingDiagram,
+  KanbanDragDiagram,
+} from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'For solo realtors — Chippi' };
 
@@ -29,10 +34,7 @@ export default function RealtorsPage() {
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'See all features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Realtor hero — a solo realtor on their phone after-hours, Chippi drafting a reply on the laptop in the background. Calm, golden hour, real workspace not a stock office."
-        />
+        <ComposerDraftDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -46,10 +48,7 @@ export default function RealtorsPage() {
           'Priority order updates as deals move.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Lead feed — new inquiry lands, score and reason animate in (subtle), realtor taps the top lead."
-        />
+        <LeadScoreDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection
@@ -63,10 +62,7 @@ export default function RealtorsPage() {
           "Templates the team has approved (if you're on one).",
         ]}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Composer with Chippi draft card open — Send and Discard buttons visible, agent badge in serif orange."
-        />
+        <ComposerDraftDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -80,10 +76,7 @@ export default function RealtorsPage() {
           'Confirmation goes back in the thread.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Inline tour-booking flow — pick time → calendar updates → confirmation sent."
-        />
+        <CalendarBookingDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
@@ -97,10 +90,7 @@ export default function RealtorsPage() {
           'Won/lost reasons logged in plain language.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Kanban — card moves Negotiating → Closed Won, side panel auto-fills with closing details."
-        />
+        <KanbanDragDiagram aspect="video" />
       </MarketingSection>
 
       <MarketingSection
