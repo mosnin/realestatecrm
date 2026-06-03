@@ -57,6 +57,7 @@ import {
   Contact,
   Handshake,
   Plug,
+  Gauge,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -136,6 +137,7 @@ const brokerAdminNavSections = [
       { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
       { href: '/broker/import-export', label: 'Import / export', icon: Upload, exact: false, adminOnly: true },
     ],
   },

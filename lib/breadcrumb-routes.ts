@@ -26,6 +26,7 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/broker/deals', label: 'Deals' },
   { path: '/broker/properties', label: 'Properties' },
   { path: '/broker/integrations', label: 'Integrations' },
+  { path: '/broker/usage', label: 'Usage' },
   { path: '/broker/realtors', label: 'Realtors' },
   { path: '/broker/members', label: 'Members' },
   { path: '/broker/leads', label: 'Leads' },
