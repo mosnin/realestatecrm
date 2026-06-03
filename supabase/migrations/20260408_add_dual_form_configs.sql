@@ -62,33 +62,59 @@ CREATE INDEX IF NOT EXISTS idx_contact_form_lead_type
 -- ============================================================
 -- Data migration: copy existing single formConfig to rentalFormConfig
 -- ============================================================
--- Spaces that already have a custom formConfig with leadType='rental' (or 'general')
--- should have it copied to rentalFormConfig for seamless migration.
-UPDATE "SpaceSetting"
-  SET "rentalFormConfig" = "formConfig"
-  WHERE "formConfig" IS NOT NULL
-    AND "rentalFormConfig" IS NULL
-    AND ("formConfig"->>'leadType' IS NULL
-         OR "formConfig"->>'leadType' IN ('rental', 'general'));
+-- These backfills READ the legacy single-config columns created by
+-- 20260408_add_form_builder.sql (SpaceSetting."formConfig" and
+-- Brokerage."brokerageFormConfig"). Because the 20260408_* filenames carry no
+-- time component, Supabase sorts this file BEFORE add_form_builder.sql, so on a
+-- FRESH database those source columns do not exist yet when this runs. Guard the
+-- backfills behind an existence check so a fresh DB skips them harmlessly (the
+-- columns get created later with no rows to backfill), while an upgraded DB that
+-- already has the columns runs them exactly as before.
 
--- Spaces that have a custom formConfig with leadType='buyer'
--- should have it copied to buyerFormConfig.
-UPDATE "SpaceSetting"
-  SET "buyerFormConfig" = "formConfig"
-  WHERE "formConfig" IS NOT NULL
-    AND "buyerFormConfig" IS NULL
-    AND "formConfig"->>'leadType' = 'buyer';
+-- SpaceSetting backfill (depends on "SpaceSetting"."formConfig")
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'SpaceSetting' AND column_name = 'formConfig'
+  ) THEN
+    -- Spaces that already have a custom formConfig with leadType='rental' (or 'general')
+    -- should have it copied to rentalFormConfig for seamless migration.
+    UPDATE "SpaceSetting"
+      SET "rentalFormConfig" = "formConfig"
+      WHERE "formConfig" IS NOT NULL
+        AND "rentalFormConfig" IS NULL
+        AND ("formConfig"->>'leadType' IS NULL
+             OR "formConfig"->>'leadType' IN ('rental', 'general'));
 
--- Same for brokerage-level configs
-UPDATE "Brokerage"
-  SET "brokerageRentalFormConfig" = "brokerageFormConfig"
-  WHERE "brokerageFormConfig" IS NOT NULL
-    AND "brokerageRentalFormConfig" IS NULL
-    AND ("brokerageFormConfig"->>'leadType' IS NULL
-         OR "brokerageFormConfig"->>'leadType' IN ('rental', 'general'));
+    -- Spaces that have a custom formConfig with leadType='buyer'
+    -- should have it copied to buyerFormConfig.
+    UPDATE "SpaceSetting"
+      SET "buyerFormConfig" = "formConfig"
+      WHERE "formConfig" IS NOT NULL
+        AND "buyerFormConfig" IS NULL
+        AND "formConfig"->>'leadType' = 'buyer';
+  END IF;
+END $$;
 
-UPDATE "Brokerage"
-  SET "brokerageBuyerFormConfig" = "brokerageFormConfig"
-  WHERE "brokerageFormConfig" IS NOT NULL
-    AND "brokerageBuyerFormConfig" IS NULL
-    AND "brokerageFormConfig"->>'leadType' = 'buyer';
+-- Brokerage backfill (depends on "Brokerage"."brokerageFormConfig")
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'Brokerage' AND column_name = 'brokerageFormConfig'
+  ) THEN
+    UPDATE "Brokerage"
+      SET "brokerageRentalFormConfig" = "brokerageFormConfig"
+      WHERE "brokerageFormConfig" IS NOT NULL
+        AND "brokerageRentalFormConfig" IS NULL
+        AND ("brokerageFormConfig"->>'leadType' IS NULL
+             OR "brokerageFormConfig"->>'leadType' IN ('rental', 'general'));
+
+    UPDATE "Brokerage"
+      SET "brokerageBuyerFormConfig" = "brokerageFormConfig"
+      WHERE "brokerageFormConfig" IS NOT NULL
+        AND "brokerageBuyerFormConfig" IS NULL
+        AND "brokerageFormConfig"->>'leadType' = 'buyer';
+  END IF;
+END $$;

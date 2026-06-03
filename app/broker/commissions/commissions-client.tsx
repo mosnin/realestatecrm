@@ -110,13 +110,24 @@ function monthKeyOf(iso: string): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-function pctToDecimal(v: string): number | null {
+// Rates on ledger rows and in the PATCH route are PERCENT (2.5 = 2.5%, route
+// computes amounts as dealValue * rate / 100, validates 0..100). Parse the
+// edit-field string straight through in percent units, no division.
+function parsePct(v: string): number | null {
   const n = parseFloat(v);
   if (Number.isNaN(n)) return null;
   if (n < 0 || n > 100) return null;
-  return n / 100;
+  return n;
 }
 
+// Display a percent-valued rate (2.5 -> "2.5"). Round to 2 decimals to avoid
+// float noise.
+function formatPct(n: number): string {
+  return (Math.round(n * 100) / 100).toString();
+}
+
+// Brokerage DEFAULT rates are stored as DECIMALS (0.03 = 3%); convert to
+// percent for the defaults caption only.
 function decimalToPct(d: number): string {
   return (Math.round(d * 10000) / 100).toString();
 }
@@ -134,9 +145,9 @@ type EditFields = {
 
 function buildEditDefaults(row: LedgerRow): EditFields {
   return {
-    agentRate: decimalToPct(row.agentRate),
-    brokerRate: decimalToPct(row.brokerRate),
-    referralRate: decimalToPct(row.referralRate),
+    agentRate: formatPct(row.agentRate),
+    brokerRate: formatPct(row.brokerRate),
+    referralRate: formatPct(row.referralRate),
     referralUserEmail: '',
     notes: row.notes ?? '',
     status: row.status,
@@ -175,21 +186,21 @@ function EditRowDialog({ row, onClose, onSaved }: EditDialogProps) {
 
     const patch: Record<string, unknown> = {};
 
-    const newAgent = pctToDecimal(fields.agentRate);
+    const newAgent = parsePct(fields.agentRate);
     if (newAgent === null) {
       toast.error('Agent rate must be between 0 and 100');
       return;
     }
     if (Math.abs(newAgent - row.agentRate) > 1e-9) patch.agentRate = newAgent;
 
-    const newBroker = pctToDecimal(fields.brokerRate);
+    const newBroker = parsePct(fields.brokerRate);
     if (newBroker === null) {
       toast.error('Broker rate must be between 0 and 100');
       return;
     }
     if (Math.abs(newBroker - row.brokerRate) > 1e-9) patch.brokerRate = newBroker;
 
-    const newReferral = pctToDecimal(fields.referralRate);
+    const newReferral = parsePct(fields.referralRate);
     if (newReferral === null) {
       toast.error('Referral rate must be between 0 and 100');
       return;
@@ -681,8 +692,8 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-xs">{formatDate(row.closedAt)}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(row.dealValue)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{decimalToPct(row.agentRate)}%</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-xs">{decimalToPct(row.brokerRate)}%</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-xs">{formatPct(row.agentRate)}%</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-xs">{formatPct(row.brokerRate)}%</td>
                     <td className="px-3 py-3 text-right tabular-nums text-xs font-medium">
                       {formatCurrency(row.brokerAmount)}
                     </td>

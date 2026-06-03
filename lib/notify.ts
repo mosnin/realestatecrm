@@ -161,7 +161,7 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
       sendPushToSpace(params.spaceId, {
         title: `New lead: ${params.name}${score}`,
         body: `Open ${info.spaceName} to review.`,
-        url: `/s/${info.spaceSlug}/people/${params.contactId}`,
+        url: `/s/${info.spaceSlug}/contacts/${params.contactId}`,
       }).catch((err) => logger.error('[notify] lead push failed', { spaceId: params.spaceId }, err))
     );
   }
@@ -339,7 +339,7 @@ export async function notifyNewContact(params: NotifyNewContactParams): Promise<
       await sendPushToSpace(params.spaceId, {
         title: `New lead: ${params.contactName}`,
         body: `Open ${info.spaceName} to review.`,
-        url: `/s/${info.spaceSlug}/people`,
+        url: `/s/${info.spaceSlug}/contacts`,
       });
     } catch (err) {
       logger.error('[notify] contact push failed', { spaceId: params.spaceId }, err);

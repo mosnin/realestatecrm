@@ -33,7 +33,7 @@ export default async function PropertiesPage({
     const { data, error } = await supabase
       .from('Property')
       .select('*')
-      .eq('spaceId', space.id)
+      .or(`spaceId.eq.${space.id},assignedSpaceId.eq.${space.id}`)
       .order('createdAt', { ascending: false });
     if (error) throw error;
     properties = (data ?? []) as Property[];

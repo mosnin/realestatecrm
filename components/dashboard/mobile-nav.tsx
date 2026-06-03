@@ -7,7 +7,7 @@ import { mobileNavItems } from '@/lib/nav-items';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  Users,
+  UserCircle,
   PhoneIncoming,
 } from 'lucide-react';
 
@@ -19,7 +19,7 @@ const brokerSideItems = {
     { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
   ],
   right: [
-    { href: '/broker/realtors', label: 'Realtors', icon: Users, exact: false },
+    { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
   ],
 };
 

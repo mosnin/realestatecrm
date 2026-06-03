@@ -27,7 +27,7 @@ import { SearchPill, WorkspaceSwitcher } from '@/components/dashboard/sidebar';
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, CreditCard, Settings, Check, MessageCircle, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield, PhoneIncoming, BarChart3, Trophy, SlidersHorizontal, TrendingUp, HeartPulse, Flag, Activity, Gauge, Upload } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { ShareLinksMenu } from './share-links-menu';
@@ -42,37 +42,52 @@ const brokerMobileNavItems = [
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
 ];
 
+// Mobile broker drawer — mirrors the desktop admin sidebar's destinations,
+// hrefs, labels, and icons exactly (see brokerAdminNavSections in
+// components/dashboard/sidebar.tsx). The mobile grouping into titled sections
+// is a presentation choice; the destinations and their icons are the
+// authoritative desktop set. `adminOnly` items (Settings, Import / export)
+// are hidden from realtor_member, matching the desktop predicate.
 const brokerMobileNavSections = [
   {
     title: 'Overview',
     items: [
-      { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true },
-      { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false },
-      { href: '/broker/leads', label: 'Leads', icon: Briefcase, exact: false },
-      { href: '/broker/pipeline', label: 'Pipeline', icon: ListChecks, exact: false },
+      { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true, adminOnly: false },
+      { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
+      { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+      { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
+      { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
+      { href: '/broker/retention', label: 'Retention', icon: HeartPulse, exact: false, adminOnly: false },
+      { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
+      { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
+      { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
     ],
   },
   {
     title: 'Team',
     items: [
-      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Users, exact: false },
-      { href: '/broker/members', label: 'Members', icon: Users, exact: false },
-      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+      { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: false },
     ],
   },
   {
     title: 'Tools',
     items: [
-      { href: '/broker/analytics', label: 'Analytics', icon: Briefcase, exact: false },
-      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false },
+      { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+      { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
     ],
   },
   {
     title: 'Admin',
     items: [
-      { href: '/broker/import-export', label: 'Import / Export', icon: ArrowLeftRight, exact: false },
-      { href: '/broker/settings', label: 'Settings', icon: Settings, exact: false },
+      { href: '/broker/import-export', label: 'Import / export', icon: Upload, exact: false, adminOnly: true },
+      { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
 ];
@@ -286,12 +301,23 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
               )}
               {isBroker && showBrokerMobileNavOnly && (
                 <>
-                  {brokerMobileNavSections.map((section) => (
+                  {brokerMobileNavSections.map((section) => {
+                    // Mirror the desktop predicate: hide adminOnly items unless
+                    // the member is a broker_owner/broker_admin. A realtor_member
+                    // never sees Settings or Import / export.
+                    const visibleItems = section.items.filter(
+                      (item) =>
+                        !item.adminOnly ||
+                        brokerageRole === 'broker_owner' ||
+                        brokerageRole === 'broker_admin',
+                    );
+                    if (visibleItems.length === 0) return null;
+                    return (
                     <div key={section.title} className="pb-2">
                       <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                         {section.title}
                       </p>
-                      {section.items.map((item) => {
+                      {visibleItems.map((item) => {
                         const isActive = item.exact
                           ? pathname === item.href
                           : pathname.startsWith(item.href);
@@ -313,7 +339,8 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
                         );
                       })}
                     </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </nav>
