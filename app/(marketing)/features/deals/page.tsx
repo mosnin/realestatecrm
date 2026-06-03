@@ -9,9 +9,8 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { KanbanDragDiagram } from '@/components/marketing/diagrams';
+import { KanbanDragDiagram, TeamLeaderboardDiagram } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'Deals — Chippi' };
 
@@ -53,10 +52,7 @@ export default function FeaturesDealsPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Deal side panel — fields editable inline, save state visible."
-        />
+        <KanbanDragDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -68,13 +64,8 @@ export default function FeaturesDealsPage() {
           'Reason patterns aggregated quietly.',
           'Surfaced as insight, not as nag.',
         ]}
-        side="right"
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Close-deal modal — reason field with one-line examples."
-        />
-      </MarketingSection>
+        stacked
+      />
 
       <MarketingSection
         eyebrow="THE BROKER VIEW"
@@ -87,10 +78,7 @@ export default function FeaturesDealsPage() {
         ]}
         side="left"
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Broker rollup — total pipeline value, top deals, aging alerts."
-        />
+        <TeamLeaderboardDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection

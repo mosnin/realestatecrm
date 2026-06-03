@@ -10,7 +10,6 @@
 import { Calendar, CalendarDays, CalendarClock, Video, Home, Plus } from 'lucide-react';
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { MarketingIntegrations } from '@/components/marketing/marketing-integrations';
 import { CalendarBookingDiagram } from '@/components/marketing/diagrams';
@@ -109,13 +108,8 @@ export default function FeaturesCalendarPage() {
           'Snooze and reschedule one-tap.',
           'Surface what to look at next.',
         ]}
-        side="left"
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Follow-up cards row — each with deal context and quick-action row."
-        />
-      </MarketingSection>
+        stacked
+      />
 
       <MarketingSection
         eyebrow="THE PROMISE"

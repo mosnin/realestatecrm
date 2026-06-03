@@ -8,7 +8,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { PropertyGridDiagram } from '@/components/marketing/diagrams';
 
@@ -52,14 +51,11 @@ export default function FeaturesPropertiesPage() {
           'Linked deals + contacts.',
         ]}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Property detail page — gallery left, specs and offers right."
-        />
+        <PropertyGridDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
-        side="right"
+        stacked
         eyebrow="COMMISSION"
         title="Track what you'll earn."
         sub="Commission per property. Per deal. Per quarter. So you know what's coming and what closed."
@@ -68,12 +64,7 @@ export default function FeaturesPropertiesPage() {
           'Per-deal split visibility.',
           'Quarterly rollups.',
         ]}
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Commission summary — total + breakdown by deal."
-        />
-      </MarketingSection>
+      />
 
       <MarketingSection
         stacked
