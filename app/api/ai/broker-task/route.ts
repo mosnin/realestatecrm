@@ -36,6 +36,8 @@ import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
+import { decideRoute } from '@/lib/chat/router';
+import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
@@ -434,6 +436,25 @@ export async function POST(req: NextRequest) {
   if (history.length > 0) {
     const last = history[history.length - 1];
     if (last.role === 'user' && last.content === message) history.pop();
+  }
+
+  // ── Router: Q&A in-process, actions to Modal ─────────────────────────────
+  // Most broker turns are read-only questions about the team ("how's the
+  // pipeline?", "how many leads are waiting?"). Answer those in-process from a
+  // live brokerage snapshot — instant, no Modal cold start, the same fast lane
+  // the realtor chat uses. Action verbs (reassign, route, send) fall through to
+  // Modal, where the BROKER_TOOLS catalog lives. Errors → Modal (safe default).
+  if (decideRoute(message) === 'direct') {
+    logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId: brokerCtx.brokerage.id });
+    return streamBrokerDirectTurn({
+      brokerage: brokerCtx.brokerage,
+      persistenceSpaceId,
+      userId: clerkUserId,
+      conversationId,
+      userMessage: message,
+      history: history.map((h) => ({ role: h.role, content: h.content })),
+      abortController,
+    });
   }
 
   // Modal dispatch. `mode: 'broker'` + brokerage_id + broker_role tell
