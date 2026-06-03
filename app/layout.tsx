@@ -56,7 +56,11 @@ export default async function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
+            // No-flash theme. An explicit choice (localStorage 'theme') always
+            // wins. When unset, the logged-out / public surface follows the OS
+            // (prefers-color-scheme); the realtor dashboard keeps its light
+            // default so existing users aren't surprised.
+            __html: `(function(){try{var p=location.pathname;var app=/^\\/(s|broker|setup|subscribe|billing|billing-required|onboarding|admin|trial|authorize)(\\/|$)/.test(p);var t=localStorage.getItem('theme');var d=t==='dark'||(t!=='light'&&!app&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`,
           }}
         />
       </head>
