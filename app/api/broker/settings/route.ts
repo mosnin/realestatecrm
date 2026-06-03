@@ -16,6 +16,9 @@ type BrokerageAutoAssignFields = {
   autoAssignEnabled?: boolean | null;
   assignmentMethod?: string | null;
   lastAssignedUserId?: string | null;
+  slaEnabled?: boolean | null;
+  slaFirstResponseMinutes?: number | null;
+  slaEscalateMinutes?: number | null;
 };
 
 type SettingsResponse = {
@@ -30,6 +33,9 @@ type SettingsResponse = {
   lastAssignedUserId: string | null;
   lastAssignedUserName: string | null;
   realtorMemberCount: number;
+  slaEnabled: boolean;
+  slaFirstResponseMinutes: number;
+  slaEscalateMinutes: number;
   brokerageLicenseNumber: string | null;
   brokerageFairHousingNotice: string | null;
   brokerageShowEqualHousingMark: boolean;
@@ -46,17 +52,26 @@ async function resolveAutoAssignMeta(brokerageId: string): Promise<{
   lastAssignedUserId: string | null;
   lastAssignedUserName: string | null;
   realtorMemberCount: number;
+  slaEnabled: boolean;
+  slaFirstResponseMinutes: number;
+  slaEscalateMinutes: number;
 }> {
   let autoAssignEnabled = false;
   let assignmentMethod: AssignmentMethod = 'manual';
   let lastAssignedUserId: string | null = null;
+  let slaEnabled = false;
+  let slaFirstResponseMinutes = 60;
+  let slaEscalateMinutes = 120;
 
   // Explicitly select the new columns so we can detect a missing-column error
   // and degrade gracefully. If the SELECT errors (e.g. columns don't exist
   // yet), we keep the defaults above — the page stays usable for every broker.
   const { data: extra, error: extraErr } = await supabase
     .from('Brokerage')
-    .select('autoAssignEnabled, assignmentMethod, lastAssignedUserId')
+    .select(
+      'autoAssignEnabled, assignmentMethod, lastAssignedUserId, ' +
+      'slaEnabled, slaFirstResponseMinutes, slaEscalateMinutes'
+    )
     .eq('id', brokerageId)
     .maybeSingle<BrokerageAutoAssignFields>();
 
@@ -72,6 +87,15 @@ async function resolveAutoAssignMeta(brokerageId: string): Promise<{
     }
     if (typeof extra.lastAssignedUserId === 'string' && extra.lastAssignedUserId) {
       lastAssignedUserId = extra.lastAssignedUserId;
+    }
+    if (typeof extra.slaEnabled === 'boolean') {
+      slaEnabled = extra.slaEnabled;
+    }
+    if (typeof extra.slaFirstResponseMinutes === 'number' && extra.slaFirstResponseMinutes > 0) {
+      slaFirstResponseMinutes = extra.slaFirstResponseMinutes;
+    }
+    if (typeof extra.slaEscalateMinutes === 'number' && extra.slaEscalateMinutes > 0) {
+      slaEscalateMinutes = extra.slaEscalateMinutes;
     }
   }
 
@@ -103,6 +127,9 @@ async function resolveAutoAssignMeta(brokerageId: string): Promise<{
     lastAssignedUserId,
     lastAssignedUserName,
     realtorMemberCount: typeof count === 'number' ? count : 0,
+    slaEnabled,
+    slaFirstResponseMinutes,
+    slaEscalateMinutes,
   };
 }
 
@@ -132,6 +159,9 @@ export async function GET() {
     lastAssignedUserId: auto.lastAssignedUserId,
     lastAssignedUserName: auto.lastAssignedUserName,
     realtorMemberCount: auto.realtorMemberCount,
+    slaEnabled: auto.slaEnabled,
+    slaFirstResponseMinutes: auto.slaFirstResponseMinutes,
+    slaEscalateMinutes: auto.slaEscalateMinutes,
     brokerageLicenseNumber: ctx.brokerage.brokerageLicenseNumber ?? null,
     brokerageFairHousingNotice: ctx.brokerage.brokerageFairHousingNotice ?? null,
     brokerageShowEqualHousingMark: ctx.brokerage.brokerageShowEqualHousingMark ?? false,
@@ -255,6 +285,49 @@ export async function PATCH(req: Request) {
     updates.assignmentMethod = body.assignmentMethod;
   }
 
+  // Speed-to-lead SLA controls.
+  if (body.slaEnabled !== undefined) {
+    if (typeof body.slaEnabled !== 'boolean') {
+      return NextResponse.json({ error: 'slaEnabled must be a boolean' }, { status: 400 });
+    }
+    updates.slaEnabled = body.slaEnabled;
+  }
+
+  if (body.slaFirstResponseMinutes !== undefined) {
+    const v = body.slaFirstResponseMinutes;
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 5 || v > 1440) {
+      return NextResponse.json(
+        { error: 'slaFirstResponseMinutes must be an integer between 5 and 1440' },
+        { status: 400 }
+      );
+    }
+    updates.slaFirstResponseMinutes = v;
+  }
+
+  if (body.slaEscalateMinutes !== undefined) {
+    const v = body.slaEscalateMinutes;
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 5 || v > 1440) {
+      return NextResponse.json(
+        { error: 'slaEscalateMinutes must be an integer between 5 and 1440' },
+        { status: 400 }
+      );
+    }
+    // Cross-field: escalate must be >= first-response. Compare against the
+    // value in this same request when both are supplied, else trust client
+    // validation — the enforcement engine also guards it at runtime.
+    const firstRef =
+      typeof body.slaFirstResponseMinutes === 'number'
+        ? (body.slaFirstResponseMinutes as number)
+        : null;
+    if (firstRef !== null && v < firstRef) {
+      return NextResponse.json(
+        { error: 'slaEscalateMinutes must be greater than or equal to slaFirstResponseMinutes' },
+        { status: 400 }
+      );
+    }
+    updates.slaEscalateMinutes = v;
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
@@ -311,6 +384,9 @@ export async function PATCH(req: Request) {
     lastAssignedUserId: auto.lastAssignedUserId,
     lastAssignedUserName: auto.lastAssignedUserName,
     realtorMemberCount: auto.realtorMemberCount,
+    slaEnabled: auto.slaEnabled,
+    slaFirstResponseMinutes: auto.slaFirstResponseMinutes,
+    slaEscalateMinutes: auto.slaEscalateMinutes,
     brokerageLicenseNumber: brokerage?.brokerageLicenseNumber ?? ctx.brokerage.brokerageLicenseNumber ?? null,
     brokerageFairHousingNotice: brokerage?.brokerageFairHousingNotice ?? ctx.brokerage.brokerageFairHousingNotice ?? null,
     brokerageShowEqualHousingMark: brokerage?.brokerageShowEqualHousingMark ?? ctx.brokerage.brokerageShowEqualHousingMark ?? false,
