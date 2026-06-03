@@ -9,8 +9,6 @@ import { withSentryConfig } from "@sentry/nextjs";
  * For now the CSP is omitted (see note below), but the domains are documented.
  */
 const securityHeaders = [
-  // Prevent embedding in iframes from other origins (clickjacking)
-  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   // Prevent MIME-type sniffing
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // Limit referrer info sent to cross-origin requests
@@ -51,6 +49,25 @@ const nextConfig: NextConfig = {
         // Apply to all routes
         source: '/(.*)',
         headers: securityHeaders,
+      },
+      {
+        // Clickjacking protection (X-Frame-Options) for every route EXCEPT the
+        // public booking embed (`/book/:slug/embed`), which is designed to be
+        // iframed cross-origin on realtors' own sites. The negative lookahead
+        // ensures this rule does not match the embed path, so SAMEORIGIN is
+        // never sent there. X-Frame-Options has no "allow any origin" value,
+        // so the only correct way to permit framing is to NOT send the header
+        // at all for the embed — hence the exclusion rather than an override.
+        source: '/((?!book/[^/]+/embed).*)',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
+        // The booking embed must be framable by any third-party site. Modern
+        // browsers honor CSP frame-ancestors over X-Frame-Options; we set a
+        // permissive value here and (per the rule above) omit X-Frame-Options
+        // entirely for this path so nothing blocks cross-origin embedding.
+        source: '/book/:slug/embed',
+        headers: [{ key: 'Content-Security-Policy', value: 'frame-ancestors *' }],
       },
     ];
   },

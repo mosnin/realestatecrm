@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { hasLLMKey } from '@/lib/llm';
 import { scoreDynamicApplication } from '@/lib/dynamic-lead-scoring';
 import type { IntakeFormConfig } from '@/lib/types';
 
@@ -26,6 +28,27 @@ export async function POST(req: NextRequest) {
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
+
+  // Rate limit: 30 preview scoring runs per hour per user
+  const { allowed } = await checkRateLimit(
+    `score-preview:${userId}`,
+    30,
+    3600,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many scoring runs. Try again in a bit.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
+  if (!hasLLMKey()) {
+    return NextResponse.json(
+      { error: 'AI scoring is not configured on this server.' },
+      { status: 503 },
+    );
+  }
 
   const formConfig = body.formConfig as IntakeFormConfig | undefined;
   const answers = body.answers as Record<string, string | string[] | number | boolean> | undefined;

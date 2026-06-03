@@ -48,6 +48,13 @@ import {
 } from '@/lib/form-builder';
 import { TITLE_FONT } from '@/lib/typography';
 import {
+  trackFormStart,
+  trackStepView,
+  trackStepComplete,
+  trackFormSubmit,
+  setupAbandonTracking,
+} from '@/lib/form-analytics-client';
+import {
   AlertCircle,
   ArrowUp,
   Check,
@@ -147,6 +154,19 @@ function formatAnswerText(question: FormQuestion, value: string | string[]): str
 
 function isTapToSubmit(type: FormQuestion['type']): boolean {
   return type === 'select' || type === 'radio';
+}
+
+/**
+ * Best-effort analytics call. Analytics is fire-and-forget and must NEVER
+ * block or break the form — any tracker throw is swallowed here so the
+ * submission path is untouched.
+ */
+function track(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // Swallow — analytics failures must never surface to the lead.
+  }
 }
 
 /**
@@ -294,6 +314,62 @@ export function IntakeChat({
   const askedRef = useRef<Set<string>>(new Set());
   const submitFiredRef = useRef(false);
 
+  // ── Analytics lifecycle refs ─────────────────────────────────────────────
+  // Best-effort funnel tracking. None of this gates submission (BUG 1 path).
+  const formStartedRef = useRef(false);
+  const submittedRef = useRef(false);
+  const formConfigVersion = activeConfig?.version;
+  // Stable step index = the current question's position among visible
+  // questions. Used for step_view / step_complete and as the abandon point.
+  const stepIndexFor = useCallback(
+    (questionId: string): number => {
+      const visible = questionList.filter((q) =>
+        evaluateVisibility(q.visibleWhen, answers),
+      );
+      const idx = visible.findIndex((q) => q.id === questionId);
+      return idx >= 0 ? idx : 0;
+    },
+    [questionList, answers],
+  );
+  // Keep the last seen step index in a ref so beforeunload can read it
+  // without re-binding the listener on every advance.
+  const currentStepIndexRef = useRef(0);
+
+  // form_start — once, when the chat first begins. Fires on mount with the
+  // resolved spaceId the component already has.
+  useEffect(() => {
+    if (formStartedRef.current) return;
+    formStartedRef.current = true;
+    track(() => trackFormStart(spaceId, formConfigVersion));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // form_abandon — on unmount / beforeunload if not submitted. The tracker
+  // uses sendBeacon under the hood; we just feed it the live step index and
+  // submitted flag via refs so the listener never goes stale.
+  useEffect(() => {
+    const cleanup = setupAbandonTracking(
+      spaceId,
+      () => currentStepIndexRef.current,
+      () => submittedRef.current,
+      formConfigVersion,
+    );
+    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId, formConfigVersion]);
+
+  // step_view — each time the active question changes. Mirrors the
+  // askedRef gate so we emit exactly one view per question reveal.
+  useEffect(() => {
+    if (!currentQuestion) return;
+    const idx = stepIndexFor(currentQuestion.id);
+    currentStepIndexRef.current = idx;
+    track(() =>
+      trackStepView(spaceId, idx, currentQuestion.label, formConfigVersion),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestion?.id]);
+
   // Reset pending input state whenever the active question changes.
   // The active question's label is rendered by CurrentQuestion (in serif
   // Times — the focal moment per question). Past questions live in
@@ -338,6 +414,14 @@ export function IntakeChat({
         setPendingError(error);
         return;
       }
+      track(() =>
+        trackStepComplete(
+          spaceId,
+          stepIndexFor(question.id),
+          question.label,
+          formConfigVersion,
+        ),
+      );
       if (question.id === LEAD_TYPE_QUESTION_ID) {
         setLeadType(value as LeadType);
       }
@@ -358,7 +442,7 @@ export function IntakeChat({
       setPendingValue('');
       setPendingError(null);
     },
-    [],
+    [spaceId, formConfigVersion, stepIndexFor],
   );
 
   // Skip an optional question with no user-visible bubble. The question
@@ -367,6 +451,14 @@ export function IntakeChat({
   // for the ask.
   const skipOptional = useCallback((question: FormQuestion) => {
     if (question.required) return;
+    track(() =>
+      trackStepComplete(
+        spaceId,
+        stepIndexFor(question.id),
+        question.label,
+        formConfigVersion,
+      ),
+    );
     setTurns((prev) => [
       ...prev,
       {
@@ -378,7 +470,7 @@ export function IntakeChat({
     setAnswers((prev) => ({ ...prev, [question.id]: '' }));
     setPendingValue('');
     setPendingError(null);
-  }, []);
+  }, [spaceId, formConfigVersion, stepIndexFor]);
 
   async function submit() {
     if (!activeConfig || !leadType) {
@@ -408,8 +500,14 @@ export function IntakeChat({
       visibleQuestionCount,
     });
 
+    // Brokerage forms route to the brokerage endpoint so the lead gets
+    // routed, tagged, scored against the brokerage model, and the broker
+    // gets notified. Realtor forms keep the personal endpoint. Same body
+    // shape; only the URL differs.
+    const endpoint = brokerageId ? '/api/public/apply/brokerage' : '/api/public/apply';
+
     try {
-      const res = await fetch('/api/public/apply', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -422,6 +520,11 @@ export function IntakeChat({
         return;
       }
       const data = (await res.json()) as { applicationRef?: string };
+      // Mark submitted FIRST so an unmount race can't fire a false abandon,
+      // then emit the submit event. Best-effort — never blocks the success
+      // transition.
+      submittedRef.current = true;
+      track(() => trackFormSubmit(spaceId, formConfigVersion));
       setApplicationRef(data.applicationRef ?? null);
       setPhase('done');
     } catch {

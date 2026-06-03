@@ -21,6 +21,7 @@ import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import { logger } from '@/lib/logger';
 import { routeBrokerageLead } from '@/lib/brokerage-routing';
+import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -244,7 +245,12 @@ function buildDynamicSchemaForSubmission(
  * Extract standard contact fields from dynamic form submission.
  */
 function extractContactFields(data: Record<string, unknown>, config: IntakeFormConfig) {
-  const name = (data.name as string) ?? '';
+  // Support split first/last name fields (new default) or legacy single name field
+  const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : '';
+  const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : '';
+  const name = firstName && lastName
+    ? `${firstName} ${lastName}`
+    : firstName || lastName || ((data.name as string) ?? '');
   const email = (data.email as string) || null;
   const phone = (data.phone as string) ?? '';
 
@@ -305,7 +311,7 @@ export async function POST(req: NextRequest) {
     // ── Look up the Brokerage ──────────────────────────────────────────────
     const { data: brokerage, error: brokerageError } = await supabase
       .from('Brokerage')
-      .select('id, name, ownerId, status, privacyPolicyHtml')
+      .select('id, name, ownerId, status, privacyPolicyHtml, "brokerageRentalScoringModel", "brokerageBuyerScoringModel"')
       .eq('id', rawBrokerageId)
       .maybeSingle();
     if (brokerageError) throw brokerageError;
@@ -387,6 +393,14 @@ export async function POST(req: NextRequest) {
         if (scoringSettings) {
           scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
         }
+        // Fallback chain: prefer the assigned space's SpaceSetting model, else the
+        // brokerage-level model, else null.
+        if (!scoringModel) {
+          const brokerageScoringColumn = resolvedLeadType === 'buyer'
+            ? 'brokerageBuyerScoringModel'
+            : 'brokerageRentalScoringModel';
+          scoringModel = (brokerage as Record<string, unknown>)[brokerageScoringColumn] as ScoringModel | null;
+        }
       } catch (err) {
         logger.warn('[apply/brokerage] scoring model fetch failed (non-fatal, will use legacy scoring)', {
           spaceId: space.id,
@@ -425,7 +439,12 @@ export async function POST(req: NextRequest) {
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {
         logger.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
-        return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
+        // Only return field-level path/message to the client, not full Zod internals
+        const safeIssues = parsed.error.issues.map((i: z.ZodIssue) => ({
+          path: i.path,
+          message: i.message,
+        }));
+        return NextResponse.json({ error: 'Invalid submission data', issues: safeIssues }, { status: 400 });
       }
 
       const data = parsed.data as Record<string, unknown>;
@@ -597,6 +616,27 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // The status portal resolves the Contact via getSpaceFromSlug(slug) scoped
+    // to that space's id, so the confirmation link MUST carry the slug of the
+    // space the Contact is actually inserted into — not the owner space when a
+    // routed agent's space differs.
+    let slugForStatusLink = space.slug;
+    if (spaceIdForInsert !== space.id) {
+      try {
+        const { data: insertSpace } = await supabase
+          .from('Space')
+          .select('slug')
+          .eq('id', spaceIdForInsert)
+          .maybeSingle();
+        if (insertSpace?.slug) slugForStatusLink = insertSpace.slug;
+      } catch (err) {
+        logger.warn('[apply/brokerage] routed space slug lookup failed; using owner slug', {
+          spaceId: spaceIdForInsert,
+          ownerSpaceId: space.id,
+        }, err);
+      }
+    }
+
     // ── Create Contact in the assigned agent's space (or owner fallback) ──
     const contactInsert: Record<string, unknown> = {
       id: crypto.randomUUID(),
@@ -637,6 +677,20 @@ export async function POST(req: NextRequest) {
       .select();
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
+
+    // Create initial status update record for audit trail (seeds the applicant portal timeline)
+    const { error: statusAuditErr } = await supabase
+      .from('ApplicationStatusUpdate')
+      .insert({
+        contactId: contact.id,
+        spaceId: spaceIdForInsert,
+        fromStatus: null,
+        toStatus: 'received',
+        note: null,
+      });
+    if (statusAuditErr) {
+      logger.warn('[apply/brokerage] initial status audit insert failed (non-fatal)', { contactId: contact.id }, statusAuditErr);
+    }
 
     logger.info('[apply/brokerage] submission persisted', {
       contactId: contact.id,
@@ -748,10 +802,11 @@ export async function POST(req: NextRequest) {
           toEmail: contactEmail,
           applicantName: contactName,
           businessName,
-          slug: `brokerage:${brokerage.id}`,
+          slug: slugForStatusLink,
           applicationRef,
           leadType: contactLeadType,
           customMessage: intakeConfirmationEmail,
+          statusPortalToken,
         }).catch((confirmErr) => {
           logger.error('[apply/brokerage] applicant confirmation email failed', { contactId: contact.id }, confirmErr);
         })
@@ -759,6 +814,19 @@ export async function POST(req: NextRequest) {
 
     await Promise.all([brokerNotification, applicantConfirmation]);
     logger.debug('[apply/brokerage] notifications dispatched', { contactId: contact.id });
+
+    // Fire the agent trigger so Chippi works the new lead in real time instead
+    // of waiting for the cron sweep. Scope to the space the Contact was actually
+    // inserted into (the routed agent's space, or owner fallback).
+    try {
+      await fireAgentTrigger({
+        spaceId: spaceIdForInsert,
+        event: 'application_submitted',
+        contactId: contact.id,
+      });
+    } catch (e) {
+      logger.error('[apply/brokerage] agent trigger failed (non-fatal)', { contactId: contact.id }, e);
+    }
 
     return NextResponse.json(
       {

@@ -1,9 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
+
+/**
+ * Shape validation for a persisted scoring model.
+ *
+ * The deterministic scorer reads this stored JSON at runtime, so the nested
+ * `optionScores` and `ranges` sub-objects must be schema-validated — not just
+ * the top-level `weights` object. Bounds mirror the generator's contract
+ * (lib/scoring/generate-scoring-model.ts + scoring-model-types.ts): scores and
+ * points are 0-100, range bounds are finite numbers (max may be null for an
+ * unlimited upper bound). Kept local to this endpoint per task scope.
+ */
+const score0to100 = z.number().min(0).max(100);
+
+const numberRangeSchema = z
+  .object({
+    min: z.number().finite(),
+    max: z.number().finite().nullable(),
+    points: score0to100,
+    label: z.string().max(200).optional(),
+  })
+  .strict();
+
+const questionScoringModelSchema = z
+  .object({
+    weight: z.number().min(0).max(100),
+    optionScores: z.record(z.string(), score0to100).optional(),
+    ranges: z.array(numberRangeSchema).optional(),
+  })
+  .strict();
+
+const scoringModelSchema = z
+  .object({
+    weights: z.record(z.string(), questionScoringModelSchema),
+    totalWeight: z.number(),
+    reasoning: z.string().max(2000),
+    generatedAt: z.string(),
+    leadType: z.enum(['rental', 'buyer']),
+  })
+  .strict();
 
 /**
  * PUT /api/form-config/save-scoring
@@ -49,13 +89,18 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  const scoringModel = body.scoringModel as ScoringModel | undefined;
-  if (!scoringModel || !scoringModel.weights || typeof scoringModel.weights !== 'object') {
+  // Schema-validate the full scoring model, including the nested
+  // `optionScores` and `ranges` sub-objects the deterministic scorer reads.
+  const parsedModel = scoringModelSchema.safeParse(body.scoringModel);
+  if (!parsedModel.success) {
+    const first = parsedModel.error.issues[0];
+    const path = first?.path?.length ? first.path.join('.') : 'scoringModel';
     return NextResponse.json(
-      { error: 'Invalid scoring model' },
+      { error: `Invalid scoring model: ${path} ${first?.message ?? 'is malformed'}` },
       { status: 400 },
     );
   }
+  const scoringModel: ScoringModel = parsedModel.data as ScoringModel;
 
   // Validate weights sum to ~100 (allow small rounding margin)
   const totalWeight = Object.values(scoringModel.weights).reduce(

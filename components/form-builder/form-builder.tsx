@@ -367,9 +367,28 @@ function QuestionEditor({
 }) {
   const isSystem = !!question.system;
   const hasOptions = ['select', 'multi_select', 'radio'].includes(question.type);
+  const isNumber = question.type === 'number';
+  const isTextLike = ['text', 'textarea', 'email', 'phone'].includes(question.type);
+  const showValidation = isNumber || isTextLike;
 
   const updateField = <K extends keyof FormQuestion>(key: K, value: FormQuestion[K]) => {
     onChange({ ...question, [key]: value });
+  };
+
+  // Write a single validation rule, creating the object if absent and dropping
+  // empty values so we never persist empties (e.g. {} or undefined fields).
+  const updateValidation = (
+    key: keyof NonNullable<FormQuestion['validation']>,
+    value: number | string | undefined,
+  ) => {
+    const next = { ...(question.validation || {}) };
+    if (value === undefined || value === '') {
+      delete next[key];
+    } else {
+      // pattern is a string; min/max/minLength/maxLength are numbers
+      (next as Record<string, number | string>)[key] = value;
+    }
+    updateField('validation', Object.keys(next).length > 0 ? next : undefined);
   };
 
   return (
@@ -501,6 +520,87 @@ function QuestionEditor({
           >
             <Plus size={12} /> Add option
           </button>
+        </div>
+      )}
+
+      {/* Validation rules — only for types the renderer can actually enforce */}
+      {showValidation && (
+        <div className="space-y-2">
+          <Label className="text-xs">Validation</Label>
+
+          {isNumber && (
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Min</Label>
+                <Input
+                  type="number"
+                  value={question.validation?.min ?? ''}
+                  onChange={(e) =>
+                    updateValidation('min', e.target.value === '' ? undefined : Number(e.target.value))
+                  }
+                  placeholder="No minimum"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Max</Label>
+                <Input
+                  type="number"
+                  value={question.validation?.max ?? ''}
+                  onChange={(e) =>
+                    updateValidation('max', e.target.value === '' ? undefined : Number(e.target.value))
+                  }
+                  placeholder="No maximum"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          {isTextLike && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Min length</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={question.validation?.minLength ?? ''}
+                    onChange={(e) =>
+                      updateValidation('minLength', e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    placeholder="No minimum"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Max length</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={question.validation?.maxLength ?? ''}
+                    onChange={(e) =>
+                      updateValidation('maxLength', e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    placeholder="No maximum"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Pattern (regex)</Label>
+                <Input
+                  value={question.validation?.pattern ?? ''}
+                  onChange={(e) => updateValidation('pattern', e.target.value)}
+                  placeholder="e.g. ^[A-Z]{2}\d{4}$"
+                  className="h-8 text-xs font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  A regular expression the answer must match. Leave blank to skip.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 

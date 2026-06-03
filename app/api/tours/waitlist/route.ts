@@ -13,6 +13,22 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
+  // Lazy expiry: reap stale holds for THIS space before listing.
+  // A 'notified' entry whose 30-min hold (expiresAt) has passed is reset
+  // back to 'waiting' so the slot is freed. Best-effort — a failure here
+  // must not 500 the list.
+  try {
+    const { error: reapError } = await supabase
+      .from('TourWaitlist')
+      .update({ status: 'waiting', expiresAt: null, notifiedAt: null })
+      .eq('spaceId', space.id)
+      .eq('status', 'notified')
+      .lt('expiresAt', new Date().toISOString());
+    if (reapError) console.error('[waitlist] Reap of expired holds failed:', reapError);
+  } catch (err) {
+    console.error('[waitlist] Reap of expired holds failed:', err);
+  }
+
   const { data, error } = await supabase
     .from('TourWaitlist')
     .select('*')

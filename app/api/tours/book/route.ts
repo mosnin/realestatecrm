@@ -5,6 +5,7 @@ import { sendTourConfirmation, type TourEmailData } from '@/lib/tour-emails';
 import { notifyNewTour } from '@/lib/notify';
 import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { validateTourSlot } from '@/lib/tours/validate-slot';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -84,6 +85,20 @@ export async function POST(req: NextRequest) {
   }
   if (start.getTime() < Date.now()) {
     return NextResponse.json({ error: 'Cannot book in the past' }, { status: 400 });
+  }
+
+  // Re-validate that the requested time is a REAL, allowed slot in the
+  // realtor's configured availability window. The GET /available endpoint
+  // enforces this when generating slots, but the write path must not trust the
+  // client: a crafted POST with any future, non-conflicting timestamp could
+  // otherwise book an off-hours / blocked-date / wrong-weekday tour. This
+  // check is ADDITIVE — the "not in past" + atomic conflict checks still run.
+  const slotCheck = await validateTourSlot(space.id, start, validPropertyProfileId);
+  if (!slotCheck.ok) {
+    return NextResponse.json(
+      { error: slotCheck.reason ?? 'Selected time is not a valid tour slot.' },
+      { status: 422 },
+    );
   }
 
   const end = new Date(start.getTime() + duration * 60 * 1000);

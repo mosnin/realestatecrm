@@ -28,6 +28,15 @@ export async function POST(req: NextRequest) {
   if (tourError) throw tourError;
   if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
+  // Only completed tours can be converted into a deal. Reject anything else
+  // (e.g. scheduled, confirmed, cancelled, no-show) before any write.
+  if (tour.status !== 'completed') {
+    return NextResponse.json(
+      { error: `Only completed tours can be converted to a deal (tour status: ${tour.status}).` },
+      { status: 409 }
+    );
+  }
+
   // Check if already converted
   const { data: existingDeal } = await supabase
     .from('Deal')
