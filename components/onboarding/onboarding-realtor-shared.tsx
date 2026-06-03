@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Shared onboarding building blocks — used by the V2 storytelling flow
+ * Shared onboarding building blocks - used by the V2 storytelling flow
  * (`onboarding-realtor-v2.tsx`). The legacy `onboarding-realtor.tsx`
  * keeps its own inline copies on purpose: it's the live flow, slated
  * for deletion once V2 ships to all realtors, and refactoring code
@@ -171,7 +171,7 @@ export function StageWhoYouServe({
         })}
       </div>
 
-      <Section label="Anything I should always say — or never say — to a lead? (optional)">
+      <Section label="Anything I should always say - or never say - to a lead? (optional)">
         <textarea
           value={voiceGuidance}
           onChange={(e) => onChangeVoiceGuidance(e.target.value)}
@@ -198,8 +198,8 @@ export function StageVoice({
   const firstName = (name.trim().split(/\s+/)[0]) || 'me';
   const business = businessName.trim() || 'our team';
 
-  const warm = `Hi! Yes, 1422 Pine is still available — great spot, I just walked through it on Saturday. Want me to send a few photos and find a time that works for you to take a look? No pressure either way. — ${firstName} at ${business}`;
-  const direct = `Hi — yes, 1422 Pine is available. Asking $625K, 3 bed / 2 bath, last open house had 11 groups through. I can hold a private tour Tue 5–7p or Wed 6–7p. Which works? — ${firstName}, ${business}`;
+  const warm = `Hi! Yes, 1422 Pine is still available - great spot, I just walked through it on Saturday. Want me to send a few photos and find a time that works for you to take a look? No pressure either way. - ${firstName} at ${business}`;
+  const direct = `Hi - yes, 1422 Pine is available. Asking $625K, 3 bed / 2 bath, last open house had 11 groups through. I can hold a private tour Tue 5–7p or Wed 6–7p. Which works? - ${firstName}, ${business}`;
 
   return (
     <div className="space-y-8">
@@ -208,7 +208,7 @@ export function StageVoice({
           Which one sounds more like you?
         </h2>
         <p className="text-sm text-muted-foreground">
-          A new lead just asked about a listing. Pick the reply that matches your voice — I&apos;ll match it from here.
+          A new lead just asked about a listing. Pick the reply that matches your voice - I&apos;ll match it from here.
         </p>
       </div>
 
@@ -264,7 +264,7 @@ export function StageSources({
           Where do most of your leads come from?
         </h2>
         <p className="text-sm text-muted-foreground">
-          Pick your top one or two — that&apos;s where I&apos;ll watch first. You can wire up the rest in Settings later.
+          Pick your top one or two - that&apos;s where I&apos;ll watch first. You can wire up the rest in Settings later.
         </p>
       </div>
 

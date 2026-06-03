@@ -15,6 +15,7 @@ import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
@@ -251,6 +252,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Account-switch swipe — plays the Chippi-logo swipe when arriving here
+          from the brokerage side. Yields the moment to itself; ChippiSplash
+          steps aside when a switch is in progress. */}
+      <AccountSwitchSwipe />
       {/* First-paint splash — greets the realtor by name (varied each open),
           shows a snapshot of what's new, then dissolves into the dashboard.
           Plays every time the app/PWA is opened. */}

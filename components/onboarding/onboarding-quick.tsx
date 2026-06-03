@@ -19,7 +19,7 @@ type SlugState =
   | { kind: 'invalid'; message: string };
 
 /**
- * Quick-path onboarding — one screen, two real fields. Replaces the old
+ * Quick-path onboarding - one screen, two real fields. Replaces the old
  * 9-step realtor onboarding. The activation event (intake link) lives at
  * the bottom of this screen as soon as a valid business name produces a
  * usable slug. Brokers tap the link at the bottom to switch to the longer
@@ -126,7 +126,7 @@ export function OnboardingQuick({ defaultName }: Props) {
         if (!spaceRes.ok) {
           if (spaceRes.status === 409) {
             setSlugState({ kind: 'taken' });
-            setSubmitError('That URL was just taken — pick another.');
+            setSubmitError('That URL was just taken - pick another.');
             return;
           }
           throw new Error('space');
@@ -142,7 +142,7 @@ export function OnboardingQuick({ defaultName }: Props) {
         toast.success("You're in. Here's your workspace.");
         router.push(`/s/${slug}/chippi`);
       } catch {
-        setSubmitError("Couldn't finish setup — usually temporary.");
+        setSubmitError("Couldn't finish setup - usually temporary.");
         setSubmitting(false);
       }
     },
@@ -218,7 +218,7 @@ export function OnboardingQuick({ defaultName }: Props) {
               )}
               {slugState.kind === 'taken' && (
                 <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">
-                  taken — pick a different name
+                  taken - pick a different name
                 </span>
               )}
               {slugState.kind === 'invalid' && (

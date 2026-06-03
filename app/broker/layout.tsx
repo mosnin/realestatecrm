@@ -5,6 +5,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
+import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { supabase } from '@/lib/supabase';
 import { PAGE_MAX } from '@/lib/geometry';
 import type { Metadata } from 'next';
@@ -150,6 +151,7 @@ export default async function BrokerLayout({ children }: { children: React.React
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+      <AccountSwitchSwipe />
       <Sidebar
         slug={slug}
         spaceName={spaceName}

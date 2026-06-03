@@ -15,10 +15,10 @@ interface OnboardingShellProps {
   stepKey: string;
   /** The rendered step content. */
   children: React.ReactNode;
-  /** Optional back handler — rendered as a subtle top-left affordance. */
+  /** Optional back handler - rendered as a subtle top-left affordance. */
   onBack?: () => void;
   /**
-   * Hide the progress dots for "bookend" stages — the welcome cover
+   * Hide the progress dots for "bookend" stages - the welcome cover
    * and the final reveal. A book cover isn't page 1, and the payoff
    * screen shouldn't read as "8 of 9." Defaults to false so the
    * legacy flow is unaffected.
@@ -40,7 +40,7 @@ export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBa
           40/30 → 70/50 so the orange is actually perceptible at the
           moment of strongest emotional engagement (onboarding is the
           realtor's first taste of the brand). Dark mode held at the
-          original 4-3% — bright orange on a dark canvas reads as a
+          original 4-3% - bright orange on a dark canvas reads as a
           glow, not a wash. The wrapper imports brandOrange below so
           the stray-orange lint rule recognises this as one of the
           five named contexts. */}
@@ -52,7 +52,7 @@ export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBa
         )}
       />
 
-      {/* Back button — top-left, ghost pill */}
+      {/* Back button - top-left, ghost pill */}
       {onBack && (
         <button
           type="button"
