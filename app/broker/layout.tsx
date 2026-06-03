@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { Sidebar } from '@/components/dashboard/sidebar';
+import { SidebarCollapseProvider } from '@/components/dashboard/sidebar-collapse';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
@@ -236,23 +237,25 @@ export default async function BrokerLayout({ children }: { children: React.React
         }}
       />
       <AccountSwitchSwipe />
-      <Sidebar
-        slug={slug}
-        spaceName={spaceName}
-        unreadLeadCount={unreadLeadCount}
-        isBroker={true}
-        isBrokerOnly={isBrokerOnly}
-        brokerageName={ctx.brokerage.name}
-        brokerageRole={ctx.membership.role}
-        brokerageMemberships={[{ id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role }]}
-      />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
-        {/* Chat-vs-dashboard padding is decided client-side by usePathname()
-            inside BrokerMain — NOT by the fragile x-pathname header — so the
-            container is always correct and nothing touches the screen edge. */}
-        <BrokerMain>{children}</BrokerMain>
-      </div>
+      <SidebarCollapseProvider>
+        <Sidebar
+          slug={slug}
+          spaceName={spaceName}
+          unreadLeadCount={unreadLeadCount}
+          isBroker={true}
+          isBrokerOnly={isBrokerOnly}
+          brokerageName={ctx.brokerage.name}
+          brokerageRole={ctx.membership.role}
+          brokerageMemberships={[{ id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role }]}
+        />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
+          {/* Chat-vs-dashboard padding is decided client-side by usePathname()
+              inside BrokerMain — NOT by the fragile x-pathname header — so the
+              container is always correct and nothing touches the screen edge. */}
+          <BrokerMain>{children}</BrokerMain>
+        </div>
+      </SidebarCollapseProvider>
       <MobileNav slug={slug} isBroker={true} isBrokerOnly={isBrokerOnly} />
     </div>
   );
