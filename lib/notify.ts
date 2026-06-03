@@ -329,4 +329,20 @@ export async function notifyNewContact(params: NotifyNewContactParams): Promise<
       logger.error('[notify] contact SMS failed', { spaceId: params.spaceId }, err);
     }
   }
+
+  // Push — a manually/agent-added new lead is the same "new lead" event as an
+  // inbound application (notifyNewLead), so it gets the same push. Without this
+  // the push channel only fired for intake-form leads, silently skipping every
+  // lead added by hand or by the add-person tool.
+  if (info.pushEnabled) {
+    try {
+      await sendPushToSpace(params.spaceId, {
+        title: `New lead: ${params.contactName}`,
+        body: `Open ${info.spaceName} to review.`,
+        url: `/s/${info.spaceSlug}/people`,
+      });
+    } catch (err) {
+      logger.error('[notify] contact push failed', { spaceId: params.spaceId }, err);
+    }
+  }
 }
