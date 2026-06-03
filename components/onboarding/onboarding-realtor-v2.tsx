@@ -1,71 +1,90 @@
 'use client';
 
 /**
- * Realtor onboarding — V2, the storytelling flow.
+ * Realtor onboarding — V2, the conversational flow.
  *
- * The audit found V1 was a wizard: welcome → data → data → demo →
- * data → static-plan. It collected fields, then summarized the fields.
- * Apple onboarding tells a story — welcome, recognition, trust, then a
- * payoff where the product DOES something for you before you arrive.
+ * The realtor doesn't fill out a form; they have a conversation with Chippi,
+ * inside an interface that looks and moves exactly like the chat their own
+ * leads will use. Three acts:
  *
- * The arc (9 stages, each one idea):
- *   1. welcome   — "Hi. I'm Chippi." One promise. (unchanged from V1.)
- *   2. name      — name + role. Role auto-advances when name's filled.
- *   3. business  — business name → live slug check.
- *   4. where     — ZIP + tenure. "Continue" CREATES the workspace.
- *   5. promise   — the trust micro-screen. "I draft. You approve."
- *   6. serve     — audience + voice guidance. (shared)
- *   7. voice     — pick warm vs direct from two drafts. (shared)
- *   8. sources   — top 1-2 lead sources. (shared)
- *   9. reveal    — Chippi TYPES a first-touch message in their voice,
- *                  live. The payoff. "Take me in" completes.
+ *   Act I  (intro)  — a cinematic cold open (OnboardingIntro): a title line,
+ *                     the Chippi mark, then a blur-out into the chat.
+ *   Act II (chat)   — Chippi types each question; the realtor answers through
+ *                     real inline inputs rendered as their own chat bubbles.
+ *                     Same surface, same motion as the live intake chat.
+ *   Act III (ready) — Chippi types a real first-touch draft (the payoff), then
+ *                     a closing preloader (OnboardingReady) flashes a few
+ *                     working-words → "Your account is ready." → the dashboard.
  *
- * Gated behind NEXT_PUBLIC_ONBOARDING_V2 (see app/setup/page.tsx).
- * V1 stays the default and the rollback path until this proves out.
+ * IMPORTANT — the persistence contract is UNCHANGED. Every `/api/onboarding`
+ * call (check_slug, save_profile, create_space, save_realtor_profile,
+ * complete) and the broker-create/space-patch sequence are byte-for-byte what
+ * the prior stage-based V2 sent. This is a re-presentation of a protected
+ * backend, not a change to it.
  *
- * Persistence mirrors V1:
- *   - End of `where`: save_profile + create_space + save_realtor_profile.
- *   - End of serve/voice/sources: save_realtor_profile upsert (cumulative).
- *   - reveal "take me in": complete → redirect (broker branch for owners).
+ * Gated behind NEXT_PUBLIC_ONBOARDING_V2 (see app/setup/page.tsx). V1
+ * (`onboarding-realtor.tsx`) stays the rollback path — don't refactor it.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import { Loader2, ArrowRight, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { cn, rootDomain } from '@/lib/utils';
+import { brandOrange } from '@/lib/colors';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
-import { rootDomain } from '@/lib/utils';
 import { CHIPPI_PILL } from '@/lib/typography';
-import { OnboardingShell } from './onboarding-shell';
-import { TypingText } from './typing-text';
+import { BrandLogo } from '@/components/brand-logo';
 import { composeOnboardingDraft } from '@/lib/onboarding-draft';
+import { OnboardingIntro, OnboardingReady } from './onboarding-cinematics';
+import { ChippiSays, UserSays, AnswerAffordance, Thread } from './onboarding-chat';
+import { TypingText } from './typing-text';
 import {
   type Role, type Tenure, type Tone, type SlugState,
   TENURE_TO_YEARS,
   toggle, toggleCapped,
-  Section, PickerButton, StageContinue, ErrorLine,
-  StageWhoYouServe, StageVoice, StageSources,
+  PickerButton,
+  CLIENT_TYPE_OPTIONS, LEAD_SOURCE_OPTIONS,
 } from './onboarding-realtor-shared';
 
 interface Props {
   defaultName: string;
 }
 
-type Stage =
-  | 'welcome' | 'name' | 'business' | 'where' | 'promise'
-  | 'serve' | 'voice' | 'sources' | 'reveal';
+type Phase = 'intro' | 'chat' | 'ready';
 
-const STAGE_ORDER: Stage[] = [
-  'welcome', 'name', 'business', 'where', 'promise',
-  'serve', 'voice', 'sources', 'reveal',
+/** Conversation steps, in order. Bookended by the cinematics, not in here. */
+type Step =
+  | 'greet' | 'name' | 'role' | 'business' | 'where'
+  | 'promise' | 'serve' | 'voice' | 'sources' | 'reveal';
+
+const ORDER: Step[] = [
+  'greet', 'name', 'role', 'business', 'where',
+  'promise', 'serve', 'voice', 'sources', 'reveal',
 ];
 
-/** Stages that show progress dots (excludes the welcome cover + reveal payoff). */
-const PROGRESS_STAGES: Stage[] = ['name', 'business', 'where', 'promise', 'serve', 'voice', 'sources'];
+const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
+  { value: 'lt1', label: 'Under a year' },
+  { value: '1-3', label: '1–3 years' },
+  { value: '4-10', label: '4–10 years' },
+  { value: '10plus', label: '10+ years' },
+];
+
+const ROLE_LABEL: Record<Role, string> = {
+  solo: "I'm a solo agent",
+  team_lead: 'I lead a team',
+  brokerage_owner: 'I own the brokerage',
+};
 
 export function OnboardingRealtorV2({ defaultName }: Props) {
   const router = useRouter();
-  const [stage, setStage] = useState<Stage>('welcome');
+
+  const [phase, setPhase] = useState<Phase>('intro');
+
+  // Conversation position.
+  const [stepIdx, setStepIdx] = useState(0);
+  const [typedDone, setTypedDone] = useState(false);
+  const current = ORDER[stepIdx];
 
   // Identity + workspace.
   const [name, setName] = useState(defaultName || '');
@@ -87,13 +106,39 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [workspaceCreated, setWorkspaceCreated] = useState(false);
 
+  // Where to land once the closing preloader finishes.
+  const redirectRef = useRef<string | null>(null);
+
+  const firstName = (name.trim().split(/\s+/)[0]) || 'there';
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+
+  const goToStep = useCallback((s: Step) => {
+    setStepIdx(ORDER.indexOf(s));
+    setTypedDone(false);
+    setError(null);
+  }, []);
+  const advance = useCallback(() => {
+    setStepIdx((i) => Math.min(i + 1, ORDER.length - 1));
+    setTypedDone(false);
+    setError(null);
+  }, []);
+
+  // Greet has no input — once Chippi finishes saying hello, glide to the
+  // first question after a short beat.
+  useEffect(() => {
+    if (current !== 'greet' || !typedDone) return;
+    const t = setTimeout(advance, 650);
+    return () => clearTimeout(t);
+  }, [current, typedDone, advance]);
+
   // Auto-derive slug from business name until the realtor edits it.
   useEffect(() => {
     if (slugTouched) return;
     setSlug(normalizeSlug(businessName));
   }, [businessName, slugTouched]);
 
-  // Debounced slug availability check (same contract as V1).
+  // Debounced slug availability check (same contract as before).
   const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const checkSeq = useRef(0);
   useEffect(() => {
@@ -126,17 +171,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
     return () => { if (checkTimer.current) clearTimeout(checkTimer.current); };
   }, [slug]);
 
-  const goTo = useCallback((s: Stage) => setStage(s), []);
-  const goNext = useCallback(() => {
-    const i = STAGE_ORDER.indexOf(stage);
-    if (i < STAGE_ORDER.length - 1) setStage(STAGE_ORDER[i + 1]);
-  }, [stage]);
-  const goBack = useCallback(() => {
-    const i = STAGE_ORDER.indexOf(stage);
-    if (i > 0) setStage(STAGE_ORDER[i - 1]);
-  }, [stage]);
-
-  // ── Persistence ─────────────────────────────────────────────────────────────
+  // ── Persistence (unchanged contract) ─────────────────────────────────────────
 
   const saveProfilePartial = useCallback(async () => {
     if (!workspaceCreated) return;
@@ -187,7 +222,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
           setSlugState({ kind: 'taken' });
           setError('That URL was just taken — pick another.');
           setSubmitting(false);
-          goTo('business');
+          goToStep('business');
           return;
         }
         throw new Error('space');
@@ -200,14 +235,15 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       });
 
       setSubmitting(false);
-      goNext();
+      advance();
     } catch {
       setError("Couldn't save that — usually temporary.");
       setSubmitting(false);
     }
-  }, [role, tenure, zipCode, businessName, slug, slugState, name, goNext, goTo]);
+  }, [role, tenure, zipCode, businessName, slug, slugState, name, advance, goToStep]);
 
-  // reveal "take me in" → complete + redirect (broker branch for owners).
+  // reveal "take me in" → complete, then hand off to the closing preloader,
+  // which redirects when it finishes. (broker branch for owners.)
   const handleFinish = useCallback(async () => {
     setSubmitting(true);
     setError(null);
@@ -234,8 +270,8 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
             body: JSON.stringify({ slug, brokerageId: newBrokerageId }),
           }).catch(() => undefined);
         }
-        toast.success('Brokerage created. Chippi is ready.');
-        router.push('/broker');
+        redirectRef.current = '/broker';
+        setPhase('ready');
         return;
       }
 
@@ -245,209 +281,299 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       });
       if (!completeRes.ok) throw new Error('complete');
 
-      toast.success("You're in. Chippi is ready.");
-      router.push(`/s/${slug}/chippi`);
+      redirectRef.current = `/s/${slug}/chippi`;
+      setPhase('ready');
     } catch {
       setError("Couldn't finish setup — usually temporary.");
       setSubmitting(false);
     }
-  }, [saveProfilePartial, slug, router, role, businessName]);
+  }, [saveProfilePartial, slug, role, businessName]);
 
-  // ── Shell wiring ──────────────────────────────────────────────────────────────
+  // ── Copy ──────────────────────────────────────────────────────────────────────
 
-  const isBookend = stage === 'welcome' || stage === 'reveal';
-  const progressIndex = PROGRESS_STAGES.indexOf(stage);
-  // Back is offered on every middle stage except the first (name) and the
-  // terminal reveal — going back from name would hit the welcome cover, and
-  // going back from reveal after completion is meaningless.
-  const canBack = !isBookend && stage !== 'name';
+  const promptFor = useCallback((s: Step): string => {
+    switch (s) {
+      case 'greet': return "I'm Chippi — your new companion. From here on, I'm working right alongside you.";
+      case 'name': return 'First — what should I call you?';
+      case 'role': return `Good to meet you, ${firstName}. What are you running?`;
+      case 'business': return 'What should leads call your business?';
+      case 'where': return 'Where do you work — and how long have you been at it?';
+      case 'promise': return 'Before we go further, one promise: I draft, you approve. Nothing leaves without your name on it.';
+      case 'serve': return "Who do you work with most? Pick up to three — I'll tune everything to them.";
+      case 'voice': return 'A new lead just asked about a listing. Which reply sounds like you?';
+      case 'sources': return "Where do most of your leads come from? Pick your top one or two — that's where I'll watch first.";
+      case 'reveal': return `That's everything I need, ${firstName}. Watch — here's the first note I'd send a new lead.`;
+    }
+  }, [firstName]);
+
+  // The realtor's answer bubble for a completed step. null = no bubble.
+  const answerFor = useCallback((s: Step): string | null => {
+    switch (s) {
+      case 'name': return name.trim() || null;
+      case 'role': return role ? ROLE_LABEL[role] : null;
+      case 'business': return businessName.trim() ? `${businessName.trim()} · ${slug}` : null;
+      case 'where': {
+        const t = TENURE_OPTIONS.find((o) => o.value === tenure)?.label;
+        return zipCode && t ? `${zipCode} · ${t}` : null;
+      }
+      case 'serve': {
+        const labels = clientTypes
+          .map((v) => CLIENT_TYPE_OPTIONS.find((o) => o.value === v)?.label)
+          .filter(Boolean);
+        return labels.length ? labels.join(', ') : null;
+      }
+      case 'voice': return tone ? (tone === 'warm' ? 'Warm' : 'Direct') : null;
+      case 'sources': {
+        const labels = leadSources
+          .map((v) => LEAD_SOURCE_OPTIONS.find((o) => o.value === v)?.label)
+          .filter(Boolean);
+        return labels.length ? labels.join(', ') : "We'll set this up later.";
+      }
+      default: return null;
+    }
+  }, [name, role, businessName, slug, zipCode, tenure, clientTypes, tone, leadSources]);
+
+  // ── Cinematics ──────────────────────────────────────────────────────────────
+
+  if (phase === 'intro') {
+    return <OnboardingIntro onDone={() => setPhase('chat')} />;
+  }
+
+  // ── The conversation ──────────────────────────────────────────────────────────
 
   return (
-    <OnboardingShell
-      stepIndex={progressIndex < 0 ? 0 : progressIndex}
-      totalSteps={PROGRESS_STAGES.length}
-      stepKey={stage}
-      hideProgress={isBookend}
-      onBack={canBack ? goBack : undefined}
-    >
-      {stage === 'welcome' && <StageWelcome onContinue={goNext} />}
+    <>
+      <motion.div
+        className="relative min-h-screen w-full overflow-hidden bg-background text-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {/* Brand-warm wash — same as the onboarding shell, one of the five
+            sanctioned orange contexts. */}
+        <div
+          aria-hidden
+          className={brandOrange(
+            'LOGO',
+            'pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]',
+          )}
+        />
 
-      {stage === 'name' && (
-        <StageName
-          name={name}
-          role={role}
-          onChangeName={setName}
-          onPickRole={setRole}
-          onContinue={goNext}
+        {/* Fixed brand mark — the chat's quiet header. */}
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-10 flex justify-center bg-gradient-to-b from-background to-transparent pt-6 pb-8">
+          <BrandLogo className="h-5 opacity-80" alt="Chippi" />
+        </div>
+
+        <div className="relative z-[1]">
+          <Thread signal={`${stepIdx}:${typedDone}`}>
+            {/* Past turns. */}
+            {ORDER.slice(0, stepIdx).map((id) => {
+              const answer = answerFor(id);
+              return (
+                <Fragment key={id}>
+                  <ChippiSays text={promptFor(id)} />
+                  {answer && <UserSays>{answer}</UserSays>}
+                </Fragment>
+              );
+            })}
+
+            {/* Active turn — Chippi types, then the answer affordance fades in. */}
+            <ChippiSays
+              key={`active-${current}`}
+              text={promptFor(current)}
+              active
+              typing
+              onTyped={() => setTypedDone(true)}
+            />
+
+            {current !== 'greet' && (
+              <AnswerAffordance show={typedDone}>
+                {renderAffordance()}
+              </AnswerAffordance>
+            )}
+          </Thread>
+        </div>
+      </motion.div>
+
+      {phase === 'ready' && (
+        <OnboardingReady
+          onDone={() => {
+            if (redirectRef.current) router.push(redirectRef.current);
+          }}
         />
       )}
+    </>
+  );
 
-      {stage === 'business' && (
-        <StageBusiness
-          businessName={businessName}
-          slug={slug}
-          slugState={slugState}
-          submitting={submitting}
-          error={error}
-          onChangeBusinessName={setBusinessName}
-          onTouchSlug={(s) => { setSlugTouched(true); setSlug(normalizeSlug(s)); }}
-          onContinue={goNext}
-        />
-      )}
+  // ── Affordances ───────────────────────────────────────────────────────────────
 
-      {stage === 'where' && (
-        <StageWhere
-          zipCode={zipCode}
-          tenure={tenure}
-          submitting={submitting}
-          error={error}
-          onChangeZip={setZipCode}
-          onChangeTenure={setTenure}
-          onContinue={handleCreateWorkspace}
-        />
-      )}
+  function renderAffordance() {
+    switch (current) {
+      case 'name':
+        return (
+          <NameAffordance value={name} onChange={setName} onContinue={() => name.trim() && advance()} />
+        );
 
-      {stage === 'promise' && <StagePromise onContinue={goNext} />}
+      case 'role':
+        return (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+              <PickerButton key={r} selected={role === r} onClick={() => { setRole(r); setTimeout(advance, 360); }}>
+                <span className="font-medium">{ROLE_LABEL[r]}</span>
+              </PickerButton>
+            ))}
+          </div>
+        );
 
-      {stage === 'serve' && (
-        <StageWhoYouServe
-          clientTypes={clientTypes}
-          voiceGuidance={voiceGuidance}
-          onToggleClientType={(v) => setClientTypes((prev) => toggleCapped(prev, v, 3))}
-          onChangeVoiceGuidance={setVoiceGuidance}
-          onContinue={() => { void saveProfilePartial(); goNext(); }}
-        />
-      )}
+      case 'business':
+        return (
+          <BusinessAffordance
+            businessName={businessName}
+            slug={slug}
+            slugState={slugState}
+            submitting={submitting}
+            error={error}
+            onChangeBusinessName={setBusinessName}
+            onTouchSlug={(s) => { setSlugTouched(true); setSlug(normalizeSlug(s)); }}
+            onContinue={advance}
+          />
+        );
 
-      {stage === 'voice' && (
-        <StageVoice
-          name={name}
-          businessName={businessName}
-          tone={tone}
-          onPick={(t) => { setTone(t); void saveProfilePartial(); goNext(); }}
-        />
-      )}
+      case 'where':
+        return (
+          <WhereAffordance
+            zipCode={zipCode}
+            tenure={tenure}
+            submitting={submitting}
+            error={error}
+            onChangeZip={setZipCode}
+            onChangeTenure={setTenure}
+            onContinue={handleCreateWorkspace}
+          />
+        );
 
-      {stage === 'sources' && (
-        <StageSources
-          leadSources={leadSources}
-          onToggle={(v) => setLeadSources((prev) => toggle(prev, v))}
-          onContinue={() => { void saveProfilePartial(); goNext(); }}
-        />
-      )}
+      case 'promise':
+        return (
+          <div className="flex justify-end">
+            <button type="button" onClick={advance} className={CHIPPI_PILL}>
+              Got it <ArrowRight size={14} />
+            </button>
+          </div>
+        );
 
-      {stage === 'reveal' && (
-        <StageReveal
-          name={name}
-          businessName={businessName}
-          tone={tone ?? 'warm'}
-          clientTypes={clientTypes}
-          leadSources={leadSources}
-          submitting={submitting}
-          error={error}
-          onFinish={handleFinish}
-        />
-      )}
-    </OnboardingShell>
+      case 'serve':
+        return (
+          <ServeAffordance
+            clientTypes={clientTypes}
+            voiceGuidance={voiceGuidance}
+            onToggle={(v) => setClientTypes((prev) => toggleCapped(prev, v, 3))}
+            onChangeGuidance={setVoiceGuidance}
+            onContinue={() => { void saveProfilePartial(); advance(); }}
+          />
+        );
+
+      case 'voice':
+        return (
+          <VoiceAffordance
+            name={name}
+            businessName={businessName}
+            tone={tone}
+            onPick={(t) => { setTone(t); void saveProfilePartial(); setTimeout(advance, 360); }}
+          />
+        );
+
+      case 'sources':
+        return (
+          <SourcesAffordance
+            leadSources={leadSources}
+            onToggle={(v) => setLeadSources((prev) => toggle(prev, v))}
+            onContinue={() => { void saveProfilePartial(); advance(); }}
+          />
+        );
+
+      case 'reveal':
+        return (
+          <RevealAffordance
+            name={name}
+            businessName={businessName}
+            tone={tone ?? 'warm'}
+            clientTypes={clientTypes}
+            leadSources={leadSources}
+            submitting={submitting}
+            error={error}
+            onFinish={handleFinish}
+          />
+        );
+
+      default:
+        return null;
+    }
+  }
+}
+
+// ── Affordance pieces ──────────────────────────────────────────────────────────
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1.5 text-xs font-medium text-muted-foreground">{children}</p>;
+}
+
+function ErrorLine({ message }: { message: string }) {
+  return (
+    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+      {message}
+    </div>
   );
 }
 
-// ── Stage: welcome ─────────────────────────────────────────────────────────────
+const INPUT_CLS =
+  'w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring';
 
-function StageWelcome({ onContinue }: { onContinue: () => void }) {
+function SubmitPill({
+  onClick, disabled, children = 'Continue',
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="space-y-10 text-center">
-      <div className="space-y-3">
-        <h1 className="text-4xl sm:text-5xl tracking-tight text-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          Hi. I&apos;m Chippi.
-        </h1>
-        <p className="text-2xl sm:text-3xl tracking-tight text-muted-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          Let&apos;s set up your business in about five minutes —
-          <br className="hidden sm:block" />
-          and by the end, I&apos;ll already be working on it.
-        </p>
-      </div>
+    <div className="flex justify-end">
       <button
         type="button"
-        onClick={onContinue}
-        className={CHIPPI_PILL}
+        disabled={disabled}
+        onClick={onClick}
+        className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Let&apos;s go
-        <ArrowRight size={14} />
+        {children} <ArrowRight size={14} />
       </button>
     </div>
   );
 }
 
-// ── Stage: name + role ─────────────────────────────────────────────────────────
-
-function StageName({
-  name, role, onChangeName, onPickRole, onContinue,
+function NameAffordance({
+  value, onChange, onContinue,
 }: {
-  name: string;
-  role: Role | null;
-  onChangeName: (v: string) => void;
-  onPickRole: (r: Role) => void;
+  value: string;
+  onChange: (v: string) => void;
   onContinue: () => void;
 }) {
-  // Role pick auto-advances when the name is already filled (the common
-  // case — Clerk pre-fills it). A 380ms beat lets the selection register
-  // before the screen glides forward. If name is empty, the realtor
-  // types it and uses the Continue button instead — no jarring jump.
-  const nameReady = name.trim().length > 0;
-  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (advanceTimer.current) clearTimeout(advanceTimer.current); }, []);
-
-  const pick = (r: Role) => {
-    onPickRole(r);
-    if (nameReady) {
-      if (advanceTimer.current) clearTimeout(advanceTimer.current);
-      advanceTimer.current = setTimeout(onContinue, 380);
-    }
-  };
-
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl tracking-tight text-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          First — who are you?
-        </h2>
-        <p className="text-sm text-muted-foreground">Just your name and what you run. One tap each.</p>
-      </div>
-
-      <Section label="Your name">
-        <input
-          type="text"
-          autoComplete="name"
-          value={name}
-          onChange={(e) => onChangeName(e.target.value)}
-          placeholder="Sarah Chen"
-          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </Section>
-
-      <Section label="What are you running?">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <PickerButton selected={role === 'solo'} onClick={() => pick('solo')}>
-            <span className="font-medium">I&apos;m a solo agent</span>
-          </PickerButton>
-          <PickerButton selected={role === 'team_lead'} onClick={() => pick('team_lead')}>
-            <span className="font-medium">I lead a team</span>
-          </PickerButton>
-          <PickerButton selected={role === 'brokerage_owner'} onClick={() => pick('brokerage_owner')}>
-            <span className="font-medium">I own the brokerage</span>
-          </PickerButton>
-        </div>
-      </Section>
-
-      <StageContinue onClick={onContinue} disabled={!nameReady || role === null} />
+    <div className="space-y-4">
+      <input
+        type="text"
+        autoComplete="name"
+        autoFocus
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && value.trim()) onContinue(); }}
+        placeholder="Sarah Chen"
+        className={INPUT_CLS}
+      />
+      <SubmitPill onClick={onContinue} disabled={!value.trim()} />
     </div>
   );
 }
 
-// ── Stage: business name + slug ────────────────────────────────────────────────
-
-function StageBusiness({
+function BusinessAffordance({
   businessName, slug, slugState, submitting, error,
   onChangeBusinessName, onTouchSlug, onContinue,
 }: {
@@ -462,66 +588,46 @@ function StageBusiness({
 }) {
   const linkPreview = slug ? `${rootDomain}/apply/${slug}` : `${rootDomain}/apply/your-business`;
   const canContinue = !submitting && businessName.trim().length > 0 && slugState.kind === 'available';
-
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl tracking-tight text-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          What should leads call your business?
-        </h2>
-        <p className="text-sm text-muted-foreground">This names your intake link — where leads reach you.</p>
-      </div>
-
-      <Section label="Business name">
+    <div className="space-y-5">
+      <div>
+        <FieldLabel>Business name</FieldLabel>
         <input
           type="text"
+          autoFocus
           value={businessName}
           onChange={(e) => onChangeBusinessName(e.target.value)}
           placeholder="Coastal Realty"
-          autoFocus
-          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring"
+          className={INPUT_CLS}
         />
-      </Section>
-
-      <Section label="Your intake link">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={slug}
-            onChange={(e) => onTouchSlug(e.target.value)}
-            placeholder="your-business"
-            className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-        <p className="text-xs text-muted-foreground mt-1.5 break-all">{linkPreview}</p>
+      </div>
+      <div>
+        <FieldLabel>Your intake link</FieldLabel>
+        <input
+          type="text"
+          value={slug}
+          onChange={(e) => onTouchSlug(e.target.value)}
+          placeholder="your-business"
+          className={cn(INPUT_CLS, 'font-mono text-sm')}
+        />
+        <p className="mt-1.5 break-all text-xs text-muted-foreground">{linkPreview}</p>
         <SlugHint state={slugState} />
-      </Section>
-
+      </div>
       {error && <ErrorLine message={error} />}
-
-      <StageContinue onClick={onContinue} disabled={!canContinue} />
+      <SubmitPill onClick={onContinue} disabled={!canContinue} />
     </div>
   );
 }
 
 function SlugHint({ state }: { state: SlugState }) {
   if (state.kind === 'idle') return null;
-  if (state.kind === 'checking') return <p className="text-xs text-muted-foreground mt-1">Checking…</p>;
-  if (state.kind === 'available') return <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 inline-flex items-center gap-1"><Check size={12} /> Available</p>;
-  if (state.kind === 'taken') return <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Taken — try another.</p>;
-  return <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{state.message}</p>;
+  if (state.kind === 'checking') return <p className="mt-1 text-xs text-muted-foreground">Checking…</p>;
+  if (state.kind === 'available') return <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><Check size={12} /> Available</p>;
+  if (state.kind === 'taken') return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Taken — try another.</p>;
+  return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{state.message}</p>;
 }
 
-// ── Stage: ZIP + tenure ────────────────────────────────────────────────────────
-
-const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
-  { value: 'lt1', label: 'Under a year' },
-  { value: '1-3', label: '1–3 years' },
-  { value: '4-10', label: '4–10 years' },
-  { value: '10plus', label: '10+ years' },
-];
-
-function StageWhere({
+function WhereAffordance({
   zipCode, tenure, submitting, error, onChangeZip, onChangeTenure, onContinue,
 }: {
   zipCode: string;
@@ -534,87 +640,176 @@ function StageWhere({
 }) {
   const canContinue = !submitting && /^\d{5}$/.test(zipCode.trim()) && tenure !== null;
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl tracking-tight text-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          Where do you work, and for how long?
-        </h2>
-        <p className="text-sm text-muted-foreground">So I speak to your market like a local, not a tourist.</p>
-      </div>
-
-      <Section label="Primary ZIP code">
+    <div className="space-y-5">
+      <div>
+        <FieldLabel>Primary ZIP code</FieldLabel>
         <input
           type="text"
           inputMode="numeric"
+          autoFocus
           value={zipCode}
           onChange={(e) => onChangeZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
           placeholder="33139"
-          autoFocus
-          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring"
+          className={INPUT_CLS}
         />
-      </Section>
-
-      <Section label="How long have you been in real estate?">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      </div>
+      <div>
+        <FieldLabel>How long have you been in real estate?</FieldLabel>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {TENURE_OPTIONS.map((opt) => (
             <PickerButton key={opt.value} selected={tenure === opt.value} onClick={() => onChangeTenure(opt.value)}>
               <span className="font-medium">{opt.label}</span>
             </PickerButton>
           ))}
         </div>
-      </Section>
-
-      {error && <ErrorLine message={error} />}
-
-      <StageContinue onClick={onContinue} disabled={!canContinue}>
-        {submitting ? <Loader2 size={14} className="animate-spin" /> : 'Continue'}
-      </StageContinue>
-    </div>
-  );
-}
-
-// ── Stage: the trust promise ───────────────────────────────────────────────────
-
-function StagePromise({ onContinue }: { onContinue: () => void }) {
-  // A breath between setup and the deeper profile questions. Names the
-  // single most common new-user fear ("will it send things without
-  // me?") once, plainly — then never mentions it again. A 1.4s minimum
-  // gate keeps the realtor from tapping past it before reading.
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 1400);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <div className="space-y-10 text-center">
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">One promise.</p>
-        <h2
-          className="text-3xl sm:text-4xl tracking-tight text-foreground leading-snug"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          I draft. You approve.
-          <br />
-          Nothing leaves without your name on it.
-        </h2>
       </div>
-      <button
-        type="button"
-        onClick={onContinue}
-        disabled={!ready}
-        className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground text-background px-6 py-3 text-sm font-semibold transition-all duration-300 hover:opacity-90 disabled:opacity-0"
-      >
-        Got it
-        <ArrowRight size={14} />
-      </button>
+      {error && <ErrorLine message={error} />}
+      <SubmitPill onClick={onContinue} disabled={!canContinue}>
+        {submitting ? <Loader2 size={14} className="animate-spin" /> : 'Continue'}
+      </SubmitPill>
     </div>
   );
 }
 
-// ── Stage: the reveal (typing draft) ───────────────────────────────────────────
+function ServeAffordance({
+  clientTypes, voiceGuidance, onToggle, onChangeGuidance, onContinue,
+}: {
+  clientTypes: string[];
+  voiceGuidance: string;
+  onToggle: (v: string) => void;
+  onChangeGuidance: (v: string) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {CLIENT_TYPE_OPTIONS.map((opt) => {
+          const selected = clientTypes.includes(opt.value);
+          const atCap = !selected && clientTypes.length >= 3;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={atCap}
+              onClick={() => onToggle(opt.value)}
+              className={cn(
+                'rounded-xl border px-4 py-3 text-sm font-medium transition-all',
+                selected
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border bg-background text-foreground hover:bg-foreground/[0.04]',
+                atCap && 'cursor-not-allowed opacity-40',
+              )}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      <div>
+        <FieldLabel>Anything I should always say — or never say — to a lead? (optional)</FieldLabel>
+        <textarea
+          value={voiceGuidance}
+          onChange={(e) => onChangeGuidance(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder='e.g. "Never push for a tour on the first message. Always sign off as Sarah from Coastal Realty."'
+          className={cn(INPUT_CLS, 'resize-none text-sm')}
+        />
+      </div>
+      <SubmitPill onClick={onContinue} disabled={clientTypes.length === 0} />
+    </div>
+  );
+}
 
-function StageReveal({
+function VoiceAffordance({
+  name, businessName, tone, onPick,
+}: {
+  name: string;
+  businessName: string;
+  tone: Tone | null;
+  onPick: (t: Tone) => void;
+}) {
+  const firstName = (name.trim().split(/\s+/)[0]) || 'me';
+  const business = businessName.trim() || 'our team';
+  const warm = `Hi! Yes, 1422 Pine is still available — great spot, I just walked through it on Saturday. Want me to send a few photos and find a time that works for you to take a look? No pressure either way. — ${firstName} at ${business}`;
+  const direct = `Hi — yes, 1422 Pine is available. Asking $625K, 3 bed / 2 bath, last open house had 11 groups through. I can hold a private tour Tue 5–7p or Wed 6–7p. Which works? — ${firstName}, ${business}`;
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <VoiceCard label="Warm" body={warm} selected={tone === 'warm'} onClick={() => onPick('warm')} />
+      <VoiceCard label="Direct" body={direct} selected={tone === 'direct'} onClick={() => onPick('direct')} />
+    </div>
+  );
+}
+
+function VoiceCard({
+  label, body, selected, onClick,
+}: {
+  label: string;
+  body: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-xl border p-5 text-left transition-all',
+        selected
+          ? 'border-foreground bg-foreground/[0.04] ring-2 ring-foreground/10 ring-offset-2 ring-offset-background'
+          : 'border-border bg-background hover:bg-foreground/[0.04]',
+      )}
+    >
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{body}</p>
+    </button>
+  );
+}
+
+function SourcesAffordance({
+  leadSources, onToggle, onContinue,
+}: {
+  leadSources: string[];
+  onToggle: (v: string) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {LEAD_SOURCE_OPTIONS.map((opt) => {
+          const selected = leadSources.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onToggle(opt.value)}
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all',
+                selected
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border bg-background text-foreground hover:bg-foreground/[0.04]',
+              )}
+            >
+              {opt.icon ? (
+                <img src={opt.icon} alt="" aria-hidden className="h-6 w-6 object-contain" />
+              ) : (
+                <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold', selected ? 'bg-background/20' : 'bg-muted text-muted-foreground')}>
+                  {opt.label[0]}
+                </span>
+              )}
+              <span className="text-center leading-tight">{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <SubmitPill onClick={onContinue}>
+        {leadSources.length === 0 ? 'Skip for now' : 'Continue'}
+      </SubmitPill>
+    </div>
+  );
+}
+
+function RevealAffordance({
   name, businessName, tone, clientTypes, leadSources, submitting, error, onFinish,
 }: {
   name: string;
@@ -626,42 +821,21 @@ function StageReveal({
   error: string | null;
   onFinish: () => void;
 }) {
-  const firstName = (name.trim().split(/\s+/)[0]) || 'there';
   const draft = composeOnboardingDraft({ name, businessName, tone, clientTypes, leadSources });
   const [typed, setTyped] = useState(false);
-
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl tracking-tight text-foreground" style={{ fontFamily: 'var(--font-title)' }}>
-          That&apos;s everything I need, {firstName}.
-        </h2>
-        <p className="text-sm text-muted-foreground">{draft.frame}</p>
-      </div>
-
-      {/* The draft card — Chippi types it out, live. The whole arc points
-          here: the welcome promised "by the end I'll already be working
-          on it," and this is the moment that lands. */}
+    <div className="space-y-5">
       <div className="rounded-xl border border-border/70 bg-card p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Draft · {tone === 'warm' ? 'Warm' : 'Direct'}
         </p>
-        <p className="text-sm text-foreground leading-relaxed min-h-[7.5rem]">
+        <p className="min-h-[7.5rem] text-sm leading-relaxed text-foreground">
           <TypingText text={draft.body} onDone={() => setTyped(true)} />
         </p>
       </div>
-
       {error && <ErrorLine message={error} />}
-
-      {/* The finish button fades in only once the draft finishes typing —
-          the realtor watches Chippi work, THEN walks in. */}
-      <div className={`flex justify-end transition-opacity duration-500 ${typed ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <button
-          type="button"
-          onClick={onFinish}
-          disabled={submitting}
-          className={CHIPPI_PILL}
-        >
+      <div className={cn('flex justify-end transition-opacity duration-500', typed ? 'opacity-100' : 'pointer-events-none opacity-0')}>
+        <button type="button" onClick={onFinish} disabled={submitting} className={CHIPPI_PILL}>
           {submitting ? <Loader2 size={14} className="animate-spin" /> : <>Looks good — take me in <ArrowRight size={14} /></>}
         </button>
       </div>
