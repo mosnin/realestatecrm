@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
@@ -132,10 +133,10 @@ export default async function BrokerPeoplePage() {
       return 'No contacts across the brokerage yet.';
     }
     if (hotCount > 0) {
-      return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'} — ${hotCount} hot, ${warmCount} warm across the team.`;
+      return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'}. ${hotCount} hot, ${warmCount} warm across the team.`;
     }
     if (warmCount > 0) {
-      return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'} — ${warmCount} warm in the pipeline.`;
+      return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'}. ${warmCount} warm in the pipeline.`;
     }
     return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'} across ${spaceIds.length} ${spaceIds.length === 1 ? 'realtor' : 'realtors'}.`;
   })();
@@ -174,9 +175,16 @@ export default async function BrokerPeoplePage() {
             const activityTs = c.lastContactedAt ?? c.updatedAt ?? c.createdAt;
             const initials = getInitials(c.name);
 
+            const drillPrompt = encodeURIComponent(
+              `Tell me about ${c.name} (${realtorName}'s lead). What's the next move?`
+            );
+
             return (
               <StaggerItem key={c.id}>
-                <div className="flex items-center gap-3 py-3 hover:bg-foreground/[0.04] transition-colors -mx-1 px-1 rounded-sm">
+                <Link
+                  href={`/broker?prompt=${drillPrompt}`}
+                  className="flex items-center gap-3 py-3 hover:bg-foreground/[0.04] transition-colors -mx-1 px-1 rounded-sm"
+                >
                   {/* Avatar / initial */}
                   <div
                     className="w-8 h-8 rounded-full bg-foreground/[0.06] text-foreground/70
@@ -241,7 +249,7 @@ export default async function BrokerPeoplePage() {
                       {timeAgo(activityTs)}
                     </span>
                   </div>
-                </div>
+                </Link>
               </StaggerItem>
             );
           })}

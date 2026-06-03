@@ -117,8 +117,8 @@ const brokerAdminNavSections = [
       { href: '/broker', label: 'Chippi', icon: MessageCircle, exact: true, adminOnly: false },
       { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-      { href: '/broker/people', label: 'People', icon: Contact, exact: false, adminOnly: false },
-      { href: '/broker/deals', label: 'Deals', icon: Handshake, exact: false, adminOnly: false },
+      { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
@@ -133,8 +133,6 @@ const brokerAdminNavSections = [
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
@@ -157,8 +155,6 @@ const brokerMemberNavSections = [
   {
     label: 'More',
     items: [
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
     ],

@@ -66,8 +66,6 @@ const brokerMobileNavSections = [
     items: [
       { href: '/broker/analytics', label: 'Analytics', icon: Briefcase, exact: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false },
-      { href: '/broker/chat', label: 'Team Chat', icon: Bell, exact: false },
-      { href: '/broker/announcements', label: 'Announcements', icon: Plug, exact: false },
     ],
   },
   {
