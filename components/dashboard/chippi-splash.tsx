@@ -22,7 +22,6 @@ import {
 } from "motion/react";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { peekSwitchFlag } from "@/components/dashboard/account-switch";
 
 export interface ChippiSnapshot {
   newLeads: number;
@@ -64,15 +63,10 @@ export function ChippiSplash({
   snapshot: ChippiSnapshot;
 }) {
   const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">("greeting");
-  // When the user is switching accounts, the account-switch swipe owns the
-  // arrival moment — read the flag at render time (before effects) so we step
-  // aside cleanly instead of stacking two overlays.
-  const [skip] = useState(() => peekSwitchFlag());
   const reduce = useReducedMotion();
   const items = useMemo(() => buildItems(snapshot), [snapshot]);
 
   useEffect(() => {
-    if (skip) return;
     const a = setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT);
     const b = setTimeout(() => setStage("gone"), T_TO_GONE);
     const safety = setTimeout(() => setStage("gone"), T_SAFETY);
@@ -81,17 +75,17 @@ export function ChippiSplash({
       clearTimeout(b);
       clearTimeout(safety);
     };
-  }, [skip]);
+  }, []);
 
   // Lock body scroll while the overlay is up.
   useEffect(() => {
-    if (skip || stage === "gone") return;
+    if (stage === "gone") return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [stage, skip]);
+  }, [stage]);
 
   // Shared blur-rise (plain fade under reduced motion).
   const rise = reduce
@@ -116,9 +110,6 @@ export function ChippiSplash({
           transition: { duration: 0.6, ease: EASE },
         },
       };
-
-  // Switching accounts → the swipe handles the moment; render nothing here.
-  if (skip) return null;
 
   return (
     <AnimatePresence>

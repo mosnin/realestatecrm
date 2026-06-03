@@ -459,7 +459,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
               {!isBrokerOnly && slug && (
                 <Link
                   href={base}
-                  onClick={() => triggerAccountSwitch()}
                   className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${spaceName}`}
                 >
