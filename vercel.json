@@ -9,6 +9,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/deal-checklist-reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/cron/broker-weekly-report",
       "schedule": "0 9 * * 1"
     },

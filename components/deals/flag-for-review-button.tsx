@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,9 @@ export function FlagForReviewButton({
   visible = true,
 }: FlagForReviewButtonProps) {
   const router = useRouter();
+  // This component always renders inside the /s/[slug]/... route tree, so the
+  // slug is available from the route params at runtime — no prop change needed.
+  const { slug } = useParams<{ slug: string }>();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -51,21 +54,21 @@ export function FlagForReviewButton({
   if (!visible) return null;
 
   if (hasOpenReview) {
-    // Clickable — calls router.refresh() so the agent can pull the latest
-    // server state. Without this, the chip stays "Review pending" even
-    // after the broker resolves (server components re-render on navigation,
-    // but the agent has no in-app reason to navigate and no real-time
-    // subscription tells them to). Worst case: click does nothing visible
-    // because the review is still open.
+    // Navigate to the realtor's reviews so the agent can actually read what
+    // the broker said. We only know there IS an open review (the boolean),
+    // not its id — the parent holds that state — so we link to the reviews
+    // list at /s/[slug]/reviews rather than a no-op refresh. From there the
+    // agent clicks into the thread. (Linking straight to /reviews/[id] would
+    // require the parent to pass the review id into this component.)
     return (
       <button
         type="button"
-        onClick={() => router.refresh()}
+        onClick={() => router.push(`/s/${slug}/reviews`)}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50',
           'px-2.5 h-8 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors',
         )}
-        title="Your broker is reviewing this deal. Click to check for updates."
+        title="Your broker is reviewing this deal. Click to see the review."
       >
         <Flag size={13} className="text-muted-foreground" />
         Review pending

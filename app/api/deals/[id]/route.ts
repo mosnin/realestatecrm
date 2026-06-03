@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -31,6 +32,7 @@ export async function GET(
   const { userId } = authResult;
 
   const { id } = await params;
+  try {
   const ctx = await resolveDealAndSpace(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const { deal } = ctx;
@@ -41,8 +43,14 @@ export async function GET(
     supabase.from('DealActivity').select('*').eq('dealId', id).eq('spaceId', ctx.space.id).order('createdAt', { ascending: false }).limit(50),
   ]);
 
-  if (stageResult.error && stageResult.error.code !== 'PGRST116') throw stageResult.error;
-  if (dcResult.error) throw dcResult.error;
+  if (stageResult.error && stageResult.error.code !== 'PGRST116') {
+    console.error('[deals/GET] stage fetch error:', stageResult.error);
+    return NextResponse.json({ error: 'Failed to load deal' }, { status: 500 });
+  }
+  if (dcResult.error) {
+    console.error('[deals/GET] deal contacts fetch error:', dcResult.error);
+    return NextResponse.json({ error: 'Failed to load deal' }, { status: 500 });
+  }
 
   const dealContacts = (dcResult.data ?? []).map((row: any) => ({
     dealId: row.dealId,
@@ -57,6 +65,10 @@ export async function GET(
     dealContacts,
     activities: activityResult.data ?? [],
   });
+  } catch (err) {
+    console.error('[deals/GET] unexpected error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
 }
 
 export async function PATCH(
@@ -67,6 +79,18 @@ export async function PATCH(
     const authResult = await requireAuth();
     if (authResult instanceof NextResponse) return authResult;
     const { userId } = authResult;
+
+    // Rate limit: 120 deal edits per minute per user. Deal triage involves
+    // rapid inline edits (value, priority, next-action), so the ceiling is
+    // generous — high enough to never bite normal use, low enough to stop a
+    // runaway client or scripted abuse from hammering the table.
+    const { allowed } = await checkRateLimit(`deals-patch:${userId}`, 120, 60);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many deal edits. Try again in a moment.' },
+        { status: 429, headers: { 'Retry-After': '60' } },
+      );
+    }
 
     const { id } = await params;
 
@@ -197,6 +221,20 @@ export async function PATCH(
     const stageChanged = body.stageId && body.stageId !== existing.stageId;
     const statusChanged = body.status && body.status !== existing.status;
 
+    // When a deal is marked WON and has no close date — and this PATCH isn't
+    // itself setting one — default closeDate to today (date-only). A won deal
+    // with no close date breaks pipeline/commission timelines. Minimal: just
+    // the date, no sold-price field.
+    let wonCloseDateVal: string | undefined = undefined;
+    if (
+      statusChanged &&
+      body.status === 'won' &&
+      body.closeDate === undefined &&
+      !existing.closeDate
+    ) {
+      wonCloseDateVal = new Date().toISOString().slice(0, 10);
+    }
+
     // Validate stageId belongs to this space BEFORE any mutations so an
     // invalid stageId cannot leave the row in a partially-updated state.
     if (body.stageId !== undefined) {
@@ -221,6 +259,47 @@ export async function PATCH(
     const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
     if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
       return NextResponse.json({ error: 'Invalid priority' }, { status: 400 });
+    }
+
+    // Validate position: it's the kanban ordering key. The safe write path is
+    // the reorder RPC (/api/deals/reorder), which rebalances every card in the
+    // column atomically — a raw PATCH can only ever corrupt that ordering. The
+    // UI never sends position through PATCH (kanban drag hits the reorder
+    // endpoint). So we reject any negative/float/garbage value outright; a
+    // valid non-negative integer is tolerated but the field is NOT written here
+    // (it's dropped from the update below — callers must use the reorder RPC).
+    if (body.position !== undefined) {
+      if (typeof body.position !== 'number' || !Number.isInteger(body.position) || body.position < 0) {
+        return NextResponse.json({ error: 'Invalid position' }, { status: 400 });
+      }
+    }
+
+    // propertyId ownership scoping. Mirrors the POST route: when a non-null
+    // propertyId is supplied, verify the Property belongs to THIS space before
+    // accepting it. Relying on the FK alone lets a caller link their deal to
+    // another space's Property (the FK only checks existence, not ownership).
+    let propertyIdVal: string | null | undefined = undefined;
+    if (body.propertyId !== undefined) {
+      if (body.propertyId === null || body.propertyId === '') {
+        propertyIdVal = null;
+      } else {
+        if (typeof body.propertyId !== 'string') {
+          return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 });
+        }
+        const trimmed = body.propertyId.slice(0, 64);
+        const { data: propRow, error: propErr } = await supabase
+          .from('Property')
+          .select('id')
+          .eq('id', trimmed)
+          .eq('spaceId', space.id)
+          .maybeSingle();
+        if (propErr) {
+          console.error('[deals/PATCH] property validation error:', propErr);
+          return NextResponse.json({ error: 'Failed to validate property' }, { status: 500 });
+        }
+        if (!propRow) return NextResponse.json({ error: 'Invalid propertyId' }, { status: 404 });
+        propertyIdVal = trimmed;
+      }
     }
 
     // Handle dealContacts replacement — diff-based instead of delete-all-then-insert.
@@ -292,8 +371,15 @@ export async function PATCH(
         ...(body.address !== undefined && { address: body.address ?? null }),
         ...(body.priority !== undefined && { priority: body.priority }),
         ...(body.closeDate !== undefined && { closeDate: closeDateVal }),
+        // Default closeDate to today when marking a deal won with no prior
+        // close date (and this PATCH isn't setting one — guaranteed by the
+        // body.closeDate === undefined guard where wonCloseDateVal is computed).
+        ...(wonCloseDateVal !== undefined && { closeDate: wonCloseDateVal }),
         ...(body.stageId !== undefined && { stageId: body.stageId }),
-        ...(body.position !== undefined && { position: body.position }),
+        // position is NOT written here. It's the kanban ordering key and the
+        // only safe write path is the reorder RPC (/api/deals/reorder), which
+        // rebalances the whole column atomically. A raw PATCH can only corrupt
+        // ordering, so we validate-and-ignore it above.
         ...(body.status !== undefined && { status: body.status }),
         // When stageId changes, stamp stageChangedAt so daysInStage actually
         // reflects "time in current stage" — not "time since any field edit".
@@ -303,13 +389,10 @@ export async function PATCH(
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
         ...(nextActionDueAtVal !== undefined && { nextActionDueAt: nextActionDueAtVal }),
-        // propertyId: null unlinks; otherwise validated as string referencing a
-        // Property in this space. We don't load the row here — the FK will
-        // reject a mismatched id; validating at edit time adds a round-trip
-        // without additional safety.
-        ...(body.propertyId !== undefined && {
-          propertyId: body.propertyId ? String(body.propertyId).slice(0, 64) : null,
-        }),
+        // propertyId: null unlinks; otherwise an id verified above to reference
+        // a Property in THIS space (ownership-scoped, mirroring the POST route —
+        // the FK alone only checks existence, not ownership).
+        ...(propertyIdVal !== undefined && { propertyId: propertyIdVal }),
         // Won/lost post-mortem fields — captured from the kanban dialog.
         // When the deal transitions back to active we clear them so stale
         // reasons don't confuse a later close.
@@ -358,8 +441,52 @@ export async function PATCH(
         metadata: statusMetadata,
       });
     }
+
+    // Log meaningful human field edits to the activity trail. The AI tools
+    // (update_deal_value, etc.) write a 'note' row with { oldValue, newValue,
+    // via } metadata whenever they change a field — but human PATCH edits to
+    // the same fields previously logged NOTHING (only stage/status above).
+    // Diff the updated row against the prior values and mirror the AI shape so
+    // value/probability/commission/dates/next-action/priority edits show up in
+    // the timeline. stage/status are intentionally excluded — they log above.
+    const money = (n: number | null | undefined) =>
+      n == null ? 'none' : `$${Math.round(Number(n)).toLocaleString('en-US')}`;
+    const dateOnly = (d: unknown) => (d ? String(d).slice(0, 10) : null);
+    type FieldDiff = { key: string; label: string; oldVal: unknown; newVal: unknown; format?: (v: unknown) => string };
+    const diffs: FieldDiff[] = [
+      { key: 'value', label: 'Value', oldVal: existing.value, newVal: dealRow.value, format: (v) => money(v as number | null) },
+      { key: 'probability', label: 'Probability', oldVal: existing.probability, newVal: dealRow.probability, format: (v) => (v == null ? 'none' : `${v}%`) },
+      { key: 'commissionRate', label: 'Commission rate', oldVal: existing.commissionRate, newVal: dealRow.commissionRate, format: (v) => (v == null ? 'none' : `${v}%`) },
+      { key: 'closeDate', label: 'Close date', oldVal: dateOnly(existing.closeDate), newVal: dateOnly(dealRow.closeDate), format: (v) => (v ? String(v) : 'none') },
+      { key: 'followUpAt', label: 'Follow-up', oldVal: existing.followUpAt ?? null, newVal: dealRow.followUpAt ?? null, format: (v) => (v ? String(v) : 'none') },
+      { key: 'nextAction', label: 'Next action', oldVal: existing.nextAction ?? null, newVal: dealRow.nextAction ?? null, format: (v) => (v ? String(v) : 'none') },
+      { key: 'priority', label: 'Priority', oldVal: existing.priority, newVal: dealRow.priority, format: (v) => (v == null ? 'none' : String(v)) },
+    ];
+    for (const d of diffs) {
+      // Skip fields this PATCH didn't touch and unchanged values.
+      if (d.newVal === d.oldVal) continue;
+      const fmtFn = d.format ?? ((v: unknown) => String(v));
+      activityInserts.push({
+        id: crypto.randomUUID(),
+        dealId: id,
+        spaceId: existing.spaceId,
+        type: 'note',
+        content: `${d.label} updated to ${fmtFn(d.newVal)}`,
+        metadata: { field: d.key, oldValue: d.oldVal, newValue: d.newVal, via: 'manual_edit' },
+      });
+    }
+
     if (activityInserts.length > 0) {
-      await supabase.from('DealActivity').insert(activityInserts);
+      // Non-fatal: a failed activity insert must never fail the edit. Mirrors
+      // the AI tools, which log a warning and move on.
+      try {
+        const { error: activityErr } = await supabase.from('DealActivity').insert(activityInserts);
+        if (activityErr) {
+          console.error('[deals/PATCH] activity insert failed:', activityErr);
+        }
+      } catch (e) {
+        console.error('[deals/PATCH] activity insert threw:', e);
+      }
     }
 
     // Get stage for the include
@@ -407,7 +534,19 @@ export async function DELETE(
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
+  // Rate limit: 120 deletes per minute per user — same generous ceiling as
+  // PATCH. High enough to never bite a normal user clearing out stale deals,
+  // low enough to cap a runaway/scripted client.
+  const { allowed } = await checkRateLimit(`deals-delete:${userId}`, 120, 60);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many deletes. Try again in a moment.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
+
   const { id } = await params;
+  try {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -416,7 +555,10 @@ export async function DELETE(
     .select('*')
     .eq('id', id)
     .eq('spaceId', space.id);
-  if (dealError) throw dealError;
+  if (dealError) {
+    console.error('[deals/DELETE] fetch error:', dealError);
+    return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 });
+  }
   if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const deal = dealRows[0];
@@ -439,7 +581,10 @@ export async function DELETE(
     .delete()
     .eq('id', id)
     .eq('spaceId', space.id);
-  if (deleteError) throw deleteError;
+  if (deleteError) {
+    console.error('[deals/DELETE] delete error:', deleteError);
+    return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 });
+  }
 
   // Fire-and-forget the Wasabi cleanup. The DB delete already committed;
   // a Wasabi failure here orphans the object, which the nightly storage
@@ -469,4 +614,8 @@ export async function DELETE(
   });
 
   return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[deals/DELETE] unexpected error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
 }
