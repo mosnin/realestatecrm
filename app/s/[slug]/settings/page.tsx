@@ -9,6 +9,7 @@ import { NotificationsSection } from './notifications-section';
 import { BriefSection } from './brief-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
+import { YourDataSection } from './your-data-section';
 import { McpSection, TemplatesSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { MemoryList } from '@/components/chippi/memory-list';
@@ -406,6 +407,17 @@ export default async function SettingsPage({
               fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
               showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
             />
+          </section>
+          <section
+            id="your-data"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Your data</p>
+            <p className={BODY_MUTED}>
+              Take a copy of everything, or delete your account. Your data is
+              yours.
+            </p>
+            <YourDataSection spaceName={space.name} />
           </section>
         </div>
       )}
