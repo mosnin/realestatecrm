@@ -1255,40 +1255,21 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
-                  {/* Day-one guidance — only for users with zero history.
-                      Without this the empty hero is just a greeting + blank
-                      composer, which is too sparse for first-run when the
-                      realtor doesn't yet know what Chippi can do.
-
-                      Broker variant: a single calm line setting the chief-
-                      of-staff frame and stating the trust boundary up front
-                      (won't read a realtor's private notes without their
-                      okay). Per the Phase 1 voice spec — facts vs.
-                      benchmarks, not judgements about realtors. */}
-                  {isBroker ? (
+                  {/* Day-one guidance — realtor only, and only for users with
+                      zero history. The broker chat goes straight from greeting
+                      to composer (no subtext) per the brokerage design. */}
+                  {!isBroker && isFresh && (
                     <motion.p
                       initial={{ opacity: 0, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
                       className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
                     >
-                      I see across your whole brokerage. I won&apos;t read a
-                      realtor&apos;s private notes without their okay. Ask me anything.
+                      Try me. Or browse the{' '}
+                      <span className="text-foreground/70">Brief</span>,{' '}
+                      <span className="text-foreground/70">Outbox</span>, and{' '}
+                      <span className="text-foreground/70">Log</span> from the sidebar.
                     </motion.p>
-                  ) : (
-                    isFresh && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -2 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-                        className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
-                      >
-                        Try me. Or browse the{' '}
-                        <span className="text-foreground/70">Brief</span>,{' '}
-                        <span className="text-foreground/70">Outbox</span>, and{' '}
-                        <span className="text-foreground/70">Log</span> from the sidebar.
-                      </motion.p>
-                    )
                   )}
                   {renderInput()}
                 </div>

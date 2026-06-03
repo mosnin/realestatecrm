@@ -445,6 +445,14 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           </SheetContent>
         </Sheet>
 
+        {/* Chippi mark on the brokerage dashboard header — gives the broker
+            surface the same brand anchor the realtor side carries. */}
+        {isOnBrokerPage && (
+          <Link href="/broker" className="hidden md:inline-flex items-center mr-1" aria-label="Chippi">
+            <BrandLogo className="h-5" alt="Chippi" />
+          </Link>
+        )}
+
         {/* Desktop breadcrumb — small, monospaced separator, no chunky pills.
             The current section reads as the focal label; the workspace name
             is quiet context. Quick-switch is a borderless link, not a chip. */}
