@@ -133,8 +133,6 @@ const brokerAdminNavSections = [
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
@@ -157,8 +155,6 @@ const brokerMemberNavSections = [
   {
     label: 'More',
     items: [
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
     ],

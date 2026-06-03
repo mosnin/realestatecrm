@@ -6,8 +6,8 @@ import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
+import { BrokerMain } from '@/components/broker/broker-main';
 import { supabase } from '@/lib/supabase';
-import { PAGE_MAX } from '@/lib/geometry';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { pickGreeting } from '@/lib/greetings';
@@ -248,21 +248,10 @@ export default async function BrokerLayout({ children }: { children: React.React
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
-        {/* Broker home (/broker) is the Chippi chat — render it like the
-            realtor shell: no padding box, full-height flex column so
-            ChippiWorkspace can take h-full and handle its own max-w-3xl.
-            All other broker pages keep the wide padded dashboard container. */}
-        {brokerPath === '/broker' ? (
-          <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[env(safe-area-inset-bottom)] md:pb-0">
-            {children}
-          </main>
-        ) : (
-          <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
-            <div className={`w-full mx-auto ${PAGE_MAX} min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28`}>
-              {children}
-            </div>
-          </main>
-        )}
+        {/* Chat-vs-dashboard padding is decided client-side by usePathname()
+            inside BrokerMain — NOT by the fragile x-pathname header — so the
+            container is always correct and nothing touches the screen edge. */}
+        <BrokerMain>{children}</BrokerMain>
       </div>
       <MobileNav slug={slug} isBroker={true} isBrokerOnly={isBrokerOnly} />
     </div>
