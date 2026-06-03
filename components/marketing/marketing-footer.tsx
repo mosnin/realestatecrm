@@ -1,5 +1,11 @@
+'use client';
+
 /**
  * Marketing footer — paper-flat, 5-column, reference (not destination).
+ *
+ * The rebuilt homepage (`/`) ships its own bespoke `<HomeFooter>`, so this
+ * shared footer returns null there to avoid a double footer. Every other
+ * marketing page renders it as before.
  *
  * Apple discipline: a wall of small text in columns with the brand mark and
  * copyright at the bottom. NO big CTA card here — the page's `<MarketingCTA>`
@@ -18,6 +24,7 @@
  */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/brand-logo';
 import { cn } from '@/lib/utils';
 
@@ -75,6 +82,10 @@ const LINK_CLASS =
 
 export function MarketingFooter() {
   const year = new Date().getFullYear();
+  const pathname = usePathname();
+
+  // The homepage renders its own <HomeFooter>; don't stack two footers there.
+  if (pathname === '/') return null;
 
   return (
     <footer
