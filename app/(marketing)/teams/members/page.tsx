@@ -8,7 +8,6 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TeamMembersDiagram } from '@/components/marketing/diagrams';
 
@@ -38,10 +37,7 @@ export default function TeamsMembersPage() {
         ]}
         side="right"
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Invite panel — role dropdown, email field, copy-link button."
-        />
+        <TeamMembersDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -67,13 +63,8 @@ export default function TeamsMembersPage() {
           'Aggregate metrics are team-visible.',
           'Audit log for any admin-side change.',
         ]}
-        side="right"
-      >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Diagram — realtor's private workspace + the aggregate view a broker sees. Two surfaces, hairline between them."
-        />
-      </MarketingSection>
+        stacked
+      />
 
       <MarketingSection
         eyebrow="THE PROMISE"

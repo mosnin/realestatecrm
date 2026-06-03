@@ -14,11 +14,12 @@
 
 import { MarketingHero } from '@/components/marketing/marketing-hero';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingMediaSlot } from '@/components/marketing/marketing-media-slot';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import {
   LeadRoutingDiagram,
   TeamLeaderboardDiagram,
+  TemplateAdaptDiagram,
+  TeamChatDiagram,
 } from '@/components/marketing/diagrams';
 
 export const metadata = { title: 'For brokerages and teams — Chippi' };
@@ -33,10 +34,7 @@ export default function TeamsPage() {
         primaryCta={{ label: 'Talk to sales', href: '/about' }}
         secondaryCta={{ label: 'See features', href: '/features' }}
       >
-        <MarketingMediaSlot
-          aspect="video"
-          description="Teams hero — split screen: broker's leaderboard panel on the left, realtor's daily brief on the right; the same lead appears on both — distributed and being worked."
-        />
+        <TeamLeaderboardDiagram aspect="video" />
       </MarketingHero>
 
       <MarketingSection
@@ -81,10 +79,7 @@ export default function TeamsPage() {
         ]}
         learnMore={{ label: 'See templates', href: '/teams/templates' }}
       >
-        <MarketingMediaSlot
-          aspect="square"
-          description="Template library list — template names + previews on the left, edit panel on the right."
-        />
+        <TemplateAdaptDiagram aspect="square" />
       </MarketingSection>
 
       <MarketingSection
@@ -99,10 +94,7 @@ export default function TeamsPage() {
         ]}
         learnMore={{ label: 'See team chat', href: '/teams/chat' }}
       >
-        <MarketingMediaSlot
-          aspect="wide"
-          description="Team chat surface — channel list left, conversation right with Chippi avatar mid-thread."
-        />
+        <TeamChatDiagram aspect="wide" />
       </MarketingSection>
 
       <MarketingSection
