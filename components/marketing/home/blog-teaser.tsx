@@ -7,8 +7,9 @@
  */
 
 import Link from 'next/link';
-import { Reveal, Stagger, StaggerItem, Eyebrow, Placeholder } from './home-kit';
+import { Reveal, Stagger, StaggerItem, Eyebrow } from './home-kit';
 import { ArrowRight } from 'lucide-react';
+import { ArticleCover } from './visuals/editorial-visuals';
 
 const POSTS = [
   { tag: 'Product', title: 'Why an agent beats another CRM tab.', read: '5 min read' },
@@ -35,10 +36,12 @@ export function BlogTeaser() {
       </Reveal>
 
       <Stagger className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-        {POSTS.map((p) => (
+        {POSTS.map((p, i) => (
           <StaggerItem key={p.title}>
             <Link href="/blog" className="group block">
-              <Placeholder label="Article cover" aspect="aspect-[16/10]" />
+              <div className="overflow-hidden rounded-3xl ring-1 ring-border/60">
+                <ArticleCover variant={((i % 3) + 1) as 1 | 2 | 3} className="w-full" />
+              </div>
               <div className="mt-5">
                 <span className="text-[12px] font-medium uppercase tracking-[0.16em] text-brand">
                   {p.tag}

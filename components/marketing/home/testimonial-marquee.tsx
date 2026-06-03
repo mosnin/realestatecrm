@@ -8,6 +8,7 @@
 
 import { motion, useReducedMotion } from 'motion/react';
 import { Reveal, Eyebrow } from './home-kit';
+import { MonogramAvatar } from './visuals/editorial-visuals';
 import { cn } from '@/lib/utils';
 
 const QUOTES = [
@@ -40,7 +41,7 @@ function Row({ items, reverse }: { items: typeof QUOTES; reverse?: boolean }) {
               “{q.body}”
             </blockquote>
             <figcaption className="mt-5 flex items-center gap-3">
-              <span className="h-9 w-9 rounded-full bg-foreground/[0.07]" aria-hidden />
+              <MonogramAvatar seed={`${q.name}-${q.role}`} className="h-9 w-9" />
               <span className="leading-tight">
                 <span className="block text-[13px] font-semibold text-foreground">{q.name}</span>
                 <span className="block text-[12px] text-foreground/45">{q.role}</span>

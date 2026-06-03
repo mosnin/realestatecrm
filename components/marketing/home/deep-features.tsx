@@ -7,8 +7,12 @@
  * a three-up row of feature cards over a two-up media row.
  */
 
-import { Reveal, Stagger, StaggerItem, Eyebrow, Placeholder } from './home-kit';
+import { Reveal, Stagger, StaggerItem, Eyebrow } from './home-kit';
 import { Aperture, FolderOpen, Users } from 'lucide-react';
+import {
+  CommandPulseVisual,
+  ApprovalGateVisual,
+} from './visuals/deep-feature-visuals';
 
 const FEATURES = [
   {
@@ -73,7 +77,9 @@ export function DeepFeatures() {
               Ask Chippi in plain language. It drafts, books, files, and
               updates — then shows you what it did before anything ships.
             </p>
-            <Placeholder label="Chippi command bar" aspect="aspect-[16/9]" className="mt-7" />
+            <div className="mt-7 aspect-[16/9] overflow-hidden rounded-2xl ring-1 ring-border/60">
+              <CommandPulseVisual className="h-full w-full" />
+            </div>
           </div>
         </StaggerItem>
         <StaggerItem>
@@ -85,7 +91,9 @@ export function DeepFeatures() {
               Chippi never sends, books, or changes a record without your tap.
               Grant per-task autonomy when you trust it. You stay in the seat.
             </p>
-            <Placeholder label="Approval panel" aspect="aspect-[16/9]" className="mt-7" />
+            <div className="mt-7 aspect-[16/9] overflow-hidden rounded-2xl ring-1 ring-border/60">
+              <ApprovalGateVisual className="h-full w-full" />
+            </div>
           </div>
         </StaggerItem>
       </Stagger>

@@ -13,8 +13,9 @@
 import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { Play } from 'lucide-react';
-import { Placeholder, Parallax } from './home-kit';
+import { Parallax } from './home-kit';
 import { GradientBackground } from '@/components/ui/paper-design-shader-background';
+import { HeroWorkspaceVisual } from './visuals/hero-workspace-visual';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -133,11 +134,9 @@ export function HomeHero() {
               </span>
               <span aria-hidden className="w-[42px]" />
             </div>
-            <Placeholder
-              label="The Chippi workspace"
-              aspect="aspect-[16/9]"
-              className="rounded-none ring-0"
-            />
+            <div className="aspect-[16/9] w-full">
+              <HeroWorkspaceVisual className="h-full w-full" />
+            </div>
           </motion.div>
 
           {/* Annotation callouts — desktop only; focus in after the product. */}
