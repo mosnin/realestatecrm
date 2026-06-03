@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { monitorCron } from '@/lib/cron-monitor';
 
 // Env vars read at request time, not module load. Otherwise tests (and
 // serverless cold-start ordering) lock these to whatever was set when the
@@ -48,7 +49,7 @@ type SweepOutcome =
   | { spaceId: string; status: 'skipped'; reason: string }
   | { spaceId: string; status: 'errored'; error: string };
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/agent-sweep] CRON_SECRET env var is not set — rejecting request');
@@ -153,6 +154,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(summary);
 }
+
+export const GET = monitorCron('agent-sweep', { crontab: '0 */4 * * *' }, handler);
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 

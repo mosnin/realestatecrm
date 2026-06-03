@@ -15,8 +15,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { monitorCron } from '@/lib/cron-monitor';
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const authHeader = req.headers.get('authorization');
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -35,3 +36,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, ...data });
 }
+
+export const GET = monitorCron('cleanup', { crontab: '0 3 * * *' }, handler);

@@ -16,10 +16,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { monitorCron } from '@/lib/cron-monitor';
 
 const HARD_DELETE_DAYS = 30;
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const auth = req.headers.get('authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -66,3 +67,9 @@ export async function GET(req: NextRequest) {
     deleted: deletedCount,
   });
 }
+
+export const GET = monitorCron(
+  'sweep-paused-runs',
+  { crontab: '0 4 * * *' },
+  handler,
+);

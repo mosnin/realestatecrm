@@ -31,6 +31,7 @@ import {
   publicUrlToKey,
 } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -289,7 +290,7 @@ async function sweepOnce(spec: PrefixSpec): Promise<SweepResult> {
   };
 }
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/storage-gc] CRON_SECRET not set — rejecting');
@@ -321,3 +322,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = monitorCron('storage-gc', { crontab: '0 5 * * *' }, handler);

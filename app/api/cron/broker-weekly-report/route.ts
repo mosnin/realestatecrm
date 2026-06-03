@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
+import { monitorCron } from '@/lib/cron-monitor';
 
 /**
  * GET /api/cron/broker-weekly-report
@@ -12,7 +13,7 @@ import { redis } from '@/lib/redis';
  * twice if the cron is re-triggered (manual hit, accidental Vercel double-
  * fire, cold-start race). Without it, every broker gets the report twice.
  */
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/broker-weekly-report] CRON_SECRET env var is not set — rejecting request');
@@ -239,6 +240,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const GET = monitorCron(
+  'broker-weekly-report',
+  { crontab: '0 9 * * 1' },
+  handler,
+);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

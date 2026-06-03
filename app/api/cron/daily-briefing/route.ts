@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { composeBrief } from '@/lib/briefing/compose';
 import { shouldGenerateFor } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
+import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
 
@@ -87,7 +88,7 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
   }
 }
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/daily-briefing] CRON_SECRET is not set — rejecting request');
@@ -163,3 +164,5 @@ export async function GET(req: NextRequest) {
     durationMs: Date.now() - startedAt,
   });
 }
+
+export const GET = monitorCron('daily-briefing', { crontab: '0 * * * *' }, handler);

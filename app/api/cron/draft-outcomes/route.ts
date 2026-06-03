@@ -35,6 +35,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { monitorCron } from '@/lib/cron-monitor';
 
 // Window edges. Adjust here, not at the call site.
 const CHECK_DELAY_MS = 24 * 60 * 60 * 1000;        // wait 1 day before judging
@@ -66,7 +67,7 @@ type DealRow = {
 
 type StageRow = { id: string; kind: string | null };
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error('[cron/draft-outcomes] CRON_SECRET env var is not set — rejecting request');
@@ -192,6 +193,8 @@ export async function GET(req: NextRequest) {
   console.log('[cron/draft-outcomes] Sweep complete', summary);
   return NextResponse.json(summary);
 }
+
+export const GET = monitorCron('draft-outcomes', { crontab: '0 3 * * *' }, handler);
 
 function classifyDraft(
   draft: DraftRow,
