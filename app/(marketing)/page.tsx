@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 import { MarketingHeroHome } from '@/components/marketing/marketing-hero-home';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { MarketingLogoStrip } from '@/components/marketing/marketing-logo-strip';
+import { MarketingQuote } from '@/components/marketing/marketing-quote';
 import {
   ComposerDraftDiagram,
   KanbanDragDiagram,
@@ -35,19 +35,11 @@ export default async function MarketingHomePage() {
         secondaryCta={{ label: 'See how it works', href: '/features/chippi' }}
       />
 
-      {/* Trusted-by row — six greyscale slots until real brokerage logos
-          land. Paper-flat, static, no marquee. The slots themselves are
-          the placeholder until customers ship us assets we can use. */}
-      <MarketingLogoStrip
-        items={[
-          { name: 'Brokerage 1' },
-          { name: 'Brokerage 2' },
-          { name: 'Brokerage 3' },
-          { name: 'Brokerage 4' },
-          { name: 'Brokerage 5' },
-          { name: 'Brokerage 6' },
-        ]}
-      />
+      {/* The promise, stated once. This is the single most common fear a new
+          realtor has — "will it send things without me?" — answered plainly,
+          in serif, before the feature story begins. We don't fake brokerage
+          logos here; an honest promise outweighs borrowed proof. */}
+      <MarketingQuote quote="Chippi drafts. You approve. Nothing leaves without your name on it." />
 
       <MarketingSection
         eyebrow="Chippi"
