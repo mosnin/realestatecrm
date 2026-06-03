@@ -1704,7 +1704,10 @@ function RealtorSidebarShell({
           currentIcon={Briefcase}
           slug={slug}
           spaceName={spaceName}
-          brokerageMemberships={brokerageMemberships}
+          // The realtor sidebar stays a realtor surface — no brokerage rows
+          // here. Switching to the brokerage lives on the header ("Switch to
+          // {brokerage}") so the workspace identity here reads clean.
+          brokerageMemberships={[]}
           isOnBrokerPage={isOnBrokerPage}
           collapsed={collapsed}
           showQuickCreate
