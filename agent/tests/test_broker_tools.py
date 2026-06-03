@@ -1,4 +1,4 @@
-"""Contract + permission-gate tests for the 13 broker tools.
+"""Contract + permission-gate tests for the 15 broker tools.
 
 Phase 5 of Chippi-for-Brokers — defends three invariants:
 
@@ -269,6 +269,7 @@ _ALL_TOOL_INPUTS: list[tuple[str, dict[str, Any]]] = [
     ("find_breached_leads", {}),
     ("commission_report", {}),
     ("audit_response_times", {}),
+    ("find_at_risk_agents", {}),
     ("reassign_lead", {"lead_id": "c_lead", "to_realtor_id": "u_realtor"}),
     ("flag_deal_for_broker_review", {"deal_id": "d1", "reason": "needs a look here please"}),
     ("send_team_announcement", {"message": "stand-up at 9am"}),
@@ -814,11 +815,11 @@ async def test_set_routing_rule_accepts_valid_enum(
         assert payload["autoAssignEnabled"] is True
 
 
-# ── Sanity: BROKER_TOOLS has all 14 tools registered ────────────────────────
+# ── Sanity: BROKER_TOOLS has all 15 tools registered ────────────────────────
 
 
-def test_broker_tools_registry_has_fourteen() -> None:
-    assert len(BROKER_TOOLS) == 14
+def test_broker_tools_registry_has_fifteen() -> None:
+    assert len(BROKER_TOOLS) == 15
     names = {t.name for t in BROKER_TOOLS}
     expected = {
         "team_health",
@@ -829,6 +830,7 @@ def test_broker_tools_registry_has_fourteen() -> None:
         "find_breached_leads",
         "commission_report",
         "audit_response_times",
+        "find_at_risk_agents",
         "reassign_lead",
         "flag_deal_for_broker_review",
         "send_team_announcement",

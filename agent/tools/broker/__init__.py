@@ -5,15 +5,15 @@ agent's `agent/chippi.py:make_chippi_agent` toolbelt. Where the realtor side
 acts on a single workspace's CRM, the broker side reads across the whole
 brokerage's swarm of realtor spaces.
 
-BROKER_TOOLS now carries the FULL chief-of-staff catalog — 14 tools across
+BROKER_TOOLS now carries the FULL chief-of-staff catalog — 15 tools across
 five groups. The registry is NOT empty; the agent reads + writes across the
 brokerage through these.
 
-Read tools (8):
+Read tools (9):
   - team_health, realtor_performance, read_realtor_morning_story (team.py)
   - find_stuck_deals, find_unassigned_leads, find_breached_leads (pipeline.py)
   - commission_report (revenue.py)
-  - audit_response_times (performance.py)
+  - audit_response_times, find_at_risk_agents (performance.py)
 
 Write tools (6 — the "command your team" suite, every one audit-gated):
   - reassign_lead, flag_deal_for_broker_review (actions.py)
