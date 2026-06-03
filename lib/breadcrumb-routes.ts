@@ -22,6 +22,7 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/profile', label: 'Profile' },
   // Broker routes
   { path: '/broker/brief', label: 'Brief' },
+  { path: '/broker/forecast', label: 'Forecast' },
   { path: '/broker/people', label: 'People' },
   { path: '/broker/deals', label: 'Deals' },
   { path: '/broker/properties', label: 'Properties' },

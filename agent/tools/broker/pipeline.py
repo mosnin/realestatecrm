@@ -11,6 +11,12 @@ momentum?":
                                        queue without a realtor on them, with
                                        a proposed routing target picked by
                                        lightest current load.
+  find_breached_leads()              — routed leads (tag: assigned-by-broker)
+                                       that have never been contacted
+                                       (lastContactedAt IS NULL) and are past
+                                       the brokerage's slaFirstResponseMinutes
+                                       clock; flags any already past
+                                       slaEscalateMinutes too.
 
 Both are brokerage-scoped through `Space WHERE brokerageId = ctx.brokerage_id`
 and gated by `require_broker_role(ctx)`. Phase 3 will add the matching write
@@ -34,6 +40,10 @@ from ._guards import require_broker_role
 # Cap on returned rows — the broker chat needs the top N, not the full list.
 _STUCK_DEAL_LIMIT = 20
 _UNASSIGNED_LEAD_LIMIT = 50
+_BREACHED_LEAD_LIMIT = 50
+
+# Default SLA window when the brokerage row has no value set.
+_DEFAULT_SLA_FIRST_RESPONSE_MINUTES = 60
 
 
 @function_tool(strict_mode=False)
@@ -299,7 +309,177 @@ async def find_unassigned_leads(
     }
 
 
-PIPELINE_TOOLS: list = [find_stuck_deals, find_unassigned_leads]
+@function_tool(strict_mode=False)
+async def find_breached_leads(
+    ctx: RunContextWrapper[AgentContext],
+) -> dict[str, Any]:
+    """Find routed leads past the brokerage's first-response SLA, oldest first."""
+    # Breached = Contact in a member Space tagged 'assigned-by-broker',
+    # lastContactedAt IS NULL, createdAt older than slaFirstResponseMinutes.
+    # Returns up to _BREACHED_LEAD_LIMIT rows ordered oldest-first; flags any
+    # already past slaEscalateMinutes.
+    require_broker_role(ctx)
+    brokerage_id = ctx.context.brokerage_id
+
+    db = await supabase()
+    now = datetime.now(timezone.utc)
+
+    # ── 1. Read brokerage SLA policy ───────────────────────────────────────
+    brokerage_res = await (
+        db.table("Brokerage")
+        .select("id,slaEnabled,slaFirstResponseMinutes,slaEscalateMinutes")
+        .eq("id", brokerage_id)
+        .maybe_single()
+        .execute()
+    )
+    brokerage = brokerage_res.data or {}
+    sla_first_minutes: int = int(
+        brokerage.get("slaFirstResponseMinutes") or _DEFAULT_SLA_FIRST_RESPONSE_MINUTES
+    )
+    sla_escalate_minutes: int | None = (
+        int(brokerage["slaEscalateMinutes"])
+        if brokerage.get("slaEscalateMinutes") is not None
+        else None
+    )
+
+    first_response_cutoff = now - timedelta(minutes=sla_first_minutes)
+
+    # ── 2. Resolve member spaces ───────────────────────────────────────────
+    spaces_res = await (
+        db.table("Space")
+        .select("id,ownerId,name")
+        .eq("brokerageId", brokerage_id)
+        .execute()
+    )
+    spaces = spaces_res.data or []
+    if not spaces:
+        return {
+            "ok": True,
+            "breached_leads": [],
+            "summary": "No member spaces found for this brokerage.",
+        }
+
+    space_to_owner: dict[str, str] = {
+        s["id"]: s.get("ownerId") for s in spaces if s.get("id")
+    }
+    space_ids = list(space_to_owner.keys())
+
+    # ── 3. Query breached contacts ─────────────────────────────────────────
+    # Contacts in member spaces that:
+    #   - carry the 'assigned-by-broker' tag  (filtered in Python — same
+    #     pattern as find_unassigned_leads, since the DB layer has no JSONB
+    #     array-contains operator)
+    #   - have never been contacted (lastContactedAt IS NULL)
+    #   - were created before the first-response cutoff (old enough to breach)
+    contacts_res = await (
+        db.table("Contact")
+        .select("id,name,email,tags,spaceId,createdAt,lastContactedAt")
+        .in_("spaceId", space_ids)
+        .is_("lastContactedAt", None)
+        .lte("createdAt", first_response_cutoff)
+        .order("createdAt", desc=False)
+        .limit(_BREACHED_LEAD_LIMIT * 3)  # over-fetch; filter tags in Python
+        .execute()
+    )
+    raw = contacts_res.data or []
+
+    breached = [
+        c for c in raw
+        if "assigned-by-broker" in (c.get("tags") or [])
+    ][:_BREACHED_LEAD_LIMIT]
+
+    if not breached:
+        return {
+            "ok": True,
+            "breached_leads": [],
+            "summary": (
+                f"No leads have breached the {sla_first_minutes}-minute "
+                "first-response SLA — all caught up."
+            ),
+        }
+
+    # ── 4. Resolve realtor names ───────────────────────────────────────────
+    owner_ids = list({space_to_owner[c["spaceId"]] for c in breached if c.get("spaceId") in space_to_owner and space_to_owner.get(c["spaceId"])})
+    users_by_id: dict[str, dict[str, Any]] = {}
+    if owner_ids:
+        users_res = await (
+            db.table("User")
+            .select("id,name,email")
+            .in_("id", owner_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_res.data or [])}
+
+    # ── 5. Build output rows ───────────────────────────────────────────────
+    escalate_cutoff = (
+        now - timedelta(minutes=sla_escalate_minutes)
+        if sla_escalate_minutes is not None
+        else None
+    )
+
+    result_rows: list[dict[str, Any]] = []
+    for c in breached:
+        created_raw = c.get("createdAt")
+        if isinstance(created_raw, str):
+            try:
+                created_dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+        elif isinstance(created_raw, datetime):
+            created_dt = created_raw
+        else:
+            continue
+
+        if created_dt.tzinfo is None:
+            created_dt = created_dt.replace(tzinfo=timezone.utc)
+
+        minutes_waited = int((now - created_dt).total_seconds() // 60)
+        owner_id = space_to_owner.get(c.get("spaceId") or "")
+        owner = users_by_id.get(owner_id) if owner_id else None
+        realtor_name = (
+            (owner or {}).get("name") or (owner or {}).get("email") or "Unknown Realtor"
+        )
+
+        past_escalate = (
+            escalate_cutoff is not None and created_dt <= escalate_cutoff
+        )
+
+        result_rows.append({
+            "id": c["id"],
+            "name": c.get("name") or "(no name)",
+            "email": c.get("email"),
+            "minutes_waited": minutes_waited,
+            "assigned_to": {
+                "id": owner_id or "",
+                "name": realtor_name,
+            },
+            "past_escalate_threshold": past_escalate,
+            "createdAt": created_dt.isoformat(),
+        })
+
+    # ── 6. Summary sentence ────────────────────────────────────────────────
+    oldest = result_rows[0]  # already sorted oldest-first
+    escalated_count = sum(1 for r in result_rows if r["past_escalate_threshold"])
+    summary_parts = [
+        f"{len(result_rows)} lead{'s' if len(result_rows) != 1 else ''} need a first response",
+        f"the oldest has waited {oldest['minutes_waited']} min, assigned to {oldest['assigned_to']['name']}",
+    ]
+    if escalated_count:
+        summary_parts.append(
+            f"{escalated_count} already past the {sla_escalate_minutes}-min escalation threshold"
+        )
+    summary = "; ".join(summary_parts) + "."
+
+    return {
+        "ok": True,
+        "sla_first_response_minutes": sla_first_minutes,
+        "sla_escalate_minutes": sla_escalate_minutes,
+        "breached_leads": result_rows,
+        "summary": summary,
+    }
 
 
-__all__ = ["find_stuck_deals", "find_unassigned_leads", "PIPELINE_TOOLS"]
+PIPELINE_TOOLS: list = [find_stuck_deals, find_unassigned_leads, find_breached_leads]
+
+
+__all__ = ["find_stuck_deals", "find_unassigned_leads", "find_breached_leads", "PIPELINE_TOOLS"]

@@ -193,6 +193,44 @@ export default async function BrokerBriefPage() {
     topRealtorMtd = { name, amount: topAmount };
   }
 
+  // Speed-to-lead SLA counts — only queried when slaEnabled is on.
+  // Two numbers: leads currently breaching (needs action) + leads Chippi
+  // escalated to the broker today (proof of work).
+  let slaEnabled = false;
+  let needsResponse = 0;
+  let escalatedToday = 0;
+  if (brokerage.slaEnabled && spaceIds.length > 0) {
+    slaEnabled = true;
+    const todayStart = new Date(
+      Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate()),
+    ).toISOString();
+    const firstThreshold = new Date(
+      Date.now() - brokerage.slaFirstResponseMinutes * 60000,
+    ).toISOString();
+
+    const [needsRes, escalatedRes] = await Promise.all([
+      // Currently-breaching: routed, never contacted, older than slaFirstResponseMinutes.
+      supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .in('spaceId', spaceIds)
+        .contains('tags', ['assigned-by-broker'])
+        .is('lastContactedAt', null)
+        .lte('createdAt', firstThreshold),
+      // Escalated today: BrokerNotification rows Chippi created today for this brokerage.
+      supabase
+        .from('BrokerNotification')
+        .select('*', { count: 'exact', head: true })
+        .eq('brokerageId', brokerage.id)
+        .eq('type', 'review_requested')
+        .gte('createdAt', todayStart)
+        .filter('metadata->>kind', 'eq', 'lead_sla_breach'),
+    ]);
+
+    needsResponse = needsRes.count ?? 0;
+    escalatedToday = escalatedRes.count ?? 0;
+  }
+
   const [applicationRows, leadRows] = await Promise.all([
     spaceIds.length > 0
       ? supabase
@@ -447,6 +485,35 @@ export default async function BrokerBriefPage() {
           </p>
         )}
       </section>
+
+      {/* Speed to lead — only when slaEnabled is on */}
+      {slaEnabled && (
+        <section>
+          <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+            <h2 className={SECTION_LABEL}>Speed to lead</h2>
+          </div>
+          <p className="text-sm text-foreground mt-3">
+            {needsResponse > 0 ? (
+              <>
+                <span className="font-medium">
+                  {needsResponse} {needsResponse === 1 ? 'lead needs' : 'leads need'} a first response.
+                </span>
+                {escalatedToday > 0 && (
+                  <span className="text-muted-foreground">
+                    {' '}Chippi escalated {escalatedToday} {escalatedToday === 1 ? 'lead' : 'leads'} to you today.
+                  </span>
+                )}
+              </>
+            ) : escalatedToday > 0 ? (
+              <span className="text-muted-foreground">
+                Every lead has been answered. Chippi escalated {escalatedToday} {escalatedToday === 1 ? 'lead' : 'leads'} to you today.
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Every lead has been answered.</span>
+            )}
+          </p>
+        </section>
+      )}
 
       {/* Pending invitations — only when there are some */}
       {pendingInvitations.length > 0 && (

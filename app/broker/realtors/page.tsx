@@ -29,10 +29,25 @@ export default async function BrokerRealtorsPage() {
   const RESPONSE_OUTBOUND_TYPES = ['call', 'email', 'meeting'] as const;
   const responseSince = new Date(Date.now() - RESPONSE_WINDOW_DAYS * 24 * 3600 * 1000).toISOString();
 
-  // Pull only what the table actually shows: people on file + deals (count + value)
-  // + recent contacts in the response-time window + their first outbound activity.
-  // The recent-contact + activity queries feed the inline response-time pill.
-  const [contactRows, dealRows, recentContactRows] = await Promise.all([
+  // Pull the full health picture per realtor in one parallel volley:
+  //   - contactRows       → total people on file (for pipeline context)
+  //   - dealRows          → active deals + pipeline value
+  //   - wonDealRows       → deals closed (top-performer signal)
+  //   - openLeadRows      → contacts tagged new-lead (open lead load)
+  //   - unworkedRows      → broker-assigned leads with no first contact
+  //   - slaNudgedRows     → leads that have hit the SLA nudge threshold
+  //   - slaEscalatedRows  → leads that have escalated to the broker
+  //   - recentContactRows → for response-time band (7-day window)
+  const [
+    contactRows,
+    dealRows,
+    wonDealRows,
+    openLeadRows,
+    unworkedRows,
+    slaNudgedRows,
+    slaEscalatedRows,
+    recentContactRows,
+  ] = await Promise.all([
     spaceIds.length > 0
       ? supabase
           .from('Contact')
@@ -47,9 +62,62 @@ export default async function BrokerRealtorsPage() {
           .from('Deal')
           .select('spaceId, value')
           .in('spaceId', spaceIds)
+          .eq('status', 'active')
           .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
+    // Won deals — top-performer signal: closed something recently
+    spaceIds.length > 0
+      ? supabase
+          .from('Deal')
+          .select('spaceId, value')
+          .in('spaceId', spaceIds)
+          .eq('status', 'won')
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    // Open lead load — new leads not yet converted
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .contains('tags', ['new-lead'])
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    // Un-worked broker-assigned leads: assigned but lastContactedAt IS NULL
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .contains('tags', ['assigned-by-broker'])
+          .is('lastContactedAt', null)
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    // Speed-to-lead misses: nudged (breached first-response SLA)
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .contains('tags', ['sla-nudged'])
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    // Speed-to-lead escalations: breached escalation SLA — the loudest signal
+    spaceIds.length > 0
+      ? supabase
+          .from('Contact')
+          .select('spaceId')
+          .in('spaceId', spaceIds)
+          .contains('tags', ['sla-escalated'])
+          .limit(10000)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    // Recent contacts for 7-day response-time band
     spaceIds.length > 0
       ? supabase
           .from('Contact')
@@ -122,11 +190,33 @@ export default async function BrokerRealtorsPage() {
     return 'on_pace';
   }
 
-  const peopleBySpace = (contactRows as { spaceId: string }[]).reduce<Record<string, number>>(
-    (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; },
+  // Aggregate per-space counts for all health signals
+  function countBySpace(rows: { spaceId: string }[]): Record<string, number> {
+    return rows.reduce<Record<string, number>>((acc, r) => {
+      acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  const peopleBySpace    = countBySpace(contactRows as { spaceId: string }[]);
+  const openLeadsBySpace = countBySpace(openLeadRows as { spaceId: string }[]);
+  const unworkedBySpace  = countBySpace(unworkedRows as { spaceId: string }[]);
+  const nudgedBySpace    = countBySpace(slaNudgedRows as { spaceId: string }[]);
+  const escalatedBySpace = countBySpace(slaEscalatedRows as { spaceId: string }[]);
+
+  const dealsBySpace = (dealRows as { spaceId: string; value: number | null }[]).reduce<
+    Record<string, { count: number; value: number }>
+  >(
+    (acc, r) => {
+      if (!acc[r.spaceId]) acc[r.spaceId] = { count: 0, value: 0 };
+      acc[r.spaceId].count += 1;
+      acc[r.spaceId].value += r.value ?? 0;
+      return acc;
+    },
     {}
   );
-  const dealsBySpace = (dealRows as { spaceId: string; value: number | null }[]).reduce<
+
+  const wonBySpace = (wonDealRows as { spaceId: string; value: number | null }[]).reduce<
     Record<string, { count: number; value: number }>
   >(
     (acc, r) => {
@@ -144,6 +234,28 @@ export default async function BrokerRealtorsPage() {
     const avgHours = samples.length > 0
       ? samples.reduce((a, b) => a + b, 0) / samples.length
       : null;
+
+    const openLeads = sid ? (openLeadsBySpace[sid] ?? 0) : 0;
+    const unworked  = sid ? (unworkedBySpace[sid]  ?? 0) : 0;
+    const slaMisses = sid ? ((nudgedBySpace[sid] ?? 0) + (escalatedBySpace[sid] ?? 0)) : 0;
+    const dealsWon  = sid ? (wonBySpace[sid]?.count ?? 0) : 0;
+
+    // Health tier — needs-attention surfaces first so the broker acts;
+    // top-performer is last so they get recognised without dominating.
+    //   needs-attention = un-worked broker leads OR SLA misses (letting leads sit)
+    //   top-performer   = won at least one deal AND no SLA misses AND no un-worked
+    //   on-track        = everything in between
+    let health: RealtorRow['health'];
+    if (!m.User?.onboard) {
+      health = 'pending';
+    } else if (unworked > 0 || slaMisses > 0) {
+      health = 'needs-attention';
+    } else if (dealsWon > 0 && slaMisses === 0 && unworked === 0) {
+      health = 'top-performer';
+    } else {
+      health = 'on-track';
+    }
+
     return {
       membershipId: m.id,
       userId: m.userId,
@@ -155,14 +267,17 @@ export default async function BrokerRealtorsPage() {
       people:   sid ? (peopleBySpace[sid] ?? 0) : 0,
       deals:    sid ? (dealsBySpace[sid]?.count ?? 0) : 0,
       pipeline: sid ? (dealsBySpace[sid]?.value ?? 0) : 0,
+      dealsWon,
+      openLeads,
+      unworked,
+      slaMisses,
       responseAvgHours: avgHours === null ? null : Math.round(avgHours * 10) / 10,
       responseBand: bandFor(avgHours),
+      health,
     };
   });
 
-  // ── Page-scoped narration. Pick the loudest fact: top performer by deals,
-  // a quiet-week call-out, or a "nobody onboard" flag. Hand-coded ladder, no
-  // agent call — this is the deals-page-cuts pattern.
+  // ── Status-sentence header: accountability-first framing ──────────────────
   const subtitle = (() => {
     if (realtors.length === 0) {
       return 'No realtors yet. Send the first invite.';
@@ -171,17 +286,19 @@ export default async function BrokerRealtorsPage() {
     if (active.length === 0) {
       return `${realtors.length} invited. Nobody onboard yet.`;
     }
-    const ranked = [...realtors].sort((a, b) => b.deals - a.deals);
-    const top = ranked[0];
-    if (top.deals > 0) {
-      const firstName = (top.name ?? top.email).split(/\s+/)[0];
-      return `${firstName} leads the team — ${top.deals} ${top.deals === 1 ? 'deal' : 'deals'} in flight.`;
+    const needsAttention = active.filter((r) => r.health === 'needs-attention');
+    const topPerformers  = active.filter((r) => r.health === 'top-performer');
+    if (needsAttention.length > 0 && topPerformers.length > 0) {
+      return `${needsAttention.length} ${needsAttention.length === 1 ? 'needs' : 'need'} your attention, ${topPerformers.length} crushing it.`;
     }
-    const quiet = realtors.filter((r) => r.onboard && r.people === 0).length;
-    if (quiet > 0) {
-      return `${active.length} active. ${quiet} ${quiet === 1 ? 'is' : 'are'} sitting quiet.`;
+    if (needsAttention.length > 0) {
+      return `${needsAttention.length} ${needsAttention.length === 1 ? 'needs' : 'need'} your attention.`;
     }
-    return `${active.length} active. Pipeline empty — nudge the team.`;
+    if (topPerformers.length > 0) {
+      const firstName = (topPerformers[0].name ?? topPerformers[0].email).split(/\s+/)[0];
+      return `${firstName} is crushing it. Team is on track.`;
+    }
+    return `${active.length} active. Team is on track.`;
   })();
 
   return (
