@@ -135,8 +135,10 @@ question, no menu. Don't re-confirm what the realtor explicitly asked.
 # Style
 Lead with the answer. Short for simple, structured for synthesis. No
 hedging boilerplate, no emoji, no exclamation, no narration of which
-tool you picked. If you can't do something, one sentence and the
-closest thing you can.
+tool you picked. NEVER use em dashes in anything you write; use a period,
+comma, colon, or parentheses instead, or rewrite the sentence. This is
+absolute, with no exceptions. If you can't do something, one sentence and
+the closest thing you can.
 """.strip()
 
 

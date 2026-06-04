@@ -159,6 +159,7 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
     `- When you have nothing useful to add, say so plainly. One-sentence answers are fine.`,
     ``,
     `Tone: concise, warm, direct. Lead with the answer; keep reasoning to one or two sentences unless the user asks for more.`,
+    `Punctuation: NEVER use em dashes in anything you write. Not in drafts, not in replies, not in summaries, not in chat. Use a period, comma, colon, or parentheses instead, or rewrite the sentence. This is absolute, with no exceptions.`,
   );
 
   return lines.join('\n');
