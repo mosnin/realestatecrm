@@ -247,7 +247,10 @@ const EMPOWER = [
 
 function Empower() {
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+    <section
+      id="empower-the-floor"
+      className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+    >
       <Reveal className="max-w-3xl">
         <Eyebrow>Empower the floor</Eyebrow>
         <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -296,7 +299,10 @@ const SIGNALS = [
 
 function Bottlenecks() {
   return (
-    <section className="mx-auto max-w-7xl px-6 py-12 md:px-8 md:py-16">
+    <section
+      id="bottlenecks"
+      className="mx-auto max-w-7xl px-6 py-12 scroll-mt-28 md:px-8 md:py-16"
+    >
       <Reveal>
         <div className="relative overflow-hidden rounded-[2rem] bg-[#171310] p-8 md:p-14">
           {/* warm wash bleeding up from the floor — the sanctioned dark-band feel */}
@@ -442,7 +448,10 @@ export function BrokeragesContent() {
       <Empower />
 
       {/* Lead distribution — auto-assign and hand-pick to the right realtor. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="lead-distribution"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <FeatureRow
           eyebrow="Lead distribution"
           title={<>every lead, the right realtor.</>}
@@ -457,7 +466,10 @@ export function BrokeragesContent() {
       </section>
 
       {/* Performance — track what the floor is closing. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="performance"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <FeatureRow
           flip
           eyebrow="Performance"
@@ -496,7 +508,10 @@ export function BrokeragesContent() {
       </section>
 
       {/* Team chat — talk shop on the same page, @chippi in channel. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="team-chat"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <FeatureRow
           flip
           eyebrow="Team chat"

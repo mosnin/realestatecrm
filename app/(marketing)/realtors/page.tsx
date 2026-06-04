@@ -55,7 +55,10 @@ export default async function RealtorsPage() {
       <RealtorsHero />
 
       {/* In the field — phone / web app / office. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="in-the-field"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal className="max-w-3xl">
           <Eyebrow>In the field</Eyebrow>
           <h2 className="mt-5 font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -73,6 +76,7 @@ export default async function RealtorsPage() {
 
       {/* The feature sequence — tick-tock, grounded in real capabilities. */}
       <div className="relative mx-auto max-w-7xl space-y-24 px-6 py-12 md:space-y-32 md:px-8 md:py-16">
+        <div id="the-reply" className="scroll-mt-28">
         <FeatureRow
           eyebrow="The reply"
           title={
@@ -89,7 +93,9 @@ export default async function RealtorsPage() {
           ]}
           media={<ComposerDraftDiagram aspect="video" />}
         />
+        </div>
 
+        <div id="first-call" className="scroll-mt-28">
         <FeatureRow
           flip
           eyebrow="First call"
@@ -107,6 +113,7 @@ export default async function RealtorsPage() {
           ]}
           media={<LeadScoreDiagram aspect="square" />}
         />
+        </div>
 
         <FeatureRow
           eyebrow="Tours"
@@ -180,13 +187,18 @@ export default async function RealtorsPage() {
       </div>
 
       {/* One workspace, not six tabs — the consolidation payoff. */}
-      <OnePlace />
+      <div id="one-workspace" className="scroll-mt-28">
+        <OnePlace />
+      </div>
 
       {/* Tailored to how you already work — repetitive work handled. */}
       <TailorIt />
 
       {/* The one promise — you stay in the driver's seat. */}
-      <section className="relative mx-auto max-w-4xl px-6 py-24 text-center md:px-8 md:py-32">
+      <section
+        id="stay-in-control"
+        className="relative mx-auto max-w-4xl px-6 py-24 text-center scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal>
           <Eyebrow>One promise</Eyebrow>
           <h2 className="mx-auto mt-5 max-w-3xl font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">

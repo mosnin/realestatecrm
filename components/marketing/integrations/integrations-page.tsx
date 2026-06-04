@@ -63,7 +63,10 @@ export function IntegrationsPage() {
       <HowItWorks />
 
       {/* The catalog — grouped, scannable. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="the-catalog"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal className="max-w-3xl">
           <Eyebrow>The catalog</Eyebrow>
           <h2 className="mt-5 font-title text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -175,7 +178,10 @@ const STEPS: { n: string; title: string; body: string }[] = [
 
 function HowItWorks() {
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+    <section
+      id="how-it-works"
+      className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+    >
       <Reveal className="max-w-3xl">
         <Eyebrow>How it works</Eyebrow>
         <h2 className="mt-5 font-title text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -269,7 +275,10 @@ function Monogram({ name }: { name: string }) {
 
 function ClosingCTA() {
   return (
-    <section className="mx-auto max-w-7xl px-6 py-12 md:px-8 md:py-24">
+    <section
+      id="get-connected"
+      className="mx-auto max-w-7xl px-6 py-12 scroll-mt-28 md:px-8 md:py-24"
+    >
       <Reveal>
         <div className="relative overflow-hidden rounded-[2rem] bg-[#171310] px-8 py-16 text-center md:px-16 md:py-24">
           <div
