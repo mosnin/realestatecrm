@@ -270,8 +270,49 @@ CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   role            text NOT NULL CHECK (role IN ('broker_owner', 'broker_admin', 'realtor_member')),
   "invitedById"   text REFERENCES "User"(id) ON DELETE SET NULL,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  -- Per-member broker profile (20260615000000). Owner/admin customize their
+  -- own profile within the brokerage; mirror of the realtor profile fields
+  -- on SpaceSetting. Gated to the member themselves in the API layer.
+  "displayName"   text,
+  "title"         text,
+  bio             text,
+  "photoUrl"      text,
+  phone           text,
   UNIQUE ("brokerageId", "userId")
 );
+
+-- Brokerage-level integrations via Composio (20260615000000). The brokerage
+-- analogue of "IntegrationConnection": each owner/admin connects their OWN
+-- third-party accounts at the brokerage level. Keyed on
+-- (brokerageId, userId, toolkit). Owner/admin only — realtor_member is blocked
+-- in the API layer (requireBroker / canEditSettings). Composio holds the OAuth
+-- tokens; this table holds the pointer + status + audit.
+CREATE TABLE IF NOT EXISTS "BrokerageIntegrationConnection" (
+  "id"                   text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "brokerageId"          text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "userId"               text NOT NULL,                    -- Clerk userId of the admin/owner who connected
+  "toolkit"              text NOT NULL,                    -- composio toolkit slug, e.g. 'gmail'
+  "composioConnectionId" text NOT NULL,                    -- the connected-account id Composio returns
+  "status"               text NOT NULL DEFAULT 'active'
+                           CHECK ("status" IN ('active', 'expired', 'revoked', 'failed')),
+  "label"                text,                             -- human-readable: 'work@example.com'
+  "lastError"            text,                             -- on 'failed' / 'expired'
+  "lastUsedAt"           timestamptz,
+  "createdAt"            timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "BrokerageIntegrationConnection_active_unique"
+  ON "BrokerageIntegrationConnection" ("brokerageId", "userId", "toolkit")
+  WHERE "status" = 'active';
+
+CREATE INDEX IF NOT EXISTS "BrokerageIntegrationConnection_brokerageId_idx"
+  ON "BrokerageIntegrationConnection" ("brokerageId", "status");
+
+CREATE INDEX IF NOT EXISTS "BrokerageIntegrationConnection_userId_idx"
+  ON "BrokerageIntegrationConnection" ("userId");
+
+ALTER TABLE "BrokerageIntegrationConnection" ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS "Invitation" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,

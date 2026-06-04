@@ -66,6 +66,13 @@ export type BrokerageMembership = {
   role: MembershipRole;
   invitedById: string | null;
   createdAt: Date;
+  // Per-member broker profile (20260615000000). Owner/admin customize their
+  // own profile within the brokerage. Null until the member fills it in.
+  displayName?: string | null;
+  title?: string | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  phone?: string | null;
 };
 
 export type Invitation = {

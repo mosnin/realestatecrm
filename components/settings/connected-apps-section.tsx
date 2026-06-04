@@ -216,12 +216,36 @@ interface SetupHealth {
  * Pass `showSetupHealth` from /settings to keep the warnings where the
  * operator can fix them.
  */
+/**
+ * Endpoint set the panel talks to. Defaults to the realtor routes so existing
+ * callers are untouched. The brokerage integrations surface passes the
+ * /api/broker/integrations routes instead — same component, same rendering,
+ * different scope. `health` is optional: the brokerage surface has no health
+ * endpoint (no curated triggers yet), so it falls back to the static status
+ * pill when omitted.
+ */
+export interface ConnectedAppsEndpoints {
+  list: string;
+  connect: (toolkit: string) => string;
+  item: (connectionId: string) => string;
+  health?: string;
+}
+
+const REALTOR_ENDPOINTS: ConnectedAppsEndpoints = {
+  list: '/api/integrations',
+  connect: (toolkit) => `/api/integrations/connect/${toolkit}`,
+  item: (id) => `/api/integrations/${id}`,
+  health: '/api/integrations/health',
+};
+
 export function ConnectedAppsSection({
   callbackResult,
   showSetupHealth = false,
+  endpoints = REALTOR_ENDPOINTS,
 }: {
   callbackResult?: CallbackResult | null;
   showSetupHealth?: boolean;
+  endpoints?: ConnectedAppsEndpoints;
 } = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [connections, setConnections] = useState<ConnectionRow[]>([]);
@@ -245,7 +269,7 @@ export function ConnectedAppsSection({
 
   async function fetchConnections() {
     try {
-      const res = await fetch('/api/integrations');
+      const res = await fetch(endpoints.list);
       if (!res.ok) {
         setConfigured(false);
         return;
@@ -266,9 +290,12 @@ export function ConnectedAppsSection({
   // fetchHealth is intentionally non-blocking — it updates the health badges
   // after the connections list is already on screen.
   const fetchHealth = useCallback(async () => {
+    // No health endpoint (e.g. brokerage surface) → skip; the static status
+    // pill renders instead of a live badge.
+    if (!endpoints.health) return;
     setHealthLoading(true);
     try {
-      const res = await fetch('/api/integrations/health');
+      const res = await fetch(endpoints.health);
       if (!res.ok) return;
       const data = (await res.json()) as { connections: ConnectionHealth[] };
       const map = new Map<string, ConnectionHealth>();
@@ -281,7 +308,7 @@ export function ConnectedAppsSection({
     } finally {
       setHealthLoading(false);
     }
-  }, []);
+  }, [endpoints.health]);
 
   // Fetch health on mount and whenever the window regains focus.
   // This catches stale auth that expires while the realtor is away.
@@ -297,7 +324,7 @@ export function ConnectedAppsSection({
     setBusyToolkit(toolkit);
     setError(null);
     try {
-      const res = await fetch(`/api/integrations/connect/${toolkit}`, {
+      const res = await fetch(endpoints.connect(toolkit), {
         method: 'POST',
       });
       const data = (await res.json()) as { redirectUrl?: string; error?: string };
@@ -320,7 +347,7 @@ export function ConnectedAppsSection({
     setBusyToolkit(connectionId);
     setError(null);
     try {
-      const res = await fetch(`/api/integrations/${connectionId}`, {
+      const res = await fetch(endpoints.item(connectionId), {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -351,7 +378,7 @@ export function ConnectedAppsSection({
       ),
     );
     try {
-      const res = await fetch(`/api/integrations/${connectionId}`, {
+      const res = await fetch(endpoints.item(connectionId), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paused: target }),
