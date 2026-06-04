@@ -10,7 +10,7 @@
  * still call `auth()` from their own server component before rendering.
  */
 
-import { MarketingNav } from '@/components/marketing/marketing-nav';
+import { MarketingNavbar } from '@/components/marketing/marketing-navbar';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
@@ -23,7 +23,7 @@ export default function MarketingLayout({
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      <MarketingNav />
+      <MarketingNavbar />
       <main className="flex-1">{children}</main>
       <MarketingFooter />
     </div>

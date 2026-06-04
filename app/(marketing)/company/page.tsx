@@ -71,7 +71,10 @@ export default async function CompanyPage() {
       </section>
 
       {/* 2. The problem they saw — one reading column. */}
-      <section className="relative mx-auto max-w-3xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="the-gap"
+        className="relative mx-auto max-w-3xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal>
           <Eyebrow>The gap</Eyebrow>
           <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -97,7 +100,10 @@ export default async function CompanyPage() {
       </section>
 
       {/* 3. The founders — two people who lived the gap. */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="the-founders"
+        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal className="mx-auto max-w-3xl text-center">
           <Eyebrow>The founders</Eyebrow>
           <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
@@ -114,7 +120,10 @@ export default async function CompanyPage() {
       </section>
 
       {/* 4. What Chippi believes — the conviction, carried from /about. */}
-      <section className="relative mx-auto max-w-3xl px-6 py-24 md:px-8 md:py-32">
+      <section
+        id="what-we-believe"
+        className="relative mx-auto max-w-3xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
+      >
         <Reveal>
           <Eyebrow>What we believe</Eyebrow>
           <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
