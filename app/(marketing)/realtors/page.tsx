@@ -63,8 +63,8 @@ export default async function RealtorsPage() {
             <span className="text-muted-foreground"> the work is.</span>
           </h2>
           <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-            you're rarely at a desk. Chippi is a tap away on whatever screen is
-            already in your hand, and the same workspace opens wide when you're
+            you&rsquo;re rarely at a desk. Chippi is a tap away on whatever screen is
+            already in your hand, and the same workspace opens wide when you&rsquo;re
             back at the office.
           </p>
         </Reveal>
@@ -77,7 +77,7 @@ export default async function RealtorsPage() {
           eyebrow="The reply"
           title={
             <>
-              drafts you'd have written.
+              drafts you&rsquo;d have written.
               <span className="text-muted-foreground"> in your voice.</span>
             </>
           }
@@ -131,7 +131,7 @@ export default async function RealtorsPage() {
           title={
             <>
               a pipeline that
-              <span className="text-muted-foreground"> doesn't lie.</span>
+              <span className="text-muted-foreground"> doesn&rsquo;t lie.</span>
             </>
           }
           sub="drag a card to the next stage; Chippi keeps the value, the dates, and the counterparty in sync. the board reflects reality, not yesterday."
@@ -190,7 +190,7 @@ export default async function RealtorsPage() {
         <Reveal>
           <Eyebrow>One promise</Eyebrow>
           <h2 className="mx-auto mt-5 max-w-3xl font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            you stay in the driver's seat.
+            you stay in the driver&rsquo;s seat.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">
             Chippi does the work; you make the call. approval-first by default,

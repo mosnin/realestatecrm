@@ -55,7 +55,7 @@ export function OnePlace() {
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
           your inbox, your people, your pipeline, your calendar, your listings,
-          your files. they stop living in separate apps. it's one workspace, and
+          your files. they stop living in separate apps. it&rsquo;s one workspace, and
           Chippi keeps every corner of it current.
         </p>
       </Reveal>
