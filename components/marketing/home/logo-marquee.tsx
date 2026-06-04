@@ -6,9 +6,12 @@
  * Real brokerage marks, rendered as uniform monochrome silhouettes (black on
  * light, white on dark). Several of the source logos ship in different colors
  * (and a few are white-on-transparent), so forcing one calm tone is what makes
- * them read as a single proof strip instead of a clashing color jumble. It also
- * keeps the strip on the neutral-first, restrained aesthetic of the rest of the
- * page. Two duplicated tracks animate x: 0 -> -50% on a linear loop (the
+ * them read as a single proof strip instead of a clashing color jumble.
+ *
+ * Each logo sits in a fixed, equal-width cell and is height- AND width-capped
+ * with object-contain, so wide wordmarks (Compass, RE/MAX) and tall marks read
+ * at one consistent scale, stay centered, and never stretch or clip at the loop
+ * seam. Two duplicated tracks animate x: 0 -> -50% on a linear loop (the
  * standard seamless marquee). Pauses for reduced-motion.
  */
 
@@ -19,10 +22,10 @@ type Logo = { src: string; alt: string };
 const LOGOS: Logo[] = [
   { src: '/marketing/logos/lpt.png', alt: 'Luxe Properties' },
   { src: '/marketing/logos/compass.png', alt: 'Compass' },
-  { src: '/marketing/logos/exit.webp', alt: 'EXIT Realty' },
+  { src: '/marketing/logos/exit.svg', alt: 'EXIT Realty' },
   { src: '/marketing/logos/remax.png', alt: 'RE/MAX' },
   { src: '/marketing/logos/source.png', alt: 'The Source Realty' },
-  { src: '/marketing/logos/brokerage4.png', alt: 'Real estate brokerage' },
+  { src: '/marketing/logos/brokerage4.png', alt: 'Zander Realty Group' },
 ];
 
 export function LogoMarquee() {
@@ -35,23 +38,27 @@ export function LogoMarquee() {
         Trusted by professionals at
       </p>
 
-      <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
+      <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
         <motion.div
-          className="flex w-max items-center gap-12 md:gap-16"
+          className="flex w-max items-center"
           animate={reduce ? undefined : { x: ['0%', '-50%'] }}
           transition={{ duration: 32, ease: 'linear', repeat: Infinity }}
         >
           {track.map((logo, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <div
               key={`${logo.alt}-${i}`}
-              src={logo.src}
-              alt={logo.alt}
-              loading="lazy"
-              decoding="async"
-              draggable={false}
-              className="h-6 w-auto shrink-0 select-none object-contain opacity-50 brightness-0 md:h-8 dark:opacity-60 dark:invert"
-            />
+              className="flex h-12 w-32 shrink-0 items-center justify-center px-2 md:w-44"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                className="max-h-6 w-auto max-w-full select-none object-contain opacity-50 brightness-0 md:max-h-7 dark:opacity-60 dark:invert"
+              />
+            </div>
           ))}
         </motion.div>
       </div>
