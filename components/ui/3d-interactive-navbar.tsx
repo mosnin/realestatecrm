@@ -3,9 +3,10 @@
 /**
  * Chippi marketing nav — a floating, Apple-grade PILL nav.
  *
- * A translucent dark pill, sticky at the top, centered. Left: the white Chippi
- * logo. Center: the marketing links, each (except Pricing) a dropdown that
- * jumps to real, anchored sections of its page. Right: Log in + a white
+ * A translucent, theme-aware pill, sticky at the top, centered. It adapts to
+ * light and dark via semantic tokens. Left: the theme-aware Chippi logo.
+ * Center: the marketing links, each (except Pricing) a dropdown that jumps to
+ * real, anchored sections of its page. Right: Log in + a foreground-filled
  * Start free pill.
  *
  * Motion is built on the repo's Apple curve (EASE_APPLE) and durations from
@@ -32,6 +33,7 @@ import {
 } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { EASE_APPLE, DURATION_FAST } from '@/lib/motion';
+import { BrandLogo } from '@/components/brand-logo';
 
 // ----------------------------------------------------------------------------
 // Nav model — links + the REAL page sections each dropdown jumps to.
@@ -220,19 +222,19 @@ function DropdownPanel({
     >
       {/* small hover bridge so the cursor can cross the gap without closing */}
       <div aria-hidden className="absolute -top-3 left-0 right-0 h-3" />
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/85 p-1.5 shadow-2xl backdrop-blur-xl">
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
         <ul>
           {sections.map((s) => (
             <motion.li key={s.to} variants={reduced ? undefined : itemVariants}>
               <Link
                 href={`${link.href}#${s.to}`}
                 onClick={onNavigate}
-                className="group flex flex-col gap-0.5 rounded-xl px-3.5 py-2.5 transition-colors hover:bg-white/[0.06]"
+                className="group flex flex-col gap-0.5 rounded-xl px-3.5 py-2.5 transition-colors hover:bg-foreground/[0.04]"
               >
-                <span className="text-[13.5px] font-medium text-white">
+                <span className="text-[13.5px] font-medium text-foreground">
                   {s.label}
                 </span>
-                <span className="text-[12.5px] leading-snug text-white/45">
+                <span className="text-[12.5px] leading-snug text-muted-foreground">
                   {s.desc}
                 </span>
               </Link>
@@ -242,7 +244,7 @@ function DropdownPanel({
         <Link
           href={link.href}
           onClick={onNavigate}
-          className="group/all mt-0.5 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[12.5px] text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
+          className="group/all mt-0.5 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[12.5px] text-foreground/55 transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
         >
           all of {link.label.toLowerCase()}
           <span aria-hidden className="transition-transform group-hover/all:translate-x-0.5">
@@ -303,13 +305,13 @@ function DesktopNav({ reduced }: { reduced: boolean }) {
           >
             <Link
               href={link.href}
-              className="relative flex items-center gap-1 px-3.5 py-2 text-[13.5px] font-medium text-white/65 transition-colors hover:text-white"
+              className="relative flex items-center gap-1 px-3.5 py-2 text-[13.5px] font-medium text-foreground/70 transition-colors hover:text-foreground"
             >
               {/* sliding highlight — the iOS segmented move */}
               {active(i) && (
                 <motion.span
                   layoutId="nav-highlight"
-                  className="absolute inset-0 -z-10 rounded-full bg-white/[0.08]"
+                  className="absolute inset-0 -z-10 rounded-full bg-foreground/[0.06]"
                   transition={
                     reduced
                       ? { duration: 0 }
@@ -317,13 +319,13 @@ function DesktopNav({ reduced }: { reduced: boolean }) {
                   }
                 />
               )}
-              <span className={cn(active(i) && 'text-white')}>{link.label}</span>
+              <span className={cn(active(i) && 'text-foreground')}>{link.label}</span>
               {hasMenu && (
                 <motion.span
                   aria-hidden
                   animate={{ rotate: openIdx === i ? 180 : 0 }}
                   transition={{ duration: 0.18, ease: EASE_APPLE }}
-                  className="text-[9px] text-white/40"
+                  className="text-[9px] text-foreground/40"
                 >
                   &#9662;
                 </motion.span>
@@ -369,7 +371,7 @@ function MobileGroup({
       <Link
         href={link.href}
         onClick={onNavigate}
-        className="flex items-center justify-between rounded-xl px-3 py-3.5 text-[17px] font-medium text-white transition-colors active:bg-white/[0.06]"
+        className="flex items-center justify-between rounded-xl px-3 py-3.5 text-[17px] font-medium text-foreground transition-colors active:bg-foreground/[0.04]"
       >
         {link.label}
       </Link>
@@ -377,18 +379,18 @@ function MobileGroup({
   }
 
   return (
-    <div className="border-b border-white/[0.06] last:border-0">
+    <div className="border-b border-border/60 last:border-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-xl px-3 py-3.5 text-left text-[17px] font-medium text-white transition-colors active:bg-white/[0.06]"
+        className="flex w-full items-center justify-between rounded-xl px-3 py-3.5 text-left text-[17px] font-medium text-foreground transition-colors active:bg-foreground/[0.04]"
       >
         {link.label}
         <motion.span
           aria-hidden
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.18, ease: EASE_APPLE }}
-          className="text-[11px] text-white/45"
+          className="text-[11px] text-foreground/45"
         >
           &#9662;
         </motion.span>
@@ -408,12 +410,12 @@ function MobileGroup({
                   <Link
                     href={`${link.href}#${s.to}`}
                     onClick={onNavigate}
-                    className="flex flex-col gap-0.5 rounded-xl px-3 py-2.5 transition-colors active:bg-white/[0.06]"
+                    className="flex flex-col gap-0.5 rounded-xl px-3 py-2.5 transition-colors active:bg-foreground/[0.04]"
                   >
-                    <span className="text-[15px] font-medium text-white/90">
+                    <span className="text-[15px] font-medium text-foreground/90">
                       {s.label}
                     </span>
-                    <span className="text-[13px] leading-snug text-white/45">
+                    <span className="text-[13px] leading-snug text-muted-foreground">
                       {s.desc}
                     </span>
                   </Link>
@@ -444,24 +446,24 @@ function MobileSheet({
           animate={{ opacity: 1, y: 0 }}
           exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
           transition={{ duration: 0.22, ease: EASE_APPLE }}
-          className="absolute inset-x-3 top-[72px] z-40 overflow-hidden rounded-3xl border border-white/10 bg-black/90 p-2 shadow-2xl backdrop-blur-xl md:hidden"
+          className="absolute inset-x-3 top-[72px] z-40 overflow-hidden rounded-3xl border border-border/70 bg-background/95 p-2 shadow-2xl backdrop-blur-xl md:hidden"
         >
           <div className="max-h-[calc(100vh-7rem)] overflow-y-auto">
             {NAV_LINKS.map((link) => (
               <MobileGroup key={link.href} link={link} onNavigate={onClose} />
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t border-white/[0.06] p-2 pt-3">
+            <div className="mt-2 flex flex-col gap-2 border-t border-border/60 p-2 pt-3">
               <Link
                 href="/login/realtor"
                 onClick={onClose}
-                className="flex h-11 items-center justify-center rounded-full text-[15px] font-medium text-white/80 ring-1 ring-white/15 transition-colors active:bg-white/[0.06]"
+                className="flex h-11 items-center justify-center rounded-full text-[15px] font-medium text-foreground/80 ring-1 ring-border transition-colors active:bg-foreground/[0.04]"
               >
                 Log in
               </Link>
               <Link
                 href="/login/realtor?intent=signup"
                 onClick={onClose}
-                className="flex h-11 items-center justify-center rounded-full bg-white text-[15px] font-medium text-black transition-transform active:scale-[0.98]"
+                className="flex h-11 items-center justify-center rounded-full bg-foreground text-[15px] font-medium text-background transition-transform active:scale-[0.98]"
               >
                 Start free
               </Link>
@@ -484,12 +486,10 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full">
       <div className="mx-auto max-w-5xl px-3 pt-3 md:px-4">
-        <div className="relative flex h-14 items-center justify-between rounded-full border border-white/10 bg-black/80 pl-5 pr-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          {/* Left: logo */}
+        <div className="relative flex h-14 items-center justify-between rounded-full border border-border/70 bg-background/80 pl-5 pr-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl">
+          {/* Left: logo — theme-aware, flips with light/dark */}
           <Link href="/" aria-label="Chippi home" className="flex shrink-0 items-center">
-            {/* Bar is always dark, so the white logo reads directly. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-white.png" alt="Chippi" className="h-5 w-auto" />
+            <BrandLogo className="h-5 w-auto" alt="Chippi" />
           </Link>
 
           {/* Center: nav links + dropdowns */}
@@ -501,13 +501,13 @@ export function Navbar() {
           <div className="flex items-center gap-1">
             <Link
               href="/login/realtor"
-              className="hidden h-9 items-center rounded-full px-3.5 text-[13.5px] font-medium text-white/65 transition-colors hover:text-white md:inline-flex"
+              className="hidden h-9 items-center rounded-full px-3.5 text-[13.5px] font-medium text-foreground/70 transition-colors hover:text-foreground md:inline-flex"
             >
               Log in
             </Link>
             <Link
               href="/login/realtor?intent=signup"
-              className="hidden h-9 items-center rounded-full bg-white px-4 text-[13.5px] font-medium text-black transition-transform duration-150 hover:opacity-90 active:scale-[0.98] md:inline-flex"
+              className="hidden h-9 items-center rounded-full bg-foreground px-4 text-[13.5px] font-medium text-background transition-transform duration-150 hover:opacity-90 active:scale-[0.98] md:inline-flex"
             >
               Start free
             </Link>
@@ -518,24 +518,24 @@ export function Navbar() {
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
-              className="flex h-10 w-10 items-center justify-center text-white md:hidden"
+              className="flex h-10 w-10 items-center justify-center text-foreground md:hidden"
             >
               <span className="relative flex h-3.5 w-5 flex-col justify-between">
                 <span
                   className={cn(
-                    'h-0.5 w-full rounded-full bg-white transition-transform duration-200',
+                    'h-0.5 w-full rounded-full bg-foreground transition-transform duration-200',
                     mobileOpen && 'translate-y-[6px] rotate-45',
                   )}
                 />
                 <span
                   className={cn(
-                    'h-0.5 w-full rounded-full bg-white transition-opacity duration-200',
+                    'h-0.5 w-full rounded-full bg-foreground transition-opacity duration-200',
                     mobileOpen && 'opacity-0',
                   )}
                 />
                 <span
                   className={cn(
-                    'h-0.5 w-full rounded-full bg-white transition-transform duration-200',
+                    'h-0.5 w-full rounded-full bg-foreground transition-transform duration-200',
                     mobileOpen && '-translate-y-[6px] -rotate-45',
                   )}
                 />
