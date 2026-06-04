@@ -56,7 +56,7 @@ export function HomeFooter() {
       <div className="mx-auto max-w-7xl px-6 pt-20 md:px-8 md:pt-28">
         {/* last CTA */}
         <Reveal className="flex flex-col items-start justify-between gap-8 border-b border-black/[0.08] pb-16 md:flex-row md:items-end">
-          <h2 className="max-w-2xl text-[clamp(2rem,4.5vw,3.5rem)] font-title leading-[1.04] tracking-[-0.02em] text-foreground">
+          <h2 className="max-w-2xl text-[clamp(2rem,4.5vw,3.5rem)] font-heading font-semibold leading-[1.04] tracking-[-0.035em] text-foreground">
             Ready to let the busywork run itself?
           </h2>
           <div className="flex gap-3">

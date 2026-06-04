@@ -15,16 +15,8 @@ import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { Play } from 'lucide-react';
 import { Parallax } from './home-kit';
 import { AsciiBlob } from './ascii-blob';
-import { HeroWorkspaceVisual } from './visuals/hero-workspace-visual';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-
-const CALLOUTS = [
-  { label: 'Drafts every reply', side: 'left', top: '26%' },
-  { label: 'Books the tour', side: 'right', top: '36%' },
-  { label: 'Scores each lead', side: 'left', top: '62%' },
-  { label: 'Keeps the pipeline current', side: 'right', top: '70%' },
-] as const;
 
 export function HomeHero() {
   const reduce = useReducedMotion();
@@ -76,8 +68,7 @@ export function HomeHero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.9, ease: EASE }}
-            style={{ fontFamily: 'var(--font-title)' }}
-            className="mt-7 text-[clamp(3rem,7.6vw,6rem)] leading-[0.96] tracking-[-0.02em] text-foreground"
+            className="mt-7 font-heading text-[clamp(3rem,7.6vw,6rem)] font-semibold leading-[0.96] tracking-[-0.04em] text-foreground"
           >
             You close the deals.
             <br />
@@ -132,29 +123,29 @@ export function HomeHero() {
               </span>
               <span aria-hidden className="w-[42px]" />
             </div>
-            <div className="aspect-[16/9] w-full">
-              <HeroWorkspaceVisual className="h-full w-full" />
+            {/* Hero product video. Source provided later; blank placeholder
+                for now — drop the <source> in and it autoplays muted/looped. */}
+            <div className="relative aspect-[16/9] w-full bg-muted">
+              <video
+                className="h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="none"
+              >
+                {/* <source src="" type="video/mp4" /> */}
+              </video>
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              >
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-foreground/[0.05] ring-1 ring-border/70">
+                  <Play size={22} className="ml-0.5 fill-foreground/30 text-foreground/30" />
+                </span>
+              </div>
             </div>
           </motion.div>
-
-          {/* Annotation callouts — desktop only; focus in after the product. */}
-          {CALLOUTS.map((c, i) => (
-            <motion.div
-              key={c.label}
-              aria-hidden
-              className="absolute hidden lg:flex items-center gap-2"
-              style={{ top: c.top, [c.side]: '-3rem' }}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, x: c.side === 'left' ? -14 : 14, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-              transition={{ duration: 0.6, ease: EASE, delay: reduce ? 0 : 1.15 + i * 0.14 }}
-            >
-              {c.side === 'right' && <span className="h-px w-9 bg-brand/40" />}
-              <span className="rounded-full bg-card px-3.5 py-1.5 text-[13px] font-medium text-foreground shadow-sm ring-1 ring-border/70">
-                {c.label}
-              </span>
-              {c.side === 'left' && <span className="h-px w-9 bg-brand/40" />}
-            </motion.div>
-          ))}
         </Parallax>
       </div>
     </section>
