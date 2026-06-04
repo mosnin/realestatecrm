@@ -59,7 +59,7 @@ export function TestimonialMarquee() {
     <section className="py-24 md:py-32">
       <Reveal className="mx-auto mb-12 max-w-3xl px-6 text-center md:px-8">
         <Eyebrow>From the field</Eyebrow>
-        <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-semibold leading-[1.04] tracking-[-0.02em] text-foreground">
+        <h2 className="mt-5 font-title text-[clamp(2rem,4.5vw,3.5rem)] font-normal leading-[1.04] tracking-[-0.018em] text-foreground">
           Loved by the people who carry the deals.
         </h2>
       </Reveal>

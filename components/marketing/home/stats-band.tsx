@@ -39,7 +39,7 @@ export function StatsBand() {
               <p className="text-[15px] font-medium uppercase tracking-[0.18em] text-white/45">
                 The whole job, one surface
               </p>
-              <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-white">
+              <h2 className="mt-4 font-title text-[clamp(1.75rem,3.5vw,2.75rem)] font-normal leading-[1.05] tracking-[-0.018em] text-white">
                 Stop paying for six tools that don&apos;t talk to each other.
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">

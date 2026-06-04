@@ -49,7 +49,7 @@ export function DeepFeatures() {
         {/* Left — label, headline, CTA, accordion */}
         <Reveal>
           <Eyebrow>Features</Eyebrow>
-          <h2 className="mt-5 text-[clamp(2rem,4.8vw,3.75rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground">
+          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
             One agent. Every corner of the job.
           </h2>
           <p className="mt-4 max-w-md text-lg leading-relaxed text-foreground/55">

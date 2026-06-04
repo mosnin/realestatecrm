@@ -23,7 +23,7 @@ export function BlogTeaser() {
       <Reveal className="flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-2xl">
           <Eyebrow>From the team</Eyebrow>
-          <h2 className="mt-5 text-[clamp(2rem,4.5vw,3.5rem)] font-semibold leading-[1.04] tracking-[-0.02em] text-foreground">
+          <h2 className="mt-5 font-title text-[clamp(2rem,4.5vw,3.5rem)] font-normal leading-[1.04] tracking-[-0.018em] text-foreground">
             Thinking on the business of real estate.
           </h2>
         </div>
