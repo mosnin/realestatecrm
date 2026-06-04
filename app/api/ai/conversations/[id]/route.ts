@@ -12,7 +12,7 @@ const rateLimited = () =>
 async function getConversationAndVerifyOwner(conversationId: string, userId: string) {
   const { data: conv, error } = await supabase
     .from('Conversation')
-    .select('id, spaceId, Space(ownerId)')
+    .select('id, spaceId, title, Space(ownerId)')
     .eq('id', conversationId)
     .maybeSingle();
   if (error) throw error;
@@ -25,6 +25,15 @@ async function getConversationAndVerifyOwner(conversationId: string, userId: str
     .eq('id', (conv as any).Space.ownerId)
     .maybeSingle();
   if (!user) return null;
+
+  // Surface guard: broker-Chippi and team conversations have their own
+  // broker-gated routes. A broker_owner also owns their personal realtor
+  // space, so ownership alone is not isolation — refuse to rename/delete a
+  // broker conversation through the realtor endpoint.
+  const convTitle = (conv as { title?: string }).title ?? '';
+  if (convTitle.startsWith('[BROKER_CHIPPI]') || convTitle.startsWith('[BROKERAGE_CHAT]')) {
+    return null;
+  }
 
   return conv;
 }

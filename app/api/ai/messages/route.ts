@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     // with a 403 the client couldn't see.
     const { data: conv, error: convErr } = await supabase
       .from('Conversation')
-      .select('id, spaceId')
+      .select('id, spaceId, title')
       .eq('id', conversationId)
       .maybeSingle();
     if (convErr) {
@@ -59,6 +59,15 @@ export async function GET(req: NextRequest) {
     }
     if (!space || space.ownerId !== dbUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Surface guard: broker-Chippi and team conversations have their own
+    // broker-gated routes. Never serve them through the realtor messages
+    // endpoint, even when the caller owns the space — a broker_owner also
+    // owns their personal realtor space, so ownership alone is not isolation.
+    const convTitle = conv.title ?? '';
+    if (convTitle.startsWith('[BROKER_CHIPPI]') || convTitle.startsWith('[BROKERAGE_CHAT]')) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const { data, error } = await supabase
