@@ -41,6 +41,21 @@
 const ACTION_VERBS_RE =
   /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject)\b/i;
 
+/**
+ * Workspace-DATA queries that READ the realtor's book of business. These are
+ * not mutations, but they still REQUIRE tools (find_person, find_property,
+ * pipeline_summary, find_quiet_hot_persons, …) — the toolless direct path
+ * cannot answer "show my pipeline" or "find my hottest leads", it can only
+ * deflect. So any message that references the realtor's data (a read verb
+ * paired with, or just a mention of, a workspace noun) routes to the agent.
+ *
+ * This is the fix for the "Chippi has no access to anything" failure: read
+ * phrasings like "show today's pipeline", "find hot leads", "who's overdue",
+ * "plan my day" must reach the tools, not the generic LLM.
+ */
+const WORKSPACE_QUERY_RE =
+  /\b(show|find|search|look\s?up|lookup|list|see|view|pull|display|surface|who(?:'?s| is| are)?|which|whose|overdue|hottest|hot|warm|cold|stuck|stalled|quiet|pipeline|deals?|leads?|contacts?|people|person|clients?|prospects?|buyers?|sellers?|listings?|propert(?:y|ies)|tours?|showings?|follow[\s-]?ups?|calendar|agenda|schedule|today|tomorrow|this week|inbox|drafts?|offers?|commissions?|stages?|scores?|plan my|my day|my week|my pipeline|my leads|my deals|my contacts|my schedule|my calendar)\b/i;
+
 export type RouteDecision = 'direct' | 'agent';
 
 export interface RouteAttachment {
@@ -71,9 +86,20 @@ export function decideRoute(
     if (ACTION_VERBS_RE.test(text)) {
       return 'agent';
     }
-    // Attachments without an action verb are the direct path's sweet spot.
+    // Attachments without an action verb are the direct path's sweet spot
+    // (multimodal vision summary) — keep them fast even if the caption
+    // mentions a workspace noun like "listing".
     if (attachments.length > 0) {
       return 'direct';
+    }
+    // Text reads of the realtor's own data still need tools — route them to
+    // the agent so "show my pipeline" / "find hot leads" / "who's overdue"
+    // reach the read tools instead of the toolless direct path (which can
+    // only deflect). The file's own philosophy: better to over-route to the
+    // tool-capable agent than answer a data question with a toolless LLM that
+    // has no access to the workspace.
+    if (WORKSPACE_QUERY_RE.test(text)) {
+      return 'agent';
     }
     return 'direct';
   } catch {

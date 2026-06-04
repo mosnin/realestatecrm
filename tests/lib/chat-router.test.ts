@@ -10,12 +10,22 @@ import { describe, it, expect } from 'vitest';
 import { decideRoute, shouldEscalate, ACTION_VERBS_REGEX } from '@/lib/chat/router';
 
 describe('decideRoute', () => {
-  it('routes a generic question to direct', () => {
+  it('routes a generic (non-data) question to direct', () => {
     expect(decideRoute("what's a CMA?")).toBe('direct');
     expect(decideRoute('Explain the 1031 exchange rules to me.')).toBe('direct');
-    expect(decideRoute('What did Preston say in his last note?')).toBe('direct');
     expect(decideRoute('Summarize this for me.')).toBe('direct');
-    expect(decideRoute('Who is my hottest lead?')).toBe('direct');
+  });
+
+  it('routes reads of the realtor data to agent — they need tools', () => {
+    // These are READS, not mutations, but answering them requires the read
+    // tools (pipeline_summary, find_person, find_quiet_hot_persons, …). The
+    // toolless direct path can only deflect, so they must reach the agent.
+    expect(decideRoute("Show today's pipeline")).toBe('agent');
+    expect(decideRoute('Find hot leads')).toBe('agent');
+    expect(decideRoute('Plan my day')).toBe('agent');
+    expect(decideRoute('Who is my hottest lead?')).toBe('agent');
+    expect(decideRoute("what's overdue?")).toBe('agent');
+    expect(decideRoute('list my deals')).toBe('agent');
   });
 
   it('routes action verbs to agent', () => {
@@ -40,12 +50,11 @@ describe('decideRoute', () => {
   });
 
   it('matches action verbs as standalone words, not substrings', () => {
-    // 'sending' would be a verb — but the regex is on \badd\b etc., and
-    // 'sending' contains 'send' as a prefix word boundary, so it matches.
-    // 'addendum' should NOT match \badd\b because of the trailing chars
-    // — actually \badd\b matches whole-word 'add' only, so addendum fails.
+    // \badd\b matches whole-word 'add' only, so 'addendum' does not match;
+    // \bsend\b does not match 'sender'. Neither line contains a data-read
+    // word, so both stay on the direct path.
     expect(decideRoute('The addendum was unclear')).toBe('direct');
-    expect(decideRoute('Show me sender info')).toBe('direct');
+    expect(decideRoute('The sender was anonymous.')).toBe('direct');
   });
 
   it('routes attachments without action verbs to direct (multimodal Q&A)', () => {
