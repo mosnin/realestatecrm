@@ -47,7 +47,7 @@ export function LogoMarquee() {
           {track.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
-              className="flex h-12 w-32 shrink-0 items-center justify-center px-2 md:w-44"
+              className="flex h-11 w-28 shrink-0 items-center justify-center px-3 md:w-40"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -56,7 +56,7 @@ export function LogoMarquee() {
                 loading="lazy"
                 decoding="async"
                 draggable={false}
-                className="max-h-6 w-auto max-w-full select-none object-contain opacity-50 brightness-0 md:max-h-7 dark:opacity-60 dark:invert"
+                className="max-h-5 w-auto max-w-[64px] select-none object-contain opacity-50 brightness-0 md:max-h-6 md:max-w-[84px] dark:opacity-60 dark:invert"
               />
             </div>
           ))}
