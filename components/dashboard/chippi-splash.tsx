@@ -22,6 +22,14 @@ import {
 } from "motion/react";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { peekSwitchFlag } from "@/components/dashboard/account-switch";
+
+// One-shot, per-page-load gate. Module state lives for the lifetime of the JS
+// bundle: it survives client-side navigation (so switching between the realtor
+// and broker dashboards does NOT replay the heavy splash) but resets on a full
+// page reload (so a first open or hard refresh plays it again). The lighter
+// Chippi-logo account-switch swipe is a separate component and is unaffected.
+let splashPlayed = false;
 
 export interface ChippiSnapshot {
   newLeads: number;
@@ -62,11 +70,23 @@ export function ChippiSplash({
   greeting: string;
   snapshot: ChippiSnapshot;
 }) {
-  const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">("greeting");
+  // Decide ONCE, on first render, whether this mount should play the splash.
+  // Skip it if it has already played this page load (client-side navigation,
+  // e.g. switching dashboards) or if an account switch is in progress — that
+  // hands the moment to the lighter Chippi-logo swipe instead.
+  const [shouldPlay] = useState(() => !splashPlayed && !peekSwitchFlag());
+  const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">(
+    shouldPlay ? "greeting" : "gone"
+  );
   const reduce = useReducedMotion();
   const items = useMemo(() => buildItems(snapshot), [snapshot]);
 
   useEffect(() => {
+    if (!shouldPlay) return;
+    // Mark played so later client-side navigations skip the splash. A full page
+    // reload resets this module, which is exactly the first-load / hard-refresh
+    // behavior we want.
+    splashPlayed = true;
     const a = setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT);
     const b = setTimeout(() => setStage("gone"), T_TO_GONE);
     const safety = setTimeout(() => setStage("gone"), T_SAFETY);
@@ -75,7 +95,7 @@ export function ChippiSplash({
       clearTimeout(b);
       clearTimeout(safety);
     };
-  }, []);
+  }, [shouldPlay]);
 
   // Lock body scroll while the overlay is up.
   useEffect(() => {

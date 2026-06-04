@@ -3,6 +3,13 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Search,
   UserPlus,
   UserMinus,
@@ -784,6 +791,29 @@ export function BrokerLeadsClient({
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
   const [search, setSearch] = useState('');
+  const [realtorFilter, setRealtorFilter] = useState<string>('all');
+
+  // Resolve the realtor a routed lead sits with — same rule AssignedRow uses
+  // (live progress wins, falls back to the assignment label).
+  const realtorOf = useCallback(
+    (lead: LeadRow) => assignedLeadProgress[lead.id]?.realtorName ?? lead.assignedTo ?? null,
+    [assignedLeadProgress],
+  );
+
+  // Realtors who actually have routed leads, plus any team member — so the
+  // menu mirrors the team even before everyone has a lead. Sorted, deduped.
+  const realtorNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const lead of assigned) {
+      const name = realtorOf(lead);
+      if (name) set.add(name);
+    }
+    for (const r of realtors) {
+      const name = r.name ?? r.email;
+      if (name) set.add(name);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [assigned, realtors, realtorOf]);
 
   const applySearch = useCallback(
     (list: LeadRow[]) => {
@@ -799,8 +829,19 @@ export function BrokerLeadsClient({
     [search],
   );
 
-  const filteredUnassigned = useMemo(() => applySearch(unassigned), [unassigned, applySearch]);
-  const filteredAssigned = useMemo(() => applySearch(assigned), [assigned, applySearch]);
+  const filteredUnassigned = useMemo(() => {
+    // A specific realtor has no claim on unassigned leads — hide them.
+    if (realtorFilter !== 'all') return [];
+    return applySearch(unassigned);
+  }, [unassigned, applySearch, realtorFilter]);
+
+  const filteredAssigned = useMemo(() => {
+    const byRealtor =
+      realtorFilter === 'all'
+        ? assigned
+        : assigned.filter((l) => realtorOf(l) === realtorFilter);
+    return applySearch(byRealtor);
+  }, [assigned, applySearch, realtorFilter, realtorOf]);
 
   function handleAssigned(leadId: string, realtor: RealtorOption) {
     const lead = unassigned.find((l) => l.id === leadId);
@@ -831,22 +872,42 @@ export function BrokerLeadsClient({
 
   return (
     <div className="space-y-8 pb-56 md:pb-24">
-      {/* Search — the only chrome. View toggles, sort dropdown, lead type
-          filter, score pills, and "Add Lead" button all cut. Brokers don't
-          manually add leads; intake forms do. */}
+      {/* Search + by-realtor filter — the only chrome. View toggles, sort
+          dropdown, lead type filter, score pills, and "Add Lead" button all
+          cut. Brokers don't manually add leads; intake forms do. */}
       {hasAnyLeads && (
-        <div className="relative w-full sm:w-80">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-          />
-          <input
-            type="text"
-            placeholder="Search by name, email, or phone…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-border/70 bg-background pl-9 pr-3 h-9 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="relative w-full sm:w-80">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-md border border-border/70 bg-background pl-9 pr-3 h-9 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          {realtorNames.length > 1 && (
+            <Select value={realtorFilter} onValueChange={setRealtorFilter}>
+              <SelectTrigger
+                className="w-full sm:w-[200px]"
+                aria-label="Filter by realtor"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All realtors</SelectItem>
+                {realtorNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 
@@ -863,8 +924,10 @@ export function BrokerLeadsClient({
       )}
 
       {/* Unassigned — the one demanding routing. Shown first so it's the
-          first thing the broker reaches for. */}
-      {hasAnyLeads && (
+          first thing the broker reaches for. Hidden when filtering to a
+          single realtor: unassigned leads belong to no one, so an empty
+          queue under a realtor filter is noise. */}
+      {hasAnyLeads && realtorFilter === 'all' && (
         <section className="space-y-2">
           <SectionHeader
             label="Unassigned"
@@ -906,7 +969,9 @@ export function BrokerLeadsClient({
               <p className="text-sm text-foreground">
                 {isSearching
                   ? 'No matches in the routed list.'
-                  : "Nothing on a realtor's plate yet."}
+                  : realtorFilter !== 'all'
+                    ? `Nothing on ${realtorFilter}’s plate yet.`
+                    : "Nothing on a realtor's plate yet."}
               </p>
             </div>
           ) : (

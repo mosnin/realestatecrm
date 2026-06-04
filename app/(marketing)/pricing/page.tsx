@@ -22,7 +22,7 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 
-export const metadata = { title: 'Pricing — Chippi' };
+export const metadata = { title: 'Pricing · Chippi' };
 
 const INCLUDED: string[] = [
   'The agent (Chippi runs the workspace)',
@@ -42,10 +42,10 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What happens after the trial?',
-    a: 'You enter the plan automatically — only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
+    a: 'You enter the plan automatically, but only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
   },
   {
-    q: 'Brokerages — what changes?',
+    q: 'Brokerages: what changes?',
     a: 'The pricing scales by realtor. The agent doesn’t. Every realtor on your floor gets the same surface; admins see the rollup. Talk to us for migration.',
   },
 ];
@@ -58,7 +58,7 @@ export default function PricingPage() {
         title="One plan. Honest pricing."
         sub="Start with a seven-day free trial. After that, a single monthly price that covers the agent, the integrations, and the surface. No seats math, no feature gates."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales for teams', href: '/about' }}
+        secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
       />
 
       {/* The pricing card — the page's focal element. */}
@@ -120,7 +120,7 @@ export default function PricingPage() {
         eyebrow="FOR BROKERAGES"
         title="Talk to us about the floor."
         sub="Brokerages pay by realtor with volume pricing. We’ll talk through migration and onboarding the team."
-        learnMore={{ label: 'Talk to sales', href: '/about' }}
+        learnMore={{ label: 'Talk to sales', href: '/demo' }}
       />
 
       {/* FAQ — three questions, hairline-divided, all visible at once. */}
@@ -156,7 +156,7 @@ export default function PricingPage() {
         title="Start your free trial."
         sub="Seven days. No credit card. Bring your inbox and let Chippi do the rest."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales', href: '/about' }}
+        secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
     </>
   );

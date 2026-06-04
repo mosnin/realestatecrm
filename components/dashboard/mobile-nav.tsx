@@ -9,19 +9,20 @@ import {
   LayoutDashboard,
   UserCircle,
   PhoneIncoming,
+  BarChart3,
 } from 'lucide-react';
 
-// IA: /broker = Chippi home (center affordance), /broker/brief = dashboard,
-//     /broker/leads = leads, /broker/realtors = realtors team list.
-const brokerSideItems = {
-  left: [
-    { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: true },
-    { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
-  ],
-  right: [
-    { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-  ],
-};
+// IA: /broker = Chippi home (center affordance). Four side items split
+// 2-left / 2-right so the Chippi avatar sits dead-center, exactly like the
+// realtor bar (People · Deals · [Chippi] · Calendar · Settings). Broker
+// destinations differ; the structure is identical.
+//   Brief · Leads · [Chippi] · Realtors · Pipeline
+const brokerSideItems = [
+  { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: true },
+  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
+  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
+  { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false },
+];
 
 interface MobileNavProps {
   slug: string;
@@ -135,7 +136,7 @@ function BrokerMobileNav({ pathname }: { pathname: string }) {
 
   return (
     <BarShell>
-      {brokerSideItems.left.map((item) => (
+      {brokerSideItems.slice(0, 2).map((item) => (
         <SideTab
           key={item.href}
           href={item.href}
@@ -145,7 +146,7 @@ function BrokerMobileNav({ pathname }: { pathname: string }) {
         />
       ))}
       <ChippiTab href="/broker" isActive={pathname === '/broker'} />
-      {brokerSideItems.right.map((item) => (
+      {brokerSideItems.slice(2).map((item) => (
         <SideTab
           key={item.href}
           href={item.href}

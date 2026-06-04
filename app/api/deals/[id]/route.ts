@@ -299,6 +299,13 @@ export async function PATCH(
         // reflects "time in current stage" — not "time since any field edit".
         // Mirrors the Contact behaviour added in migration 20260316000004.
         ...(stageChanged && { stageChangedAt: new Date().toISOString() }),
+        // When the deal transitions to a closed status (won|lost), stamp
+        // closedAt so time-to-close and conversion metrics (lib/deal-metrics.ts)
+        // have a real close timestamp. Gated on statusChanged so re-saving an
+        // already-closed deal doesn't overwrite the original close time.
+        ...(statusChanged && (body.status === 'won' || body.status === 'lost') && {
+          closedAt: new Date().toISOString(),
+        }),
         ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         ...(nextActionVal !== undefined && { nextAction: nextActionVal }),

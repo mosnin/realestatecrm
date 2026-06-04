@@ -16,10 +16,17 @@
  * (mirrors the realtor board pattern verbatim).
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BrokerKanbanColumn } from './broker-kanban-column';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { TITLE_FONT } from '@/lib/typography';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -211,11 +218,33 @@ function MobileKanban({
 
 export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
   const router = useRouter();
+  const [realtor, setRealtor] = useState<string>('all');
 
   function handleOpenDeal(deal: BrokerDealItem) {
     const prompt = `Audit the deal "${deal.title}" owned by ${deal.realtorName}. What stage is it at and what needs attention?`;
     router.push(`/broker?prompt=${encodeURIComponent(prompt)}`);
   }
+
+  // Distinct realtor names present in the board, sorted for a stable menu.
+  const realtorNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const col of columns) {
+      for (const deal of col.deals) set.add(deal.realtorName);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [columns]);
+
+  // Narrow cards within each column to the selected realtor, then drop the
+  // columns that empty out — same "no empty columns" rule the server applies.
+  const visibleColumns = useMemo(() => {
+    if (realtor === 'all') return columns;
+    return columns
+      .map((col) => ({
+        ...col,
+        deals: col.deals.filter((d) => d.realtorName === realtor),
+      }))
+      .filter((col) => col.deals.length > 0);
+  }, [columns, realtor]);
 
   if (columns.length === 0) {
     return (
@@ -230,27 +259,59 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Mobile: snap-to-stage */}
-      <div className="md:hidden">
-        <MobileKanban columns={columns} onOpenDeal={handleOpenDeal} />
-      </div>
+      {/* By-realtor filter — mirrors the broker activity filter idiom. Only
+          shown when more than one realtor has deals; with one realtor it's a
+          control that can't do anything. */}
+      {realtorNames.length > 1 && (
+        <div className="flex items-center gap-2">
+          <Select value={realtor} onValueChange={setRealtor}>
+            <SelectTrigger className="w-[200px]" aria-label="Filter by realtor">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All realtors</SelectItem>
+              {realtorNames.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      {/* Desktop: horizontal-scroll kanban, matches realtor board layout */}
-      <div className="hidden md:block overflow-x-auto pb-4">
-        <StaggerList className="flex gap-4 min-w-max items-start">
-          {columns.map((col) => (
-            <StaggerItem key={col.id}>
-              <BrokerKanbanColumn
-                stageId={col.id}
-                stageName={col.name}
-                stageColor={col.color}
-                deals={col.deals}
-                onOpenDeal={handleOpenDeal}
-              />
-            </StaggerItem>
-          ))}
-        </StaggerList>
-      </div>
+      {visibleColumns.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">No active deals for {realtor}.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Switch back to all realtors to see the full pipeline.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile: snap-to-stage */}
+          <div className="md:hidden">
+            <MobileKanban columns={visibleColumns} onOpenDeal={handleOpenDeal} />
+          </div>
+
+          {/* Desktop: horizontal-scroll kanban, matches realtor board layout */}
+          <div className="hidden md:block overflow-x-auto pb-4">
+            <StaggerList key={realtor} className="flex gap-4 min-w-max items-start">
+              {visibleColumns.map((col) => (
+                <StaggerItem key={col.id}>
+                  <BrokerKanbanColumn
+                    stageId={col.id}
+                    stageName={col.name}
+                    stageColor={col.color}
+                    deals={col.deals}
+                    onOpenDeal={handleOpenDeal}
+                  />
+                </StaggerItem>
+              ))}
+            </StaggerList>
+          </div>
+        </>
+      )}
     </div>
   );
 }

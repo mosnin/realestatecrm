@@ -44,10 +44,10 @@ interface ComposerDraftDiagramProps {
 }
 
 const DRAFT_LINES = [
-  'Hi Marcus — happy to show you 415 Lexington on',
+  'Hi Marcus, happy to show you 415 Lexington on',
   'Saturday at 2pm. It’s a south-facing two-bed with',
   'the rooftop your wife asked about. I’ll bring the',
-  'comparable sales for the block — see you then.',
+  'comparable sales for the block. See you then.',
 ];
 
 // Phase budget. Each line lands 280ms after the prior; the Send pill

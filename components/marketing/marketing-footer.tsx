@@ -1,5 +1,11 @@
+'use client';
+
 /**
  * Marketing footer — paper-flat, 5-column, reference (not destination).
+ *
+ * The rebuilt homepage (`/`) ships its own bespoke `<HomeFooter>`, so this
+ * shared footer returns null there to avoid a double footer. Every other
+ * marketing page renders it as before.
  *
  * Apple discipline: a wall of small text in columns with the brand mark and
  * copyright at the bottom. NO big CTA card here — the page's `<MarketingCTA>`
@@ -18,6 +24,7 @@
  */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/brand-logo';
 import { cn } from '@/lib/utils';
 
@@ -29,40 +36,22 @@ const COLUMNS: FooterColumn[] = [
     title: 'Product',
     items: [
       { href: '/realtors', label: 'For realtors' },
-      { href: '/teams', label: 'For teams' },
-      { href: '/features', label: 'All features' },
+      { href: '/brokerages', label: 'For brokerages' },
+      { href: '/integrations', label: 'Integrations' },
       { href: '/pricing', label: 'Pricing' },
-    ],
-  },
-  {
-    title: 'Surfaces',
-    items: [
-      { href: '/features/chippi', label: 'Chippi' },
-      { href: '/features/people', label: 'People' },
-      { href: '/features/deals', label: 'Deals' },
-      { href: '/features/communication', label: 'Communication' },
-      { href: '/features/calendar', label: 'Calendar' },
-      { href: '/features/properties', label: 'Properties' },
-      { href: '/features/studio', label: 'Studio' },
-      { href: '/features/files', label: 'Files' },
-    ],
-  },
-  {
-    title: 'Teams',
-    items: [
-      { href: '/teams', label: 'Overview' },
-      { href: '/teams/leads', label: 'Lead distribution' },
-      { href: '/teams/members', label: 'Members' },
-      { href: '/teams/analytics', label: 'Analytics' },
-      { href: '/teams/templates', label: 'Templates' },
-      { href: '/teams/chat', label: 'Team chat' },
     ],
   },
   {
     title: 'Company',
     items: [
-      { href: '/about', label: 'About' },
+      { href: '/company', label: 'Company' },
+      { href: '/demo', label: 'Book a demo' },
       { href: '/login/realtor', label: 'Log in' },
+    ],
+  },
+  {
+    title: 'Legal',
+    items: [
       { href: '/legal', label: 'Legal' },
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },
@@ -75,6 +64,10 @@ const LINK_CLASS =
 
 export function MarketingFooter() {
   const year = new Date().getFullYear();
+  const pathname = usePathname();
+
+  // The homepage renders its own <HomeFooter>; don't stack two footers there.
+  if (pathname === '/') return null;
 
   return (
     <footer
@@ -82,8 +75,8 @@ export function MarketingFooter() {
       role="contentinfo"
     >
       <div className="mx-auto max-w-7xl px-6 md:px-8 py-16 md:py-20">
-        {/* Columns: brand + 4 link groups. 2-col mobile, 5-col md+. */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-12">
+        {/* Columns: brand + 3 link groups. 2-col mobile, 4-col md+. */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-12">
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
             <Link

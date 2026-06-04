@@ -102,8 +102,8 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // Twilio + WhatsApp are the realtor's phone — SMS for US clients, WhatsApp
   // for international and under-40 segment. Slack/Discord/Teams are internal
   // team comms; the SMS-class tools are client comms.
-  { toolkit: 'twilio', name: 'Twilio', blurb: 'SMS and voice with US clients — Chippi can reply where the conversation actually lives.', category: 'messaging', promoted: true, iconUrl: '/integrations/twilio.svg' },
-  { toolkit: 'whatsapp', name: 'WhatsApp', blurb: 'International buyers, co-buyer group threads, agent-to-agent.', category: 'messaging', promoted: true, iconUrl: '/integrations/whatsapp.svg' },
+  { toolkit: 'twilio', name: 'Twilio', blurb: 'Connect your SMS and voice records so Chippi can read them into the right deal.', category: 'messaging', promoted: true, iconUrl: '/integrations/twilio.svg' },
+  { toolkit: 'whatsapp', name: 'WhatsApp', blurb: 'Bring buyer and agent threads into Chippi so the history lives on the deal.', category: 'messaging', promoted: true, iconUrl: '/integrations/whatsapp.svg' },
   { toolkit: 'slack', name: 'Slack', blurb: 'Post to your team channel. Chippi drafts replies to your DMs.', category: 'messaging', promoted: true, iconUrl: '/integrations/slack.svg' },
   { toolkit: 'discord', name: 'Discord', blurb: 'Same, for Discord servers.', category: 'messaging', iconUrl: '/integrations/discord.svg' },
   { toolkit: 'microsoft_teams', name: 'Microsoft Teams', blurb: 'Same, for Teams channels.', category: 'messaging', iconUrl: '/integrations/microsoftteams.svg' },

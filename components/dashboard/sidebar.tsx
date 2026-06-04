@@ -57,7 +57,6 @@ import {
   Handshake,
   Plug,
   Gauge,
-  HeartPulse,
   TrendingUp,
 } from 'lucide-react';
 import {
@@ -143,7 +142,6 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
       { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
-      { href: '/broker/retention', label: 'Retention', icon: HeartPulse, exact: false, adminOnly: false },
       { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
       { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
@@ -205,6 +203,7 @@ const brokerSettingsNavSections = [
     label: 'Team',
     items: [
       { href: '/broker/settings', label: 'General', icon: Settings, exact: true },
+      { href: '/broker/settings/profile', label: 'Profile', icon: UserCircle, exact: false },
       { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
       { href: '/broker/settings/mcp', label: 'MCP', icon: Key, exact: false },
     ],

@@ -35,7 +35,6 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/broker/agent-activity', label: 'Agent activity' },
   { path: '/broker/activity', label: 'Activity' },
   { path: '/broker/reviews', label: 'Reviews' },
-  { path: '/broker/retention', label: 'Retention' },
   { path: '/broker/templates', label: 'Templates' },
   { path: '/broker/leaderboard', label: 'Leaderboard' },
   { path: '/broker/billing', label: 'Billing' },
@@ -44,6 +43,7 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/broker/settings/auto-assignment', label: 'Auto-assignment' },
   { path: '/broker/settings/routing-rules', label: 'Routing rules' },
   { path: '/broker/settings/mcp', label: 'MCP' },
+  { path: '/broker/settings/profile', label: 'Profile' },
   { path: '/broker/settings', label: 'Settings' },
   { path: '/broker', label: 'Chippi', exact: true },
 ];

@@ -32,7 +32,7 @@ import { supabase } from '@/lib/supabase';
 import { hasLLMKey } from '@/lib/llm';
 import { composioConfigured } from '@/lib/integrations/composio';
 
-export const metadata = { title: 'Status — Chippi' };
+export const metadata = { title: 'Status · Chippi' };
 
 // Always evaluate at request time — a status page must never be cached into a
 // stale "operational" snapshot.
@@ -159,7 +159,7 @@ export default async function StatusPage() {
             ))}
           </ul>
           <p className="mt-6 text-sm text-muted-foreground">
-            Subscribe to status updates —{' '}
+            Subscribe to status updates at{' '}
             <a
               href="mailto:status@chippi.app"
               className="underline underline-offset-2 transition-colors hover:text-foreground"

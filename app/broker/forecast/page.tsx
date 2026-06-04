@@ -4,6 +4,14 @@ import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { supabase } from '@/lib/supabase';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
+import {
+  avgTimeToCloseDays,
+  conversionRate,
+  stageBottlenecks,
+  type DealMetricRow,
+  type DealStatus,
+  type StageMetricRow,
+} from '@/lib/deal-metrics';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
 import {
   H1,
@@ -175,6 +183,19 @@ export default async function BrokerForecastPage() {
     .order('value', { ascending: false })
     .limit(2000);
 
+  // Fetch closed deals (won + lost, all time) for per-realtor conversion and
+  // time-to-close. Read-only, scoped to the same member spaces. We pull the
+  // close-metric columns (createdAt/closedAt/stageChangedAt/status/stageId) that
+  // lib/deal-metrics.ts needs — these were added in the deal_close_metrics
+  // migration. Active deals already live in activeRaw; we union them in below so
+  // the per-realtor rollup sees the full pipeline, not just the closed tail.
+  const { data: closedRaw } = await supabase
+    .from('Deal')
+    .select('id, spaceId, status, stageId, createdAt, closedAt, stageChangedAt')
+    .in('spaceId', spaceIds)
+    .in('status', ['won', 'lost'])
+    .limit(4000);
+
   // Fetch stage names so we can display the deal's current stage
   const allStageIds = Array.from(
     new Set(
@@ -200,6 +221,8 @@ export default async function BrokerForecastPage() {
 
   let wonGci = 0;
   let wonCount = 0;
+  // Realized GCI this month, per realtor space — feeds the per-realtor rollup.
+  const realizedBySpace = new Map<string, number>();
   for (const d of (wonRaw ?? []) as Array<{
     id: string;
     spaceId: string;
@@ -209,14 +232,17 @@ export default async function BrokerForecastPage() {
   }>) {
     const rate =
       d.commissionRate != null ? d.commissionRate / 100 : defaultBrokerRate;
-    wonGci += (d.value ?? 0) * rate;
+    const gci = (d.value ?? 0) * rate;
+    wonGci += gci;
     wonCount += 1;
+    realizedBySpace.set(d.spaceId, (realizedBySpace.get(d.spaceId) ?? 0) + gci);
   }
 
   // ── Active deal projections ────────────────────────────────────────────────
 
   type ProjectedDeal = {
     id: string;
+    spaceId: string;
     title: string;
     realtorName: string;
     value: number;
@@ -272,6 +298,7 @@ export default async function BrokerForecastPage() {
 
     projectedDeals.push({
       id: d.id,
+      spaceId: d.spaceId,
       title: d.title,
       realtorName,
       value,
@@ -315,6 +342,127 @@ export default async function BrokerForecastPage() {
   }
 
   const activeCount = projectedDeals.length;
+
+  // ── Per-realtor performance context ────────────────────────────────────────
+  // For each realtor space we fold together: their active deals (from
+  // activeRaw) and their closed deals (from closedRaw) into DealMetricRow[],
+  // then run the pure metrics. avgTimeToClose + conversion read the closed
+  // tail; bottlenecks read the active set. Projected GCI sums their weighted
+  // active deals; realized GCI is this-month won (realizedBySpace).
+  type RealtorMetricRow = DealMetricRow & { spaceId: string };
+
+  const metricRowsBySpace = new Map<string, RealtorMetricRow[]>();
+  const pushRow = (row: RealtorMetricRow) => {
+    const list = metricRowsBySpace.get(row.spaceId);
+    if (list) list.push(row);
+    else metricRowsBySpace.set(row.spaceId, [row]);
+  };
+
+  for (const d of (activeRaw ?? []) as DealRow[]) {
+    pushRow({
+      id: d.id,
+      spaceId: d.spaceId,
+      status: 'active',
+      stageId: d.stageId ?? '',
+      createdAt: d.updatedAt, // active deals don't drive time-to-close
+      closedAt: null,
+      stageChangedAt: d.stageChangedAt,
+    });
+  }
+  for (const d of (closedRaw ?? []) as Array<{
+    id: string;
+    spaceId: string;
+    status: string;
+    stageId: string | null;
+    createdAt: string;
+    closedAt: string | null;
+    stageChangedAt: string | null;
+  }>) {
+    pushRow({
+      id: d.id,
+      spaceId: d.spaceId,
+      status: d.status as DealStatus,
+      stageId: d.stageId ?? '',
+      createdAt: d.createdAt,
+      closedAt: d.closedAt,
+      stageChangedAt: d.stageChangedAt,
+    });
+  }
+
+  // Projected GCI per space (sum of weighted active deals).
+  const projectedBySpace = new Map<string, number>();
+  for (const deal of projectedDeals) {
+    projectedBySpace.set(
+      deal.spaceId,
+      (projectedBySpace.get(deal.spaceId) ?? 0) + deal.projectedGci,
+    );
+  }
+
+  type RealtorRollup = {
+    spaceId: string;
+    name: string;
+    avgClose: number | null;
+    conversion: number | null;
+    projected: number;
+    realized: number;
+    activeCount: number;
+  };
+
+  const realtorSpaceIds = new Set<string>([
+    ...metricRowsBySpace.keys(),
+    ...realizedBySpace.keys(),
+  ]);
+
+  const realtorRollups: RealtorRollup[] = Array.from(realtorSpaceIds)
+    .map((sid) => {
+      const rows = metricRowsBySpace.get(sid) ?? [];
+      const activeForSpace = rows.filter((r) => r.status === 'active').length;
+      return {
+        spaceId: sid,
+        name: spaceToRealtor.get(sid) ?? 'Unknown',
+        avgClose: avgTimeToCloseDays(rows),
+        conversion: conversionRate(rows),
+        projected: projectedBySpace.get(sid) ?? 0,
+        realized: realizedBySpace.get(sid) ?? 0,
+        activeCount: activeForSpace,
+      };
+    })
+    // Show realtors with anything in flight or realized this month first; drop
+    // dead spaces with no signal at all so the table reads as the live roster.
+    .filter(
+      (r) =>
+        r.activeCount > 0 ||
+        r.realized > 0 ||
+        r.avgClose !== null ||
+        r.conversion !== null,
+    )
+    .sort((a, b) => b.projected + b.realized - (a.projected + a.realized));
+
+  // ── Deal bottlenecks (where deals stall) ───────────────────────────────────
+  // Run across the brokerage's active deals. Stages come from the same set we
+  // already resolved for the active deals' current stages.
+  const bottleneckStages: StageMetricRow[] = ((stagesRaw ?? []) as StageRow[]).map(
+    (s) => ({ id: s.id, name: s.name }),
+  );
+  const activeMetricRows: DealMetricRow[] = ((activeRaw ?? []) as DealRow[]).map(
+    (d) => ({
+      id: d.id,
+      status: 'active',
+      stageId: d.stageId ?? '',
+      createdAt: d.updatedAt,
+      closedAt: null,
+      stageChangedAt: d.stageChangedAt,
+    }),
+  );
+  const bottleneckReport = stageBottlenecks(
+    activeMetricRows,
+    bottleneckStages,
+    now,
+  );
+  // Stages that actually hold active deals, worst-stall first.
+  const stallStages = bottleneckReport.stages
+    .filter((s) => s.count > 0)
+    .sort((a, b) => b.avgAgeDays - a.avgAgeDays);
 
   // ── Status sentence ────────────────────────────────────────────────────────
 
@@ -487,6 +635,132 @@ export default async function BrokerForecastPage() {
                   );
                 })}
               </ul>
+            )}
+          </section>
+
+          {/* Per-realtor performance context */}
+          <section>
+            <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+              <h2 className={SECTION_LABEL}>By realtor</h2>
+              {realtorRollups.length > 0 && (
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {realtorRollups.length}
+                </span>
+              )}
+            </div>
+
+            {realtorRollups.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center mt-4">
+                <p className="text-sm text-foreground">No realtor activity yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Each realtor&rsquo;s forecast and pace will appear here as deals move.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {realtorRollups.map((r) => {
+                  const forecast = r.projected + r.realized;
+                  return (
+                    <li key={r.spaceId} className="py-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Realtor identity + pace */}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {r.name}
+                          </p>
+                          <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5">
+                            <span className={META}>
+                              {r.activeCount} active deal{r.activeCount === 1 ? '' : 's'}
+                            </span>
+                            <span className={META}>
+                              {r.conversion !== null
+                                ? `${Math.round(r.conversion * 100)}% close rate`
+                                : 'no close rate yet'}
+                            </span>
+                            <span className={META}>
+                              {r.avgClose !== null
+                                ? `${Math.round(r.avgClose)}d to close`
+                                : 'no close history'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right side: projected vs realized */}
+                        <div className="flex-shrink-0 text-right space-y-1">
+                          <p
+                            className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground"
+                            style={TITLE_FONT}
+                          >
+                            {formatCompact(forecast)}
+                          </p>
+                          <p className={cn(META, 'tabular-nums')}>
+                            {formatCompact(r.realized)} won &middot;{' '}
+                            {formatCompact(r.projected)} in flight
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* Where deals stall */}
+          <section>
+            <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+              <h2 className={SECTION_LABEL}>Where deals stall</h2>
+              {stallStages.length > 0 && (
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {stallStages.length}
+                </span>
+              )}
+            </div>
+
+            {stallStages.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center mt-4">
+                <p className="text-sm text-foreground">Nothing stuck right now.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Stages holding active deals will show their average age here.
+                </p>
+              </div>
+            ) : (
+              <>
+                {bottleneckReport.worstStage && (
+                  <p className={cn(BODY_MUTED, 'mt-4')}>
+                    Deals sit longest in{' '}
+                    <span className="text-foreground font-medium">
+                      {bottleneckReport.worstStage.stageName}
+                    </span>
+                    {' '}&middot; {Math.round(bottleneckReport.worstStage.avgAgeDays)}d on
+                    average across {bottleneckReport.worstStage.count} active deal
+                    {bottleneckReport.worstStage.count === 1 ? '' : 's'}.
+                  </p>
+                )}
+                <ul className="divide-y divide-border/60 mt-4">
+                  {stallStages.map((s) => (
+                    <li
+                      key={s.stageId}
+                      className="py-3 flex items-center justify-between gap-4"
+                    >
+                      <span className="text-sm text-foreground truncate">
+                        {s.stageName}
+                      </span>
+                      <div className="flex-shrink-0 flex items-center gap-3">
+                        <span className={cn(META, 'tabular-nums')}>
+                          {s.count} deal{s.count === 1 ? '' : 's'}
+                        </span>
+                        <span
+                          className="text-[15px] leading-none tabular-nums text-foreground"
+                          style={TITLE_FONT}
+                        >
+                          {Math.round(s.avgAgeDays)}d
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </section>
 

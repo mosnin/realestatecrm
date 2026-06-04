@@ -1,23 +1,29 @@
 /**
- * `/` — Chippi marketing homepage.
+ * `/` — Chippi homepage (v2 rebuild).
  *
- * One idea: Chippi runs your workspace. Hero, four product surfaces in
- * tick-tock rhythm, one closing CTA. Every media block is a slot until the
- * real footage lands. Auth users still bounce to their workspace.
+ * A single scrolling experience, told the way Apple tells a product: meet the
+ * agent (hero) → quiet proof (logos) → the work it handles (core cards) → the
+ * first ask (CTA) → the rest of the workspace (deep features) → the numbers
+ * (stats) → the voices (testimonials) → the payoff where the realtor's whole
+ * world wires into Chippi (connect diagram) → thinking (blog) → arrival
+ * (footer). Bold-sans, light-canvas, motion throughout.
+ *
+ * Auth users bounce straight to their workspace. The bespoke <HomeFooter>
+ * replaces the shared marketing footer here (which returns null on `/`).
  */
 
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { MarketingHeroHome } from '@/components/marketing/marketing-hero-home';
-import { MarketingSection } from '@/components/marketing/marketing-section';
-import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { MarketingQuote } from '@/components/marketing/marketing-quote';
-import {
-  ComposerDraftDiagram,
-  KanbanDragDiagram,
-  CalendarBookingDiagram,
-  TeamLeaderboardDiagram,
-} from '@/components/marketing/diagrams';
+import { HomeHero } from '@/components/marketing/home/home-hero';
+import { LogoMarquee } from '@/components/marketing/home/logo-marquee';
+import { CoreCards } from '@/components/marketing/home/core-cards';
+import { TryFreeCTA } from '@/components/marketing/home/try-free-cta';
+import { DeepFeatures } from '@/components/marketing/home/deep-features';
+import { StatsBand } from '@/components/marketing/home/stats-band';
+import { TestimonialMarquee } from '@/components/marketing/home/testimonial-marquee';
+import { IntegrationsBeam } from '@/components/marketing/home/integrations-beam';
+import { BlogTeaser } from '@/components/marketing/home/blog-teaser';
+import { HomeFooter } from '@/components/marketing/home/home-footer';
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -26,87 +32,17 @@ export default async function MarketingHomePage() {
   }
 
   return (
-    <>
-      <MarketingHeroHome
-        eyebrow="The agentic OS for real estate"
-        title="Chippi runs your workspace."
-        sub="An AI agent that qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current — so you can focus on the deals that matter."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'See how it works', href: '/features/chippi' }}
-      />
-
-      {/* The promise, stated once. This is the single most common fear a new
-          realtor has — "will it send things without me?" — answered plainly,
-          in serif, before the feature story begins. We don't fake brokerage
-          logos here; an honest promise outweighs borrowed proof. */}
-      <MarketingQuote quote="Chippi drafts. You approve. Nothing leaves without your name on it." />
-
-      <MarketingSection
-        eyebrow="Chippi"
-        title="An agent that runs the room."
-        sub="Chippi reads your inbox, drafts replies, schedules tours, and updates the pipeline. Always asks before sending."
-        bullets={[
-          'Drafts replies in your voice.',
-          'Books tours straight from a reply.',
-          'Surfaces what to look at first.',
-        ]}
-        learnMore={{ label: 'Meet Chippi', href: '/features/chippi' }}
-        side="right"
-      >
-        <ComposerDraftDiagram aspect="square" />
-      </MarketingSection>
-
-      <MarketingSection
-        eyebrow="People & deals"
-        title="A pipeline that updates itself."
-        sub="Renters, buyers, sellers, vendors — every contact is a record with a timeline. Move a deal stage; Chippi keeps the rest in sync."
-        bullets={[
-          'Contact records with full timeline.',
-          'Drag-and-drop kanban pipeline.',
-          'Deal value and dates always current.',
-        ]}
-        learnMore={{ label: 'See people + deals', href: '/features/people' }}
-        side="left"
-      >
-        <KanbanDragDiagram aspect="video" />
-      </MarketingSection>
-
-      <MarketingSection
-        eyebrow="Inbox & calendar"
-        title="Your inbox, in here."
-        sub="Gmail and Outlook plug in. Read, star, reply — Chippi drafts the reply you were going to type. Tours land on the calendar without leaving the thread."
-        bullets={[
-          'Email read + compose inline.',
-          'Tour booking from a reply.',
-          'Calendar synced both ways.',
-        ]}
-        learnMore={{ label: 'See communication', href: '/features/communication' }}
-        side="right"
-      >
-        <CalendarBookingDiagram aspect="video" />
-      </MarketingSection>
-
-      <MarketingSection
-        eyebrow="For teams"
-        title="Built for floors, not just desks."
-        sub="Brokerages route leads, share templates, and see what the floor is closing. Every realtor still has their own workspace; admins see the room."
-        bullets={[
-          'Auto-routed leads to the right realtor.',
-          'Shared templates the team can reach for.',
-          'Performance dashboards a broker would actually open.',
-        ]}
-        learnMore={{ label: 'See teams', href: '/teams' }}
-        side="left"
-      >
-        <TeamLeaderboardDiagram aspect="wide" />
-      </MarketingSection>
-
-      <MarketingCTA
-        title="Start your free trial."
-        sub="Seven days, no credit card. Bring your inbox and let Chippi do the rest."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales', href: '/about' }}
-      />
-    </>
+    <div className="bg-muted text-foreground">
+      <HomeHero />
+      <LogoMarquee />
+      <CoreCards />
+      <TryFreeCTA />
+      <DeepFeatures />
+      <StatsBand />
+      <TestimonialMarquee />
+      <IntegrationsBeam />
+      <BlogTeaser />
+      <HomeFooter />
+    </div>
   );
 }
