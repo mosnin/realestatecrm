@@ -1,15 +1,14 @@
 'use client';
 
 /**
- * HomeHero — rebuilt to live inside the shader, not hide it.
- *
- * The Chippi-orange grain-gradient is the hero's atmosphere. Instead of a flat
- * mute, a radial keeps the headline zone calm while the warm glow blooms
- * around the edges and floor — so it reads as "an intelligence is present."
- * The product floats below in the same app-window language as the cards, with
- * scroll parallax and annotation callouts that focus into place.
+ * HomeHero — Chippi-orange ASCII blob atmosphere, a serif headline whose last
+ * word rotates through the jobs Chippi runs (drafting → booking → scoring →
+ * chasing → rest), and the product video framed below in the same app-window
+ * language as the cards, drifting on scroll. A center-protect radial keeps the
+ * headline zone calm so the ASCII field stays legible-but-quiet behind it.
  */
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { Play } from 'lucide-react';
@@ -20,6 +19,22 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 export function HomeHero() {
   const reduce = useReducedMotion();
+
+  // The rotating "what Chippi does" word — the dynamic power word in the
+  // headline. Cycles through the real jobs and lands on the tagline.
+  const titles = useMemo(
+    () => ['drafting', 'booking', 'scoring', 'chasing', 'rest'],
+    [],
+  );
+  const [titleNumber, setTitleNumber] = useState(0);
+  useEffect(() => {
+    if (reduce) return;
+    const id = setTimeout(
+      () => setTitleNumber((n) => (n === titles.length - 1 ? 0 : n + 1)),
+      2100,
+    );
+    return () => clearTimeout(id);
+  }, [titleNumber, titles, reduce]);
 
   const rise: Variants = reduce
     ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
@@ -68,11 +83,40 @@ export function HomeHero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.9, ease: EASE }}
-            className="mt-7 font-heading text-[clamp(3rem,7.6vw,6rem)] font-semibold leading-[0.96] tracking-[-0.04em] text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+            className="mt-7 text-[clamp(2.75rem,7.2vw,5.75rem)] leading-[0.98] tracking-[-0.015em] text-foreground"
           >
-            You close the deals.
-            <br />
-            <span className="text-brand">Chippi does the rest.</span>
+            <span className="block">
+              You <em className="font-bold">close</em> the deals.
+            </span>
+            <span className="block">Chippi does the</span>
+            <span className="relative mt-1 flex w-full justify-center overflow-hidden pb-3 text-center md:pb-4">
+              {reduce ? (
+                <span className="font-bold italic text-brand">rest.</span>
+              ) : (
+                <>
+                  {/* keeps the line height while the words rotate through */}
+                  <span className="invisible font-bold italic" aria-hidden>
+                    drafting.
+                  </span>
+                  {titles.map((title, index) => (
+                    <motion.span
+                      key={title}
+                      className="absolute font-bold italic text-brand"
+                      initial={{ opacity: 0, y: -120 }}
+                      transition={{ type: 'spring', stiffness: 50 }}
+                      animate={
+                        titleNumber === index
+                          ? { y: 0, opacity: 1 }
+                          : { y: titleNumber > index ? -150 : 150, opacity: 0 }
+                      }
+                    >
+                      {title}.
+                    </motion.span>
+                  ))}
+                </>
+              )}
+            </span>
           </motion.h1>
 
           <motion.p
