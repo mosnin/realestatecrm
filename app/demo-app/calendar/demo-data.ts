@@ -55,7 +55,7 @@ export const DEMO_EVENTS: DemoCalendarEvent[] = [
   {
     id: 'demo-callback-morning',
     title: 'Follow-up call-back',
-    description: 'Circle back on the Maple Ave offer paperwork.',
+    description: 'Finish the Maple Ave offer paperwork.',
     start: at(1, 14, 30), // Monday 2:30p
     end: at(1, 15, 0),
     allDay: false,

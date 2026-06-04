@@ -78,7 +78,7 @@ export const DEMO_INBOX: DemoEmailItem[] = [
     toAddress: JORDAN.address,
     subject: 'Rental application documents attached',
     snippet:
-      'Attaching the completed application, two pay stubs, and the reference letter for the Maple Street unit. Let me know if anything else is needed.',
+      'Attaching the completed application, two pay stubs, and the reference letter for the Maple Street unit. Happy to send anything else you need.',
     sentAt: hoursAgo(3),
     unread: true,
     starred: true,
