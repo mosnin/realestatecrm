@@ -90,6 +90,7 @@ import { logSmsSentTool } from './log-sms-sent';
 
 // Brokerage — broker-role gated
 import { summarizeRealtorTool } from './summarize-realtor';
+import { analyzeRealtorTool } from './analyze-realtor';
 import { assignLeadToRealtorTool } from './assign-lead-to-realtor';
 import { requestDealReviewTool } from './request-deal-review';
 
@@ -175,6 +176,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Brokerage ──────────────────────────────────────────────────────────
   summarizeRealtorTool as ToolDefinition,
+  analyzeRealtorTool as ToolDefinition,
   assignLeadToRealtorTool as ToolDefinition,
   requestDealReviewTool as ToolDefinition,
 
