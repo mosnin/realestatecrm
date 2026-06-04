@@ -35,7 +35,6 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/broker/agent-activity', label: 'Agent activity' },
   { path: '/broker/activity', label: 'Activity' },
   { path: '/broker/reviews', label: 'Reviews' },
-  { path: '/broker/retention', label: 'Retention' },
   { path: '/broker/templates', label: 'Templates' },
   { path: '/broker/leaderboard', label: 'Leaderboard' },
   { path: '/broker/billing', label: 'Billing' },
