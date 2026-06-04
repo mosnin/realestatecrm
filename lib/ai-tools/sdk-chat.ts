@@ -116,21 +116,33 @@ export function buildChatAgent(
   const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel });
   const planner = buildPlannerAgent(ctx, { model: agentModel });
 
+  // Each sub-agent gets an explicit, small per-run turn cap. Without this, the
+  // SDK runs every `asTool` sub-agent with its DEFAULT_MAX_TURNS (10), and the
+  // parent's own cap does NOT bound the children — so a single request that
+  // fans out (e.g. "deep dive on my leads" -> research_person per lead) could
+  // chain dozens of uncapped sub-runs, each re-sending its growing transcript,
+  // into millions of tokens before failing. A tight cap collapses that blast
+  // radius while still leaving room for each skill's legitimate tool sequence
+  // (find_person -> find_deal -> recall_history -> answer).
+  const SUBAGENT_MAX_TURNS = 5;
   const skillTools = [
     pipelineAnalyst.asTool({
       toolName: 'analyze_pipeline',
       toolDescription:
         'Analyze the pipeline for stuck deals, quiet hot persons, and overdue follow-ups.',
+      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
     }),
     contactResearcher.asTool({
       toolName: 'research_person',
       toolDescription:
         'Research everything we know about a person and recommend the next action.',
+      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
     }),
     planner.asTool({
       toolName: 'planner',
       toolDescription:
         'Break a complex multi-step task into a concrete execution plan before starting work. Call this first when the user asks for something that requires several distinct actions.',
+      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
     }),
   ];
 
