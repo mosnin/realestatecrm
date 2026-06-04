@@ -61,6 +61,7 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
       .update({
         status: 'lost',
         wonLostReason: args.reason,
+        closedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', args.dealId)

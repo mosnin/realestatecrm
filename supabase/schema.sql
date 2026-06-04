@@ -210,7 +210,11 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   "probability"    INTEGER DEFAULT NULL CHECK ("probability" >= 0 AND "probability" <= 100),
   "milestones"     JSONB DEFAULT '[]'::jsonb,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
-  "updatedAt" timestamptz NOT NULL DEFAULT now()
+  "updatedAt" timestamptz NOT NULL DEFAULT now(),
+  -- Performance-metrics timestamps (see lib/deal-metrics.ts):
+  -- stamped when the deal last changed stage / closed (won|lost).
+  "stageChangedAt" timestamptz,
+  "closedAt"       timestamptz
 );
 
 CREATE TABLE IF NOT EXISTS "DealContact" (
@@ -641,10 +645,14 @@ BEGIN
     AND position >= p_new_position
     AND id != p_deal_id;
 
-  -- Place the deal at its new stage and position
+  -- Place the deal at its new stage and position. Stamp stageChangedAt only
+  -- when the stage actually changes (a pure same-stage reorder must not reset
+  -- "time in current stage"), so bottleneck metrics stay accurate.
   UPDATE "Deal"
   SET "stageId"   = p_new_stage_id,
       position    = p_new_position,
+      "stageChangedAt" = CASE WHEN "stageId" IS DISTINCT FROM p_new_stage_id
+                              THEN now() ELSE "stageChangedAt" END,
       "updatedAt" = now()
   WHERE id = p_deal_id;
 END;

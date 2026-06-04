@@ -104,7 +104,7 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     const { error: updateErr } = await supabase
       .from('Deal')
-      .update({ stageId: args.stageId, updatedAt: new Date().toISOString() })
+      .update({ stageId: args.stageId, stageChangedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       .eq('id', args.dealId)
       .eq('spaceId', ctx.space.id);
     if (updateErr) {

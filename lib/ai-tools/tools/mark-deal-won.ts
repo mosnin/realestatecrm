@@ -72,6 +72,7 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
 
     const updates: Record<string, unknown> = {
       status: 'won',
+      closedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     if (args.finalValue !== undefined) updates.value = args.finalValue;
