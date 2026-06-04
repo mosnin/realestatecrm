@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { Reveal, Stagger, StaggerItem, Eyebrow } from './home-kit';
 import { ArrowRight } from 'lucide-react';
-import { ArticleCover } from './visuals/editorial-visuals';
+import { MediaSlot } from './media-slot';
 
 const POSTS = [
   { tag: 'Product', title: 'Why an agent beats another CRM tab.', read: '5 min read' },
@@ -36,11 +36,11 @@ export function BlogTeaser() {
       </Reveal>
 
       <Stagger className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-        {POSTS.map((p, i) => (
+        {POSTS.map((p) => (
           <StaggerItem key={p.title}>
             <Link href="/blog" className="group block">
               <div className="overflow-hidden rounded-3xl ring-1 ring-border/60">
-                <ArticleCover variant={((i % 3) + 1) as 1 | 2 | 3} className="w-full" />
+                <MediaSlot className="aspect-[16/10] w-full" />
               </div>
               <div className="mt-5">
                 <span className="text-[12px] font-medium uppercase tracking-[0.16em] text-brand">

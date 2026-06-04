@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Aperture, FolderOpen, Users, ShieldCheck } from 'lucide-react';
 import { Reveal, Eyebrow } from './home-kit';
-import { HeroWorkspaceVisual } from './visuals/hero-workspace-visual';
+import { MediaSlot } from './media-slot';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -113,10 +113,8 @@ export function DeepFeatures() {
 
         {/* Right — the agent at the center of every surface */}
         <Reveal delay={0.1}>
-          <div className="overflow-hidden rounded-[1.75rem] bg-card ring-1 ring-border/70 shadow-[0_30px_90px_-30px_rgba(0,0,0,0.22)]">
-            <div className="aspect-[4/3] w-full">
-              <HeroWorkspaceVisual className="h-full w-full" />
-            </div>
+          <div className="overflow-hidden rounded-[1.75rem] ring-1 ring-border/70">
+            <MediaSlot className="aspect-[4/3] w-full" iconSize={34} />
           </div>
         </Reveal>
       </div>

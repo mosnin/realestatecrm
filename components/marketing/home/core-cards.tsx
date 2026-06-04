@@ -2,41 +2,22 @@
 
 /**
  * CoreCards — the five things Chippi does, as a Chippi-skinned MagicUI bento.
- * Each card's background is its own abstract animation (pure geometry, one
- * scarce brand-orange accent) — the idea made *felt*, not a literal UI mock.
- * The animation lives in the top of the card and fades into the surface so the
- * icon + title + description stay clean. Section heading is serif Times.
+ * The top of each card is a calm media frame (MediaSlot) awaiting a real
+ * product capture; the icon + title + description sit clean on the card below.
+ * No fake line-art — the frame is honest about what's coming.
  */
 
 import { Mail, PenLine, Target, CalendarCheck, KanbanSquare } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { BentoGrid, BentoCard } from '@/components/ui/bento-grid';
 import { Reveal } from './home-kit';
-import { InboxTriageAnimation } from './animations/inbox-triage-animation';
-import { VoiceDraftAnimation } from './animations/voice-draft-animation';
-import { LeadScoreAnimation } from './animations/lead-score-animation';
-import { TourBookingAnimation } from './animations/tour-booking-animation';
-import { PipelineFlowAnimation } from './animations/pipeline-flow-animation';
+import { MediaSlot } from './media-slot';
 
-/** Hosts an abstraction in the top of a bento card and fades it into the
- *  surface so the title/description below stay legible. */
-function AnimCanvas({
-  children,
-  tint = false,
-}: {
-  children: React.ReactNode;
-  tint?: boolean;
-}) {
+/** A media frame pinned to the top of a bento card; the text zone below stays
+ *  on the clean card surface. Real screenshots drop straight in here. */
+function CardMedia() {
   return (
-    <div className="absolute inset-0">
-      {tint && (
-        <div aria-hidden className="absolute inset-0 bg-brand-subtle/40" />
-      )}
-      <div className={cn('absolute inset-x-4 top-4 bottom-[44%]')}>{children}</div>
-      <div
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-card via-card/80 to-transparent"
-      />
+    <div className="absolute inset-x-0 top-0 h-[46%]">
+      <MediaSlot className="h-full w-full border-b border-border/60" />
     </div>
   );
 }
@@ -59,11 +40,7 @@ export function CoreCards() {
           href="/features/communication"
           cta="See the inbox"
           className="col-span-3 md:col-span-2"
-          background={
-            <AnimCanvas>
-              <InboxTriageAnimation className="h-full w-full" />
-            </AnimCanvas>
-          }
+          background={<CardMedia />}
         />
 
         <BentoCard
@@ -73,11 +50,7 @@ export function CoreCards() {
           href="/features/chippi"
           cta="Meet Chippi"
           className="col-span-3 md:col-span-1"
-          background={
-            <AnimCanvas tint>
-              <VoiceDraftAnimation className="h-full w-full" />
-            </AnimCanvas>
-          }
+          background={<CardMedia />}
         />
 
         <BentoCard
@@ -87,11 +60,7 @@ export function CoreCards() {
           href="/features/people"
           cta="See people"
           className="col-span-3 md:col-span-1"
-          background={
-            <AnimCanvas>
-              <LeadScoreAnimation className="h-full w-full" />
-            </AnimCanvas>
-          }
+          background={<CardMedia />}
         />
 
         <BentoCard
@@ -101,11 +70,7 @@ export function CoreCards() {
           href="/features/calendar"
           cta="See the calendar"
           className="col-span-3 md:col-span-1"
-          background={
-            <AnimCanvas>
-              <TourBookingAnimation className="h-full w-full" />
-            </AnimCanvas>
-          }
+          background={<CardMedia />}
         />
 
         <BentoCard
@@ -115,11 +80,7 @@ export function CoreCards() {
           href="/features/deals"
           cta="See the pipeline"
           className="col-span-3 md:col-span-1"
-          background={
-            <AnimCanvas>
-              <PipelineFlowAnimation className="h-full w-full" />
-            </AnimCanvas>
-          }
+          background={<CardMedia />}
         />
       </BentoGrid>
     </section>
