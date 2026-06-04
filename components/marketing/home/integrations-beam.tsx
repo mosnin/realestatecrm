@@ -11,7 +11,7 @@
  */
 
 import { forwardRef, useRef } from 'react';
-import { Mail, CalendarDays, ClipboardList, Route, Globe } from 'lucide-react';
+import { Mail, Inbox, CalendarDays, ClipboardList, Route, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatedBeam } from '@/components/ui/animated-beam';
 import { BrandLogo } from '@/components/brand-logo';
@@ -24,12 +24,12 @@ const Node = forwardRef<
   <div
     ref={ref}
     className={cn(
-      'z-10 flex items-center gap-2.5 rounded-2xl bg-card px-4 py-3 ring-1 ring-border/70',
+      'z-10 flex items-center gap-2.5 rounded-full bg-card px-4 py-2.5 ring-1 ring-border/70',
       'shadow-[0_2px_10px_-4px_rgba(0,0,0,0.12)]',
       className,
     )}
   >
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground/70">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground/70">
       <Icon size={17} strokeWidth={1.75} />
     </span>
     <span className="text-[14px] font-medium text-foreground">{label}</span>
@@ -41,6 +41,7 @@ export function IntegrationsBeam() {
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
   const inboxRef = useRef<HTMLDivElement>(null);
+  const emailRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const intakeRef = useRef<HTMLDivElement>(null);
   const toursRef = useRef<HTMLDivElement>(null);
@@ -74,8 +75,9 @@ export function IntegrationsBeam() {
         className="relative mx-auto mt-16 flex h-[420px] w-full max-w-4xl items-stretch justify-between px-2 md:px-10"
       >
         {/* left column — the systems Chippi reads */}
-        <div className="flex flex-col justify-center gap-10">
-          <Node ref={inboxRef} icon={Mail} label="Inbox" />
+        <div className="flex flex-col justify-center gap-8">
+          <Node ref={inboxRef} icon={Inbox} label="Inbox" />
+          <Node ref={emailRef} icon={Mail} label="Email" />
           <Node ref={calendarRef} icon={CalendarDays} label="Calendar" />
         </div>
 
@@ -83,11 +85,11 @@ export function IntegrationsBeam() {
         <div className="flex flex-col justify-center">
           <div
             ref={hubRef}
-            className="relative z-10 flex h-24 w-24 items-center justify-center rounded-3xl bg-card ring-1 ring-border/70 shadow-[0_8px_40px_-8px_rgba(255,150,79,0.45)]"
+            className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-card ring-1 ring-border/70 shadow-[0_8px_40px_-8px_rgba(255,150,79,0.45)]"
           >
             <span
               aria-hidden
-              className="absolute inset-0 rounded-3xl bg-brand/5 ring-1 ring-brand/20"
+              className="absolute inset-0 rounded-full bg-brand/5 ring-1 ring-brand/20"
             />
             <BrandLogo className="relative h-7" alt="Chippi" />
           </div>
@@ -102,7 +104,8 @@ export function IntegrationsBeam() {
 
         {/* beams — left flows in, right flows in (reversed) */}
         <AnimatedBeam containerRef={containerRef} fromRef={inboxRef} toRef={hubRef} {...BEAM} delay={0.2} />
-        <AnimatedBeam containerRef={containerRef} fromRef={calendarRef} toRef={hubRef} {...BEAM} delay={0.6} />
+        <AnimatedBeam containerRef={containerRef} fromRef={emailRef} toRef={hubRef} {...BEAM} delay={0.45} />
+        <AnimatedBeam containerRef={containerRef} fromRef={calendarRef} toRef={hubRef} {...BEAM} delay={0.7} />
         <AnimatedBeam containerRef={containerRef} fromRef={intakeRef} toRef={hubRef} {...BEAM} delay={0.4} reverse />
         <AnimatedBeam containerRef={containerRef} fromRef={toursRef} toRef={hubRef} {...BEAM} delay={0.9} reverse />
         <AnimatedBeam containerRef={containerRef} fromRef={publicRef} toRef={hubRef} {...BEAM} delay={1.3} reverse />
