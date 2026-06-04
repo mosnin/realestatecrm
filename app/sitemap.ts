@@ -23,31 +23,15 @@ const ROUTES: ReadonlyArray<{
   changeFrequency: ChangeFrequency;
   priority: number;
 }> = [
-  // Top-level
+  // Core marketing pages
   { path: '/', changeFrequency: 'weekly', priority: 1.0 },
-  { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/realtors', changeFrequency: 'monthly', priority: 0.9 },
+  { path: '/brokerages', changeFrequency: 'monthly', priority: 0.9 },
+  { path: '/integrations', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
-  { path: '/realtors', changeFrequency: 'monthly', priority: 0.8 },
+  { path: '/company', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/demo', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/status', changeFrequency: 'daily', priority: 0.4 },
-
-  // Features
-  { path: '/features', changeFrequency: 'monthly', priority: 0.8 },
-  { path: '/features/calendar', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/chippi', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/communication', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/deals', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/files', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/people', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/properties', changeFrequency: 'monthly', priority: 0.7 },
-  { path: '/features/studio', changeFrequency: 'monthly', priority: 0.7 },
-
-  // Teams
-  { path: '/teams', changeFrequency: 'monthly', priority: 0.8 },
-  { path: '/teams/analytics', changeFrequency: 'monthly', priority: 0.6 },
-  { path: '/teams/chat', changeFrequency: 'monthly', priority: 0.6 },
-  { path: '/teams/leads', changeFrequency: 'monthly', priority: 0.6 },
-  { path: '/teams/members', changeFrequency: 'monthly', priority: 0.6 },
-  { path: '/teams/templates', changeFrequency: 'monthly', priority: 0.6 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

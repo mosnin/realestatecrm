@@ -58,7 +58,7 @@ export default function PricingPage() {
         title="One plan. Honest pricing."
         sub="Start with a seven-day free trial. After that, a single monthly price that covers the agent, the integrations, and the surface. No seats math, no feature gates."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales for teams', href: '/about' }}
+        secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
       />
 
       {/* The pricing card — the page's focal element. */}
@@ -120,7 +120,7 @@ export default function PricingPage() {
         eyebrow="FOR BROKERAGES"
         title="Talk to us about the floor."
         sub="Brokerages pay by realtor with volume pricing. We’ll talk through migration and onboarding the team."
-        learnMore={{ label: 'Talk to sales', href: '/about' }}
+        learnMore={{ label: 'Talk to sales', href: '/demo' }}
       />
 
       {/* FAQ — three questions, hairline-divided, all visible at once. */}
@@ -156,7 +156,7 @@ export default function PricingPage() {
         title="Start your free trial."
         sub="Seven days. No credit card. Bring your inbox and let Chippi do the rest."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
-        secondaryCta={{ label: 'Talk to sales', href: '/about' }}
+        secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
     </>
   );

@@ -36,40 +36,22 @@ const COLUMNS: FooterColumn[] = [
     title: 'Product',
     items: [
       { href: '/realtors', label: 'For realtors' },
-      { href: '/teams', label: 'For teams' },
-      { href: '/features', label: 'All features' },
+      { href: '/brokerages', label: 'For brokerages' },
+      { href: '/integrations', label: 'Integrations' },
       { href: '/pricing', label: 'Pricing' },
-    ],
-  },
-  {
-    title: 'Surfaces',
-    items: [
-      { href: '/features/chippi', label: 'Chippi' },
-      { href: '/features/people', label: 'People' },
-      { href: '/features/deals', label: 'Deals' },
-      { href: '/features/communication', label: 'Communication' },
-      { href: '/features/calendar', label: 'Calendar' },
-      { href: '/features/properties', label: 'Properties' },
-      { href: '/features/studio', label: 'Studio' },
-      { href: '/features/files', label: 'Files' },
-    ],
-  },
-  {
-    title: 'Teams',
-    items: [
-      { href: '/teams', label: 'Overview' },
-      { href: '/teams/leads', label: 'Lead distribution' },
-      { href: '/teams/members', label: 'Members' },
-      { href: '/teams/analytics', label: 'Analytics' },
-      { href: '/teams/templates', label: 'Templates' },
-      { href: '/teams/chat', label: 'Team chat' },
     ],
   },
   {
     title: 'Company',
     items: [
-      { href: '/about', label: 'About' },
+      { href: '/company', label: 'Company' },
+      { href: '/demo', label: 'Book a demo' },
       { href: '/login/realtor', label: 'Log in' },
+    ],
+  },
+  {
+    title: 'Legal',
+    items: [
       { href: '/legal', label: 'Legal' },
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },
@@ -93,8 +75,8 @@ export function MarketingFooter() {
       role="contentinfo"
     >
       <div className="mx-auto max-w-7xl px-6 md:px-8 py-16 md:py-20">
-        {/* Columns: brand + 4 link groups. 2-col mobile, 5-col md+. */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-12">
+        {/* Columns: brand + 3 link groups. 2-col mobile, 4-col md+. */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-12">
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
             <Link

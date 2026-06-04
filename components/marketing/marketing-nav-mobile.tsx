@@ -3,26 +3,20 @@
 /**
  * Marketing nav — mobile full-screen drawer.
  *
- * Opens as a left-side Sheet that covers the full viewport. Inside, the
- * primary nav rows stack vertically; "Features" and "Teams" expand
- * inline to reveal the SAME leaf links as the desktop panel (single
- * source of truth from `marketing-nav-links.ts`).
+ * Opens as a left-side Sheet that covers the full viewport. Inside, the nav
+ * rows stack vertically as plain links — the site consolidated to a handful
+ * of pages, so the old Features/Teams inline expansion was retired.
  *
- * The drawer's top edge carries the same warm wash gradient as the
- * dashboard mobile drawer (`components/dashboard/header.tsx`). It's the
- * one sanctioned brand-orange surface on marketing — the realtor opening
- * the nav from a phone touches the same vocabulary they'd touch inside
- * the product. Sanctioned in STYLESHEET.md §Color §The brand orange rule
- * via the LOGO context (onboarding/brand-wash surface family).
- *
- * Only one expandable row may be open at a time — opening one closes the
- * other. That keeps the surface from competing with itself for the eye.
+ * The drawer's top edge carries the same warm wash gradient as the dashboard
+ * mobile drawer. It's the one sanctioned brand-orange surface on marketing —
+ * the realtor opening the nav from a phone touches the same vocabulary they'd
+ * touch inside the product. Sanctioned in STYLESHEET.md §Color via the LOGO
+ * context (onboarding/brand-wash surface family).
  */
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -32,20 +26,12 @@ import {
 } from '@/components/ui/sheet';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { BrandLogo } from '@/components/brand-logo';
-import { EASE_APPLE } from '@/lib/motion';
 import { PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import {
-  SURFACE_LINKS,
-  TEAM_LINKS,
-  type MarketingLeafLink,
-} from './marketing-nav-links';
+import { TOP_LEVEL_NAV } from './marketing-nav-links';
 
-type ExpandedKey = 'features' | 'teams' | null;
-
-/** Plain top-level row — a straight link, no expansion. The h-14 height
- *  matches the brief's tall-row mobile spec and gives a generous tap
- *  target without needing aria padding tricks. */
+/** Plain top-level row — a straight link. The h-14 height gives a generous
+ *  tap target. */
 function MobileTopRow({
   href,
   label,
@@ -70,104 +56,9 @@ function MobileTopRow({
   );
 }
 
-/** Expandable top-level row — chevron rotates 180°, leaf list slides in
- *  beneath. Only one of these is open at a time across the drawer. */
-function MobileExpandableRow({
-  label,
-  isExpanded,
-  onToggle,
-  leafLinks,
-  onNavigate,
-}: {
-  label: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  leafLinks: MarketingLeafLink[];
-  onNavigate: () => void;
-}) {
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isExpanded}
-        className={cn(
-          'flex items-center justify-between w-full h-14 px-5',
-          'text-base font-medium text-foreground',
-          'hover:bg-foreground/[0.04] active:bg-foreground/[0.06]',
-          'transition-colors duration-150',
-        )}
-      >
-        <span>{label}</span>
-        <ChevronDown
-          size={16}
-          strokeWidth={1.75}
-          className={cn(
-            'text-muted-foreground transition-transform duration-200 ease-out',
-            isExpanded && 'rotate-180',
-          )}
-        />
-      </button>
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -4, height: 0 }}
-            transition={{ duration: 0.22, ease: EASE_APPLE }}
-            className="overflow-hidden"
-          >
-            <div className="py-1 pl-5 pr-3 space-y-0">
-              {leafLinks.map((link) => {
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={onNavigate}
-                    className={cn(
-                      'flex items-start gap-3 rounded-md px-3 py-2.5',
-                      'hover:bg-foreground/[0.04] active:bg-foreground/[0.06]',
-                      'transition-colors duration-150',
-                    )}
-                  >
-                    <Icon
-                      size={14}
-                      strokeWidth={1.75}
-                      className="text-foreground/70 flex-shrink-0 mt-0.5"
-                    />
-                    <span className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">
-                        {link.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground leading-snug">
-                        {link.description}
-                      </span>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export function MarketingNavMobile() {
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState<ExpandedKey>(null);
-
-  const toggle = (key: 'features' | 'teams') =>
-    setExpanded((prev) => (prev === key ? null : key));
-
-  const close = () => {
-    setOpen(false);
-    // Reset expansion state on close so the next open starts collapsed —
-    // matches the Apple-mobile pattern of a clean drawer per session.
-    setExpanded(null);
-  };
+  const close = () => setOpen(false);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -193,9 +84,7 @@ export function MarketingNavMobile() {
           'p-0 border-0 bg-background flex flex-col overflow-hidden',
         )}
       >
-        {/* Brand wash — same recipe as the dashboard mobile drawer. The
-            one sanctioned warm tint on marketing because this surface
-            shares vocabulary with the app sidebar. */}
+        {/* Brand wash — same recipe as the dashboard mobile drawer. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-32 z-0 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
@@ -231,23 +120,15 @@ export function MarketingNavMobile() {
 
           {/* Primary nav — vertical stack of tall rows */}
           <nav className="flex-1 overflow-y-auto py-2">
-            <MobileTopRow href="/realtors" label="Realtors" onNavigate={close} />
-            <MobileExpandableRow
-              label="Teams"
-              isExpanded={expanded === 'teams'}
-              onToggle={() => toggle('teams')}
-              leafLinks={TEAM_LINKS}
-              onNavigate={close}
-            />
-            <MobileExpandableRow
-              label="Features"
-              isExpanded={expanded === 'features'}
-              onToggle={() => toggle('features')}
-              leafLinks={SURFACE_LINKS}
-              onNavigate={close}
-            />
-            <MobileTopRow href="/pricing" label="Pricing" onNavigate={close} />
-            <MobileTopRow href="/about" label="About" onNavigate={close} />
+            {TOP_LEVEL_NAV.map((item) => (
+              <MobileTopRow
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                onNavigate={close}
+              />
+            ))}
+            <MobileTopRow href="/demo" label="Book a demo" onNavigate={close} />
           </nav>
 
           {/* Bottom CTAs — full-width pair separated by a hairline */}
@@ -258,10 +139,6 @@ export function MarketingNavMobile() {
               className={cn(
                 GHOST_PILL,
                 'w-full justify-center h-11',
-                // Override the GHOST_PILL muted foreground at this size —
-                // a bottom-pinned CTA pair reads cleanest when both pills
-                // are full-width and the labels feel equal-weight even
-                // though the primary is the loud note.
                 'text-foreground border border-border/70',
               )}
             >

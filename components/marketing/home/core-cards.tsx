@@ -37,7 +37,7 @@ export function CoreCards() {
           name="Reads your inbox, surfaces what matters"
           description="Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first."
           Icon={Mail}
-          href="/features/communication"
+          href="/realtors"
           cta="See the inbox"
           className="col-span-3 md:col-span-2"
           background={<CardMedia />}
@@ -47,7 +47,7 @@ export function CoreCards() {
           name="Drafts in your voice"
           description="Every reply written before you open the thread. Read it, edit it, send it — or don't."
           Icon={PenLine}
-          href="/features/chippi"
+          href="/realtors"
           cta="Meet Chippi"
           className="col-span-3 md:col-span-1"
           background={<CardMedia />}
@@ -57,7 +57,7 @@ export function CoreCards() {
           name="Knows who to call first"
           description="Every lead scored against your deals, the hottest one rising out of the noise — so your morning starts with the right call."
           Icon={Target}
-          href="/features/people"
+          href="/realtors"
           cta="See people"
           className="col-span-3 md:col-span-1"
           background={<CardMedia />}
@@ -67,7 +67,7 @@ export function CoreCards() {
           name="Books the tour"
           description="Reply with a time; Chippi puts it on every calendar and writes it back to the deal."
           Icon={CalendarCheck}
-          href="/features/calendar"
+          href="/realtors"
           cta="See the calendar"
           className="col-span-3 md:col-span-1"
           background={<CardMedia />}
@@ -77,7 +77,7 @@ export function CoreCards() {
           name="Keeps the pipeline honest"
           description="Move a card; the value, the dates, the counterparty all stay in sync. The board reflects reality, not last week."
           Icon={KanbanSquare}
-          href="/features/deals"
+          href="/realtors"
           cta="See the pipeline"
           className="col-span-3 md:col-span-1"
           background={<CardMedia />}

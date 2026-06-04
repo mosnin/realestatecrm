@@ -141,7 +141,7 @@ export function HomeHero() {
               Start free
             </Link>
             <Link
-              href="/features/chippi"
+              href="/demo"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-card/80 px-6 text-[15px] font-medium text-foreground ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-card"
             >
               <Play size={15} className="fill-current" /> Watch demo

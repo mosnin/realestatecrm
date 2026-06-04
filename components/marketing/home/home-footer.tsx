@@ -14,30 +14,17 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: 'Product',
     links: [
-      { label: 'Chippi', href: '/features/chippi' },
-      { label: 'People', href: '/features/people' },
-      { label: 'Deals', href: '/features/deals' },
-      { label: 'Calendar', href: '/features/calendar' },
-      { label: 'Studio', href: '/features/studio' },
-      { label: 'Files', href: '/features/files' },
-    ],
-  },
-  {
-    title: 'For teams',
-    links: [
-      { label: 'Overview', href: '/teams' },
-      { label: 'Lead distribution', href: '/teams/leads' },
-      { label: 'Members', href: '/teams/members' },
-      { label: 'Analytics', href: '/teams/analytics' },
-      { label: 'Templates', href: '/teams/templates' },
+      { label: 'For realtors', href: '/realtors' },
+      { label: 'For brokerages', href: '/brokerages' },
+      { label: 'Integrations', href: '/integrations' },
+      { label: 'Pricing', href: '/pricing' },
     ],
   },
   {
     title: 'Company',
     links: [
-      { label: 'About', href: '/about' },
-      { label: 'Pricing', href: '/pricing' },
-      { label: 'Blog', href: '/blog' },
+      { label: 'Company', href: '/company' },
+      { label: 'Book a demo', href: '/demo' },
       { label: 'Status', href: '/status' },
     ],
   },
@@ -67,16 +54,16 @@ export function HomeFooter() {
               Start free
             </Link>
             <Link
-              href="/about"
+              href="/demo"
               className="inline-flex h-12 items-center justify-center rounded-full bg-black/[0.04] px-6 text-[15px] font-medium text-foreground transition-colors hover:bg-black/[0.07]"
             >
-              Talk to sales
+              Book a demo
             </Link>
           </div>
         </Reveal>
 
         {/* link map */}
-        <div className="grid grid-cols-2 gap-8 py-16 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-8 py-16 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
             <Link href="/" aria-label="Chippi home" className="inline-flex items-center">
               <BrandLogo className="h-6" alt="Chippi" />
