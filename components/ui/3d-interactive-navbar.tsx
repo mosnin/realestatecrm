@@ -3,75 +3,49 @@
 /**
  * 3D interactive navbar (from 21st.dev "3d-interactive-navbar"), tailored to Chippi.
  *
- * Dark, deliberately heavy: a Three.js reflective card on the left, "decrypt"
+ * Dark, deliberately heavy: a pointer-tilted card on the left, "decrypt"
  * glitch text on the nav links, and an animated mega-dropdown. The aesthetic
- * is intentional — do not calm it down. Only the CONTENT is Chippi.
+ * is intentional, do not calm it down. Only the CONTENT is Chippi.
  *
- * SSR note: this file renders a raw <Canvas> from @react-three/fiber, which
- * reaches for browser APIs at module/render time. It must be mounted via
- * next/dynamic with { ssr: false } at the consumption site
- * (components/marketing/marketing-navbar.tsx does this). Keep 'use client'
- * at the top.
+ * The left card used to be a Three.js reflective mesh. It is now a pure
+ * CSS/DOM card with a perspective tilt driven by the pointer, so the file has
+ * no WebGL dependency and renders fine under SSR. Keep 'use client' at the top
+ * for the framer-motion and pointer state.
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { RoundedBox, MeshTransmissionMaterial, Environment } from '@react-three/drei';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Mesh } from 'three';
 import { cn } from '@/lib/utils';
 
 // ----------------------------------------------------------------------------
-// 3D card
+// Tilt card (pure CSS, no WebGL)
 // ----------------------------------------------------------------------------
 
-function Card3D({ mousePosition }: { mousePosition: { x: number; y: number } }) {
-  const meshRef = useRef<Mesh>(null);
-
-  useFrame(() => {
-    if (!meshRef.current) return;
-    // Lerp the card rotation toward the pointer for a parallax tilt.
-    const targetX = mousePosition.y * 0.3;
-    const targetY = mousePosition.x * 0.3;
-    meshRef.current.rotation.x += (targetX - meshRef.current.rotation.x) * 0.1;
-    meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.1;
-  });
+/**
+ * TiltCard — a small dark card that tilts toward the pointer. Replaces the old
+ * Three.js reflective mesh. The tilt is driven by `mousePosition` (range -1..1
+ * on each axis), the same signal the logo wrapper already computed for the
+ * mesh, so the parallax feel is preserved with zero dependencies.
+ */
+function TiltCard({ mousePosition }: { mousePosition: { x: number; y: number } }) {
+  // Pointer y tilts around X, pointer x tilts around Y. Cap at a gentle angle.
+  const rotateX = (mousePosition.y * 14).toFixed(2);
+  const rotateY = (mousePosition.x * 14).toFixed(2);
 
   return (
-    <RoundedBox ref={meshRef} args={[3, 1.8, 0.18]} radius={0.12} smoothness={6}>
-      <MeshTransmissionMaterial
-        backside
-        samples={6}
-        thickness={0.6}
-        roughness={0.15}
-        transmission={1}
-        ior={1.25}
-        chromaticAberration={0.04}
-        anisotropy={0.2}
-        distortion={0.2}
-        distortionScale={0.3}
-        temporalDistortion={0.1}
-        color="#aab4ff"
-      />
-    </RoundedBox>
-  );
-}
-
-function Scene({ mousePosition }: { mousePosition: { x: number; y: number } }) {
-  return (
-    <Canvas
-      camera={{ position: [0, 0, 5], fov: 45 }}
-      dpr={[1, 2]}
-      gl={{ alpha: true, antialias: true }}
-      style={{ background: 'transparent' }}
+    <div
+      aria-hidden
+      className="h-full w-full overflow-hidden rounded-[10px] border border-neutral-800 bg-gradient-to-br from-neutral-800 via-neutral-900 to-black shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+      style={{
+        transform: `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+        transition: 'transform 0.15s ease-out',
+        transformStyle: 'preserve-3d',
+      }}
     >
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={1.2} />
-      <directionalLight position={[-5, -5, -5]} intensity={0.4} color="#6366f1" />
-      <Card3D mousePosition={mousePosition} />
-      <Environment preset="city" />
-    </Canvas>
+      {/* Soft sheen so the card reads as glassy, like the old material. */}
+      <div className="h-full w-full bg-gradient-to-tr from-transparent via-white/5 to-indigo-300/20" />
+    </div>
   );
 }
 
@@ -428,17 +402,22 @@ export function Navbar() {
     setMousePosition({ x, y });
   }, []);
 
+  const handleMouseLeave = useCallback(() => {
+    setMousePosition({ x: 0, y: 0 });
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black">
       <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 md:px-8">
-        {/* Logo + 3D card */}
+        {/* Logo + tilt card */}
         <div
           ref={logoRef}
           onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
           className="flex items-center gap-3"
         >
           <div className="relative h-12 w-12">
-            <Scene mousePosition={mousePosition} />
+            <TiltCard mousePosition={mousePosition} />
           </div>
           <Link href="/" aria-label="Chippi home" className="flex items-center">
             {/* Bar is always black, so use the white logo directly. */}
