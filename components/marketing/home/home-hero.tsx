@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { Play } from 'lucide-react';
 import { Parallax } from './home-kit';
-import { GradientBackground } from '@/components/ui/paper-design-shader-background';
+import { AsciiBlob } from './ascii-blob';
 import { HeroWorkspaceVisual } from './visuals/hero-workspace-visual';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -40,21 +40,19 @@ export function HomeHero() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-muted">
-      {/* Chippi-orange shader — the hero's atmosphere. */}
-      <GradientBackground />
-      {/* Center-protect radial: clean reading zone behind the headline, glow
-          left free at the edges. `--background` flips with the theme. */}
+    <section className="relative overflow-hidden bg-background">
+      {/* Animated orange ASCII gradient blob drifting behind the hero. */}
+      <AsciiBlob />
+      {/* Center-protect radial: a clean reading zone behind the headline so
+          the ASCII field stays legible-but-quiet there. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(72% 58% at 50% 34%, var(--background) 38%, transparent 82%)',
+            'radial-gradient(60% 50% at 50% 32%, var(--background) 32%, transparent 78%)',
         }}
       />
-      {/* A whisper of veil so the visible glow reads premium, not garish. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-background/10" />
       {/* Settle into the page. */}
       <div
         aria-hidden
