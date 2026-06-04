@@ -201,7 +201,7 @@ function TeamChatContent() {
             live thread filling upward. flex-1 + justify-end + min-h-0. */}
         <div className="flex-1 min-h-0 flex flex-col justify-end gap-2.5 pt-3">
           <IncomingBubble sender="Devin" time="9:24" visible={phase >= 1}>
-            offer&apos;s in on 415 — buyer wants a Saturday walkthrough.
+            offer&apos;s in on 415. buyer wants a Saturday walkthrough.
           </IncomingBubble>
 
           <IncomingBubble sender="Maya" time="9:25" visible={phase >= 2}>

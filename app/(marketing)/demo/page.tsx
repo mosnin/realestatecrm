@@ -16,7 +16,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DemoBooking } from '@/components/marketing/demo/demo-booking';
 
-export const metadata = { title: 'Book a demo — Chippi' };
+export const metadata = { title: 'Book a demo · Chippi' };
 
 export default async function DemoPage() {
   const { userId } = await auth();

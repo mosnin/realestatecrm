@@ -40,7 +40,7 @@ const ROOMS = [
   { icon: Users, label: 'people', note: 'every contact, every touch, on one timeline.' },
   { icon: KanbanSquare, label: 'pipeline', note: 'the board that reflects reality, not last week.' },
   { icon: CalendarCheck, label: 'calendar', note: 'tours and follow-ups in the week you already keep.' },
-  { icon: Building2, label: 'properties', note: 'listings as records — offers, specs, who saw what.' },
+  { icon: Building2, label: 'properties', note: 'listings as records: offers, specs, who saw what.' },
   { icon: FolderOpen, label: 'files', note: 'contracts and signed PDFs, filed per deal.' },
 ];
 
@@ -55,7 +55,7 @@ export function OnePlace() {
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
           your inbox, your people, your pipeline, your calendar, your listings,
-          your files — they stop living in separate apps. it's one workspace, and
+          your files. they stop living in separate apps. it's one workspace, and
           Chippi keeps every corner of it current.
         </p>
       </Reveal>
@@ -89,7 +89,7 @@ const TAILORED = [
   {
     icon: PenLine,
     title: 'drafts in your voice.',
-    body: 'Chippi learns how you actually write and composes the reply you would have typed — then stops for your read.',
+    body: 'Chippi learns how you actually write and composes the reply you would have typed, then stops for your read.',
   },
   {
     icon: Bell,
@@ -99,12 +99,12 @@ const TAILORED = [
   {
     icon: Aperture,
     title: 'content from the record.',
-    body: 'listing copy, the email blast, the social post — generated from the property record, scheduled to your channels.',
+    body: 'listing copy, the email blast, the social post, all generated from the property record and scheduled to your channels.',
   },
   {
     icon: ShieldCheck,
     title: 'autonomy you grant.',
-    body: 'approval-first on every send by default. trust a task, and hand Chippi that one — per tool, on your terms.',
+    body: 'approval-first on every send by default. trust a task, and hand Chippi that one, per tool, on your terms.',
   },
 ];
 
@@ -118,8 +118,8 @@ export function TailorIt() {
           <span className="text-muted-foreground"> you already work.</span>
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-          the repetitive work — the reply, the follow-up, the post, the
-          bookkeeping — runs in the background so the hours go to the deal. you
+          the repetitive work, the reply, the follow-up, the post, the
+          bookkeeping, runs in the background so the hours go to the deal. you
           decide how much Chippi handles, and you can change your mind anytime.
         </p>
       </Reveal>

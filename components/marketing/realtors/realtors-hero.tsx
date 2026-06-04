@@ -79,7 +79,7 @@ export function RealtorsHero() {
             transition={{ duration: 0.9, ease: EASE }}
             className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-foreground/60 md:text-xl"
           >
-            you're out getting deals done — at the showing, in the car, between
+            you're out getting deals done: at the showing, in the car, between
             doors. Chippi reads the inbox, drafts the reply, books the tour, and
             keeps every deal current while you work. nothing leaves without your
             tap.

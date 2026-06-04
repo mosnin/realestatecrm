@@ -22,7 +22,7 @@ import { AsciiBlob } from '@/components/marketing/home/ascii-blob';
 import { Reveal, Eyebrow } from '@/components/marketing/home/home-kit';
 import { Founders } from '@/components/marketing/company/founders';
 
-export const metadata = { title: 'Company — Chippi' };
+export const metadata = { title: 'Company · Chippi' };
 
 export default async function CompanyPage() {
   const { userId } = await auth();
@@ -80,13 +80,14 @@ export default async function CompanyPage() {
           <div className="mt-6 space-y-5 text-lg leading-relaxed text-foreground/55">
             <p>
               An agent’s day is mostly attention management. Email, calendar,
-              replies, follow-ups, pipeline updates. The actual selling —
-              listening, judging, knowing — happens in maybe ten percent of it.
+              replies, follow-ups, pipeline updates. The actual selling,
+              the listening and judging and knowing, happens in maybe ten
+              percent of it.
             </p>
             <p>
               Everywhere else, that other ninety percent has started to run
               itself. In real estate it still doesn’t. The tools are stuck a
-              generation behind what’s now possible — agents and brokerages are
+              generation behind what’s now possible. Agents and brokerages are
               nowhere near the productivity the moment allows. That distance,
               between what could happen and what actually does, is the whole
               reason Chippi exists.
@@ -103,7 +104,7 @@ export default async function CompanyPage() {
             Built by people who know the work.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-            Orlando and Preston teamed up to solve the problem from both ends —
+            Orlando and Preston teamed up to solve the problem from both ends:
             the agent’s day and the brokerage’s floor.
           </p>
         </Reveal>
@@ -172,18 +173,18 @@ export default async function CompanyPage() {
 const BELIEFS = [
   {
     title: 'Configuration is failure to decide.',
-    body: 'Settings, toggles, customization layers — they’re admissions the team couldn’t pick. Picking is the work. We won’t make your day harder so our spec was easier.',
+    body: 'Settings, toggles, customization layers. They’re admissions the team couldn’t pick. Picking is the work. We won’t make your day harder so our spec was easier.',
   },
   {
     title: 'Nothing leaves without your name on it.',
-    body: 'Chippi drafts, books, and updates — but by default every move is yours to approve. You can grant per-task autonomy when you trust it. The default is you in the loop, and that’s where the trust lives.',
+    body: 'Chippi drafts, books, and updates, but by default every move is yours to approve. You can grant per-task autonomy when you trust it. The default is you in the loop, and that’s where the trust lives.',
   },
   {
     title: 'Chippi has one voice.',
-    body: 'Wherever Chippi shows up — a draft card, a toast, an activity row — the same signature carries through. Nothing else does. It’s how you learn to trust the agent across every surface.',
+    body: 'Wherever Chippi shows up, on a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It’s how you learn to trust the agent across every surface.',
   },
   {
     title: 'No numbers we can’t defend.',
-    body: 'No 10× headline. No minutes-saved-per-day claim. The day we can prove a number against your own data, we’ll quote it — and footnote it. Until then, the agent does the talking.',
+    body: 'No 10× headline. No minutes-saved-per-day claim. The day we can prove a number against your own data, we’ll quote it, and footnote it. Until then, the agent does the talking.',
   },
 ];

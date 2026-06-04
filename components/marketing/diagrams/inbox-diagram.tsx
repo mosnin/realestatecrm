@@ -32,7 +32,7 @@ const ROWS = [
   { from: 'Marcus Chen', subject: 'Re: 415 Lexington tour', time: '2m', unread: true },
   { from: 'Priya Nair', subject: 'Mortgage pre-approval letter', time: '18m', unread: true },
   { from: 'Dani Alvarez', subject: 'Thinking about listing in spring', time: '1h', unread: false },
-  { from: 'Tom Whitfield', subject: 'Closing docs — 88 Pine', time: '3h', unread: false },
+  { from: 'Tom Whitfield', subject: 'Closing docs for 88 Pine', time: '3h', unread: false },
 ];
 
 const ROW_INTERVAL = 220;

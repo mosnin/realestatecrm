@@ -21,17 +21,17 @@ const FEATURES = [
   {
     icon: Aperture,
     title: 'Studio writes the post.',
-    body: 'Listing copy, the email blast, the social post — generated from the property record, scheduled to your channels.',
+    body: 'Listing copy, the email blast, the social post, all generated from the property record and scheduled to your channels.',
   },
   {
     icon: FolderOpen,
     title: 'Files that belong to the deal.',
-    body: 'Contracts, photos, signed PDFs — filed per deal, searchable, versioned. Chippi files them for you.',
+    body: 'Contracts, photos, signed PDFs, filed per deal, searchable, versioned. Chippi files them for you.',
   },
   {
     icon: Users,
     title: 'A team layer brokers actually open.',
-    body: 'Route leads, share templates, see what the floor is closing — while every realtor keeps their own workspace.',
+    body: 'Route leads, share templates, see what the floor is closing, while every realtor keeps their own workspace.',
   },
   {
     icon: ShieldCheck,
@@ -54,7 +54,7 @@ export function DeepFeatures() {
           </h2>
           <p className="mt-4 max-w-md text-lg leading-relaxed text-foreground/55">
             The inbox is where it starts. Chippi reaches everywhere the work
-            lives — so you never leave to get something done.
+            lives, so you never leave to get something done.
           </p>
           <Link
             href="/login/realtor?intent=signup"

@@ -49,7 +49,7 @@ interface Slot {
 const TEMPLATE_LINES: ({ type: 'text'; text: string } | { type: 'slot'; slot: Slot })[] = [
   { type: 'text', text: 'Hi ' },
   { type: 'slot', slot: { placeholder: '{first_name}', filled: 'Marcus' } },
-  { type: 'text', text: ' — thanks for the note about ' },
+  { type: 'text', text: ', thanks for the note about ' },
   { type: 'slot', slot: { placeholder: '{property}', filled: '415 Lexington' } },
   { type: 'text', text: '. I have a slot ' },
   { type: 'slot', slot: { placeholder: '{tour_time}', filled: 'Saturday at 2pm' } },

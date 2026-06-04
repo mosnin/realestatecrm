@@ -31,7 +31,7 @@ interface StudioDiagramProps {
 }
 
 const CAPTION = [
-  'Just listed — 415 Lexington. South-facing two-bed',
+  'Just listed: 415 Lexington. South-facing two-bed',
   'with the rooftop everyone asks about. Tours open',
   'Saturday. Link in bio to book yours.',
 ];

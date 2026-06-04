@@ -19,7 +19,7 @@ const FOUNDERS = [
   {
     name: 'Preston',
     role: 'Co-founder',
-    bio: 'A decade building in e-commerce, software, and technology. He recently built groundbreaking AI agent-orchestration frameworks, alongside several products of his own — the machinery that lets an agent do real work, not just answer questions.',
+    bio: 'A decade building in e-commerce, software, and technology. He recently built groundbreaking AI agent-orchestration frameworks, alongside several products of his own: the machinery that lets an agent do real work, not just answer questions.',
   },
 ];
 

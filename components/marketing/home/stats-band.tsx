@@ -44,7 +44,7 @@ export function StatsBand() {
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
                 CRM, inbox, calendar, content studio, files, and the team
-                dashboard — one agent runs all of it, and they finally agree.
+                dashboard. one agent runs all of it, and they finally agree.
               </p>
             </div>
             <div className="shrink-0 text-right">

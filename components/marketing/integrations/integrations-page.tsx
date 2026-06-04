@@ -71,7 +71,7 @@ export function IntegrationsPage() {
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
             Connected through Composio. Each one becomes a tool Chippi can call
-            mid-task — reading what it needs, writing back where the work lives.
+            mid-task, reading what it needs, writing back where the work lives.
           </p>
         </Reveal>
 
@@ -127,7 +127,7 @@ function Hero() {
         <Reveal delay={0.12}>
           <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-foreground/60 md:text-xl">
             Connect the tools you already pay for. Chippi connects through
-            Composio, then calls each one as a tool while it works — pulling
+            Composio, then calls each one as a tool while it works, pulling
             data out of your workflows and writing it back where it belongs.
           </p>
         </Reveal>
@@ -159,7 +159,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
   {
     n: '01',
     title: 'connect your tools',
-    body: 'Pick the apps you already work in and authorize them once. Chippi connects through Composio over OAuth — no keys to copy, no scripts to wire.',
+    body: 'Pick the apps you already work in and authorize them once. Chippi connects through Composio over OAuth. no keys to copy, no scripts to wire.',
   },
   {
     n: '02',

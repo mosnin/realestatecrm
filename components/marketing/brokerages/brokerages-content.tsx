@@ -200,7 +200,7 @@ function Hero() {
           >
             give every agent an extra teammate, and give yourself the whole room
             on one surface. Chippi routes the leads, tracks what the floor is
-            closing, and surfaces where deals stall — so you can unblock them.
+            closing, and surfaces where deals stall, so you can unblock them.
           </motion.p>
 
           <motion.div variants={rise} transition={{ duration: 0.9, ease: EASE }}>
@@ -231,17 +231,17 @@ const EMPOWER = [
   {
     icon: Users,
     title: 'every agent, a teammate.',
-    body: 'each realtor keeps their own Chippi workspace — it reads their inbox, drafts replies in their voice, and keeps every deal current. you add a team layer on top; you never take their workspace away.',
+    body: 'each realtor keeps their own Chippi workspace. it reads their inbox, drafts replies in their voice, and keeps every deal current. you add a team layer on top; you never take their workspace away.',
   },
   {
     icon: TimerReset,
     title: 'time, compressed.',
-    body: 'first-touch, follow-ups, tour booking, deal updates — the repetitive work runs itself. the floor spends its hours on the conversations that close, not on the busywork around them.',
+    body: 'first-touch, follow-ups, tour booking, deal updates. the repetitive work runs itself. the floor spends its hours on the conversations that close, not on the busywork around them.',
   },
   {
     icon: ShieldCheck,
     title: 'nothing leaves without a name on it.',
-    body: 'Chippi drafts; the realtor approves. every send goes through the person whose name is on it. the agent does the work — the floor stays in the driver’s seat.',
+    body: 'Chippi drafts; the realtor approves. every send goes through the person whose name is on it. the agent does the work; the floor stays in the driver’s seat.',
   },
 ];
 
@@ -254,7 +254,7 @@ function Empower() {
           give every agent an extra teammate.
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-          a brokerage doesn&apos;t fail on features — it fails when the realtors
+          a brokerage doesn&apos;t fail on features. it fails when the realtors
           stop logging in. so Chippi makes the floor faster first, and gives you
           the room as a byproduct.
         </p>
@@ -317,7 +317,7 @@ function Bottlenecks() {
                 find where deals stall. then unblock them.
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
-                ask Chippi how the floor is doing and it reads the real work —
+                ask Chippi how the floor is doing and it reads the real work,
                 not a spreadsheet someone updated last week. stuck deals, missed
                 follow-ups, hot leads gone quiet, the pipeline by stage. the
                 bottleneck surfaces; you decide the move.
@@ -341,7 +341,7 @@ function Bottlenecks() {
 
             <p className="mt-6 flex items-center gap-2 text-[13px] text-white/45">
               <AlarmClockOff size={14} className="shrink-0" />
-              flag any deal for your sign-off — Chippi opens the review, you make
+              flag any deal for your sign-off. Chippi opens the review, you make
               the call.
             </p>
           </div>
@@ -368,7 +368,7 @@ function OnePlace() {
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
                 CRM, inbox, calendar, templates, files, team chat, and the floor
-                dashboard — stop bouncing between softwares that don&apos;t talk
+                dashboard. stop bouncing between softwares that don&apos;t talk
                 to each other. one agent runs all of it, and they finally agree.
               </p>
             </div>
@@ -449,7 +449,7 @@ export function BrokeragesContent() {
           sub="auto-assign by territory and load, or hand-pick the realtor and write the brief. Chippi can reassign a lead to anyone on the floor with a reason logged to the activity trail."
           points={[
             'auto-assignment, weighted by who has room.',
-            'hand-pick and reassign — always your override.',
+            'hand-pick and reassign, always your override.',
             'every assignment logged, with the reason, per realtor.',
           ]}
           media={<LeadRoutingDiagram aspect="wide" />}
@@ -462,9 +462,9 @@ export function BrokeragesContent() {
           flip
           eyebrow="Performance"
           title={<>see what the floor is closing.</>}
-          sub="ask Chippi to roll up any realtor's last week — deals active, won, and lost; new and hot leads; drafts pending and their approval rate. the numbers come from the work, not a status meeting."
+          sub="ask Chippi to roll up any realtor's last week: deals active, won, and lost; new and hot leads; drafts pending and their approval rate. the numbers come from the work, not a status meeting."
           points={[
-            'per-realtor rollups — deals, leads, drafts.',
+            'per-realtor rollups across deals, leads, and drafts.',
             'response time and pipeline value, live.',
             'sortable leaderboard the floor can see.',
           ]}
@@ -485,7 +485,7 @@ export function BrokeragesContent() {
         <FeatureRow
           eyebrow="Templates & compliance"
           title={<>write the reply once.</>}
-          sub="approved templates the whole floor reaches for. Chippi adapts each one to the lead and the realtor's voice, so a template never lands as a stamp — and the high-risk replies stay on-brand."
+          sub="approved templates the whole floor reaches for. Chippi adapts each one to the lead and the realtor's voice, so a template never lands as a stamp, and the high-risk replies stay on-brand."
           points={[
             'a brokerage-wide library, written once.',
             'per-lead, per-voice adaptation on every send.',
@@ -501,11 +501,11 @@ export function BrokeragesContent() {
           flip
           eyebrow="Team chat"
           title={<>talk shop, on the same page.</>}
-          sub="channels that live with the deal, not next to it. @chippi in a channel and it answers in line — where the deal stands, a drafted reply, a number pulled from the record. no tab-switching."
+          sub="channels that live with the deal, not next to it. @chippi in a channel and it answers in line: where the deal stands, a drafted reply, a number pulled from the record. no tab-switching."
           points={[
             'per-deal channels, archived on close.',
             'mention @chippi to pull it into the thread.',
-            'general channels for the floor — Chippi stays out unless invited.',
+            'general channels for the floor; Chippi stays out unless invited.',
           ]}
           media={<TeamChatDiagram aspect="wide" />}
         />
@@ -518,7 +518,7 @@ export function BrokeragesContent() {
           title={<>who belongs, and what they see.</>}
           sub="three roles, no permissions matrix. Owner runs the show, Admin manages the floor, Member is the realtor doing the work. admins see the rollup; private drafts and notes stay private."
           points={[
-            'Owner / Admin / Member — three tiers, no more.',
+            'Owner, Admin, Member. three tiers, no more.',
             'invite by link with the role pre-set.',
             'aggregate metrics are team-visible; private surfaces stay private.',
           ]}

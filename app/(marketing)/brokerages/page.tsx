@@ -27,7 +27,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { BrokeragesContent } from '@/components/marketing/brokerages/brokerages-content';
 
-export const metadata = { title: 'For brokerages — Chippi' };
+export const metadata = { title: 'For brokerages · Chippi' };
 
 export default async function BrokeragesPage() {
   const { userId } = await auth();

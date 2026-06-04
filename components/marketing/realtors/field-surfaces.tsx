@@ -19,7 +19,7 @@ const SURFACES = [
   {
     icon: Smartphone,
     title: 'on your phone.',
-    body: 'talk to Chippi between showings — read the thread, approve the draft, book the tour without sitting down.',
+    body: 'talk to Chippi between showings. read the thread, approve the draft, book the tour without sitting down.',
   },
   {
     icon: Globe,
@@ -29,7 +29,7 @@ const SURFACES = [
   {
     icon: Monitor,
     title: 'at the office.',
-    body: 'back at the desk, the same workspace opens wide — inbox, pipeline, and calendar where you left them.',
+    body: 'back at the desk, the same workspace opens wide: inbox, pipeline, and calendar where you left them.',
   },
 ];
 

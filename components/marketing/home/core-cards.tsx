@@ -45,7 +45,7 @@ export function CoreCards() {
 
         <BentoCard
           name="Drafts in your voice"
-          description="Every reply written before you open the thread. Read it, edit it, send it — or don't."
+          description="Every reply written before you open the thread. Read it, edit it, send it. or don't."
           Icon={PenLine}
           href="/realtors"
           cta="Meet Chippi"
@@ -55,7 +55,7 @@ export function CoreCards() {
 
         <BentoCard
           name="Knows who to call first"
-          description="Every lead scored against your deals, the hottest one rising out of the noise — so your morning starts with the right call."
+          description="Every lead scored against your deals, the hottest one rising out of the noise, so your morning starts with the right call."
           Icon={Target}
           href="/realtors"
           cta="See people"

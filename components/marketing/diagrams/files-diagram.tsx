@@ -27,10 +27,10 @@ interface FilesDiagramProps {
 }
 
 const FILES = [
-  { name: '415 Lexington — signed contract.pdf', meta: 'PDF · 2m ago', icon: FileText },
-  { name: 'Listing photos — 88 Pine', meta: '24 images · 1h ago', icon: ImageIcon },
-  { name: 'Commission statement — Q2', meta: 'Sheet · yesterday', icon: FileSpreadsheet },
-  { name: 'Chen — buyer documents', meta: 'Folder · 6 files', icon: Folder },
+  { name: '415 Lexington signed contract.pdf', meta: 'PDF · 2m ago', icon: FileText },
+  { name: '88 Pine listing photos', meta: '24 images · 1h ago', icon: ImageIcon },
+  { name: 'Commission statement, Q2', meta: 'Sheet · yesterday', icon: FileSpreadsheet },
+  { name: 'Chen buyer documents', meta: 'Folder · 6 files', icon: Folder },
 ];
 
 const ROW_INTERVAL = 220;

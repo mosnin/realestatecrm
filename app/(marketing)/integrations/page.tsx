@@ -15,9 +15,9 @@
 import { IntegrationsPage } from '@/components/marketing/integrations/integrations-page';
 
 export const metadata = {
-  title: 'Integrations — Chippi',
+  title: 'Integrations · Chippi',
   description:
-    'Connect the tools you already use. Chippi connects through Composio, then calls each one as a tool while it works — pulling data from and pushing data into your existing workflows.',
+    'Connect the tools you already use. Chippi connects through Composio, then calls each one as a tool while it works, pulling data from and pushing data into your existing workflows.',
 };
 
 export default function Page() {

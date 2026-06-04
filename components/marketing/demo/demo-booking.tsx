@@ -50,8 +50,8 @@ export function DemoBooking() {
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-foreground/60">
             For brokerages and teams sizing up Chippi. Pick a time and
-            we&rsquo;ll walk your floor through it live — the inbox, the drafts,
-            the deals it keeps current — and answer how it fits your book.
+            we&rsquo;ll walk your floor through it live: the inbox, the drafts,
+            the deals it keeps current. then we answer how it fits your book.
           </p>
         </Reveal>
 

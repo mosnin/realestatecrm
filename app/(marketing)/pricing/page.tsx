@@ -22,7 +22,7 @@ import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 
-export const metadata = { title: 'Pricing — Chippi' };
+export const metadata = { title: 'Pricing · Chippi' };
 
 const INCLUDED: string[] = [
   'The agent (Chippi runs the workspace)',
@@ -42,10 +42,10 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What happens after the trial?',
-    a: 'You enter the plan automatically — only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
+    a: 'You enter the plan automatically, but only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
   },
   {
-    q: 'Brokerages — what changes?',
+    q: 'Brokerages: what changes?',
     a: 'The pricing scales by realtor. The agent doesn’t. Every realtor on your floor gets the same surface; admins see the rollup. Talk to us for migration.',
   },
 ];

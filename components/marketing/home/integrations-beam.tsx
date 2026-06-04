@@ -65,7 +65,7 @@ export function IntegrationsBeam() {
         <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
           Your inbox and calendar feed Chippi. Your intake link, tours page, and
           public page route straight back to it. Every lead, every reply, every
-          booking — one current, flowing through the center.
+          booking. one current, flowing through the center.
         </p>
       </Reveal>
 

@@ -38,9 +38,9 @@ import {
 } from '@/components/marketing/diagrams';
 
 export const metadata = {
-  title: 'For solo realtors — Chippi',
+  title: 'For solo realtors · Chippi',
   description:
-    'Chippi is the extra teammate in the field — reachable on your phone, the web app, or the office desktop. It drafts in your voice, scores the lead, books the tour, and keeps every deal current.',
+    'Chippi is the extra teammate in the field, reachable on your phone, the web app, or the office desktop. It drafts in your voice, scores the lead, books the tour, and keeps every deal current.',
 };
 
 export default async function RealtorsPage() {
@@ -64,7 +64,7 @@ export default async function RealtorsPage() {
           </h2>
           <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
             you're rarely at a desk. Chippi is a tap away on whatever screen is
-            already in your hand — and the same workspace opens wide when you're
+            already in your hand, and the same workspace opens wide when you're
             back at the office.
           </p>
         </Reveal>
@@ -85,7 +85,7 @@ export default async function RealtorsPage() {
           points={[
             'trained on how you actually write.',
             'never sends without your tap.',
-            'works for email and SMS alike.',
+            'ready in your inbox before you open the thread.',
           ]}
           media={<ComposerDraftDiagram aspect="video" />}
         />
@@ -99,7 +99,7 @@ export default async function RealtorsPage() {
               <span className="text-muted-foreground"> first.</span>
             </>
           }
-          sub="every new inquiry comes in scored against your active deals. hot, warm, cold — at a glance, with the reason attached in plain language."
+          sub="every new inquiry comes in scored against your active deals. hot, warm, cold, at a glance, with the reason attached in plain language."
           points={[
             'multi-signal scoring on each lead.',
             'the quiet hot ones surfaced before they go cold.',
@@ -116,7 +116,7 @@ export default async function RealtorsPage() {
               <span className="text-muted-foreground"> from the thread.</span>
             </>
           }
-          sub="reply with a time. Chippi checks your availability, puts it on the calendar, sends the confirmation, and writes it back to the deal — no tab-switching."
+          sub="reply with a time. Chippi checks your availability, puts it on the calendar, sends the confirmation, and writes it back to the deal. no tab-switching."
           points={[
             'proposes times against your open hours.',
             'two-way Google and Outlook sync.',
@@ -151,7 +151,7 @@ export default async function RealtorsPage() {
               <span className="text-muted-foreground"> read and triaged.</span>
             </>
           }
-          sub="Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first — and stays quiet when nothing's worth surfacing."
+          sub="Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first. it stays quiet when nothing's worth surfacing."
           points={[
             'threads, not loose messages.',
             'scored against your active deals.',
@@ -169,9 +169,9 @@ export default async function RealtorsPage() {
               <span className="text-muted-foreground"> in order.</span>
             </>
           }
-          sub="emails, calls, tours, drafts, replies — assembled chronologically per contact. you scroll the relationship; you don't reconstruct it from memory."
+          sub="emails, tours, notes, drafts, replies, assembled chronologically per contact. you scroll the relationship; you don't reconstruct it from memory."
           points={[
-            'calls and meetings logged as they happen.',
+            'tours and meetings logged as they happen.',
             'Chippi-authored actions tagged on the timeline.',
             'ask Chippi to recall the history and it does.',
           ]}

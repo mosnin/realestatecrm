@@ -177,7 +177,7 @@ export function Placeholder({
   return (
     <div
       role="img"
-      aria-label={label ? `Placeholder — ${label}` : 'Image placeholder'}
+      aria-label={label ? `Placeholder: ${label}` : 'Image placeholder'}
       className={cn(
         'relative w-full overflow-hidden rounded-3xl ring-1',
         aspect,

@@ -125,7 +125,7 @@ export function HomeHero() {
             className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-foreground/60 md:text-xl"
           >
             Chippi reads your inbox, drafts replies in your voice, books the
-            tours, and keeps every deal current — the busywork runs itself, and
+            tours, and keeps every deal current. the busywork runs itself, and
             nothing leaves without your name on it.
           </motion.p>
 
