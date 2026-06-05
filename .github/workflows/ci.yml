@@ -67,3 +67,23 @@ jobs:
       # (instrumentation.ts → lib/env.ts) against the placeholder env above.
       - name: Build
         run: pnpm build
+
+  # Keeps docs/repo-map.generated.md honest: it is derived from the source tree,
+  # so if a PR adds a route/table/tool/cron without regenerating, this fails.
+  # Pure Python (no Node deps) → runs in parallel with the main job.
+  repo-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regenerate repo map
+        run: python3 scripts/gen_repo_map.py
+
+      - name: Fail if the repo map is stale
+        run: |
+          if ! git diff --quiet docs/repo-map.generated.md; then
+            echo "::error::docs/repo-map.generated.md is out of date. Run 'python3 scripts/gen_repo_map.py' and commit the result."
+            git diff docs/repo-map.generated.md
+            exit 1
+          fi
