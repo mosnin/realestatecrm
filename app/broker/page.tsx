@@ -66,22 +66,41 @@ export default async function BrokerHomePage({
     conversations = (convData ?? []) as Conversation[];
 
     if (urlConversationId) {
-      initialConversationId = urlConversationId;
-      const { data: msgData } = await supabase
-        .from('Message')
-        .select('role, content, blocks')
-        .eq('conversationId', urlConversationId)
-        .order('createdAt', { ascending: true })
-        .limit(50);
-      initialMessages = ((msgData ?? []) as {
-        role: string;
-        content: string;
-        blocks: MessageBlock[] | null;
-      }[]).map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        blocks: m.blocks,
-      }));
+      // Verify the requested conversation is THIS brokerage's broker-Chippi
+      // conversation BEFORE loading messages. Without this guard an arbitrary
+      // conversationId in the URL (a realtor's, or another brokerage's) would
+      // render its private history on the broker dashboard.
+      const { data: convRow } = await supabase
+        .from('Conversation')
+        .select('id, spaceId, title')
+        .eq('id', urlConversationId)
+        .maybeSingle();
+      const convTitle = (convRow?.title ?? '') as string;
+      const isThisBrokerageConversation =
+        convRow != null &&
+        (convRow as { spaceId: string }).spaceId === spaceRow.id &&
+        convTitle.startsWith(titlePrefix);
+
+      if (isThisBrokerageConversation) {
+        initialConversationId = urlConversationId;
+        const { data: msgData } = await supabase
+          .from('Message')
+          .select('role, content, blocks')
+          .eq('spaceId', spaceRow.id)
+          .eq('conversationId', urlConversationId)
+          .order('createdAt', { ascending: true })
+          .limit(50);
+        initialMessages = ((msgData ?? []) as {
+          role: string;
+          content: string;
+          blocks: MessageBlock[] | null;
+        }[]).map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          blocks: m.blocks,
+        }));
+      }
+      // Foreign / realtor / unknown conversation id → new-chat state.
     }
   }
 

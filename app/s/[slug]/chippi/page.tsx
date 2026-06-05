@@ -55,6 +55,12 @@ export default async function ChippiPage({
       .from('Conversation')
       .select('*')
       .eq('spaceId', space.id)
+      // Realtor surface NEVER shows broker-Chippi or team chat. These live in
+      // the same table today (keyed by spaceId), so both prefixes must be
+      // excluded here, exactly as the /api/ai/conversations list does. Missing
+      // the [BROKER_CHIPPI] exclusion here leaked brokerage chats into the
+      // realtor sidebar on server render.
+      .not('title', 'like', '[BROKER_CHIPPI]%')
       .not('title', 'like', '[BROKERAGE_CHAT]%')
       .order('updatedAt', { ascending: false })
       .limit(50);
@@ -64,18 +70,39 @@ export default async function ChippiPage({
     // No URL param → show the new-chat screen (targetConvId = null).
     const targetConvId = urlConversationId ?? null;
     if (targetConvId) {
-      initialConversationId = targetConvId;
-      const { data: msgData } = await supabase
-        .from('Message')
-        .select('role, content, blocks')
-        .eq('conversationId', targetConvId)
-        .order('createdAt', { ascending: true })
-        .limit(50);
-      initialMessages = ((msgData ?? []) as { role: string; content: string; blocks: MessageBlock[] | null }[]).map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        blocks: m.blocks,
-      }));
+      // Verify the requested conversation belongs to THIS realtor space and is
+      // a realtor conversation BEFORE loading any messages. Without this guard
+      // an arbitrary conversationId in the URL (a brokerage conversation, or
+      // another user's) would render its private history on this dashboard.
+      const { data: convRow } = await supabase
+        .from('Conversation')
+        .select('id, spaceId, title')
+        .eq('id', targetConvId)
+        .maybeSingle();
+      const convTitle = (convRow?.title ?? '') as string;
+      const isOwnRealtorConversation =
+        convRow != null &&
+        (convRow as { spaceId: string }).spaceId === space.id &&
+        !convTitle.startsWith('[BROKER_CHIPPI]') &&
+        !convTitle.startsWith('[BROKERAGE_CHAT]');
+
+      if (isOwnRealtorConversation) {
+        initialConversationId = targetConvId;
+        const { data: msgData } = await supabase
+          .from('Message')
+          .select('role, content, blocks')
+          .eq('spaceId', space.id)
+          .eq('conversationId', targetConvId)
+          .order('createdAt', { ascending: true })
+          .limit(50);
+        initialMessages = ((msgData ?? []) as { role: string; content: string; blocks: MessageBlock[] | null }[]).map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          blocks: m.blocks,
+        }));
+      }
+      // Foreign / broker / unknown conversation id → fall through to the
+      // new-chat state (no id, no messages) rather than exposing anything.
     }
   } catch {
     // fall back to empty state
