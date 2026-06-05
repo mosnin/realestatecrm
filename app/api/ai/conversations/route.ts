@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { RESERVED_TITLE_LIKE_PATTERNS } from '@/lib/chat/conversation-access';
 
 const rateLimited = () =>
   NextResponse.json(
@@ -36,8 +37,11 @@ export async function GET(req: NextRequest) {
       .from('Conversation')
       .select('*')
       .eq('spaceId', space.id)
-      .not('title', 'like', '[BROKERAGE_CHAT]%')
-      .not('title', 'like', '[BROKER_CHIPPI]%')
+      // Reserved broker/team prefixes are sourced from
+      // lib/chat/conversation-access so the realtor exclusion set lives in one
+      // place. The realtor surface never serves broker-Chippi or team chats.
+      .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[0])
+      .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[1])
       .order('updatedAt', { ascending: false });
     if (error) return NextResponse.json({ error: 'Failed to load conversations' }, { status: 500 });
 

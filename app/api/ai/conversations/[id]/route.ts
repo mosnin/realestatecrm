@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 
 const rateLimited = () =>
   NextResponse.json(
@@ -28,10 +29,10 @@ async function getConversationAndVerifyOwner(conversationId: string, userId: str
 
   // Surface guard: broker-Chippi and team conversations have their own
   // broker-gated routes. A broker_owner also owns their personal realtor
-  // space, so ownership alone is not isolation — refuse to rename/delete a
-  // broker conversation through the realtor endpoint.
-  const convTitle = (conv as { title?: string }).title ?? '';
-  if (convTitle.startsWith('[BROKER_CHIPPI]') || convTitle.startsWith('[BROKERAGE_CHAT]')) {
+  // space, so ownership alone is not isolation. Refuse to rename/delete a
+  // broker conversation through the realtor endpoint. The reserved-title
+  // check lives in lib/chat/conversation-access.
+  if (isReservedConversationTitle((conv as { title?: string }).title)) {
     return null;
   }
 
