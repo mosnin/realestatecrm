@@ -271,6 +271,39 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('explicit mode:chat forces the direct path even for an action verb', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    // "send Preston a follow-up" is an action verb the heuristic router would
+    // send to the agent. The composer's explicit Chat pick overrides it — the
+    // realtor asked for a fast answer, not the tool loop.
+    await POST(makeRequest({ message: 'send Preston a follow-up', mode: 'chat' }));
+    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('explicit mode:agent forces Modal even for a generic question', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    // "what's a CMA?" is generic Q&A the heuristic router would keep on the
+    // direct path. The explicit Agent pick sends it to Modal (the mandatory
+    // acting runtime) so the realtor's chosen runtime is honored.
+    await POST(makeRequest({ message: "what's a CMA?", mode: 'agent' }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
+    expect(tsStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('mode:agent degrades to the in-process TS agent when MODAL_CHAT_URL is unset', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    delete process.env.MODAL_CHAT_URL;
+    // A missing Modal URL must not fail the one turn the realtor asked to run;
+    // the in-process TS agent has the full tool surface, so we degrade to it.
+    await POST(makeRequest({ message: 'add Preston as a contact', mode: 'agent' }));
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('passes the resolved chat model into the direct streamer', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     await POST(makeRequest({ message: 'what is a CMA?' }));

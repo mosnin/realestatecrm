@@ -89,6 +89,18 @@ interface PostBody {
   conversationId?: string | null;
   message: string;
   attachmentIds?: string[];
+  /**
+   * Explicit per-message runtime pick from the composer's Chat/Agent switch.
+   *   - 'chat'  → lean single-call path: one LLM completion + read-only vector
+   *               search over the realtor's data. No tools, no agent loop, so
+   *               a turn costs ~3k tokens. The structural fix for the
+   *               500k-tokens-per-input blowup: most turns never touch the
+   *               tool loop at all.
+   *   - 'agent' → full tool surface on Modal. Can act (create / send /
+   *               schedule). Bounded server-side (max_turns + lean tool set).
+   * Absent (older client) → fall back to the heuristic router.
+   */
+  mode?: 'chat' | 'agent' | string;
 }
 
 function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
@@ -616,7 +628,18 @@ export async function POST(req: NextRequest) {
     id: a.id,
     mimeType: a.mime_type,
   }));
-  const route = decideRoute(message, routerAttachments);
+  // Explicit per-message mode from the composer's Chat/Agent switch wins over
+  // the heuristic router. 'chat' maps to the lean direct path (no tools, no
+  // loop — the 500k-token fix); 'agent' maps to the full tool surface. An
+  // absent mode (older client) falls back to decideRoute so nothing breaks.
+  const explicitMode: 'chat' | 'agent' | null =
+    body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+  const route =
+    explicitMode === 'chat'
+      ? 'direct'
+      : explicitMode === 'agent'
+        ? 'agent'
+        : decideRoute(message, routerAttachments);
 
   // Resolve the model for THIS turn: the workspace model forced to something
   // the active provider can actually serve (kills the grok-slug-to-OpenAI
@@ -663,9 +686,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Agent path (opt-in whole-turn Modal) — full tool surface in the sandbox.
-  if (chatRuntime() === 'modal') {
-    logger.info('[ai/task] router → agent (Modal, opt-in)', { spaceSlug });
+  // Agent path → Modal. Two ways in:
+  //   1. CHIPPI_CHAT_RUNTIME=modal forces ALL agent turns through the sandbox.
+  //      This is a deliberate deploy choice, so a missing MODAL_CHAT_URL is a
+  //      misconfiguration we surface loudly (callModalAgent returns 503) rather
+  //      than silently downgrading the whole deploy to the TS runtime.
+  //   2. The realtor picked Agent mode for THIS message. Prefer Modal, but if
+  //      MODAL_CHAT_URL is unset, degrade gracefully to the in-process TS agent
+  //      (it has the full tool surface too) instead of failing the one turn.
+  const forcedModal = chatRuntime() === 'modal';
+  const perMessageModal = explicitMode === 'agent' && Boolean(process.env.MODAL_CHAT_URL);
+  if (route === 'agent' && (forcedModal || perMessageModal)) {
+    logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
       ctx,
       conversationId,

@@ -38,6 +38,15 @@ export interface UiMessage {
   streaming?: boolean;
 }
 
+/**
+ * Per-message runtime pick from the composer's Chat/Agent switch.
+ *   - 'chat'  → lean single-call path (one LLM completion + read-only vector
+ *               search). Fast, cheap, can't act.
+ *   - 'agent' → full tool surface on Modal. Can act; bounded server-side.
+ * Defaults to 'chat' when the caller omits it.
+ */
+export type ChatMode = 'chat' | 'agent';
+
 export interface UseAgentTaskOptions {
   spaceSlug: string;
   /** Current conversation, or null to have the hook create one on first send. */
@@ -87,7 +96,7 @@ export interface UseAgentTaskResult {
    * created yet. Cleared automatically on `turn_complete`.
    */
   activePlan: { task: string; steps: Array<{ title: string; description: string }> } | null;
-  send: (text: string, attachmentIds?: string[]) => Promise<void>;
+  send: (text: string, attachmentIds?: string[], mode?: ChatMode) => Promise<void>;
   approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   deny: (requestId: string) => Promise<void>;
   /**
@@ -623,7 +632,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [spaceSlug, onConversationCreated, conversationsEndpoint, conversationCreatePayload]);
 
   const send = useCallback(
-    async (text: string, attachmentIds?: string[]) => {
+    async (text: string, attachmentIds?: string[], mode: ChatMode = 'chat') => {
       const trimmed = text.trim();
       const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
       // Allow attachment-only sends — the user might just want to drop in a
@@ -676,6 +685,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         spaceSlug,
         conversationId: convId,
         message: trimmed,
+        mode,
         ...(hasAttachments ? { attachmentIds } : {}),
       });
     },
