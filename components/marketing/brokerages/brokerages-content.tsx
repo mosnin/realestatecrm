@@ -105,7 +105,7 @@ function FeatureRow({
     <div className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 md:gap-16">
       <Reveal className={cn(flip && 'md:order-2')}>
         <Eyebrow>{eyebrow}</Eyebrow>
-        <h2 className="mt-5 font-title text-[clamp(2rem,4.4vw,3.25rem)] font-normal leading-[1.04] tracking-[-0.025em] text-foreground">
+        <h2 className="mt-5 font-serif text-[clamp(2.25rem,4.8vw,3.5rem)] font-normal leading-[1.05] tracking-normal text-foreground">
           {title}
         </h2>
         <p className="mt-4 max-w-md text-lg leading-relaxed text-foreground/55">
@@ -184,11 +184,11 @@ function Hero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.9, ease: EASE }}
-            className="font-brand mt-7 text-[clamp(2.25rem,6vw,4.75rem)] leading-[1.05] tracking-tight text-foreground"
+            className="font-serif mt-7 text-[clamp(2.5rem,6.4vw,5.25rem)] leading-[1.0] tracking-normal text-foreground"
           >
             <span className="block">One agent for the</span>
             <span className="block">
-              whole <em className="font-bold italic text-brand">floor.</em>
+              whole <em className="italic text-brand">floor.</em>
             </span>
           </motion.h1>
 
@@ -252,7 +252,7 @@ function Empower() {
     >
       <Reveal className="max-w-3xl">
         <Eyebrow>Empower the floor</Eyebrow>
-        <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+        <h2 className="mt-5 font-serif text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.04] tracking-normal text-foreground">
           give every agent an extra teammate.
         </h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
@@ -271,7 +271,7 @@ function Empower() {
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground/[0.05] text-foreground/70">
                   <Icon size={20} strokeWidth={1.75} />
                 </span>
-                <h3 className="font-title text-[1.6rem] font-normal leading-[1.05] tracking-[-0.02em] text-foreground">
+                <h3 className="font-serif text-[1.75rem] font-normal leading-[1.05] tracking-normal text-foreground">
                   {s.title}
                 </h3>
                 <p className="text-[15px] leading-relaxed text-foreground/55">
@@ -318,7 +318,7 @@ function Bottlenecks() {
               <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-white/45">
                 Productivity &amp; bottlenecks
               </p>
-              <h2 className="mt-4 font-title text-[clamp(1.75rem,3.8vw,3rem)] font-normal leading-[1.05] tracking-[-0.018em] text-white">
+              <h2 className="mt-4 font-serif text-[clamp(2rem,3.8vw,3.25rem)] font-normal leading-[1.05] tracking-normal text-white">
                 find where deals stall. then unblock them.
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
@@ -368,7 +368,7 @@ function OnePlace() {
               <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-white/45">
                 One place, not six tools
               </p>
-              <h2 className="mt-4 font-title text-[clamp(1.75rem,3.5vw,2.75rem)] font-normal leading-[1.05] tracking-[-0.018em] text-white">
+              <h2 className="mt-4 font-serif text-[clamp(2rem,3.5vw,3rem)] font-normal leading-[1.05] tracking-normal text-white">
                 all the data, one surface.
               </h2>
               <p className="mt-4 text-[15px] leading-relaxed text-white/55">
@@ -409,7 +409,7 @@ function ClosingCta() {
             }}
           />
           <div className="relative">
-            <h2 className="mx-auto max-w-3xl font-title text-[clamp(2rem,5vw,3.75rem)] font-normal leading-[1.04] tracking-[-0.018em] text-white">
+            <h2 className="mx-auto max-w-3xl font-serif text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.04] tracking-normal text-white">
               bring your floor to Chippi.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">

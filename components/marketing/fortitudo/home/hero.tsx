@@ -69,7 +69,13 @@ export function HomeHero() {
     >
       <motion.div style={{ y: asciiY }} className="absolute inset-0">
         <AsciiField className="absolute inset-0 h-full w-full opacity-30" cell={14} />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,150,79,0.16),transparent_55%)]" />
+        {/* Soft circular orange bloom behind the headline: one large, heavily
+            blurred disc of --brand at low opacity for the calm Apple "soft
+            light" feel. Theme-aware via the --brand token. */}
+        <div
+          aria-hidden
+          className="absolute left-1/2 top-[40%] h-[clamp(26rem,58vw,44rem)] w-[clamp(26rem,58vw,44rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/20 blur-[120px]"
+        />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(255,150,79,0.08),transparent_50%)]" />
         {/* Center-protect: keep the headline zone calm/legible. */}
         <div
@@ -93,14 +99,14 @@ export function HomeHero() {
 
           <motion.h1
             variants={item}
-            className="font-brand text-4xl leading-[1.05] tracking-tight text-foreground sm:text-6xl lg:text-7xl"
+            className="font-serif text-5xl leading-[1.0] tracking-normal text-foreground sm:text-7xl lg:text-8xl"
           >
             <span className="block">You close the deals.</span>
             <span className="block">Chippi does the</span>
             <span className="block">
               <RotatingWord
                 words={['drafting', 'scoring', 'booking', 'chasing', 'rest']}
-                className="text-gradient-brand"
+                className="font-serif italic text-gradient-brand"
               />
             </span>
           </motion.h1>

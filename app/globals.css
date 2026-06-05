@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -22,6 +23,10 @@
      Bitcount Grid Single, used via the `.font-brand` utility on the logged-out
      site and auth pages. The product (dashboard) never reaches for it. */
   --font-brand: "Bitcount Grid Single", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  /* Marketing/auth-only display serif (logged-out headlines). Instrument Serif
+     is the big-headline face on the logged-out site; the Bitcount brand face is
+     reserved for the small eyebrow/label lines only. The product never uses it. */
+  --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
 
   /* Rainbow-button color stops (marketing CTA flourish). */
   --color-color-1: hsl(var(--color-1));
@@ -1006,11 +1011,21 @@
  * orange for the signature glyphs + headline flourish.
  * ────────────────────────────────────────────────────────────────────────── */
 
-/* The studio brand display face: headings on the marketing/auth site. */
+/* The studio brand mono-grid face: reserved for the small eyebrow/label lines
+   on the marketing/auth site (kickers, section eyebrows, footer column heads).
+   Never the headline. The display serif below carries the big headlines. */
 .font-brand {
   font-family: var(--font-brand);
   font-variation-settings: "slnt" 0, "CRSV" 0.5, "ELSH" 0, "ELXP" 0;
   letter-spacing: 0.01em;
+}
+
+/* The display serif: the big logged-out headlines (hero + section + page
+   heroes). Instrument Serif reads larger and wants tighter leading + normal
+   tracking, so headline call sites pair it with leading-[1.0–1.05] and drop the
+   tight letter-spacing the mono face used. */
+.font-serif {
+  font-family: var(--font-serif);
 }
 
 /* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */

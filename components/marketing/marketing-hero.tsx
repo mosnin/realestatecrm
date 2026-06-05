@@ -5,8 +5,8 @@
  *
  * Apple-discipline:
  * - ONE focal element: the headline. Eyebrow recedes, sub recedes further.
- * - Headline is serif Times via `var(--font-title)` — the loudest typography
- *   on the marketing site.
+ * - Headline is the display serif via the `.font-serif` utility (Instrument
+ *   Serif), the loudest typography on the marketing site.
  * - Optional media slot sits BELOW the headline (centered + full-bleed in
  *   container width) so the eye lands on the words first, then the picture.
  *   When media is provided as a video, autoplay-mute-loop is the default —
@@ -111,7 +111,7 @@ export function MarketingHero({
             animate="enter"
             variants={MARKETING_HERO_REVEAL}
             transition={{ delay: 0.05 }}
-            className="font-brand mt-5 text-[40px] sm:text-[56px] md:text-[72px] leading-[1.05] tracking-tight text-foreground"
+            className="font-serif mt-5 text-[44px] sm:text-[64px] md:text-[80px] leading-[1.0] tracking-normal text-foreground"
           >
             {title}
           </motion.h1>

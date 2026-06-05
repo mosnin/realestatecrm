@@ -43,8 +43,8 @@ export function Testimonials() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-brand text-xs uppercase tracking-[0.25em] text-brand">From the field</p>
-          <h2 className="font-brand mt-3 text-3xl text-foreground sm:text-4xl lg:text-5xl">
-            Loved by the people who <span className="text-gradient-brand">carry the deals.</span>
+          <h2 className="font-serif mt-3 text-4xl leading-[1.05] tracking-normal text-foreground sm:text-5xl lg:text-6xl">
+            Loved by the people who <span className="italic text-gradient-brand">carry the deals.</span>
           </h2>
         </div>
 

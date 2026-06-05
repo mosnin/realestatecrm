@@ -14,8 +14,8 @@ export function HomeCTA() {
         <AsciiField className="absolute inset-0 h-full w-full opacity-50" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,150,79,0.2),transparent_60%)]" />
         <div className="relative z-10">
-          <h2 className="font-brand text-3xl text-white sm:text-4xl lg:text-5xl">
-            Bring your inbox. <span className="text-gradient-brand">Chippi does the rest.</span>
+          <h2 className="font-serif text-4xl leading-[1.05] tracking-normal text-white sm:text-5xl lg:text-6xl">
+            Bring your inbox. <span className="italic text-gradient-brand">Chippi does the rest.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg text-white/65">
             Seven days free, no credit card. Connect your email and watch the busywork start

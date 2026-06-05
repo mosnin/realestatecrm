@@ -53,7 +53,7 @@ export default async function CompanyPage() {
             <Eyebrow>Our story</Eyebrow>
           </Reveal>
           <Reveal delay={0.06}>
-            <h1 className="font-brand mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,6vw,4.5rem)] leading-[1.05] tracking-tight text-foreground">
+            <h1 className="font-serif mx-auto mt-7 max-w-4xl text-[clamp(2.5rem,6.4vw,5rem)] leading-[1.02] tracking-normal text-foreground">
               Real estate deserves to work the way the rest of the world already does.
             </h1>
           </Reveal>
@@ -74,7 +74,7 @@ export default async function CompanyPage() {
       >
         <Reveal>
           <Eyebrow>The gap</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 font-serif text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             The work moved on. The software didn’t.
           </h2>
           <div className="mt-6 space-y-5 text-lg leading-relaxed text-foreground/55">
@@ -103,7 +103,7 @@ export default async function CompanyPage() {
       >
         <Reveal className="mx-auto max-w-3xl text-center">
           <Eyebrow>The founders</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 font-serif text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             Built by people who know the work.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
@@ -123,7 +123,7 @@ export default async function CompanyPage() {
       >
         <Reveal>
           <Eyebrow>What we believe</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 font-serif text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             A few things we won’t move on.
           </h2>
         </Reveal>
@@ -148,7 +148,7 @@ export default async function CompanyPage() {
       <section className="relative mx-auto max-w-7xl px-6 pb-28 pt-4 md:px-8">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-title text-[clamp(2rem,4.8vw,3.5rem)] font-normal leading-[1.04] tracking-[-0.02em] text-foreground">
+            <h2 className="font-serif text-[clamp(2.25rem,4.8vw,3.75rem)] font-normal leading-[1.04] tracking-normal text-foreground">
               Come see what your day looks like with Chippi.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">

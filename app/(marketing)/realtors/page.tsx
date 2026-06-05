@@ -61,7 +61,7 @@ export default async function RealtorsPage() {
       >
         <Reveal className="max-w-3xl">
           <Eyebrow>In the field</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 font-serif text-[clamp(2.5rem,4.8vw,4.25rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             reachable wherever
             <span className="text-muted-foreground"> the work is.</span>
           </h2>
@@ -201,7 +201,7 @@ export default async function RealtorsPage() {
       >
         <Reveal>
           <Eyebrow>One promise</Eyebrow>
-          <h2 className="mx-auto mt-5 max-w-3xl font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mx-auto mt-5 max-w-3xl font-serif text-[clamp(2.5rem,4.8vw,4.25rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             you stay in the driver&rsquo;s seat.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">

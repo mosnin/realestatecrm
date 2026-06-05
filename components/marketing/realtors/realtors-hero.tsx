@@ -65,11 +65,11 @@ export function RealtorsHero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.9, ease: EASE }}
-            className="font-brand mt-7 text-[clamp(2.25rem,6vw,4.75rem)] leading-[1.05] tracking-tight text-foreground"
+            className="font-serif mt-7 text-[clamp(2.5rem,6.4vw,5.25rem)] leading-[1.0] tracking-normal text-foreground"
           >
             <span className="block">An extra teammate</span>
             <span className="block">
-              in the <em className="font-bold italic text-brand">field.</em>
+              in the <em className="italic text-brand">field.</em>
             </span>
           </motion.h1>
 

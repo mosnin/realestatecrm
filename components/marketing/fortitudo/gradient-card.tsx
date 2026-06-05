@@ -123,7 +123,7 @@ export function GradientCard({
         )}
         <div className="flex-1" />
         <div>
-          <h3 className="font-brand text-2xl leading-tight text-white">{title}</h3>
+          <h3 className="font-serif text-[1.75rem] leading-tight tracking-normal text-white">{title}</h3>
           <p className="mt-2 text-sm leading-relaxed text-white/65">{description}</p>
           {(meta || href) && (
             <div className="mt-5 flex items-center justify-between gap-3">

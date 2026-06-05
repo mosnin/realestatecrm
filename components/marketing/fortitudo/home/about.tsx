@@ -33,9 +33,9 @@ export function About() {
         <div className="grid grid-cols-1 gap-16 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="font-brand text-xs uppercase tracking-[0.25em] text-brand">Why Chippi</p>
-            <h2 className="font-brand mt-3 text-3xl text-foreground sm:text-4xl lg:text-5xl">
+            <h2 className="font-serif mt-3 text-4xl leading-[1.05] tracking-normal text-foreground sm:text-5xl lg:text-6xl">
               Real estate, working the way the rest of the world{' '}
-              <span className="text-gradient-brand">already does.</span>
+              <span className="italic text-gradient-brand">already does.</span>
             </h2>
             <p className="mt-5 text-lg text-foreground/65">
               The tools agents and brokerages live in were drawn for a slower era. The work
@@ -64,7 +64,7 @@ export function About() {
                 transition={{ duration: 0.4, delay: index * 0.08 }}
               >
                 <SpotlightCard className="p-6">
-                  <h3 className="font-brand text-lg text-foreground">{value.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{value.title}</h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {value.description}
                   </p>

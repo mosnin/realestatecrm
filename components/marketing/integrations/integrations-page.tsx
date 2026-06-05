@@ -69,7 +69,7 @@ export function IntegrationsPage() {
       >
         <Reveal className="max-w-3xl">
           <Eyebrow>The catalog</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+          <h2 className="mt-5 font-serif text-[clamp(2.5rem,5vw,4.25rem)] font-normal leading-[1.04] tracking-normal text-foreground">
             {TOTAL} apps Chippi can work inside.
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
@@ -119,7 +119,7 @@ function Hero() {
         </Reveal>
 
         <Reveal delay={0.06}>
-          <h1 className="font-brand mx-auto mt-7 max-w-4xl text-[clamp(2.5rem,6.4vw,5rem)] leading-[1.02] tracking-tight text-foreground">
+          <h1 className="font-serif mx-auto mt-7 max-w-4xl text-[clamp(2.75rem,6.8vw,5.5rem)] leading-[1.0] tracking-normal text-foreground">
             Your whole stack, wired into one agent.
           </h1>
         </Reveal>
@@ -193,7 +193,7 @@ function HowItWorks() {
       <Stagger className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-3xl border border-border/60 bg-border/60 md:grid-cols-3">
         {STEPS.map((step) => (
           <StaggerItem key={step.n} className="flex flex-col bg-background px-8 py-10">
-            <span className="font-title text-[2rem] leading-none tracking-[-0.02em] text-muted-foreground/50">
+            <span className="font-serif text-[2.25rem] leading-none tracking-normal text-muted-foreground/50">
               {step.n}
             </span>
             <h3 className="mt-8 text-lg font-semibold text-foreground">{step.title}</h3>
@@ -287,7 +287,7 @@ function ClosingCTA() {
             }}
           />
           <div className="relative">
-            <h2 className="mx-auto max-w-3xl font-title text-[clamp(2rem,5vw,3.75rem)] font-normal leading-[1.04] tracking-[-0.018em] text-white">
+            <h2 className="mx-auto max-w-3xl font-serif text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.04] tracking-normal text-white">
               Connect your stack. Let Chippi work inside it.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">
