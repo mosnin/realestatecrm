@@ -62,7 +62,7 @@ back a layer.
 | Auth | **Clerk** (`@clerk/nextjs`). Component overrides in `globals.css` `.cl-*` selectors. |
 | Data | **Supabase** (`@supabase/supabase-js`) + browser client in `lib/supabase-browser.ts`, server in `lib/supabase.ts`. |
 | Realtime | Supabase Postgres CDC via `hooks/use-realtime.ts`. |
-| Fonts | All system / local. **No Google Fonts.** SF Pro is read from the OS via the system stack; Times New Roman is read from the OS as the serif. The only third-party font we ship is `geist` (in deps but not currently bound to a CSS variable in `globals.css`). |
+| Fonts | **Product**: all system / local — SF Pro from the OS, Times New Roman as the serif. **Logged-out site only**: one Google Fonts face, Bitcount Grid Single, bound to `--font-brand` and used via the `.font-brand` utility for marketing/auth display type (see "The logged-out site" section). The product never loads or uses it. |
 
 If a feature looks like it needs a new dep, the bar is high — it almost never does. The list above is the whole vocabulary.
 
@@ -893,13 +893,101 @@ it competes with these four — usually it should live one click away.
 
 ---
 
+## The logged-out site (marketing + auth) — the "studio ASCII" system
+
+The **logged-out** surfaces (the marketing site under `app/(marketing)/`
+and the auth pages under `app/(auth)/`) run a **different, louder** visual
+system than the product. The product is paper-flat and neutral; the
+logged-out site is the **studio ASCII** aesthetic, adopted wholesale from
+the fortitudo design and retinted to Chippi orange. This split is
+deliberate: marketing does the pitch, the product does the work.
+
+**This system NEVER leaks into the product.** Everything here is opt-in via
+a class (`.font-brand`, `.text-gradient-brand`, `.rounded-marketing-*`) or
+lives in `components/marketing/fortitudo/**`. The dashboard, agent chat, and
+broker app stay on the neutral system documented above. The `no-stray-orange`
+and `no-shadow-on-product-chrome` tests still pass because `components/marketing`
+is outside the strict zone — orange and shadows are *expected* here.
+
+### What the look is
+
+- **Brand display font** — Bitcount Grid Single, applied via the `.font-brand`
+  utility. It's the marketing/auth headline + eyebrow + footer-column face.
+  Loaded once via a Google Fonts `@import` in `globals.css`. Bound to
+  `--font-brand`. The product never uses it (the product's serif flourish is
+  still Times via `--font-title`).
+- **ASCII field** — `components/marketing/fortitudo/ascii-field.tsx`. A slow
+  canvas field of glyphs in Chippi orange (#ff964f → pale amber on the crests),
+  orange-on-transparent so it reads on **both** light and dark. It's the
+  signature behind every hero and inside the closing CTA card.
+- **Orange is the marketing primary.** On the logged-out site, primary CTAs,
+  hero accents, eyebrows, and the gradient-text headline word are **brand
+  orange** (`bg-brand` / `text-brand` / `.text-gradient-brand`). This is the
+  one place orange leads instead of being a rare signature — the brand
+  expression marketing earns. `--primary` itself is **unchanged** (still
+  neutral), so the product is untouched.
+- **Dark accent cards** — the home gradient cards, the closing CTA card, and
+  the footer use a deep charcoal base (`#111113` / `#0d0e12`) that reads as a
+  deliberate dark surface on **both** canvases (same call as the product's
+  black stats card).
+
+### Chrome (`components/marketing/fortitudo/`)
+
+| Piece | File | Notes |
+|---|---|---|
+| Floating pill nav | `nav.tsx` | Frosted card pill, mega-menu dropdowns, full-screen ASCII mobile menu. Chippi routes + Clerk auth links. |
+| Inset charcoal footer | `footer.tsx` | Rounded dark card, brand small-caps column heads. |
+| Scroll progress | `scroll-progress.tsx` | Thin brand-orange bar pinned top. |
+| Theme toggle | `theme-toggle.tsx` | Round chip, wired to Chippi's `ThemeProvider`. |
+| Gradient card | `gradient-card.tsx` | 3D-tilt dark card + ASCII + orange glow. Home "what Chippi does". |
+| Spotlight card | `spotlight-card.tsx` | Cursor-tracking orange glow, theme-aware. Steps / testimonials / beliefs. |
+| Rotating word | `rotating-word.tsx` | Headline word that morphs (blur + slide). |
+| Dot flow / loader | `dot-flow.tsx`, `dot-loader.tsx` | The GSAP status chip in the hero. |
+| Rainbow button | `rainbow-button.tsx` | Warm-tuned rainbow CTA flourish (reserved). |
+
+The route-group `layout.tsx` mounts ScrollProgress + nav + footer, so **every**
+logged-out page inherits the look. Home sections live in
+`components/marketing/fortitudo/home/**`. The shared `MarketingHero` /
+`MarketingCTA` and the home-kit `Eyebrow` were retuned to this system so the
+sub-pages (realtors, brokerages, integrations, company, pricing, status) cohere.
+
+### Where the discipline still holds
+
+- **Copy voice is unchanged** — calm, lowercase verbs, no exclamation marks,
+  no em dashes, no invented metrics. Realtors/brokerages never get phone
+  numbers and Chippi never texts/calls leads; marketing copy never implies it.
+- **The product is off-limits.** If you find yourself reaching for `.font-brand`
+  or `bg-brand` as a *primary* outside `components/marketing/**` or the auth
+  layout, that's the bug. The product's orange rule (the five contexts) is
+  untouched.
+
+---
+
 ## Auth pages (`components/auth/auth-page-layout.tsx`)
 
-Auth is the **first impression**. Brand expression is allowed here in ways
-it isn't allowed in product chrome — but the rules still hold: no shadows,
-no gradients on form chrome, calm copy.
+Auth is the **first impression**, and it now wears the **studio ASCII** look
+(see above): a split screen with an ASCII brand panel on the left and the
+Clerk form on the right. Brand expression is allowed here in ways it isn't
+in product chrome — the Clerk **primary button is brand orange**, the input
+focus ring is brand, and the headline is the brand display face. Calm copy
+still holds; no marketing gradients on the form chrome itself.
 
 ### Layout
+
+```
+main   relative min-h-screen bg-background grid lg:grid-cols-2
+
+LEFT  ASCII brand panel (desktop) — AsciiField + orange wash + brand tagline
+RIGHT form panel — role switcher + brand-display heading + Clerk form + ToS
+      mobile: brand panel collapses to a slim ASCII signature strip on top
+```
+
+(Historical note — the previous auth layout used a cobe Globe on the right
+and foreground-neutral form chrome. That was replaced wholesale by the ASCII
+split when the logged-out site adopted the studio system.)
+
+<details>
+<summary>Previous (pre-redesign) auth layout reference</summary>
 
 ```
 main   relative min-h-screen bg-background
@@ -951,6 +1039,8 @@ Auth pages are **not** allowed:
 The principle: auth is **calm welcome, not a pitch**. The marketing pages
 do the pitch. By the time the user lands at sign-in, they've already
 decided.
+
+</details>
 
 ---
 
