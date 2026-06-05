@@ -125,7 +125,7 @@ arrow(c, "")
 
 # 4. Core services (lib)
 draw_band(c, "Core services", "lib/*", [
-    "lead-scoring  (gpt-4o-mini)", "notify · email · sms · tour-emails",
+    "lead-scoring (deterministic engine · gpt-4.1-mini summaries)", "notify · email · sms · tour-emails",
     "permissions · api-auth  (offboarding gate)", "embeddings · vectorize · zilliz (pgvector)",
     "brokerage-routing", "commissions", "brokerage-seats", "billing (Stripe)",
     "storage (Wasabi)", "usage · ledger", "briefing", "calendar", "studio · publish",
