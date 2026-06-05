@@ -27,13 +27,9 @@ export async function isPlatformAdmin(): Promise<boolean> {
   // Authoritative check in DB — the single source of truth for admin role
   const { data } = await supabase
     .from('User')
-    .select('platformRole, status')
+    .select('platformRole')
     .eq('clerkId', session.userId)
     .maybeSingle();
-  // Same offboarding gate as getBrokerContext()/requireAuth(): an offboarded
-  // user loses admin access immediately, not when their Clerk session expires.
-  // Resilient to a missing `status` column (pre-BP1a): undefined !== 'offboarded'.
-  if ((data as { status?: string } | null)?.status === 'offboarded') return false;
   return data?.platformRole === 'admin';
 }
 

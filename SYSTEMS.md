@@ -2,7 +2,7 @@
 
 The bug-hunting map: **symptom → owning system → files**. When something breaks, start here, jump to the system, open the cited files.
 
-This is the hand-written judgment layer. For mechanical structure (every route, table, tool, cron) see the generated `docs/repo-map.generated.md`; for the visual, `docs/architecture-diagram.svg`. Findings from the 2026-06 ten-agent audit live in `docs/AUDIT_2026-06.md`.
+This is the hand-written judgment layer. For mechanical structure (every route, table, tool, cron) see the generated `docs/repo-map.generated.md`; for the visual, `docs/architecture-diagram.svg`. The bug fixes and findings from the 2026-06 ten-agent audit ship in the companion PR (`docs/AUDIT_2026-06.md`).
 
 **The one fact that governs every system:** Supabase runs under the **service-role key — RLS is bypassed.** Tenant isolation is enforced *only* in application code, by scoping every workspace query to the caller's `spaceId`/`ownerId`/`brokerageId`. A single missing `.eq('spaceId', …)` is a cross-tenant leak with no database safety net. Most real bugs in this repo live on that seam.
 

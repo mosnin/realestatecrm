@@ -114,8 +114,7 @@ function autoTitleConversation(spaceId: string, conversationId: string, userMess
       const { error } = await supabase
         .from('Conversation')
         .update({ title, updatedAt: new Date().toISOString() })
-        .eq('id', conversationId)
-        .eq('spaceId', spaceId);
+        .eq('id', conversationId);
       if (error) {
         logger.warn('[ai/task] auto-title patch failed', { conversationId }, error);
       }

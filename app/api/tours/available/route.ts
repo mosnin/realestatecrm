@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { decrypt, decryptOrPassthrough, encrypt } from '@/lib/crypto';
+import { decrypt } from '@/lib/crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /** Public endpoint — returns available time slots for the next 14 days. */
@@ -301,8 +301,7 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
 async function getValidGCalToken(tokenRow: any, spaceId: string): Promise<string> {
   const expiresAt = new Date(tokenRow.expiresAt).getTime();
   if (Date.now() < expiresAt - 60_000) {
-    // Tokens are encrypted at rest; soft-migration passthrough for legacy rows.
-    return decryptOrPassthrough(tokenRow.accessToken);
+    return tokenRow.accessToken;
   }
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -327,8 +326,7 @@ async function getValidGCalToken(tokenRow: any, spaceId: string): Promise<string
   await supabase
     .from('GoogleCalendarToken')
     .update({
-      // Encrypt at rest — must match the read path and every other writer.
-      accessToken: encrypt(tokens.access_token),
+      accessToken: tokens.access_token,
       expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     })
