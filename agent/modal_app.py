@@ -39,6 +39,14 @@ from pathlib import Path
 
 logger = structlog.get_logger(__name__)
 
+# Hard ceiling on agent-loop steps for an interactive chat turn. Each step
+# re-sends the system prompt + tool schemas + accumulated tool results, so
+# total prompt tokens scale with this number. 12 leaves headroom for a real
+# multi-step plan (lookup → plan → several writes → confirm) while capping a
+# pathological loop that would otherwise burn a whole day's token budget on
+# one message.
+CHAT_MAX_TURNS = 12
+
 # Resolve the agent source directory from this file's location, NOT from the
 # deploy cwd. Without this, `modal deploy agent/modal_app.py` (from repo root)
 # mounts the WRONG dir at /app — db.py et al land at /app/agent/* and every
@@ -655,8 +663,17 @@ async def chat_turn(item: dict):
             # SDK's prefix dispatcher (which raises `Unknown prefix: x-ai`).
             chippi.model = make_chat_model(model)
             try:
+                # Explicit loop bound. The SDK re-sends the full system prompt
+                # + tool-schema block + every accumulated tool result on EACH
+                # step, so prompt tokens are the per-step cost times the number
+                # of steps. Capping the loop is the hard ceiling on a runaway
+                # turn's token bill; a legit plan rarely needs more than this.
                 result = Runner.run_streamed(
-                    chippi, input=input_items, context=ctx, run_config=run_config
+                    chippi,
+                    input=input_items,
+                    context=ctx,
+                    run_config=run_config,
+                    max_turns=CHAT_MAX_TURNS,
                 )
                 async for event in result.stream_events():
                     try:
