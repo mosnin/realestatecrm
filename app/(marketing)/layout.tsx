@@ -10,8 +10,9 @@
  * still call `auth()` from their own server component before rendering.
  */
 
-import { MarketingNavbar } from '@/components/marketing/marketing-navbar';
-import { MarketingFooter } from '@/components/marketing/marketing-footer';
+import { FortitudoNav } from '@/components/marketing/fortitudo/nav';
+import { FortitudoFooter } from '@/components/marketing/fortitudo/footer';
+import { ScrollProgress } from '@/components/marketing/fortitudo/scroll-progress';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
 export default function MarketingLayout({
@@ -20,12 +21,15 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      <MarketingNavbar />
+      {/* fortitudo "studio ASCII" chrome: thin scroll bar, floating pill nav,
+          inset charcoal footer. Every logged-out page inherits the look. */}
+      <ScrollProgress />
+      <FortitudoNav />
       <main className="flex-1">{children}</main>
-      <MarketingFooter />
+      <FortitudoFooter />
     </div>
   );
 }

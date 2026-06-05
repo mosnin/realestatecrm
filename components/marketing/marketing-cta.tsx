@@ -12,12 +12,11 @@
  * motion: no pulse at all.
  */
 
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { MARKETING_REVEAL, MARKETING_VIEWPORT } from '@/lib/marketing-motion';
-import { EASE_APPLE } from '@/lib/motion';
+import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 
 export interface MarketingCTAProps {
   title: string;
@@ -34,44 +33,43 @@ export function MarketingCTA({
   secondaryCta,
   className,
 }: MarketingCTAProps) {
-  const reduced = useReducedMotion();
   return (
     <motion.section
       initial="initial"
       whileInView="enter"
       viewport={MARKETING_VIEWPORT}
       variants={MARKETING_REVEAL}
-      className={cn('relative py-32 md:py-40', className)}
+      className={cn('relative bg-background px-4 py-24 md:py-32', className)}
     >
-      <div className="mx-auto max-w-3xl px-6 md:px-8 text-center">
-        <h2
-          style={TITLE_FONT}
-          className="text-[40px] sm:text-[52px] md:text-[64px] leading-[1.05] tracking-[-0.02em] text-foreground"
-        >
-          {title}
-        </h2>
-        {sub && (
-          <p className="mt-5 text-lg md:text-xl text-muted-foreground leading-snug">
-            {sub}
-          </p>
-        )}
-        <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
-          <motion.div
-            className="inline-flex"
-            initial={false}
-            whileInView={reduced ? undefined : { scale: [1, 1.02, 1] }}
-            viewport={MARKETING_VIEWPORT}
-            transition={{ duration: 0.24, ease: EASE_APPLE }}
-          >
-            <Link href={primaryCta.href} className={PRIMARY_PILL}>
+      {/* fortitudo ASCII closing card: dark base reads on light + dark. */}
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-marketing-3xl border border-white/10 bg-[#111113] px-6 py-20 text-center sm:py-24">
+        <AsciiField className="absolute inset-0 h-full w-full opacity-50" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,150,79,0.2),transparent_60%)]" />
+        <div className="relative z-10">
+          <h2 className="font-brand text-3xl text-white sm:text-4xl lg:text-5xl">
+            {title}
+          </h2>
+          {sub && (
+            <p className="mx-auto mt-5 max-w-xl text-lg leading-snug text-white/65">
+              {sub}
+            </p>
+          )}
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href={primaryCta.href}
+              className="inline-flex items-center justify-center rounded-full bg-brand px-8 py-3.5 text-base font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-brand/40"
+            >
               {primaryCta.label}
             </Link>
-          </motion.div>
-          {secondaryCta && (
-            <Link href={secondaryCta.href} className={GHOST_PILL}>
-              {secondaryCta.label} <span aria-hidden>→</span>
-            </Link>
-          )}
+            {secondaryCta && (
+              <Link
+                href={secondaryCta.href}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-8 py-3.5 text-base font-medium text-white/80 transition-colors hover:border-white/30 hover:text-white"
+              >
+                {secondaryCta.label} <span aria-hidden>→</span>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </motion.section>

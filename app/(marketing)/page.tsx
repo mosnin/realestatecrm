@@ -1,29 +1,25 @@
 /**
- * `/` — Chippi homepage (v2 rebuild).
+ * `/` (home): Chippi homepage, rebuilt on the fortitudo "studio ASCII" design system.
  *
- * A single scrolling experience, told the way Apple tells a product: meet the
- * agent (hero) → quiet proof (logos) → the work it handles (core cards) → the
- * first ask (CTA) → the rest of the workspace (deep features) → the numbers
- * (stats) → the voices (testimonials) → the payoff where the realtor's whole
- * world wires into Chippi (connect diagram) → thinking (blog) → arrival
- * (footer). Bold-sans, light-canvas, motion throughout.
+ * One scrolling experience in fortitudo's section vocabulary, carrying Chippi's
+ * real-estate-CRM substance: meet the agent (ASCII hero with the rotating job
+ * word) → the honest number strip (stats) → the work it handles (gradient
+ * cards) → the flow (how it works) → the voices (testimonials) → why it exists
+ * (about) → the ask (ASCII CTA). The shared fortitudo footer/nav come from the
+ * route-group layout, so there's no per-page footer here.
  *
- * Auth users bounce straight to their workspace. The bespoke <HomeFooter>
- * replaces the shared marketing footer here (which returns null on `/`).
+ * Auth users bounce straight to their workspace (unchanged auth wiring).
  */
 
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { HomeHero } from '@/components/marketing/home/home-hero';
-import { LogoMarquee } from '@/components/marketing/home/logo-marquee';
-import { CoreCards } from '@/components/marketing/home/core-cards';
-import { TryFreeCTA } from '@/components/marketing/home/try-free-cta';
-import { DeepFeatures } from '@/components/marketing/home/deep-features';
-import { StatsBand } from '@/components/marketing/home/stats-band';
-import { TestimonialMarquee } from '@/components/marketing/home/testimonial-marquee';
-import { IntegrationsBeam } from '@/components/marketing/home/integrations-beam';
-import { BlogTeaser } from '@/components/marketing/home/blog-teaser';
-import { HomeFooter } from '@/components/marketing/home/home-footer';
+import { HomeHero } from '@/components/marketing/fortitudo/home/hero';
+import { StatsBand } from '@/components/marketing/fortitudo/home/stats-band';
+import { CoreCards } from '@/components/marketing/fortitudo/home/core-cards';
+import { HowItWorks } from '@/components/marketing/fortitudo/home/how-it-works';
+import { Testimonials } from '@/components/marketing/fortitudo/home/testimonials';
+import { About } from '@/components/marketing/fortitudo/home/about';
+import { HomeCTA } from '@/components/marketing/fortitudo/home/cta';
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -32,17 +28,14 @@ export default async function MarketingHomePage() {
   }
 
   return (
-    <div className="bg-muted text-foreground">
+    <div className="bg-background text-foreground">
       <HomeHero />
-      <LogoMarquee />
-      <CoreCards />
-      <TryFreeCTA />
-      <DeepFeatures />
       <StatsBand />
-      <TestimonialMarquee />
-      <IntegrationsBeam />
-      <BlogTeaser />
-      <HomeFooter />
+      <CoreCards />
+      <HowItWorks />
+      <Testimonials />
+      <About />
+      <HomeCTA />
     </div>
   );
 }

@@ -65,8 +65,7 @@ export function RealtorsHero() {
           <motion.h1
             variants={rise}
             transition={{ duration: 0.9, ease: EASE }}
-            style={{ fontFamily: 'var(--font-title)' }}
-            className="mt-7 text-[clamp(2.5rem,6.4vw,5.25rem)] leading-[1.0] tracking-[-0.02em] text-foreground"
+            className="font-brand mt-7 text-[clamp(2.25rem,6vw,4.75rem)] leading-[1.05] tracking-tight text-foreground"
           >
             <span className="block">An extra teammate</span>
             <span className="block">
@@ -92,7 +91,7 @@ export function RealtorsHero() {
           >
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-[15px] font-medium text-background transition-transform duration-150 active:scale-[0.98]"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
             >
               Start free
             </Link>

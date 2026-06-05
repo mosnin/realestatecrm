@@ -49,7 +49,7 @@ export function HomeFooter() {
           <div className="flex gap-3">
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-[15px] font-medium text-background transition-transform duration-150 active:scale-[0.98]"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
             >
               Start free
             </Link>

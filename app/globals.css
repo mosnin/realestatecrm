@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single:wght@100..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -17,6 +18,22 @@
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
+  /* Marketing/auth-only brand display font (fortitudo "studio ASCII" look).
+     Bitcount Grid Single, used via the `.font-brand` utility on the logged-out
+     site and auth pages. The product (dashboard) never reaches for it. */
+  --font-brand: "Bitcount Grid Single", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+
+  /* Rainbow-button color stops (marketing CTA flourish). */
+  --color-color-1: hsl(var(--color-1));
+  --color-color-2: hsl(var(--color-2));
+  --color-color-3: hsl(var(--color-3));
+  --color-color-4: hsl(var(--color-4));
+  --color-color-5: hsl(var(--color-5));
+
+  /* Marketing animations (ASCII/hero atmosphere). */
+  --animate-fade-up: fade-up 0.5s ease-out;
+  --animate-rainbow: rainbow var(--speed, 2s) infinite linear;
+  --animate-pulse-brand: pulse-brand 2.4s ease-in-out infinite;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -56,6 +73,13 @@
 :root {
   --radius: 0.75rem;
   --card-radius: 0.75rem;
+
+  /* Rainbow-button color stops (marketing CTA only). */
+  --color-1: 24 100% 65%;
+  --color-2: 16 100% 60%;
+  --color-3: 38 100% 62%;
+  --color-4: 28 100% 58%;
+  --color-5: 45 100% 64%;
 
   /* Neutral-first palette. Orange is demoted to --brand for rare moments. */
   --background: #ffffff;
@@ -396,25 +420,28 @@
   border-radius: 0.375rem !important;
 }
 .cl-formFieldInput:focus {
-  border-color: rgba(17, 17, 19, 0.3) !important;
+  border-color: var(--brand) !important;
   box-shadow: none !important;
   outline: none !important;
 }
-/* Primary button — pill, foreground bg, no orange, no shadow. */
+/* Primary button: pill, Chippi brand orange (fortitudo auth treatment).
+   Auth is the first impression, where brand expression is allowed; the orange
+   CTA matches the logged-out site's primary pills. The product chrome stays
+   neutral; this is scoped to the Clerk auth form. */
 .cl-formButtonPrimary {
-  background: var(--foreground) !important;
-  color: var(--background) !important;
+  background: var(--brand) !important;
+  color: var(--brand-foreground) !important;
   border: none !important;
   border-radius: 9999px !important;
   box-shadow: none !important;
   height: 2.25rem !important;
   padding: 0 1rem !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   font-size: 0.875rem !important;
-  transition: background-color 0.15s ease, transform 0.15s ease !important;
+  transition: filter 0.15s ease, transform 0.15s ease !important;
 }
 .cl-formButtonPrimary:hover {
-  background: rgba(17, 17, 19, 0.9) !important;
+  filter: brightness(1.05) !important;
   opacity: 1 !important;
 }
 .cl-formButtonPrimary:active {
@@ -424,14 +451,19 @@
   background: transparent !important;
 }
 .cl-footerActionLink {
-  color: var(--muted-foreground) !important;
-  font-weight: 500 !important;
+  color: var(--brand) !important;
+  font-weight: 600 !important;
   text-decoration: underline !important;
   text-underline-offset: 4px !important;
-  transition: color 0.15s ease !important;
+  transition: filter 0.15s ease !important;
 }
 .cl-footerActionLink:hover {
-  color: var(--foreground) !important;
+  filter: brightness(0.92) !important;
+}
+/* "Forgot password" / inline form actions: brand link. */
+.cl-formFieldAction,
+.cl-formFieldAction__password {
+  color: var(--brand) !important;
 }
 .cl-footerActionText {
   color: var(--muted-foreground) !important;
@@ -484,11 +516,11 @@
   background: rgba(241, 243, 245, 0.04) !important;
 }
 .dark .cl-formFieldInput:focus {
-  border-color: rgba(241, 243, 245, 0.3) !important;
+  border-color: var(--brand) !important;
   box-shadow: none !important;
 }
 .dark .cl-formButtonPrimary:hover {
-  background: rgba(241, 243, 245, 0.9) !important;
+  filter: brightness(1.08) !important;
 }
 .dark .cl-formFieldErrorText {
   color: #fb7185 !important; /* rose-400 */
@@ -959,4 +991,60 @@
   [data-sonner-toast] {
     transition: none !important;
   }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * MARKETING + AUTH AESTHETIC (fortitudo "studio ASCII" system, Chippi-tinted)
+ *
+ * Adopted wholesale for the logged-out site and auth pages. The product
+ * (dashboard, agent chat, broker app) does NOT use any of this. It stays on
+ * the paper-flat neutral system above. Everything here is opt-in via a class
+ * (`.font-brand`, `.text-gradient-brand`, etc.) so it can't leak into product
+ * chrome. Brand orange is Chippi's #ff964f (var --brand), not fortitudo's
+ * #F97316. Works in both light and dark because it leans on the semantic
+ * tokens (--background / --foreground / --border) for surfaces and reserves
+ * orange for the signature glyphs + headline flourish.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* The studio brand display face: headings on the marketing/auth site. */
+.font-brand {
+  font-family: var(--font-brand);
+  font-variation-settings: "slnt" 0, "CRSV" 0.5, "ELSH" 0, "ELXP" 0;
+  letter-spacing: 0.01em;
+}
+
+/* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #ff964f, #ffb27a, #ffc994);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Extra rounded radii for the marketing cards/pill chrome (matches fortitudo's
+   2xl/3xl card language without touching the product's --radius ladder). */
+.rounded-marketing-xl { border-radius: 1.25rem; }
+.rounded-marketing-2xl { border-radius: 1.75rem; }
+.rounded-marketing-3xl { border-radius: 2rem; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rainbow {
+  0% { background-position: 0%; }
+  100% { background-position: 200%; }
+}
+
+@keyframes pulse-brand {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 150, 79, 0.3); }
+  50% { box-shadow: 0 0 36px rgba(255, 150, 79, 0.55); }
+}
+
+.animate-fade-up { animation: fade-up 0.5s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-rainbow { animation: none !important; }
 }
