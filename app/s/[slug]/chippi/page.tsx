@@ -7,6 +7,10 @@ import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
 import { loadUserInvocableSkills } from '@/lib/ai-tools/skills/loader';
+import {
+  isRealtorConversation,
+  RESERVED_TITLE_LIKE_PATTERNS,
+} from '@/lib/chat/conversation-access';
 
 // Force dynamic rendering — the page reads searchParams to pick which
 // conversation to hydrate, and we need a fresh server render on every
@@ -56,12 +60,12 @@ export default async function ChippiPage({
       .select('*')
       .eq('spaceId', space.id)
       // Realtor surface NEVER shows broker-Chippi or team chat. These live in
-      // the same table today (keyed by spaceId), so both prefixes must be
-      // excluded here, exactly as the /api/ai/conversations list does. Missing
-      // the [BROKER_CHIPPI] exclusion here leaked brokerage chats into the
-      // realtor sidebar on server render.
-      .not('title', 'like', '[BROKER_CHIPPI]%')
-      .not('title', 'like', '[BROKERAGE_CHAT]%')
+      // the same table today (keyed by spaceId), so both reserved prefixes
+      // must be excluded here, exactly as the /api/ai/conversations list does.
+      // Prefixes are sourced from lib/chat/conversation-access so the
+      // exclusion set lives in one place.
+      .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[0])
+      .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[1])
       .order('updatedAt', { ascending: false })
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
@@ -79,12 +83,10 @@ export default async function ChippiPage({
         .select('id, spaceId, title')
         .eq('id', targetConvId)
         .maybeSingle();
-      const convTitle = (convRow?.title ?? '') as string;
-      const isOwnRealtorConversation =
-        convRow != null &&
-        (convRow as { spaceId: string }).spaceId === space.id &&
-        !convTitle.startsWith('[BROKER_CHIPPI]') &&
-        !convTitle.startsWith('[BROKERAGE_CHAT]');
+      const isOwnRealtorConversation = isRealtorConversation(
+        convRow as { spaceId: string; title: string } | null,
+        space.id,
+      );
 
       if (isOwnRealtorConversation) {
         initialConversationId = targetConvId;

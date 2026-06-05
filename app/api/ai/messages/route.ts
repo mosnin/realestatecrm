@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 
 const MESSAGE_LIMIT = 50;
 
@@ -63,10 +64,10 @@ export async function GET(req: NextRequest) {
 
     // Surface guard: broker-Chippi and team conversations have their own
     // broker-gated routes. Never serve them through the realtor messages
-    // endpoint, even when the caller owns the space — a broker_owner also
+    // endpoint, even when the caller owns the space. A broker_owner also
     // owns their personal realtor space, so ownership alone is not isolation.
-    const convTitle = conv.title ?? '';
-    if (convTitle.startsWith('[BROKER_CHIPPI]') || convTitle.startsWith('[BROKERAGE_CHAT]')) {
+    // The reserved-title check lives in lib/chat/conversation-access.
+    if (isReservedConversationTitle(conv.title)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
