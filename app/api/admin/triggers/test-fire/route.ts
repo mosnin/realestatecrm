@@ -31,6 +31,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { getById } from '@/lib/integrations/connections';
 import { listTriggersForConnection } from '@/lib/integrations/triggers';
 import { logger } from '@/lib/logger';
+import { isPlatformAdmin } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -48,12 +49,17 @@ interface TestFireBody {
 }
 
 export async function POST(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-  }
-  if (!bearerOk(req.headers.get('Authorization'), cronSecret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Auth: a logged-in platform admin (honors the /api/admin/* invariant) OR a
+  // valid CRON_SECRET bearer (ops/CLI invocation has no Clerk session). Either
+  // is sufficient; both fail closed.
+  if (!(await isPlatformAdmin())) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+    }
+    if (!bearerOk(req.headers.get('Authorization'), cronSecret)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const webhookSecret = process.env.COMPOSIO_WEBHOOK_SECRET;
