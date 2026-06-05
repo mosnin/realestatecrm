@@ -119,7 +119,7 @@ export function DraftBlockView({ block, className }: DraftBlockViewProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
-            {channelLabel} draft — review and send
+            {channelLabel} draft · review and send
           </p>
           <p className="text-sm font-semibold text-foreground">To {block.recipientName}</p>
 
@@ -127,7 +127,7 @@ export function DraftBlockView({ block, className }: DraftBlockViewProps) {
             {isEmail && (
               <div className="mb-1">
                 <span className="text-muted-foreground font-medium">Subject:</span>{' '}
-                {block.subject || '—'}
+                {block.subject || '(no subject)'}
               </div>
             )}
             <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">
