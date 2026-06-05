@@ -302,8 +302,16 @@ async def run_swarm_endpoint(payload: dict) -> dict:
 # call and piped JSONL through stdin/stdout — that bought no real isolation
 # (none of these tools shell out or write outside postgres) and cost 5–15s
 # of cold-start on every turn. Inline run, same security boundary, no tax.
+#
+# scaledown_window=150: keep the warm container alive for 150s after the last
+# request instead of Modal's default 60s. A realtor reading Chippi's reply and
+# typing the next message almost always lands inside that window, so follow-up
+# turns reuse the warm container and skip the cold start. The container still
+# scales to zero when truly idle, so this only adds warmth AFTER activity, at
+# negligible cost. (The first message after a long gap still pays spin-up;
+# killing that needs min_containers>=1, a separate always-on cost decision.)
 
-@app.function(secrets=secrets, timeout=600)
+@app.function(secrets=secrets, timeout=600, scaledown_window=150)
 @modal.fastapi_endpoint(method="POST")
 async def chat_turn(item: dict):
     """Run one chat turn for the realtor and stream SDK events as SSE."""
