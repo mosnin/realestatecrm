@@ -3,9 +3,19 @@
  *
  * Parallel to `app/api/ai/task/route.ts` (the realtor chat surface) but
  * gated on broker access and dispatched to Modal with `mode: 'broker'`.
- * The shared SSE protocol and message persistence shapes are identical;
- * the routes differ in three places — auth, persistence-space, and the
- * Modal payload's `mode` field.
+ * The shared SSE protocol is identical; the routes differ in auth and in
+ * WHERE they persist.
+ *
+ * STORAGE IS STRUCTURALLY SEPARATE. Broker conversations + messages live in
+ * their OWN tables — "BrokerConversation" / "BrokerMessage" — keyed by
+ * `brokerageId`, NOT in the realtor "Conversation"/"Message" tables. A realtor
+ * surface cannot read a broker row because the rows are not in the same table.
+ *
+ * RUNTIME SPACE vs. STORAGE. The Modal runtime still needs a `space_id` for
+ * AgentSettings/usage/the agent run — that stays the broker owner's personal
+ * Space (resolveRuntimeSpaceId). But it is RUNTIME-ONLY; no conversation or
+ * message is ever written keyed by that space. If the runtime space can't be
+ * resolved, the turn still persists to the broker tables.
  *
  * Defense layer 2 of three (per Chippi-for-Brokers Phase 1 spec):
  *
@@ -30,7 +40,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
+import { saveBrokerUserMessage, saveBrokerAssistantMessage } from '@/lib/agent/broker-persistence';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
@@ -62,23 +72,17 @@ interface PostBody {
  *  many-turn conversation, so 8 is plenty. */
 const HISTORY_LIMIT = 8;
 
-/** Title prefix used to mark broker-Chippi conversations on the broker_owner's
- *  Space — keeps them out of the realtor's own conversation list (the realtor
- *  page filters by NOT LIKE '[BROKER_CHIPPI]%'). Distinct from the team-chat
- *  prefix in `app/api/broker/chat/route.ts` (`[BROKERAGE_CHAT]`). */
-const CONV_TITLE_PREFIX = '[BROKER_CHIPPI]';
-
 /**
- * Find or create the persistence space for broker-Chippi conversations.
+ * Resolve the broker owner's personal Space id — RUNTIME USE ONLY.
  *
- * Conversations + Messages are keyed by `spaceId` in the schema, so the
- * broker chat needs a Space row to anchor on. The broker_owner's personal
- * Space is the natural anchor — every brokerage has exactly one. For
- * broker-only accounts (no personal space), Phase 1 returns null and the
- * caller surfaces an error; Phase 2 will pick the brokerage's owner's
- * Space, which is the same row in practice.
+ * The Modal runtime still needs a `space_id` for AgentSettings/usage/the agent
+ * run. The broker owner's personal Space is the anchor. This is NOT where
+ * conversations or messages are stored — those live in the broker tables keyed
+ * by brokerageId. Returns null if the broker owner has no personal Space; the
+ * caller treats that as a non-fatal "no runtime space" and still persists the
+ * turn to the broker tables.
  */
-async function resolvePersistenceSpaceId(brokerageOwnerId: string): Promise<string | null> {
+async function resolveRuntimeSpaceId(brokerageOwnerId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('Space')
     .select('id')
@@ -88,45 +92,44 @@ async function resolvePersistenceSpaceId(brokerageOwnerId: string): Promise<stri
   return data.id as string;
 }
 
+/**
+ * Find or create the BrokerConversation for this turn.
+ *
+ * If a conversationId is given, accept it ONLY when the BrokerConversation's
+ * brokerageId matches this broker's brokerage — a foreign id (another
+ * brokerage's, or a realtor's, which won't even exist in this table) is
+ * rejected and a fresh conversation is created instead. No spaceId, no title
+ * prefix: the brokerageId column is the boundary.
+ */
 async function resolveConversation(
-  spaceId: string,
   brokerageId: string,
   conversationId: string | null | undefined,
 ): Promise<string> {
   if (conversationId) {
     const { data } = await supabase
-      .from('Conversation')
-      .select('id, spaceId, title')
+      .from('BrokerConversation')
+      .select('id, brokerageId')
       .eq('id', conversationId)
       .maybeSingle();
-    // Title must carry the broker prefix AND name this brokerage — prevents
-    // a realtor conversation id from being smuggled into the broker route.
-    if (
-      data &&
-      data.spaceId === spaceId &&
-      typeof data.title === 'string' &&
-      data.title.startsWith(CONV_TITLE_PREFIX) &&
-      data.title.includes(brokerageId)
-    ) {
+    if (data && data.brokerageId === brokerageId) {
       return conversationId;
     }
   }
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('Conversation').insert({
+  const { error } = await supabase.from('BrokerConversation').insert({
     id,
-    spaceId,
-    title: `${CONV_TITLE_PREFIX} ${brokerageId}`,
+    brokerageId,
+    title: 'New conversation',
   });
   if (error) throw error;
   return id;
 }
 
-async function loadHistory(spaceId: string, conversationId: string): Promise<HistoryRow[]> {
+async function loadHistory(conversationId: string): Promise<HistoryRow[]> {
   const { data } = await supabase
-    .from('Message')
+    .from('BrokerMessage')
     .select('role, content, createdAt')
-    .eq('spaceId', spaceId)
     .eq('conversationId', conversationId)
     .order('createdAt', { ascending: false })
     .limit(HISTORY_LIMIT);
@@ -148,14 +151,14 @@ async function loadHistory(spaceId: string, conversationId: string): Promise<His
 
 interface ProxyModalStreamInput {
   modalBody: ReadableStream<Uint8Array>;
-  spaceId: string;
+  brokerageId: string;
   conversationId: string;
   abortController: AbortController;
 }
 
 function proxyModalStream({
   modalBody,
-  spaceId,
+  brokerageId,
   conversationId,
   abortController,
 }: ProxyModalStreamInput): Response {
@@ -184,9 +187,9 @@ function proxyModalStream({
         }
         if (toSave.length === 0) return;
         try {
-          await saveAssistantMessage({ spaceId, conversationId, blocks: toSave });
+          await saveBrokerAssistantMessage({ brokerageId, conversationId, blocks: toSave });
         } catch (err) {
-          logger.warn('[ai/broker-task] persist assistant message failed', { spaceId }, err);
+          logger.warn('[ai/broker-task] persist assistant message failed', { brokerageId }, err);
         }
       }
 
@@ -296,7 +299,7 @@ function proxyModalStream({
         }
       } catch (err) {
         if (!abortController.signal.aborted) {
-          logger.error('[ai/broker-task] modal stream read error', { spaceId }, err);
+          logger.error('[ai/broker-task] modal stream read error', { brokerageId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
         }
       } finally {
@@ -377,57 +380,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Persistence space: the brokerage_owner's personal Space. Solo-broker-
-  // owner with no personal Space (broker_only) → return a clear error in
-  // Phase 1; Phase 2 will resolve this once broker_only accounts get a
-  // canonical anchor space.
-  const persistenceSpaceId = await resolvePersistenceSpaceId(brokerCtx.brokerage.ownerId);
-  if (!persistenceSpaceId) {
-    logger.warn('[ai/broker-task] no persistence space for brokerage', {
-      brokerageId: brokerCtx.brokerage.id,
-    });
-    return NextResponse.json(
-      { error: 'Broker chat is not available for this brokerage yet.' },
-      { status: 503 },
-    );
-  }
+  const brokerageId = brokerCtx.brokerage.id;
+
+  // Runtime space — the broker owner's personal Space, needed ONLY for the
+  // Modal agent run (AgentSettings/usage). It is NOT where the conversation or
+  // messages are stored. A broker owner with no personal Space still gets a
+  // working chat: the turn persists to the broker tables; only the Modal
+  // settings/usage want a space, and the direct (in-process) path needs none.
+  const runtimeSpaceId = await resolveRuntimeSpaceId(brokerCtx.brokerage.ownerId);
 
   const abortController = new AbortController();
 
   let conversationId: string;
   try {
-    conversationId = await resolveConversation(
-      persistenceSpaceId,
-      brokerCtx.brokerage.id,
-      body.conversationId ?? null,
-    );
+    conversationId = await resolveConversation(brokerageId, body.conversationId ?? null);
   } catch (err) {
-    logger.error(
-      '[ai/broker-task] conversation resolve failed',
-      { brokerageId: brokerCtx.brokerage.id },
-      err,
-    );
+    logger.error('[ai/broker-task] conversation resolve failed', { brokerageId }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
   try {
-    await saveUserMessage({ spaceId: persistenceSpaceId, conversationId, content: message });
+    await saveBrokerUserMessage({ brokerageId, conversationId, content: message });
   } catch (err) {
-    logger.error(
-      '[ai/broker-task] save user message failed',
-      { brokerageId: brokerCtx.brokerage.id },
-      err,
-    );
+    logger.error('[ai/broker-task] save user message failed', { brokerageId }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
   let history: HistoryRow[];
   try {
-    history = await loadHistory(persistenceSpaceId, conversationId);
+    history = await loadHistory(conversationId);
   } catch (err) {
     logger.warn(
       '[ai/broker-task] history load failed — continuing without it',
-      { brokerageId: brokerCtx.brokerage.id },
+      { brokerageId },
       err,
     );
     history = [];
@@ -445,10 +430,12 @@ export async function POST(req: NextRequest) {
   // the realtor chat uses. Action verbs (reassign, route, send) fall through to
   // Modal, where the BROKER_TOOLS catalog lives. Errors → Modal (safe default).
   if (decideRoute(message) === 'direct') {
-    logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId: brokerCtx.brokerage.id });
+    logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId });
     return streamBrokerDirectTurn({
       brokerage: brokerCtx.brokerage,
-      persistenceSpaceId,
+      // Runtime space is for usage recording only; null is fine (usage just
+      // skips). The conversation/message persist goes to the broker tables.
+      runtimeSpaceId,
       userId: clerkUserId,
       conversationId,
       userMessage: message,
@@ -469,9 +456,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The Modal agent run needs a runtime space_id for AgentSettings/usage. If
+  // the broker owner has no personal Space, the agentic (tool) path can't run —
+  // but the user message is already saved to the broker tables, so we surface a
+  // clear, non-destructive error rather than dropping the turn.
+  if (!runtimeSpaceId) {
+    logger.warn('[ai/broker-task] no runtime space for agentic turn', { brokerageId });
+    return NextResponse.json(
+      { error: 'Broker actions are not available for this brokerage yet.' },
+      { status: 503 },
+    );
+  }
+
   const payload = {
     secret: process.env.AGENT_INTERNAL_SECRET ?? '',
-    space_id: persistenceSpaceId,
+    space_id: runtimeSpaceId,
     user_id: clerkUserId,
     message,
     history: history.map((h) => ({ role: h.role, content: h.content })),
@@ -480,7 +479,7 @@ export async function POST(req: NextRequest) {
     //    to make_broker_agent() and to populate AgentContext for the
     //    per-tool require_broker_role() guard (defense layer 3). ──
     mode: 'broker' as const,
-    brokerage_id: brokerCtx.brokerage.id,
+    brokerage_id: brokerageId,
     broker_role: brokerCtx.brokerRole,
   };
 
@@ -493,26 +492,19 @@ export async function POST(req: NextRequest) {
       signal: abortController.signal,
     });
   } catch (err) {
-    logger.error(
-      '[ai/broker-task] Modal fetch failed',
-      { brokerageId: brokerCtx.brokerage.id },
-      err,
-    );
+    logger.error('[ai/broker-task] Modal fetch failed', { brokerageId }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
   }
 
   if (!modalRes.ok || !modalRes.body) {
     const status = modalRes.status;
-    logger.error('[ai/broker-task] Modal returned error', {
-      status,
-      brokerageId: brokerCtx.brokerage.id,
-    });
+    logger.error('[ai/broker-task] Modal returned error', { status, brokerageId });
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
   }
 
   return proxyModalStream({
     modalBody: modalRes.body,
-    spaceId: persistenceSpaceId,
+    brokerageId,
     conversationId,
     abortController,
   });

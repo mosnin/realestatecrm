@@ -15,7 +15,7 @@
  */
 
 import { logger } from '@/lib/logger';
-import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
+import { saveBrokerAssistantMessage } from '@/lib/agent/broker-persistence';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
@@ -48,7 +48,9 @@ and point them at the relevant page (Realtors, Deals, Forecast).
 
 interface BrokerDirectInput {
   brokerage: { id: string; name: string; ownerId: string };
-  persistenceSpaceId: string;
+  /** Broker owner's personal Space — usage recording only, may be null. The
+   *  conversation + messages persist to the broker tables, not this space. */
+  runtimeSpaceId: string | null;
   userId: string | null;
   conversationId: string;
   userMessage: string;
@@ -138,22 +140,25 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
         if (result.text.trim()) {
           const blocks: MessageBlock[] = [{ type: 'text', content: result.text }];
           try {
-            await saveAssistantMessage({ spaceId: input.persistenceSpaceId, conversationId: input.conversationId, blocks });
+            await saveBrokerAssistantMessage({ brokerageId: input.brokerage.id, conversationId: input.conversationId, blocks });
           } catch (err) {
             logger.warn('[broker-direct] save assistant message failed', { brokerageId: input.brokerage.id }, err);
           }
         }
-        void recordChatUsage({
-          spaceId: input.persistenceSpaceId,
-          userId: input.userId,
-          conversationId: input.conversationId,
-          model,
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          cachedTokens: result.usage.cachedTokens,
-          route: 'direct',
-          runtime: 'ts',
-        }).catch(() => {});
+        // Usage is space-scoped; record it only when a runtime space exists.
+        if (input.runtimeSpaceId) {
+          void recordChatUsage({
+            spaceId: input.runtimeSpaceId,
+            userId: input.userId,
+            conversationId: input.conversationId,
+            model,
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            cachedTokens: result.usage.cachedTokens,
+            route: 'direct',
+            runtime: 'ts',
+          }).catch(() => {});
+        }
       } catch (err) {
         const aborted = (err as { name?: string })?.name === 'AbortError';
         if (!aborted) {
