@@ -18,6 +18,7 @@ import {
   Search,
   Slash,
   MessageCircle,
+  Zap,
   Send,
   Sunrise,
   UserPlus,
@@ -75,9 +76,24 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
 
 type Mode = 'draft' | null;
 
+/**
+ * Chat vs Agent — the per-message runtime the realtor picks in the composer.
+ *   - 'chat'  → fast, cheap answer. One model call + read-only search over
+ *               their data. Finds and explains; never acts.
+ *   - 'agent' → Chippi can act: create, send, schedule, run integrations.
+ * Defaults to 'chat' and resets to 'chat' after every send — agent is a
+ * deliberate, per-message choice, not a sticky mode you forget you're in.
+ */
+export type ChatMode = 'chat' | 'agent';
+
 interface ChippiPromptBoxProps {
   placeholder?: string;
-  onSend?: (message: string, mentions: MentionItem[], attachmentIds?: string[]) => void;
+  onSend?: (
+    message: string,
+    mentions: MentionItem[],
+    attachmentIds?: string[],
+    mode?: ChatMode,
+  ) => void;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
   onVoiceStart?: () => void;
@@ -99,6 +115,12 @@ interface ChippiPromptBoxProps {
   prefill?: { text: string; nonce: number };
   /** Skills offered in the `/` menu. Empty or omitted → no menu. */
   skills?: SkillItem[];
+  /**
+   * Show the Chat ↔ Agent runtime switch. Default true (realtor surface).
+   * The broker chat is always its own agent, so the switch would be a lie
+   * there — pass false to hide it.
+   */
+  showModeSwitch?: boolean;
 }
 
 type UploadedAttachment = {
@@ -181,6 +203,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       autoFocus = false,
       prefill,
       skills = [],
+      showModeSwitch = true,
     },
     ref,
   ) {
@@ -201,6 +224,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const slashDismissedRef = useRef(false);
 
     const [mode, setMode] = useState<Mode>(null);
+    // Chat (default) vs Agent. Per-message: resets to 'chat' after each send.
+    const [chatMode, setChatMode] = useState<ChatMode>('chat');
     const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
     const [attachError, setAttachError] = useState<string | null>(null);
     const localCounterRef = useRef(0);
@@ -252,7 +277,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         ? ''
         : mode
           ? MODE_META[mode].placeholder
-          : placeholder;
+          : chatMode === 'agent'
+            ? 'Tell Chippi what to do…'
+            : placeholder;
 
     // Auto-resize
     useEffect(() => {
@@ -571,10 +598,15 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         finalText,
         mentions,
         readyAttachmentIds.length ? readyAttachmentIds : undefined,
+        chatMode,
       );
       setMessage('');
       setMentions([]);
       setMode(null);
+      // Agent is a deliberate per-message choice — snap back to Chat so the
+      // next message doesn't silently run the tool loop the realtor forgot
+      // they'd left on.
+      setChatMode('chat');
       // Don't DELETE the rows — the server is keeping them as part of the
       // turn. Just clear local state and revoke object URLs.
       for (const a of attachments) {
@@ -1104,6 +1136,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                 loud for daily use; the Plus pattern matches Slack / iMessage /
                 ChatGPT and lets us add affordances later without crowding. */}
             <div className="flex items-center justify-between gap-2 px-2 py-2">
+              <div className="flex items-center gap-1.5">
               <div className="relative" ref={plusMenuRef}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1266,6 +1299,51 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Chat ↔ Agent — the per-message runtime switch. Chat answers
+                  fast and reads their data; Agent can act. Resets to Chat
+                  after every send so Agent is always a deliberate choice. */}
+              {showModeSwitch && (
+              <div
+                role="group"
+                aria-label="Response mode"
+                className="inline-flex items-center rounded-full bg-foreground/[0.04] p-0.5"
+              >
+                {(['chat', 'agent'] as const).map((m) => {
+                  const active = chatMode === m;
+                  const Icon = m === 'chat' ? MessageCircle : Zap;
+                  return (
+                    <Tooltip key={m}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setChatMode(m)}
+                          disabled={disabled || isLoading || isRecording}
+                          aria-pressed={active}
+                          className={cn(
+                            'inline-flex items-center gap-1 h-6 px-2.5 rounded-full',
+                            'text-[11.5px] font-medium transition-all duration-150',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                            active
+                              ? 'bg-background text-foreground border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          <Icon size={11} strokeWidth={2} />
+                          {m === 'chat' ? 'Chat' : 'Agent'}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>
+                        {m === 'chat'
+                          ? 'Fast answers, reads your data'
+                          : 'Chippi can act — create, send, schedule'}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+              )}
               </div>
 
               {renderRightButton()}

@@ -21,6 +21,7 @@ catalog regardless of Composio's state.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 import httpx
@@ -374,6 +375,39 @@ async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
         return []
     if not toolkits:
         return []
+
+    # ── Token-cost guard: dispatcher-only by default ────────────────────────
+    # The curated fast-path pre-loads dozens of Composio FunctionTools, and
+    # each carries a full JSON Schema — HubSpot/Gmail CRM actions run 1-3k
+    # tokens EACH. The OpenAI Agents SDK re-sends the ENTIRE tool-schema block
+    # on every step of the agent loop, so ~23 curated schemas × up to 10 loop
+    # steps was the dominant term in the 500k-tokens-per-turn blowup.
+    #
+    # The dispatcher (find_integration_tool → call_integration_tool) is two
+    # small tools that reach the SAME full Composio catalog with one extra
+    # hop of latency. Default to it. A deploy that would rather pay the tokens
+    # for that one less hop can opt back into curated with
+    # CHIPPI_CURATED_INTEGRATIONS=1 — no code change, no redeploy.
+    curated_enabled = (os.environ.get("CHIPPI_CURATED_INTEGRATIONS", "") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if not curated_enabled:
+        from tools.integrations_dispatcher import (
+            call_integration_tool,
+            find_integration_tool,
+        )
+
+        logger.info(
+            "integration_tools_dispatcher_only",
+            space_id=space_id,
+            user_id=user_id,
+            connected_toolkits=toolkits,
+            reason="curated_disabled_token_guard",
+        )
+        return [find_integration_tool, call_integration_tool]
 
     # Collect curated slugs across the realtor's connected toolkits. A
     # toolkit with no curated entry contributes nothing here and falls
