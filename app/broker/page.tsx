@@ -20,8 +20,6 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 export const dynamic = 'force-dynamic';
 
-const CONV_TITLE_PREFIX = '[BROKER_CHIPPI]';
-
 export default async function BrokerHomePage({
   searchParams,
 }: {
@@ -43,65 +41,52 @@ export default async function BrokerHomePage({
         ? urlPrefill
         : undefined;
 
-  // Conversations + Messages anchor on the broker_owner's personal Space.
-  const { data: spaceRow } = await supabase
-    .from('Space')
-    .select('id')
-    .eq('ownerId', ctx.brokerage.ownerId)
-    .maybeSingle();
+  // Broker conversations + messages live in their OWN tables, keyed by
+  // brokerageId — structurally separate from the realtor "Conversation"/
+  // "Message" tables. No Space lookup, no title-prefix query.
+  const { data: convData } = await supabase
+    .from('BrokerConversation')
+    .select('*')
+    .eq('brokerageId', ctx.brokerage.id)
+    .order('updatedAt', { ascending: false })
+    .limit(50);
+  const conversations = (convData ?? []) as Conversation[];
 
-  let conversations: Conversation[] = [];
   let initialMessages: { role: 'user' | 'assistant'; content: string; blocks?: MessageBlock[] | null }[] = [];
   let initialConversationId: string | null = null;
 
-  if (spaceRow) {
-    const titlePrefix = `${CONV_TITLE_PREFIX} ${ctx.brokerage.id}`;
-    const { data: convData } = await supabase
-      .from('Conversation')
-      .select('*')
-      .eq('spaceId', spaceRow.id)
-      .ilike('title', `${titlePrefix}%`)
-      .order('updatedAt', { ascending: false })
-      .limit(50);
-    conversations = (convData ?? []) as Conversation[];
+  if (urlConversationId) {
+    // Verify the requested conversation belongs to THIS brokerage BEFORE
+    // loading messages. Without this guard an arbitrary conversationId in the
+    // URL (another brokerage's) would render its private history. A realtor
+    // conversation id simply won't exist in "BrokerConversation".
+    const { data: convRow } = await supabase
+      .from('BrokerConversation')
+      .select('id, brokerageId')
+      .eq('id', urlConversationId)
+      .maybeSingle();
+    const isThisBrokerageConversation =
+      convRow != null && (convRow as { brokerageId: string }).brokerageId === ctx.brokerage.id;
 
-    if (urlConversationId) {
-      // Verify the requested conversation is THIS brokerage's broker-Chippi
-      // conversation BEFORE loading messages. Without this guard an arbitrary
-      // conversationId in the URL (a realtor's, or another brokerage's) would
-      // render its private history on the broker dashboard.
-      const { data: convRow } = await supabase
-        .from('Conversation')
-        .select('id, spaceId, title')
-        .eq('id', urlConversationId)
-        .maybeSingle();
-      const convTitle = (convRow?.title ?? '') as string;
-      const isThisBrokerageConversation =
-        convRow != null &&
-        (convRow as { spaceId: string }).spaceId === spaceRow.id &&
-        convTitle.startsWith(titlePrefix);
-
-      if (isThisBrokerageConversation) {
-        initialConversationId = urlConversationId;
-        const { data: msgData } = await supabase
-          .from('Message')
-          .select('role, content, blocks')
-          .eq('spaceId', spaceRow.id)
-          .eq('conversationId', urlConversationId)
-          .order('createdAt', { ascending: true })
-          .limit(50);
-        initialMessages = ((msgData ?? []) as {
-          role: string;
-          content: string;
-          blocks: MessageBlock[] | null;
-        }[]).map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          blocks: m.blocks,
-        }));
-      }
-      // Foreign / realtor / unknown conversation id → new-chat state.
+    if (isThisBrokerageConversation) {
+      initialConversationId = urlConversationId;
+      const { data: msgData } = await supabase
+        .from('BrokerMessage')
+        .select('role, content, blocks')
+        .eq('conversationId', urlConversationId)
+        .order('createdAt', { ascending: true })
+        .limit(50);
+      initialMessages = ((msgData ?? []) as {
+        role: string;
+        content: string;
+        blocks: MessageBlock[] | null;
+      }[]).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        blocks: m.blocks,
+      }));
     }
+    // Foreign / realtor / unknown conversation id → new-chat state.
   }
 
   return (

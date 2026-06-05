@@ -381,10 +381,24 @@ export function ChippiWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Broker history comes from the broker-gated `/api/ai/broker-messages`
+  // (reads "BrokerMessage"); realtor history from `/api/ai/messages` (reads
+  // "Message"). Choosing by variant, mirroring taskEndpoint / conversations-
+  // Endpoint above, is what fixes the broker "can't load history after reload"
+  // 404 — the realtor endpoint refuses broker conversations by design.
+  const messagesEndpoint = isBroker ? '/api/ai/broker-messages' : '/api/ai/messages';
+
+  // Per-conversation mutations (rename / delete) hit the broker-gated
+  // `/api/ai/broker-conversations/<id>` for the broker variant — the realtor
+  // `/api/ai/conversations/<id>` route refuses broker rows (and the broker
+  // rows live in a different table entirely). Returns the base path; callers
+  // append the conversation id.
+  const conversationItemBase = isBroker ? '/api/ai/broker-conversations' : '/api/ai/conversations';
+
   const loadConversation = useCallback(
     async (convId: string) => {
       try {
-        const res = await fetch(`/api/ai/messages?conversationId=${convId}`);
+        const res = await fetch(`${messagesEndpoint}?conversationId=${convId}`);
         if (!res.ok) {
           const errBody = await res.text().catch(() => '');
           console.error('[Chat] fetch failed', res.status, errBody);
@@ -402,7 +416,7 @@ export function ChippiWorkspace({
         });
       }
     },
-    [setMessages],
+    [setMessages, messagesEndpoint],
   );
 
   useEffect(() => {
@@ -498,10 +512,13 @@ export function ChippiWorkspace({
       // a page nav after the realtor walked away from the toast.
       for (const [id, timer] of pendingDeleteTimersRef.current.entries()) {
         clearTimeout(timer);
-        void fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+        void fetch(`${conversationItemBase}/${id}`, { method: 'DELETE' });
       }
       pendingDeleteTimersRef.current.clear();
     };
+    // conversationItemBase is constant per mount (isBroker never changes), so
+    // an empty dep array is correct — this is an unmount-only flush.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDeleteConversation(id: string) {
@@ -522,15 +539,14 @@ export function ChippiWorkspace({
       });
     }
 
-    // Broker conversations live under the same Conversation table — the
-    // existing /api/ai/conversations/[id] DELETE owns the row by id and
-    // auth-checks via Space ownership, which holds for broker rows too
-    // (they live on the broker_owner's space). Phase 1 reuses it; Phase
-    // 2 may revisit if cross-brokerage auth needs sharpening.
+    // Broker conversations live in their own "BrokerConversation" table, so
+    // the delete routes to the broker-gated /api/ai/broker-conversations/<id>
+    // (which scopes the delete to the caller's brokerage). The realtor route
+    // is used for the realtor variant.
     const timer = setTimeout(async () => {
       pendingDeleteTimersRef.current.delete(id);
       try {
-        const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${conversationItemBase}/${id}`, { method: 'DELETE' });
         if (!res.ok) {
           // Server rejected the delete — put the row back and tell the
           // realtor. They've already moved on by now, so the toast carries
@@ -584,7 +600,7 @@ export function ChippiWorkspace({
 
   async function handleRenameConversation(id: string, title: string) {
     try {
-      const res = await fetch(`/api/ai/conversations/${id}`, {
+      const res = await fetch(`${conversationItemBase}/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
