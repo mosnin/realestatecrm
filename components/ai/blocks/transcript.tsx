@@ -9,6 +9,7 @@ import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
 import { SubagentTaskBlockView } from './subagent-task-block-view';
 import { ReasoningBlockView } from './reasoning-block-view';
 import { PermissionBlockView } from './permission-block-view';
+import { DraftBlockView } from './draft-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
@@ -101,7 +102,8 @@ export function Transcript({
     | { kind: 'tool-single'; block: ToolCallBlock }
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
     | { kind: 'subagent'; block: ToolCallBlock }
-    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> };
+    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> }
+    | { kind: 'draft'; block: Extract<MessageBlock, { type: 'draft' }> };
 
   const items: RenderItem[] = [];
   for (let i = 0; i < blocks.length; i++) {
@@ -112,6 +114,10 @@ export function Transcript({
     }
     if (block.type === 'subagent_task') {
       items.push({ kind: 'subagent-task', block });
+      continue;
+    }
+    if (block.type === 'draft') {
+      items.push({ kind: 'draft', block });
       continue;
     }
     if (block.type === 'tool_call') {
@@ -200,6 +206,8 @@ export function Transcript({
             );
           case 'permission':
             return <PermissionBlockView key={`perm-${item.block.callId}`} block={item.block} />;
+          case 'draft':
+            return <DraftBlockView key={`draft-${item.block.draftId}`} block={item.block} />;
         }
       })}
 

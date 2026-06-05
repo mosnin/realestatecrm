@@ -460,6 +460,34 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
+      case 'draft_created': {
+        // draft_message landed. Drop a draft block into the streaming
+        // assistant turn so the realtor can approve & send (or discard) the
+        // draft inline — no detour to the drafts/inbox tab.
+        const targetId = streamingMsgIdRef.current;
+        if (!targetId) return;
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== targetId) return m;
+            // Idempotent — never mount two cards for the same draft.
+            if (m.blocks.some((b) => b.type === 'draft' && b.draftId === event.draftId)) {
+              return m;
+            }
+            const block: MessageBlock = {
+              type: 'draft',
+              draftId: event.draftId,
+              channel: event.channel,
+              recipientName: event.recipientName,
+              subject: event.subject ?? null,
+              preview: event.preview,
+              status: 'pending',
+            };
+            return { ...m, blocks: [...m.blocks, block] };
+          }),
+        );
+        return;
+      }
+
       case 'turn_complete': {
         const targetId = streamingMsgIdRef.current;
         // Snapshot + reset the reasoning buffer + start time before any
