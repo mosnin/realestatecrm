@@ -259,12 +259,14 @@ describe('POST /api/ai/task — dual-path router', () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     await POST(
       makeRequest({
-        message: 'summarize this listing',
+        message: 'summarize this document',
         attachmentIds: ['att1'],
       }),
     );
-    // attachment hydration is mocked → empty array, but the router still
-    // sees the message text. "summarize" is a read, no action verb.
+    // Attachment hydration is mocked → empty array, so the router decides on
+    // the message text alone. "summarize this document" is a read with no
+    // action verb and no workspace-data noun (contrast "show my pipeline"),
+    // so it stays on the fast direct path.
     expect(directStreamMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
