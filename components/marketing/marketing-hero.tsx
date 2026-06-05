@@ -33,8 +33,9 @@ import {
 } from 'motion/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
+import { GHOST_PILL } from '@/lib/typography';
 import { MARKETING_HERO_REVEAL } from '@/lib/marketing-motion';
+import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 
 export interface MarketingHeroProps {
   /** Small all-caps label above the headline (e.g. "FOR REALTORS"). Optional. */
@@ -78,16 +79,29 @@ export function MarketingHero({
   return (
     <section
       ref={heroRef}
-      className={cn('relative pt-24 md:pt-32 pb-12 md:pb-16', className)}
+      className={cn('relative overflow-hidden pt-32 md:pt-40 pb-12 md:pb-16', className)}
     >
-      <div className="mx-auto max-w-6xl px-6 md:px-8">
+      {/* fortitudo ASCII atmosphere behind the headline, with a center-protect
+          radial so the words stay legible on both light and dark. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <AsciiField className="absolute inset-0 h-full w-full opacity-25" cell={14} />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,150,79,0.12),transparent_55%)]" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(60% 60% at 50% 40%, var(--background) 32%, transparent 80%)',
+          }}
+        />
+      </div>
+      <div className="relative z-10 mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-3xl mx-auto">
           {eyebrow && (
             <motion.p
               initial="initial"
               animate="enter"
               variants={MARKETING_HERO_REVEAL}
-              className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+              className="font-brand text-xs font-medium uppercase tracking-[0.25em] text-brand"
             >
               {eyebrow}
             </motion.p>
@@ -97,8 +111,7 @@ export function MarketingHero({
             animate="enter"
             variants={MARKETING_HERO_REVEAL}
             transition={{ delay: 0.05 }}
-            style={TITLE_FONT}
-            className="mt-5 text-[44px] sm:text-[60px] md:text-[80px] leading-[1.02] tracking-[-0.02em] text-foreground"
+            className="font-brand mt-5 text-[40px] sm:text-[56px] md:text-[72px] leading-[1.05] tracking-tight text-foreground"
           >
             {title}
           </motion.h1>
@@ -122,7 +135,10 @@ export function MarketingHero({
               className="mt-10 flex items-center justify-center gap-3 flex-wrap"
             >
               {primaryCta && (
-                <Link href={primaryCta.href} className={PRIMARY_PILL}>
+                <Link
+                  href={primaryCta.href}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-brand px-7 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-brand/40"
+                >
                   {primaryCta.label}
                 </Link>
               )}

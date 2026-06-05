@@ -133,10 +133,15 @@ export function Parallax({
   );
 }
 
-/** Small all-caps pill label (ref: "PROCESS" / "Introduction"). */
+/**
+ * Studio eyebrow: fortitudo's brand-orange small-caps label in the brand
+ * display face. The `tone` prop is retained for call-site compatibility (some
+ * pages pass `onDark`/`brand`), but the brand-orange treatment now reads on
+ * both light and dark so every tone resolves to the same accent.
+ */
 export function Eyebrow({
   children,
-  tone = 'default',
+  tone: _tone = 'default',
   className,
 }: {
   children: React.ReactNode;
@@ -146,10 +151,7 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em]',
-        tone === 'default' && 'bg-foreground/[0.06] text-foreground/70',
-        tone === 'onDark' && 'bg-white/10 text-white/80',
-        tone === 'brand' && 'bg-brand/10 text-brand',
+        'font-brand inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.25em] text-brand',
         className,
       )}
     >
