@@ -29,6 +29,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
+import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import {
   chippiErrorMessage,
@@ -135,7 +136,13 @@ async function resolveConversation(
       .select('id, spaceId, title')
       .eq('id', conversationId)
       .maybeSingle();
-    if (data && data.spaceId === spaceId) {
+    // Reject reserved broker/team titles. A broker_owner's personal spaceId
+    // equals their realtor space, and the pre-migration broker/team rows still
+    // live in this shared table — so the spaceId check alone is NOT isolation.
+    // Without this, a broker/team conversationId would be accepted on the
+    // realtor surface, its history fed to the model, and new realtor turns
+    // persisted into that broker conversation. Fall through to a fresh one.
+    if (data && data.spaceId === spaceId && !isReservedConversationTitle(data.title)) {
       if (!data.title || data.title === 'New conversation') {
         autoTitleConversation(spaceId, conversationId, userMessage);
       }
