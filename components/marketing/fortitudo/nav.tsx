@@ -122,7 +122,7 @@ function MegaMenuDropdown({
               key={item.href + item.label}
               href={item.href}
               onClick={onClose}
-              className="group flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-foreground/[0.05]"
+              className="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-foreground/[0.05]"
             >
               <Icon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
               <div>
@@ -166,7 +166,7 @@ export function FortitudoNav() {
                   <button
                     onClick={() => setOpenMenu(openMenu === group.label ? null : group.label)}
                     className={cn(
-                      'flex cursor-pointer items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                      'flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors',
                       openMenu === group.label
                         ? 'bg-brand/5 text-brand'
                         : 'text-muted-foreground hover:text-foreground',
@@ -210,7 +210,7 @@ export function FortitudoNav() {
               {/* Mobile menu button. */}
               <FortitudoThemeToggle className="lg:hidden" />
               <button
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors hover:bg-foreground/[0.06] lg:hidden"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] lg:hidden"
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open menu"
               >

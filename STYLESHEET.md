@@ -911,11 +911,28 @@ is outside the strict zone — orange and shadows are *expected* here.
 
 ### What the look is
 
-- **Brand display font** — Bitcount Grid Single, applied via the `.font-brand`
-  utility. It's the marketing/auth headline + eyebrow + footer-column face.
-  Loaded once via a Google Fonts `@import` in `globals.css`. Bound to
-  `--font-brand`. The product never uses it (the product's serif flourish is
-  still Times via `--font-title`).
+- **Display serif (the headlines).** Instrument Serif, applied via the
+  `.font-serif` utility, bound to `--font-serif` (`"Instrument Serif", ui-serif,
+  Georgia, "Times New Roman", serif`). Loaded once via a Google Fonts `@import`
+  in `globals.css` (weights 400 + italic). This is the big-headline face for the
+  whole logged-out site: the home hero h1 (with the rotating word in serif
+  italic over `.text-gradient-brand`), every home section h2 (`core-cards`,
+  `how-it-works`, `testimonials`, `about`, `cta`), and the inner page heroes
+  (realtors, brokerages, integrations, company) plus the shared `MarketingHero`
+  h1. The serif reads larger and lighter than the old mono face, so headline
+  call sites pair it with tight leading (`leading-[1.0]` to `leading-[1.05]`)
+  and **normal** tracking. The serif does not want the tight letter-spacing the
+  mono grid used, so drop it. Accent words inside a headline take serif `italic`
+  over `.text-gradient-brand` for the one flourish. The product never uses it
+  (the product's serif flourish is still Times via `--font-title`).
+- **Brand mono-grid (the eyebrows only).** Bitcount Grid Single, applied via the
+  `.font-brand` utility, bound to `--font-brand`. It is now reserved for the
+  **small** eyebrow / label lines: the "Chippi // the agentic OS for real
+  estate" kicker, the section eyebrows, the footer column heads, the dot-flow
+  status chip, stat-strip numerals, step-badge numerals, and the full-screen
+  mobile-menu nav labels. It is a signature accent, never the headline. Card-head
+  h3s that used to wear it now drop to plain SF Pro semibold so the mono grid
+  stays scarce. The product never loads or uses it.
 - **ASCII field** — `components/marketing/fortitudo/ascii-field.tsx`. A slow
   canvas field of glyphs in Chippi orange (#ff964f → pale amber on the crests),
   orange-on-transparent so it reads on **both** light and dark. It's the
@@ -930,6 +947,26 @@ is outside the strict zone — orange and shadows are *expected* here.
   the footer use a deep charcoal base (`#111113` / `#0d0e12`) that reads as a
   deliberate dark surface on **both** canvases (same call as the product's
   black stats card).
+
+### Rounding (one Apple-soft radius language)
+
+The logged-out site runs a single, consistent rounding vocabulary. There are no
+stray sharp corners out front. One language, applied everywhere:
+
+| Surface | Radius | Notes |
+|---|---|---|
+| Cards, panels, section containers, the closing CTA, the footer | `rounded-marketing-3xl` (32px) is the floor | gradient cards, spotlight cards, the CTA card, the inset footer all sit here. |
+| Buttons, chips, tags, the nav pill, nav menu triggers | `rounded-full` | every CTA and the floating pill nav. The desktop nav menu triggers and the mobile hamburger are `rounded-full` too. |
+| Icon containers, feature glyph backings, the how-it-works step markers | `rounded-full` circular badges, brand-tinted (`bg-brand/10 text-brand`) | the step number sits inside a `h-11 w-11` brand-tinted disc. |
+| Avatars | `rounded-full` | (testimonials carry no avatar today; when one lands, it is a circle.) |
+| Mega-menu inner hover rows | `rounded-2xl` | one step softer than the product's `rounded-xl`, so nothing on the logged-out site reads at the product control radius. |
+
+This is the marketing radius ladder (`.rounded-marketing-xl` / `-2xl` / `-3xl`
+plus `rounded-full`), kept separate from the product's `--radius` ladder so the
+two systems never blur. The hero backdrop is a single large, heavily blurred
+**circular** `--brand` bloom (a `rounded-full` disc at low opacity) behind the
+headline, for the calm "soft light" feel, with the center-protect radial kept on
+top so the headline stays legible on both light and dark.
 
 ### Chrome (`components/marketing/fortitudo/`)
 
@@ -1223,4 +1260,4 @@ tests/style/no-stray-orange.test.ts               CI enforcement of the brand-or
 ```
 
 If you find a screen doing something this file doesn't sanction, the screen
-is wrong. Fix it back. The system holds because it's enforced.
+is wrong. Fix it back. The system holds beca

@@ -3,7 +3,8 @@
  *
  * One scrolling experience in fortitudo's section vocabulary, carrying Chippi's
  * real-estate-CRM substance: meet the agent (ASCII hero with the rotating job
- * word) → the honest number strip (stats) → the work it handles (gradient
+ * word) → the brokerage proof strip (logo marquee) → the honest number strip
+ * (stats) → the work it handles (gradient
  * cards) → the flow (how it works) → the voices (testimonials) → why it exists
  * (about) → the ask (ASCII CTA). The shared fortitudo footer/nav come from the
  * route-group layout, so there's no per-page footer here.
@@ -14,6 +15,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { HomeHero } from '@/components/marketing/fortitudo/home/hero';
+import { LogoMarquee } from '@/components/marketing/home/logo-marquee';
 import { StatsBand } from '@/components/marketing/fortitudo/home/stats-band';
 import { CoreCards } from '@/components/marketing/fortitudo/home/core-cards';
 import { HowItWorks } from '@/components/marketing/fortitudo/home/how-it-works';
@@ -30,6 +32,7 @@ export default async function MarketingHomePage() {
   return (
     <div className="bg-background text-foreground">
       <HomeHero />
+      <LogoMarquee />
       <StatsBand />
       <CoreCards />
       <HowItWorks />
