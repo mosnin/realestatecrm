@@ -240,6 +240,32 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "createdAt"      timestamptz NOT NULL DEFAULT now()
 );
 
+-- Broker Chippi conversations live in their OWN tables, keyed by brokerageId
+-- (NOT spaceId), so brokerage-private chat is structurally isolated from the
+-- realtor "Conversation"/"Message" tables. See migration
+-- 20260616000000_broker_chat_separate_storage.sql.
+CREATE TABLE IF NOT EXISTS "BrokerConversation" (
+  "id"          text PRIMARY KEY,
+  "brokerageId" text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "title"       text NOT NULL DEFAULT 'New conversation',
+  "createdAt"   timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "BrokerConversation_brokerageId_updatedAt_idx"
+  ON "BrokerConversation" ("brokerageId", "updatedAt" DESC);
+
+CREATE TABLE IF NOT EXISTS "BrokerMessage" (
+  "id"             text PRIMARY KEY,
+  "brokerageId"    text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "conversationId" text NOT NULL REFERENCES "BrokerConversation"(id) ON DELETE CASCADE,
+  "role"           text NOT NULL,
+  "content"        text NOT NULL DEFAULT '',
+  "blocks"         jsonb,
+  "createdAt"      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "BrokerMessage_conversationId_createdAt_idx"
+  ON "BrokerMessage" ("conversationId", "createdAt");
+
 -- Chat attachments: files the realtor uploads via the prompt box.
 -- Owned by spaceId; the cowork agent reads them via the read_attachment tool.
 CREATE TABLE IF NOT EXISTS "Attachment" (
