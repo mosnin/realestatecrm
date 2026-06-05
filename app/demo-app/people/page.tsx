@@ -4,9 +4,7 @@
  * /demo-app/people — backend-free clone of the real contacts surface
  * (app/s/[slug]/contacts/page.tsx).
  *
- * The real page renders <PerformanceStrip> + <ContactTable>. We REUSE
- * PerformanceStrip verbatim (it's pure presentation over already-fetched
- * rows) and feed it hardcoded deal/stage data. We REPLICATE ContactTable's
+ * The real page renders <ContactTable>. We REPLICATE ContactTable's
  * markup here because the real one self-fetches from /api/contacts on mount —
  * a network call this demo must not make. Every fetch / add / edit / delete /
  * import / compare write path is stripped; all read-side interactivity
@@ -65,11 +63,8 @@ import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting
 import { CONTACT_STAGES } from '@/lib/constants';
 import { motion } from 'framer-motion';
 import { EASE_APPLE } from '@/lib/motion';
-import { PerformanceStrip } from '@/components/contacts/performance-strip';
 import {
   DEMO_CONTACTS,
-  DEMO_DEALS,
-  DEMO_STAGES,
   type DemoClient,
 } from './dummy-data';
 
@@ -116,14 +111,9 @@ function ScoreChip({ score }: { score: number | null }) {
 }
 
 export default function DemoPeoplePage() {
-  // The real page fetches deals/stages server-side and hands them to the
-  // strip; here the rows are hardcoded but the math is the same.
   return (
     <div className="p-4 md:p-6">
-      <div className="space-y-6">
-        <PerformanceStrip deals={DEMO_DEALS} stages={DEMO_STAGES} />
-        <DemoContactTable />
-      </div>
+      <DemoContactTable />
     </div>
   );
 }
