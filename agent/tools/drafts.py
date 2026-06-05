@@ -167,11 +167,17 @@ async def draft_message(
     )
     if existing.data:
         prior = existing.data[0]
+        prior_content = prior.get("content") or ""
         return {
             "action": "deduped",
             "draftId": prior["id"],
             "contactId": contact_id,
             "channel": channel,
+            # Render fields so the chat card can show the existing draft inline
+            # without a refetch. subject is null for sms/note.
+            "recipientName": contact_name,
+            "subject": subject if channel == "email" else None,
+            "preview": prior_content[:600],
             "note": "A pending draft for this contact already exists from the last 48h.",
             "nextStep": (
                 f"Already had a pending draft for {contact_name} from the last 48h — "
@@ -243,6 +249,11 @@ async def draft_message(
         "contactId": contact_id,
         "channel": channel,
         "autoCreatedContact": auto_created,
+        # Render fields so the chat card can show the new draft inline without
+        # a refetch. subject is null for sms/note; preview is the message body.
+        "recipientName": contact_name,
+        "subject": subject if channel == "email" else None,
+        "preview": (content or "")[:600],
         "nextStep": next_step,
     }
 

@@ -23,6 +23,7 @@ export type AgentEvent =
   | PermissionResolvedEvent
   | PlanCreatedEvent
   | SubagentSpawnedEvent
+  | DraftCreatedEvent
   | TurnCompleteEvent
   | ErrorEvent
   | SystemEvent;
@@ -153,6 +154,23 @@ export interface SubagentSpawnedEvent extends BaseEvent {
   goal: string;
   /** The originating tool call, so the card can sit where the tool ran. */
   callId: string;
+}
+
+/**
+ * Chippi called `draft_message` and a pending AgentDraft now exists. The
+ * client renders an inline draft card so the realtor can approve and send (or
+ * discard) without leaving the conversation. Persisted as a `draft` block so a
+ * reloaded conversation re-shows the card. `subject` is null for sms/note.
+ */
+export interface DraftCreatedEvent extends BaseEvent {
+  type: 'draft_created';
+  /** AgentDraft id the card PATCHes to approve / dismiss. */
+  draftId: string;
+  channel: 'email' | 'sms' | 'note';
+  recipientName: string;
+  subject?: string | null;
+  /** The drafted message body (full or first ~600 chars). */
+  preview: string;
 }
 
 /** End-of-turn marker. Client disables the input until the user types again. */

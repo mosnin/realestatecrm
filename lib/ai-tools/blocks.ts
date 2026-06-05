@@ -16,7 +16,8 @@ export type MessageBlock =
   | ToolCallBlock
   | PermissionBlock
   | ReasoningBlock
-  | SubagentTaskBlock;
+  | SubagentTaskBlock
+  | DraftBlock;
 
 export interface TextBlock {
   type: 'text';
@@ -93,6 +94,28 @@ export interface SubagentTaskBlock {
   runId: string;
   /** The task brief handed to the sub-agent. */
   goal: string;
+}
+
+/**
+ * A pending AgentDraft surfaced inline in the conversation. When Chippi calls
+ * `draft_message`, the realtor can approve and send (or discard) the draft
+ * right here in the chat — no detour to the drafts/inbox tab. The card sends
+ * the real `draftId` to PATCH /api/agent/drafts/{draftId}, which is where the
+ * space-ownership and delivery boundary already lives.
+ *
+ * `status` is the last-known lifecycle state, persisted so a reloaded card
+ * reflects whether the draft was already actioned. 'pending' is the state at
+ * creation; 'approved' = reviewed but delivery returned sent=false; 'sent' =
+ * delivered; 'dismissed' = discarded. `subject` is null for sms/note.
+ */
+export interface DraftBlock {
+  type: 'draft';
+  draftId: string;
+  channel: 'email' | 'sms' | 'note';
+  recipientName: string;
+  subject?: string | null;
+  preview: string;
+  status: 'pending' | 'approved' | 'sent' | 'dismissed';
 }
 
 /**

@@ -474,8 +474,13 @@ async def chat_turn(item: dict):
             cid = raw.get("call_id")
         return str(cid) if cid else None
 
-    def translate(event: Any) -> dict | None:
-        """Map an OpenAI Agents SDK stream event to our JSONL protocol."""
+    def translate(event: Any) -> dict | list | None:
+        """Map an OpenAI Agents SDK stream event to our JSONL protocol.
+
+        Returns a single event dict, a list of event dicts (when one SDK event
+        fans out to several — e.g. a draft_message result also emits a
+        draft_created event), or None to filter the event.
+        """
         name = type(event).__name__
 
         if name == "RawResponsesStreamEvent":
@@ -529,13 +534,37 @@ async def chat_turn(item: dict):
                 summary = "" if output is None else str(output)
                 if len(summary) > 800:
                     summary = summary[:799] + "…"
-                return {
+                ok = result_is_ok(output)
+                call_id = _call_id(it)
+                result_event = {
                     "type": "tool_call_result",
                     "tool": tool_name,
-                    "ok": result_is_ok(output),
+                    "ok": ok,
                     "summary": summary,
-                    "call_id": _call_id(it),
+                    "call_id": call_id,
                 }
+
+                # When draft_message succeeds, ALSO emit a draft_created event
+                # carrying the render fields the inline chat card needs, so the
+                # realtor can approve / discard the draft without leaving the
+                # conversation. The tool output dict is parsed from the item.
+                if tool_name == "draft_message" and ok:
+                    parsed = safe_json_loads(output)
+                    if isinstance(parsed, dict) and parsed.get("draftId"):
+                        return [
+                            result_event,
+                            {
+                                "type": "draft_created",
+                                "draftId": parsed.get("draftId"),
+                                "channel": parsed.get("channel"),
+                                "recipientName": parsed.get("recipientName"),
+                                "subject": parsed.get("subject"),
+                                "preview": parsed.get("preview") or "",
+                                "call_id": call_id,
+                            },
+                        ]
+
+                return result_event
 
             return None
 
@@ -682,7 +711,12 @@ async def chat_turn(item: dict):
                         out = None
                     if out:
                         streamed = True
-                        yield f"data: {json.dumps(out, default=str)}\n\n"
+                        # translate() may fan one SDK event out to several
+                        # protocol events (e.g. a draft_message result also
+                        # emits draft_created). Normalize to a list and frame
+                        # each one separately.
+                        for frame in out if isinstance(out, list) else [out]:
+                            yield f"data: {json.dumps(frame, default=str)}\n\n"
 
                 final = getattr(result, "final_output", None)
                 final_text = (

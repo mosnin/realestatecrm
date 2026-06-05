@@ -254,6 +254,7 @@ interface ProxyModalStreamInput {
  *   token            → text_delta
  *   tool_call_start  → tool_call_start  (rename "tool" field → "name")
  *   tool_call_result → tool_call_result (rename "tool" field → "name")
+ *   draft_created    → draft_created     (+ append a `draft` block to persist)
  *   done             → turn_complete    (+ persist assistant message)
  *   error            → error
  */
@@ -405,6 +406,41 @@ function proxyModalStream({
                 summary,
                 callId,
               });
+
+            } else if (type === 'draft_created') {
+              // draft_message landed. Push a draft_created browser event so the
+              // client mounts the inline approve/discard card, AND append a
+              // persistable draft block so a reloaded conversation re-shows it.
+              // The card PATCHes the real draftId — the approval endpoint owns
+              // the space-ownership + delivery boundary.
+              const channel =
+                evt.channel === 'email' || evt.channel === 'sms' || evt.channel === 'note'
+                  ? evt.channel
+                  : 'note';
+              const draftId = typeof evt.draftId === 'string' ? evt.draftId : '';
+              const recipientName =
+                typeof evt.recipientName === 'string' ? evt.recipientName : 'this contact';
+              const subject = typeof evt.subject === 'string' ? evt.subject : null;
+              const preview = typeof evt.preview === 'string' ? evt.preview : '';
+              if (draftId) {
+                blocks.push({
+                  type: 'draft',
+                  draftId,
+                  channel,
+                  recipientName,
+                  subject,
+                  preview,
+                  status: 'pending',
+                });
+                push(controller, {
+                  type: 'draft_created',
+                  draftId,
+                  channel,
+                  recipientName,
+                  subject,
+                  preview,
+                });
+              }
 
             } else if (type === 'done') {
               const finalText =
