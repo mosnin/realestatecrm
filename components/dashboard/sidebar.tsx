@@ -1468,7 +1468,7 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0', SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl overflow-hidden shrink-0 m-2', SIDEBAR_WIDTH)}>
         <div className="px-4 pt-5 pb-3">
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
@@ -1530,12 +1530,12 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden transition-[width] duration-200 ease-out', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 overflow-hidden transition-[width] duration-200 ease-out m-2', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
         />
         <div className="relative z-10 flex flex-col h-full">
           {/* Brand mark — in collapsed rail mode it doubles as the expand
@@ -1740,7 +1740,7 @@ function RealtorSidebarShell({
     <aside
       data-dashboard-sidebar
       className={cn(
-        'group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0',
+        'group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 m-2',
         'transition-[width] duration-200 ease-in-out',
         collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH,
       )}
@@ -1754,7 +1754,7 @@ function RealtorSidebarShell({
           wash doesn't hint at content beyond the visible edge. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
       />
 
       <div className="relative z-10 flex flex-col h-full">
