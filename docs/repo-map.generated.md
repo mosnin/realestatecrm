@@ -10,7 +10,7 @@
 - **Page routes:** 194
 - **API endpoints:** 312
 - **Cron jobs:** 10
-- **DB tables:** 99  ·  **RPCs:** 17  ·  **migrations:** 147
+- **DB tables:** 99  ·  **RPCs:** 17  ·  **migrations:** 149
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 53 declared
 
@@ -851,7 +851,7 @@ the runtimes diverge — this table makes the drift visible.
 
 **RPCs (17):** `book_tour_atomic`, `cleanup_agent_data`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `ensure_agent_settings_for_space`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `offboard_brokerage_member`, `reorder_deal`, `routine_next_run_at`, `routine_set_next_run`, `search_knowledge_docs`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`
 
-**Migrations:** 147 (latest: `20260616000000_broker_chat_separate_storage.sql`)
+**Migrations:** 149 (latest: `20260618000000_integration_rls_policies.sql`)
 
 ## External services
 
