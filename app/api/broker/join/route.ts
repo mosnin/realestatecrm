@@ -105,13 +105,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
 
-  // Link the user's Space to this brokerage (best-effort)
+  // Adopt this brokerage's intake form-config ONLY if the Space isn't already
+  // linked. Membership (above) is the source of truth for access; Space.brokerageId
+  // is just the intake-config owner — and a realtor who belongs to brokerage A
+  // joining brokerage B must NOT have B silently steal their workspace. Set it
+  // only when currently NULL; never overwrite an existing link.
   const { data: space } = await supabase
     .from('Space')
-    .select('id')
+    .select('id, brokerageId')
     .eq('ownerId', user.id)
     .maybeSingle();
-  if (space) {
+  if (space && !space.brokerageId) {
     await supabase.from('Space').update({ brokerageId: brokerage.id }).eq('id', space.id);
   }
 

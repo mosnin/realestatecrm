@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getComposio, composioConfigured } from '@/lib/integrations/composio';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { userOwnsSpace } from '@/lib/space';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -87,6 +88,14 @@ export async function POST(req: NextRequest) {
     : [];
   if (!spaceId || !userId) {
     return NextResponse.json({ error: 'spaceId and userId are required' }, { status: 400 });
+  }
+
+  // The bearer secret authenticates Modal, not the (spaceId, userId) pair.
+  // Verify ownership before the rate-limit so a mismatched spaceId can't drain
+  // another workspace's search budget. activeToolkits below already scopes data
+  // by (spaceId, userId); this closes the rate-limit-key gap ahead of it.
+  if (!(await userOwnsSpace(spaceId, userId))) {
+    return NextResponse.json({ error: 'space/user mismatch' }, { status: 403 });
   }
 
   // Per-space cap — a runaway agent that keeps calling find_integration_tool
