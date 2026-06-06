@@ -7,8 +7,8 @@
 
 ## At a glance
 
-- **Page routes:** 194
-- **API endpoints:** 312
+- **Page routes:** 187
+- **API endpoints:** 311
 - **Cron jobs:** 10
 - **DB tables:** 99  ·  **RPCs:** 17  ·  **migrations:** 149
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
@@ -65,7 +65,7 @@
 - `/book/[slug]`
 - `/book/[slug]/embed`
 
-**broker** (33)
+**broker** (32)
 
 - `/broker`
 - `/broker/activity`
@@ -89,7 +89,6 @@
 - `/broker/properties`
 - `/broker/realtors`
 - `/broker/realtors/[userId]`
-- `/broker/response-times`
 - `/broker/reviews`
 - `/broker/reviews/[id]`
 - `/broker/settings`
@@ -131,15 +130,6 @@
 **demo** (1)
 
 - `/demo`
-
-**demo-app** (6)
-
-- `/demo-app`
-- `/demo-app/calendar`
-- `/demo-app/chippi`
-- `/demo-app/deals`
-- `/demo-app/inbox`
-- `/demo-app/people`
 
 **integrations** (3)
 
@@ -445,7 +435,7 @@
 
 - `/api/brief/unsubscribe`
 
-**/api/broker** (44)
+**/api/broker** (43)
 
 - `/api/broker/activity`
 - `/api/broker/agent-activity`
@@ -489,7 +479,6 @@
 - `/api/broker/templates`
 - `/api/broker/templates/[id]`
 - `/api/broker/templates/[id]/publish`
-- `/api/broker/trends`
 - `/api/broker/unassign-lead`
 
 **/api/brokerages** (1)
