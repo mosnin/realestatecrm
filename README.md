@@ -73,7 +73,7 @@ lib/                    # Core business logic
   supabase.ts           # Supabase client
   permissions.ts        # Auth helpers and broker context
 supabase/
-  schema.sql            # Database schema and migrations
+  migrations/           # Database schema — the migration chain (single source of truth)
 docs/framework/         # Design system documentation (tokens, components, archetypes)
 ```
 
@@ -117,7 +117,7 @@ pnpm dev
 
 1. Create a Supabase project
 2. Enable the pgvector extension (Database > Extensions > search "vector")
-3. Run `supabase/schema.sql` in the SQL editor
+3. Apply the migrations in `supabase/migrations/` oldest-first (e.g. `supabase db reset`) — the chain is self-contained from the `0000` base migration
 
 ### Build for production
 

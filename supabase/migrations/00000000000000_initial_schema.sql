@@ -1,3 +1,21 @@
+-- ============================================================================
+-- 00000000000000_initial_schema — the base schema, now the FIRST migration.
+--
+-- Migrations are the single source of truth. This file is the former
+-- supabase/schema.sql (the hand-maintained fresh-install base: core tables,
+-- extensions, the match_documents RPC, indexes, RLS enables) relocated to the
+-- front of the migration chain so the 150-file chain is self-contained from an
+-- empty database. The ~149 incremental migrations that follow ALTER these
+-- tables; they always assumed this base existed.
+--
+-- ⚠️ VALIDATION REQUIRED before relying on this for fresh installs: run
+--    `supabase db reset` (apply the full chain from empty) in a Supabase
+--    environment. It could NOT be validated in the build sandbox (no
+--    pgvector / auth schema). Risk: a later migration's ALTER ... ADD COLUMN
+--    without IF NOT EXISTS could collide with a column already present here,
+--    since schema.sql was hand-updated over time to mirror later migrations.
+-- ============================================================================
+
 -- Supabase schema for Real Estate CRM
 -- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New query)
 
@@ -779,3 +797,20 @@ CREATE INDEX IF NOT EXISTS "TelemetryEvent_event_createdAt_idx"
 
 CREATE INDEX IF NOT EXISTS "TelemetryEvent_spaceId_event_idx"
   ON "TelemetryEvent" ("spaceId", event);
+
+-- ── ContactActivity (was defined only in the old setup.sql, never in a
+--    migration; folded in here so migrate-from-empty creates it). ───────────
+CREATE TABLE IF NOT EXISTS "ContactActivity" (
+  id          text        PRIMARY KEY,
+  "contactId" text        NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
+  "spaceId"   text        NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  type        text        NOT NULL
+                CHECK (type IN ('note', 'call', 'email', 'meeting', 'follow_up')),
+  content     text,
+  metadata    jsonb,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_contact_activity_contact ON "ContactActivity"("contactId");
+CREATE INDEX IF NOT EXISTS idx_contact_activity_space   ON "ContactActivity"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_contact_activity_type    ON "ContactActivity"(type);
+ALTER TABLE "ContactActivity" ENABLE ROW LEVEL SECURITY;

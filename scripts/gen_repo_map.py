@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate docs/repo-map.generated.md — the structural spine of the repo.
 
-Everything here is DERIVED from source (the route tree, vercel.json, schema.sql,
+Everything here is DERIVED from source (the route tree, vercel.json, migrations,
 the two agent tool catalogs, package.json). Nothing is hand-typed, so it cannot
 drift from reality the way prose docs do. Output is deterministic (sorted, no
 timestamps) so a CI staleness gate can `git diff --exit-code` it.
@@ -65,21 +65,20 @@ def collect_crons():
 
 
 # ---------------------------------------------------------------------------
-# Data model (schema.sql + migrations)
+# Data model (migrations)
 # ---------------------------------------------------------------------------
 def collect_schema():
-    # schema.sql is the base, but ~half the tables exist only in migrations.
-    # Union both so the table/RPC list is the real universe, not just the seed.
-    files = [os.path.join(ROOT, "supabase", "schema.sql")]
-    mig_paths = sorted(glob.glob(os.path.join(ROOT, "supabase", "migrations", "*.sql")))
-    files += mig_paths
+    # Migrations are the single source of truth — the former schema.sql is now
+    # the 0000 base migration. Read the whole chain so the table/RPC list is the
+    # real universe.
+    files = sorted(glob.glob(os.path.join(ROOT, "supabase", "migrations", "*.sql")))
     tables, rpcs = set(), set()
     for f in files:
         with open(f) as fh:
             sql = fh.read()
         tables.update(re.findall(r'CREATE TABLE(?:\s+IF NOT EXISTS)?\s+"([A-Za-z]+)"', sql))
         rpcs.update(re.findall(r"CREATE OR REPLACE FUNCTION ([a-z_]+)", sql))
-    migs = sorted(os.path.basename(p) for p in mig_paths)
+    migs = sorted(os.path.basename(p) for p in files)
     return sorted(tables), sorted(rpcs), migs
 
 
@@ -190,7 +189,7 @@ def main():
     w("# Repo Map (generated)")
     w("")
     w("> **Do not edit by hand.** Regenerate with `python3 scripts/gen_repo_map.py`.")
-    w("> Derived from the source tree, `vercel.json`, `supabase/schema.sql`, and the")
+    w("> Derived from the source tree, `vercel.json`, `supabase/migrations/`, and the")
     w("> two agent tool catalogs. CI fails if this file is stale. The *meaning* of each")
     w("> system (purpose, fragile seams) lives in `SYSTEMS.md` / `SEAMS.md`, not here.")
     w("")
@@ -259,7 +258,7 @@ def main():
     w("")
 
     # ---- Data model ----
-    w("## Data model (supabase/schema.sql)")
+    w("## Data model (supabase/migrations)")
     w("")
     w(f"**Tables ({len(tables)}):** {', '.join(f'`{t}`' for t in tables)}")
     w("")

@@ -12,7 +12,7 @@ Chippi is an **agentic operating system for U.S. real estate agents and brokerag
 
 CRM-style data structures (contacts, deals, pipelines) are the substrate, not the product. New work should make Chippi do **more** on the realtor's behalf — not add more configuration surfaces the realtor has to operate themselves.
 
-**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/schema.sql`), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/migrations/*` — the migration chain is the single source of truth), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
 
 **AI agent runtime**: Interactive chat turns run via the **OpenAI Agents SDK** (`openai-agents` Python package) inside a **Modal sandbox** (`agent/modal_app.py`), deployed with `modal deploy agent/modal_app.py`. The model is **gpt-5-mini** with `reasoning_effort="medium"`. The Next.js layer (`app/api/ai/task/route.ts`) proxies SSE from Modal and handles auth, rate-limiting, and persistence. Set `CHIPPI_CHAT_RUNTIME=ts` to fall back to the in-process TypeScript runtime for local development. Do **not** reference or revert to the TypeScript-only runtime as the primary path — Modal is the mandatory runtime.
 
@@ -86,7 +86,7 @@ Do **not** modify these unless the task explicitly requires it:
 | 6 | Workspace state (contacts, deals, stages) | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
 | 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
 | 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
-| 9 | Database schema and migrations | `supabase/schema.sql`, `supabase/migrations/*` |
+| 9 | Database schema and migrations | `supabase/migrations/*` (the `0000` base migration + the chain; single source of truth) |
 | 10 | Deployment configuration | `next.config.ts`, `package.json` scripts, `scripts/*` |
 | 11 | Core routing and middleware | `middleware.ts`, route matchers, redirect logic |
 | 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/supabase.ts`, `lib/redis.ts` |
