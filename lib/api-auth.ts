@@ -122,12 +122,15 @@ export async function requireSpaceOwner(
     // fetch all, then deterministically prefer broker_owner over broker_admin.
     const { data: memberships } = await supabase
       .from('BrokerageMembership')
-      .select('role, brokerageId')
+      .select('role, brokerageId, createdAt')
       .eq('userId', dbUser.id)
-      .in('role', ['broker_owner', 'broker_admin']);
+      .in('role', ['broker_owner', 'broker_admin'])
+      .order('createdAt', { ascending: true });
 
     const membership =
-      memberships?.find((m) => m.role === 'broker_owner') ?? memberships?.[0];
+      memberships?.find((m) => m.role === 'broker_owner') ??
+      memberships?.find((m) => m.role === 'broker_admin') ??
+      memberships?.[0];
 
     if (membership) {
       // Check if the space's owner is a member of the same brokerage

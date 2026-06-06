@@ -75,7 +75,9 @@ export async function POST(req: NextRequest) {
         phone: tour.guestPhone || null,
         type: 'TOUR',
         tags: ['from-tour'],
-        scoringStatus: 'unscored',
+        // 'unscored' violates contact_scoring_status_check (pending|scored|failed);
+        // it silently failed the insert so the deal was created with no contact link.
+        scoringStatus: 'pending',
       });
       if (!contactErr) contactId = newContactId;
     }

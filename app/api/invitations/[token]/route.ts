@@ -174,13 +174,17 @@ export async function POST(_req: Request, { params }: Params) {
     .eq('id', user.id)
     .eq('status', 'offboarded');
 
-  // Link the user's Space to this brokerage (best-effort)
+  // Adopt this brokerage's intake form-config ONLY if the Space isn't already
+  // linked. Never overwrite an existing link: a realtor already in brokerage A
+  // accepting an invite to brokerage B keeps A as their workspace's form-config
+  // owner. Access comes from the membership row above; Space.brokerageId is only
+  // the intake-config owner.
   const { data: space } = await supabase
     .from('Space')
-    .select('id')
+    .select('id, brokerageId')
     .eq('ownerId', user.id)
     .maybeSingle();
-  if (space) {
+  if (space && !space.brokerageId) {
     await supabase
       .from('Space')
       .update({ brokerageId: inv.brokerageId })

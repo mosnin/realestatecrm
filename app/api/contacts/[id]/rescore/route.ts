@@ -45,7 +45,8 @@ export async function POST(
   await supabase
     .from('Contact')
     .update({ scoringStatus: 'pending' })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
 
   // Fetch the form config snapshot and scoring model for dynamic scoring.
   // The formConfigSnapshot is stored on the contact at submission time.
@@ -104,7 +105,8 @@ export async function POST(
     await supabase
       .from('Contact')
       .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('spaceId', space.id);
     console.error('[rescore] Scoring failed:', scoringErr);
     return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
   }
@@ -119,7 +121,8 @@ export async function POST(
       scoreDetails: result.scoreDetails,
       updatedAt: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
 
   if (updateError) {
     console.error('[rescore] Update error:', updateError);

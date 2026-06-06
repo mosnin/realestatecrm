@@ -75,6 +75,41 @@ interface PrefixSpec {
 
 const PREFIX_SPECS: PrefixSpec[] = [
   {
+    // Generic uploads via /api/files — every object is a File row, so any
+    // files/ object with no matching File.storageKey is a true orphan
+    // (DB insert failed after upload, or the row was deleted).
+    prefix: STORAGE_PREFIXES.files,
+    label: 'files',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('File')
+        .select('storageKey')
+        .in('storageKey', candidates);
+      return new Set(
+        ((data ?? []) as { storageKey: string }[])
+          .map((r) => r.storageKey)
+          .filter(Boolean),
+      );
+    },
+  },
+  {
+    // Studio-generated media also lives in the File table (File.storageKey
+    // under the studio/ prefix), referenced via StudioGeneration.fileId.
+    prefix: STORAGE_PREFIXES.studio,
+    label: 'studio',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('File')
+        .select('storageKey')
+        .in('storageKey', candidates);
+      return new Set(
+        ((data ?? []) as { storageKey: string }[])
+          .map((r) => r.storageKey)
+          .filter(Boolean),
+      );
+    },
+  },
+  {
     prefix: STORAGE_PREFIXES.contactDocuments,
     label: 'contact-documents',
     referencedKeys: async (candidates) => {
