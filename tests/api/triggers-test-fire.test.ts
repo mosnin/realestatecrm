@@ -24,6 +24,10 @@ vi.mock('@/lib/integrations/triggers', () => ({
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+// Caller is treated as a non-admin so these tests exercise the CRON_SECRET path.
+vi.mock('@/lib/permissions', () => ({
+  isPlatformAdmin: vi.fn().mockResolvedValue(false),
+}));
 
 // Stub global fetch so the route's POST to its own receiver doesn't
 // actually leave the test runtime.

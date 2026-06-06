@@ -52,6 +52,10 @@ vi.mock('@/lib/integrations/triggers', async (importOriginal) => {
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+// Caller is treated as a non-admin so these tests exercise the CRON_SECRET path.
+vi.mock('@/lib/permissions', () => ({
+  isPlatformAdmin: vi.fn().mockResolvedValue(false),
+}));
 
 import { POST } from '@/app/api/admin/triggers/backfill/route';
 
