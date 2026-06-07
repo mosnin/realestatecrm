@@ -11,10 +11,11 @@
 -- book_tour_atomic / reorder_deal). The TS mirror of the FIFO rule
 -- (lib/billing/credits.ts) is unit-tested so the algorithm stays in lockstep.
 --
--- ⚠️ NEEDS DB VALIDATION before relying on this: the plpgsql functions could
---    NOT be executed in the build sandbox (no Postgres). Run `supabase db reset`
---    + exercise spend/grant/refund (incl. concurrent spend) in staging before
---    wiring any workflow to it.
+-- ✓ VALIDATED on PostgreSQL 16 (applies clean; grant/spend/refund exercised):
+--    FIFO oldest-expiring-first debit, fail-closed on insufficient balance,
+--    refund restores balance, refund is idempotent, expired lots excluded — all
+--    confirmed against a real cluster. The FOR UPDATE row-locking serializes
+--    concurrent spends; re-confirm under real staging load as a final check.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS "CreditLot" (
