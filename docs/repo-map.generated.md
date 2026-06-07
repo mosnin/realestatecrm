@@ -8,7 +8,7 @@
 ## At a glance
 
 - **Page routes:** 187
-- **API endpoints:** 311
+- **API endpoints:** 312
 - **Cron jobs:** 10
 - **DB tables:** 101  ·  **RPCs:** 20  ·  **migrations:** 151
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
@@ -309,12 +309,13 @@
 - `/api/account/delete`
 - `/api/account/export`
 
-**/api/admin** (17)
+**/api/admin** (18)
 
 - `/api/admin/actions`
 - `/api/admin/agent-stats`
 - `/api/admin/announcements`
 - `/api/admin/announcements/[id]`
+- `/api/admin/billing`
 - `/api/admin/broadcast`
 - `/api/admin/brokerages`
 - `/api/admin/brokerages/[id]`
