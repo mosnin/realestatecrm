@@ -8,7 +8,7 @@
 ## At a glance
 
 - **Page routes:** 187
-- **API endpoints:** 312
+- **API endpoints:** 313
 - **Cron jobs:** 10
 - **DB tables:** 101  ·  **RPCs:** 20  ·  **migrations:** 151
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
@@ -426,10 +426,11 @@
 
 - `/api/auth/me`
 
-**/api/billing** (3)
+**/api/billing** (4)
 
 - `/api/billing/cancel`
 - `/api/billing/checkout`
+- `/api/billing/credits/checkout`
 - `/api/billing/portal`
 
 **/api/brief** (1)
