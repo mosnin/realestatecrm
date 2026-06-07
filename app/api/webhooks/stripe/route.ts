@@ -293,6 +293,22 @@ async function POSTHandler(req: NextRequest) {
           const acctType = session.metadata?.accountType;
           const acctId = session.metadata?.accountId;
           if (acctId && (acctType === 'space' || acctType === 'brokerage')) {
+            // Anti-poisoning (mirrors the subscription paths): if the target
+            // account already has a Stripe customer, it must match the payer.
+            // A brand-new account with no customer yet is allowed — the metadata
+            // was server-set from a verified owned space at checkout.
+            const acctTable = acctType === 'space' ? 'Space' : 'Brokerage';
+            const { data: acct } = await supabase
+              .from(acctTable)
+              .select('stripeCustomerId')
+              .eq('id', acctId)
+              .maybeSingle();
+            if (acct?.stripeCustomerId && acct.stripeCustomerId !== (session.customer as string)) {
+              logger.error('[stripe-webhook] top-up account/customer mismatch — rejecting metadata poisoning', {
+                acctType, acctId, sessionCustomer: session.customer,
+              });
+              break;
+            }
             await grantTopup({ type: acctType, id: acctId }, topupId);
             logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
           } else {
@@ -506,11 +522,14 @@ async function POSTHandler(req: NextRequest) {
           .eq('stripeSubscriptionId', paidSubId);
 
         // Monthly credit grant (best-effort — never break payment processing).
-        // Today the only Space price is Solo, so set the tier if unset, then
-        // grant. New tiers (Pro) will carry their plan via checkout metadata.
+        // Trust the tier stamped on the subscription metadata (set at checkout);
+        // fall back to the current Space.plan, else Solo. Using the metadata
+        // avoids mislabeling a downgrade (e.g. Pro→Solo) off a stale Space.plan.
         try {
           if (paidSpace?.id) {
-            const planId = paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo';
+            const planId =
+              (paidSub.metadata?.plan as string) ||
+              (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
             if (planId !== paidSpace.plan) {
               await supabase
                 .from('Space')
@@ -518,9 +537,11 @@ async function POSTHandler(req: NextRequest) {
                 .eq('id', paidSpace.id);
             }
             await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+          } else {
+            logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
           }
         } catch (e) {
-          logger.error('[stripe-webhook] space monthly grant failed', undefined, e);
+          logger.error('[stripe-webhook] space monthly grant failed (paid, credits NOT granted)', { paidSubId }, e);
         }
 
         // Notify only on active transition (payment recovered past_due subscription)
