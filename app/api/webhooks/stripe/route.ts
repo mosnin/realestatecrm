@@ -4,6 +4,8 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { grantTopup } from '@/lib/billing/grants';
+import { TOPUPS, type TopupId } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -282,6 +284,23 @@ async function POSTHandler(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Top-up purchase (one-time payment, no subscription) — grant credits.
+        // Idempotent via the event-ID dedupe above, so a retried delivery won't
+        // double-grant. Metadata is set by app/api/billing/credits/checkout.
+        const topupId = session.metadata?.topup as TopupId | undefined;
+        if (topupId && topupId in TOPUPS) {
+          const acctType = session.metadata?.accountType;
+          const acctId = session.metadata?.accountId;
+          if (acctId && (acctType === 'space' || acctType === 'brokerage')) {
+            await grantTopup({ type: acctType, id: acctId }, topupId);
+            logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+          } else {
+            logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
+          }
+          break;
+        }
+
         if (!session.subscription) break;
 
         const subscription = await stripe.subscriptions.retrieve(
