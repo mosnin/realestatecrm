@@ -28,12 +28,13 @@
 
 ```
 supabase/
-  schema.sql      # Single-file source-of-truth for the current shape.
-                  # Idempotent — safe to re-run.
-  setup.sql       # Complete bootstrap for a fresh Supabase project.
-                  # Header comment: "run this once in Supabase SQL
-                  # Editor" — there is no CLI bootstrap command today.
-  migrations/     # 72 timestamped *.sql files, append-only forward migrations.
+  migrations/     # THE single source of truth. Timestamped *.sql, append-only,
+                  # applied oldest-first. The 00000000000000_initial_schema
+                  # base migration holds the core tables/extensions/RPC; every
+                  # later file ALTERs on top. Apply with `supabase db reset` or
+                  # paste oldest-first in the SQL Editor.
+                  # (The former schema.sql / setup.sql snapshots were removed —
+                  #  they drifted from the migrations.)
 ```
 
 ## Migration workflow

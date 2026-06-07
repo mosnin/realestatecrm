@@ -89,7 +89,7 @@ realestatecrm/
 │   ├── vectorize.ts            # Contact/deal → vector sync
 │   └── zilliz.ts               # Vector storage (Supabase pgvector, interface unchanged)
 ├── supabase/
-│   └── schema.sql              # Full database schema (tables + pgvector + RPC)
+│   └── migrations/             # Full database schema — migration chain (tables + pgvector + RPC)
 ├── scripts/
 ├── middleware.ts               # Clerk auth middleware + route protection
 ├── next.config.ts              # Next.js config (TS/ESLint errors ignored)
@@ -114,7 +114,7 @@ realestatecrm/
 | Stages API | `app/api/stages/route.ts`, `[id]/route.ts` | Deal stage CRUD |
 | AI assistant | `app/api/ai/task/route.ts`, `app/api/ai/task/approve/[requestId]/route.ts`, `lib/ai-tools/loop.ts`, `lib/ai.ts` | SSE-streamed on-demand agent with a tool-use loop, approval-gated mutations, sub-agent delegation, RAG context from Supabase pgvector, and `Message.blocks` persistence |
 | Vector system | `lib/embeddings.ts`, `lib/zilliz.ts`, `lib/vectorize.ts`, `app/api/vectorize/sync/route.ts` | OpenAI embeddings → Supabase `DocumentEmbedding` table, `match_documents` RPC |
-| Data model | `supabase/schema.sql` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message, DocumentEmbedding |
+| Data model | `supabase/migrations/` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message, DocumentEmbedding |
 | Dashboard gate | `app/dashboard/page.tsx` | Redirects to workspace if onboarding complete, or to `/onboarding` |
 | Admin (legacy) | `app/admin/*` | Redis-based admin dashboard, legacy path |
 | Server actions (legacy) | `app/actions.ts` | `createSlugAction`, `deleteSlugAction` — older space creation path using Redis |
@@ -244,7 +244,7 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 5. **Post-login routing** lives in `app/auth/redirect/page.tsx` (NOT `/dashboard` — that route does not exist) and `app/s/[slug]/layout.tsx`. Onboarding completion is gated by `User.onboard` via `lib/onboarding.ts`.
 6. **Two space creation paths**: `app/api/onboarding/route.ts` (create_space action) and `app/actions.ts` (createSlugAction) both create spaces with different default stage names.
 7. **Vector dependency optional**: pgvector/embeddings failures are silently caught — assistant works without RAG. But scoring requires OpenAI.
-8. **pgvector setup**: The `vector` extension and `DocumentEmbedding` table must be created in Supabase before vector sync works. Run the additions in `supabase/schema.sql` via the Supabase SQL Editor.
+8. **pgvector setup**: The `vector` extension and `DocumentEmbedding` table must be created in Supabase before vector sync works. Apply the migrations in `supabase/migrations/` (they create the `vector` extension, `DocumentEmbedding`, and `match_documents`).
 
 ---
 

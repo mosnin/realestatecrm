@@ -176,8 +176,8 @@ const { data: spaceId } = await supabase.rpc('create_space_with_defaults', { ...
 
 ### Before writing a migration
 
-1. Check `supabase/schema.sql` — it's the source of truth for fresh installs
-2. Check existing migrations in `supabase/migrations/` — 14 files, chronologically ordered
+1. Check `supabase/migrations/` — the migration chain is the single source of truth (the `00000000000000_initial_schema` base migration holds the core tables; everything after ALTERs it)
+2. Migrations are chronologically ordered; the base is first
 3. Verify column names against this doc and the schema
 
 ### Migration rules
@@ -185,7 +185,7 @@ const { data: spaceId } = await supabase.rpc('create_space_with_defaults', { ...
 1. **Never rename columns** without an expand/contract plan (add new → migrate data → drop old)
 2. **Always use `IF NOT EXISTS`** / `IF EXISTS` for idempotent migrations
 3. **Always add defaults** for new NOT NULL columns on existing tables
-4. **Always update `supabase/schema.sql`** alongside migration files
+4. **Add a new timestamped migration** for every schema change — migrations are the only source of truth (there is no separate schema snapshot to keep in sync)
 5. **Never drop tables** without explicit instruction
 6. **Test migrations** against a fresh database AND an existing database
 

@@ -12,7 +12,7 @@ Chippi is an **agentic operating system for U.S. real estate agents and brokerag
 
 CRM-style data structures (contacts, deals, pipelines) are the substrate, not the product. New work should make Chippi do **more** on the realtor's behalf — not add more configuration surfaces the realtor has to operate themselves.
 
-**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/schema.sql`), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/migrations/*` — the migration chain is the single source of truth), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
 
 **AI agent runtime**: Interactive chat turns **default to the in-process TypeScript runtime** (`@openai/agents`, via `app/api/ai/task/route.ts` → `lib/ai-tools/sdk-chat-stream.ts`) — no cold start. The chat model is the realtor's selected model through OpenRouter; the default is **`x-ai/grok-4.3`** (see `lib/chat-models.ts` / `agent/llm.py`). A **Modal Python sandbox** (`agent/modal_app.py`, OpenAI Agents SDK) is **opt-in** via `CHIPPI_CHAT_RUNTIME=modal` and is the target for delegated/autonomous sub-agent ("swarm") runs. The single source of truth for the default is `lib/ai-tools/runtime-flag.ts` (`'ts'` unless the env var says `'modal'`). NOTE: a prior version of this line claimed Modal was the "mandatory runtime" and told you not to use the TS path — that was **wrong and inverted the actual default**; trust `runtime-flag.ts`, not prose.
 
@@ -86,7 +86,7 @@ Do **not** modify these unless the task explicitly requires it:
 | 6 | Workspace state (contacts, deals, stages) | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
 | 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
 | 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
-| 9 | Database schema and migrations | `supabase/schema.sql`, `supabase/migrations/*` |
+| 9 | Database schema and migrations | `supabase/migrations/*` (the `0000` base migration + the chain; single source of truth) |
 | 10 | Deployment configuration | `next.config.ts`, `package.json` scripts, `scripts/*` |
 | 11 | Core routing and middleware | `middleware.ts`, route matchers, redirect logic |
 | 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/supabase.ts`, `lib/redis.ts` |

@@ -1,7 +1,7 @@
 # Repo Map (generated)
 
 > **Do not edit by hand.** Regenerate with `python3 scripts/gen_repo_map.py`.
-> Derived from the source tree, `vercel.json`, `supabase/schema.sql`, and the
+> Derived from the source tree, `vercel.json`, `supabase/migrations/`, and the
 > two agent tool catalogs. CI fails if this file is stale. The *meaning* of each
 > system (purpose, fragile seams) lives in `SYSTEMS.md` / `SEAMS.md`, not here.
 
@@ -10,7 +10,7 @@
 - **Page routes:** 187
 - **API endpoints:** 311
 - **Cron jobs:** 10
-- **DB tables:** 99  ·  **RPCs:** 17  ·  **migrations:** 149
+- **DB tables:** 100  ·  **RPCs:** 17  ·  **migrations:** 150
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 53 declared
 
@@ -834,13 +834,13 @@ the runtimes diverge — this table makes the drift visible.
 
 - **Python only (46):** `add_intake_question`, `advance_deal_stage`, `analyze_portfolio`, `ask_realtor`, `audit_response_times`, `book_tour`, `call_integration_tool`, `change_member_role`, `commission_report`, `create_contact`, `draft_message`, `edit_studio_image`, `find_at_risk_agents`, `find_breached_leads`, `find_contacts`, `find_deals`, `find_integration_tool`, `find_unassigned_leads`, `flag_deal_for_broker_review`, `generate_priority_list`, `generate_studio_image`, `get_contact_activity`, `get_intake_form`, `log_activity_run`, `manage_goal`, `manage_routines`, `offboard_member`, `outcome`, `process_inbound_message`, `read_realtor_morning_story`, `realtor_performance`, `reassign_lead`, `recall_docs`, `recall_memory`, `remove_intake_question`, `route_lead`, `save_intake_form`, `send_email_now`, `send_sms_now`, `send_team_announcement`, `set_routing_rule`, `store_memory`, `team_health`, `update_contact`, `update_deal`, `update_intake_question`
 
-## Data model (supabase/schema.sql)
+## Data model (supabase/migrations)
 
-**Tables (99):** `AIUserProfile`, `AffiliateAccount`, `AgentActivityLog`, `AgentDraft`, `AgentGoal`, `AgentMemory`, `AgentPausedRun`, `AgentQuestion`, `AgentSettings`, `AgentTask`, `AgentTrajectory`, `Announcement`, `AnnouncementDismissal`, `AppKnowledgeDoc`, `ApplicationMessage`, `ApplicationStatusUpdate`, `Artifact`, `ArtifactVersion`, `Attachment`, `AuditLog`, `Brief`, `BriefTipHistory`, `BrokerConversation`, `BrokerMessage`, `BrokerNotification`, `Brokerage`, `BrokerageIntegrationConnection`, `BrokerageMembership`, `BrokerageRemoval`, `BrokerageTemplate`, `CalendarEvent`, `CalendarEventMirror`, `CalendarNote`, `CallLog`, `ChatUsage`, `ClientAuthCode`, `ClientDocument`, `ClientInfoRequest`, `ClientMessage`, `ClientUser`, `CmaReport`, `CommissionLedger`, `CommissionSplit`, `Contact`, `ContactDocument`, `Conversation`, `CustomAgent`, `DeadLetterEvent`, `Deal`, `DealActivity`, `DealChecklistItem`, `DealContact`, `DealDocument`, `DealReviewComment`, `DealReviewRequest`, `DealRoutingRule`, `DealStage`, `DisabledSpace`, `DocumentEmbedding`, `EmailBroadcast`, `ExecutionStep`, `File`, `FormAnalyticsEvent`, `FormDraft`, `GoalDecomposition`, `GoogleCalendarToken`, `IntegrationConnection`, `IntegrationTrigger`, `Invitation`, `McpApiKey`, `McpAuthCode`, `Message`, `MessageTemplate`, `Note`, `Pipeline`, `ProfilePage`, `Property`, `PropertyPacket`, `PushSubscription`, `Routine`, `SignatureRequest`, `Space`, `SpaceSetting`, `StudioBrand`, `StudioGeneration`, `StudioPost`, `SupportTicket`, `SwarmEvent`, `SwarmMember`, `SwarmRun`, `TaskCheckpoint`, `TaskDependency`, `TelemetryEvent`, `Tour`, `TourAvailabilityOverride`, `TourFeedback`, `TourPropertyProfile`, `TourWaitlist`, `User`
+**Tables (100):** `AIUserProfile`, `AffiliateAccount`, `AgentActivityLog`, `AgentDraft`, `AgentGoal`, `AgentMemory`, `AgentPausedRun`, `AgentQuestion`, `AgentSettings`, `AgentTask`, `AgentTrajectory`, `Announcement`, `AnnouncementDismissal`, `AppKnowledgeDoc`, `ApplicationMessage`, `ApplicationStatusUpdate`, `Artifact`, `ArtifactVersion`, `Attachment`, `AuditLog`, `Brief`, `BriefTipHistory`, `BrokerConversation`, `BrokerMessage`, `BrokerNotification`, `Brokerage`, `BrokerageIntegrationConnection`, `BrokerageMembership`, `BrokerageRemoval`, `BrokerageTemplate`, `CalendarEvent`, `CalendarEventMirror`, `CalendarNote`, `CallLog`, `ChatUsage`, `ClientAuthCode`, `ClientDocument`, `ClientInfoRequest`, `ClientMessage`, `ClientUser`, `CmaReport`, `CommissionLedger`, `CommissionSplit`, `Contact`, `ContactActivity`, `ContactDocument`, `Conversation`, `CustomAgent`, `DeadLetterEvent`, `Deal`, `DealActivity`, `DealChecklistItem`, `DealContact`, `DealDocument`, `DealReviewComment`, `DealReviewRequest`, `DealRoutingRule`, `DealStage`, `DisabledSpace`, `DocumentEmbedding`, `EmailBroadcast`, `ExecutionStep`, `File`, `FormAnalyticsEvent`, `FormDraft`, `GoalDecomposition`, `GoogleCalendarToken`, `IntegrationConnection`, `IntegrationTrigger`, `Invitation`, `McpApiKey`, `McpAuthCode`, `Message`, `MessageTemplate`, `Note`, `Pipeline`, `ProfilePage`, `Property`, `PropertyPacket`, `PushSubscription`, `Routine`, `SignatureRequest`, `Space`, `SpaceSetting`, `StudioBrand`, `StudioGeneration`, `StudioPost`, `SupportTicket`, `SwarmEvent`, `SwarmMember`, `SwarmRun`, `TaskCheckpoint`, `TaskDependency`, `TelemetryEvent`, `Tour`, `TourAvailabilityOverride`, `TourFeedback`, `TourPropertyProfile`, `TourWaitlist`, `User`
 
 **RPCs (17):** `book_tour_atomic`, `cleanup_agent_data`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `ensure_agent_settings_for_space`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `offboard_brokerage_member`, `reorder_deal`, `routine_next_run_at`, `routine_set_next_run`, `search_knowledge_docs`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`
 
-**Migrations:** 149 (latest: `20260618000000_integration_rls_policies.sql`)
+**Migrations:** 150 (latest: `20260618000000_integration_rls_policies.sql`)
 
 ## External services
 

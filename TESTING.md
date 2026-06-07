@@ -14,13 +14,13 @@ No automated test framework is currently configured in this repository. All vali
 | Package manager | pnpm (v10.12 configured in `package.json`) |
 | Database | Supabase project (PostgreSQL) with `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured |
 | Clerk | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` configured |
-| Schema | Run `supabase/schema.sql` in the Supabase SQL Editor (enable the `vector` extension first) |
+| Schema | Apply `supabase/migrations/` oldest-first (e.g. `supabase db reset`; enable the `vector` extension first) |
 
 ### Basic run flow
 
 ```bash
 pnpm install
-# Apply supabase/schema.sql via the Supabase SQL Editor
+# Apply supabase/migrations/ oldest-first (supabase db reset)
 pnpm dev
 ```
 
@@ -31,7 +31,7 @@ Dev server runs at `http://localhost:3000` with Turbopack.
 | Service | Required for | Env vars |
 |---|---|---|
 | OpenAI | Lead scoring, embeddings, AI assistant | `OPENAI_API_KEY` |
-| Supabase pgvector | Vector search (RAG context) — same Supabase project; enable `vector` extension and run `supabase/schema.sql` | (none beyond Supabase) |
+| Supabase pgvector | Vector search (RAG context) — same Supabase project; enable `vector` extension and apply `supabase/migrations/` | (none beyond Supabase) |
 | Upstash Redis | Rate limiting, pending-approval state for the AI agent, legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
 | Resend | Transactional emails | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
 | Telnyx | SMS notifications + `send_sms` AI tool | `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER` |
