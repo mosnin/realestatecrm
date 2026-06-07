@@ -26,10 +26,11 @@ export async function grantMonthlyCredits(
   account: BillingAccount,
   plan: PlanId,
   addonUsers = 0,
+  sourceId?: string | null,
 ): Promise<number> {
   const amount = monthlyGrantAmount(plan, addonUsers);
   if (amount <= 0) return 0;
-  await grantCredits(account, amount, 'monthly_grant', rolloverExpiry());
+  await grantCredits(account, amount, 'monthly_grant', rolloverExpiry(), sourceId);
   return amount;
 }
 
@@ -52,10 +53,15 @@ export async function grantFreeSignup(account: BillingAccount): Promise<number> 
   return amount;
 }
 
-/** A purchased top-up pack (30-day rollover). */
-export async function grantTopup(account: BillingAccount, topup: TopupId): Promise<number> {
+/** A purchased top-up pack (30-day rollover). `sourceId` (the Stripe checkout
+ *  session id) makes a retried webhook idempotent. */
+export async function grantTopup(
+  account: BillingAccount,
+  topup: TopupId,
+  sourceId?: string | null,
+): Promise<number> {
   const amount = TOPUPS[topup].credits;
-  await grantCredits(account, amount, 'topup', rolloverExpiry());
+  await grantCredits(account, amount, 'topup', rolloverExpiry(), sourceId);
   return amount;
 }
 
@@ -67,7 +73,11 @@ const GRANTABLE_PLANS = new Set<PlanId>(['solo', 'pro', 'team', 'team_plus']);
  * plan string stored on Space/Brokerage (legacy `starter`/`enterprise` carry no
  * defined monthly grant → no-op). Returns the credits granted (0 if none).
  */
-export async function grantPlanMonthly(account: BillingAccount, planRaw: string): Promise<number> {
+export async function grantPlanMonthly(
+  account: BillingAccount,
+  planRaw: string,
+  sourceId?: string | null,
+): Promise<number> {
   if (!GRANTABLE_PLANS.has(planRaw as PlanId)) return 0;
-  return grantMonthlyCredits(account, planRaw as PlanId);
+  return grantMonthlyCredits(account, planRaw as PlanId, 0, sourceId);
 }

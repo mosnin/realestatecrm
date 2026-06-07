@@ -105,12 +105,17 @@ export async function getCreditBalance(account: BillingAccount): Promise<number>
   return availableBalance((data ?? []) as CreditLot[]);
 }
 
-/** Add a credit lot (monthly grant, top-up, free signup, or add-on user). */
+/** Add a credit lot (monthly grant, top-up, free signup, or add-on user).
+ *  `sourceId` is the originating Stripe object id (invoice id for a monthly
+ *  grant, checkout session id for a top-up). When set, the DB's partial unique
+ *  index on (reason, sourceId) makes the grant idempotent — a retried webhook
+ *  re-runs this and the duplicate INSERT is a no-op, so credits can't inflate. */
 export async function grantCredits(
   account: BillingAccount,
   amount: number,
   reason: 'monthly_grant' | 'topup' | 'free_signup' | 'addon_user' | 'migration' | 'manual_admin',
   expiresAt: Date | null,
+  sourceId?: string | null,
 ): Promise<void> {
   const { error } = await supabase.rpc('grant_credits', {
     p_account_type: account.type,
@@ -118,6 +123,7 @@ export async function grantCredits(
     p_amount: amount,
     p_reason: reason,
     p_expires_at: expiresAt ? expiresAt.toISOString() : null,
+    p_source_id: sourceId ?? null,
   });
   if (error) throw error;
 }
