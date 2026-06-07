@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
-import { TOPUPS, type TopupId } from '@/lib/plans';
+import { PLANS, TOPUPS, type TopupId } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -85,20 +85,12 @@ function getPeriodEnd(sub: Stripe.Subscription): string {
 }
 
 /**
- * Map a brokerage plan → seat limit.
- * starter = 5, team = 15, enterprise = unlimited (NULL).
+ * Map a brokerage plan → seat limit, from the single source of truth in
+ * lib/plans.ts (team = 5, team_plus = 10). Unknown plans → null (no cap set).
  */
 function seatLimitForPlan(plan: string | undefined | null): number | null {
-  switch (plan) {
-    case 'starter':
-      return 5;
-    case 'team':
-      return 15;
-    case 'enterprise':
-      return null;
-    default:
-      return null;
-  }
+  if (plan === 'team' || plan === 'team_plus') return PLANS[plan].includedUsers;
+  return null;
 }
 
 /**
@@ -223,7 +215,7 @@ async function updateBrokerageFromSubscription(
 
   if (opts.includePlanFromMetadata) {
     const plan = subscription.metadata?.plan;
-    if (plan === 'starter' || plan === 'team' || plan === 'enterprise') {
+    if (plan === 'team' || plan === 'team_plus') {
       updateData.plan = plan;
       updateData.seatLimit = seatLimitForPlan(plan);
     }

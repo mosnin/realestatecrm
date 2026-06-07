@@ -5,17 +5,15 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
 
-type BrokeragePlan = 'starter' | 'team' | 'enterprise';
+type BrokeragePlan = 'team' | 'team_plus';
 
 /** Map plan → Stripe price env var. */
 function getBrokeragePriceEnv(plan: BrokeragePlan): string | undefined {
   switch (plan) {
-    case 'starter':
-      return process.env.STRIPE_PRICE_STARTER;
     case 'team':
       return process.env.STRIPE_PRICE_TEAM;
-    case 'enterprise':
-      return process.env.STRIPE_PRICE_ENTERPRISE;
+    case 'team_plus':
+      return process.env.STRIPE_PRICE_TEAM_PLUS;
   }
 }
 
@@ -195,9 +193,9 @@ async function handleBrokerageCheckout(
 
   // Validate plan input
   const plan = body?.plan as BrokeragePlan | undefined;
-  if (plan !== 'starter' && plan !== 'team' && plan !== 'enterprise') {
+  if (plan !== 'team' && plan !== 'team_plus') {
     return NextResponse.json(
-      { error: 'plan must be one of: starter, team, enterprise' },
+      { error: 'plan must be one of: team, team_plus' },
       { status: 400 },
     );
   }
