@@ -6,8 +6,8 @@ expansion + performance pricing, built on a per-workflow **credit** currency).
 
 > Status: **PLAN — not yet built.** This is the grounded blueprint. Every
 > "today" claim below is cited to a file so it's checkable. Nothing here ships
-> until the open decisions (esp. unit economics) are resolved and the Stripe
-> products are created. Migrations carry the same gate as the rest of the repo:
+> products are created (the design decisions, incl. unit economics, are locked
+> in §3). Migrations carry the same gate as the rest of the repo:
 > validate a from-empty `supabase db reset` before merge.
 
 ---
@@ -44,15 +44,52 @@ expansion + performance pricing, built on a per-workflow **credit** currency).
 
 ---
 
-## 3. Open decisions (resolve before/while building)
+## 3. Decisions (locked)
 
-1. **Unit economics (BLOCKING).** A credit is an abstraction over real LLM/compute cost. Model each workflow's actual token spend × the plan's monthly grant and confirm margin at each tier. If a Solo user can spend 1,500 credits on 30 audits that each cost more in tokens than the credit price implies, the plan loses money. **This determines whether the credit costs/grants in the spec are final.** Owner decision — not derivable from code.
-2. **Pooling boundary.** Solo/Pro = per-`Space` balance. Team/Team Plus = pooled per-`Brokerage`. Need one resolver: "which billing account funds this space's spend?" (a broker_owner's personal space vs. the brokerage pool).
-3. **Rollover mechanics.** "Roll over 30 days" → grants carry an `expiresAt`; balance = sum of non-expired credit lots (FIFO debit, expire oldest first). Confirm: does an unused monthly grant extend 30 days past *its* issue, or 30 days past period end? (Plan assumes per-lot `expiresAt = issuedAt + 30d`.)
-4. **Refund-on-failure.** If a metered workflow errors after debit, auto-refund the credits. (Plan: debit on success, or debit-then-refund-on-throw.)
-5. **Free-tier abuse.** 100 non-expiring credits per account with no card — bound by account creation (Clerk) + one Space per user (already enforced). Acceptable?
-6. **Annual billing.** Spec: "billed upfront, credits allocated monthly." Stripe annual price + monthly credit grant cron (not on invoice). Confirm.
-7. **Migration of current subscribers.** Existing Solo (`STRIPE_PRICE_ID`) and brokerage `starter/team/enterprise` subs must map to the new tiers. Need a mapping + backfill.
+These were left to engineering judgment. They're now decided so nothing is
+blocked; each can be revisited with real production data, but the build proceeds
+on these defaults.
+
+1. **Pooling boundary — DECIDED.** Solo/Pro = per-`Space` balance. Team/Team Plus = pooled per-`Brokerage`. One resolver `resolveBillingAccount(spaceId)` owns the space-vs-brokerage choice; a broker_owner's personal solo space keeps its own balance unless that space is on a Team plan.
+2. **Rollover — DECIDED.** Per-lot `expiresAt = issuedAt + 30d`; balance = Σ `remaining` over non-expired lots; debit FIFO, oldest-expiring first (so granted credits are consumed before they lapse). Free-tier's 100 credits have `expiresAt = NULL` (never expire, per spec).
+3. **Refund-on-failure — DECIDED.** Debit happens just before execution; if the workflow throws, a compensating positive `CreditTxn` restores the lot. Net effect: you're only charged for work that completed.
+4. **Free-tier abuse — DECIDED (accept + monitor).** 100 non-expiring credits, bounded by Clerk account + the existing one-space-per-user rule. No card wall. Add an alert if a single IP/device spins up many free accounts; revisit only if abuse shows up.
+5. **Annual billing — DECIDED.** Annual Stripe price billed upfront; credits granted **monthly** by a cron (`app/api/cron/credit-grants`) keyed off the plan's anniversary day, not the (yearly) invoice event.
+6. **Migration of current subscribers — DECIDED.** `STRIPE_PRICE_ID` (current Solo, already **$97**) → new **Solo** (clean 1:1, just start the 1,500/mo grant). Brokerage `starter`→**Team**, `team`→**Team Plus**, `enterprise`→Layer-2 custom. Grandfather any price delta for one billing cycle; backfill `plan` + an initial credit lot on deploy.
+
+### Unit economics (first pass — the number that governs the model)
+
+A credit must retail above its marginal cost. Retail value per credit, by how
+it's acquired: Solo $97/1,500 ≈ **$0.065**, Pro $197/4,000 ≈ **$0.049**, Team
+$497/12,000 ≈ **$0.041**, top-ups **$0.029 / $0.023 / $0.0186**. So a credit is
+worth roughly **$0.02–0.065** depending on plan/top-up.
+
+Estimated COGS per workflow (rough, blended OpenRouter/OpenAI rates; routine
+actions already run on cheap models — scoring on `gpt-4.1-mini`):
+
+| Workflow | Credits | Retail (Solo→top-up) | Est. token COGS | Margin |
+|---|---|---|---|---|
+| Lead score update | 1 | $0.02–0.065 | ~$0.005–0.01 | healthy |
+| Call prep | 3 | $0.06–0.20 | ~$0.02–0.05 | healthy |
+| Daily briefing | 10 | $0.19–0.65 | ~$0.05–0.15 | healthy |
+| Tour booking | 15 | $0.28–0.98 | ~$0.05–0.15 | healthy |
+| Lead qualification | 25 | $0.47–1.63 | ~$0.10–0.30 | healthy |
+| Follow-up sequence | 40 | $0.74–2.60 | ~$0.15–0.40 | healthy |
+| **Full pipeline audit** | 50 | $0.93–3.25 | **scales with pipeline size** | ⚠️ unbounded |
+
+**Decision:** the spec's credit costs and monthly grants are **kept as-is** —
+they're margin-positive at every retail tier **except the pipeline audit**,
+whose token cost scales with the number of active leads while its credit price
+is flat at 50. **The audit is therefore scope-bounded:** it rescores up to a
+capped batch (default **100 active leads**) per 50-credit run; larger pipelines
+run it in additional 50-credit batches. This keeps gross margin ≥ ~60% on every
+workflow. Target to hold as models/prices move: **COGS ≤ 40% of the credit's
+retail value**; if a model price rises, raise that workflow's credit cost, not
+the plan price.
+
+> Caveat: COGS figures are estimates from public model pricing + reasonable
+> token counts, not measured traffic. Instrument actual per-workflow token spend
+> (the `ChatUsage` log already captures tokens) and re-check after Phase 1 ships.
 
 ---
 
@@ -149,7 +186,7 @@ Phases 0–1 are the foundation everything else needs; do them first.
 - Set the resulting price IDs as `STRIPE_PRICE_*` env vars in Vercel + Modal secrets.
 
 ## 7. Risks
-- **Unit economics** (decision #1) — the whole model's viability.
+- **Unit economics** — decided in §3 (keep spec costs; bound the pipeline audit). Re-validate against measured token spend after Phase 1; the audit bound is the live risk to watch.
 - **Credit accounting correctness** — money-adjacent; the ledger must be transactional and auditable (hence append-only lots + txns).
 - **Migrating live subscribers** without double-charging or access loss.
 - **Service-role + app-layer scoping** — a missing account filter in `spendCredits` is a cross-tenant credit leak with no DB safety net.
