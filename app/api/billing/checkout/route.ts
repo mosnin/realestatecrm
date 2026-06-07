@@ -135,10 +135,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Stamp the tier on the subscription so the webhook grants the right
+    // monthly credits and labels Space.plan correctly — without this it has to
+    // infer from the (possibly stale) current Space.plan, which mislabels a
+    // downgrade. Derived from the price: Pro if it's the Pro price, else Solo.
+    const spacePlan = priceId === process.env.STRIPE_PRICE_PRO ? 'pro' : 'solo';
+
     // Only grant a 7-day trial if the user has never used one before
     const hasUsedTrial = !!stripeData?.trialUsedAt;
     const subscriptionData: Record<string, unknown> = {
-      metadata: { spaceId: space.id },
+      metadata: { spaceId: space.id, plan: spacePlan },
     };
     if (!hasUsedTrial) {
       subscriptionData.trial_period_days = 7;
@@ -152,7 +158,7 @@ export async function POST(req: NextRequest) {
       subscription_data: subscriptionData,
       success_url: `${appUrl}/s/${slug}/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/subscribe?slug=${slug}`,
-      metadata: { spaceId: space.id },
+      metadata: { spaceId: space.id, plan: spacePlan },
     });
 
     console.log('[checkout] Session created:', session.id, 'url:', session.url?.slice(0, 50));

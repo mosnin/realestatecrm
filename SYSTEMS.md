@@ -111,6 +111,19 @@ Money, platform admin, inbound webhooks, outbound notifications.
 
 ---
 
+## Recurring hazards (the bugs we keep re-introducing)
+
+These are bug *classes* that have recurred. Recognize the shape before you write code near it — most regressions here are someone re-stepping on one of these.
+
+1. **Isolation-by-title-prefix is not isolation.** Broker-Chippi / team-chat conversations once lived in the realtor `Conversation`/`Message` tables distinguished only by a `[BROKER_CHIPPI]`/`[BROKERAGE_CHAT]` title prefix. Because a broker_owner also owns their personal realtor space, *space ownership alone is not a boundary*. Any realtor read of `Conversation`/`Message` MUST route through `lib/chat/conversation-access` (`isRealtorConversation` / reserved-prefix exclusion) — list, single-conversation, messages, **and the write path** (`resolveConversation`). Broker chat now has its own `BrokerConversation`/`BrokerMessage` tables (keyed by `brokerageId`); prefer structural separation over string matches.
+2. **`Space.brokerageId` is NOT "which brokerage the user belongs to."** Membership lives in `BrokerageMembership` (a user can be in several). `Space.brokerageId` is only the intake-config owner and must never be overwritten on a second join. Don't read it as a membership signal.
+3. **Parallel realtor↔broker routes drift.** `task`/`broker-task`, `conversations`/`broker-conversations`, `messages`/`broker-messages` are near-duplicates; a fix applied to one is easily missed on the other (the isolation guard gap lived in exactly this seam). When you touch one, check its twin.
+4. **One chat runtime default.** TS is the default (`lib/ai-tools/runtime-flag.ts`); Modal is opt-in. Don't assume Modal is running for chat (Composio env, etc. must work on the TS path).
+5. **Service-role bypasses RLS.** All server queries use the service-role key, so RLS is *not* the tenant boundary — app-layer `.eq('spaceId'/'brokerageId')` scoping is. Add the scope filter; don't rely on a policy.
+6. **Webhooks must verify signature + be idempotent, and fail closed** when the secret is unset (see §10 seams).
+
+If a doc disagrees with the code, the code wins — and fix the doc. Docs that merely restate structure belong in the generated map, not prose (prose rots; the map is gated).
+
 ## How to keep this honest
 
 This file is judgment, not generated — it can drift. When you add a system or move a boundary, update the relevant section. The mechanical companion (`docs/repo-map.generated.md`) is CI-gated and can't drift; lean on it for "does this route/table/tool still exist," and use this file for "what does it mean and where does it break."

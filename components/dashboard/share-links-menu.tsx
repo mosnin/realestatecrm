@@ -137,7 +137,7 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
           type="button"
           aria-label="Share my links"
           title="Share my links"
-          className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors data-[state=open]:bg-foreground/[0.045] data-[state=open]:text-foreground"
+          className="h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors data-[state=open]:bg-foreground/[0.045] data-[state=open]:text-foreground"
         >
           <Link2 size={14} strokeWidth={1.75} />
         </button>

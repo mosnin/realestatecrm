@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
 import {
   findCalendarConnection,
   writeEventThrough,
@@ -94,6 +95,19 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
   },
 
   async handler(args, ctx) {
+    // Credit gate (no-op unless CREDITS_ENFORCED). Charged on success below.
+    try {
+      await assertCanSpend(ctx.space.id, 'tour_booking');
+    } catch (err) {
+      if (err instanceof CreditsExhaustedError) {
+        return {
+          summary: 'Out of credits — buy a top-up or upgrade to keep booking tours.',
+          display: 'error',
+        };
+      }
+      throw err;
+    }
+
     // Resolve guest from Contact when provided.
     let contactId: string | null = null;
     let guestName = args.guestName ?? '';
@@ -224,6 +238,7 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
       minute: '2-digit',
     });
     const where = args.propertyAddress ? ` at ${args.propertyAddress}` : '';
+    await chargeWorkflow(ctx.space.id, 'tour_booking');
     return {
       summary: `Tour scheduled for ${guestName || 'guest'}${where} — ${prettyTime}.`,
       data: {

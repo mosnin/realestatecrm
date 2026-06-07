@@ -26,6 +26,7 @@ import { composeBrief } from '@/lib/briefing/compose';
 import { shouldGenerateFor } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import { monitorCron } from '@/lib/cron-monitor';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
 
 export const runtime = 'nodejs';
 
@@ -43,6 +44,14 @@ interface CandidateRow {
 
 async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'failed'> {
   try {
+    // Credit gate (no-op unless CREDITS_ENFORCED). Skip the brief if the
+    // account can't afford it; charged after a successful compose below.
+    try {
+      await assertCanSpend(spaceId, 'daily_briefing');
+    } catch (err) {
+      if (err instanceof CreditsExhaustedError) return 'failed';
+      throw err;
+    }
     const { brief, cardMeta } = await composeBrief(spaceId);
     const { data: row, error } = await supabase
       .from('Brief')
@@ -62,6 +71,8 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
       console.error(`[cron/daily-briefing] upsert failed for ${spaceId}:`, error.message);
       return 'failed';
     }
+
+    await chargeWorkflow(spaceId, 'daily_briefing');
 
     // Inline delivery fan-out. Wrapped in its own try/catch so a Resend
     // / Telnyx hiccup never bubbles up and fails the brief generation —

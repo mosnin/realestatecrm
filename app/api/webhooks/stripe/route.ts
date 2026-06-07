@@ -4,6 +4,8 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
+import { TOPUPS, type TopupId } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -282,6 +284,39 @@ async function POSTHandler(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Top-up purchase (one-time payment, no subscription) — grant credits.
+        // Idempotent via the event-ID dedupe above, so a retried delivery won't
+        // double-grant. Metadata is set by app/api/billing/credits/checkout.
+        const topupId = session.metadata?.topup as TopupId | undefined;
+        if (topupId && topupId in TOPUPS) {
+          const acctType = session.metadata?.accountType;
+          const acctId = session.metadata?.accountId;
+          if (acctId && (acctType === 'space' || acctType === 'brokerage')) {
+            // Anti-poisoning (mirrors the subscription paths): if the target
+            // account already has a Stripe customer, it must match the payer.
+            // A brand-new account with no customer yet is allowed — the metadata
+            // was server-set from a verified owned space at checkout.
+            const acctTable = acctType === 'space' ? 'Space' : 'Brokerage';
+            const { data: acct } = await supabase
+              .from(acctTable)
+              .select('stripeCustomerId')
+              .eq('id', acctId)
+              .maybeSingle();
+            if (acct?.stripeCustomerId && acct.stripeCustomerId !== (session.customer as string)) {
+              logger.error('[stripe-webhook] top-up account/customer mismatch — rejecting metadata poisoning', {
+                acctType, acctId, sessionCustomer: session.customer,
+              });
+              break;
+            }
+            await grantTopup({ type: acctType, id: acctId }, topupId);
+            logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+          } else {
+            logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
+          }
+          break;
+        }
+
         if (!session.subscription) break;
 
         const subscription = await stripe.subscriptions.retrieve(
@@ -451,6 +486,13 @@ async function POSTHandler(req: NextRequest) {
           await updateBrokerageFromSubscription(brokerageId, paidSub, {
             includePlanFromMetadata: true,
           });
+          // Monthly credit grant (best-effort — must never break payment
+          // processing). Idempotent-per-invoice via the event-ID dedupe above.
+          try {
+            await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, paidSub.metadata?.plan ?? '');
+          } catch (e) {
+            logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+          }
           break;
         }
 
@@ -460,7 +502,7 @@ async function POSTHandler(req: NextRequest) {
         // so a poisoned stripeSubscriptionId can't activate another's space.
         const { data: paidSpace } = await supabase
           .from('Space')
-          .select('stripeCustomerId')
+          .select('id, plan, stripeCustomerId')
           .eq('stripeSubscriptionId', paidSubId)
           .maybeSingle();
         if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== paidSub.customer) {
@@ -478,6 +520,29 @@ async function POSTHandler(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(paidSub),
           })
           .eq('stripeSubscriptionId', paidSubId);
+
+        // Monthly credit grant (best-effort — never break payment processing).
+        // Trust the tier stamped on the subscription metadata (set at checkout);
+        // fall back to the current Space.plan, else Solo. Using the metadata
+        // avoids mislabeling a downgrade (e.g. Pro→Solo) off a stale Space.plan.
+        try {
+          if (paidSpace?.id) {
+            const planId =
+              (paidSub.metadata?.plan as string) ||
+              (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
+            if (planId !== paidSpace.plan) {
+              await supabase
+                .from('Space')
+                .update({ plan: planId, planActivatedAt: new Date().toISOString() })
+                .eq('id', paidSpace.id);
+            }
+            await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+          } else {
+            logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
+          }
+        } catch (e) {
+          logger.error('[stripe-webhook] space monthly grant failed (paid, credits NOT granted)', { paidSubId }, e);
+        }
 
         // Notify only on active transition (payment recovered past_due subscription)
         if (paidStatus === 'active') {
