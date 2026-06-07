@@ -103,7 +103,7 @@ function SidebarCollapseToggle() {
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="hidden md:inline-flex items-center justify-center w-8 h-8 -ml-1 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.96]"
+      className="hidden md:inline-flex items-center justify-center w-8 h-8 rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.96]"
     >
       <Icon size={17} strokeWidth={1.75} />
     </button>
@@ -179,7 +179,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
     setBrokerExpandedKey((prev) => (prev === key ? null : key));
 
   return (
-    <header data-dashboard-header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
+    <header data-dashboard-header className="h-14 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Desktop sidebar collapse toggle (Claude-style panel icon). */}
         <SidebarCollapseToggle />
@@ -501,7 +501,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
       {/* Right cluster — quiet icon row in the new sidebar language. Search
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1.5">
         {slug && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
@@ -511,7 +511,7 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           onClick={toggleTheme}
           aria-label="Toggle theme"
           title="Toggle theme"
-          className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors"
+          className="h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         >
           {theme === 'dark' ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
         </button>
