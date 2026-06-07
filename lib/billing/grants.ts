@@ -46,3 +46,16 @@ export async function grantTopup(account: BillingAccount, topup: TopupId): Promi
   await grantCredits(account, amount, 'topup', rolloverExpiry());
   return amount;
 }
+
+/** Plan tiers that carry a recurring monthly credit grant. */
+const GRANTABLE_PLANS = new Set<PlanId>(['solo', 'pro', 'team', 'team_plus']);
+
+/**
+ * Grant a plan's monthly credits when an invoice is paid. Tolerant of the raw
+ * plan string stored on Space/Brokerage (legacy `starter`/`enterprise` carry no
+ * defined monthly grant → no-op). Returns the credits granted (0 if none).
+ */
+export async function grantPlanMonthly(account: BillingAccount, planRaw: string): Promise<number> {
+  if (!GRANTABLE_PLANS.has(planRaw as PlanId)) return 0;
+  return grantMonthlyCredits(account, planRaw as PlanId);
+}
