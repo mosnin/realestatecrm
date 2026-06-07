@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the credit-lot writer so we can assert how the grant helpers call it —
 // specifically that they forward the Stripe `sourceId` that makes a retried
 // webhook idempotent at the DB level. Dropping that arg is a silent money bug.
-const grantCreditsMock = vi.fn(async () => {});
+const { grantCreditsMock } = vi.hoisted(() => ({
+  grantCreditsMock: vi.fn(async (..._args: unknown[]) => {}),
+}));
 vi.mock('@/lib/billing/credits', () => ({
-  grantCredits: (...args: unknown[]) => grantCreditsMock(...args),
+  grantCredits: grantCreditsMock,
 }));
 
 import { monthlyGrantAmount, grantPlanMonthly, grantTopup } from '@/lib/billing/grants';
