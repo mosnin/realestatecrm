@@ -4,7 +4,7 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
-import { grantTopup } from '@/lib/billing/grants';
+import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
 import { TOPUPS, type TopupId } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
@@ -470,6 +470,13 @@ async function POSTHandler(req: NextRequest) {
           await updateBrokerageFromSubscription(brokerageId, paidSub, {
             includePlanFromMetadata: true,
           });
+          // Monthly credit grant (best-effort — must never break payment
+          // processing). Idempotent-per-invoice via the event-ID dedupe above.
+          try {
+            await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, paidSub.metadata?.plan ?? '');
+          } catch (e) {
+            logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+          }
           break;
         }
 
@@ -479,7 +486,7 @@ async function POSTHandler(req: NextRequest) {
         // so a poisoned stripeSubscriptionId can't activate another's space.
         const { data: paidSpace } = await supabase
           .from('Space')
-          .select('stripeCustomerId')
+          .select('id, plan, stripeCustomerId')
           .eq('stripeSubscriptionId', paidSubId)
           .maybeSingle();
         if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== paidSub.customer) {
@@ -497,6 +504,24 @@ async function POSTHandler(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(paidSub),
           })
           .eq('stripeSubscriptionId', paidSubId);
+
+        // Monthly credit grant (best-effort — never break payment processing).
+        // Today the only Space price is Solo, so set the tier if unset, then
+        // grant. New tiers (Pro) will carry their plan via checkout metadata.
+        try {
+          if (paidSpace?.id) {
+            const planId = paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo';
+            if (planId !== paidSpace.plan) {
+              await supabase
+                .from('Space')
+                .update({ plan: planId, planActivatedAt: new Date().toISOString() })
+                .eq('id', paidSpace.id);
+            }
+            await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+          }
+        } catch (e) {
+          logger.error('[stripe-webhook] space monthly grant failed', undefined, e);
+        }
 
         // Notify only on active transition (payment recovered past_due subscription)
         if (paidStatus === 'active') {
