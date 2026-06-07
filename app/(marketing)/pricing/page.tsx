@@ -1,130 +1,233 @@
 /**
- * `/pricing` — one plan, honest pricing.
+ * `/pricing` — Chippi V2 three-layer pricing.
  *
- * Apple-discipline: Chippi ships ONE plan at ONE price. We refuse the
- * 3-tier "Starter / Pro / Enterprise" pattern because it's a sales
- * tactic, not a customer service. "Configuration is failure to decide"
- * (STYLESHEET.md). For brokerages there is a single "Talk to sales"
- * track — one conversation link, not a fourth column.
+ * Layer 1: platform tiers for individuals (Free / Solo / Pro Performer) and
+ * teams (Team / Team Plus). Layer 2: brokerage expansion (auto-expanding
+ * per-agent pricing). Premium AI workflows draw from a monthly credit balance.
  *
- * The page is a single column: hero → the pricing card → a quiet
- * anchor for brokerages → three honest FAQs → arrival CTA. No
- * checkmark grids, no monthly/annual toggle, no testimonials.
- *
- * Placeholder pricing: $79 / realtor / month after a 7-day trial.
- * The number renders in serif Times — the brand's quiet flourish —
- * because the price IS the page's focal element.
+ * Numbers come from `lib/plans` so the marketing page can't drift from the
+ * product's source of truth. Marketing visual system (studio): serif Times for
+ * prices, orange accents allowed.
  */
 
 import Link from 'next/link';
 import { MarketingHero } from '@/components/marketing/marketing-hero';
-import { MarketingSection } from '@/components/marketing/marketing-section';
 import { MarketingCTA } from '@/components/marketing/marketing-cta';
 import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
 
 export const metadata = { title: 'Pricing · Chippi' };
 
-const INCLUDED: string[] = [
-  'The agent (Chippi runs the workspace)',
-  'Email + calendar integrations (Gmail, Outlook, Google Calendar)',
-  'Unlimited contacts, deals, properties',
-  'File room with versioning',
-  'Studio (content generation + scheduling)',
-  'Realtime sync across devices',
-  'Priority support',
-  'All future updates included',
+const SIGNUP = '/login/realtor?intent=signup';
+
+type Card = {
+  id: keyof typeof PLANS;
+  blurb: string;
+  cta: { label: string; href: string };
+  featured?: boolean;
+};
+
+const INDIVIDUAL: Card[] = [
+  { id: 'free', blurb: 'Experience the workspace. No card required.', cta: { label: 'Start free', href: SIGNUP } },
+  { id: 'solo', blurb: 'Organize your pipeline and start using AI workflows.', cta: { label: 'Start Solo', href: SIGNUP } },
+  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start Pro', href: SIGNUP }, featured: true },
 ];
+
+const TEAM: Card[] = [
+  { id: 'team', blurb: 'Shared command center for scoring, routing, accountability.', cta: { label: 'Start a team', href: '/demo' } },
+  { id: 'team_plus', blurb: 'Brokerage-level workflow without enterprise complexity.', cta: { label: 'Talk to sales', href: '/demo' } },
+];
+
+const EXPANSION: { range: string; mo: number; yr: number }[] = [
+  { range: '10–24 agents', mo: 69, yr: 56 },
+  { range: '25–49 agents', mo: 59, yr: 48 },
+  { range: '50–99 agents', mo: 49, yr: 40 },
+  { range: '100–199 agents', mo: 39, yr: 32 },
+];
+
+const WORKFLOW_LABELS: Record<keyof typeof WORKFLOW_CREDIT_COST, string> = {
+  pipeline_audit: 'Full pipeline audit',
+  followup_sequence: 'Follow-up sequence',
+  lead_qualification: 'Lead qualification run',
+  tour_booking: 'Tour booking workflow',
+  daily_briefing: 'Daily AI briefing',
+  call_prep: 'Call prep',
+  lead_score: 'Lead score update',
+};
 
 const FAQ: { q: string; a: string }[] = [
   {
-    q: 'Why one plan instead of tiers?',
-    a: 'Tiers are a sales tactic, not a service. One plan, one price, the whole surface. If you outgrow the agent, you’ll tell us.',
+    q: 'What are credits?',
+    a: 'High-value agentic actions draw from a monthly credit balance — a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
   },
   {
-    q: 'What happens after the trial?',
-    a: 'You enter the plan automatically, but only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
+    q: 'What happens when I run out of credits?',
+    a: 'Buy a one-time top-up anytime, or upgrade your plan for a larger monthly allocation and a better rate. Your workspace never locks — only the premium AI workflows pause.',
   },
   {
-    q: 'Brokerages: what changes?',
-    a: 'The pricing scales by realtor. The agent doesn’t. Every realtor on your floor gets the same surface; admins see the rollup. Talk to us for migration.',
+    q: 'How does brokerage pricing work?',
+    a: 'Add an agent and billing updates automatically — the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
   },
 ];
+
+function PlanCard({ card }: { card: Card }) {
+  const p = PLANS[card.id];
+  return (
+    <div
+      className={`flex flex-col rounded-2xl border p-8 ${
+        card.featured ? 'border-brand/60' : 'border-border/70'
+      }`}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        {p.label}
+      </p>
+      <p style={TITLE_FONT} className="mt-4 text-[44px] leading-none tracking-[-0.02em] text-foreground">
+        {p.priceMonthly === 0 ? '$0' : `$${p.priceMonthly}`}
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {p.priceMonthly === 0 ? 'free forever' : 'per month'}
+        {p.includedUsers > 1 ? ` · ${p.includedUsers} users` : ''}
+      </p>
+      <p className="mt-5 text-sm text-foreground/85">{card.blurb}</p>
+      <p className="mt-5 text-sm text-foreground">
+        <span style={TITLE_FONT} className="text-xl">
+          {(p.monthlyCredits || p.oneTimeCredits || 0).toLocaleString()}
+        </span>{' '}
+        <span className="text-muted-foreground">
+          credits{p.monthlyCredits ? ' / month' : ' to start'}
+        </span>
+      </p>
+      {p.addUser && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          +${p.addUser.priceMonthly}/user · +{p.addUser.credits.toLocaleString()} credits
+        </p>
+      )}
+      <Link href={card.cta.href} className={`${PRIMARY_PILL} mt-8 w-full justify-center`}>
+        {card.cta.label}
+      </Link>
+    </div>
+  );
+}
 
 export default function PricingPage() {
   return (
     <>
       <MarketingHero
         eyebrow="PRICING"
-        title="One plan. Honest pricing."
-        sub="Start with a seven-day free trial. After that, a single monthly price that covers the agent, the integrations, and the surface. No seats math, no feature gates."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        title="Pricing that scales with your team."
+        sub="Start free. Move up as you grow. Premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
+        primaryCta={{ label: 'Start free', href: SIGNUP }}
         secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
       />
 
-      {/* The pricing card — the page's focal element. */}
-      <section className="relative pb-24 md:pb-32">
-        <div className="mx-auto max-w-xl px-6 md:px-8">
-          <div className="rounded-2xl border border-border/70 p-10 md:p-14 text-center">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              The plan
-            </p>
-            <p
-              style={TITLE_FONT}
-              className="mt-2 text-3xl tracking-tight text-foreground"
-            >
-              Chippi
-            </p>
-            <p
-              style={TITLE_FONT}
-              className="mt-8 text-[60px] md:text-[80px] leading-none tracking-[-0.02em] text-foreground"
-            >
-              $79
-            </p>
-            <p className="mt-4 text-sm text-muted-foreground">
-              per realtor / month, after the 7-day trial.
-            </p>
-
-            <div className="border-t border-border/60 my-10" />
-
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground text-left">
-              What&rsquo;s included
-            </p>
-            <ul className="mt-5 space-y-2 text-sm text-foreground/85 text-left">
-              {INCLUDED.map((line) => (
-                <li key={line} className="flex items-start gap-2.5">
-                  <span
-                    aria-hidden
-                    className="mt-2 h-1 w-1 rounded-full bg-foreground/70 flex-shrink-0"
-                  />
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-
-            <Link
-              href="/login/realtor?intent=signup"
-              className={`${PRIMARY_PILL} mt-10 w-full justify-center`}
-            >
-              Start free trial
-            </Link>
-            <p className="mt-4 text-xs text-muted-foreground">
-              No credit card required. Cancel anytime.
-            </p>
+      {/* Individual plans */}
+      <section className="relative pb-16 md:pb-24">
+        <div className="mx-auto max-w-6xl px-6 md:px-8">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            For individual agents
+          </p>
+          <div className="mt-6 grid gap-5 md:grid-cols-3">
+            {INDIVIDUAL.map((c) => (
+              <PlanCard key={c.id} card={c} />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Quiet anchor for brokerages. */}
-      <MarketingSection
-        stacked
-        eyebrow="FOR BROKERAGES"
-        title="Talk to us about the floor."
-        sub="Brokerages pay by realtor with volume pricing. We’ll talk through migration and onboarding the team."
-        learnMore={{ label: 'Talk to sales', href: '/demo' }}
-      />
+      {/* Team plans */}
+      <section className="relative pb-16 md:pb-24">
+        <div className="mx-auto max-w-4xl px-6 md:px-8">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            For teams
+          </p>
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {TEAM.map((c) => (
+              <PlanCard key={c.id} card={c} />
+            ))}
+          </div>
+        </div>
+      </section>
 
-      {/* FAQ — three questions, hairline-divided, all visible at once. */}
-      <section className="relative py-24 md:py-32">
+      {/* Brokerage expansion */}
+      <section className="relative pb-16 md:pb-24">
+        <div className="mx-auto max-w-3xl px-6 md:px-8">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Brokerage expansion
+          </p>
+          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
+            Add an agent. Billing updates automatically.
+          </h2>
+          <div className="mt-8 overflow-hidden rounded-2xl border border-border/70">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/60 text-left text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">Agents</th>
+                  <th className="px-5 py-3 font-medium tabular-nums">Monthly / agent</th>
+                  <th className="px-5 py-3 font-medium tabular-nums">Annual / agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {EXPANSION.map((row) => (
+                  <tr key={row.range} className="border-b border-border/60 last:border-0">
+                    <td className="px-5 py-3 text-foreground">{row.range}</td>
+                    <td className="px-5 py-3 tabular-nums text-foreground">${row.mo}</td>
+                    <td className="px-5 py-3 tabular-nums text-foreground">${row.yr}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="px-5 py-3 text-foreground">200+ agents</td>
+                  <td className="px-5 py-3 text-muted-foreground" colSpan={2}>
+                    Custom — performance pricing available.{' '}
+                    <Link href="/demo" className="text-brand hover:underline">Talk to sales</Link>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Credits explainer */}
+      <section className="relative pb-16 md:pb-24">
+        <div className="mx-auto max-w-3xl px-6 md:px-8">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Premium AI workflows
+          </p>
+          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
+            Credits are spent when Chippi does real work.
+          </h2>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Every paid plan includes a monthly credit balance. High-value actions cost more; routine ones cost little. Unused credits roll over for 30 days.
+          </p>
+          <ul className="mt-8 divide-y divide-border/60 border-t border-b border-border/60">
+            {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[]).map((k) => (
+              <li key={k} className="flex items-center justify-between py-3">
+                <span className="text-sm text-foreground">{WORKFLOW_LABELS[k]}</span>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Need more? One-time top-ups
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {Object.values(TOPUPS).map((t) => (
+              <div key={t.id} className="rounded-2xl border border-border/70 p-5">
+                <p className="text-sm font-medium text-foreground">{t.label}</p>
+                <p style={TITLE_FONT} className="mt-2 text-2xl tabular-nums text-foreground">
+                  {t.credits.toLocaleString()}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">credits · ${t.price} one-time</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="relative py-16 md:py-24">
         <div className="max-w-3xl mx-auto px-6 md:px-8">
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -132,20 +235,16 @@ export default function PricingPage() {
             </p>
             <h2
               style={TITLE_FONT}
-              className="mt-4 text-[34px] sm:text-[44px] md:text-[56px] leading-[1.05] tracking-[-0.02em] text-foreground"
+              className="mt-4 text-[34px] sm:text-[44px] tracking-[-0.02em] text-foreground"
             >
               What people ask first.
             </h2>
           </div>
-          <ul className="mt-16 divide-y divide-border/60 border-t border-b border-border/60">
+          <ul className="mt-14 divide-y divide-border/60 border-t border-b border-border/60">
             {FAQ.map((item) => (
               <li key={item.q} className="py-8">
-                <p className="text-base md:text-lg font-medium text-foreground">
-                  {item.q}
-                </p>
-                <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
-                  {item.a}
-                </p>
+                <p className="text-base md:text-lg font-medium text-foreground">{item.q}</p>
+                <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">{item.a}</p>
               </li>
             ))}
           </ul>
@@ -153,9 +252,9 @@ export default function PricingPage() {
       </section>
 
       <MarketingCTA
-        title="Start your free trial."
-        sub="Seven days. No credit card. Bring your inbox and let Chippi do the rest."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        title="Start free. Grow when you’re ready."
+        sub="No card required to begin. Bring your inbox and let Chippi do the work."
+        primaryCta={{ label: 'Start free', href: SIGNUP }}
         secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
     </>
