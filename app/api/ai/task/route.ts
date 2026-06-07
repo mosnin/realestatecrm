@@ -46,6 +46,7 @@ import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
@@ -573,6 +574,22 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/task] token budget check failed — continuing', { spaceSlug }, err);
   }
 
+  // Credit gate — refuse the turn up front when the funding account is out of
+  // credits. No-op unless CREDITS_ENFORCED, so this is dormant until credits go
+  // live. Joins the daily-token-budget gate above as a pre-stream refusal the
+  // chat client already surfaces (same non-OK JSON error shape as 429/400).
+  try {
+    await assertCanSpend(ctx.space.id, 'chat_turn');
+  } catch (err) {
+    if (err instanceof CreditsExhaustedError) {
+      return NextResponse.json(
+        { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
+        { status: 402 },
+      );
+    }
+    throw err;
+  }
+
   let conversationId: string;
   try {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);
@@ -587,6 +604,11 @@ export async function POST(req: NextRequest) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
+
+  // Charge the turn now that it's committed to running (user message saved, all
+  // execution paths below dispatch the model). Flat per-turn cost, best-effort
+  // so a metering miss never breaks the reply. No-op unless CREDITS_ENFORCED.
+  await chargeWorkflow(ctx.space.id, 'chat_turn', { userId: ctx.userId });
 
   void (async () => {
     try {

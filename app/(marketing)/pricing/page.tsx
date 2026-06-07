@@ -45,7 +45,10 @@ const EXPANSION: { range: string; mo: number; yr: number }[] = [
   { range: '100–199 agents', mo: 39, yr: 32 },
 ];
 
-const WORKFLOW_LABELS: Record<keyof typeof WORKFLOW_CREDIT_COST, string> = {
+// Premium workflows shown on the pricing table. `chat_turn` is intentionally
+// omitted — the per-turn chat meter is an internal cost ceiling, not one of the
+// advertised "premium workflows" (the copy positions routine chat as ~free).
+const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
   pipeline_audit: 'Full pipeline audit',
   followup_sequence: 'Follow-up sequence',
   lead_qualification: 'Lead qualification run',
@@ -200,7 +203,9 @@ export default function PricingPage() {
             Every paid plan includes a monthly credit balance. High-value actions cost more; routine ones cost little. Unused credits roll over for 30 days.
           </p>
           <ul className="mt-8 divide-y divide-border/60 border-t border-b border-border/60">
-            {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[]).map((k) => (
+            {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[])
+              .filter((k) => k in WORKFLOW_LABELS)
+              .map((k) => (
               <li key={k} className="flex items-center justify-between py-3">
                 <span className="text-sm text-foreground">{WORKFLOW_LABELS[k]}</span>
                 <span className="text-sm tabular-nums text-muted-foreground">
