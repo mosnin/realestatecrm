@@ -66,7 +66,7 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={handleToggle}
-        className="relative p-2 rounded-md hover:bg-foreground/[0.04] transition-colors"
+        className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         title="Notifications"
       >
         <Bell size={16} className="text-muted-foreground" />

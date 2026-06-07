@@ -8,9 +8,9 @@
 ## At a glance
 
 - **Page routes:** 187
-- **API endpoints:** 311
+- **API endpoints:** 313
 - **Cron jobs:** 10
-- **DB tables:** 99  ·  **RPCs:** 17  ·  **migrations:** 150
+- **DB tables:** 101  ·  **RPCs:** 20  ·  **migrations:** 153
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 53 declared
 
@@ -309,12 +309,13 @@
 - `/api/account/delete`
 - `/api/account/export`
 
-**/api/admin** (17)
+**/api/admin** (18)
 
 - `/api/admin/actions`
 - `/api/admin/agent-stats`
 - `/api/admin/announcements`
 - `/api/admin/announcements/[id]`
+- `/api/admin/billing`
 - `/api/admin/broadcast`
 - `/api/admin/brokerages`
 - `/api/admin/brokerages/[id]`
@@ -425,10 +426,11 @@
 
 - `/api/auth/me`
 
-**/api/billing** (3)
+**/api/billing** (4)
 
 - `/api/billing/cancel`
 - `/api/billing/checkout`
+- `/api/billing/credits/checkout`
 - `/api/billing/portal`
 
 **/api/brief** (1)
@@ -836,11 +838,11 @@ the runtimes diverge — this table makes the drift visible.
 
 ## Data model (supabase/schema.sql)
 
-**Tables (99):** `AIUserProfile`, `AffiliateAccount`, `AgentActivityLog`, `AgentDraft`, `AgentGoal`, `AgentMemory`, `AgentPausedRun`, `AgentQuestion`, `AgentSettings`, `AgentTask`, `AgentTrajectory`, `Announcement`, `AnnouncementDismissal`, `AppKnowledgeDoc`, `ApplicationMessage`, `ApplicationStatusUpdate`, `Artifact`, `ArtifactVersion`, `Attachment`, `AuditLog`, `Brief`, `BriefTipHistory`, `BrokerConversation`, `BrokerMessage`, `BrokerNotification`, `Brokerage`, `BrokerageIntegrationConnection`, `BrokerageMembership`, `BrokerageRemoval`, `BrokerageTemplate`, `CalendarEvent`, `CalendarEventMirror`, `CalendarNote`, `CallLog`, `ChatUsage`, `ClientAuthCode`, `ClientDocument`, `ClientInfoRequest`, `ClientMessage`, `ClientUser`, `CmaReport`, `CommissionLedger`, `CommissionSplit`, `Contact`, `ContactDocument`, `Conversation`, `CustomAgent`, `DeadLetterEvent`, `Deal`, `DealActivity`, `DealChecklistItem`, `DealContact`, `DealDocument`, `DealReviewComment`, `DealReviewRequest`, `DealRoutingRule`, `DealStage`, `DisabledSpace`, `DocumentEmbedding`, `EmailBroadcast`, `ExecutionStep`, `File`, `FormAnalyticsEvent`, `FormDraft`, `GoalDecomposition`, `GoogleCalendarToken`, `IntegrationConnection`, `IntegrationTrigger`, `Invitation`, `McpApiKey`, `McpAuthCode`, `Message`, `MessageTemplate`, `Note`, `Pipeline`, `ProfilePage`, `Property`, `PropertyPacket`, `PushSubscription`, `Routine`, `SignatureRequest`, `Space`, `SpaceSetting`, `StudioBrand`, `StudioGeneration`, `StudioPost`, `SupportTicket`, `SwarmEvent`, `SwarmMember`, `SwarmRun`, `TaskCheckpoint`, `TaskDependency`, `TelemetryEvent`, `Tour`, `TourAvailabilityOverride`, `TourFeedback`, `TourPropertyProfile`, `TourWaitlist`, `User`
+**Tables (101):** `AIUserProfile`, `AffiliateAccount`, `AgentActivityLog`, `AgentDraft`, `AgentGoal`, `AgentMemory`, `AgentPausedRun`, `AgentQuestion`, `AgentSettings`, `AgentTask`, `AgentTrajectory`, `Announcement`, `AnnouncementDismissal`, `AppKnowledgeDoc`, `ApplicationMessage`, `ApplicationStatusUpdate`, `Artifact`, `ArtifactVersion`, `Attachment`, `AuditLog`, `Brief`, `BriefTipHistory`, `BrokerConversation`, `BrokerMessage`, `BrokerNotification`, `Brokerage`, `BrokerageIntegrationConnection`, `BrokerageMembership`, `BrokerageRemoval`, `BrokerageTemplate`, `CalendarEvent`, `CalendarEventMirror`, `CalendarNote`, `CallLog`, `ChatUsage`, `ClientAuthCode`, `ClientDocument`, `ClientInfoRequest`, `ClientMessage`, `ClientUser`, `CmaReport`, `CommissionLedger`, `CommissionSplit`, `Contact`, `ContactDocument`, `Conversation`, `CreditLot`, `CreditTxn`, `CustomAgent`, `DeadLetterEvent`, `Deal`, `DealActivity`, `DealChecklistItem`, `DealContact`, `DealDocument`, `DealReviewComment`, `DealReviewRequest`, `DealRoutingRule`, `DealStage`, `DisabledSpace`, `DocumentEmbedding`, `EmailBroadcast`, `ExecutionStep`, `File`, `FormAnalyticsEvent`, `FormDraft`, `GoalDecomposition`, `GoogleCalendarToken`, `IntegrationConnection`, `IntegrationTrigger`, `Invitation`, `McpApiKey`, `McpAuthCode`, `Message`, `MessageTemplate`, `Note`, `Pipeline`, `ProfilePage`, `Property`, `PropertyPacket`, `PushSubscription`, `Routine`, `SignatureRequest`, `Space`, `SpaceSetting`, `StudioBrand`, `StudioGeneration`, `StudioPost`, `SupportTicket`, `SwarmEvent`, `SwarmMember`, `SwarmRun`, `TaskCheckpoint`, `TaskDependency`, `TelemetryEvent`, `Tour`, `TourAvailabilityOverride`, `TourFeedback`, `TourPropertyProfile`, `TourWaitlist`, `User`
 
-**RPCs (17):** `book_tour_atomic`, `cleanup_agent_data`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `ensure_agent_settings_for_space`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `offboard_brokerage_member`, `reorder_deal`, `routine_next_run_at`, `routine_set_next_run`, `search_knowledge_docs`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`
+**RPCs (20):** `book_tour_atomic`, `cleanup_agent_data`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `ensure_agent_settings_for_space`, `grant_credits`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `offboard_brokerage_member`, `refund_credit_txn`, `reorder_deal`, `routine_next_run_at`, `routine_set_next_run`, `search_knowledge_docs`, `spend_credits`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`
 
-**Migrations:** 150 (latest: `20260619000000_commission_ledger_retain_on_agent_delete.sql`)
+**Migrations:** 153 (latest: `20260622000000_credit_hardening.sql`)
 
 ## External services
 

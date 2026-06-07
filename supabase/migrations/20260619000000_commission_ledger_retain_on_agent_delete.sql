@@ -18,11 +18,10 @@
 -- Readers of agentUserId must tolerate NULL (historical rows for departed
 -- agents). Grouping/leaderboard queries treat NULL as "former agent".
 --
--- ⚠️ VALIDATION REQUIRED (same as the Tier E migration): apply against a real
--- Supabase DB and confirm the constraint swap succeeds. Not validatable in the
--- build sandbox (no Postgres). The auto-generated FK name is assumed to be
--- "CommissionLedger_agentUserId_fkey" (Postgres default for the inline REFERENCES
--- in the create migration); the DROP is guarded with IF EXISTS.
+-- ✓ VALIDATED on PostgreSQL 16: the constraint swap applies clean; deleting an
+-- agent's User row now PRESERVES the commission row with agentUserId = NULL
+-- (before: the row was cascade-deleted). The FK name is the Postgres default
+-- "CommissionLedger_agentUserId_fkey"; the DROP is guarded with IF EXISTS.
 -- ============================================================================
 
 ALTER TABLE "CommissionLedger" ALTER COLUMN "agentUserId" DROP NOT NULL;

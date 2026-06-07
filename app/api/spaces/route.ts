@@ -200,7 +200,17 @@ export async function PATCH(req: NextRequest) {
   if (name !== undefined) updateFields.name = name;
   if (emoji !== undefined) updateFields.emoji = emoji;
   if (body.brokerageId && typeof body.brokerageId === 'string') {
-    updateFields.brokerageId = body.brokerageId;
+    // SECURITY: only allow associating with a brokerage the owner is actually a
+    // member of. brokerageId drives credit-pool routing (lib/billing/account.ts);
+    // accepting an arbitrary value would let a user point their space at any
+    // brokerage's billing pool.
+    const { data: membership } = await supabase
+      .from('BrokerageMembership')
+      .select('userId')
+      .eq('brokerageId', body.brokerageId)
+      .eq('userId', space.ownerId)
+      .maybeSingle();
+    if (membership) updateFields.brokerageId = body.brokerageId;
   }
 
   // Handle slug change

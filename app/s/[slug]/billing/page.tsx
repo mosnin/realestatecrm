@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { BillingPage } from '@/components/billing/billing-page';
+import { CreditsSummary } from '@/components/billing/credits-summary';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import { H1, TITLE_FONT } from '@/lib/typography';
@@ -92,6 +93,7 @@ export default async function Billing({
         cardBrand={cardBrand}
         invoices={invoices}
       />
+      <CreditsSummary spaceId={space.id} slug={slug} />
     </div>
   );
 }

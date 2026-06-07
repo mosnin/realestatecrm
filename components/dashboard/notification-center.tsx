@@ -168,7 +168,7 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
       <button
         ref={btnRef}
         onClick={() => setOpen(!open)}
-        className="relative h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors"
+        className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         title="Notifications"
         aria-label={totalCount > 0 ? `${totalCount} notifications` : 'Notifications'}
       >
