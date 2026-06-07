@@ -1,15 +1,18 @@
 # Auth & Routing Flow
 
-How sign-up, sign-in, and onboarding work — and what broke and how it was fixed.
+How sign-up, sign-in, and onboarding work.
+
+> ⚠️ **Corrected:** earlier revisions of this doc routed everything through a `/dashboard` page and an `/onboarding` route. **Neither exists.** Post-login routing is `app/auth/redirect/page.tsx` (`/auth/redirect?intent=...`), and the onboarding UI is `app/setup`. The flow below has been updated; if you find a lingering `/dashboard` or `/onboarding` reference further down, it's stale — trust `app/auth/redirect` and `app/setup`.
 
 ---
 
 ## The flow
 
 ```
-Sign Up (Clerk)  ──→  /dashboard  ──→  /setup  ──→  /s/{slug}
-Sign In (Clerk)  ──→  /dashboard  ──→  /s/{slug}
-                                   └──→  /setup  (if no workspace yet)
+Sign Up (Clerk)  ──→  /auth/redirect  ──→  /setup  ──→  /s/{slug}
+Sign In (Clerk)  ──→  /auth/redirect  ──→  /s/{slug}
+                                       └──→  /setup   (if no workspace yet)
+                                       └──→  /broker  (if broker, no personal space)
 ```
 
 ### Step by step
