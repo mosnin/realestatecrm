@@ -32,6 +32,11 @@ CREATE TABLE IF NOT EXISTS "AuditLog" (
   "createdAt"  timestamptz NOT NULL DEFAULT now()
 );
 
+-- schema.sql may have already created AuditLog WITHOUT actorId (the CREATE TABLE
+-- IF NOT EXISTS above then no-ops), so guarantee the column exists before the
+-- index references it. Idempotent.
+ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "actorId" text;
+
 -- Fast lookups by actor, resource, and time window
 CREATE INDEX IF NOT EXISTS "audit_log_actor_idx"     ON "AuditLog" ("actorId");
 CREATE INDEX IF NOT EXISTS "audit_log_resource_idx"  ON "AuditLog" ("resource", "resourceId");
