@@ -445,6 +445,19 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           </SheetContent>
         </Sheet>
 
+        {/* Mobile: the Chippi mark in the top bar. On desktop the sidebar logo
+            and the breadcrumb carry identity; on mobile the sidebar is hidden
+            (bottom MobileNav takes over) and the top bar otherwise shows only
+            the menu button — so the brand mark would be absent until the drawer
+            is opened. Links to the dashboard home. */}
+        <Link
+          href={isOnBrokerPage ? '/broker' : base}
+          className="md:hidden inline-flex items-center"
+          aria-label="Chippi home"
+        >
+          <BrandLogo className="h-5" alt="Chippi" />
+        </Link>
+
         {/* Chippi mark on the brokerage dashboard header — gives the broker
             surface the same brand anchor the realtor side carries. */}
         {isOnBrokerPage && (
