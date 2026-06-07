@@ -257,12 +257,12 @@ export function ChippiBar({ slug }: Props) {
       className={cn(
         'fixed z-30 pointer-events-none',
         // Right column on desktop, clearing the floating sidebar column:
-        // 8px gutter + 240px sidebar card + 8px gap = 256px (the sidebar is now
-        // an inset card, not a full-bleed 240px panel — see sidebar.tsx).
+        // 12px gutter + 240px sidebar card + 12px gap = 264px (the sidebar is
+        // now an inset card, not a full-bleed 240px panel — see sidebar.tsx).
         // Above mobile nav on mobile with breathing room between the input and
         // the floating charcoal pill (mobile nav is ~76px tall including its
         // 12px float + 64px bar — bottom-24 puts the input ~20px above the pill).
-        'left-0 right-0 bottom-24 md:left-[256px] md:bottom-0',
+        'left-0 right-0 bottom-24 md:left-[264px] md:bottom-0',
         'px-3 sm:px-6 pb-3 md:pb-5',
       )}
       role="region"
