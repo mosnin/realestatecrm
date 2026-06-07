@@ -109,7 +109,7 @@ export async function getCreditBalance(account: BillingAccount): Promise<number>
 export async function grantCredits(
   account: BillingAccount,
   amount: number,
-  reason: 'monthly_grant' | 'topup' | 'free_signup' | 'addon_user' | 'migration',
+  reason: 'monthly_grant' | 'topup' | 'free_signup' | 'addon_user' | 'migration' | 'manual_admin',
   expiresAt: Date | null,
 ): Promise<void> {
   const { error } = await supabase.rpc('grant_credits', {
@@ -120,6 +120,26 @@ export async function grantCredits(
     p_expires_at: expiresAt ? expiresAt.toISOString() : null,
   });
   if (error) throw error;
+}
+
+/** Recent ledger transactions for an account (newest first) — for billing UIs. */
+export interface CreditTxnRow {
+  id: string;
+  delta: number;
+  workflow: string;
+  reason: string | null;
+  createdAt: string;
+}
+export async function getRecentTxns(account: BillingAccount, limit = 20): Promise<CreditTxnRow[]> {
+  const { data, error } = await supabase
+    .from('CreditTxn')
+    .select('id, delta, workflow, reason, createdAt')
+    .eq('accountType', account.type)
+    .eq('accountId', account.id)
+    .order('createdAt', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as CreditTxnRow[];
 }
 
 export interface SpendResult {
