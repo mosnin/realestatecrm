@@ -31,7 +31,7 @@ const BROKERAGE_PLANS = new Set<string>(['team', 'team_plus']);
 export async function resolveBillingAccount(spaceId: string): Promise<BillingContext> {
   const { data: space, error } = await supabase
     .from('Space')
-    .select('id, plan, brokerageId')
+    .select('id, plan, brokerageId, ownerId')
     .eq('id', spaceId)
     .maybeSingle();
   if (error) throw error;
@@ -44,10 +44,22 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
       .eq('id', space.brokerageId)
       .maybeSingle();
     if (brokerage && BROKERAGE_PLANS.has(brokerage.plan as string)) {
-      return {
-        account: { type: 'brokerage', id: brokerage.id as string },
-        plan: brokerage.plan as PlanId,
-      };
+      // SECURITY (money routing): only pool at the brokerage if the space's
+      // owner is a VERIFIED member of it. `Space.brokerageId` is a loosely-set
+      // field — without this check a realtor could point their space at any
+      // team brokerage and drain its shared credit pool through metered work.
+      const { data: membership } = await supabase
+        .from('BrokerageMembership')
+        .select('userId')
+        .eq('brokerageId', space.brokerageId)
+        .eq('userId', space.ownerId)
+        .maybeSingle();
+      if (membership) {
+        return {
+          account: { type: 'brokerage', id: brokerage.id as string },
+          plan: brokerage.plan as PlanId,
+        };
+      }
     }
   }
 

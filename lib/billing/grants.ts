@@ -5,6 +5,7 @@
  * same way.
  */
 
+import { supabase } from '@/lib/supabase';
 import { grantCredits, type BillingAccount } from '@/lib/billing/credits';
 import { PLANS, TOPUPS, CREDIT_ROLLOVER_DAYS, type PlanId, type TopupId } from '@/lib/plans';
 
@@ -32,10 +33,21 @@ export async function grantMonthlyCredits(
   return amount;
 }
 
-/** One-time Free-tier signup grant (never expires, per spec). */
+/** One-time Free-tier signup grant (never expires, per spec). Idempotent: one
+ *  per account. The unique index (uq_creditlot_free_signup) is the hard
+ *  backstop; this pre-check avoids a noisy duplicate-key error on a retried
+ *  signup. */
 export async function grantFreeSignup(account: BillingAccount): Promise<number> {
   const amount = PLANS.free.oneTimeCredits ?? 0;
   if (amount <= 0) return 0;
+  const { data: existing } = await supabase
+    .from('CreditLot')
+    .select('id')
+    .eq('accountType', account.type)
+    .eq('accountId', account.id)
+    .eq('reason', 'free_signup')
+    .maybeSingle();
+  if (existing) return 0;
   await grantCredits(account, amount, 'free_signup', null);
   return amount;
 }
