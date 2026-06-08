@@ -29,6 +29,10 @@ All variables found or inferable from code usage:
 | `STRIPE_PRICE_ENTERPRISE` | `app/api/billing/checkout/route.ts` | Stripe price ID for the Enterprise brokerage plan | **Medium** | Enterprise plan checkout cannot be created |
 | `COMPOSIO_API_KEY` | `lib/integrations/composio.ts`, `agent/integrations.py` | Composio API key for loading the realtor's connected toolkits (Gmail, Slack, HubSpot, etc.) into the chat agent AND autonomous runs | **High (when integrations used)** | Connections show "Connected" in /settings but Chippi can't see them as tools. **Must be set in BOTH Vercel env AND the Modal `chippi-secrets` secret** so chat (Modal) and the Next.js callback both work. |
 | `COMPOSIO_WEBHOOK_SECRET` | `app/api/webhooks/composio/route.ts` | Signing secret for inbound Composio trigger webhooks (HMAC-SHA256). Grab it from Composio dashboard → Project Settings → Webhook. Required for the receiver to authenticate trigger deliveries — without it, the receiver returns 500 and Chippi never notices anything happening in the realtor's connected apps. | **High (when triggers used)** | Inbound trigger deliveries rejected; Chippi cannot react to email replies, calendar accepts, deal stage changes, etc. Outbound tool execution still works. |
+| `CRON_SECRET` | `app/api/cron/*/route.ts` | Bearer token that gates every `/api/cron/*` route. Vercel Cron injects this automatically. Without it every cron endpoint is unauthenticated — any caller can fire sweeps, briefings, and cleanup jobs. | **High** | All cron routes open to unauthenticated callers; cron jobs never authenticate requests |
+| `AGENT_INTERNAL_SECRET` | `app/api/agent/run-now/route.ts`, `app/api/ai/task/route.ts` | Shared secret between Next.js and Modal. Must match the value in the Modal `chippi-secrets` secret. Without it, any caller can trigger Modal runs. | **High** | Internal agent routes unauthenticated; Modal runs can be triggered by anyone |
+| `CLIENT_AUTH_SECRET` | `app/api/clients/auth/route.ts` | Signing secret for client-portal JWTs. Falls back to `CLERK_SECRET_KEY` if unset, but set a dedicated value in production. | **Medium** | Falls back to CLERK_SECRET_KEY; set a dedicated secret in production |
+| `CREDITS_ENFORCED` | `lib/billing/meter.ts` | Billing kill-switch. Default derives from `NODE_ENV` (ON in production, OFF elsewhere). Set `false` to disable enforcement instantly without a deploy. Run `scripts/backfill-credit-grants.ts` before enabling in production. | **Medium** | Unset = NODE_ENV-derived default; missing flag logs a boot warning |
 | `NODE_ENV` | `lib/utils.ts` | Protocol selection (http vs https) | **Auto-set** | Set automatically by Next.js; do not override manually |
 
 ### Clerk-specific variables
@@ -85,6 +89,11 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 |---|---|
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | Legacy admin path. Core CRM works without it. |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Falls back to defaults. Set for correct intake link URLs. |
+| `CRON_SECRET` | Required to authenticate Vercel Cron calls to `/api/cron/*`. Without it, cron routes are open. |
+| `AGENT_INTERNAL_SECRET` | Required to authenticate Next.js → Modal calls. Must match `chippi-secrets` in Modal. |
+| `COMPOSIO_WEBHOOK_SECRET` | Required for composio trigger webhooks to be authenticated. Without it receiver returns 500. |
+| `CLIENT_AUTH_SECRET` | Signs client-portal JWTs. Falls back to CLERK_SECRET_KEY; set dedicated value in production. |
+| `CREDITS_ENFORCED` | Billing kill-switch. Unset = NODE_ENV-derived default. Set `false` to disable enforcement instantly. |
 | `NEXT_PUBLIC_APP_URL` | For correct contact links in notification emails. |
 | `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | Required for lead notification emails. Notifications are silently skipped if unset. |
 | `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` | Required for SMS notifications and the `send_sms` AI tool. SMS silently skipped if unset. Users must enable SMS in workspace settings. |

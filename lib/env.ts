@@ -105,6 +105,10 @@ const optionalSchema = z.object({
 
   // Composio integrations
   COMPOSIO_API_KEY: z.string().optional(),
+  // HMAC-SHA256 signing secret for inbound Composio trigger webhooks.
+  // Required for app/api/webhooks/composio to authenticate deliveries —
+  // without it, the receiver returns 500 and Chippi ignores trigger events.
+  COMPOSIO_WEBHOOK_SECRET: z.string().optional(),
 
   // Direct Postgres (Modal side)
   DATABASE_URL: z.string().optional(),
@@ -112,6 +116,15 @@ const optionalSchema = z.object({
   // App URLs / flags
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
+  // Public root domain used by intake URL construction, email links, and the
+  // OAuth well-known routes. Falls back to 'workflowrouting.com' (prod) or
+  // 'localhost:3000' (dev) — intake URLs will be wrong if not explicitly set.
+  NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),
+  // Billing kill-switch. Default derives from NODE_ENV in lib/billing/meter.ts
+  // ('true' in production, 'false' otherwise). Set CREDITS_ENFORCED=false to
+  // disable enforcement instantly across all environments without a deploy.
+  // Run scripts/backfill-credit-grants.ts BEFORE enabling in production.
+  CREDITS_ENFORCED: z.string().optional(),
 
   // Sentry
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
@@ -150,6 +163,24 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     ],
   },
   { label: 'Upstash rate limiting', keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'] },
+  // CRON_SECRET gates every /api/cron/* route. Without it every cron endpoint
+  // is open — no autonomous sweeps, briefings, or cleanup jobs will be secured.
+  { label: 'Cron endpoint protection (CRON_SECRET)', keys: ['CRON_SECRET'] },
+  // AGENT_INTERNAL_SECRET gates /api/agent/run-now and /api/ai/task cross-system
+  // calls. Without it, any caller can fire Modal runs.
+  { label: 'Modal agent internal auth (AGENT_INTERNAL_SECRET)', keys: ['AGENT_INTERNAL_SECRET'] },
+  // COMPOSIO_WEBHOOK_SECRET authenticates inbound trigger deliveries. Without it,
+  // the composio webhook receiver returns 500 on every delivery.
+  { label: 'Composio webhook HMAC secret (COMPOSIO_WEBHOOK_SECRET)', keys: ['COMPOSIO_WEBHOOK_SECRET'] },
+  // CLIENT_AUTH_SECRET signs client-portal JWTs. Falls back to CLERK_SECRET_KEY
+  // but a dedicated secret is strongly recommended in production.
+  { label: 'Client portal JWT secret (CLIENT_AUTH_SECRET)', keys: ['CLIENT_AUTH_SECRET'] },
+  // NEXT_PUBLIC_ROOT_DOMAIN drives intake URL construction and email links. Absent
+  // in production means intake URLs may point at the wrong domain.
+  { label: 'Root domain for intake URLs (NEXT_PUBLIC_ROOT_DOMAIN)', keys: ['NEXT_PUBLIC_ROOT_DOMAIN'] },
+  // CREDITS_ENFORCED is the billing kill-switch. Log its absence so an operator
+  // knows the flag exists and that meter.ts is falling back to NODE_ENV logic.
+  { label: 'Billing enforcement flag (CREDITS_ENFORCED)', keys: ['CREDITS_ENFORCED'] },
 ];
 
 function validateEnv(): Env {
