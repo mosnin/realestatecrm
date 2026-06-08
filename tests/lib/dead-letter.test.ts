@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { insertMock, fromMock } = vi.hoisted(() => {
-  const insertMock = vi.fn(async () => ({ error: null }));
-  const fromMock = vi.fn(() => ({ insert: insertMock }));
+  const insertMock = vi.fn(async (_row?: Record<string, unknown>) => ({ error: null }));
+  const fromMock = vi.fn((_table?: string) => ({ insert: insertMock }));
   return { insertMock, fromMock };
 });
 vi.mock('@/lib/supabase', () => ({ supabase: { from: fromMock } }));
