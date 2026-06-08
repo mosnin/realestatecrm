@@ -71,33 +71,33 @@ beforeEach(() => {
 describe('getSeatUsage', () => {
   it('sums members + non-expired pending invites', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'team', seatLimit: 15 } },
+      Brokerage: { single: { plan: 'team', seatLimit: 5 } },
       BrokerageMembership: { count: 7 },
       Invitation: { count: 3 },
     };
     const u = await getSeatUsage('b1');
     expect(u).toMatchObject({
       plan: 'team',
-      seatLimit: 15,
+      seatLimit: 5,
       members: 7,
       pendingInvites: 3,
       used: 10,
     });
   });
 
-  it('returns seatLimit=null for enterprise', async () => {
+  it('derives seatLimit from the plan when the column is null (team_plus → 10)', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'enterprise', seatLimit: null } },
+      Brokerage: { single: { plan: 'team_plus', seatLimit: null } },
       BrokerageMembership: { count: 42 },
       Invitation: { count: 0 },
     };
     const u = await getSeatUsage('b1');
-    expect(u.plan).toBe('enterprise');
-    expect(u.seatLimit).toBeNull();
+    expect(u.plan).toBe('team_plus');
+    expect(u.seatLimit).toBe(10);
     expect(u.used).toBe(42);
   });
 
-  it('falls back to starter/5 when the Brokerage row select errors (pre-migration)', async () => {
+  it('falls back to team/5 when the Brokerage row select errors (pre-migration)', async () => {
     mockByTable = {
       Brokerage: { error: { message: 'column "plan" does not exist' }, single: null },
       BrokerageMembership: { count: 2 },
@@ -106,7 +106,7 @@ describe('getSeatUsage', () => {
     const u = await getSeatUsage('b1');
     // Fail CLOSED on the cap — the helper should NOT unlock the brokerage
     // just because the column isn't there yet.
-    expect(u.plan).toBe('starter');
+    expect(u.plan).toBe('team');
     expect(u.seatLimit).toBe(5);
   });
 });
@@ -115,7 +115,7 @@ describe('getSeatUsage', () => {
 describe('checkSeatCapacity', () => {
   it('allows +1 when used=4/5', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'starter', seatLimit: 5 } },
+      Brokerage: { single: { plan: 'team', seatLimit: 5 } },
       BrokerageMembership: { count: 4 },
       Invitation: { count: 0 },
     };
@@ -126,7 +126,7 @@ describe('checkSeatCapacity', () => {
 
   it('rejects +2 when used=4/5 with needed=2', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'starter', seatLimit: 5 } },
+      Brokerage: { single: { plan: 'team', seatLimit: 5 } },
       BrokerageMembership: { count: 4 },
       Invitation: { count: 0 },
     };
@@ -135,13 +135,13 @@ describe('checkSeatCapacity', () => {
     expect(r.needed).toBe(2);
   });
 
-  it('enterprise always allows — even huge requests', async () => {
+  it('team_plus honors its larger cap (used=9/10 allows +1)', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'enterprise', seatLimit: null } },
-      BrokerageMembership: { count: 500 },
-      Invitation: { count: 50 },
+      Brokerage: { single: { plan: 'team_plus', seatLimit: 10 } },
+      BrokerageMembership: { count: 9 },
+      Invitation: { count: 0 },
     };
-    const r = await checkSeatCapacity('b1', 9999);
+    const r = await checkSeatCapacity('b1', 1);
     expect(r.ok).toBe(true);
   });
 
@@ -150,7 +150,7 @@ describe('checkSeatCapacity', () => {
     // can't reach the DB, we refuse the invite rather than risk the
     // brokerage silently exceeding its billed seat count.
     mockByTable = {
-      Brokerage: { single: { plan: 'starter', seatLimit: 5 } },
+      Brokerage: { single: { plan: 'team', seatLimit: 5 } },
       BrokerageMembership: { error: { message: 'db flap' }, count: null },
       Invitation: { count: 0 },
     };
@@ -161,7 +161,7 @@ describe('checkSeatCapacity', () => {
 
   it('clamps non-positive additional to 0 (never rejects on a zero-invite probe)', async () => {
     mockByTable = {
-      Brokerage: { single: { plan: 'starter', seatLimit: 5 } },
+      Brokerage: { single: { plan: 'team', seatLimit: 5 } },
       BrokerageMembership: { count: 5 }, // full
       Invitation: { count: 0 },
     };

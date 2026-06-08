@@ -45,7 +45,9 @@ import {
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
+import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
+import { assertCanSpend, CreditsExhaustedError } from '@/lib/billing/meter';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
@@ -545,6 +547,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Dunning gate — pause premium AI for a LAPSED paid subscription (the card
+  // failed, or the plan was canceled), while leaving the CRM fully usable.
+  // Only past_due / canceled / unpaid are gated; free & never-subscribed
+  // ('inactive'), trialing, active, and brokerage-member spaces (whose own
+  // status is 'inactive' — the brokerage funds them) all pass. Admins bypass.
+  // Fails OPEN so a DB hiccup can't lock out a paying customer.
+  try {
+    const { data: subRow } = await supabase
+      .from('Space')
+      .select('stripeSubscriptionStatus')
+      .eq('id', ctx.space.id)
+      .maybeSingle();
+    const subStatus = subRow?.stripeSubscriptionStatus ?? 'inactive';
+    if (isSubscriptionDelinquent(subStatus)) {
+      const { data: userRow } = await supabase
+        .from('User')
+        .select('platformRole')
+        .eq('clerkId', ctx.userId)
+        .maybeSingle();
+      if (userRow?.platformRole !== 'admin') {
+        return NextResponse.json(
+          {
+            error:
+              'Your subscription needs attention — update your payment method in billing to keep using Chippi. Your workspace and data stay available.',
+          },
+          { status: 402 },
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn('[ai/task] subscription status check failed — allowing turn', { spaceSlug }, err);
+  }
+
   try {
     const { data: agentSettingsRow } = await supabase
       .from('AgentSettings')
@@ -552,8 +587,12 @@ export async function POST(req: NextRequest) {
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
 
+    // Default must match the AgentSettings.dailyTokenBudget DB column default
+    // (and schemas.py / the settings + usage APIs), which are all 50_000. This
+    // fallback was 500_000, so a space with no AgentSettings row was gated at
+    // 10x the budget every other surface shows and enforces.
     const dailyTokenBudget: number =
-      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
+      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
 
     // Previously this read AgentTask.inputTokens/outputTokens — columns no
     // code writes — so the enforcement silently passed every time. Route
@@ -573,6 +612,22 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/task] token budget check failed — continuing', { spaceSlug }, err);
   }
 
+  // Credit gate — refuse the turn up front when the funding account is out of
+  // credits. No-op unless CREDITS_ENFORCED, so this is dormant until credits go
+  // live. Joins the daily-token-budget gate above as a pre-stream refusal the
+  // chat client already surfaces (same non-OK JSON error shape as 429/400).
+  try {
+    await assertCanSpend(ctx.space.id, 'chat_turn');
+  } catch (err) {
+    if (err instanceof CreditsExhaustedError) {
+      return NextResponse.json(
+        { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
+        { status: 402 },
+      );
+    }
+    throw err;
+  }
+
   let conversationId: string;
   try {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);
@@ -587,6 +642,11 @@ export async function POST(req: NextRequest) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
+
+  // The turn's credit charge is applied by the model-aware ChatUsage trigger
+  // (meter_chat_usage_credits) when usage is recorded — not here. A second flat
+  // charge at this point would double-debit the turn. The pre-stream gate above
+  // (assertCanSpend) stays: refuse up front when out of credits.
 
   void (async () => {
     try {

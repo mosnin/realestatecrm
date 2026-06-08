@@ -22,6 +22,19 @@ import {
 } from '@/lib/integrations/triggers';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { recordDeadLetter, originalEventData } from './dead-letter';
+
+/** Resolve the space owned by a user (Space.ownerId is unique). Best-effort —
+ *  returns 'unknown' so the DLQ write never fails on the NOT NULL spaceId. */
+async function spaceIdForOwner(userId: unknown): Promise<string> {
+  if (typeof userId !== 'string' || !userId) return 'unknown';
+  try {
+    const { data } = await supabase.from('Space').select('id').eq('ownerId', userId).maybeSingle();
+    return data?.id ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 // Per-space daily ceiling on trigger-initiated dispatches. The receiver
 // already enforces a per-(connection, slug) hourly cap; this one is the
@@ -45,6 +58,27 @@ export const publishScheduledPost = inngest.createFunction(
   {
     id: 'studio-publish-scheduled-post',
     triggers: [{ event: 'studio/post.scheduled' }],
+    // Capture a permanently-failed publish (all retries exhausted) so it lands
+    // in the admin DLQ instead of vanishing.
+    onFailure: async (arg) => {
+      const data = originalEventData(arg);
+      const postId = String(data.postId ?? '');
+      let spaceId = 'unknown';
+      if (postId) {
+        const { data: post } = await supabase
+          .from('StudioPost')
+          .select('userId')
+          .eq('id', postId)
+          .maybeSingle();
+        spaceId = await spaceIdForOwner(post?.userId);
+      }
+      await recordDeadLetter({
+        spaceId,
+        eventType: 'studio/post.scheduled',
+        eventPayload: { postId },
+        error: (arg as { error?: unknown }).error,
+      });
+    },
   },
   async ({ event, step }) => {
     const postId = String((event.data as { postId?: unknown }).postId ?? '');
@@ -183,6 +217,21 @@ export const handleComposioTrigger = inngest.createFunction(
   {
     id: 'composio-handle-trigger',
     triggers: [{ event: 'composio/trigger.received' }],
+    // Capture a permanently-failed trigger dispatch in the admin DLQ.
+    onFailure: async (arg) => {
+      const data = originalEventData(arg);
+      const spaceId = await spaceIdForOwner(data.userId);
+      await recordDeadLetter({
+        spaceId,
+        eventType: 'composio/trigger.received',
+        eventPayload: {
+          deliveryId: data.deliveryId,
+          triggerSlug: data.triggerSlug,
+          toolkitSlug: data.toolkitSlug,
+        },
+        error: (arg as { error?: unknown }).error,
+      });
+    },
   },
   async ({ event, step }) => {
     const data = event.data as {

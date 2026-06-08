@@ -132,7 +132,7 @@ function makeBrokerage(overrides: Partial<Brokerage> = {}): Brokerage {
     brokerageBuyerFormConfig: null,
     brokerageRentalScoringModel: null,
     brokerageBuyerScoringModel: null,
-    plan: 'starter',
+    plan: 'team',
     seatLimit: 5,
     stripeCustomerId: null,
     stripeSubscriptionId: null,

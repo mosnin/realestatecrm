@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { checkSeatCapacity } from '@/lib/brokerage-seats';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 
@@ -92,6 +93,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'Your access to this brokerage was removed. Ask the broker to re-invite you by email.' },
       { status: 403 },
+    );
+  }
+
+  // Seat cap — the invite paths enforce checkSeatCapacity, but self-join via the
+  // (static, shareable) code did not, so anyone with the code could add
+  // themselves past the plan's paid seat limit. Gate it the same way.
+  const seat = await checkSeatCapacity(brokerage.id, 1);
+  if (!seat.ok) {
+    return NextResponse.json(
+      { error: 'This brokerage has reached its seat limit. Ask the broker to add seats or remove a member.' },
+      { status: 402 },
     );
   }
 

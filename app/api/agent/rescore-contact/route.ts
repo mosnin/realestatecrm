@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
@@ -55,6 +56,19 @@ export async function POST(req: NextRequest) {
   // Skip if already pending
   if (contact.scoringStatus === 'pending') {
     return NextResponse.json({ skipped: true, reason: 'Already scoring' });
+  }
+
+  // Meter the AI work — this autonomous path runs the SAME scoreLeadApplicationDynamic
+  // as the metered UI rescore button, so it must charge the same 'lead_score' credit.
+  // Without this the highest-volume scoring path (Chippi auto-rescores on triggers +
+  // sweeps) ran completely free. No-op unless CREDITS_ENFORCED.
+  try {
+    await assertCanSpend(spaceId, 'lead_score');
+  } catch (err) {
+    if (err instanceof CreditsExhaustedError) {
+      return NextResponse.json({ skipped: true, reason: 'Out of credits' }, { status: 402 });
+    }
+    throw err;
   }
 
   // Every write below is double-scoped by (id, spaceId). The SELECT above
@@ -115,6 +129,9 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', contactId)
       .eq('spaceId', spaceId);
+
+    // Charge only after a successful score (best-effort; never blocks the result).
+    await chargeWorkflow(spaceId, 'lead_score');
 
     return NextResponse.json({ success: true, score: result.leadScore, label: result.scoreLabel });
   } catch {

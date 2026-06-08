@@ -36,11 +36,12 @@ export type Brokerage = {
   brokerageRentalScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   brokerageBuyerScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   /**
-   * Plan tier — controls seatLimit (BP3). 'starter' → 5, 'team' → 15,
-   * 'enterprise' → unlimited (seatLimit = null).
+   * Plan tier (V2 — lib/plans.ts). 'team' → 5 seats, 'team_plus' → 10. A
+   * brokerage that hasn't subscribed may still carry a legacy/unset value in
+   * the DB; anything outside {team, team_plus} is treated as "no active plan".
    */
-  plan: 'starter' | 'team' | 'enterprise';
-  /** Max members + pending invites. Null = unlimited (enterprise). */
+  plan: 'team' | 'team_plus';
+  /** Max members + pending invites. */
   seatLimit: number | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;

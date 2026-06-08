@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { BillingPage } from '@/components/billing/billing-page';
 import { CreditsSummary } from '@/components/billing/credits-summary';
+import type { PlanId } from '@/lib/plans';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import { H1, TITLE_FONT } from '@/lib/typography';
@@ -87,6 +88,7 @@ export default async function Billing({
       </header>
       <BillingPage
         slug={slug}
+        plan={(((space as { plan?: string }).plan) ?? 'free') as PlanId}
         subscriptionStatus={subscriptionStatus}
         currentPeriodEnd={currentPeriodEnd}
         cardLast4={cardLast4}

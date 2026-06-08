@@ -44,6 +44,17 @@ const MAX_CONCURRENCY = 8;
 // Modal function itself has a 300s timeout; we don't want to block the cron.
 const MODAL_TIMEOUT_MS = 30_000;
 
+// Page size for the active-space fetch (avoids PostgREST's silent row cap).
+const SPACE_PAGE_SIZE = 1000;
+
+// Wall-clock budget for dispatching sweeps. Stop picking up new spaces past
+// this so a large fleet exits cleanly with partial progress instead of being
+// killed mid-run; the recently-swept guard rotates coverage across cron ticks.
+const SWEEP_BUDGET_MS = 270_000; // headroom under maxDuration (300s)
+
+// Give the long sweep the full serverless ceiling rather than the 10s default.
+export const maxDuration = 300;
+
 type SweepOutcome =
   | { spaceId: string; status: 'started' }
   | { spaceId: string; status: 'skipped'; reason: string }
@@ -73,17 +84,27 @@ async function handler(req: NextRequest) {
 
   const startedAt = Date.now();
 
-  // ── 1. Fetch active spaces ─────────────────────────────────────────────
-  const { data: spaces, error: spaceErr } = await supabase
-    .from('Space')
-    .select('id, slug')
-    .in('stripeSubscriptionStatus', ['active', 'trialing']);
-  if (spaceErr) {
-    console.error('[cron/agent-sweep] Failed to load spaces', spaceErr);
-    return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
+  // ── 1. Fetch ALL active spaces (paginated) ─────────────────────────────
+  // A single unbounded select is silently capped by PostgREST's default row
+  // limit, so once a deployment crosses one page of active spaces every space
+  // past that page would NEVER get swept. Page through explicitly.
+  const allSpaces: { id: string; slug: string }[] = [];
+  for (let from = 0; ; from += SPACE_PAGE_SIZE) {
+    const { data, error: spaceErr } = await supabase
+      .from('Space')
+      .select('id, slug')
+      .in('stripeSubscriptionStatus', ['active', 'trialing'])
+      .order('id', { ascending: true })
+      .range(from, from + SPACE_PAGE_SIZE - 1);
+    if (spaceErr) {
+      console.error('[cron/agent-sweep] Failed to load spaces', spaceErr);
+      return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
+    }
+    const page = (data ?? []) as { id: string; slug: string }[];
+    allSpaces.push(...page);
+    if (page.length < SPACE_PAGE_SIZE) break; // last page reached
   }
 
-  const allSpaces = (spaces ?? []) as { id: string; slug: string }[];
   if (allSpaces.length === 0) {
     return NextResponse.json({ totalSpaces: 0, started: 0, skipped: 0, errored: 0 });
   }
@@ -111,6 +132,9 @@ async function handler(req: NextRequest) {
 
   async function worker() {
     while (cursor < allSpaces.length) {
+      // Stop dispatching once the time budget is spent — leftover spaces are
+      // picked up on the next tick (recently-swept ones skip fast).
+      if (Date.now() - startedAt > SWEEP_BUDGET_MS) break;
       const idx = cursor++;
       const space = allSpaces[idx];
       try {
@@ -139,12 +163,17 @@ async function handler(req: NextRequest) {
     if (s.status === 'skipped') skipReasons[s.reason] = (skipReasons[s.reason] ?? 0) + 1;
   }
 
+  // Spaces never picked up because the time budget ran out — surfaced so a
+  // persistently non-zero value signals the fleet has outgrown one cron tick.
+  const remaining = allSpaces.length - outcomes.length;
   const summary = {
     totalSpaces: allSpaces.length,
     started,
     skipped: skipped.length,
     skipReasons,
     errored: errored.length,
+    remaining,
+    budgetExhausted: remaining > 0,
     durationMs: Date.now() - startedAt,
   };
   console.log('[cron/agent-sweep] Sweep complete', summary);
