@@ -1,27 +1,26 @@
 'use client';
 
 /**
- * Agent showcase: the "Chippi, working" section — modeled on ClickUp Brain's
- * agent block, rebuilt in the fortitudo studio-ASCII system and carrying
- * Chippi's real-estate substance.
+ * Agent showcase ("Chippi, working") — reference layout (ClickUp Brain block)
+ * rendered in the calm light fortitudo system so it harmonizes with the rest of
+ * the home instead of reading as a dark clone.
  *
- * Three beats, top to bottom:
- *   1. The orbit — a dark ASCII panel with the Chippi mark at center and its
- *      jobs floating around it (the screenshot's signature motif).
- *   2. Proof cards — three SpotlightCards that SHOW Chippi working (scores a
- *      lead, drafts the reply, books the tour) rather than describing it.
- *   3. The platform strip — trained on your voice / connected to your stack /
- *      every model. The multi-model + integrations story the home was missing.
+ * Every surface shares one vocabulary (SpotlightCard chrome, hairline borders,
+ * the subtle ASCII signature) so the section reads as a single cohesive unit:
+ *   header
+ *   → orbit card (Chippi mark + jobs floating around it, on the light card)
+ *   → three proof cards with realistic multi-element mockups (triage / thread / agenda)
+ *   → one wide flagship card ("ask Chippi anything")
+ *   → platform strip (voice / connected / every model)
  *
- * Placeholders: the centre mark, the app tiles, and the model dots are clearly
- * marked TODOs for real logos/art. Everything else is final.
+ * Placeholders: the centre mark, the app tiles, and the model dots are marked
+ * TODO for real art.
  */
 
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
-  ArrowUpRight,
   Bell,
   CalendarCheck,
   CheckCheck,
@@ -31,22 +30,59 @@ import {
 import { AsciiField } from '../ascii-field';
 import { SpotlightCard } from '../spotlight-card';
 
-// The jobs that orbit the mark. `pos` places each pill on the md+ orbit.
+// Jobs that float around the mark. `pos` places each on the md+ orbit; kept
+// airy and spread to the edges (not clustered) to echo the reference.
 const orbitJobs = [
-  { label: 'scores the lead', Icon: TrendingUp, pos: 'top-6 left-[6%]', float: 0 },
-  { label: 'drafts the reply', Icon: PenLine, pos: 'top-10 right-[8%]', float: 0.6 },
-  { label: 'books the tour', Icon: CalendarCheck, pos: 'top-1/2 left-[1%] -translate-y-1/2', float: 1.2 },
-  { label: 'updates the deal', Icon: ArrowUpRight, pos: 'top-1/2 right-[1%] -translate-y-1/2', float: 0.3 },
-  { label: 'logs the touch', Icon: CheckCheck, pos: 'bottom-8 left-[12%]', float: 0.9 },
-  { label: 'chases follow-ups', Icon: Bell, pos: 'bottom-6 right-[14%]', float: 1.5 },
+  { label: 'scores the lead', Icon: TrendingUp, pos: 'top-[8%] left-[4%]', float: 0 },
+  { label: 'drafts the reply', Icon: PenLine, pos: 'top-[14%] right-[5%]', float: 0.7 },
+  { label: 'books the tour', Icon: CalendarCheck, pos: 'top-1/2 left-[1%] -translate-y-1/2', float: 1.3 },
+  { label: 'updates the deal', Icon: ArrowRight, pos: 'top-1/2 right-[1%] -translate-y-1/2', float: 0.4 },
+  { label: 'logs the touch', Icon: CheckCheck, pos: 'bottom-[10%] left-[8%]', float: 1.0 },
+  { label: 'chases follow-ups', Icon: Bell, pos: 'bottom-[8%] right-[9%]', float: 1.6 },
 ];
 
 function OrbitPill({ Icon, label }: { Icon: typeof Bell; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 backdrop-blur-md">
+    <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-foreground/75 shadow-sm backdrop-blur-md">
       <Icon className="h-3.5 w-3.5 text-brand" />
       {label}
     </span>
+  );
+}
+
+// One lead row in the triage mockup.
+function LeadRow({
+  initials,
+  name,
+  note,
+  score,
+  tone,
+  highlight,
+}: {
+  initials: string;
+  name: string;
+  note: string;
+  score: string;
+  tone: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${
+        highlight ? 'border-brand/30 bg-brand-subtle' : 'border-border/60 bg-muted/30'
+      }`}
+    >
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[11px] font-medium text-foreground/70">
+        {initials}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-foreground">{name}</p>
+        <p className="truncate text-[11px] text-muted-foreground">{note}</p>
+      </div>
+      <span className={`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
+        {score}
+      </span>
+    </div>
   );
 }
 
@@ -66,104 +102,110 @@ export function AgentShowcase() {
           </p>
         </div>
 
-        {/* 1. The orbit — dark ASCII panel with the mark at centre and jobs around it. */}
-        <div className="relative mx-auto mt-16 max-w-5xl overflow-hidden rounded-marketing-3xl border border-white/10 bg-[#111113]">
-          <AsciiField className="absolute inset-0 h-full w-full opacity-40" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(255,150,79,0.22),transparent_60%)]" />
+        {/* Orbit — light card, Chippi mark at centre, jobs floating around it. */}
+        <div className="mx-auto mt-16 max-w-5xl">
+          <SpotlightCard className="overflow-hidden">
+            <div className="relative">
+              <AsciiField className="absolute inset-0 h-full w-full opacity-[0.12]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,var(--brand-subtle),transparent_60%)]" />
 
-          <div className="relative z-10 px-6 py-16 sm:py-20">
-            {/* Orbit stage (md+): centre mark + floating job pills + concentric rings. */}
-            <div className="relative mx-auto hidden h-[420px] max-w-3xl md:block">
-              {/* concentric orbit rings */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10"
-              />
-              <div
-                aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.06]"
-              />
+              <div className="relative z-10 px-6 py-16 sm:py-20">
+                {/* md+ orbit stage */}
+                <div className="relative mx-auto hidden h-[400px] max-w-3xl md:block">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/50"
+                  />
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/30"
+                  />
 
-              {/* centre mark — TODO: replace placeholder with the Chippi logo mark */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-marketing-2xl bg-gradient-to-br from-brand to-amber-400 shadow-lg shadow-brand/30">
-                  {/* placeholder glyph for the brand mark */}
-                  <span className="font-brand text-3xl text-white">C</span>
+                  {/* centre mark — TODO: replace placeholder tile with the Chippi logo mark */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                    <div className="absolute -inset-6 -z-10 rounded-full bg-[radial-gradient(circle,rgba(255,150,79,0.28),transparent_70%)]" />
+                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-marketing-2xl bg-gradient-to-br from-brand to-amber-400 shadow-lg shadow-brand/30">
+                      <span className="font-brand text-3xl text-white">C</span>
+                    </div>
+                    <p className="font-brand mt-3 text-sm text-foreground">Chippi</p>
+                    <p className="text-xs text-muted-foreground">always on</p>
+                  </div>
+
+                  {orbitJobs.map((job) => (
+                    <motion.div
+                      key={job.label}
+                      className={`absolute ${job.pos}`}
+                      animate={{ y: [0, -7, 0] }}
+                      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: job.float }}
+                    >
+                      <OrbitPill Icon={job.Icon} label={job.label} />
+                    </motion.div>
+                  ))}
                 </div>
-                <p className="font-brand mt-3 text-sm text-white">Chippi</p>
-                <p className="text-xs text-white/50">always on</p>
-              </div>
 
-              {/* floating job pills */}
-              {orbitJobs.map((job) => (
-                <motion.div
-                  key={job.label}
-                  className={`absolute ${job.pos}`}
-                  animate={{ y: [0, -7, 0] }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                    delay: job.float,
-                  }}
-                >
-                  <OrbitPill Icon={job.Icon} label={job.label} />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Mobile: centre mark + wrapped pills (no absolute orbit). */}
-            <div className="md:hidden">
-              <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-marketing-2xl bg-gradient-to-br from-brand to-amber-400 shadow-lg shadow-brand/30">
-                  <span className="font-brand text-2xl text-white">C</span>
+                {/* mobile fallback */}
+                <div className="md:hidden">
+                  <div className="text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-marketing-2xl bg-gradient-to-br from-brand to-amber-400 shadow-lg shadow-brand/30">
+                      <span className="font-brand text-2xl text-white">C</span>
+                    </div>
+                    <p className="font-brand mt-3 text-sm text-foreground">Chippi</p>
+                  </div>
+                  <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    {orbitJobs.map((job) => (
+                      <OrbitPill key={job.label} Icon={job.Icon} label={job.label} />
+                    ))}
+                  </div>
                 </div>
-                <p className="font-brand mt-3 text-sm text-white">Chippi</p>
-              </div>
-              <div className="mt-6 flex flex-wrap justify-center gap-2">
-                {orbitJobs.map((job) => (
-                  <OrbitPill key={job.label} Icon={job.Icon} label={job.label} />
-                ))}
               </div>
             </div>
-          </div>
+          </SpotlightCard>
         </div>
 
-        {/* 2. Proof cards — show Chippi working, not just claim it. */}
-        <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {/* Card: scores the lead */}
+        {/* Three proof cards — richer, multi-element mockups. */}
+        <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+          {/* triage */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0 }}
+            transition={{ duration: 0.5 }}
           >
             <SpotlightCard className="h-full p-6">
               <p className="font-brand text-xs uppercase tracking-[0.2em] text-brand">In the inbox</p>
               <h3 className="font-brand mt-2 text-xl text-foreground">Knows who to call first</h3>
-              {/* mockup */}
               <div className="mt-5 space-y-2">
-                <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/40 px-3 py-2.5">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[11px] font-medium text-foreground/70">
-                    MP
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">Maya Patel</p>
-                    <p className="truncate text-xs text-muted-foreground">new buyer inquiry</p>
-                  </div>
-                  <span className="inline-flex flex-shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">
-                    hot · 82
-                  </span>
-                </div>
-                <p className="pl-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-brand">Chippi</span> scored her against your 3 open
-                  deals. call her first.
+                <LeadRow
+                  initials="MP"
+                  name="Maya Patel"
+                  note="new buyer inquiry · 14 Oak St"
+                  score="hot · 82"
+                  tone="bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400"
+                  highlight
+                />
+                <LeadRow
+                  initials="TR"
+                  name="Tom Reyes"
+                  note="refi question"
+                  score="warm · 64"
+                  tone="bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+                />
+                <LeadRow
+                  initials="DL"
+                  name="Dana Lee"
+                  note="just browsing"
+                  score="cold · 41"
+                  tone="bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400"
+                />
+                <p className="pt-1 text-xs text-muted-foreground">
+                  <span className="font-medium text-brand">Chippi</span> ranked your inbox against your
+                  open deals. Maya first.
                 </p>
               </div>
             </SpotlightCard>
           </motion.div>
 
-          {/* Card: drafts the reply */}
+          {/* thread */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -173,32 +215,41 @@ export function AgentShowcase() {
             <SpotlightCard className="h-full p-6">
               <p className="font-brand text-xs uppercase tracking-[0.2em] text-brand">The reply</p>
               <h3 className="font-brand mt-2 text-xl text-foreground">Written in your voice</h3>
-              {/* mockup */}
               <div className="mt-5 space-y-3">
-                <div className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2.5">
-                  <p className="text-sm leading-relaxed text-foreground/80">
-                    &ldquo;Hi Maya, thanks for reaching out about 14 Oak. I have Saturday open if
-                    you&rsquo;d like to see it in person&hellip;&rdquo;
-                  </p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    <span className="font-medium text-brand">Chippi</span> drafted
+                {/* incoming */}
+                <div className="flex gap-2">
+                  <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-medium text-foreground/70">
+                    MP
                   </span>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground">
-                      Edit
+                  <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-foreground/80">
+                    Is 14 Oak still available? Could I see it this weekend?
+                  </div>
+                </div>
+                {/* Chippi draft */}
+                <div className="rounded-2xl border border-brand/25 bg-brand-subtle px-3 py-2.5">
+                  <p className="text-xs leading-relaxed text-foreground/85">
+                    Hi Maya, thanks for reaching out about 14 Oak. I have Saturday at 2 open if
+                    you&rsquo;d like to see it in person.
+                  </p>
+                  <div className="mt-2.5 flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-brand">Chippi</span> drafted · your voice
                     </span>
-                    <span className="rounded-full bg-foreground px-2.5 py-1 text-[11px] font-medium text-background">
-                      Approve
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground">
+                        Edit
+                      </span>
+                      <span className="rounded-full bg-foreground px-2.5 py-0.5 text-[11px] font-medium text-background">
+                        Approve
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </SpotlightCard>
           </motion.div>
 
-          {/* Card: books the tour */}
+          {/* agenda */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -208,19 +259,27 @@ export function AgentShowcase() {
             <SpotlightCard className="h-full p-6">
               <p className="font-brand text-xs uppercase tracking-[0.2em] text-brand">The calendar</p>
               <h3 className="font-brand mt-2 text-xl text-foreground">Books it, then logs it</h3>
-              {/* mockup */}
-              <div className="mt-5 space-y-2">
-                <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/40 px-3 py-2.5">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand/15">
-                    <CalendarCheck className="h-3.5 w-3.5 text-brand" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">Tour · 14 Oak St</p>
-                    <p className="truncate text-xs text-muted-foreground">Saturday, 2:00 PM</p>
+              <div className="mt-5">
+                <div className="rounded-2xl border border-border/60 bg-muted/30 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Saturday
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center gap-2 rounded-lg border border-brand/25 bg-brand-subtle px-2.5 py-2">
+                      <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0 text-brand" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs text-foreground">2:00 PM · Tour, 14 Oak St</p>
+                        <p className="truncate text-[10px] text-muted-foreground">Maya Patel · confirmed</p>
+                      </div>
+                      <CheckCheck className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                    </div>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-border" />
+                      4:30 PM · open
+                    </div>
                   </div>
-                  <CheckCheck className="h-4 w-4 flex-shrink-0 text-emerald-500" />
                 </div>
-                <p className="pl-1 text-xs text-muted-foreground">
+                <p className="pt-3 text-xs text-muted-foreground">
                   <span className="font-medium text-brand">Chippi</span> booked it, sent the
                   confirmation, and wrote it back to the deal.
                 </p>
@@ -229,10 +288,56 @@ export function AgentShowcase() {
           </motion.div>
         </div>
 
-        {/* 3. The platform strip — voice / connected / models. */}
-        <div className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-3xl border border-border/60 bg-border/60 sm:grid-cols-3">
-          {/* trained on your voice */}
-          <div className="bg-background px-6 py-8 text-center">
+        {/* Wide flagship card — the "ask Chippi anything" beat. */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="mt-5"
+        >
+          <SpotlightCard className="p-6 sm:p-8">
+            <div className="grid items-center gap-8 md:grid-cols-2">
+              <div>
+                <p className="font-brand text-xs uppercase tracking-[0.2em] text-brand">Ask anything</p>
+                <h3 className="font-brand mt-2 text-2xl text-foreground sm:text-3xl">
+                  It knows your whole book.
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  Every deal, every thread, every tour. Ask Chippi in plain language and the answer
+                  comes back with names and numbers, not a shrug.
+                </p>
+              </div>
+              {/* composer mockup */}
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">
+                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-brand to-amber-400 text-[10px] text-white">
+                    C
+                  </span>
+                  <span className="text-xs text-foreground/70">which buyers should I call today?</span>
+                </div>
+                <div className="mt-3 space-y-2 px-1">
+                  <div className="flex items-start gap-2">
+                    <CheckCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand" />
+                    <p className="text-xs leading-relaxed text-foreground/80">
+                      <span className="font-medium">Maya Patel</span> — hot, tour Saturday. Confirm the time.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand" />
+                    <p className="text-xs leading-relaxed text-foreground/80">
+                      <span className="font-medium">Tom Reyes</span> — refi, gone quiet 4 days. Nudge him.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SpotlightCard>
+        </motion.div>
+
+        {/* Platform strip — voice / connected / every model. */}
+        <div className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-3xl border border-border/60 bg-border/60 sm:grid-cols-3">
+          <div className="bg-card px-6 py-8 text-center">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand-subtle px-3 py-1.5">
               <PenLine className="h-3.5 w-3.5 text-brand" />
               <span className="text-xs font-medium text-foreground">sound like you</span>
@@ -243,8 +348,7 @@ export function AgentShowcase() {
             </p>
           </div>
 
-          {/* connected to your stack */}
-          <div className="bg-background px-6 py-8 text-center">
+          <div className="bg-card px-6 py-8 text-center">
             {/* TODO: swap letter tiles for real Gmail / Outlook / Calendar logos */}
             <div className="flex items-center justify-center gap-1.5">
               {['G', 'O', 'C', '+'].map((t) => (
@@ -262,15 +366,11 @@ export function AgentShowcase() {
             </p>
           </div>
 
-          {/* every model */}
-          <div className="bg-background px-6 py-8 text-center">
+          <div className="bg-card px-6 py-8 text-center">
             {/* TODO: swap dots for real model marks (ChatGPT / Claude / Gemini) */}
             <div className="flex items-center justify-center -space-x-2">
               {['bg-foreground/80', 'bg-brand', 'bg-foreground/40'].map((c) => (
-                <span
-                  key={c}
-                  className={`h-8 w-8 rounded-full border-2 border-background ${c}`}
-                />
+                <span key={c} className={`h-8 w-8 rounded-full border-2 border-card ${c}`} />
               ))}
             </div>
             <h3 className="font-brand mt-4 text-lg text-foreground">Every model</h3>
