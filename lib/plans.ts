@@ -125,3 +125,27 @@ export type TopupId = keyof typeof TOPUPS;
 
 /** Credit lots roll over for 30 days (Free's one-time grant never expires). */
 export const CREDIT_ROLLOVER_DAYS = 30;
+
+/**
+ * USD of token COGS that ONE credit is allowed to cover — the calibration for
+ * model-aware chat/agent metering. Chosen so that consuming a plan's FULL
+ * monthly credit allotment still leaves >= 60% gross margin on every tier:
+ *
+ *   margin@full = 1 - (monthlyCredits * CREDIT_COGS_BUDGET_USD) / planPrice
+ *
+ * The binding tier is the Team Plus add-on seat ($69 / 2000 credits → max
+ * $0.0138/credit for exactly 60%). $0.013 holds >= 62% on every tier, leaving a
+ * buffer for model-price-estimate / provider-markup error.
+ *
+ * The DB trigger 20260627000000_meter_chat_usage_credits.sql is the enforcement
+ * point (charges credits/turn = max(1, ceil(costUsd / this)) off each ChatUsage
+ * row, model-aware); this constant + helper are the TS-side source of truth for
+ * estimation/display. Keep the two in sync.
+ */
+export const CREDIT_COGS_BUDGET_USD = 0.013;
+
+/** Credits a turn costs given its actual token COGS (model-aware). Floor of 1
+ *  so even a near-free turn costs a credit. Mirrors the SQL trigger. */
+export function creditsForCostUsd(costUsd: number): number {
+  return Math.max(1, Math.ceil((costUsd > 0 ? costUsd : 0) / CREDIT_COGS_BUDGET_USD));
+}
