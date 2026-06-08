@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock the account resolver and the DB spend/balance calls so we can exercise
 // the enforcement semantics without a database. workflowCost stays REAL (reads
 // lib/plans.ts) so chat_turn=1 is what actually gates here.
-const { resolveMock, balanceMock, spendMock } = vi.hoisted(() => ({
+const { resolveMock, balanceMock, spendMock, adminMock } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   balanceMock: vi.fn(),
   spendMock: vi.fn(),
+  adminMock: vi.fn(),
 }));
 
 vi.mock('@/lib/billing/account', () => ({ resolveBillingAccount: resolveMock }));
@@ -14,6 +15,8 @@ vi.mock('@/lib/billing/credits', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/billing/credits')>();
   return { ...actual, getCreditBalance: balanceMock, spendCredits: spendMock };
 });
+// Platform-admin check — mocked so the bypass is exercised without a DB.
+vi.mock('@/lib/permissions', () => ({ isPlatformAdminByClerkId: adminMock }));
 
 // CREDITS_ENFORCED is read at module load, so each case re-imports meter with
 // the flag stubbed to the value under test.
@@ -28,6 +31,8 @@ describe('credit enforcement (meter)', () => {
     resolveMock.mockReset();
     balanceMock.mockReset();
     spendMock.mockReset();
+    adminMock.mockReset();
+    adminMock.mockResolvedValue(false); // default: not an admin
     resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' } });
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -71,5 +76,22 @@ describe('credit enforcement (meter)', () => {
     spendMock.mockRejectedValue(new Error('db down'));
     const { chargeWorkflow } = await loadMeter(true);
     await expect(chargeWorkflow('sp1', 'chat_turn')).resolves.toBeUndefined();
+  });
+
+  // ── Platform admins: unlimited usage (never gated, never charged) ──────────
+  it('assertCanSpend never refuses a platform admin, even at zero balance', async () => {
+    adminMock.mockResolvedValue(true);
+    balanceMock.mockResolvedValue(0); // would normally throw
+    const { assertCanSpend } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn', { userId: 'admin1' })).resolves.toBeUndefined();
+    expect(adminMock).toHaveBeenCalledWith('admin1');
+    expect(balanceMock).not.toHaveBeenCalled(); // bypassed before reading balance
+  });
+
+  it('chargeWorkflow never debits a platform admin', async () => {
+    adminMock.mockResolvedValue(true);
+    const { chargeWorkflow } = await loadMeter(true);
+    await chargeWorkflow('sp1', 'chat_turn', { userId: 'admin1' });
+    expect(spendMock).not.toHaveBeenCalled();
   });
 });

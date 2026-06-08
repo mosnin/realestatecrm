@@ -617,7 +617,7 @@ export async function POST(req: NextRequest) {
   // live. Joins the daily-token-budget gate above as a pre-stream refusal the
   // chat client already surfaces (same non-OK JSON error shape as 429/400).
   try {
-    await assertCanSpend(ctx.space.id, 'chat_turn');
+    await assertCanSpend(ctx.space.id, 'chat_turn', { userId: ctx.userId });
   } catch (err) {
     if (err instanceof CreditsExhaustedError) {
       return NextResponse.json(

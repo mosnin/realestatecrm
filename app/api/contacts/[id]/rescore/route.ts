@@ -32,7 +32,7 @@ export async function POST(
   // Credit gate (no-op unless CREDITS_ENFORCED). Refuse up front when the
   // account can't afford a lead score; charged on success below.
   try {
-    await assertCanSpend(space.id, 'lead_score');
+    await assertCanSpend(space.id, 'lead_score', { userId });
   } catch (err) {
     if (err instanceof CreditsExhaustedError) {
       return NextResponse.json(

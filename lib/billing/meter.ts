@@ -13,9 +13,22 @@
 
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
+import { isPlatformAdminByClerkId } from '@/lib/permissions';
 import type { Workflow } from '@/lib/plans';
 
-export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
+/**
+ * Credit enforcement switch. Explicit env wins (CREDITS_ENFORCED=true|false is
+ * the kill switch / instant rollback); otherwise ON in production, OFF in dev
+ * and test so the suite and local work run free. Flipping prod on requires the
+ * existing-account credit backfill first (scripts/backfill-credit-grants.ts) —
+ * otherwise un-granted accounts get refused for having a zero balance.
+ */
+export const CREDITS_ENFORCED =
+  process.env.CREDITS_ENFORCED === 'true'
+    ? true
+    : process.env.CREDITS_ENFORCED === 'false'
+      ? false
+      : process.env.NODE_ENV === 'production';
 
 export class CreditsExhaustedError extends Error {
   readonly workflow: Workflow;
@@ -32,12 +45,21 @@ export class CreditsExhaustedError extends Error {
  * Refuse a workflow up front when the funding account can't afford it.
  * No-op unless enforcement is on. Throws CreditsExhaustedError when short —
  * callers translate that to a 402 / an "out of credits" result.
+ *
+ * Pass `userId` (the acting Clerk id) so platform admins are never refused —
+ * application admins have unlimited usage. Mirrors the same bypass in the
+ * charge_credits_for_chat_usage DB trigger.
  */
-export async function assertCanSpend(spaceId: string, workflow: Workflow, units = 1): Promise<void> {
+export async function assertCanSpend(
+  spaceId: string,
+  workflow: Workflow,
+  opts?: { units?: number; userId?: string },
+): Promise<void> {
   if (!CREDITS_ENFORCED) return;
+  if (await isPlatformAdminByClerkId(opts?.userId)) return; // admins: unlimited
   const { account } = await resolveBillingAccount(spaceId);
   const balance = await getCreditBalance(account);
-  if (balance < workflowCost(workflow, units)) {
+  if (balance < workflowCost(workflow, opts?.units ?? 1)) {
     throw new CreditsExhaustedError(workflow, balance);
   }
 }
@@ -53,6 +75,7 @@ export async function chargeWorkflow(
   opts?: { units?: number; userId?: string },
 ): Promise<void> {
   if (!CREDITS_ENFORCED) return;
+  if (await isPlatformAdminByClerkId(opts?.userId)) return; // admins: unlimited
   try {
     const { account } = await resolveBillingAccount(spaceId);
     await spendCredits(account, workflow, {

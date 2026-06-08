@@ -97,7 +97,7 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
   async handler(args, ctx) {
     // Credit gate (no-op unless CREDITS_ENFORCED). Charged on success below.
     try {
-      await assertCanSpend(ctx.space.id, 'tour_booking');
+      await assertCanSpend(ctx.space.id, 'tour_booking', { userId: ctx.userId });
     } catch (err) {
       if (err instanceof CreditsExhaustedError) {
         return {
@@ -238,7 +238,7 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
       minute: '2-digit',
     });
     const where = args.propertyAddress ? ` at ${args.propertyAddress}` : '';
-    await chargeWorkflow(ctx.space.id, 'tour_booking');
+    await chargeWorkflow(ctx.space.id, 'tour_booking', { userId: ctx.userId });
     return {
       summary: `Tour scheduled for ${guestName || 'guest'}${where} — ${prettyTime}.`,
       data: {

@@ -51,6 +51,24 @@ export async function requirePlatformAdmin(): Promise<{ clerkUserId: string }> {
   return { clerkUserId: session.userId };
 }
 
+/**
+ * Platform-admin check by Clerk id, WITHOUT a session — for trusted server
+ * contexts that already hold the acting user's id (credit metering). Same
+ * offboarding gate and single source of truth (User.platformRole) as
+ * isPlatformAdmin(); the only difference is the id comes from the caller, not
+ * auth(). Returns false for a missing/empty id.
+ */
+export async function isPlatformAdminByClerkId(clerkId: string | null | undefined): Promise<boolean> {
+  if (!clerkId) return false;
+  const { data } = await supabase
+    .from('User')
+    .select('platformRole, status')
+    .eq('clerkId', clerkId)
+    .maybeSingle();
+  if ((data as { status?: string } | null)?.status === 'offboarded') return false;
+  return data?.platformRole === 'admin';
+}
+
 // ── Broker ────────────────────────────────────────────────────────────────────
 
 type BrokerContext = {
