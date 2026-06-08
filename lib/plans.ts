@@ -91,6 +91,22 @@ export const PLANS: Record<PlanId, PlanDef> = {
 };
 
 /**
+ * Reverse lookup: which plan does a Stripe price id belong to? The webhook uses
+ * this to derive the ACTIVE plan from the live subscription's price, instead of
+ * a `metadata.plan` that's stamped once at checkout and goes STALE on a
+ * portal-driven plan change (Solo↔Pro / Team↔Team Plus). Returns null when the
+ * id isn't a known plan price (e.g. price ids unset in this env) so callers can
+ * fall back to metadata / the stored plan.
+ */
+export function planIdForStripePrice(priceId: string | null | undefined): PlanId | null {
+  if (!priceId) return null;
+  for (const p of Object.values(PLANS)) {
+    if (p.stripePriceMonthly === priceId || p.stripePriceAnnual === priceId) return p.id;
+  }
+  return null;
+}
+
+/**
  * Credit cost per premium workflow (docs/PRICING_V2_PLAN.md §4.4). The key is
  * the canonical `workflow` string written to CreditTxn.workflow.
  */

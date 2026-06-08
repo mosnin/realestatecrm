@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
-import { TOPUPS, type TopupId } from '@/lib/plans';
+import { TOPUPS, type TopupId, planIdForStripePrice } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -515,6 +515,19 @@ async function POSTHandler(req: NextRequest) {
         const paidSub = await stripe.subscriptions.retrieve(paidSubId);
         const paidStatus = mapStatus(paidSub.status);
 
+        // Derive the ACTIVE plan from the live subscription's price, not the
+        // checkout-time metadata.plan — that's stamped once and goes STALE on a
+        // portal plan change, so a Solo→Pro upgrade was granted Solo credits +
+        // relabeled Solo, and Pro→Solo kept granting Pro credits at the Solo
+        // price. Falls back to metadata when the price isn't a known plan price.
+        const livePlan = planIdForStripePrice(paidSub.items.data[0]?.price?.id);
+        // Grant monthly credits ONLY on a genuine new-subscription or renewal
+        // invoice. Proration / mid-cycle / manual invoices also fire
+        // payment_succeeded and would each mint an extra full month of credits.
+        const grantableInvoice =
+          invoice.billing_reason === 'subscription_create' ||
+          invoice.billing_reason === 'subscription_cycle';
+
         // Brokerage path
         const brokerageId = paidSub.metadata?.brokerageId;
         if (brokerageId) {
@@ -523,10 +536,12 @@ async function POSTHandler(req: NextRequest) {
           });
           // Monthly credit grant (best-effort — must never break payment
           // processing). Idempotent-per-invoice via the event-ID dedupe above.
-          try {
-            await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, paidSub.metadata?.plan ?? '');
-          } catch (e) {
-            logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+          if (grantableInvoice) {
+            try {
+              await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, livePlan ?? paidSub.metadata?.plan ?? '');
+            } catch (e) {
+              logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+            }
           }
           break;
         }
@@ -563,15 +578,20 @@ async function POSTHandler(req: NextRequest) {
         try {
           if (paidSpace?.id) {
             const planId =
+              livePlan ||
               (paidSub.metadata?.plan as string) ||
               (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
+            // Keep the plan label in sync even when this invoice isn't grantable
+            // (so a portal plan change is reflected immediately).
             if (planId !== paidSpace.plan) {
               await supabase
                 .from('Space')
                 .update({ plan: planId, planActivatedAt: new Date().toISOString() })
                 .eq('id', paidSpace.id);
             }
-            await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+            if (grantableInvoice) {
+              await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+            }
           } else {
             logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
           }
