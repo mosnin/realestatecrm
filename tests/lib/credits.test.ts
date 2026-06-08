@@ -114,6 +114,9 @@ describe('workflowCost', () => {
   it('returns the per-workflow cost', () => {
     expect(workflowCost('lead_score')).toBe(1);
     expect(workflowCost('pipeline_audit')).toBe(50);
+    // chat_turn must resolve to a real number — if it's ever dropped from the
+    // cost table, the chat gate would compute NaN and silently never enforce.
+    expect(workflowCost('chat_turn')).toBe(1);
   });
   it('multiplies by units for batched runs (e.g. pipeline audit batches)', () => {
     expect(workflowCost('pipeline_audit', 3)).toBe(150);

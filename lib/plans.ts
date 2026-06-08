@@ -118,6 +118,12 @@ export const WORKFLOW_CREDIT_COST = {
   daily_briefing: 10,
   call_prep: 3,
   lead_score: 1,
+  // One Chippi chat/agent turn (the in-app assistant). Flat 1 credit — a turn's
+  // blended token COGS sits at or below a lead-score's, so it clears the spec's
+  // "COGS ≤ 40% of credit retail" bar, and 1/turn leaves Solo ~1,500 turns/mo
+  // (~50/day) — generous for normal use while still hard-capping runaway
+  // automation. Raise this (not the plan price) if a chat model gets pricier.
+  chat_turn: 1,
 } as const;
 
 export type Workflow = keyof typeof WORKFLOW_CREDIT_COST;
