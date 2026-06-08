@@ -37,7 +37,12 @@
 -- ============================================================================
 
 -- 1. ── pin search_path on the money RPCs ────────────────────────────────────
-ALTER FUNCTION grant_credits(text, text, integer, text, timestamptz)
+-- grant_credits carries the 6-arg signature (…, p_source_id text) from
+-- 20260623_credit_grant_idempotency, which DROPped the original 5-arg version.
+-- Targeting the dropped 5-arg signature here aborts the whole migration on a
+-- combined replay (search_path pins, the CHECKs, and the unique indexes below
+-- all silently fail to apply), so the signature must match the live function.
+ALTER FUNCTION grant_credits(text, text, integer, text, timestamptz, text)
   SET search_path = public;
 ALTER FUNCTION spend_credits(text, text, integer, text, text, text, jsonb)
   SET search_path = public;
