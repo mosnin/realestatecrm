@@ -47,7 +47,7 @@ import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
-import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, CreditsExhaustedError } from '@/lib/billing/meter';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
@@ -643,10 +643,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
-  // Charge the turn now that it's committed to running (user message saved, all
-  // execution paths below dispatch the model). Flat per-turn cost, best-effort
-  // so a metering miss never breaks the reply. No-op unless CREDITS_ENFORCED.
-  await chargeWorkflow(ctx.space.id, 'chat_turn', { userId: ctx.userId });
+  // The turn's credit charge is applied by the model-aware ChatUsage trigger
+  // (meter_chat_usage_credits) when usage is recorded — not here. A second flat
+  // charge at this point would double-debit the turn. The pre-stream gate above
+  // (assertCanSpend) stays: refuse up front when out of credits.
 
   void (async () => {
     try {
