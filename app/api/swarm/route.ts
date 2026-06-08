@@ -9,6 +9,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 
 // ── GET /api/swarm?spaceId=... ───────────────────────────────────────────────
 // List recent swarm runs for a space, newest-first, capped at 20.
@@ -111,6 +112,25 @@ export async function POST(req: NextRequest) {
     await assertSpaceEnabled(spaceId);
   } catch {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
+  }
+
+  // Daily token budget — the chat route enforces this, but swarm dispatch (a
+  // multi-agent run, the costliest path) did not, so a space already over its
+  // cap could launch unlimited swarms. Gate it the same way. Fails open on a DB
+  // error so a transient blip can't block a legitimate run.
+  try {
+    const { data: settingsRow } = await supabase
+      .from('AgentSettings')
+      .select('dailyTokenBudget')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    const dailyTokenBudget = (settingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
+    const { total: todayTokens } = await getTodayTokenUsage(space.id);
+    if (todayTokens >= dailyTokenBudget) {
+      return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
+    }
+  } catch (err) {
+    console.error('[swarm/POST] budget check failed — continuing', err);
   }
 
   // Fetch custom agents if IDs were provided.
