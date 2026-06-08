@@ -45,6 +45,7 @@ import {
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
+import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
@@ -543,6 +544,39 @@ export async function POST(req: NextRequest) {
       { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
     );
+  }
+
+  // Dunning gate — pause premium AI for a LAPSED paid subscription (the card
+  // failed, or the plan was canceled), while leaving the CRM fully usable.
+  // Only past_due / canceled / unpaid are gated; free & never-subscribed
+  // ('inactive'), trialing, active, and brokerage-member spaces (whose own
+  // status is 'inactive' — the brokerage funds them) all pass. Admins bypass.
+  // Fails OPEN so a DB hiccup can't lock out a paying customer.
+  try {
+    const { data: subRow } = await supabase
+      .from('Space')
+      .select('stripeSubscriptionStatus')
+      .eq('id', ctx.space.id)
+      .maybeSingle();
+    const subStatus = subRow?.stripeSubscriptionStatus ?? 'inactive';
+    if (isSubscriptionDelinquent(subStatus)) {
+      const { data: userRow } = await supabase
+        .from('User')
+        .select('platformRole')
+        .eq('clerkId', ctx.userId)
+        .maybeSingle();
+      if (userRow?.platformRole !== 'admin') {
+        return NextResponse.json(
+          {
+            error:
+              'Your subscription needs attention — update your payment method in billing to keep using Chippi. Your workspace and data stay available.',
+          },
+          { status: 402 },
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn('[ai/task] subscription status check failed — allowing turn', { spaceSlug }, err);
   }
 
   try {

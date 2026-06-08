@@ -83,6 +83,16 @@ export async function requireActiveSubscription(
 }
 
 /**
+ * Subscription states that pause premium AI under dunning (a lapsed PAID plan).
+ * Deliberately EXCLUDES 'inactive' (free / never-subscribed) and
+ * 'trialing'/'active', so free and trial users are never gated — only an
+ * account whose paid subscription failed payment or was canceled.
+ */
+export function isSubscriptionDelinquent(status: string | null | undefined): boolean {
+  return status === 'past_due' || status === 'canceled' || status === 'unpaid';
+}
+
+/**
  * Verifies the calling user owns the given workspace slug, OR is a
  * broker_owner/broker_admin of the brokerage that manages this space.
  * Returns { userId, space } or a 4xx NextResponse.
