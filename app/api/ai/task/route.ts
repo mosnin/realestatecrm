@@ -552,8 +552,12 @@ export async function POST(req: NextRequest) {
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
 
+    // Default must match the AgentSettings.dailyTokenBudget DB column default
+    // (and schemas.py / the settings + usage APIs), which are all 50_000. This
+    // fallback was 500_000, so a space with no AgentSettings row was gated at
+    // 10x the budget every other surface shows and enforces.
     const dailyTokenBudget: number =
-      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
+      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
 
     // Previously this read AgentTask.inputTokens/outputTokens — columns no
     // code writes — so the enforcement silently passed every time. Route
