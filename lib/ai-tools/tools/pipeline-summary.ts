@@ -70,6 +70,12 @@ export const pipelineSummaryTool = defineTool<typeof parameters, { summary: Summ
     if (!includeLostWon) {
       query = query.eq('status', 'active');
     }
+    // Bound the fetch. A snapshot only ever surfaces top-5 per bucket, so even
+    // a huge pipeline gains nothing from pulling every row — and an unbounded
+    // scan on a large space is a memory/latency hazard. 1000 deals is far more
+    // than any realistic active pipeline; this caps both branches (active-only
+    // and includeLostWon).
+    query = query.limit(1000);
 
     const { data, error } = await query.abortSignal(ctx.signal);
     if (error) {

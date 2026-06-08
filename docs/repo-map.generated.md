@@ -10,7 +10,7 @@
 - **Page routes:** 187
 - **API endpoints:** 313
 - **Cron jobs:** 10
-- **DB tables:** 101  ·  **RPCs:** 23  ·  **migrations:** 161
+- **DB tables:** 101  ·  **RPCs:** 23  ·  **migrations:** 162
 - **Agent tools — TS (lib/ai-tools):** 56 declared, 55 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 53 declared
 
@@ -842,7 +842,7 @@ the runtimes diverge — this table makes the drift visible.
 
 **RPCs (23):** `book_tour_atomic`, `charge_credits_for_chat_usage`, `cleanup_agent_data`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `ensure_agent_settings_for_space`, `grant_credits`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `offboard_brokerage_member`, `purge_credit_rows_for_account`, `refund_credit_txn`, `reorder_deal`, `resolve_billing_account_for_space`, `routine_next_run_at`, `routine_set_next_run`, `search_knowledge_docs`, `spend_credits`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`
 
-**Migrations:** 161 (latest: `20260701000000_p3_sql_hardening.sql`)
+**Migrations:** 162 (latest: `20260703000000_scale_indexes.sql`)
 
 ## External services
 

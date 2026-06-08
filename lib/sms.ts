@@ -90,15 +90,24 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
 
   try {
     const hasMedia = Array.isArray(params.mediaUrls) && params.mediaUrls.length > 0;
-    const response = await client.messages.send({
-      from: fromNumber,
-      to: toNumber,
-      text: params.body,
-      // Including media_urls promotes the send from SMS to MMS server-side.
-      // Telnyx expects an array of publicly fetchable URLs — caller is
-      // responsible for making sure the URLs resolve without auth.
-      ...(hasMedia ? { media_urls: params.mediaUrls } : {}),
-    });
+    const response = await client.messages.send(
+      {
+        from: fromNumber,
+        to: toNumber,
+        text: params.body,
+        // Including media_urls promotes the send from SMS to MMS server-side.
+        // Telnyx expects an array of publicly fetchable URLs — caller is
+        // responsible for making sure the URLs resolve without auth.
+        ...(hasMedia ? { media_urls: params.mediaUrls } : {}),
+      },
+      // 10s per-attempt timeout, no retries. SMS here is best-effort — this
+      // function never throws and the caller treats a `false` return as
+      // "notification skipped". A hung Telnyx call must not pin a serverless
+      // invocation open. The SDK retries timeouts by default (which would make
+      // the real wall-clock bound ~3x), so maxRetries:0 keeps it a hard 10s;
+      // on timeout the SDK rejects and we fall into the catch below.
+      { timeout: 10_000, maxRetries: 0 },
+    );
     logger.info('[sms] sent', {
       to: toNumber,
       messageId: response?.data?.id ?? 'unknown',
