@@ -42,12 +42,20 @@ export async function POST(req: NextRequest) {
     // Which balance does this space fund? Team/Team Plus pool at the brokerage.
     const { account } = await resolveBillingAccount(space.id);
 
-    const { data: stripeData } = await supabase
-      .from('Space')
+    // Use the FUNDING account's Stripe customer, not the space's. For a
+    // Team/Team Plus space the balance pools at the brokerage, whose customer
+    // lives on Brokerage.stripeCustomerId — the space's own customer is usually
+    // null. Reading it from the space made checkout mint a brand-new guest
+    // customer, which the webhook's anti-poisoning guard (it compares the
+    // account's stored customer to session.customer) then rejected → the team
+    // was CHARGED but granted ZERO credits.
+    const customerTable = account.type === 'brokerage' ? 'Brokerage' : 'Space';
+    const { data: custRow } = await supabase
+      .from(customerTable)
       .select('stripeCustomerId')
-      .eq('id', space.id)
+      .eq('id', account.id)
       .single();
-    const customerId = stripeData?.stripeCustomerId ?? undefined;
+    const customerId = custRow?.stripeCustomerId ?? undefined;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
     // Recorded on both the session and the payment intent so the webhook can
