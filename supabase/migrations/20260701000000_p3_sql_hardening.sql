@@ -44,6 +44,16 @@ ALTER FUNCTION spend_credits(text, text, integer, text, text, text, jsonb)
 ALTER FUNCTION refund_credit_txn(text)
   SET search_path = public;
 
+-- 1b. ── pin search_path on the RLS identity function ─────────────────────────
+-- current_user_internal_id() is SECURITY DEFINER (the identity linchpin of every
+-- space-scoped RLS policy, including ChatUsage's) and references "User"
+-- unqualified — the highest-value DEFINER function in the schema, same
+-- function_search_path_mutable class as the RPCs above. auth.uid() is already
+-- schema-qualified in its body, so public + pg_temp resolves it fully; pg_temp
+-- last so a temp-table shadow of "User" can't win.
+ALTER FUNCTION current_user_internal_id()
+  SET search_path = public, pg_temp;
+
 -- 2. ── commission-rate range guards (percent, 0..100; NULL allowed) ──────────
 DO $$
 BEGIN
