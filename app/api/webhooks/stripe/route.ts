@@ -78,10 +78,34 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
 // Disable body parsing — Stripe needs the raw body for signature verification
 export const runtime = 'nodejs';
 
-/** Get current_period_end from the first subscription item. */
+/** Get current_period_end from the first subscription item. Falls back through
+ *  the other "when does access end" timestamps before start_date — on a
+ *  canceled/past_due sub the item's current_period_end can be absent, and
+ *  falling straight to start_date would write a period-end in the PAST, which
+ *  strands any "access until period end" grace logic. */
 function getPeriodEnd(sub: Stripe.Subscription): string {
-  const ts = sub.items.data[0]?.current_period_end ?? sub.start_date;
+  const subAny = sub as unknown as {
+    current_period_end?: number; cancel_at?: number; ended_at?: number;
+  };
+  const ts =
+    sub.items.data[0]?.current_period_end ??
+    subAny.current_period_end ??
+    subAny.cancel_at ??
+    subAny.ended_at ??
+    sub.start_date;
   return new Date(ts * 1000).toISOString();
+}
+
+/** Stripe's `customer` field can be a string id, an expanded object, or null.
+ *  Normalize to the id string so ownership comparisons don't silently break:
+ *  comparing a stored string id against an expanded object is always unequal
+ *  (legit update rejected → account stranded) — or, inverted, always equal
+ *  (guard bypassed). */
+function customerIdOf(
+  customer: string | { id: string } | null | undefined,
+): string | null {
+  if (!customer) return null;
+  return typeof customer === 'string' ? customer : customer.id;
 }
 
 /**
@@ -364,7 +388,7 @@ async function POSTHandler(req: NextRequest) {
           .eq('id', spaceId)
           .maybeSingle();
 
-        if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== (session.customer as string)) {
+        if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== customerIdOf(session.customer)) {
           logger.error('[stripe-webhook] checkout spaceId mismatch — rejecting metadata poisoning attempt', {
             spaceId,
             existingCustomer: targetSpace.stripeCustomerId,
@@ -380,6 +404,11 @@ async function POSTHandler(req: NextRequest) {
         break;
       }
 
+      // A subscription created outside checkout.session.completed (Stripe
+      // Dashboard, API, or trial→paid create) only ever fired `created`, which
+      // had no handler — so status/period/customer never got written until the
+      // first later event. Share the `updated` handler so creation lands too.
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const newStatus = mapStatus(subscription.status);
@@ -409,21 +438,27 @@ async function POSTHandler(req: NextRequest) {
             .eq('id', spaceId)
             .maybeSingle();
 
-          if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== subscription.customer) {
+          if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== customerIdOf(subscription.customer)) {
             logger.error('[stripe-webhook] spaceId metadata mismatch — space belongs to different customer', {
               spaceId,
               spaceCustomer: existingSpace.stripeCustomerId,
-              webhookCustomer: subscription.customer,
+              webhookCustomer: customerIdOf(subscription.customer),
             });
             break; // Reject update — potential metadata poisoning attack
           }
 
           await supabase.from('Space').update(updateData).eq('id', spaceId);
         } else {
-          await supabase
+          // No spaceId metadata (legacy subs): match by subscription id, but
+          // also bind to the subscription's customer so a poisoned/duplicated
+          // stripeSubscriptionId can't overwrite a different customer's Space.
+          const subCustomer = customerIdOf(subscription.customer);
+          let q = supabase
             .from('Space')
             .update(updateData)
             .eq('stripeSubscriptionId', subscription.id);
+          if (subCustomer) q = q.eq('stripeCustomerId', subCustomer);
+          await q;
         }
         // Notify owner of status change
         try { await notifySubscriptionChange(subscription.id, newStatus); } catch (e) { logger.error('[stripe-webhook] subscription notification failed', undefined, e); }
@@ -505,7 +540,7 @@ async function POSTHandler(req: NextRequest) {
           .select('id, plan, stripeCustomerId')
           .eq('stripeSubscriptionId', paidSubId)
           .maybeSingle();
-        if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== paidSub.customer) {
+        if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== customerIdOf(paidSub.customer)) {
           logger.error('[stripe-webhook] invoice.payment_succeeded customer mismatch — subscription belongs to a different customer', {
             paidSubId,
             spaceCustomer: paidSpace.stripeCustomerId,
@@ -591,11 +626,16 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
-        await supabase
+        // ── Existing Space path ──────────────────────────────────────────
+        // Bind to the subscription's customer so a poisoned stripeSubscriptionId
+        // can't force a victim Space to past_due (access denial-of-service).
+        const failedCustomer = customerIdOf(failedSub.customer);
+        let fq = supabase
           .from('Space')
           .update({ stripeSubscriptionStatus: 'past_due' })
           .eq('stripeSubscriptionId', subId);
+        if (failedCustomer) fq = fq.eq('stripeCustomerId', failedCustomer);
+        await fq;
         try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { logger.error('[stripe-webhook] past_due notification failed', undefined, e); }
         break;
       }
