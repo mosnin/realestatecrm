@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/permissions';
+import { logAdminAction } from '@/lib/admin';
 import { supabase } from '@/lib/supabase';
 import {
   getCreditBalance,
@@ -54,8 +55,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let adminClerkId: string;
   try {
-    await requirePlatformAdmin();
+    ({ clerkUserId: adminClerkId } = await requirePlatformAdmin());
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -79,6 +81,12 @@ export async function POST(req: Request) {
     try {
       await grantCredits(account, amount, 'manual_admin', expiresAt);
       const balance = await getCreditBalance(account);
+      await logAdminAction({
+        actor: adminClerkId,
+        action: 'grant_credits',
+        target: account.id,
+        details: { accountType: account.type, amount, expiry: expiresAt ? 'rollover' : 'never', balanceAfter: balance },
+      });
       return NextResponse.json({ ok: true, balance });
     } catch {
       return NextResponse.json({ error: 'Grant failed' }, { status: 500 });
@@ -90,6 +98,12 @@ export async function POST(req: Request) {
     if (!txnId) return NextResponse.json({ error: 'txnId required' }, { status: 400 });
     try {
       await refundCredits(txnId);
+      await logAdminAction({
+        actor: adminClerkId,
+        action: 'refund_credits',
+        target: txnId,
+        details: { txnId },
+      });
       return NextResponse.json({ ok: true });
     } catch {
       return NextResponse.json({ error: 'Refund failed' }, { status: 500 });
