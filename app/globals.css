@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single:wght@100..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -18,10 +17,11 @@
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
-  /* Marketing/auth-only brand display font (fortitudo "studio ASCII" look).
-     Bitcount Grid Single, used via the `.font-brand` utility on the logged-out
-     site and auth pages. The product (dashboard) never reaches for it. */
-  --font-brand: "Bitcount Grid Single", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  /* Marketing/auth-only brand display face, used via the `.font-brand` utility
+     on the logged-out site and auth pages. Now the clean system display stack
+     (SF Pro Display) — the previous Bitcount Grid Single techno face was pulled.
+     Swap this one line to wire a different display font; nothing else changes. */
+  --font-brand: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
 
   /* Rainbow-button color stops (marketing CTA flourish). */
   --color-color-1: hsl(var(--color-1));

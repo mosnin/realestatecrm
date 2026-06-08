@@ -62,7 +62,7 @@ back a layer.
 | Auth | **Clerk** (`@clerk/nextjs`). Component overrides in `globals.css` `.cl-*` selectors. |
 | Data | **Supabase** (`@supabase/supabase-js`) + browser client in `lib/supabase-browser.ts`, server in `lib/supabase.ts`. |
 | Realtime | Supabase Postgres CDC via `hooks/use-realtime.ts`. |
-| Fonts | **Product**: all system / local — SF Pro from the OS, Times New Roman as the serif. **Logged-out site only**: one Google Fonts face, Bitcount Grid Single, bound to `--font-brand` and used via the `.font-brand` utility for marketing/auth display type (see "The logged-out site" section). The product never loads or uses it. |
+| Fonts | **Product**: all system / local — SF Pro from the OS, Times New Roman as the serif. **Logged-out site**: marketing/auth display type uses the `.font-brand` utility bound to `--font-brand`, currently the clean system display stack (SF Pro Display). No web font is loaded. Swap the one `--font-brand` line in `globals.css` to wire a distinct display face. |
 
 If a feature looks like it needs a new dep, the bar is high — it almost never does. The list above is the whole vocabulary.
 
@@ -911,11 +911,13 @@ is outside the strict zone — orange and shadows are *expected* here.
 
 ### What the look is
 
-- **Brand display font** — Bitcount Grid Single, applied via the `.font-brand`
-  utility. It's the marketing/auth headline + eyebrow + footer-column face.
-  Loaded once via a Google Fonts `@import` in `globals.css`. Bound to
-  `--font-brand`. The product never uses it (the product's serif flourish is
-  still Times via `--font-title`).
+- **Brand display face** — applied via the `.font-brand` utility (the
+  marketing/auth headline + eyebrow + footer-column face), bound to
+  `--font-brand` in `globals.css`. It is currently the **clean system display
+  stack** (SF Pro Display) — the previous Bitcount Grid Single web font was
+  pulled. No web font is loaded; to give marketing a distinct display face,
+  change the single `--font-brand` line and nothing else. The product never
+  uses `.font-brand` (its serif flourish is still Times via `--font-title`).
 - **ASCII field** — `components/marketing/fortitudo/ascii-field.tsx`. A slow
   canvas field of glyphs in Chippi orange (#ff964f → pale amber on the crests),
   orange-on-transparent so it reads on **both** light and dark. It's the

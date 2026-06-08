@@ -16,6 +16,7 @@ import { redirect } from 'next/navigation';
 import { HomeHero } from '@/components/marketing/fortitudo/home/hero';
 import { StatsBand } from '@/components/marketing/fortitudo/home/stats-band';
 import { CoreCards } from '@/components/marketing/fortitudo/home/core-cards';
+import { AgentShowcase } from '@/components/marketing/fortitudo/home/agent-showcase';
 import { HowItWorks } from '@/components/marketing/fortitudo/home/how-it-works';
 import { Testimonials } from '@/components/marketing/fortitudo/home/testimonials';
 import { About } from '@/components/marketing/fortitudo/home/about';
