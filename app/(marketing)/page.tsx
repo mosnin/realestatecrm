@@ -33,6 +33,7 @@ export default async function MarketingHomePage() {
       <HomeHero />
       <StatsBand />
       <CoreCards />
+      <AgentShowcase />
       <HowItWorks />
       <Testimonials />
       <About />
