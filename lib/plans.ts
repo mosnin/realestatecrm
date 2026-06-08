@@ -114,11 +114,26 @@ export type Workflow = keyof typeof WORKFLOW_CREDIT_COST;
  */
 export const PIPELINE_AUDIT_LEAD_CAP = 100;
 
-/** One-time credit packs (mode=payment in Stripe). 30-day rollover. */
+/**
+ * One-time credit packs (mode=payment in Stripe). 30-day rollover.
+ *
+ * Credit counts are sized to hold ≥60% gross margin at worst-case burn — every
+ * credit can cost up to $0.013 of model COGS (the model-aware metering budget),
+ * so a credit must retail ≥ $0.013 / 0.40 = $0.0325 to clear 60%. The previous
+ * counts (1000/3000/8000) priced credits at $0.029/$0.023/$0.0186 — 55%/43%/30%
+ * margin, the Power pack a guaranteed loss at full burn.
+ *
+ * We cut the credit counts rather than raise the dollar prices: the $ amount is
+ * the live Stripe price id, so raising it would need new Stripe price objects
+ * and risk a display-vs-charge mismatch. Trimming the granted credits keeps the
+ * existing $29/$69/$149 charges and is consistent the moment it ships. Per-credit
+ * value still rewards the larger pack (Starter $0.0363 → Power $0.0331/cr), and
+ * all three clear 60%: Starter 64.1%, Growth 62.3%, Power 60.7%.
+ */
 export const TOPUPS = {
-  starter: { id: 'starter', label: 'Starter refill', credits: 1000, price: 29, stripePrice: env('STRIPE_PRICE_TOPUP_STARTER') },
-  growth: { id: 'growth', label: 'Growth refill', credits: 3000, price: 69, stripePrice: env('STRIPE_PRICE_TOPUP_GROWTH') },
-  power: { id: 'power', label: 'Power refill', credits: 8000, price: 149, stripePrice: env('STRIPE_PRICE_TOPUP_POWER') },
+  starter: { id: 'starter', label: 'Starter refill', credits: 800, price: 29, stripePrice: env('STRIPE_PRICE_TOPUP_STARTER') },
+  growth: { id: 'growth', label: 'Growth refill', credits: 2000, price: 69, stripePrice: env('STRIPE_PRICE_TOPUP_GROWTH') },
+  power: { id: 'power', label: 'Power refill', credits: 4500, price: 149, stripePrice: env('STRIPE_PRICE_TOPUP_POWER') },
 } as const;
 
 export type TopupId = keyof typeof TOPUPS;
