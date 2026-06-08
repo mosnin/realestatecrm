@@ -35,6 +35,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PLANS, type PlanId } from '@/lib/plans';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,9 @@ interface BillingPageProps {
   canceledAccessEnd?: string;
   /** Support email or URL */
   supportUrl?: string;
+  /** The account's plan tier — drives the displayed name + price. Without this
+   *  the page hardcoded "Pro"/$97 and contradicted the real plan shown below. */
+  plan?: PlanId;
 }
 
 interface Invoice {
@@ -78,9 +82,6 @@ interface Invoice {
 }
 
 // ─── Plan config ──────────────────────────────────────────────────────────────
-
-const PLAN_PRICE = 97;
-const PLAN_NAME = 'Pro';
 
 const PLAN_FEATURES = [
   { icon: PhoneIncoming, label: 'Unlimited lead intake & AI scoring' },
@@ -161,9 +162,17 @@ export function BillingPage({
   usageStats,
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
+  plan = 'pro',
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  // Plan name + price come from the single source of truth (lib/plans), not
+  // hardcoded — the page used to claim "Pro/$97" for every tier.
+  const planDef = PLANS[plan] ?? PLANS.pro;
+  const PLAN_NAME = planDef.label;
+  const PLAN_PRICE = planDef.priceMonthly;
 
   const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
 
@@ -188,28 +197,38 @@ export function BillingPage({
 
   // ── Handlers (wired to Stripe once live) ──────────────────────────────────
 
-  async function handleSubscribe() {
-    const res = await fetch('/api/billing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
+  // Shared POST→redirect handler. Guards against double-submit (a second click
+  // before the first navigates would open a second checkout/portal session) and
+  // follows a {redirect} response (e.g. past_due → billing) instead of silently
+  // doing nothing.
+  async function startBillingFlow(endpoint: string) {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.redirect) { window.location.href = data.redirect; return; }
+      // Nothing to navigate to — surface the error and re-enable the button.
+      console.error('[billing] checkout/portal returned no url', data);
+      if (typeof data.error === 'string') window.alert(data.error);
+      setActionBusy(false);
+    } catch (err) {
+      console.error('[billing] checkout/portal request failed', err);
+      setActionBusy(false);
     }
   }
 
-  async function handleManage() {
-    const res = await fetch('/api/billing/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    }
+  function handleSubscribe() {
+    void startBillingFlow('/api/billing/checkout');
+  }
+
+  function handleManage() {
+    void startBillingFlow('/api/billing/portal');
   }
 
   async function handleCancel() {
@@ -435,7 +454,7 @@ export function BillingPage({
       {/* ── What's included ── */}
       <SectionBlock
         title="What's included"
-        description="Everything in the Pro plan"
+        description={`Everything in the ${PLAN_NAME} plan`}
       >
         <ul className="space-y-3">
           {PLAN_FEATURES.map(({ icon: Icon, label }) => (
