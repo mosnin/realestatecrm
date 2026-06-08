@@ -260,16 +260,19 @@ async function POSTHandler(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Idempotency check — skip if already processed
+  // Idempotency check — skip events we've already fully processed. The Redis
+  // key is a fast-path optimization, NOT the correctness boundary: it's set
+  // only AFTER the handler succeeds (see end of function). Correctness rests on
+  // DB-level grant idempotency (CreditLot.sourceId unique index), so a Redis
+  // miss can at worst re-run a handler — it can never double-grant.
   const eventKey = `stripe:event:${event.id}`;
   try {
     const alreadyProcessed = await redis.get(eventKey);
     if (alreadyProcessed) {
       return NextResponse.json({ received: true });
     }
-    await redis.set(eventKey, '1', { ex: 259200 }); // Expire after 72h (covers Stripe's retry window)
   } catch {
-    // Redis unavailable — proceed anyway (best effort dedup)
+    // Redis unavailable — proceed; DB-level idempotency is the real backstop.
   }
 
   try {
@@ -301,7 +304,7 @@ async function POSTHandler(req: NextRequest) {
               });
               break;
             }
-            await grantTopup({ type: acctType, id: acctId }, topupId);
+            await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
             logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
           } else {
             logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
@@ -481,7 +484,7 @@ async function POSTHandler(req: NextRequest) {
           // Monthly credit grant (best-effort — must never break payment
           // processing). Idempotent-per-invoice via the event-ID dedupe above.
           try {
-            await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, paidSub.metadata?.plan ?? '');
+            await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, paidSub.metadata?.plan ?? '', invoice.id);
           } catch (e) {
             logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
           }
@@ -528,7 +531,7 @@ async function POSTHandler(req: NextRequest) {
                 .update({ plan: planId, planActivatedAt: new Date().toISOString() })
                 .eq('id', paidSpace.id);
             }
-            await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId);
+            await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
           } else {
             logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
           }
@@ -599,6 +602,18 @@ async function POSTHandler(req: NextRequest) {
   } catch (err) {
     logger.error('[stripe-webhook] error processing event', { eventType: event.type }, err);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
+  }
+
+  // Mark processed only AFTER the handler succeeded (every switch case breaks,
+  // so reaching here = success). If it had thrown, the catch returned 500 and
+  // this never runs → Stripe retries → the retry re-runs the handler and
+  // completes the work, with DB-level grant idempotency preventing any
+  // double-grant. Setting the key before processing would silently drop the
+  // event on a mid-handler crash.
+  try {
+    await redis.set(eventKey, '1', { ex: 259200 }); // 72h — covers Stripe's retry window
+  } catch {
+    // Redis unavailable — fine; DB-level idempotency already guards correctness.
   }
 
   return NextResponse.json({ received: true });
