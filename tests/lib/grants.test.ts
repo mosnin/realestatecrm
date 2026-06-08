@@ -11,6 +11,7 @@ vi.mock('@/lib/billing/credits', () => ({
 }));
 
 import { monthlyGrantAmount, grantPlanMonthly, grantTopup } from '@/lib/billing/grants';
+import { TOPUPS } from '@/lib/plans';
 
 describe('monthlyGrantAmount', () => {
   it('returns the plan base credits', () => {
@@ -46,7 +47,7 @@ describe('grant idempotency — sourceId threading', () => {
   it('grantTopup forwards the checkout-session id as sourceId', async () => {
     await grantTopup(acct, 'starter', 'cs_abc');
     expect(grantCreditsMock).toHaveBeenCalledWith(
-      acct, 1000, 'topup', expect.any(Date), 'cs_abc',
+      acct, TOPUPS.starter.credits, 'topup', expect.any(Date), 'cs_abc',
     );
   });
 
