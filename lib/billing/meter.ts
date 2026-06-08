@@ -13,6 +13,7 @@
 
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
+import { logger } from '@/lib/logger';
 import type { Workflow } from '@/lib/plans';
 
 export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
@@ -60,7 +61,8 @@ export async function chargeWorkflow(
       spaceId,
       userId: opts?.userId,
     });
-  } catch {
-    /* metering must never break the workflow */
+  } catch (err) {
+    /* metering must never break the workflow — log and swallow */
+    logger.error('[meter] chargeWorkflow failed silently', { spaceId, workflow }, err);
   }
 }

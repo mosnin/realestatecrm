@@ -17,9 +17,45 @@ from openai import AsyncOpenAI
 
 from config import settings
 from db import supabase as get_supabase
-from llm import configure_agents_sdk, get_llm_client, make_chat_model, openai_model, resolve_chat_model
+from ledger import record_chat_usage
+from llm import (
+    configure_agents_sdk,
+    extract_usage_with_cache,
+    get_llm_client,
+    make_chat_model,
+    openai_model,
+    resolve_chat_model,
+)
+from security.budget import check_budget
 
 logger = structlog.get_logger(__name__)
+
+# The swarm endpoint receives no AgentSettings (the payload carries only the
+# goal + spaceId), so the budget gate uses the same per-space daily default
+# the schema declares (AgentSettings.daily_token_budget = 50_000). One gate
+# before planning is enough — a swarm that can't afford to plan can't afford
+# to run.
+_SWARM_DAILY_TOKEN_BUDGET = 50_000
+
+
+def _usage_from_completion(response: object) -> tuple[int, int, int]:
+    """Return (prompt, completion, cached) tokens from a chat.completions result.
+
+    The planner and auditor call the OpenAI client directly, so usage lives on
+    `response.usage` (prompt_tokens / completion_tokens), with cached prompt
+    tokens under `prompt_tokens_details.cached_tokens`. Honest zero for any
+    field the provider didn't populate.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return (0, 0, 0)
+    prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
+    completion = int(getattr(usage, "completion_tokens", 0) or 0)
+    cached = 0
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is not None:
+        cached = int(getattr(details, "cached_tokens", 0) or 0)
+    return (prompt, completion, cached)
 
 
 async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_id: str | None = None) -> None:
@@ -30,7 +66,7 @@ async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_
     await db.table("SwarmEvent").insert(row).execute()
 
 
-async def plan_swarm(goal: str, custom_agents: list[dict], client: AsyncOpenAI) -> dict:
+async def plan_swarm(goal: str, custom_agents: list[dict], client: AsyncOpenAI, space_id: str) -> dict:
     """Ask GPT-4o to decompose the goal into parallel sub-tasks. Returns a plan dict."""
     agent_roster = "\n".join(
         f"- Agent {i}: {a['name']} — {a.get('systemPrompt', '')[:200]}"
@@ -66,11 +102,23 @@ Rules:
 - Use agentIndex to map to a custom agent (0-based), or -1 to auto-assign
 - wave=1 for first-wave parallel tasks, wave=2 for tasks that depend on wave-1 results
 """
+    planner_model = openai_model("gpt-4o-mini")
     response = await client.chat.completions.create(
-        model=openai_model("gpt-4o-mini"),
+        model=planner_model,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         max_tokens=1000,
+    )
+    # Bill the planner call. Direct chat.completions usage shape, recorded as
+    # one ChatUsage row so the credit trigger fires. Best-effort: never raises.
+    p_in, p_out, p_cached = _usage_from_completion(response)
+    await record_chat_usage(
+        space_id=space_id,
+        model=planner_model,
+        prompt_tokens=p_in,
+        completion_tokens=p_out,
+        cached_tokens=p_cached,
+        route="agent",
     )
     plan_text = response.choices[0].message.content or "{}"
     # The planner LLM is asked for JSON (response_format=json_object), but a
@@ -119,10 +167,11 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
             "Be concise, accurate, and helpful. Focus on the specific task assigned."
         )
 
+        member_model = resolve_chat_model(settings.worker_model)
         agent = Agent(
             name=member["name"],
             instructions=system_prompt,
-            model=make_chat_model(resolve_chat_model(settings.worker_model)),
+            model=make_chat_model(member_model),
             model_settings=ModelSettings(max_tokens=2048),
         )
 
@@ -133,6 +182,19 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
 
         result = await Runner.run(agent, member["task"], max_turns=8)
         output = result.final_output or "No output produced."
+
+        # Bill this member's model usage. Agents SDK shape — same extractor the
+        # chat path uses. One ChatUsage row per member so the credit trigger
+        # fires; best-effort, never raises.
+        m_in, m_out, _, m_cached = extract_usage_with_cache(result)
+        await record_chat_usage(
+            space_id=space_id,
+            model=member_model,
+            prompt_tokens=m_in,
+            completion_tokens=m_out,
+            cached_tokens=m_cached,
+            route="agent",
+        )
 
         await db.table("SwarmMember").update({
             "status": "completed",
@@ -158,7 +220,7 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
         }, member_id)
 
 
-async def audit_results(goal: str, members: list[dict], client: AsyncOpenAI) -> str:
+async def audit_results(goal: str, members: list[dict], client: AsyncOpenAI, space_id: str) -> str:
     """Synthesize sub-agent outputs into a final answer."""
     results_text = "\n\n".join(
         f"**{m['name']}** ({m.get('role', 'agent')}):\n{m.get('output', 'No output')}"
@@ -180,10 +242,21 @@ Synthesize these results into a clear, comprehensive final answer.
 
 Format with markdown headers for readability."""
 
+    auditor_model = openai_model("gpt-4o-mini")
     response = await client.chat.completions.create(
-        model=openai_model("gpt-4o-mini"),
+        model=auditor_model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
+    )
+    # Bill the auditor call — one ChatUsage row, same as the planner.
+    a_in, a_out, a_cached = _usage_from_completion(response)
+    await record_chat_usage(
+        space_id=space_id,
+        model=auditor_model,
+        prompt_tokens=a_in,
+        completion_tokens=a_out,
+        cached_tokens=a_cached,
+        route="agent",
     )
     return response.choices[0].message.content or "No synthesis produced."
 
@@ -200,11 +273,26 @@ async def run_swarm(payload: dict) -> None:
     client = get_llm_client()
 
     try:
+        # Budget gate — the swarm runs the planner, every member, and the
+        # auditor against real models. Before this gate it ran completely
+        # ungated: an exhausted space could fire an unbounded swarm bill.
+        # One check up front (same per-space daily counter the autonomous
+        # orchestrator uses) is enough; refuse the whole run when spent.
+        if not await check_budget(space_id, _SWARM_DAILY_TOKEN_BUDGET):
+            logger.warning("swarm_skipped_budget_exhausted", swarm_run_id=swarm_run_id, space_id=space_id)
+            await db.table("SwarmRun").update({
+                "status": "failed",
+                "errorMessage": "Daily token budget exhausted — swarm skipped.",
+                "completedAt": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", swarm_run_id).execute()
+            await emit_event(db, swarm_run_id, "swarm_failed", {"error": "Daily token budget exhausted."})
+            return
+
         # Planning phase
         await db.table("SwarmRun").update({"status": "planning"}).eq("id", swarm_run_id).execute()
         await emit_event(db, swarm_run_id, "swarm_planning", {"message": "Analyzing goal and creating execution plan..."})
 
-        plan = await plan_swarm(goal, custom_agents, client)
+        plan = await plan_swarm(goal, custom_agents, client, space_id)
 
         await db.table("SwarmRun").update({
             "plan": plan,
@@ -268,7 +356,7 @@ async def run_swarm(payload: dict) -> None:
 
         # Reload members with outputs
         members_result = await db.table("SwarmMember").select("name,role,output,status").eq("swarmRunId", swarm_run_id).execute()
-        final_result = await audit_results(goal, members_result.data or [], client)
+        final_result = await audit_results(goal, members_result.data or [], client, space_id)
 
         # Complete
         await db.table("SwarmRun").update({
