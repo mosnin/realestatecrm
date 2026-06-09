@@ -38,7 +38,7 @@ export default async function LeaderboardPage() {
 
   if (!members?.length) {
     return (
-      <div className="space-y-8 max-w-5xl pb-56 md:pb-24">
+      <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
         <header className="space-y-1.5">
           <h1 className={cn(H1)} style={TITLE_FONT}>
             Leaderboard
@@ -174,7 +174,7 @@ export default async function LeaderboardPage() {
   })();
 
   return (
-    <div className="space-y-8 max-w-5xl pb-56 md:pb-24">
+    <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
         <h1 className={cn(H1)} style={TITLE_FONT}>
           Leaderboard

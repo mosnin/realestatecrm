@@ -100,7 +100,7 @@ export const ROW_PAD_TIGHT = 'py-2.5';
 export { PAGE_MAX } from '@/lib/geometry';
 
 /** Reading column — single-form pages, settings, intake customize. */
-export const READING_MAX = 'max-w-3xl';
+export const READING_MAX = 'max-w-3xl mx-auto';
 
 /* ─── Helper class strings for primary actions ─────────────────────────── */
 

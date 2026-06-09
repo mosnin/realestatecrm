@@ -48,7 +48,7 @@ export default async function BrokerBillingPage() {
 
   if (!spaceRow && !usingBrokerageEntity) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl mx-auto pb-12">
         <BillingHeader status="No workspace is set up for billing yet." />
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-foreground">No workspace found.</p>
@@ -64,7 +64,7 @@ export default async function BrokerBillingPage() {
   const isBrokerOwner = ctx.membership.role === 'broker_owner';
   if (!isBrokerOwner) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl mx-auto pb-12">
         <BillingHeader status="The brokerage owner manages billing." />
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-foreground">Billing lives with the owner.</p>
@@ -135,7 +135,7 @@ export default async function BrokerBillingPage() {
 
   if (stripeError) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl mx-auto pb-12">
         <BillingHeader status="Manage your subscription and payment details." />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-10 text-center">
           <p className="text-sm font-medium text-destructive">
@@ -150,7 +150,7 @@ export default async function BrokerBillingPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto pb-12">
       <BillingHeader status="Manage your subscription and payment details." />
       <BillingPage
         slug={slug}
