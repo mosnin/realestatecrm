@@ -48,6 +48,7 @@ import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { assertCanSpend, CreditsExhaustedError } from '@/lib/billing/meter';
+import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
@@ -550,15 +551,27 @@ export async function POST(req: NextRequest) {
   // Dunning gate — pause premium AI for a LAPSED paid subscription (the card
   // failed, or the plan was canceled), while leaving the CRM fully usable.
   // Only past_due / canceled / unpaid are gated; free & never-subscribed
-  // ('inactive'), trialing, active, and brokerage-member spaces (whose own
-  // status is 'inactive' — the brokerage funds them) all pass. Admins bypass.
-  // Fails OPEN so a DB hiccup can't lock out a paying customer.
+  // ('inactive'), trialing, and active all pass. Admins bypass. Fails OPEN so a
+  // DB hiccup can't lock out a paying customer.
+  //
+  // Gate on the account that actually FUNDS the space, not the Space row: Solo/
+  // Pro pay from the Space, but Team / Team Plus members are funded by their
+  // Brokerage pool and their own Space status stays 'inactive' by design — so
+  // reading only the Space let a lapsed brokerage keep premium AI on every seat.
   try {
-    const { data: subRow } = await supabase
-      .from('Space')
-      .select('stripeSubscriptionStatus')
-      .eq('id', ctx.space.id)
-      .maybeSingle();
+    const { account } = await resolveBillingAccount(ctx.space.id);
+    const { data: subRow } =
+      account.type === 'brokerage'
+        ? await supabase
+            .from('Brokerage')
+            .select('stripeSubscriptionStatus')
+            .eq('id', account.id)
+            .maybeSingle()
+        : await supabase
+            .from('Space')
+            .select('stripeSubscriptionStatus')
+            .eq('id', account.id)
+            .maybeSingle();
     const subStatus = subRow?.stripeSubscriptionStatus ?? 'inactive';
     if (isSubscriptionDelinquent(subStatus)) {
       const { data: userRow } = await supabase

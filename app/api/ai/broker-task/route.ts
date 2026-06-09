@@ -49,6 +49,7 @@ import { auth } from '@clerk/nextjs/server';
 import { decideRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
+import { isSubscriptionDelinquent } from '@/lib/api-auth';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
@@ -382,6 +383,42 @@ export async function POST(req: NextRequest) {
   }
 
   const brokerageId = brokerCtx.brokerage.id;
+
+  // Dunning gate — a broker's seats are funded by the BROKERAGE subscription, so
+  // gate on the brokerage's status. The realtor route (app/api/ai/task) gates
+  // its funding account too; broker-task previously had NO dunning gate, so a
+  // lapsed Team kept full premium AI for every seat. Only past_due / canceled /
+  // unpaid are gated; active / trialing / inactive pass. Platform admins bypass.
+  // Fails OPEN so a DB hiccup can't lock out a paying brokerage.
+  try {
+    const { data: bRow } = await supabase
+      .from('Brokerage')
+      .select('stripeSubscriptionStatus')
+      .eq('id', brokerageId)
+      .maybeSingle();
+    if (isSubscriptionDelinquent(bRow?.stripeSubscriptionStatus ?? 'inactive')) {
+      const { data: userRow } = await supabase
+        .from('User')
+        .select('platformRole')
+        .eq('clerkId', clerkUserId)
+        .maybeSingle();
+      if (userRow?.platformRole !== 'admin') {
+        return NextResponse.json(
+          {
+            error:
+              'Your brokerage subscription needs attention — update the payment method in billing to keep using Chippi. Your workspace and data stay available.',
+          },
+          { status: 402 },
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn(
+      '[ai/broker-task] subscription status check failed — allowing turn',
+      { brokerageId },
+      err,
+    );
+  }
 
   // Runtime space — the broker owner's personal Space, needed ONLY for the
   // Modal agent run (AgentSettings/usage). It is NOT where the conversation or
