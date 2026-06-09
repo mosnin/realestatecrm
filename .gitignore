@@ -5,6 +5,8 @@
 
 # dependencies
 /node_modules
+# pnpm-only repo — npm's lockfile must never be committed (CI hard-fails on it)
+package-lock.json
 /.pnp
 .pnp.*
 .yarn/*
