@@ -16,11 +16,10 @@ Supporting libraries:
 - **tailwind-merge** — resolves Tailwind class conflicts
 - **class-variance-authority (CVA)** — component variants
 - **Sonner** — toast notifications
-- **@number-flow/react** — animated number transitions
 
 ### Animation
 
-Framer Motion / Motion for UI animations. GSAP for advanced animations (landing page effects). @paper-design/shaders for visual effects.
+Framer Motion / Motion for UI animations. GSAP for advanced animations (landing page effects).
 
 ### Forms and Validation
 
@@ -106,11 +105,6 @@ Upstash Redis (@upstash/redis) for rate limiting on auth and public API endpoint
 ### Maps
 
 dotted-map — decorative world map visualization.
-
-### Misc
-
-- frimousse — emoji picker for workspace emoji
-- simplex-noise — noise generation for visual effects
 
 ## Include When Needed
 
