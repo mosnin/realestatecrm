@@ -11,7 +11,8 @@
  * anchor for brokerages → three honest FAQs → arrival CTA. No
  * checkmark grids, no monthly/annual toggle, no testimonials.
  *
- * Placeholder pricing: $79 / realtor / month after a 7-day trial.
+ * Pricing: $79 / realtor / month after a 7-day trial (card collected at
+ * checkout — keep the live Stripe price object in sync with this number).
  * The number renders in serif Times — the brand's quiet flourish —
  * because the price IS the page's focal element.
  */
@@ -42,7 +43,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What happens after the trial?',
-    a: 'You enter the plan automatically, but only if you’ve added a card. No card on file means the trial just ends; we don’t bill silently.',
+    a: 'Your card is collected when you start the trial, and the plan begins automatically when the seven days end. Cancel before then and you pay nothing.',
   },
   {
     q: 'Brokerages: what changes?',
@@ -108,7 +109,7 @@ export default function PricingPage() {
               Start free trial
             </Link>
             <p className="mt-4 text-xs text-muted-foreground">
-              No credit card required. Cancel anytime.
+              Card required to start — you won&rsquo;t be charged until the trial ends. Cancel anytime.
             </p>
           </div>
         </div>
@@ -154,7 +155,7 @@ export default function PricingPage() {
 
       <MarketingCTA
         title="Start your free trial."
-        sub="Seven days. No credit card. Bring your inbox and let Chippi do the rest."
+        sub="Seven days free, cancel anytime. Bring your inbox and let Chippi do the rest."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />

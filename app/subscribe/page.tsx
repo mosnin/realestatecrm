@@ -113,7 +113,7 @@ function SubscribeContent() {
 
         {/* Chippi speaks — the focal element. */}
         <header className="space-y-2 text-center">
-          <p className="text-sm text-muted-foreground">Chippi Pro.</p>
+          <p className="text-sm text-muted-foreground">Chippi.</p>
           <h1 className="text-3xl leading-tight tracking-tight sm:text-[2.5rem]" style={TITLE_FONT}>
             Let&apos;s keep working together.
           </h1>
@@ -127,12 +127,12 @@ function SubscribeContent() {
           {/* Price */}
           <div className="flex items-end justify-center gap-1.5">
             <span className="text-[2.75rem] leading-none tabular-nums tracking-tight" style={TITLE_FONT}>
-              $97
+              $79
             </span>
             <span className="mb-1 text-base text-muted-foreground">/mo</span>
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">
-            7 days free, then $97 a month. Cancel anytime.
+            7 days free, then $79 a month. Cancel anytime.
           </p>
 
           {/* Features */}
@@ -163,7 +163,9 @@ function SubscribeContent() {
             {loading && <Loader2 size={15} className="animate-spin" />}
             {loading ? 'Taking you to checkout.' : 'Start your 7 days free'}
           </button>
-          <p className="mt-3 text-center text-xs text-muted-foreground">No card needed to start.</p>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Card required to start — you won&apos;t be charged until your trial ends. Cancel anytime.
+          </p>
         </div>
 
         {/* Already subscribed */}
