@@ -64,6 +64,10 @@ interface HistoryRow {
 interface PostBody {
   conversationId?: string | null;
   message: string;
+  /** Composer Chat/Agent switch. 'chat' → in-process direct turn, 'agent' →
+   *  Modal tool surface. Absent → decideRoute heuristic. Mirrors the realtor
+   *  route's body.mode so the broker toggle controls real behavior. */
+  mode?: 'chat' | 'agent' | string;
 }
 
 /** Cap on history messages fed to the model. Mirrors the realtor route's
@@ -455,8 +459,21 @@ export async function POST(req: NextRequest) {
   // pipeline?", "how many leads are waiting?"). Answer those in-process from a
   // live brokerage snapshot — instant, no Modal cold start, the same fast lane
   // the realtor chat uses. Action verbs (reassign, route, send) fall through to
-  // Modal, where the BROKER_TOOLS catalog lives. Errors → Modal (safe default).
-  if (decideRoute(message) === 'direct') {
+  // Modal, where the BROKER_TOOLS catalog lives.
+  //
+  // The composer's Chat/Agent switch wins over the heuristic when present:
+  // 'chat' → the lean in-process direct path, 'agent' → the full tool surface
+  // on Modal. An absent mode (older client) falls back to decideRoute so
+  // nothing breaks. Mirrors the realtor route (app/api/ai/task) exactly.
+  const explicitMode: 'chat' | 'agent' | null =
+    body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+  const route =
+    explicitMode === 'chat'
+      ? 'direct'
+      : explicitMode === 'agent'
+        ? 'agent'
+        : decideRoute(message);
+  if (route === 'direct') {
     logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId });
     return streamBrokerDirectTurn({
       brokerage: brokerCtx.brokerage,

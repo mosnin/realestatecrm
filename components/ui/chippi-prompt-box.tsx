@@ -116,9 +116,10 @@ interface ChippiPromptBoxProps {
   /** Skills offered in the `/` menu. Empty or omitted → no menu. */
   skills?: SkillItem[];
   /**
-   * Show the Chat ↔ Agent runtime switch. Default true (realtor surface).
-   * The broker chat is always its own agent, so the switch would be a lie
-   * there — pass false to hide it.
+   * Show the Chat ↔ Agent runtime switch. Default true. Both the realtor and
+   * the broker surfaces honor the switch now: the broker-task route reads
+   * `mode` ('chat' → in-process direct turn, 'agent' → Modal tool surface),
+   * mirroring the realtor route, so the toggle is truthful on both.
    */
   showModeSwitch?: boolean;
 }

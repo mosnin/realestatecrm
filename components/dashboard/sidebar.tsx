@@ -1778,10 +1778,11 @@ function RealtorSidebarShell({
           currentIcon={Briefcase}
           slug={slug}
           spaceName={spaceName}
-          // The realtor sidebar stays a realtor surface — no brokerage rows
-          // here. Switching to the brokerage lives on the header ("Switch to
-          // {brokerage}") so the workspace identity here reads clean.
-          brokerageMemberships={[]}
+          // Brokerage rows belong in the switcher on BOTH surfaces so the
+          // account list stays symmetric. Without this, switching realtor →
+          // brokerage → realtor made the brokerage vanish from the dropdown
+          // (it was only ever a header link on the realtor side).
+          brokerageMemberships={brokerageMemberships}
           isOnBrokerPage={isOnBrokerPage}
           collapsed={collapsed}
           showQuickCreate
