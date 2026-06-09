@@ -16,7 +16,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { PropertyForm } from '@/components/properties/property-form';
 import type { Property } from '@/lib/types';
 
@@ -49,7 +49,7 @@ export default function NewPropertyPage() {
   }
 
   return (
-    <div className={cn('space-y-6 max-w-2xl', PAGE_MAX)}>
+    <div className={cn('space-y-6 max-w-2xl mx-auto pb-12')}>
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Properties.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

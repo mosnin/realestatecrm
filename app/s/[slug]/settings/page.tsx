@@ -175,7 +175,7 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       {/* Page header */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
