@@ -65,6 +65,12 @@ interface BillingPageProps {
   canceledAccessEnd?: string;
   /** Support email or URL */
   supportUrl?: string;
+  /**
+   * Endpoint overrides so this same component can serve the broker surface,
+   * where portal/cancel must act on the BROKERAGE's Stripe identity instead of
+   * a Space the caller owns. Defaults are the realtor space routes.
+   */
+  endpoints?: { checkout?: string; portal?: string; cancel?: string };
 }
 
 interface Invoice {
@@ -161,6 +167,7 @@ export function BillingPage({
   usageStats,
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
+  endpoints,
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -189,7 +196,7 @@ export function BillingPage({
   // ── Handlers (wired to Stripe once live) ──────────────────────────────────
 
   async function handleSubscribe() {
-    const res = await fetch('/api/billing/checkout', {
+    const res = await fetch(endpoints?.checkout ?? '/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug }),
@@ -201,7 +208,7 @@ export function BillingPage({
   }
 
   async function handleManage() {
-    const res = await fetch('/api/billing/portal', {
+    const res = await fetch(endpoints?.portal ?? '/api/billing/portal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug }),
@@ -215,7 +222,7 @@ export function BillingPage({
   async function handleCancel() {
     setCanceling(true);
     try {
-      const res = await fetch('/api/billing/cancel', {
+      const res = await fetch(endpoints?.cancel ?? '/api/billing/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug }),
