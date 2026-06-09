@@ -10,16 +10,17 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { PLANS } from '@/lib/plans';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
 import { H3 } from '@/lib/typography';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
-// Must match the live plan price ($79/realtor/mo — see /pricing and the Stripe
-// price object behind STRIPE_PRICE_ID). Was 97 (the old plan), which overstated
-// MRR on this dashboard.
-const PRICE_PER_SEAT = 79;
+// Entry-tier price (Solo, $97 — lib/plans.ts). MRR here is approximate: it
+// prices every active Space sub at the entry tier because Space rows don't
+// record their tier yet. Exact per-plan MRR lands with a plan column.
+const PRICE_PER_SEAT = PLANS.solo.priceMonthly;
 
 /** Live-mode Stripe dashboard deep links. (Test-mode objects need /test/ in the
  *  path — these links are for the production dashboard.) */

@@ -46,7 +46,19 @@ const optionalSchema = z.object({
   // Stripe billing
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Legacy single price — Solo's fallback until the tiered products exist.
   STRIPE_PRICE_ID: z.string().optional(),
+  // Tier price IDs (lib/plans.ts) — set these when the new Stripe products are
+  // created. Solo $97 / Pro $197 bill the Space; Team $497 / Team Plus $897
+  // bill the Brokerage.
+  STRIPE_PRICE_SOLO: z.string().optional(),
+  STRIPE_PRICE_SOLO_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_PRO: z.string().optional(),
+  STRIPE_PRICE_PRO_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_TEAM: z.string().optional(),
+  STRIPE_PRICE_TEAM_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS_ANNUAL: z.string().optional(),
 
   // Cron protection
   CRON_SECRET: z.string().optional(),

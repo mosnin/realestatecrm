@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, getPriceId } from '@/lib/stripe';
+import { PLANS } from '@/lib/plans';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
@@ -73,11 +74,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
     }
 
-    let priceId;
-    try {
-      priceId = getPriceId();
-    } catch (err: any) {
-      console.error('[checkout] Price ID missing:', err.message);
+    // Tier selection — 'solo' (default, $97) or 'pro' ($197) from lib/plans.
+    // Team tiers bill the Brokerage (brokerage branch / sales), never this
+    // Space flow. Unknown plan values collapse to solo rather than erroring so
+    // older clients that send nothing keep working.
+    const spacePlan: 'solo' | 'pro' = body?.plan === 'pro' ? 'pro' : 'solo';
+    let priceId: string | null = PLANS[spacePlan].stripePriceMonthly;
+    if (!priceId && spacePlan === 'solo') {
+      // Legacy fallback: deployments configured the single STRIPE_PRICE_ID
+      // before the tiered products existed in Stripe.
+      try {
+        priceId = getPriceId();
+      } catch {
+        priceId = null;
+      }
+    }
+    if (!priceId) {
+      console.error('[checkout] No Stripe price configured for plan:', spacePlan);
       return NextResponse.json({ error: 'Billing not configured. Contact support.' }, { status: 500 });
     }
 
@@ -135,10 +148,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Only grant a 7-day trial if the user has never used one before
+    // Only grant a 7-day trial if the user has never used one before.
+    // The plan is stamped on the subscription metadata so the webhook can
+    // record which tier was actually bought.
     const hasUsedTrial = !!stripeData?.trialUsedAt;
     const subscriptionData: Record<string, unknown> = {
-      metadata: { spaceId: space.id },
+      metadata: { spaceId: space.id, plan: spacePlan },
     };
     if (!hasUsedTrial) {
       subscriptionData.trial_period_days = 7;
@@ -152,7 +167,7 @@ export async function POST(req: NextRequest) {
       subscription_data: subscriptionData,
       success_url: `${appUrl}/s/${slug}/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/subscribe?slug=${slug}`,
-      metadata: { spaceId: space.id },
+      metadata: { spaceId: space.id, plan: spacePlan },
     });
 
     console.log('[checkout] Session created:', session.id, 'url:', session.url?.slice(0, 50));

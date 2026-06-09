@@ -35,6 +35,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PLANS, type PlanId } from '@/lib/plans';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ interface BillingPageProps {
    * a Space the caller owns. Defaults are the realtor space routes.
    */
   endpoints?: { checkout?: string; portal?: string; cancel?: string };
+  /** The account's plan tier — drives the displayed name + price (lib/plans).
+   *  Defaults to the entry tier; the page used to hardcode "Pro"/$97. */
+  plan?: PlanId;
 }
 
 interface Invoice {
@@ -84,9 +88,6 @@ interface Invoice {
 }
 
 // ─── Plan config ──────────────────────────────────────────────────────────────
-
-const PLAN_PRICE = 97;
-const PLAN_NAME = 'Pro';
 
 const PLAN_FEATURES = [
   { icon: PhoneIncoming, label: 'Unlimited lead intake & AI scoring' },
@@ -168,9 +169,16 @@ export function BillingPage({
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
   endpoints,
+  plan = 'solo',
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
+
+  // Plan name + price come from the single source of truth (lib/plans), not
+  // hardcoded — the page used to claim "Pro/$97" for every account.
+  const planDef = PLANS[plan] ?? PLANS.solo;
+  const PLAN_NAME = planDef.label;
+  const PLAN_PRICE = planDef.priceMonthly;
 
   const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
 
