@@ -16,6 +16,16 @@ export default async function BrokerBillingPage() {
   const ctx = await getBrokerContext();
   if (!ctx) redirect('/setup');
 
+  // The brokerage's OWN Stripe identity — written by the brokerage-scoped
+  // checkout and kept current by the webhook. When a brokerage subscription
+  // exists, it is the billing entity for this page; the owner's personal Space
+  // is only a legacy fallback (brokerages subscribed before brokerage billing).
+  const { data: brokerageStripe } = await supabase
+    .from('Brokerage')
+    .select('stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
+    .eq('id', ctx.brokerage.id)
+    .maybeSingle();
+
   // Find the user's own space for billing
   const { data: ownSpaceRow } = await supabase
     .from('Space')
@@ -34,7 +44,9 @@ export default async function BrokerBillingPage() {
     spaceRow = ownerSpace;
   }
 
-  if (!spaceRow) {
+  const usingBrokerageEntity = Boolean(brokerageStripe?.stripeSubscriptionId);
+
+  if (!spaceRow && !usingBrokerageEntity) {
     return (
       <div className="space-y-6 max-w-3xl">
         <BillingHeader status="No workspace is set up for billing yet." />
@@ -64,19 +76,31 @@ export default async function BrokerBillingPage() {
     );
   }
 
-  const slug = spaceRow.slug as string;
-  let subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive' =
-    (spaceRow.stripeSubscriptionStatus as any) ?? 'inactive';
+  // Billing entity: the Brokerage's subscription when it has one, else the
+  // legacy owner-space subscription. The previous version of this page ONLY
+  // read the owner's personal Space, so a brokerage-scoped subscription showed
+  // the wrong status/invoices/card here.
+  const billingSubscriptionId = usingBrokerageEntity
+    ? (brokerageStripe!.stripeSubscriptionId as string)
+    : ((spaceRow?.stripeSubscriptionId as string | null) ?? null);
+  const billingCustomerId = usingBrokerageEntity
+    ? ((brokerageStripe!.stripeCustomerId as string | null) ?? null)
+    : ((spaceRow?.stripeCustomerId as string | null) ?? null);
+
+  const slug = (spaceRow?.slug as string | undefined) ?? '';
+  let subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive' = usingBrokerageEntity
+    ? mapDbStatus(brokerageStripe?.stripeSubscriptionStatus)
+    : mapDbStatus(spaceRow?.stripeSubscriptionStatus);
   let currentPeriodEnd: string | undefined;
   let cardLast4: string | undefined;
   let cardBrand: string | undefined;
   let invoices: { id: string; date: string; amount: string; status: 'paid' | 'open' | 'void'; pdf?: string }[] = [];
   let stripeError = false;
 
-  if (spaceRow.stripeSubscriptionId) {
+  if (billingSubscriptionId) {
     try {
       const stripe = getStripe();
-      const sub = await stripe.subscriptions.retrieve(spaceRow.stripeSubscriptionId as string, {
+      const sub = await stripe.subscriptions.retrieve(billingSubscriptionId, {
         expand: ['default_payment_method', 'latest_invoice'],
       });
 
@@ -90,9 +114,9 @@ export default async function BrokerBillingPage() {
         cardBrand = pm.card.brand;
       }
 
-      if (spaceRow.stripeCustomerId) {
+      if (billingCustomerId) {
         const invoiceList = await stripe.invoices.list({
-          customer: spaceRow.stripeCustomerId as string,
+          customer: billingCustomerId,
           limit: 10,
         });
         invoices = invoiceList.data.map((inv) => ({
@@ -135,6 +159,14 @@ export default async function BrokerBillingPage() {
         cardLast4={cardLast4}
         cardBrand={cardBrand}
         invoices={invoices}
+        // Manage/cancel must act on the brokerage's Stripe identity when the
+        // brokerage holds the subscription — the default routes act on a Space
+        // the caller owns, which is the wrong entity for a brokerage sub.
+        endpoints={
+          usingBrokerageEntity
+            ? { portal: '/api/broker/billing/portal', cancel: '/api/broker/billing/cancel' }
+            : undefined
+        }
       />
     </div>
   );
@@ -162,6 +194,21 @@ function mapStatus(status: Stripe.Subscription.Status): 'active' | 'trialing' | 
     case 'active': return 'active';
     case 'trialing': return 'trialing';
     case 'past_due': return 'past_due';
+    case 'canceled': return 'canceled';
+    default: return 'inactive';
+  }
+}
+
+/** DB statuses include 'unpaid', which the BillingPage props don't model —
+ *  collapse it to past_due (same user-facing meaning: payment needs attention). */
+function mapDbStatus(
+  status: string | null | undefined,
+): 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive' {
+  switch (status) {
+    case 'active': return 'active';
+    case 'trialing': return 'trialing';
+    case 'past_due':
+    case 'unpaid': return 'past_due';
     case 'canceled': return 'canceled';
     default: return 'inactive';
   }
