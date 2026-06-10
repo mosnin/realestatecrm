@@ -5,12 +5,13 @@
  * other, flipping each row) that walk the real loop: triage → draft → book +
  * update. This is the antidote to the "three identical cards" shape — each row
  * has room to breathe, a numbered eyebrow, real capability bullets, and a
- * labeled screenshot slot in a browser frame.
+ * LIVE product panel (animate-on-scroll) in a browser frame — no placeholders.
  */
 
 import { Check } from 'lucide-react';
 import { Reveal } from '../reveal';
-import { BrowserFrame, ImagePlaceholder } from '../frame';
+import { BrowserFrame } from '../frame';
+import { InboxPanel, DraftPanel, CalendarPanel } from './live-panels';
 
 interface Feature {
   no: string;
@@ -19,8 +20,13 @@ interface Feature {
   title: string;
   body: string;
   bullets: string[];
-  image: { label: string; sublabel: string };
 }
+
+const PANELS: Record<string, React.ReactNode> = {
+  inbox: <InboxPanel />,
+  reply: <DraftPanel />,
+  pipeline: <CalendarPanel />,
+};
 
 const features: Feature[] = [
   {
@@ -34,7 +40,6 @@ const features: Feature[] = [
       'The hottest deal surfaced out of the noise',
       'Nothing slips, even while you’re showing houses',
     ],
-    image: { label: 'Inbox triage', sublabel: 'Screenshot · 1280 × 900' },
   },
   {
     no: '02',
@@ -47,7 +52,6 @@ const features: Feature[] = [
       'Trained on your real tone and phrasing',
       'Edit, send, or skip — the decision stays yours',
     ],
-    image: { label: 'Draft composer', sublabel: 'Screenshot · 1280 × 900' },
   },
   {
     no: '03',
@@ -60,7 +64,6 @@ const features: Feature[] = [
       'Confirmations sent and logged for you',
       'Deals advance themselves as things happen',
     ],
-    image: { label: 'Calendar & pipeline', sublabel: 'Screenshot · 1280 × 900' },
   },
 ];
 
@@ -100,14 +103,10 @@ export function Features() {
                 </ul>
               </Reveal>
 
-              {/* screenshot */}
+              {/* live panel — Chippi working, not a placeholder */}
               <Reveal from={reverse ? 'left' : 'right'} className={reverse ? 'lg:order-1' : ''}>
                 <BrowserFrame url={`app.chippi.ai/${f.slug}`}>
-                  <ImagePlaceholder
-                    label={f.image.label}
-                    sublabel={f.image.sublabel}
-                    ratio="aspect-[4/3]"
-                  />
+                  {PANELS[f.slug]}
                 </BrowserFrame>
               </Reveal>
             </div>
