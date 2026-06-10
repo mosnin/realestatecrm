@@ -27,6 +27,7 @@ import {
 import { BrandLogo } from '@/components/brand-logo';
 import { PublicSurfaceFrame } from '@/components/public-surface-frame';
 import { cn, safeHref } from '@/lib/utils';
+import Link from 'next/link';
 import { pickContrastColor } from '@/lib/color';
 import { parseYouTubeId, youTubeThumbnail, faviconUrl } from '@/lib/profile-page';
 
@@ -243,7 +244,7 @@ function VideoCard({ video }: { video: PublicVideo }) {
  *  When a property has no photo we render a tasteful muted placeholder
  *  (Home glyph) rather than a broken-image gap. The whole card is a link
  *  when `listingUrl` is set; otherwise it's a static surface. */
-function PropertyCard({ property }: { property: PublicProperty }) {
+function PropertyCard({ property, slug }: { property: PublicProperty; slug: string }) {
   const cover = property.photos?.[0] ?? null;
   const locality = [property.city, property.stateRegion].filter(Boolean).join(', ');
   const price = formatPrice(property.listPrice);
@@ -285,19 +286,15 @@ function PropertyCard({ property }: { property: PublicProperty }) {
   const slideClass =
     'block w-[260px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/70 bg-card sm:transition-transform sm:duration-150 sm:hover:-translate-y-0.5';
 
-  if (property.listingUrl) {
-    return (
-      <a
-        href={safeHref(property.listingUrl)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={slideClass}
-      >
-        {inner}
-      </a>
-    );
-  }
-  return <div className={slideClass}>{inner}</div>;
+  // Link into the internal storefront detail page (photo gallery, facts,
+  // "Book a tour", "Ask about this") so the visitor stays in the funnel
+  // instead of bouncing to an external MLS/listing URL. The detail page
+  // surfaces the external listingUrl itself when one is set.
+  return (
+    <Link href={`/p/${slug}/property/${property.id}`} className={slideClass}>
+      {inner}
+    </Link>
+  );
 }
 
 function LinkCard({
@@ -564,7 +561,7 @@ export function PublicProfile({
                 style={{ scrollPaddingLeft: '1.5rem', scrollPaddingRight: '1.5rem' }}
               >
                 {properties.map((p) => (
-                  <PropertyCard key={p.id} property={p} />
+                  <PropertyCard key={p.id} property={p} slug={slug} />
                 ))}
               </div>
             </section>
