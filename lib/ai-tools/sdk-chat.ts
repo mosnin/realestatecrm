@@ -66,13 +66,17 @@ const DEFAULT_MAX_TOKENS = 4_096;
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
- * to spelunk the catalog can't run our token bill into the ground. 15
- * gives the agent enough headroom to chain multi-step workflows
- * autonomously (look up a person → read their activity → find their
- * deal → draft a follow-up) without stopping mid-task to ask the
- * realtor a clarifying question.
+ * to spelunk the catalog can't run our token bill into the ground.
+ *
+ * Why 8, not 15: the SDK re-sends the FULL transcript (system prompt +
+ * every tool schema + all accumulated tool outputs) on EVERY inner step
+ * — token cost grows quadratically with the cap. 8 still covers the real
+ * multi-step workflows (look up a person → read activity → find deal →
+ * draft a follow-up is 4-5 steps); anything deeper belongs on
+ * delegate_task, which runs in its own bounded Modal context instead of
+ * re-billing this conversation's transcript.
  */
-const MAX_TURNS_PER_TURN = 15;
+const MAX_TURNS_PER_TURN = 8;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -237,17 +241,23 @@ export async function loadIntegrationToolsDetailed(
   }
 
   // Per-toolkit build lets us attribute auth failures to the right row.
-  // The cost is N round-trips instead of 1, but N is bounded by how
-  // many apps the realtor has connected (typically 2-5).
+  // Builds run in PARALLEL — they're independent Composio fetches (cached
+  // after the first turn), and running them sequentially put N round-trips
+  // on the critical path before the first token.
   const collected: SdkTool[] = [];
   const liveToolkits: string[] = [];
   const unavailableToolkits: string[] = [];
-  for (const toolkit of toolkits) {
-    try {
-      const tools = await buildToolkitAgentTools({ toolkit, userId: ctx.userId });
-      collected.push(...tools);
+  const settled = await Promise.allSettled(
+    toolkits.map((toolkit) => buildToolkitAgentTools({ toolkit, userId: ctx.userId })),
+  );
+  for (let i = 0; i < toolkits.length; i++) {
+    const toolkit = toolkits[i];
+    const outcome = settled[i];
+    if (outcome.status === 'fulfilled') {
+      collected.push(...outcome.value);
       liveToolkits.push(toolkit);
-    } catch (err) {
+    } else {
+      const err = outcome.reason;
       if (isAuthLikeError(err)) {
         // Don't await — keep the chat hot. The DB write is fire-and-
         // forget; worst case is the row stays 'active' for one more

@@ -526,21 +526,19 @@ export async function POST(req: NextRequest) {
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
 
-  const { allowed } = await checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600);
-  if (!allowed) {
+  // The three rate-limit counters are independent — fire them together
+  // instead of paying three sequential Redis round-trips on the critical
+  // path before the first token.
+  const ip = getClientIp(req);
+  const [userLimit, ipLimit, spaceLimit] = await Promise.all([
+    checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600),
+    checkRateLimit(`chat:ip:${ip}`, 30, 600),
+    checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600),
+  ]);
+  if (!userLimit.allowed) {
     return NextResponse.json({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
   }
-
-  const ip = getClientIp(req);
-  const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
-  if (!ipLimit.allowed) {
-    return NextResponse.json(
-      { error: chippiErrorMessage('rate_limited') },
-      { status: 429, headers: { 'Retry-After': '600' } },
-    );
-  }
-  const spaceLimit = await checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600);
-  if (!spaceLimit.allowed) {
+  if (!ipLimit.allowed || !spaceLimit.allowed) {
     return NextResponse.json(
       { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
@@ -581,24 +579,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { data: agentSettingsRow } = await supabase
-      .from('AgentSettings')
-      .select('dailyTokenBudget')
-      .eq('spaceId', ctx.space.id)
-      .maybeSingle();
+    // Budget settings + today's usage are independent reads — fetch together.
+    const [settingsResult, usageResult] = await Promise.all([
+      supabase
+        .from('AgentSettings')
+        .select('dailyTokenBudget')
+        .eq('spaceId', ctx.space.id)
+        .maybeSingle(),
+      // Sums ChatUsage rows + the autonomous Redis counter, matching the
+      // Settings display. (The old version read AgentTask token columns no
+      // code writes, so enforcement silently passed every time.)
+      getTodayTokenUsage(ctx.space.id),
+    ]);
 
     // Default must match the AgentSettings.dailyTokenBudget DB column default
     // (and schemas.py / the settings + usage APIs), which are all 50_000. This
     // fallback was 500_000, so a space with no AgentSettings row was gated at
     // 10x the budget every other surface shows and enforces.
     const dailyTokenBudget: number =
-      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
-
-    // Previously this read AgentTask.inputTokens/outputTokens — columns no
-    // code writes — so the enforcement silently passed every time. Route
-    // through the shared helper that sums ChatUsage rows + the autonomous
-    // Redis counter, matching the Settings display.
-    const { total: todayTokens } = await getTodayTokenUsage(ctx.space.id);
+      ((settingsResult.data as { dailyTokenBudget?: number | null } | null)?.dailyTokenBudget as
+        | number
+        | null
+        | undefined) ?? 50_000;
+    const { total: todayTokens } = usageResult;
 
     if (todayTokens >= dailyTokenBudget) {
       logger.warn('[ai/task] daily token budget exceeded', {

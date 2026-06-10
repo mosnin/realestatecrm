@@ -45,7 +45,18 @@ logger = structlog.get_logger(__name__)
 # multi-step plan (lookup → plan → several writes → confirm) while capping a
 # pathological loop that would otherwise burn a whole day's token budget on
 # one message.
-CHAT_MAX_TURNS = 12
+# Inner agent-loop cap. The SDK re-sends the FULL transcript (system prompt +
+# every tool schema + accumulated tool results) on EVERY step, so token cost
+# grows quadratically with this number. 8 covers real multi-step workflows
+# (lookup → activity → deal → draft is 4-5 steps); deeper work belongs on the
+# swarm/delegate path which runs in its own bounded context.
+CHAT_MAX_TURNS = 8
+
+# Server-side guard on replayed history. The client caps what it sends, but
+# this endpoint must not trust that — an unbounded transcript re-ships on
+# every loop step (multiplying every other token cost) regardless of where
+# it came from.
+CHAT_HISTORY_MAX_ITEMS = 16
 
 # Resolve the agent source directory from this file's location, NOT from the
 # deploy cwd. Without this, `modal deploy agent/modal_app.py` (from repo root)
@@ -550,7 +561,8 @@ async def chat_turn(item: dict):
     user_content = build_user_input(text_with_attachments, attachments)
 
     input_items: list[dict[str, Any]] = []
-    for turn in history:
+    # Most-recent CHAT_HISTORY_MAX_ITEMS only — see the constant's comment.
+    for turn in history[-CHAT_HISTORY_MAX_ITEMS:]:
         if not isinstance(turn, dict):
             continue
         role = turn.get("role")
