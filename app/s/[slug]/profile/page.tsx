@@ -35,7 +35,7 @@ export default function ProfilePage() {
 
   if (!isLoaded || !initialized) {
     return (
-      <div className="space-y-4 max-w-3xl animate-pulse">
+      <div className="space-y-4 max-w-3xl mx-auto animate-pulse">
         <div className="h-8 bg-muted rounded-lg w-32" />
         <div className="h-40 bg-muted rounded-lg" />
         <div className="h-64 bg-muted rounded-lg" />
@@ -77,7 +77,7 @@ export default function ProfilePage() {
   const applicationUrl = slug ? buildIntakeUrl(slug) : '';
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Profile.</p>
         <h1 className={H1} style={TITLE_FONT}>

@@ -28,6 +28,7 @@ The team-median + load_signal heuristics are intentionally simple:
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -244,9 +245,10 @@ async def team_health(ctx: RunContextWrapper[AgentContext]) -> dict[str, Any]:
 
     db = await supabase()
 
-    realtors: list[dict[str, Any]] = []
-    all_response_hours: list[float] = []
-    for space in spaces:
+    # Per-realtor stats as a coroutine so the roster runs in PARALLEL —
+    # the sequential version paid 5 DB round-trips per realtor in series
+    # (100 sequential queries for a 20-agent floor) before answering.
+    async def _stats(space: dict[str, Any]) -> tuple[dict[str, Any], list[float]]:
         space_id = space["id"]
         owner_id = space.get("ownerId")
         user = users.get(owner_id) if owner_id else None
@@ -277,21 +279,27 @@ async def team_health(ctx: RunContextWrapper[AgentContext]) -> dict[str, Any]:
         # Response hours for this realtor.
         hours = await _response_hours_for_space(space_id, since, now)
         avg_response = round(statistics.mean(hours), 2) if hours else None
-        all_response_hours.extend(hours)
 
         last_active = await _last_active_at(space_id)
 
         signal = _load_signal(active_deals + open_leads, avg_response, last_active, now)
 
-        realtors.append({
-            "id": owner_id,
-            "name": name,
-            "active_deals": active_deals,
-            "open_leads": open_leads,
-            "avg_response_hours_7d": avg_response,
-            "last_active_at": last_active.isoformat() if last_active else None,
-            "load_signal": signal,
-        })
+        return (
+            {
+                "id": owner_id,
+                "name": name,
+                "active_deals": active_deals,
+                "open_leads": open_leads,
+                "avg_response_hours_7d": avg_response,
+                "last_active_at": last_active.isoformat() if last_active else None,
+                "load_signal": signal,
+            },
+            hours,
+        )
+
+    gathered = await asyncio.gather(*(_stats(s) for s in spaces))
+    realtors: list[dict[str, Any]] = [entry for entry, _ in gathered]
+    all_response_hours: list[float] = [h for _, hours in gathered for h in hours]
 
     team_median = (
         round(statistics.median(all_response_hours), 2)

@@ -151,7 +151,7 @@ export function DealsPageClient({
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-[1500px] mx-auto pb-12">
         <header className="flex items-end justify-between gap-4">
           <h1 className={H1} style={TITLE_FONT}>
             Deals
@@ -165,7 +165,7 @@ export function DealsPageClient({
   const hasPipelines = pipelines.length > 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-[1500px] mx-auto pb-12">
       {/* Page header — serif H1 + single primary pill. The H1 is the noun
           realtors use ("deals"); the URL, narration, and Add button all
           agree. */}

@@ -16,7 +16,7 @@ export default async function AnalyticsLayout({
   const { slug } = await params;
 
   return (
-    <div className={`${SECTION_RHYTHM} max-w-[1120px]`}>
+    <div className={`${SECTION_RHYTHM} max-w-5xl mx-auto pb-12`}>
       <header>
         <h1 className={H1} style={TITLE_FONT}>
           Analytics

@@ -101,6 +101,90 @@ function toSdkToolName(slug: string): string {
 }
 
 /**
+ * Cap on actions wrapped per toolkit. Gmail is ~20 actions; HubSpot is
+ * 100+, at 1-3k schema tokens each — and the agent SDK re-sends EVERY
+ * tool schema on EVERY step of the loop, so an uncapped HubSpot alone
+ * added ~10k+ tokens × N steps to a turn. 30 covers a toolkit's real
+ * surface; the long tail stays reachable via the dispatcher
+ * (find_integration_tool → call_integration_tool).
+ */
+const MAX_ACTIONS_PER_TOOLKIT = 30;
+
+/** Tool descriptions ship to the model verbatim on every step; some
+ *  Composio descriptions run to paragraphs. One sentence is enough to
+ *  pick a tool — Composio validates server-side anyway. */
+const MAX_DESCRIPTION_CHARS = 400;
+
+/** Cap on the stringified result a Composio execute returns INTO the
+ *  model's context. Tool outputs become conversation items that re-send
+ *  on every subsequent loop step — an unbounded Gmail thread dump gets
+ *  re-billed N more times. */
+const MAX_RESULT_CHARS = 4_000;
+
+/**
+ * Verb segments that mark an action as core (reads + the comms verbs a
+ * realtor actually asks for). When a toolkit exceeds the per-toolkit cap,
+ * core actions survive first — "fetch emails" must never lose its slot
+ * to "update workflow enrollment settings v3".
+ */
+const CORE_ACTION_SEGMENTS = [
+  'get', 'list', 'search', 'fetch', 'find', 'read',
+  'send', 'create', 'reply', 'draft', 'add', 'update',
+];
+
+function isCoreAction(slug: string): boolean {
+  const lower = slug.toLowerCase();
+  return CORE_ACTION_SEGMENTS.some((seg) => lower.includes(seg));
+}
+
+/**
+ * Catalog cache: raw Composio action metadata per toolkit. The catalog is
+ * ENTITY-INDEPENDENT (schemas, not credentials — the userId binding
+ * happens at wrap time), so one fetch serves every realtor. Without this,
+ * every chat turn paid one Composio HTTP round-trip per connected toolkit
+ * before the first token — the dominant slow term for integration users.
+ * 10 minutes is conservative: Composio action schemas change on the order
+ * of releases, not minutes. In-flight dedupe prevents a thundering herd
+ * when concurrent turns miss simultaneously.
+ */
+const CATALOG_TTL_MS = 10 * 60_000;
+const catalogCache = new Map<string, { raw: ComposioRawTool[]; expiresAt: number }>();
+const catalogInFlight = new Map<string, Promise<ComposioRawTool[]>>();
+
+async function fetchToolkitCatalog(toolkit: string): Promise<ComposioRawTool[]> {
+  const now = Date.now();
+  const cached = catalogCache.get(toolkit);
+  if (cached && cached.expiresAt > now) return cached.raw;
+
+  const inFlight = catalogInFlight.get(toolkit);
+  if (inFlight) return inFlight;
+
+  const composio = getComposio();
+  const promise = (async () => {
+    try {
+      // `limit: 1000` mirrors `loadToolsForEntity` — without it Composio's
+      // /tools endpoint returns only the first 20 actions per toolkit.
+      const raw = (await composio.tools.getRawComposioTools({
+        toolkits: [toolkit],
+        limit: 1000,
+      })) as ComposioRawTool[];
+      catalogCache.set(toolkit, { raw, expiresAt: Date.now() + CATALOG_TTL_MS });
+      return raw;
+    } finally {
+      catalogInFlight.delete(toolkit);
+    }
+  })();
+  catalogInFlight.set(toolkit, promise);
+  return promise;
+}
+
+/** Test helper. */
+export function __resetComposioCatalogCacheForTests() {
+  catalogCache.clear();
+  catalogInFlight.clear();
+}
+
+/**
  * Wrap one raw Composio action as an SDK `tool()`. The handler closes
  * over `userId` (the Composio entity id) and the ORIGINAL action slug —
  * `executeToolForEntity` needs the slug exactly as Composio knows it,
@@ -125,9 +209,13 @@ function buildOneTool(raw: ComposioRawTool, toolkitSlug: string, userId: string)
     additionalProperties: true as const,
   };
 
-  const description =
+  const fullDescription =
     raw.description?.trim() ||
     `${raw.name ?? actionSlug} — ${toolkitSlug} action available via the realtor's connected account.`;
+  const description =
+    fullDescription.length > MAX_DESCRIPTION_CHARS
+      ? `${fullDescription.slice(0, MAX_DESCRIPTION_CHARS - 1)}…`
+      : fullDescription;
 
   return tool({
     name: toSdkToolName(actionSlug),
@@ -146,10 +234,15 @@ function buildOneTool(raw: ComposioRawTool, toolkitSlug: string, userId: string)
           arguments: (input as Record<string, unknown>) ?? {},
         });
         if (result.successful) {
-          // The model reads this string. Keep the data compact — full
-          // payloads bloat the context; the model rarely needs more
-          // than "it worked" plus a small result echo.
-          return JSON.stringify({ ok: true, data: result.data ?? {} });
+          // The model reads this string — AND it becomes a conversation
+          // item that re-sends on every later loop step, so an unbounded
+          // payload is re-billed N more times. Cap it; the model rarely
+          // needs more than "it worked" plus a result echo.
+          const payload = JSON.stringify({ ok: true, data: result.data ?? {} });
+          if (payload.length > MAX_RESULT_CHARS) {
+            return `${payload.slice(0, MAX_RESULT_CHARS)}…[truncated ${payload.length - MAX_RESULT_CHARS} chars — ask for a narrower query if more detail is needed]`;
+          }
+          return payload;
         }
         return `Error: ${actionSlug} failed — ${result.error ?? 'unknown error'}`;
       } catch (err) {
@@ -164,27 +257,34 @@ function buildOneTool(raw: ComposioRawTool, toolkitSlug: string, userId: string)
 }
 
 /**
- * Fetch and wrap every action for a single connected toolkit.
+ * Fetch and wrap the actions for a single connected toolkit, capped at
+ * MAX_ACTIONS_PER_TOOLKIT with core (read/comms) actions surviving first.
  *
  * Throws the raw Composio error on failure — the caller's per-toolkit
  * loop catches it, decides whether it's auth-shaped, and flips the
  * `IntegrationConnection` row to 'expired' if so. We do NOT swallow here:
  * swallowing would hide a dead connection from the reconcile path.
  *
- * `limit: 1000` mirrors `loadToolsForEntity` — without it Composio's
- * /tools endpoint returns only the first 20 actions per toolkit, which
- * silently truncates large toolkits like HubSpot.
+ * The catalog fetch is cached per toolkit (entity-independent metadata) —
+ * the userId binding happens at wrap time, per call.
  */
 export async function buildToolkitAgentTools(args: {
   toolkit: string;
   userId: string;
 }): Promise<SdkTool[]> {
-  const composio = getComposio();
-  const raw = (await composio.tools.getRawComposioTools({
-    toolkits: [args.toolkit],
-    limit: 1000,
-  })) as ComposioRawTool[];
-  return raw.map((t) => buildOneTool(t, args.toolkit, args.userId));
+  const raw = await fetchToolkitCatalog(args.toolkit);
+  let selected = raw;
+  if (raw.length > MAX_ACTIONS_PER_TOOLKIT) {
+    const core = raw.filter((t) => isCoreAction(t.slug));
+    const rest = raw.filter((t) => !isCoreAction(t.slug));
+    selected = [...core, ...rest].slice(0, MAX_ACTIONS_PER_TOOLKIT);
+    logger.info('[integrations.agent-tools] toolkit action list capped', {
+      toolkit: args.toolkit,
+      total: raw.length,
+      kept: selected.length,
+    });
+  }
+  return selected.map((t) => buildOneTool(t, args.toolkit, args.userId));
 }
 
 /**

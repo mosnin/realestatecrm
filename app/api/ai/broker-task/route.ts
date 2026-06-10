@@ -46,7 +46,7 @@ import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
-import { decideRoute } from '@/lib/chat/router';
+import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { isSubscriptionDelinquent } from '@/lib/api-auth';
@@ -180,6 +180,7 @@ function proxyModalStream({
       const textChunks: string[] = [];
       const blocks: MessageBlock[] = [];
       let persisted = false;
+      let sentTerminal = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
         persisted = true;
@@ -273,9 +274,11 @@ function proxyModalStream({
                   : textChunks.join('');
               await persistOnce(finalText);
               push(controller, { type: 'turn_complete', reason: 'complete' });
+              sentTerminal = true;
             } else if (type === 'error') {
               await persistOnce();
               push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+              sentTerminal = true;
             }
           }
         }
@@ -293,6 +296,7 @@ function proxyModalStream({
                     : textChunks.join('');
                 await persistOnce(finalText);
                 push(controller, { type: 'turn_complete', reason: 'complete' });
+                sentTerminal = true;
               }
             } catch {
               // ignore malformed trailing line
@@ -303,9 +307,21 @@ function proxyModalStream({
         if (!abortController.signal.aborted) {
           logger.error('[ai/broker-task] modal stream read error', { brokerageId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          sentTerminal = true;
         }
       } finally {
+        // Safety net — ported from the realtor route: a Modal crash / dropped
+        // connection / container kill mid-stream previously ended this stream
+        // with NO terminal frame, so the broker's EventSource hung open
+        // forever. Persist whatever streamed and guarantee exactly one
+        // terminal frame unless the client itself aborted.
         await persistOnce();
+        if (!sentTerminal && !abortController.signal.aborted) {
+          logger.warn('[ai/broker-task] modal stream ended with no terminal event', {
+            brokerageId,
+          });
+          push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+        }
         controller.close();
         reader.releaseLock();
       }
@@ -368,21 +384,26 @@ export async function POST(req: NextRequest) {
   }
   const message = sanitized.sanitized;
 
-  // Per-user / per-IP rate limits. Same shape as the realtor route.
-  const userLimit = await checkRateLimit(`ai:broker-task:${clerkUserId}`, 30, 3600);
+  const brokerageId = brokerCtx.brokerage.id;
+
+  // Rate limits — independent counters, fired together (the realtor route got
+  // the same treatment). The per-brokerage limiter is NEW: user- and IP-level
+  // limits alone let a multi-admin brokerage burst far past intent.
+  const ip = getClientIp(req);
+  const [userLimit, ipLimit, brokerageLimit] = await Promise.all([
+    checkRateLimit(`ai:broker-task:${clerkUserId}`, 30, 3600),
+    checkRateLimit(`chat:ip:${ip}`, 30, 600),
+    checkRateLimit(`chat:brokerage:${brokerageId}`, 60, 600),
+  ]);
   if (!userLimit.allowed) {
     return NextResponse.json({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
   }
-  const ip = getClientIp(req);
-  const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
-  if (!ipLimit.allowed) {
+  if (!ipLimit.allowed || !brokerageLimit.allowed) {
     return NextResponse.json(
       { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
     );
   }
-
-  const brokerageId = brokerCtx.brokerage.id;
 
   // Dunning gate — a broker's seats are funded by the BROKERAGE subscription, so
   // gate on the brokerage's status. The realtor route (app/api/ai/task) gates
@@ -427,23 +448,49 @@ export async function POST(req: NextRequest) {
   // settings/usage want a space, and the direct (in-process) path needs none.
   const runtimeSpaceId = await resolveRuntimeSpaceId(brokerCtx.brokerage.ownerId);
 
-  // Daily token budget — the realtor route (app/api/ai/task) enforces this, but
-  // the broker route never did, so a broker could chat past the per-space cap
-  // unchecked. Gate against the runtime (funding) space when there is one.
-  // Fails open so a transient DB error can't block a legitimate broker turn.
-  if (runtimeSpaceId) {
+  // Route decision is pure — compute it BEFORE any persistence so an
+  // agent-path precondition failure (Modal unconfigured, no runtime space)
+  // can refuse cleanly. The previous order saved the user message first and
+  // THEN 503'd, leaving an orphaned user message with no assistant reply in
+  // the thread.
+  const route = decideBrokerRoute(message);
+  if (route === 'agent') {
+    if (!process.env.MODAL_CHAT_URL) {
+      logger.error('[ai/broker-task] MODAL_CHAT_URL not set');
+      return NextResponse.json(
+        { error: 'Agent backend not configured. Set MODAL_CHAT_URL.' },
+        { status: 503 },
+      );
+    }
+    if (!runtimeSpaceId) {
+      logger.warn('[ai/broker-task] no runtime space for agentic turn', { brokerageId });
+      return NextResponse.json(
+        { error: 'Broker actions are not available for this brokerage yet.' },
+        { status: 503 },
+      );
+    }
+
+    // Daily token budget — gate against the runtime (funding) space, BEFORE
+    // any persistence. Fails OPEN so a transient DB error can't block a
+    // legitimate turn. Default matches the AgentSettings column default
+    // (50_000) — same correction the realtor route carries.
     try {
-      const { data: settingsRow } = await supabase
-        .from('AgentSettings')
-        .select('dailyTokenBudget')
-        .eq('spaceId', runtimeSpaceId)
-        .maybeSingle();
-      const dailyTokenBudget = (settingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
-      const { total: todayTokens } = await getTodayTokenUsage(runtimeSpaceId);
-      if (todayTokens >= dailyTokenBudget) {
+      const [settingsResult, usageResult] = await Promise.all([
+        supabase
+          .from('AgentSettings')
+          .select('dailyTokenBudget')
+          .eq('spaceId', runtimeSpaceId)
+          .maybeSingle(),
+        getTodayTokenUsage(runtimeSpaceId),
+      ]);
+      const dailyTokenBudget: number =
+        ((settingsResult.data as { dailyTokenBudget?: number | null } | null)
+          ?.dailyTokenBudget as number | null | undefined) ?? 50_000;
+      if (usageResult.total >= dailyTokenBudget) {
         logger.warn('[ai/broker-task] daily token budget exceeded', {
+          brokerageId,
           runtimeSpaceId,
-          todayTokens,
+          todayTokens: usageResult.total,
           dailyTokenBudget,
         });
         return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
@@ -488,12 +535,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Router: Q&A in-process, actions to Modal ─────────────────────────────
-  // Most broker turns are read-only questions about the team ("how's the
-  // pipeline?", "how many leads are waiting?"). Answer those in-process from a
-  // live brokerage snapshot — instant, no Modal cold start, the same fast lane
-  // the realtor chat uses. Action verbs (reassign, route, send) fall through to
-  // Modal, where the BROKER_TOOLS catalog lives. Errors → Modal (safe default).
-  if (decideRoute(message) === 'direct') {
+  // Generic Q&A answers in-process from a live brokerage snapshot — instant,
+  // no Modal cold start. Everything broker-domain ("team health", "at-risk
+  // agents", "reassign Maria's leads") goes to Modal where BROKER_TOOLS lives.
+  // decideBrokerRoute = the shared realtor router PLUS the broker noun set;
+  // the plain decideRoute used to send broker-domain reads to the snapshot
+  // path, whose prompt is instructed to say it doesn't have the answer —
+  // brokers read that as "Chippi has no tools". Errors → Modal (safe default).
+  if (route === 'direct') {
     logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId });
     return streamBrokerDirectTurn({
       brokerage: brokerCtx.brokerage,
@@ -511,26 +560,9 @@ export async function POST(req: NextRequest) {
   // Modal dispatch. `mode: 'broker'` + brokerage_id + broker_role tell
   // chat_turn to build the broker-variant agent (BROKER_TOOLS, broker
   // system prompt) and refuse the request if those fields are missing.
-  const modalChatUrl = process.env.MODAL_CHAT_URL;
-  if (!modalChatUrl) {
-    logger.error('[ai/broker-task] MODAL_CHAT_URL not set');
-    return NextResponse.json(
-      { error: 'Agent backend not configured. Set MODAL_CHAT_URL.' },
-      { status: 503 },
-    );
-  }
-
-  // The Modal agent run needs a runtime space_id for AgentSettings/usage. If
-  // the broker owner has no personal Space, the agentic (tool) path can't run —
-  // but the user message is already saved to the broker tables, so we surface a
-  // clear, non-destructive error rather than dropping the turn.
-  if (!runtimeSpaceId) {
-    logger.warn('[ai/broker-task] no runtime space for agentic turn', { brokerageId });
-    return NextResponse.json(
-      { error: 'Broker actions are not available for this brokerage yet.' },
-      { status: 503 },
-    );
-  }
+  // Preconditions (MODAL_CHAT_URL, runtimeSpaceId) were verified BEFORE the
+  // user message was persisted — see the route-decision block above.
+  const modalChatUrl = process.env.MODAL_CHAT_URL as string;
 
   const payload = {
     secret: process.env.AGENT_INTERNAL_SECRET ?? '',

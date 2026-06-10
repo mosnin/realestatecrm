@@ -55,7 +55,7 @@ export default async function BrokerageInvitesPage({
 
   if (!userEmail) {
     return (
-      <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+      <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
         <h1 className={H1} style={TITLE_FONT}>
           Brokerage
         </h1>
@@ -99,7 +99,7 @@ export default async function BrokerageInvitesPage({
         : `${invitations.length} brokerage invites waiting.`;
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       <div className="space-y-2">
         <h1 className={H1} style={TITLE_FONT}>
           Brokerage

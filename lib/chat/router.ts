@@ -39,7 +39,7 @@
  * how, why, who, when — those are READS. Reads go direct.
  */
 const ACTION_VERBS_RE =
-  /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject)\b/i;
+  /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|reassign|unassign|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject|connect|disconnect|link|integrate|sync)\b/i;
 
 /**
  * Workspace-DATA queries that READ the realtor's book of business. These are
@@ -56,7 +56,32 @@ const ACTION_VERBS_RE =
 const WORKSPACE_QUERY_RE =
   /\b(show|find|search|look\s?up|lookup|list|see|view|pull|display|surface|who(?:'?s| is| are)?|which|whose|overdue|hottest|hot|warm|cold|stuck|stalled|quiet|pipeline|deals?|leads?|contacts?|people|person|clients?|prospects?|buyers?|sellers?|listings?|propert(?:y|ies)|tours?|showings?|follow[\s-]?ups?|calendar|agenda|schedule|today|tomorrow|this week|inbox|drafts?|offers?|commissions?|stages?|scores?|plan my|my day|my week|my pipeline|my leads|my deals|my contacts|my schedule|my calendar)\b/i;
 
+/**
+ * Integration-shaped messages. Reading email / checking a connected app needs
+ * the agent's integration tools — there is no native read-email tool, so the
+ * toolless direct path can only deflect ("I don't have access to your email"),
+ * which realtors with Gmail connected experience as Chippi losing their
+ * integrations. Nouns cover the connected-app surface (gmail, outlook, slack,
+ * hubspot, calendar/email/messages) and meta-questions about connections
+ * ("is my gmail connected?", "what integrations do I have?").
+ */
+const INTEGRATION_QUERY_RE =
+  /\b(e-?mails?|gmail|outlook|mail(?:box)?|inbox|messages?|texts?|slack|hubspot|whatsapp|integrations?|connected|composio)\b/i;
+
 export type RouteDecision = 'direct' | 'agent';
+
+/**
+ * Broker-domain reads. The shared WORKSPACE_QUERY_RE was curated from realtor
+ * traffic; broker questions ("team health", "at-risk agents", "audit response
+ * times", "who's unassigned") matched nothing and fell through to the broker
+ * direct path — whose snapshot prompt is INSTRUCTED to say it doesn't have
+ * the answer. The "Chippi says it has no tools" complaint on the broker
+ * surface was manufactured by that fallthrough. These nouns cover the broker
+ * tool catalog's natural-language surface (team/roster/performance/revenue/
+ * routing/reviews/briefing).
+ */
+const BROKER_QUERY_RE =
+  /\b(team|roster|members?|realtors?|agents?|brokerage|floor|unassigned|reassignments?|routing|response times?|at[\s-]?risk|flight[\s-]?risk|performance|production|leaderboard|rankings?|revenue|volume|gci|splits?|review queue|reviews?|briefing|brief|health|coverage|sla)\b/i;
 
 export interface RouteAttachment {
   id?: string;
@@ -101,10 +126,38 @@ export function decideRoute(
     if (WORKSPACE_QUERY_RE.test(text)) {
       return 'agent';
     }
+    // Integration reads ("do I have any new emails?", "is my gmail
+    // connected?") need the agent's integration tools for the same reason.
+    if (INTEGRATION_QUERY_RE.test(text)) {
+      return 'agent';
+    }
     return 'direct';
   } catch {
     // Bug in the regex / inputs → fall back to the full agent. Direct
     // can't run tools, so over-routing to agent is the conservative choice.
+    return 'agent';
+  }
+}
+
+/**
+ * Broker-surface routing: everything decideRoute knows, plus the broker
+ * noun set. The broker direct path serves only a 5-field aggregate snapshot
+ * — any question about specific realtors, routing, performance, or reviews
+ * needs the broker tool catalog on the agent path.
+ */
+export function decideBrokerRoute(
+  userMessage: string,
+  attachments: RouteAttachment[] = [],
+): RouteDecision {
+  try {
+    const base = decideRoute(userMessage, attachments);
+    if (base === 'agent') return 'agent';
+    const text = (userMessage ?? '').trim();
+    if (text && attachments.length === 0 && BROKER_QUERY_RE.test(text)) {
+      return 'agent';
+    }
+    return base;
+  } catch {
     return 'agent';
   }
 }

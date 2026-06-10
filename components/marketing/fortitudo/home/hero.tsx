@@ -116,7 +116,7 @@ export function HomeHero() {
               href="/login/realtor?intent=signup"
               className="inline-flex items-center gap-2 rounded-full bg-brand px-8 py-3.5 text-base font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-brand/40"
             >
-              Start free
+              Start free trial
               <ArrowRight className="h-5 w-5" />
             </Link>
             <Link
