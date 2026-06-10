@@ -171,7 +171,9 @@ export default async function BrokerBillingPage() {
             : undefined
         }
       />
-      <CreditsSummary spaceId={spaceRow.id as string} slug={slug} />
+      {/* Credits are keyed to the runtime space; a brokerage-entity broker
+          with no personal Space simply has no per-space summary to show. */}
+      {spaceRow && <CreditsSummary spaceId={spaceRow.id as string} slug={slug} />}
     </div>
   );
 }
