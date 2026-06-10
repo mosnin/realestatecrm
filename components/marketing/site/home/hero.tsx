@@ -1,99 +1,178 @@
+'use client';
+
 /**
- * Hero — the promise, with a real product shot.
+ * Hero — full-screen video opener.
  *
- * The headline is the serif Times the product uses for every page title; the
- * one idea is said once. Beneath it sits a large framed workspace screenshot
- * (placeholder slot) over a faint dot-grid backdrop and a warm brand wash, so
- * the first thing a prospect sees is the product itself, framed like software
- * — not a centered card on an empty page.
+ * Recreated to the owner's exact spec: a raw, undimmed background video
+ * (no overlay of any kind), Inter typography, a character-by-character
+ * headline entrance (30ms stagger, 500ms per character, after a 200ms hold),
+ * timed fade-ins for the subheading (800ms), buttons (1200ms), and the
+ * "liquid glass" tag card (1400ms, bottom-right on large screens). Content
+ * sits at the bottom of the viewport; the site's fixed pill nav floats above.
+ *
+ * Inter is loaded via next/font (the Next-idiomatic equivalent of the spec's
+ * <link> tags — preconnected, self-hosted, no render blocking) and scoped to
+ * this section so the logged-in product keeps its own type system.
+ *
+ * Reduced-motion: everything renders composed immediately — the staggered
+ * entrance is the one thing we won't make someone sit through twice.
  */
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check } from 'lucide-react';
-import { Reveal } from '../reveal';
-import { PanelFrame, GridBackdrop } from '../frame';
-import { HeroDemo } from './hero-demo';
-import { TITLE_FONT } from '@/lib/typography';
+import { Inter } from 'next/font/google';
 
-const assurances = ['7-day free trial', 'No setup fees', 'Cancel anytime'];
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
+  display: 'swap',
+});
+
+const VIDEO_URL =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4';
+
+const HEADLINE = 'Shaping tomorrow\nwith vision and action.';
+const CHAR_DELAY_MS = 30;
+const CHAR_DURATION_MS = 500;
+const HEADLINE_START_MS = 200;
+
+function useReducedMotionFlag(): boolean {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    setReduce(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, []);
+  return reduce;
+}
+
+/** Fades children in after `delay` ms over `duration` ms. */
+function FadeIn({
+  delay,
+  duration = 1000,
+  className = '',
+  children,
+}: {
+  delay: number;
+  duration?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const reduce = useReducedMotionFlag();
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(id);
+  }, [delay]);
+  const shown = visible || reduce;
+  return (
+    <div
+      className={`transition-opacity ${shown ? 'opacity-100' : 'opacity-0'} ${className}`}
+      style={{ transitionDuration: `${duration}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Character-by-character headline. Splits on \n into lines, each line into
+ * chars; every char enters from translateX(-18px) with a stagger of
+ * (lineIndex * lineLength * 30ms) + (charIndex * 30ms) after the initial hold.
+ */
+function AnimatedHeading({ text }: { text: string }) {
+  const reduce = useReducedMotionFlag();
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setStarted(true), HEADLINE_START_MS);
+    return () => clearTimeout(id);
+  }, []);
+  const lit = started || reduce;
+  const lines = text.split('\n');
+  return (
+    <h1
+      className="mb-4 text-4xl font-normal md:text-5xl lg:text-6xl xl:text-7xl"
+      style={{ letterSpacing: '-0.04em' }}
+    >
+      {lines.map((line, lineIndex) => (
+        <span key={lineIndex} className="block">
+          {Array.from(line).map((char, charIndex) => (
+            <span
+              key={charIndex}
+              className="inline-block"
+              style={{
+                opacity: lit ? 1 : 0,
+                transform: lit ? 'translateX(0)' : 'translateX(-18px)',
+                transition: reduce
+                  ? 'none'
+                  : `opacity ${CHAR_DURATION_MS}ms, transform ${CHAR_DURATION_MS}ms`,
+                transitionDelay: reduce
+                  ? '0ms'
+                  : `${lineIndex * line.length * CHAR_DELAY_MS + charIndex * CHAR_DELAY_MS}ms`,
+              }}
+            >
+              {char === ' ' ? ' ' : char}
+            </span>
+          ))}
+        </span>
+      ))}
+    </h1>
+  );
+}
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-20 sm:px-6 sm:pt-36">
-      <GridBackdrop />
-      {/* warm wash at the top, behind the headline */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
+    <section
+      className={`relative h-screen overflow-hidden bg-black text-white antialiased ${inter.className}`}
+    >
+      {/* Raw video — no overlay, no dimming, per spec. */}
+      <video
+        className="absolute inset-0 h-full w-full object-cover"
+        src={VIDEO_URL}
+        autoPlay
+        loop
+        muted
+        playsInline
       />
 
-      <div className="relative mx-auto max-w-3xl text-center">
-        <Reveal>
-          <p className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/60 px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
-            <span aria-hidden className="inline-block size-1.5 rounded-full bg-brand" />
-            The agentic OS for real estate
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.05}>
-          <h1
-            className="mt-7 text-[2.75rem] leading-[1.03] tracking-tight text-foreground sm:text-[4.25rem]"
-            style={TITLE_FONT}
-          >
-            You close the deals.
-            <br />
-            Chippi does the rest.
-          </h1>
-        </Reveal>
-
-        <Reveal delay={0.1}>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Chippi reads your inbox, drafts replies in your voice, books the
-            tours, and keeps every deal current. The busywork runs itself, and
-            nothing leaves without your name on it.
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.15}>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-            >
-              Start free trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/demo"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
-            >
-              Watch demo
-            </Link>
+      {/* Content — pinned to the bottom of the viewport. The site's fixed
+          pill nav floats above this section; no second navbar here. */}
+      <div className="relative z-10 flex h-full flex-col px-6 md:px-12 lg:px-16">
+        <div className="flex flex-1 flex-col justify-end pb-12 lg:grid lg:grid-cols-2 lg:items-end lg:pb-16">
+          {/* Left — headline, subheading, buttons */}
+          <div>
+            <AnimatedHeading text={HEADLINE} />
+            <FadeIn delay={800}>
+              <p className="mb-5 text-base text-gray-300 md:text-lg">
+                We back visionaries and craft ventures that define what comes next.
+              </p>
+            </FadeIn>
+            <FadeIn delay={1200}>
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  href="/login/realtor?intent=signup"
+                  className="rounded-lg bg-white px-8 py-3 font-medium text-black transition-colors hover:bg-gray-100"
+                >
+                  Start a Chat
+                </Link>
+                <Link
+                  href="/demo"
+                  className="liquid-glass rounded-lg border border-white/20 px-8 py-3 font-medium text-white transition-colors hover:bg-white hover:text-black"
+                >
+                  Explore Now
+                </Link>
+              </div>
+            </FadeIn>
           </div>
-        </Reveal>
 
-        <Reveal delay={0.2}>
-          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-            {assurances.map((a) => (
-              <li key={a} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Check className="h-3.5 w-3.5 text-brand" />
-                {a}
-              </li>
-            ))}
-          </ul>
-        </Reveal>
+          {/* Right — glass tag, bottom-right on large screens */}
+          <FadeIn delay={1400} className="mt-8 flex items-end justify-start lg:mt-0 lg:justify-end">
+            <div className="liquid-glass rounded-xl border border-white/20 px-6 py-3">
+              <p className="text-lg font-light md:text-xl lg:text-2xl">
+                Investing. Building. Advisory.
+              </p>
+            </div>
+          </FadeIn>
+        </div>
       </div>
-
-      {/* The product, working — a live, looping demo of Chippi at work. */}
-      <Reveal delay={0.15} className="relative mx-auto mt-16 max-w-2xl">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,rgba(255,150,79,0.12),transparent_70%)]"
-        />
-        <PanelFrame className="relative">
-          <HeroDemo />
-        </PanelFrame>
-      </Reveal>
     </section>
   );
 }
