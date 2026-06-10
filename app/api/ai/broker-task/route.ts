@@ -46,7 +46,7 @@ import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
-import { decideRoute } from '@/lib/chat/router';
+import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
@@ -424,12 +424,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Router: Q&A in-process, actions to Modal ─────────────────────────────
-  // Most broker turns are read-only questions about the team ("how's the
-  // pipeline?", "how many leads are waiting?"). Answer those in-process from a
-  // live brokerage snapshot — instant, no Modal cold start, the same fast lane
-  // the realtor chat uses. Action verbs (reassign, route, send) fall through to
-  // Modal, where the BROKER_TOOLS catalog lives. Errors → Modal (safe default).
-  if (decideRoute(message) === 'direct') {
+  // Generic Q&A answers in-process from a live brokerage snapshot — instant,
+  // no Modal cold start. Everything broker-domain ("team health", "at-risk
+  // agents", "reassign Maria's leads") goes to Modal where BROKER_TOOLS lives.
+  // decideBrokerRoute = the shared realtor router PLUS the broker noun set;
+  // the plain decideRoute used to send broker-domain reads to the snapshot
+  // path, whose prompt is instructed to say it doesn't have the answer —
+  // brokers read that as "Chippi has no tools". Errors → Modal (safe default).
+  if (decideBrokerRoute(message) === 'direct') {
     logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId });
     return streamBrokerDirectTurn({
       brokerage: brokerCtx.brokerage,

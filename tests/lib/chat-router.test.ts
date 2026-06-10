@@ -7,7 +7,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { decideRoute, shouldEscalate, ACTION_VERBS_REGEX } from '@/lib/chat/router';
+import {
+  decideRoute,
+  decideBrokerRoute,
+  shouldEscalate,
+  ACTION_VERBS_REGEX,
+} from '@/lib/chat/router';
 
 describe('decideRoute', () => {
   it('routes a generic (non-data) question to direct', () => {
@@ -79,6 +84,46 @@ describe('decideRoute', () => {
     expect(ACTION_VERBS_REGEX).toBeInstanceOf(RegExp);
     expect(ACTION_VERBS_REGEX.test('add')).toBe(true);
     expect(ACTION_VERBS_REGEX.test('addendum')).toBe(false);
+  });
+
+  it('routes integration reads to agent — only the agent has integration tools', () => {
+    // These were the verbatim "Chippi claims it has no tools" reports: the
+    // old regexes matched neither ("emails" wasn't a workspace noun, "check"
+    // isn't an action verb), so a Gmail-connected realtor's question landed
+    // on the toolless direct path, which can only deflect.
+    expect(decideRoute('do I have any new emails?')).toBe('agent');
+    expect(decideRoute('check my gmail')).toBe('agent');
+    expect(decideRoute('is my gmail connected?')).toBe('agent');
+    expect(decideRoute('what integrations do I have?')).toBe('agent');
+    expect(decideRoute('anything in slack?')).toBe('agent');
+    expect(decideRoute('summarize my inbox from today')).toBe('agent');
+    expect(decideRoute('connect hubspot')).toBe('agent');
+  });
+});
+
+describe('decideBrokerRoute', () => {
+  it('routes broker-domain reads to agent — the snapshot path has no broker tools', () => {
+    // The shared realtor router sent all of these to the broker direct path,
+    // whose prompt is INSTRUCTED to say it doesn't have the answer — brokers
+    // read that as "Chippi has no tools".
+    expect(decideBrokerRoute("how's team health?")).toBe('agent');
+    expect(decideBrokerRoute('audit response times')).toBe('agent');
+    expect(decideBrokerRoute('which agents are at risk?')).toBe('agent');
+    expect(decideBrokerRoute('show realtor performance')).toBe('agent');
+    expect(decideBrokerRoute("who's unassigned?")).toBe('agent');
+    expect(decideBrokerRoute('reassign Maria to John')).toBe('agent');
+    expect(decideBrokerRoute('what does the leaderboard look like?')).toBe('agent');
+    expect(decideBrokerRoute('brokerage revenue this quarter')).toBe('agent');
+  });
+
+  it('keeps generic Q&A on direct', () => {
+    expect(decideBrokerRoute("what's a CMA?")).toBe('direct');
+    expect(decideBrokerRoute('Explain the 1031 exchange rules to me.')).toBe('direct');
+  });
+
+  it('inherits the realtor routing for shared phrasings', () => {
+    expect(decideBrokerRoute('Send Preston the follow-up email')).toBe('agent');
+    expect(decideBrokerRoute('do I have any new emails?')).toBe('agent');
   });
 });
 

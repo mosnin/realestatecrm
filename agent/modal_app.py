@@ -583,11 +583,13 @@ async def chat_turn(item: dict):
         try:
             from integrations import active_toolkits, load_integration_tools
 
-            # Pull the toolkit list up so we can both surface it to the
-            # model (workspace_info below) and use it to gate the
-            # dispatcher tools.
+            # Pull the toolkit list ONCE — surfaced to the model via
+            # workspace_info below AND passed into the tool loader (which
+            # used to re-query the same table on every turn).
             connected_toolkits = await active_toolkits(space_id, user_id)
-            integration_tools = await load_integration_tools(space_id, user_id)
+            integration_tools = await load_integration_tools(
+                space_id, user_id, toolkits=connected_toolkits
+            )
         except Exception as ie:  # noqa: BLE001
             logger.warning(
                 "load_integration_tools_failed",
