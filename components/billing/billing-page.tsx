@@ -162,7 +162,7 @@ export function BillingPage({
   usageStats,
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
-  plan = 'pro',
+  plan,
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -170,9 +170,13 @@ export function BillingPage({
 
   // Plan name + price come from the single source of truth (lib/plans), not
   // hardcoded — the page used to claim "Pro/$97" for every tier.
-  const planDef = PLANS[plan] ?? PLANS.pro;
-  const PLAN_NAME = planDef.label;
-  const PLAN_PRICE = planDef.priceMonthly;
+  // No free tier: an account with no active subscription has no plan. Don't
+  // fabricate "Pro / $197" — show "No active plan", and fall back to the
+  // entry-tier price only for the get-started prompt below.
+  const planDef = plan ? PLANS[plan] : null;
+  const PLAN_NAME = planDef?.label ?? 'No active plan';
+  const PLAN_PRICE = planDef?.priceMonthly ?? null;
+  const startingPrice = PLAN_PRICE ?? PLANS.solo.priceMonthly;
 
   const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
 
@@ -359,10 +363,12 @@ export function BillingPage({
               <p className="text-lg font-bold">{PLAN_NAME}</p>
               <StatusBadge status={subscriptionStatus} />
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold tabular-nums">${PLAN_PRICE}</span>
-              <span className="text-sm text-muted-foreground">/ month</span>
-            </div>
+            {PLAN_PRICE != null && (
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold tabular-nums">${PLAN_PRICE}</span>
+                <span className="text-sm text-muted-foreground">/ month</span>
+              </div>
+            )}
             {isActive && currentPeriodEnd && (
               <p className="text-xs text-muted-foreground">
                 Next billing date:{' '}
@@ -454,7 +460,7 @@ export function BillingPage({
       {/* ── What's included ── */}
       <SectionBlock
         title="What's included"
-        description={`Everything in the ${PLAN_NAME} plan`}
+        description={planDef ? `Everything in the ${PLAN_NAME} plan` : 'Included in every Chippi plan'}
       >
         <ul className="space-y-3">
           {PLAN_FEATURES.map(({ icon: Icon, label }) => (
@@ -471,7 +477,7 @@ export function BillingPage({
         {!isActive && (
           <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold">Get started for ${PLAN_PRICE}/mo</p>
+              <p className="text-sm font-semibold">Get started {planDef ? 'for' : 'from'} ${startingPrice}/mo</p>
               <p className="text-xs text-muted-foreground mt-0.5">No contracts. Cancel anytime.</p>
             </div>
             <Button onClick={handleSubscribe} size="sm" className="gap-1.5">
