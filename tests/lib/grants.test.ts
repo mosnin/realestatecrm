@@ -15,7 +15,6 @@ import { TOPUPS } from '@/lib/plans';
 
 describe('monthlyGrantAmount', () => {
   it('returns the plan base credits', () => {
-    expect(monthlyGrantAmount('free')).toBe(0);
     expect(monthlyGrantAmount('solo')).toBe(1500);
     expect(monthlyGrantAmount('pro')).toBe(4000);
     expect(monthlyGrantAmount('team')).toBe(12000);
@@ -29,7 +28,6 @@ describe('monthlyGrantAmount', () => {
 
   it('ignores add-on users on plans without an add-on path', () => {
     expect(monthlyGrantAmount('solo', 5)).toBe(1500);
-    expect(monthlyGrantAmount('free', 5)).toBe(0);
   });
 });
 

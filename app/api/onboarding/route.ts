@@ -1,7 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { grantFreeSignup } from '@/lib/billing/grants';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import { sendWelcomeEmail } from '@/lib/email';
@@ -461,13 +460,8 @@ export async function POST(req: NextRequest) {
 
       const newSpace = createdSpace as Space;
 
-      // Free-tier signup grant — 100 credits, never-expiring (best-effort, must
-      // not block workspace creation if the credit tables aren't provisioned).
-      try {
-        await grantFreeSignup({ type: 'space', id: spaceId });
-      } catch (e) {
-        console.error('[onboarding] free-signup credit grant failed (non-fatal)', e);
-      }
+      // No free-tier signup grant — there is no free plan. Credits are granted
+      // on the first paid invoice (trial requires a card up front).
 
       const { error: stepError } = await supabase
         .from('User')

@@ -40,8 +40,10 @@ export async function CreditsSummary({ spaceId, slug }: { spaceId: string; slug:
   let txns: CreditTxnRow[] = [];
   try {
     const { account, plan } = await resolveBillingAccount(spaceId);
-    planLabel = PLANS[plan].label;
-    monthlyCredits = PLANS[plan].monthlyCredits;
+    // No free tier: a null plan means no active subscription.
+    const planDef = plan ? PLANS[plan] : null;
+    planLabel = planDef?.label ?? 'No active plan';
+    monthlyCredits = planDef?.monthlyCredits ?? 0;
     [balance, txns] = await Promise.all([getCreditBalance(account), getRecentTxns(account, 8)]);
   } catch {
     return null; // credits not provisioned in this environment yet

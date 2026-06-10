@@ -1,15 +1,13 @@
 /**
  * Credit grants — turning a plan/top-up into credit lots (docs/PRICING_V2_PLAN.md
  * §4.3). Thin layer over `grantCredits` that knows the plan amounts + expiry
- * rules, so the webhook, the free-signup path, and the admin tools all grant the
- * same way.
+ * rules, so the webhook and the admin tools all grant the same way.
  */
 
-import { supabase } from '@/lib/supabase';
 import { grantCredits, type BillingAccount } from '@/lib/billing/credits';
 import { PLANS, TOPUPS, CREDIT_ROLLOVER_DAYS, type PlanId, type TopupId } from '@/lib/plans';
 
-/** Credits expire 30 days after grant (rollover); Free's one-time grant never does. */
+/** Credits expire 30 days after grant (rollover). */
 function rolloverExpiry(): Date {
   return new Date(Date.now() + CREDIT_ROLLOVER_DAYS * 86400_000);
 }
@@ -21,7 +19,7 @@ export function monthlyGrantAmount(plan: PlanId, addonUsers = 0): number {
   return def.monthlyCredits + addon;
 }
 
-/** Grant a plan's recurring monthly credits (30-day rollover). No-op for Free. */
+/** Grant a plan's recurring monthly credits (30-day rollover). */
 export async function grantMonthlyCredits(
   account: BillingAccount,
   plan: PlanId,
@@ -31,25 +29,6 @@ export async function grantMonthlyCredits(
   const amount = monthlyGrantAmount(plan, addonUsers);
   if (amount <= 0) return 0;
   await grantCredits(account, amount, 'monthly_grant', rolloverExpiry(), sourceId);
-  return amount;
-}
-
-/** One-time Free-tier signup grant (never expires, per spec). Idempotent: one
- *  per account. The unique index (uq_creditlot_free_signup) is the hard
- *  backstop; this pre-check avoids a noisy duplicate-key error on a retried
- *  signup. */
-export async function grantFreeSignup(account: BillingAccount): Promise<number> {
-  const amount = PLANS.free.oneTimeCredits ?? 0;
-  if (amount <= 0) return 0;
-  const { data: existing } = await supabase
-    .from('CreditLot')
-    .select('id')
-    .eq('accountType', account.type)
-    .eq('accountId', account.id)
-    .eq('reason', 'free_signup')
-    .maybeSingle();
-  if (existing) return 0;
-  await grantCredits(account, amount, 'free_signup', null);
   return amount;
 }
 

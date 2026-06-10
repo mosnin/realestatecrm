@@ -16,8 +16,9 @@ import type { BillingAccount } from '@/lib/billing/credits';
 
 export interface BillingContext {
   account: BillingAccount;
-  /** The plan that governs grants/limits for this account. */
-  plan: PlanId;
+  /** The plan that governs grants/limits, or null when the account has no
+   *  active subscription. There is no free tier — unsubscribed === no plan. */
+  plan: PlanId | null;
 }
 
 const BROKERAGE_PLANS = new Set<string>(['team', 'team_plus']);
@@ -63,8 +64,11 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
     }
   }
 
+  const raw = space.plan as string | null;
   return {
     account: { type: 'space', id: space.id as string },
-    plan: ((space.plan as string) ?? 'free') as PlanId,
+    // No free tier: a space with no plan (or a legacy 'free' value) has no
+    // active plan. Callers gate grants/limits on a real PlanId.
+    plan: (raw && raw !== 'free' ? raw : null) as PlanId | null,
   };
 }

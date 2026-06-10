@@ -8,7 +8,7 @@
  * before Stripe is configured — checkout guards on a missing id).
  */
 
-export type PlanId = 'free' | 'solo' | 'pro' | 'team' | 'team_plus';
+export type PlanId = 'solo' | 'pro' | 'team' | 'team_plus';
 
 /** Where a plan's credit balance lives: solo/pro on the Space, team on the Brokerage. */
 export type AccountType = 'space' | 'brokerage';
@@ -20,10 +20,8 @@ export interface PlanDef {
   priceMonthly: number;
   /** Seats included before per-user add-ons apply. */
   includedUsers: number;
-  /** Recurring monthly credit grant (0 for Free — it gets a one-time grant). */
+  /** Recurring monthly credit grant. */
   monthlyCredits: number;
-  /** One-time grant on signup (Free tier's 100, never-expiring credits). */
-  oneTimeCredits?: number;
   /** Which entity owns the balance for this plan. */
   account: AccountType;
   stripePriceMonthly: string | null;
@@ -35,17 +33,6 @@ export interface PlanDef {
 const env = (k: string): string | null => process.env[k] ?? null;
 
 export const PLANS: Record<PlanId, PlanDef> = {
-  free: {
-    id: 'free',
-    label: 'Free',
-    priceMonthly: 0,
-    includedUsers: 1,
-    monthlyCredits: 0,
-    oneTimeCredits: 100,
-    account: 'space',
-    stripePriceMonthly: null,
-    stripePriceAnnual: null,
-  },
   solo: {
     id: 'solo',
     label: 'Solo',
@@ -107,6 +94,16 @@ export function planIdForStripePrice(priceId: string | null | undefined): PlanId
 }
 
 /**
+ * Coerce a stored plan string — which may be null, unset, or a legacy value
+ * ('free', 'starter', 'enterprise') — to a valid PlanId, or undefined when the
+ * account has no active plan. There is no free tier, so anything not in PLANS
+ * resolves to "no plan".
+ */
+export function normalizePlan(raw: string | null | undefined): PlanId | undefined {
+  return raw && raw in PLANS ? (raw as PlanId) : undefined;
+}
+
+/**
  * Credit cost per premium workflow (docs/PRICING_V2_PLAN.md §4.4). The key is
  * the canonical `workflow` string written to CreditTxn.workflow.
  */
@@ -160,7 +157,7 @@ export const TOPUPS = {
 
 export type TopupId = keyof typeof TOPUPS;
 
-/** Credit lots roll over for 30 days (Free's one-time grant never expires). */
+/** Credit lots roll over for 30 days. */
 export const CREDIT_ROLLOVER_DAYS = 30;
 
 /**
