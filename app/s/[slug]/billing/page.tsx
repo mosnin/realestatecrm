@@ -78,7 +78,7 @@ export default async function Billing({
     'No active subscription.';
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Billing.</p>
         <h1 className={H1} style={TITLE_FONT}>
