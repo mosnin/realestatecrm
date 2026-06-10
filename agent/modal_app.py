@@ -45,7 +45,18 @@ logger = structlog.get_logger(__name__)
 # multi-step plan (lookup → plan → several writes → confirm) while capping a
 # pathological loop that would otherwise burn a whole day's token budget on
 # one message.
-CHAT_MAX_TURNS = 12
+# Inner agent-loop cap. The SDK re-sends the FULL transcript (system prompt +
+# every tool schema + accumulated tool results) on EVERY step, so token cost
+# grows quadratically with this number. 8 covers real multi-step workflows
+# (lookup → activity → deal → draft is 4-5 steps); deeper work belongs on the
+# swarm/delegate path which runs in its own bounded context.
+CHAT_MAX_TURNS = 8
+
+# Server-side guard on replayed history. The client caps what it sends, but
+# this endpoint must not trust that — an unbounded transcript re-ships on
+# every loop step (multiplying every other token cost) regardless of where
+# it came from.
+CHAT_HISTORY_MAX_ITEMS = 16
 
 # Resolve the agent source directory from this file's location, NOT from the
 # deploy cwd. Without this, `modal deploy agent/modal_app.py` (from repo root)
@@ -550,7 +561,8 @@ async def chat_turn(item: dict):
     user_content = build_user_input(text_with_attachments, attachments)
 
     input_items: list[dict[str, Any]] = []
-    for turn in history:
+    # Most-recent CHAT_HISTORY_MAX_ITEMS only — see the constant's comment.
+    for turn in history[-CHAT_HISTORY_MAX_ITEMS:]:
         if not isinstance(turn, dict):
             continue
         role = turn.get("role")
@@ -586,11 +598,13 @@ async def chat_turn(item: dict):
         try:
             from integrations import active_toolkits, load_integration_tools
 
-            # Pull the toolkit list up so we can both surface it to the
-            # model (workspace_info below) and use it to gate the
-            # dispatcher tools.
+            # Pull the toolkit list ONCE — surfaced to the model via
+            # workspace_info below AND passed into the tool loader (which
+            # used to re-query the same table on every turn).
             connected_toolkits = await active_toolkits(space_id, user_id)
-            integration_tools = await load_integration_tools(space_id, user_id)
+            integration_tools = await load_integration_tools(
+                space_id, user_id, toolkits=connected_toolkits
+            )
         except Exception as ie:  # noqa: BLE001
             logger.warning(
                 "load_integration_tools_failed",
@@ -628,6 +642,21 @@ async def chat_turn(item: dict):
         " prospect to qualify, when nudging someone who never finished"
         " applying. Use the full URL verbatim; no shortening."
     ) if intake_url else None
+
+    # Broker mode gets brokerage context, NOT the realtor block above — the
+    # broker agent was previously handed the OWNER's personal workspace info
+    # (their intake link + "include it in contact-facing drafts"), which is
+    # realtor-persona instruction injected into the brokerage chief-of-staff.
+    if mode == "broker":
+        workspace_info = (
+            "# Brokerage context\n"
+            f"- Brokerage id: {brokerage_id}\n"
+            f"- Operator role: {broker_role}\n"
+            "- You are the brokerage chief-of-staff. Answer about the TEAM —"
+            " realtors, routing, performance, revenue — through the broker"
+            " tools. You do not have a personal intake link or personal"
+            " integrations in this mode."
+        )
 
     async def event_stream():
         try:

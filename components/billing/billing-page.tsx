@@ -66,6 +66,12 @@ interface BillingPageProps {
   canceledAccessEnd?: string;
   /** Support email or URL */
   supportUrl?: string;
+  /**
+   * Endpoint overrides so this same component can serve the broker surface,
+   * where portal/cancel must act on the BROKERAGE's Stripe identity instead of
+   * a Space the caller owns. Defaults are the realtor space routes.
+   */
+  endpoints?: { checkout?: string; portal?: string; cancel?: string };
   /** The account's plan tier — drives the displayed name + price. Without this
    *  the page hardcoded "Pro"/$97 and contradicted the real plan shown below. */
   plan?: PlanId;
@@ -162,15 +168,16 @@ export function BillingPage({
   usageStats,
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
-  plan = 'pro',
+  endpoints,
+  plan = 'solo',
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
   // Plan name + price come from the single source of truth (lib/plans), not
-  // hardcoded — the page used to claim "Pro/$97" for every tier.
-  const planDef = PLANS[plan] ?? PLANS.pro;
+  // hardcoded — the page used to claim "Pro/$97" for every account.
+  const planDef = PLANS[plan] ?? PLANS.solo;
   const PLAN_NAME = planDef.label;
   const PLAN_PRICE = planDef.priceMonthly;
 
@@ -224,17 +231,17 @@ export function BillingPage({
   }
 
   function handleSubscribe() {
-    void startBillingFlow('/api/billing/checkout');
+    void startBillingFlow(endpoints?.checkout ?? '/api/billing/checkout');
   }
 
   function handleManage() {
-    void startBillingFlow('/api/billing/portal');
+    void startBillingFlow(endpoints?.portal ?? '/api/billing/portal');
   }
 
   async function handleCancel() {
     setCanceling(true);
     try {
-      const res = await fetch('/api/billing/cancel', {
+      const res = await fetch(endpoints?.cancel ?? '/api/billing/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug }),

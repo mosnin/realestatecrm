@@ -65,12 +65,17 @@ beforeEach(() => {
 });
 
 describe('loadIntegrationTools — short-circuit paths', () => {
-  it('returns [] and skips the DB lookup when Composio is not configured', async () => {
+  it('checks the DB even when Composio is not configured — connected toolkits must degrade loudly', async () => {
+    // Old contract skipped the DB lookup entirely, so a deploy missing
+    // COMPOSIO_API_KEY was indistinguishable from "nothing connected" and
+    // the model told realtors their integrations were gone. New contract:
+    // the (cheap) DB lookup runs; with no connections the result is still
+    // empty and Composio is never touched.
     composioConfiguredMock.mockReturnValue(false);
+    activeToolkitsMock.mockResolvedValue([]);
     const out = await loadIntegrationTools(makeCtx());
     expect(out).toEqual([]);
-    // Don't pay the DB round-trip when there's no point.
-    expect(activeToolkitsMock).not.toHaveBeenCalled();
+    expect(activeToolkitsMock).toHaveBeenCalledTimes(1);
     expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
   });
 

@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
 import { deleteConnection as composioDelete, listConnectedAccountsForEntity } from './composio';
 import { findIntegration } from './catalog';
 
-export type IntegrationStatus = 'active' | 'expired' | 'revoked' | 'failed';
+export type IntegrationStatus = 'active' | 'pending' | 'expired' | 'revoked' | 'failed';
 
 export interface IntegrationConnectionRow {
   id: string;
@@ -68,7 +68,20 @@ export async function reconcileFromComposio(args: {
     if (!findIntegration(item.toolkit.slug)) continue;
 
     const existing = await findByComposioId(item.id);
-    if (existing) continue; // already tracked, skip
+    if (existing) {
+      // Self-heal: the connect route inserts rows as 'pending' and the OAuth
+      // callback promotes them — but the callback is a cross-site redirect
+      // that can drop. Composio says this account is ACTIVE, so promote the
+      // pending row here (this runs on every /settings load).
+      if (existing.status === 'pending') {
+        await setStatus({ id: existing.id, status: 'active' });
+        logger.info('[integrations.connections] promoted pending row via reconcile', {
+          id: existing.id,
+          toolkit: item.toolkit.slug,
+        });
+      }
+      continue; // already tracked
+    }
 
     // Composio has it, we don't — backfill.
     const inserted = await insertConnection({
@@ -158,14 +171,20 @@ export async function upsertByComposioId(args: {
   toolkit: string;
   composioConnectionId: string;
   label?: string;
+  /** Status to land on. The callback passes 'active' only when Composio's
+   *  fetched account status confirms ACTIVE; unconfirmed accounts stay
+   *  'pending' so the chat agent never loads tools for a half-finished
+   *  OAuth (which 401s and reads as "Chippi lost my integrations"). */
+  status?: 'active' | 'pending';
 }): Promise<IntegrationConnectionRow | null> {
+  const targetStatus = args.status ?? 'active';
   const existing = await findByComposioId(args.composioConnectionId);
   if (existing) {
     const { error } = await supabase
       .from('IntegrationConnection')
       .update({
         label: args.label ?? existing.label ?? null,
-        status: 'active',
+        status: targetStatus,
         lastError: null,
         updatedAt: new Date().toISOString(),
       })
@@ -179,7 +198,7 @@ export async function upsertByComposioId(args: {
       });
       return null;
     }
-    return { ...existing, label: args.label ?? existing.label ?? null, status: 'active', lastError: null };
+    return { ...existing, label: args.label ?? existing.label ?? null, status: targetStatus, lastError: null };
   }
   return insertConnection(args);
 }
@@ -195,6 +214,11 @@ export async function insertConnection(args: {
   toolkit: string;
   composioConnectionId: string;
   label?: string;
+  /** Defaults to 'active' (native integrations, reconcile backfills of
+   *  Composio-confirmed accounts). The OAuth connect route passes 'pending'
+   *  so a row exists from initiate-time WITHOUT the chat agent loading tools
+   *  for an unfinished connection. */
+  status?: 'active' | 'pending';
   /** Encrypted credential for native integrations (e.g. a Follow Up Boss
    *  API key). Omit for Composio-backed connections. */
   secretCiphertext?: string;
@@ -207,7 +231,7 @@ export async function insertConnection(args: {
       toolkit: args.toolkit,
       composioConnectionId: args.composioConnectionId,
       label: args.label ?? null,
-      status: 'active',
+      status: args.status ?? 'active',
       ...(args.secretCiphertext ? { secretCiphertext: args.secretCiphertext } : {}),
     })
     .select('*')
@@ -349,4 +373,22 @@ export async function findActive(args: {
     .eq('status', 'active')
     .maybeSingle();
   return (data ?? null) as IntegrationConnectionRow | null;
+}
+
+/** Pending rows for this (space, user, toolkit) — unfinished OAuth initiations.
+ *  The connect route sweeps these before starting a fresh flow so retries
+ *  don't accumulate orphans. */
+export async function findPending(args: {
+  spaceId: string;
+  userId: string;
+  toolkit: string;
+}): Promise<IntegrationConnectionRow[]> {
+  const { data } = await supabase
+    .from('IntegrationConnection')
+    .select('*')
+    .eq('spaceId', args.spaceId)
+    .eq('userId', args.userId)
+    .eq('toolkit', args.toolkit)
+    .eq('status', 'pending');
+  return ((data ?? []) as IntegrationConnectionRow[]);
 }

@@ -64,6 +64,10 @@ vi.mock('@/lib/integrations/connections', () => ({
   revoke: revokeMock,
   insertConnection: insertConnectionMock,
   activeToolkits: vi.fn(async () => []),
+  // Lifecycle additions: the route sweeps stale pending rows before a fresh
+  // initiate and inserts the new row as 'pending'.
+  findPending: vi.fn(async () => []),
+  setStatus: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({

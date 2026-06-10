@@ -113,7 +113,7 @@ function SubscribeContent() {
 
         {/* Chippi speaks — the focal element. */}
         <header className="space-y-2 text-center">
-          <p className="text-sm text-muted-foreground">Chippi Pro.</p>
+          <p className="text-sm text-muted-foreground">Chippi Solo.</p>
           <h1 className="text-3xl leading-tight tracking-tight sm:text-[2.5rem]" style={TITLE_FONT}>
             Let&apos;s keep working together.
           </h1>
@@ -163,11 +163,18 @@ function SubscribeContent() {
             {loading && <Loader2 size={15} className="animate-spin" />}
             {loading ? 'Taking you to checkout.' : 'Start your 7 days free'}
           </button>
-          <p className="mt-3 text-center text-xs text-muted-foreground">No card needed to start.</p>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Card required to start — you won&apos;t be charged until your trial ends. Cancel anytime.
+          </p>
         </div>
 
-        {/* Already subscribed */}
+        {/* Plans + already subscribed */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
+          Need more?{' '}
+          <a href="/pricing" className="text-foreground underline-offset-2 hover:underline">
+            See all plans
+          </a>
+          {' · '}
           Already subscribed?{' '}
           <a
             href={slug ? `/s/${slug}/billing` : '#'}

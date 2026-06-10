@@ -187,7 +187,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
 
   if (totalCount === 0) {
     return (
-      <div className="space-y-6 max-w-[900px]">
+      <div className="space-y-6 max-w-4xl mx-auto pb-12">
         <header className="space-y-1.5">
           <p className="text-sm text-muted-foreground">Follow-ups.</p>
           <h1 className={H1} style={TITLE_FONT}>Nothing due.</h1>
@@ -210,7 +210,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   ];
 
   return (
-    <div className="space-y-6 max-w-[900px]">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Follow-ups.</p>
         <h1 className={H1} style={TITLE_FONT}>

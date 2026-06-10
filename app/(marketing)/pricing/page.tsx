@@ -27,8 +27,10 @@ type Card = {
   featured?: boolean;
 };
 
+// Every offered plan is paid — there is no free tier on this page. Self-serve
+// plans start with a 7-day Stripe trial (card collected at checkout, charged
+// when the trial ends). PLANS.free remains an internal fallback state only.
 const INDIVIDUAL: Card[] = [
-  { id: 'free', blurb: 'Experience the workspace. No card required.', cta: { label: 'Start free', href: SIGNUP } },
   { id: 'solo', blurb: 'Organize your pipeline and start using AI workflows.', cta: { label: 'Start Solo', href: SIGNUP } },
   { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start Pro', href: SIGNUP }, featured: true },
 ];
@@ -118,18 +120,18 @@ export default function PricingPage() {
       <MarketingHero
         eyebrow="PRICING"
         title="Pricing that scales with your team."
-        sub="Start free. Move up as you grow. Premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
-        primaryCta={{ label: 'Start free', href: SIGNUP }}
+        sub="Every plan starts with a 7-day free trial — card collected at checkout. Premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
+        primaryCta={{ label: 'Start free trial', href: SIGNUP }}
         secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
       />
 
       {/* Individual plans */}
       <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-6xl px-6 md:px-8">
+        <div className="mx-auto max-w-4xl px-6 md:px-8">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             For individual agents
           </p>
-          <div className="mt-6 grid gap-5 md:grid-cols-3">
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
             {INDIVIDUAL.map((c) => (
               <PlanCard key={c.id} card={c} />
             ))}
@@ -257,9 +259,9 @@ export default function PricingPage() {
       </section>
 
       <MarketingCTA
-        title="Start free. Grow when you’re ready."
-        sub="No card required to begin. Bring your inbox and let Chippi do the work."
-        primaryCta={{ label: 'Start free', href: SIGNUP }}
+        title="Start your free trial. Grow when you’re ready."
+        sub="Seven days free, cancel anytime. Bring your inbox and let Chippi do the work."
+        primaryCta={{ label: 'Start free trial', href: SIGNUP }}
         secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
     </>
