@@ -37,17 +37,20 @@ export const revalidate = 60;
 
 export default async function PublicBookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ property?: string }>;
 }) {
   const { slug } = await params;
+  const { property: preselectPropertyId } = await searchParams;
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const [{ data: settingsData }, { data: customSettings }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone, logoUrl, realtorPhotoUrl')
+      .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone, logoUrl, realtorPhotoUrl, phoneNumber, publicEmail')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -75,6 +78,8 @@ export default async function PublicBookingPage({
     timezone: string | null;
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
+    phoneNumber: string | null;
+    publicEmail: string | null;
     intakeAccentColor: string | null;
     intakeFont: string | null;
     intakeDarkMode: boolean | null;
@@ -143,7 +148,8 @@ export default async function PublicBookingPage({
         logoUrl={logoUrl}
         businessName={businessName}
         agentName={agentName}
-        agentPhone={null}
+        agentPhone={settings?.phoneNumber || null}
+        agentEmail={settings?.publicEmail || null}
         agentPhoto={agentPhoto}
         pageTitle={pageTitle}
         pageIntro={pageIntro}
@@ -154,7 +160,7 @@ export default async function PublicBookingPage({
         coverPhotoUrl={coverPhotoUrl}
         profileHref={`/p/${slug}`}
       >
-        <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} profileHref={`/p/${slug}`} />
+        <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} profileHref={`/p/${slug}`} preselectPropertyId={preselectPropertyId ?? null} />
       </PublicPageShell>
     </>
   );

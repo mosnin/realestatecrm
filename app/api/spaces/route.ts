@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from('SpaceSetting')
       .select(
-        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber, timezone,' +
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber, publicEmail, timezone,' +
         'briefEnabled, briefHour, briefEmail, briefSms,' +
         'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
       phoneNumber: settings?.phoneNumber ?? '',
+      publicEmail: settings?.publicEmail ?? '',
       timezone: settings?.timezone ?? 'America/New_York',
       // Daily brief settings (Phase B3 / B6)
       briefEnabled: settings?.briefEnabled ?? true,
@@ -127,6 +128,8 @@ export async function PATCH(req: NextRequest) {
   const name            = typeof body.name            === 'string' ? body.name.slice(0, 100)            : undefined;
   // phoneNumber: use undefined (not null) when absent so we can skip it in the upsert
   const phoneNumber     = typeof body.phoneNumber     === 'string' ? body.phoneNumber.slice(0, 50)       : undefined;
+  // publicEmail: realtor's public contact email. Empty string clears it (-> null).
+  const publicEmail     = typeof body.publicEmail     === 'string' ? body.publicEmail.trim().slice(0, 254) : undefined;
   const myConnections   = typeof body.myConnections   === 'string' ? body.myConnections.slice(0, 500)    : undefined;
   const aiPersonalization = typeof body.aiPersonalization === 'string' ? body.aiPersonalization.slice(0, 1000) : undefined;
   const billingSettings = typeof body.billingSettings === 'string' ? body.billingSettings.slice(0, 2000) : undefined;
@@ -274,6 +277,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof briefEmail === 'boolean') settingsPayload.briefEmail = briefEmail;
   if (typeof briefSms === 'boolean') settingsPayload.briefSms = briefSms;
   if (phoneNumber !== undefined) settingsPayload.phoneNumber = phoneNumber;
+  if (publicEmail !== undefined) settingsPayload.publicEmail = publicEmail || null;
   if (myConnections !== undefined) settingsPayload.myConnections = myConnections;
   if (aiPersonalization !== undefined) settingsPayload.aiPersonalization = aiPersonalization;
   if (billingSettings !== undefined) settingsPayload.billingSettings = billingSettings;

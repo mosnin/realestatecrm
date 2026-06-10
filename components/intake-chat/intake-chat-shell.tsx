@@ -63,6 +63,10 @@ export interface IntakeChatShellProps {
   termsUrl?: string | null;
   hidePoweredBy?: boolean;
   footerLinks?: { label: string; url: string }[];
+  /** Realtor's public contact, surfaced as tel:/mailto: in the footer when
+   *  present. Optional and additive — the footer is unchanged when absent. */
+  agentPhone?: string | null;
+  agentEmail?: string | null;
   /** Realtor/brokerage-supplied trust signals. Chippi never injects
    *  legal copy — the slots are optional and the block disappears
    *  entirely when none are provided. */
@@ -282,6 +286,8 @@ export function IntakeChatShell({
   termsUrl,
   hidePoweredBy,
   footerLinks,
+  agentPhone,
+  agentEmail,
   licenseNumber,
   fairHousingNotice,
   showEqualHousingMark,
@@ -429,6 +435,16 @@ export function IntakeChatShell({
                   {l.label}
                 </Link>
               ))}
+              {agentPhone && (
+                <a href={`tel:${agentPhone}`} className="hover:text-foreground transition-colors">
+                  {agentPhone}
+                </a>
+              )}
+              {agentEmail && (
+                <a href={`mailto:${agentEmail}`} className="hover:text-foreground transition-colors">
+                  {agentEmail}
+                </a>
+              )}
             </div>
             {!hidePoweredBy && (
               <span

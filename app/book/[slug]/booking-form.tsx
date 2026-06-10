@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight } from 'lucide-react';
+import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight, Building2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
+import { formatCurrency } from '@/lib/formatting';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Label } from '@/components/ui/label';
 import { fireConversionEvents } from '@/lib/tracking-events';
@@ -21,6 +22,10 @@ interface BookingFormProps {
    *  realtor's public page so the applicant has somewhere to go after
    *  booking. Same dead-end fix the intake success card has. */
   profileHref?: string | null;
+  /** When the page arrives with ?property=<id> (e.g. from the storefront's
+   *  "Book a tour" CTA), preselect that profile and skip straight to the
+   *  date step if it matches a returned profile. */
+  preselectPropertyId?: string | null;
 }
 
 interface DaySlots {
@@ -33,6 +38,15 @@ interface PropertyProfile {
   name: string;
   address: string | null;
   tourDuration: number;
+  /** When the profile links a real Property, the available API merges in the
+   *  listing facts + a signed first photo so the picker can show a thumbnail
+   *  and a "Xbd · Yba · $price" line and deep-link to the storefront. */
+  propertyId?: string | null;
+  photoUrl?: string | null;
+  beds?: number | null;
+  baths?: number | null;
+  listPrice?: number | null;
+  propertyType?: string | null;
 }
 
 type Step = 'property' | 'date' | 'details' | 'confirmed';
@@ -45,7 +59,17 @@ const INPUT_CLASS = cn(FIELD_BASE, 'h-10');
 const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
 const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
-export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f', profileHref }: BookingFormProps) {
+/** "2bd · 1ba · $2,400" from a profile's merged listing facts. Empty when the
+ *  profile links no real listing. */
+function listingFactsLine(p: PropertyProfile): string {
+  const parts: string[] = [];
+  if (p.beds != null) parts.push(`${p.beds}bd`);
+  if (p.baths != null) parts.push(`${p.baths}ba`);
+  if (p.listPrice != null) parts.push(formatCurrency(p.listPrice));
+  return parts.join(' · ');
+}
+
+export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f', profileHref, preselectPropertyId }: BookingFormProps) {
   const primaryTextColor = pickContrastColor(accentColor);
   const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
@@ -95,8 +119,27 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         // Use the passed-in step to avoid stale closure on the state variable
         const stepAtLoad = currentStep ?? step;
         if (data.propertyProfiles?.length > 0 && !propId && stepAtLoad === 'date') {
-          setProperties(data.propertyProfiles);
-          setStep('property');
+          const profiles: PropertyProfile[] = data.propertyProfiles;
+          setProperties(profiles);
+          // Preselect: if the page arrived with ?property=<id>, select the
+          // matching profile and advance to the date step instead of showing
+          // the picker. The id may be a tour-profile id OR a real Property id
+          // (the storefront's "Book a tour" link passes the Property id), so
+          // match on either. Re-fetch slots scoped to that profile so its own
+          // hours/duration apply.
+          const match = preselectPropertyId
+            ? profiles.find(
+                (p) => p.id === preselectPropertyId || p.propertyId === preselectPropertyId,
+              )
+            : undefined;
+          if (match) {
+            setSelectedPropertyId(match.id);
+            if (match.address) setPropertyAddress(match.address);
+            setStep('date');
+            loadSlots(match.id, 'date');
+          } else {
+            setStep('property');
+          }
         }
       } else {
         setError('Could not load availability');
@@ -290,24 +333,49 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               <div className="space-y-2">
                 {properties.map((p) => {
                   const active = selectedPropertyId === p.id;
+                  const facts = listingFactsLine(p);
                   return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => selectProperty(p.id)}
-                      className={cn(
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
-                        active
-                          ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
-                          : 'border-border/70 hover:bg-foreground/[0.04]',
+                    <div key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectProperty(p.id)}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
+                          active
+                            ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
+                            : 'border-border/70 hover:bg-foreground/[0.04]',
+                        )}
+                      >
+                        {p.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.photoUrl}
+                            alt=""
+                            className="h-11 w-11 flex-shrink-0 rounded-md object-cover bg-foreground/[0.06]"
+                          />
+                        ) : (
+                          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-foreground/[0.06] text-muted-foreground">
+                            {p.propertyId ? <Building2 size={16} /> : <MapPin size={16} />}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                          {p.address && <p className="text-xs text-muted-foreground truncate">{p.address}</p>}
+                          {facts && <p className="text-[11px] text-muted-foreground truncate mt-0.5">{facts}</p>}
+                        </div>
+                      </button>
+                      {p.propertyId && (
+                        <a
+                          href={`/p/${slug}/property/${p.propertyId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 ml-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          View details
+                          <ExternalLink size={11} aria-hidden />
+                        </a>
                       )}
-                    >
-                      <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                        {p.address && <p className="text-xs text-muted-foreground truncate">{p.address}</p>}
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
                 <button

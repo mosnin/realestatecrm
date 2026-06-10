@@ -36,6 +36,7 @@ export function ProfileSection({ slug }: ProfileSectionProps) {
     facebook?: string;
   }>({ instagram: '', linkedin: '', facebook: '' });
   const [phone, setPhone] = useState('');
+  const [publicEmail, setPublicEmail] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [realtorPhotoUrl, setRealtorPhotoUrl] = useState('');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -61,6 +62,7 @@ export function ProfileSection({ slug }: ProfileSectionProps) {
         setBio(s.bio ?? '');
         setSocialLinks(s.socialLinks ?? { instagram: '', linkedin: '', facebook: '' });
         setPhone(s.phoneNumber ?? '');
+        setPublicEmail(s.publicEmail ?? '');
         setBusinessName(s.businessName ?? '');
         setRealtorPhotoUrl(s.realtorPhotoUrl ?? '');
       })
@@ -93,6 +95,7 @@ export function ProfileSection({ slug }: ProfileSectionProps) {
           socialLinks,
           realtorPhotoUrl: realtorPhotoUrl.trim() || null,
           phoneNumber: phone,
+          publicEmail,
           businessName,
         }),
       });
@@ -240,6 +243,20 @@ export function ProfileSection({ slug }: ProfileSectionProps) {
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 123-4567"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="publicEmail" className="text-[12.5px] font-medium text-foreground">
+          Public email
+        </Label>
+        <Input
+          id="publicEmail"
+          type="email"
+          value={publicEmail}
+          onChange={(e) => setPublicEmail(e.target.value)}
+          placeholder="hello@yourbrand.com"
+        />
+        <p className={CAPTION}>Shown on your public pages so people can reach you. Separate from your login email.</p>
       </div>
 
       <div className="space-y-1.5">

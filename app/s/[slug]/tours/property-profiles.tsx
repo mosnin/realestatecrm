@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Plus, Trash2, MapPin, Loader2, Pencil, Check, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, MapPin, Loader2, Pencil, Check, X, Building2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import type { Property } from '@/lib/types';
+import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 
 interface PropertyProfile {
   id: string;
@@ -15,6 +17,7 @@ interface PropertyProfile {
   daysAvailable: number[];
   bufferMinutes: number;
   isActive: boolean;
+  propertyId: string | null;
 }
 
 interface PropertyProfilesProps {
@@ -60,6 +63,32 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
   const [formBuffer, setFormBuffer] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Linked listing (optional) — search + select against /api/properties,
+  // same debounced pattern as the deal property picker.
+  const [linkedProperty, setLinkedProperty] = useState<Property | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerResults, setPickerResults] = useState<Property[]>([]);
+  const [pickerSearching, setPickerSearching] = useState(false);
+  const pickerDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    if (pickerDebounce.current) clearTimeout(pickerDebounce.current);
+    pickerDebounce.current = setTimeout(async () => {
+      setPickerSearching(true);
+      try {
+        const res = await fetch(`/api/properties?slug=${encodeURIComponent(slug)}&search=${encodeURIComponent(pickerQuery)}`);
+        if (res.ok) setPickerResults(await res.json());
+      } catch {
+        // transient — leave prior results
+      } finally {
+        setPickerSearching(false);
+      }
+    }, 200);
+    return () => { if (pickerDebounce.current) clearTimeout(pickerDebounce.current); };
+  }, [pickerQuery, pickerOpen, slug]);
+
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
@@ -71,6 +100,10 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
     setFormDays([1, 2, 3, 4, 5]);
     setFormBuffer(0);
     setFormError(null);
+    setLinkedProperty(null);
+    setPickerOpen(false);
+    setPickerQuery('');
+    setPickerResults([]);
   }
 
   function startEdit(p: PropertyProfile) {
@@ -82,13 +115,39 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
     setFormEnd(p.endHour);
     setFormDays(p.daysAvailable);
     setFormBuffer(p.bufferMinutes);
+    setLinkedProperty(null);
+    setPickerOpen(false);
+    setPickerQuery('');
+    setPickerResults([]);
     setShowForm(true);
+    // Resolve the linked listing (if any) so it shows in the form. Best-effort
+    // — a stale/removed listing just renders unlinked. Narrow the search by the
+    // profile's address when present so we don't pull the whole property list.
+    if (p.propertyId) {
+      const q = p.address ? `&search=${encodeURIComponent(p.address)}` : '';
+      fetch(`/api/properties?slug=${encodeURIComponent(slug)}${q}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const match = Array.isArray(data) ? data.find((x: Property) => x.id === p.propertyId) : null;
+          if (match) setLinkedProperty(match as Property);
+        })
+        .catch(() => {});
+    }
   }
 
   function toggleDay(day: number) {
     setFormDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
     );
+  }
+
+  function selectLinkedProperty(p: Property) {
+    setLinkedProperty(p);
+    setPickerOpen(false);
+    setPickerQuery('');
+    setPickerResults([]);
+    // Pre-fill the address from the listing when the realtor hasn't typed one.
+    if (!formAddress.trim()) setFormAddress(formatPropertyAddress(p));
   }
 
   async function handleSave() {
@@ -112,6 +171,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
             endHour: formEnd,
             daysAvailable: formDays,
             bufferMinutes: formBuffer,
+            propertyId: linkedProperty?.id ?? null,
           }),
         });
         if (!res.ok) throw new Error('Failed to update');
@@ -132,6 +192,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
             endHour: formEnd,
             daysAvailable: formDays,
             bufferMinutes: formBuffer,
+            propertyId: linkedProperty?.id ?? null,
           }),
         });
         if (!res.ok) throw new Error('Failed to create');
@@ -261,6 +322,96 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
             <select value={formBuffer} onChange={(e) => setFormBuffer(Number(e.target.value))} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30">
               {[0, 5, 10, 15, 20, 30].map((m) => <option key={m} value={m}>{m === 0 ? 'No buffer' : `${m} min`}</option>)}
             </select>
+          </div>
+
+          {/* Linked listing (optional) — pulls photos + facts into the booking
+              picker and powers the public storefront link. */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Linked listing (optional)</label>
+            {linkedProperty ? (
+              <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5">
+                <div className="w-10 h-10 rounded-md bg-muted flex-shrink-0 overflow-hidden">
+                  {linkedProperty.photos[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={linkedProperty.photos[0]} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <Building2 size={14} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{formatPropertyAddress(linkedProperty)}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{formatPropertyFacts(linkedProperty) || '—'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLinkedProperty(null)}
+                  className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Unlink"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : pickerOpen ? (
+              <div className="space-y-2 rounded-lg border border-border p-2.5">
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={pickerQuery}
+                    onChange={(e) => setPickerQuery(e.target.value)}
+                    placeholder="Search address, city, MLS#"
+                    className="w-full pl-7 pr-2 py-1.5 text-xs rounded border border-border bg-transparent outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                {pickerSearching && (
+                  <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" /> Searching…
+                  </p>
+                )}
+                {pickerResults.length === 0 && !pickerSearching && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {pickerQuery.trim() ? 'No matches.' : 'Type to search your listings.'}
+                  </p>
+                )}
+                {pickerResults.length > 0 && (
+                  <ul className="rounded border border-border divide-y divide-border max-h-56 overflow-y-auto">
+                    {pickerResults.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectLinkedProperty(p)}
+                          className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-muted/50 transition-colors"
+                        >
+                          <Building2 size={11} className="text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{formatPropertyAddress(p)}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{formatPropertyFacts(p) || '—'}</p>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setPickerOpen(false); setPickerQuery(''); }}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Building2 size={12} /> Link a listing…
+              </button>
+            )}
           </div>
 
           {formError && <p className="text-xs text-destructive">{formError}</p>}

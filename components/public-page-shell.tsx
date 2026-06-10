@@ -20,6 +20,9 @@ interface PublicPageShellProps {
   businessName: string;
   agentName: string;
   agentPhone: string | null;
+  /** Realtor's public contact email. Rendered as a mailto: beside the tel:
+   *  link in the footer when present. */
+  agentEmail?: string | null;
   agentPhoto: string | null;
   pageTitle: string;
   pageIntro?: string;
@@ -77,6 +80,7 @@ export function PublicPageShell({
   businessName,
   agentName,
   agentPhone,
+  agentEmail,
   agentPhoto,
   pageTitle,
   pageIntro,
@@ -224,6 +228,9 @@ export function PublicPageShell({
             <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
             {agentPhone && (
               <a href={`tel:${agentPhone}`} className="hover:text-foreground transition-colors">{agentPhone}</a>
+            )}
+            {agentEmail && (
+              <a href={`mailto:${agentEmail}`} className="hover:text-foreground transition-colors">{agentEmail}</a>
             )}
           </div>
 

@@ -79,8 +79,12 @@ export async function scoreLeadApplication(input: {
         ? 'needs_review'
         : 'unqualified';
 
+    // Urgency category name differs by lead type: rental reports
+    // 'moveInUrgency', buyer reports 'timelineUrgency'. Both express the same
+    // readiness signal, so accept either so readinessStatus is correct on both
+    // scoring paths.
     const urgencyScore = engineResult.categories
-      .find((c) => c.category === 'moveInUrgency')?.rawScore ?? 0;
+      .find((c) => c.category === 'moveInUrgency' || c.category === 'timelineUrgency')?.rawScore ?? 0;
     const readinessStatus = urgencyScore >= 0.7 ? 'ready_now' : 'not_immediate';
 
     const details: LeadScoreDetails = {

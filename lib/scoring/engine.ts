@@ -29,8 +29,16 @@ export type ScoringCategory = keyof ScoringWeights;
 
 // ── Category sub-score result ──────────────────────────────────────────────
 
+// The `category` label must be honest per lead type: a rental breakdown uses
+// the rental category names, a buyer breakdown uses the buyer names. Widened
+// from `ScoringCategory` so the buyer path can report its real categories
+// (preApproval, budgetAlignment, …) instead of mislabeling them as rental
+// ones. Consumers that look a category up by name (lead-scoring.ts reads the
+// urgency category) handle both vocabularies.
+export type ResultCategory = ScoringCategory | BuyerScoringCategory;
+
 export type CategoryResult = {
-  category: ScoringCategory;
+  category: ResultCategory;
   rawScore: number; // 0-1 normalized
   weight: number;
   weightedScore: number; // rawScore * weight
@@ -120,18 +128,6 @@ export type ScoringInput = {
 // ═══════════════════════════════════════════════════════════════════════════
 // Category scoring functions — each returns 0-1
 // ═══════════════════════════════════════════════════════════════════════════
-
-// Credit score is NOT collected on the intake form — this returns a neutral score.
-// Kept as a stub for type compatibility; not included in rental weight calculations.
-function scoreCreditScore(_input: ScoringInput): CategoryResult {
-  return {
-    category: 'affordability' as ScoringCategory, // placeholder category
-    rawScore: 1.0,
-    weight: 0,
-    weightedScore: 0,
-    signals: ['Credit score not collected — neutral'],
-  };
-}
 
 /**
  * Parse the form's range-value strings into midpoint numbers.
@@ -322,18 +318,6 @@ function scoreEmploymentStability(input: ScoringInput): CategoryResult {
   };
 }
 
-// Rental history (landlord refs, late payments, lease violations) is NOT collected on the intake form.
-// Returns neutral score — not included in rental weight calculations.
-function scoreRentalHistory(_input: ScoringInput): CategoryResult {
-  return {
-    category: 'affordability' as ScoringCategory, // placeholder
-    rawScore: 1.0,
-    weight: 0,
-    weightedScore: 0,
-    signals: ['Rental history not collected — neutral'],
-  };
-}
-
 function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
   const app = input.applicationData;
   const signals: string[] = [];
@@ -437,18 +421,6 @@ function scoreHouseholdFit(input: ScoringInput): CategoryResult {
     weight: DEFAULT_WEIGHTS.householdFit,
     weightedScore: Math.max(0, Math.min(1.0, rawScore)) * DEFAULT_WEIGHTS.householdFit,
     signals,
-  };
-}
-
-// Screening flags (evictions, bankruptcy, outstanding balances) are NOT collected on the intake form.
-// Returns neutral score — not included in rental weight calculations.
-function scoreScreeningFlags(_input: ScoringInput): CategoryResult {
-  return {
-    category: 'affordability' as ScoringCategory, // placeholder
-    rawScore: 1.0,
-    weight: 0,
-    weightedScore: 0,
-    signals: ['Screening flags not collected — neutral'],
   };
 }
 
@@ -947,7 +919,7 @@ function computeBuyerScore(input: ScoringInput): ScoringEngineResult {
   const housing = scoreBuyerHousingSituation(input);
   const completenessResult = scoreBuyerCompleteness(input);
 
-  const buyerCategories = [
+  const buyerCategories: { name: BuyerScoringCategory; rawScore: number; signals: string[] }[] = [
     { name: 'preApproval', ...preApproval },
     { name: 'budgetAlignment', ...budgetAlignment },
     { name: 'timelineUrgency', ...timeline },
@@ -956,25 +928,20 @@ function computeBuyerScore(input: ScoringInput): ScoringEngineResult {
     { name: 'completeness', ...completenessResult },
   ];
 
-  // 2. Map to CategoryResult[] for compatibility with existing types
-  const categoryMapping: ScoringCategory[] = [
-    'affordability',           // preApproval
-    'employmentStability',     // budgetAlignment
-    'moveInUrgency',           // timelineUrgency
-    'applicationCompleteness', // propertySpecificity
-    'householdFit',            // housingSituation
-    'affordability',           // completeness (reuse placeholder)
-  ];
-
-  const categories: CategoryResult[] = buyerCategories.map((cat, i) => {
-    const mappedCategory = categoryMapping[i];
-    const weight = Object.values(BUYER_WEIGHTS)[i];
+  // 2. Map to CategoryResult[] using the buyer category's OWN name as the
+  // label. The previous mapping reused 5 rental labels for 6 buyer categories
+  // (and `affordability` twice), so the per-category "why this score" was
+  // mislabeled — budgetAlignment showed as "employmentStability", completeness
+  // as "affordability". The buyer names are honest and distinct, and the
+  // weight comes from BUYER_WEIGHTS keyed by name (not array position).
+  const categories: CategoryResult[] = buyerCategories.map((cat) => {
+    const weight = BUYER_WEIGHTS[cat.name];
     return {
-      category: mappedCategory,
+      category: cat.name,
       rawScore: cat.rawScore,
       weight,
       weightedScore: cat.rawScore * weight,
-      signals: [`[${cat.name}] `, ...cat.signals],
+      signals: cat.signals,
     };
   });
 

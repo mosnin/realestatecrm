@@ -123,6 +123,9 @@ export type SpaceSetting = {
   unsubscribeToken: string | null;
   timezone: string;
   phoneNumber: string | null;
+  /** Realtor-controlled contact email shown on public applicant-facing pages
+   *  (book / property storefront). Distinct from the account login email. */
+  publicEmail: string | null;
   myConnections: string | null;
   aiPersonalization: string | null;
   billingSettings: string | null;

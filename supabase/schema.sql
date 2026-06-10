@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "notifyFollowUps"   boolean NOT NULL DEFAULT true,
   timezone            text NOT NULL DEFAULT 'America/New_York',
   "phoneNumber"       text,
+  "publicEmail"       text,
   "myConnections"     text,
   "aiPersonalization" text,
   "billingSettings"   text,
@@ -167,6 +168,12 @@ CREATE TABLE IF NOT EXISTS "TourPropertyProfile" (
   "daysAvailable" integer[] NOT NULL DEFAULT '{1,2,3,4,5}',
   "bufferMinutes" integer NOT NULL DEFAULT 0,
   "isActive"      boolean NOT NULL DEFAULT true,
+  -- Optional link to a real Property row (photos + listing facts for the
+  -- booking picker and public storefront). The Property table and its FK are
+  -- added by a later migration (20260425000000_property.sql defines Property;
+  -- 20260704000000 attaches the FK + index), so this base column stays a bare
+  -- text reference — same pattern Tour.propertyId follows.
+  "propertyId"    text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );

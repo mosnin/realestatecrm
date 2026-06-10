@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { getSignedDownloadUrl } from '@/lib/storage';
 import { decrypt, decryptOrPassthrough, encrypt } from '@/lib/crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
@@ -231,18 +232,96 @@ export async function GET(req: NextRequest) {
   // Also fetch all active property profiles for this space (so the booking page can show them)
   const { data: profiles } = await supabase
     .from('TourPropertyProfile')
-    .select('id, name, address, tourDuration, isActive')
+    .select('id, name, address, tourDuration, isActive, propertyId')
     .eq('spaceId', space.id)
     .eq('isActive', true)
     .order('createdAt', { ascending: true });
+
+  // Enrich profiles that link to a real Property with listing facts + a signed
+  // first photo, so the booking picker can show a thumbnail and "Xbd · Yba ·
+  // $price". One batched query for all linked listings; photo signing is
+  // best-effort (a failed sign → null, never throws the route).
+  const enrichedProfiles = await enrichProfilesWithListings(space.id, profiles ?? []);
 
   return NextResponse.json({
     slots,
     duration,
     timezone,
     propertyProfileId: propertyId ?? null,
-    propertyProfiles: profiles ?? [],
+    propertyProfiles: enrichedProfiles,
   });
+}
+
+/** Sign a stored object KEY into a temporary URL; http(s) values pass through.
+ *  Returns null on any failure so a bad key never breaks the booking page. */
+async function resolveStoredPhoto(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return await getSignedDownloadUrl(value, 60 * 60 * 24);
+  } catch {
+    return null;
+  }
+}
+
+type RawProfile = {
+  id: string;
+  name: string;
+  address: string | null;
+  tourDuration: number;
+  isActive: boolean;
+  propertyId: string | null;
+};
+
+async function enrichProfilesWithListings(spaceId: string, profiles: RawProfile[]) {
+  const linkedIds = Array.from(
+    new Set(profiles.map((p) => p.propertyId).filter((id): id is string => Boolean(id))),
+  );
+
+  // No linked listings — return the profiles untouched.
+  if (linkedIds.length === 0) {
+    return profiles.map((p) => ({ ...p, photoUrl: null }));
+  }
+
+  const propsById = new Map<
+    string,
+    { beds: number | null; baths: number | null; listPrice: number | null; propertyType: string | null; photos: unknown }
+  >();
+  try {
+    const { data: props } = await supabase
+      .from('Property')
+      .select('id, beds, baths, listPrice, propertyType, photos')
+      .eq('spaceId', spaceId)
+      .in('id', linkedIds);
+    for (const row of props ?? []) {
+      propsById.set(row.id, {
+        beds: row.beds,
+        baths: row.baths,
+        listPrice: row.listPrice,
+        propertyType: row.propertyType,
+        photos: row.photos,
+      });
+    }
+  } catch {
+    // Listing fetch failed — fall through and return profiles without facts.
+  }
+
+  return Promise.all(
+    profiles.map(async (p) => {
+      const prop = p.propertyId ? propsById.get(p.propertyId) : null;
+      if (!prop) return { ...p, photoUrl: null };
+      const firstPhoto = Array.isArray(prop.photos) ? (prop.photos[0] as string | undefined) : null;
+      const photoUrl = await resolveStoredPhoto(firstPhoto);
+      return {
+        ...p,
+        photoUrl,
+        beds: prop.beds,
+        baths: prop.baths,
+        listPrice: prop.listPrice,
+        propertyType: prop.propertyType,
+      };
+    }),
+  );
 }
 
 // ── Google Calendar helpers ──────────────────────────────────────────────────

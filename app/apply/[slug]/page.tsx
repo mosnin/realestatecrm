@@ -86,7 +86,7 @@ export default async function PublicApplyPage({
   const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }, { data: profileRow }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, privacyPolicyHtml, isVerified')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, privacyPolicyHtml, isVerified, phoneNumber, publicEmail')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -149,6 +149,8 @@ export default async function PublicApplyPage({
     buyerFormConfig: import('@/lib/types').IntakeFormConfig | null;
     trackingPixels: TrackingPixelsType | null;
     isVerified: boolean | null;
+    phoneNumber: string | null;
+    publicEmail: string | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Application';
@@ -291,6 +293,8 @@ export default async function PublicApplyPage({
         termsUrl={`/apply/${slug}/terms`}
         hidePoweredBy={hidePoweredBy}
         footerLinks={customization.footerLinks}
+        agentPhone={settings?.phoneNumber ?? null}
+        agentEmail={settings?.publicEmail ?? null}
         licenseNumber={settings?.intakeLicenseNumber ?? null}
         fairHousingNotice={settings?.intakeFairHousingNotice ?? null}
         showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}

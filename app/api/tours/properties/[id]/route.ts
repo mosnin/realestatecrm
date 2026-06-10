@@ -33,6 +33,21 @@ export async function PATCH(
   if (body.daysAvailable !== undefined) update.daysAvailable = body.daysAvailable;
   if (body.bufferMinutes !== undefined) update.bufferMinutes = body.bufferMinutes;
   if (body.isActive !== undefined) update.isActive = body.isActive;
+  // Linked listing: null clears it; a string sets it only after verifying the
+  // Property belongs to this space.
+  if (body.propertyId !== undefined) {
+    if (typeof body.propertyId === 'string' && body.propertyId) {
+      const { data: prop } = await supabase
+        .from('Property')
+        .select('id')
+        .eq('id', body.propertyId)
+        .eq('spaceId', ctx.space.id)
+        .maybeSingle();
+      update.propertyId = prop ? prop.id : null;
+    } else {
+      update.propertyId = null;
+    }
+  }
 
   const { data, error } = await supabase
     .from('TourPropertyProfile')
