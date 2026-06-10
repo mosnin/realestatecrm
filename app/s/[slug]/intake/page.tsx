@@ -116,7 +116,7 @@ export default async function IntakeOverviewPage({
   })();
 
   return (
-    <div className={`${PAGE_RHYTHM} max-w-[880px]`}>
+    <div className={`${PAGE_RHYTHM} max-w-3xl mx-auto pb-12`}>
       {/* Header — H1 + Chippi narration */}
       <header className="space-y-1.5">
         <h1 className={H1} style={TITLE_FONT}>

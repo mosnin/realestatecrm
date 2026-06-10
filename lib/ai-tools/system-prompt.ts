@@ -20,11 +20,25 @@
 
 import type { ToolContext } from './types';
 import { buildPersonalizedSnapshot, renderSnapshot } from './personalized-prompt';
+import { findIntegration } from '@/lib/integrations/catalog';
 import { logger } from '@/lib/logger';
 
 interface BuildOptions {
   /** Override the current date for deterministic tests. */
   now?: Date;
+  /**
+   * LIVE integration truth for THIS turn, from the tool load that just ran
+   * (lib/ai-tools/sdk-chat.ts). When provided it replaces the snapshot's
+   * cached "Connected: …" line — the 5-minute snapshot cache meant a
+   * just-connected app had its tools attached while the prompt still said
+   * it wasn't connected, and the model believed the prompt.
+   */
+  integrations?: {
+    /** Toolkit slugs whose tools are attached this turn. */
+    liveToolkits: string[];
+    /** Connected toolkits whose tools failed to load transiently. */
+    unavailableToolkits: string[];
+  };
 }
 
 /**
@@ -51,7 +65,31 @@ export async function buildPersonalizedSystemPrompt(
       spaceId: ctx.space.id,
       userId: ctx.userId,
     });
-    snapshotBlock = renderSnapshot(snap);
+    const effective = opts.integrations
+      ? {
+          ...snap,
+          // Live truth from this turn's tool load beats the cached list.
+          connectedApps: opts.integrations.liveToolkits
+            .map((slug) => findIntegration(slug)?.name ?? slug)
+            .sort(),
+        }
+      : snap;
+    snapshotBlock = renderSnapshot(effective);
+    if (opts.integrations && opts.integrations.unavailableToolkits.length > 0) {
+      const names = opts.integrations.unavailableToolkits
+        .map((slug) => findIntegration(slug)?.name ?? slug)
+        .sort()
+        .join(', ');
+      // Honesty over silence: without this line, a transient Composio
+      // failure reads to the model as "nothing connected" and it tells the
+      // realtor their integrations are gone.
+      snapshotBlock = [
+        snapshotBlock,
+        `Note: the realtor's ${names} connection${opts.integrations.unavailableToolkits.length === 1 ? ' is' : 's are'} temporarily unreachable this turn. If asked, say so — do NOT claim ${opts.integrations.unavailableToolkits.length === 1 ? 'it is' : 'they are'} disconnected or missing.`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
   } catch (err) {
     logger.warn('[system-prompt] personalization fetch failed — using static prompt', {
       spaceId: ctx.space.id,

@@ -115,7 +115,7 @@ export default async function BrokerActivityPage() {
   }));
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Activity.</p>
         <h1

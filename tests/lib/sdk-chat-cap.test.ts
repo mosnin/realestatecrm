@@ -14,12 +14,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('sdk-chat tool-call ceiling', () => {
-  it('caps tool-call iterations at 15 per turn', () => {
+  it('caps tool-call iterations at 8 per turn', () => {
+    // Deliberately lowered 15 → 8 in the agent token/latency audit: the SDK
+    // re-sends the full transcript + every tool schema on EVERY inner step,
+    // so cost grows quadratically with the cap. 8 still covers real
+    // multi-step workflows; deeper work belongs on delegate_task.
     const source = readFileSync(
       join(__dirname, '..', '..', 'lib', 'ai-tools', 'sdk-chat.ts'),
       'utf-8',
     );
-    expect(source).toMatch(/MAX_TURNS_PER_TURN\s*=\s*15\b/);
+    expect(source).toMatch(/MAX_TURNS_PER_TURN\s*=\s*8\b/);
   });
 
   it('passes the cap to run() on the fresh-turn path', () => {

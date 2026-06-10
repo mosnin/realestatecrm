@@ -26,7 +26,7 @@ export default async function ProfilePageEditor({
   if (!space) notFound();
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Profile.</p>
         <h1 className={H1} style={TITLE_FONT}>

@@ -41,7 +41,11 @@ vi.mock('@/lib/integrations/agent-tools', () => ({
   buildToolkitAgentTools: buildToolkitAgentToolsMock,
 }));
 
-import { isAuthLikeError, loadIntegrationTools } from '@/lib/ai-tools/sdk-chat';
+import {
+  isAuthLikeError,
+  loadIntegrationTools,
+  loadIntegrationToolsDetailed,
+} from '@/lib/ai-tools/sdk-chat';
 import type { ToolContext } from '@/lib/ai-tools/types';
 
 function makeCtx(): ToolContext {
@@ -108,11 +112,28 @@ describe('isAuthLikeError', () => {
 });
 
 describe('loadIntegrationTools — reconcile-on-error', () => {
-  it('returns [] without touching Composio when the SDK is not configured', async () => {
+  it('degrades LOUDLY (not silently) when the SDK is not configured but toolkits are connected', async () => {
+    // Old contract: unconfigured → [] before even checking the DB, which made
+    // a misconfigured deploy indistinguishable from "nothing connected" — the
+    // model then told realtors their integrations were gone. New contract:
+    // the DB is consulted, connected toolkits are reported as UNAVAILABLE
+    // (the prompt relays "temporarily unreachable"), and Composio is still
+    // never touched.
     composioConfiguredMock.mockReturnValue(false);
-    const tools = await loadIntegrationTools(makeCtx());
-    expect(tools).toEqual([]);
-    expect(activeToolkitsMock).not.toHaveBeenCalled();
+    activeToolkitsMock.mockResolvedValue(['gmail']);
+    const detailed = await loadIntegrationToolsDetailed(makeCtx());
+    expect(detailed.tools).toEqual([]);
+    expect(detailed.liveToolkits).toEqual([]);
+    expect(detailed.unavailableToolkits).toEqual(['gmail']);
+    expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
+  });
+
+  it('returns empty (no unavailable noise) when unconfigured AND nothing is connected', async () => {
+    composioConfiguredMock.mockReturnValue(false);
+    activeToolkitsMock.mockResolvedValue([]);
+    const detailed = await loadIntegrationToolsDetailed(makeCtx());
+    expect(detailed.tools).toEqual([]);
+    expect(detailed.unavailableToolkits).toEqual([]);
     expect(buildToolkitAgentToolsMock).not.toHaveBeenCalled();
   });
 

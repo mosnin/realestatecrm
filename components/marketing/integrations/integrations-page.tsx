@@ -138,7 +138,7 @@ function Hero() {
               href="/login/realtor?intent=signup"
               className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
             >
-              Start free
+              Start free trial
             </Link>
             <Link
               href="/demo"
@@ -291,14 +291,14 @@ function ClosingCTA() {
               Connect your stack. Let Chippi work inside it.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">
-              Seven days free. No credit card. Bring the tools you already use.
+              Seven days free, cancel anytime. Bring the tools you already use.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/login/realtor?intent=signup"
                 className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
               >
-                Start free
+                Start free trial
               </Link>
               <Link
                 href="/demo"
