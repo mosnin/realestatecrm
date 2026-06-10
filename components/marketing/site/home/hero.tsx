@@ -11,7 +11,8 @@
 import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { Reveal } from '../reveal';
-import { BrowserFrame, ImagePlaceholder, GridBackdrop } from '../frame';
+import { BrowserFrame, GridBackdrop } from '../frame';
+import { HeroDemo } from './hero-demo';
 import { TITLE_FONT } from '@/lib/typography';
 
 const assurances = ['7-day free trial', 'No setup fees', 'Cancel anytime'];
@@ -83,18 +84,14 @@ export function Hero() {
         </Reveal>
       </div>
 
-      {/* The product, framed. */}
-      <Reveal delay={0.15} className="relative mx-auto mt-16 max-w-5xl">
+      {/* The product, working — a live, looping demo of Chippi at work. */}
+      <Reveal delay={0.15} className="relative mx-auto mt-16 max-w-2xl">
         <div
           aria-hidden
-          className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,rgba(255,150,79,0.10),transparent_70%)]"
+          className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,rgba(255,150,79,0.12),transparent_70%)]"
         />
-        <BrowserFrame className="relative">
-          <ImagePlaceholder
-            label="The Chippi workspace"
-            sublabel="Screenshot · 1600 × 1000"
-            ratio="aspect-[16/10]"
-          />
+        <BrowserFrame className="relative" url="app.chippi.ai">
+          <HeroDemo />
         </BrowserFrame>
       </Reveal>
     </section>
