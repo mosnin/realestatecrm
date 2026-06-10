@@ -1,24 +1,34 @@
 /**
- * Hero — the promise.
+ * Hero — the promise, with a real product shot.
  *
- * One idea, said once: "You close the deals. Chippi does the rest." The
- * headline is the serif Times the product uses for every page title, brought
- * to the front door so marketing and product feel like one company. Below it,
- * a single calm proof: a real draft, in the realtor's voice, waiting for a tap.
- * No ASCII field, no rotating word, no orange wash — the proof is the spectacle.
+ * The headline is the serif Times the product uses for every page title; the
+ * one idea is said once. Beneath it sits a large framed workspace screenshot
+ * (placeholder slot) over a faint dot-grid backdrop and a warm brand wash, so
+ * the first thing a prospect sees is the product itself, framed like software
+ * — not a centered card on an empty page.
  */
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { Reveal } from '../reveal';
+import { BrowserFrame, ImagePlaceholder, GridBackdrop } from '../frame';
 import { TITLE_FONT } from '@/lib/typography';
+
+const assurances = ['7-day free trial', 'No setup fees', 'Cancel anytime'];
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-20 sm:px-6 sm:pt-36 sm:pb-28">
-      <div className="mx-auto max-w-3xl text-center">
+    <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-20 sm:px-6 sm:pt-36">
+      <GridBackdrop />
+      {/* warm wash at the top, behind the headline */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
+      />
+
+      <div className="relative mx-auto max-w-3xl text-center">
         <Reveal>
-          <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/60 px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
             <span aria-hidden className="inline-block size-1.5 rounded-full bg-brand" />
             The agentic OS for real estate
           </p>
@@ -26,7 +36,7 @@ export function Hero() {
 
         <Reveal delay={0.05}>
           <h1
-            className="mt-6 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-6xl"
+            className="mt-7 text-[2.75rem] leading-[1.03] tracking-tight text-foreground sm:text-[4.25rem]"
             style={TITLE_FONT}
           >
             You close the deals.
@@ -54,62 +64,39 @@ export function Hero() {
             </Link>
             <Link
               href="/demo"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
             >
               Watch demo
             </Link>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            7 days free, then $97/mo. Cancel anytime.
-          </p>
+        </Reveal>
+
+        <Reveal delay={0.2}>
+          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            {assurances.map((a) => (
+              <li key={a} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Check className="h-3.5 w-3.5 text-brand" />
+                {a}
+              </li>
+            ))}
+          </ul>
         </Reveal>
       </div>
 
-      {/* The proof, immediately: one real draft moment, paper-flat. */}
-      <Reveal delay={0.2} className="mx-auto mt-16 max-w-xl">
-        <DraftProof />
+      {/* The product, framed. */}
+      <Reveal delay={0.15} className="relative mx-auto mt-16 max-w-5xl">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,rgba(255,150,79,0.10),transparent_70%)]"
+        />
+        <BrowserFrame className="relative">
+          <ImagePlaceholder
+            label="The Chippi workspace"
+            sublabel="Screenshot · 1600 × 1000"
+            ratio="aspect-[16/10]"
+          />
+        </BrowserFrame>
       </Reveal>
     </section>
-  );
-}
-
-/** A single agent-draft card in the product's own vocabulary — the emotional
- *  core of the pitch shown once, calm. Mirrors the real review-row chrome. */
-function DraftProof() {
-  return (
-    <div className="rounded-xl border border-border/70 bg-card p-5 text-left">
-      {/* incoming */}
-      <div className="flex gap-2.5">
-        <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[11px] font-medium text-foreground/70">
-          MP
-        </span>
-        <div className="rounded-xl rounded-tl-sm border border-border/60 bg-muted/30 px-3.5 py-2.5 text-sm leading-relaxed text-foreground/80">
-          Is 14 Oak still available? Could I see it this weekend?
-        </div>
-      </div>
-
-      {/* Chippi draft */}
-      <div className="mt-3 rounded-xl border border-border/70 bg-background px-4 py-3.5">
-        <p className="text-sm leading-relaxed text-foreground/90">
-          Hi Maya — thanks for reaching out about 14 Oak. It&rsquo;s still
-          available, and I have Saturday at 2:00 open if you&rsquo;d like to see
-          it in person.
-        </p>
-        <div className="mt-3.5 flex items-center justify-between border-t border-border/60 pt-3">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand">
-            <span aria-hidden className="inline-block size-1.5 rounded-full bg-brand" />
-            Chippi drafted · your voice
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground">
-              Edit
-            </span>
-            <span className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">
-              Approve
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
