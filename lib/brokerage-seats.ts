@@ -5,18 +5,20 @@
  *   members (rows in BrokerageMembership)
  *   + pending, non-expired invitations (Invitation.status='pending' AND expiresAt > now())
  *
- * Seat limits are driven off the Brokerage.plan / Brokerage.seatLimit columns
- * added by migration BP3a:
- *   - plan:      'starter' | 'team' | 'enterprise'
- *   - seatLimit: integer NULL (starter=5, team=15, enterprise=NULL meaning unlimited)
+ * Seat limits are driven off the Brokerage.plan / Brokerage.seatLimit columns.
+ * The plan vocabulary and included-seat counts are the V2 source of truth in
+ * lib/plans.ts:
+ *   - plan:      'team' | 'team_plus'
+ *   - seatLimit: integer (team=5, team_plus=10), from PLANS[plan].includedUsers
  *
- * This module is designed to deploy AHEAD of the migration — if the plan/seatLimit
- * columns aren't present yet, we fall back to the strictest sane default
- * (starter / 5). Never silently unlock the cap on infra errors.
+ * If the plan/seatLimit columns aren't present or readable, we fall back to the
+ * strictest sane default (team / 5). Never silently unlock the cap on infra
+ * errors.
  */
 import { supabase } from '@/lib/supabase';
+import { PLANS } from '@/lib/plans';
 
-export type BrokeragePlan = 'starter' | 'team' | 'enterprise';
+export type BrokeragePlan = 'team' | 'team_plus';
 
 export interface SeatUsage {
   plan: BrokeragePlan;
@@ -34,11 +36,11 @@ export interface SeatCheckResult {
   needed?: number;
 }
 
-const DEFAULT_PLAN: BrokeragePlan = 'starter';
-const DEFAULT_SEAT_LIMIT = 5;
+const DEFAULT_PLAN: BrokeragePlan = 'team';
+const DEFAULT_SEAT_LIMIT = PLANS.team.includedUsers;
 
 function isValidPlan(value: unknown): value is BrokeragePlan {
-  return value === 'starter' || value === 'team' || value === 'enterprise';
+  return value === 'team' || value === 'team_plus';
 }
 
 /**
@@ -65,13 +67,14 @@ async function loadPlan(
 
     let seatLimit: number | null;
     if (row.seatLimit === null || row.seatLimit === undefined) {
-      // Enterprise is explicitly NULL = unlimited. Starter/team with a null value
-      // shouldn't happen per migration, but if it does, fall back to plan default.
-      seatLimit = plan === 'enterprise' ? null : DEFAULT_SEAT_LIMIT;
+      // No explicit seatLimit on the row → fall back to the plan's included
+      // seats (single source of truth in lib/plans.ts). V2 has no unlimited
+      // brokerage tier, so we never fall back to null here.
+      seatLimit = PLANS[plan].includedUsers;
     } else if (typeof row.seatLimit === 'number') {
       seatLimit = row.seatLimit;
     } else {
-      seatLimit = DEFAULT_SEAT_LIMIT;
+      seatLimit = PLANS[plan].includedUsers;
     }
 
     return { plan, seatLimit };

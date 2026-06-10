@@ -194,7 +194,8 @@ async def run_now_webhook(item: dict) -> dict:
         expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
         secret = (item.get("secret") or "")
         if not expected or secret != expected:
-            return {"error": "Unauthorized"}
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
         space_id = (item.get("space_id") or "").strip()
         if not space_id:
@@ -283,7 +284,8 @@ async def run_swarm_endpoint(payload: dict) -> dict:
     expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
     secret = (payload.get("secret") or "")
     if not expected or secret != expected:
-        return {"status": "failed", "error": "Unauthorized"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "failed", "error": "Unauthorized"}, status_code=401)
 
     from swarm_orchestrator import run_swarm
     try:
@@ -327,7 +329,8 @@ async def chat_turn(item: dict):
     expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
     secret = (item.get("secret") or "")
     if not expected or secret != expected:
-        return {"error": "Unauthorized"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     space_id = (item.get("space_id") or "").strip()
     # Clerk userId of the realtor sending this message. Required for

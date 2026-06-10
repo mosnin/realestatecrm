@@ -22,8 +22,11 @@ CREATE TABLE IF NOT EXISTS "AgentTrajectory" (
   -- in Redis) so trajectories can be joined to the live event log if needed.
   "runId" TEXT NOT NULL UNIQUE,
 
-  -- Tenant scoping. Same FK pattern as every other agent table.
-  "spaceId" UUID NOT NULL REFERENCES "Space"("id") ON DELETE CASCADE,
+  -- Tenant scoping. Same FK pattern as every other agent table. Space.id is
+  -- `text` (DB_CONVENTIONS: all PKs are text), so this MUST be text — a `uuid`
+  -- column made the FK impossible to build, which aborted the whole CREATE and
+  -- left AgentTrajectory non-existent in every environment, prod included.
+  "spaceId" TEXT NOT NULL REFERENCES "Space"("id") ON DELETE CASCADE,
 
   "startedAt" TIMESTAMPTZ NOT NULL,
   "endedAt"   TIMESTAMPTZ,

@@ -6,16 +6,26 @@ import {
   Clock,
   AlertTriangle,
   XCircle,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { PLANS } from '@/lib/plans';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
 import { H3 } from '@/lib/typography';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
-const PRICE_PER_SEAT = 97;
+// Entry-tier price (Solo, $97 — lib/plans.ts). MRR here is approximate: it
+// prices every active Space sub at the entry tier because Space rows don't
+// record their tier yet. Exact per-plan MRR lands with a plan column.
+const PRICE_PER_SEAT = PLANS.solo.priceMonthly;
+
+/** Live-mode Stripe dashboard deep links. (Test-mode objects need /test/ in the
+ *  path — these links are for the production dashboard.) */
+const stripeCustomerUrl = (id: string) => `https://dashboard.stripe.com/customers/${id}`;
+const stripeSubscriptionUrl = (id: string) => `https://dashboard.stripe.com/subscriptions/${id}`;
 
 
 const statusBarColors: Record<SubscriptionStatus, string> = {
@@ -51,6 +61,16 @@ export default async function AdminBillingPage() {
     stripeSubscriptionStatus: SubscriptionStatus;
     stripePeriodEnd: string | null;
     stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+  }[] = [];
+  let brokerageSubscriptions: {
+    id: string;
+    name: string;
+    plan: string;
+    stripeSubscriptionStatus: SubscriptionStatus;
+    stripePeriodEnd: string | null;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
   }[] = [];
   let trialExpiringSoon: {
     id: string;
@@ -62,7 +82,7 @@ export default async function AdminBillingPage() {
   }[] = [];
 
   try {
-    const [allSpacesRes, recentRes, trialExpiringRes] = await Promise.all([
+    const [allSpacesRes, recentRes, trialExpiringRes, brokerageRes] = await Promise.all([
       // All spaces for status counts
       supabase
         .from('Space')
@@ -70,7 +90,7 @@ export default async function AdminBillingPage() {
       // Recent subscriptions (non-inactive, ordered by period end)
       supabase
         .from('Space')
-        .select('id, name, ownerId, stripeSubscriptionStatus, stripePeriodEnd, stripeCustomerId, User!inner(email)')
+        .select('id, name, ownerId, stripeSubscriptionStatus, stripePeriodEnd, stripeCustomerId, stripeSubscriptionId, User!inner(email)')
         .neq('stripeSubscriptionStatus', 'inactive')
         .order('stripePeriodEnd', { ascending: false, nullsFirst: false })
         .limit(50),
@@ -82,6 +102,14 @@ export default async function AdminBillingPage() {
         .lte('stripePeriodEnd', sevenDaysFromNow)
         .gte('stripePeriodEnd', now.toISOString())
         .order('stripePeriodEnd', { ascending: true }),
+      // Brokerage-scoped subscriptions (the brokerage checkout writes these to
+      // the Brokerage row, not a Space — previously invisible on this page)
+      supabase
+        .from('Brokerage')
+        .select('id, name, plan, stripeSubscriptionStatus, stripePeriodEnd, stripeCustomerId, stripeSubscriptionId')
+        .neq('stripeSubscriptionStatus', 'inactive')
+        .order('stripePeriodEnd', { ascending: false, nullsFirst: false })
+        .limit(50),
     ]);
 
     // Count by status
@@ -103,6 +131,17 @@ export default async function AdminBillingPage() {
       stripeSubscriptionStatus: row.stripeSubscriptionStatus as SubscriptionStatus,
       stripePeriodEnd: row.stripePeriodEnd,
       stripeCustomerId: row.stripeCustomerId,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+    }));
+
+    brokerageSubscriptions = ((brokerageRes.data ?? []) as any[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      plan: row.plan ?? '—',
+      stripeSubscriptionStatus: row.stripeSubscriptionStatus as SubscriptionStatus,
+      stripePeriodEnd: row.stripePeriodEnd,
+      stripeCustomerId: row.stripeCustomerId,
+      stripeSubscriptionId: row.stripeSubscriptionId,
     }));
 
     // Map trial expiring soon
@@ -344,8 +383,116 @@ export default async function AdminBillingPage() {
                             })
                           : '—'}
                       </td>
-                      <td className="py-3 px-4 text-xs text-muted-foreground font-mono">
-                        {space.stripeCustomerId || '—'}
+                      <td className="py-3 px-4 text-xs font-mono">
+                        {space.stripeCustomerId ? (
+                          <span className="inline-flex items-center gap-2.5">
+                            <a
+                              href={stripeCustomerUrl(space.stripeCustomerId)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+                              title="Open customer in Stripe"
+                            >
+                              {space.stripeCustomerId}
+                              <ExternalLink size={11} />
+                            </a>
+                            {space.stripeSubscriptionId && (
+                              <a
+                                href={stripeSubscriptionUrl(space.stripeSubscriptionId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+                                title="Open subscription in Stripe"
+                              >
+                                sub
+                              </a>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* ── Brokerage subscriptions ─────────────────────────────── */}
+      {/* Brokerage-scoped subs live on the Brokerage row (written by the
+          brokerage checkout + webhook) and were invisible on this page, which
+          only listed Space subs. Same Stripe deep links for one-click control. */}
+      <div>
+        <p className={`${H3} mb-3`}>Brokerage subscriptions</p>
+        {brokerageSubscriptions.length === 0 ? (
+          <Card>
+            <CardContent className="px-5 py-8 text-center">
+              <p className="text-sm text-muted-foreground">No brokerage subscriptions yet.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Brokerage</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Plan</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Period End</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Stripe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {brokerageSubscriptions.map((b) => (
+                    <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="py-3 px-4 font-medium">{b.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{b.plan}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex text-[11px] font-semibold rounded-full px-2 py-0.5 ${SUBSCRIPTION_STATUS_COLORS[b.stripeSubscriptionStatus]}`}>
+                          {b.stripeSubscriptionStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 tabular-nums text-muted-foreground">
+                        {b.stripePeriodEnd
+                          ? new Date(b.stripePeriodEnd).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-xs font-mono">
+                        {b.stripeCustomerId ? (
+                          <span className="inline-flex items-center gap-2.5">
+                            <a
+                              href={stripeCustomerUrl(b.stripeCustomerId)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+                              title="Open customer in Stripe"
+                            >
+                              {b.stripeCustomerId}
+                              <ExternalLink size={11} />
+                            </a>
+                            {b.stripeSubscriptionId && (
+                              <a
+                                href={stripeSubscriptionUrl(b.stripeSubscriptionId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+                                title="Open subscription in Stripe"
+                              >
+                                sub
+                              </a>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

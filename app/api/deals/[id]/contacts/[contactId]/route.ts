@@ -31,6 +31,17 @@ export async function PATCH(
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  // DealContact has no spaceId column, so also verify the target contact
+  // belongs to the caller's space — otherwise a cross-space contactId on a
+  // shared deal link could have its role mutated.
+  const { data: contactInSpace } = await supabase
+    .from('Contact')
+    .select('id')
+    .eq('id', contactId)
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  if (!contactInSpace) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;

@@ -95,7 +95,7 @@ export default async function LeadsPage({
   };
 
   return (
-    <div className="space-y-6 max-w-[1320px]">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">People.</p>
         <h1 className={H1} style={TITLE_FONT}>

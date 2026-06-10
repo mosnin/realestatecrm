@@ -39,6 +39,7 @@ export async function GET(
     .from('Tour')
     .select('id, startsAt, endsAt, status, propertyAddress, createdAt, updatedAt')
     .eq('contactId', contactId)
+    .eq('spaceId', space.id)
     .order('startsAt', { ascending: false })
     .limit(50);
 

@@ -59,7 +59,8 @@ export async function POST(req: Request) {
     .from('Invitation')
     .select('*', { count: 'exact', head: true })
     .eq('brokerageId', brokerage.id)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .gt('expiresAt', new Date().toISOString());
   const remaining = 100 - (pendingCount ?? 0);
   if (remaining <= 0) {
     return NextResponse.json({ error: 'Too many pending invitations. Cancel some first.' }, { status: 429 });

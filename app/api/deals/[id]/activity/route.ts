@@ -33,6 +33,7 @@ export async function GET(
     .from('DealActivity')
     .select('*')
     .eq('dealId', id)
+    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
   if (error) throw error;
 

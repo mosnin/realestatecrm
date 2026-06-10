@@ -48,6 +48,7 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
@@ -388,6 +389,32 @@ export async function POST(req: NextRequest) {
   // working chat: the turn persists to the broker tables; only the Modal
   // settings/usage want a space, and the direct (in-process) path needs none.
   const runtimeSpaceId = await resolveRuntimeSpaceId(brokerCtx.brokerage.ownerId);
+
+  // Daily token budget — the realtor route (app/api/ai/task) enforces this, but
+  // the broker route never did, so a broker could chat past the per-space cap
+  // unchecked. Gate against the runtime (funding) space when there is one.
+  // Fails open so a transient DB error can't block a legitimate broker turn.
+  if (runtimeSpaceId) {
+    try {
+      const { data: settingsRow } = await supabase
+        .from('AgentSettings')
+        .select('dailyTokenBudget')
+        .eq('spaceId', runtimeSpaceId)
+        .maybeSingle();
+      const dailyTokenBudget = (settingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
+      const { total: todayTokens } = await getTodayTokenUsage(runtimeSpaceId);
+      if (todayTokens >= dailyTokenBudget) {
+        logger.warn('[ai/broker-task] daily token budget exceeded', {
+          runtimeSpaceId,
+          todayTokens,
+          dailyTokenBudget,
+        });
+        return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
+      }
+    } catch (err) {
+      logger.warn('[ai/broker-task] token budget check failed — continuing', { brokerageId }, err);
+    }
+  }
 
   const abortController = new AbortController();
 

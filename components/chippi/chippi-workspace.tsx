@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Transcript } from '@/components/ai/blocks/transcript';
@@ -1097,26 +1098,36 @@ export function ChippiWorkspace({
           Pre-fix this cluster carried eight competing icons plus a
           message-limit counter; the DOET audit (PR #101) called it a
           score-2 Discoverability failure. */}
-      <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
+      <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5">
         <ApprovalsPill />
-        {/* Brief / Drafts / History navigation dropdown — resolves to the
-            correct route family per variant. Realtor: /s/<slug>/chippi/*.
-            Broker: /broker/*. Never builds a broken /s//... href when
-            slug is empty on the broker variant. History opens the in-page
-            conversation drawer rather than navigating away so the chat
-            transcript is never left behind mid-conversation. */}
+        {/* One three-dots menu — folds New chat, History, Brief/Drafts, and
+            (realtor) Run now / Memory / Chippi settings into a single animated
+            dropdown so the chat surface stays open instead of carrying a row of
+            stacked icons. The fade+slide is the shared EASE_OUT curve baked
+            into DropdownMenuContent (components/ui/dropdown-menu.tsx,
+            motion-reduce aware). Routes resolve per variant — realtor:
+            /s/<slug>/chippi/*, broker: /broker/* — never a broken /s//… href. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="Navigate"
-              aria-label="Brief, Drafts, and History"
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors data-[state=open]:bg-foreground/[0.045] data-[state=open]:text-foreground"
+              title="Menu"
+              aria-label="Chat menu"
             >
-              <BookOpen size={15} />
+              <MoreHorizontal size={16} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" sideOffset={6} className="w-48">
+            <DropdownMenuItem onSelect={() => void handleNewConversation()} className="cursor-pointer">
+              <SquarePen size={14} className="mr-2" />
+              New chat
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setDrawerOpen(true)} className="cursor-pointer">
+              <History size={14} className="mr-2" />
+              History
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link
                 href={isBroker ? '/broker/brief' : `/s/${slug}/chippi/brief`}
@@ -1135,85 +1146,39 @@ export function ChippiWorkspace({
                 Drafts
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => setDrawerOpen(true)}
-              className="cursor-pointer"
-            >
-              <History size={14} className="mr-2" />
-              History
-            </DropdownMenuItem>
+            {!isBroker && (
+              <>
+                <DropdownMenuSeparator />
+                {isEmpty && (
+                  <DropdownMenuItem
+                    onSelect={() => void handleRunNow()}
+                    disabled={running}
+                    className="cursor-pointer"
+                  >
+                    {running ? (
+                      <Loader2 size={14} className="mr-2 animate-spin" />
+                    ) : (
+                      <Play size={14} className="mr-2" />
+                    )}
+                    Run now
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href={`/s/${slug}/chippi/memory`} className="cursor-pointer">
+                    <NotebookText size={14} className="mr-2" />
+                    Memory
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
+                    <Settings size={14} className="mr-2" />
+                    Chippi settings
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* New chat — the discoverable affordance. Sits left of History so
-            the pair reads as "new ↔ old" — the same convention iMessage
-            and the major chat apps use. */}
-        <button
-          type="button"
-          onClick={() => void handleNewConversation()}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="New chat"
-          aria-label="Start a new chat"
-        >
-          <SquarePen size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="Conversation history"
-          aria-label="Open conversation history"
-        >
-          <History size={15} />
-        </button>
-        {/* More menu — folds Voice, Run now, memory, and settings. Voice
-            and Run now are realtor-only (Phase 1 broker has no autonomous
-            run path and no broker-side voice session — the realtime API
-            is space-scoped). On the broker variant the menu still
-            renders so realtors who jump between brokerage and solo see a
-            consistent shelf; it just narrows to nothing actionable, so
-            we hide the trigger entirely when empty. */}
-        {!isBroker && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-                title="More"
-                aria-label="More options"
-              >
-                <MoreHorizontal size={15} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {isEmpty && (
-                <DropdownMenuItem
-                  onSelect={() => void handleRunNow()}
-                  disabled={running}
-                  className="cursor-pointer"
-                >
-                  {running ? (
-                    <Loader2 size={14} className="mr-2 animate-spin" />
-                  ) : (
-                    <Play size={14} className="mr-2" />
-                  )}
-                  Run now
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem asChild>
-                <Link href={`/s/${slug}/chippi/memory`} className="cursor-pointer">
-                  <NotebookText size={14} className="mr-2" />
-                  Memory
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/s/${slug}/chippi?tab=settings`} className="cursor-pointer">
-                  <Settings size={14} className="mr-2" />
-                  Chippi settings
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
         {/* Split panel disabled on broker variant — RightPanel tabs
             (contacts/deals/etc.) are realtor-scoped in Phase 1. */}
         {!isBroker && <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />}

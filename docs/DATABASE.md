@@ -49,9 +49,11 @@ Examples from the actual tree:
 
 Timestamp ensures lexicographic ordering. Pick `HHMMSS = 000000` unless
 you're interleaving migrations on the same day (the existing tree uses
-`000000`–`000004` when multiple land on the same date). One older file
-(`003_tours_applications_pro.sql`) pre-dates the timestamp convention —
-don't mimic it.
+`000000`–`000007` when multiple land on the same date). Every migration now
+follows the `YYYYMMDDHHMMSS_` convention — the old short-prefix `003_…` file was
+renamed to `20260319000007_tours_applications_pro.sql` so it sorts *after* the
+migration that creates `Tour` (it referenced `Tour` before it existed, which
+broke a from-empty migrations replay).
 
 ### Authoring
 

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-export type SeatPlan = 'starter' | 'team' | 'enterprise';
+export type SeatPlan = 'team' | 'team_plus';
 
 export interface SeatUsagePillProps {
   plan: SeatPlan;
@@ -20,7 +20,7 @@ const DEFAULT_TITLE =
   'Brokerage seats in use. Seats include active members plus pending invites.';
 
 function isValidPlan(value: unknown): value is SeatPlan {
-  return value === 'starter' || value === 'team' || value === 'enterprise';
+  return value === 'team' || value === 'team_plus';
 }
 
 /**
@@ -105,7 +105,7 @@ export function SeatUsagePill({
     ? 'h-6 gap-1.5 px-2 text-[11px]'
     : 'h-7 gap-2 px-2.5 text-xs';
 
-  // Unlimited — enterprise plans.
+  // No seat cap configured (defensive — V2 plans always carry a finite cap).
   if (seatLimit === null) {
     return (
       <span
@@ -125,7 +125,7 @@ export function SeatUsagePill({
         <span>
           {safeUsed} {safeUsed === 1 ? 'member' : 'members'}
           <span className="opacity-50"> &middot; </span>
-          Enterprise
+          Unlimited
         </span>
       </span>
     );

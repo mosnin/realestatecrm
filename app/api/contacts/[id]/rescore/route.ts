@@ -4,6 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
@@ -28,6 +29,20 @@ export async function POST(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  // Credit gate (no-op unless CREDITS_ENFORCED). Refuse up front when the
+  // account can't afford a lead score; charged on success below.
+  try {
+    await assertCanSpend(space.id, 'lead_score');
+  } catch (err) {
+    if (err instanceof CreditsExhaustedError) {
+      return NextResponse.json(
+        { error: 'Out of credits. Buy a top-up or upgrade your plan.' },
+        { status: 402 },
+      );
+    }
+    throw err;
+  }
+
   const { data: rows, error: fetchError } = await supabase
     .from('Contact')
     .select('*')
@@ -45,7 +60,8 @@ export async function POST(
   await supabase
     .from('Contact')
     .update({ scoringStatus: 'pending' })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
 
   // Fetch the form config snapshot and scoring model for dynamic scoring.
   // The formConfigSnapshot is stored on the contact at submission time.
@@ -104,7 +120,8 @@ export async function POST(
     await supabase
       .from('Contact')
       .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('spaceId', space.id);
     console.error('[rescore] Scoring failed:', scoringErr);
     return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
   }
@@ -119,12 +136,14 @@ export async function POST(
       scoreDetails: result.scoreDetails,
       updatedAt: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
 
   if (updateError) {
     console.error('[rescore] Update error:', updateError);
     return NextResponse.json({ error: 'Failed to save score' }, { status: 500 });
   }
 
+  await chargeWorkflow(space.id, 'lead_score', { userId });
   return NextResponse.json(result);
 }
