@@ -893,71 +893,74 @@ it competes with these four — usually it should live one click away.
 
 ---
 
-## The logged-out site (marketing + auth) — the "studio ASCII" system
+## The logged-out site (marketing + auth)
 
-The **logged-out** surfaces (the marketing site under `app/(marketing)/`
-and the auth pages under `app/(auth)/`) run a **different, louder** visual
-system than the product. The product is paper-flat and neutral; the
-logged-out site is the **studio ASCII** aesthetic, adopted wholesale from
-the fortitudo design and retinted to Chippi orange. This split is
-deliberate: marketing does the pitch, the product does the work.
+The **logged-out** surfaces are mid-migration between two systems:
 
-**This system NEVER leaks into the product.** Everything here is opt-in via
-a class (`.font-brand`, `.text-gradient-brand`, `.rounded-marketing-*`) or
-lives in `components/marketing/fortitudo/**`. The dashboard, agent chat, and
-broker app stay on the neutral system documented above. The `no-stray-orange`
-and `no-shadow-on-product-chrome` tests still pass because `components/marketing`
+- **The calm site system** (`components/marketing/site/**`) — the target. It
+  matches the product: paper-flat, hairline borders, neutral-first, the serif
+  Times headline the product uses for every page title, and a single foreground
+  primary CTA. Orange stays the rare Chippi signature, not decoration. This is
+  what the **home page** and the **shared chrome** (sticky nav + paper-flat
+  footer) run on today.
+- **The legacy "studio ASCII" system** (`components/marketing/fortitudo/**`,
+  `components/marketing/home/**`, `marketing-*.tsx`) — the loud aesthetic
+  adopted from the fortitudo studio design: an ASCII canvas field, brand-orange
+  primaries, charcoal accent cards. It still powers the **sub-pages** (realtors,
+  brokerages, integrations, company, pricing, status) and the **auth pages**,
+  and is being migrated to the calm system route by route.
+
+Why the home moved first: the front door makes the first-impression promise of
+the whole product. Chippi's promise is *calm, in control, trustworthy* — you're
+asking a realtor to hand over their inbox and their clients. A loud ASCII pitch
+contradicts that the moment they arrive. The calm site says the same thing the
+product says, so signing up feels like one continuous experience, not a
+costume-change at the door.
+
+**Neither system leaks into the product.** Marketing colour/shadow live behind
+opt-in classes (`.font-brand`, `.text-gradient-brand`, `.rounded-marketing-*`)
+or inside `components/marketing/**`. The `no-stray-orange` and
+`no-shadow-on-product-chrome` tests still pass because `components/marketing`
 is outside the strict zone — orange and shadows are *expected* here.
 
-### What the look is
-
-- **Brand display face** — applied via the `.font-brand` utility (the
-  marketing/auth headline + eyebrow + footer-column face), bound to
-  `--font-brand` in `globals.css`. It is currently the **clean system display
-  stack** (SF Pro Display) — the previous Bitcount Grid Single web font was
-  pulled. No web font is loaded; to give marketing a distinct display face,
-  change the single `--font-brand` line and nothing else. The product never
-  uses `.font-brand` (its serif flourish is still Times via `--font-title`).
-- **ASCII field** — `components/marketing/fortitudo/ascii-field.tsx`. A slow
-  canvas field of glyphs in Chippi orange (#ff964f → pale amber on the crests),
-  orange-on-transparent so it reads on **both** light and dark. It's the
-  signature behind every hero and inside the closing CTA card.
-- **Orange is the marketing primary.** On the logged-out site, primary CTAs,
-  hero accents, eyebrows, and the gradient-text headline word are **brand
-  orange** (`bg-brand` / `text-brand` / `.text-gradient-brand`). This is the
-  one place orange leads instead of being a rare signature — the brand
-  expression marketing earns. `--primary` itself is **unchanged** (still
-  neutral), so the product is untouched.
-- **Dark accent cards** — the home gradient cards, the closing CTA card, and
-  the footer use a deep charcoal base (`#111113` / `#0d0e12`) that reads as a
-  deliberate dark surface on **both** canvases (same call as the product's
-  black stats card).
-
-### Chrome (`components/marketing/fortitudo/`)
+### The calm site system (`components/marketing/site/`)
 
 | Piece | File | Notes |
 |---|---|---|
-| Floating pill nav | `nav.tsx` | Frosted card pill, mega-menu dropdowns, full-screen ASCII mobile menu. Chippi routes + Clerk auth links. |
-| Inset charcoal footer | `footer.tsx` | Rounded dark card, brand small-caps column heads. |
-| Scroll progress | `scroll-progress.tsx` | Thin brand-orange bar pinned top. |
-| Theme toggle | `theme-toggle.tsx` | Round chip, wired to Chippi's `ThemeProvider`. |
-| Gradient card | `gradient-card.tsx` | 3D-tilt dark card + ASCII + orange glow. Home "what Chippi does". |
-| Spotlight card | `spotlight-card.tsx` | Cursor-tracking orange glow, theme-aware. Steps / testimonials / beliefs. |
-| Rotating word | `rotating-word.tsx` | Headline word that morphs (blur + slide). |
-| Dot flow / loader | `dot-flow.tsx`, `dot-loader.tsx` | The GSAP status chip in the hero. |
-| Rainbow button | `rainbow-button.tsx` | Warm-tuned rainbow CTA flourish (reserved). |
+| Sticky nav | `nav.tsx` | Hairline-bottom bar, flat links, foreground CTA. No floating pill, no mega-menu. |
+| Footer | `footer.tsx` | Paper-flat, hairline-top, muted links. No charcoal card. |
+| Reveal | `reveal.tsx` | The ONLY motion: one fade + 12px rise on scroll-in, EASE_OUT, reduced-motion aware. No parallax, tilt, cursor-glow, or scroll-progress bar. |
+| Theme toggle | `fortitudo/theme-toggle.tsx` | Reused as-is — wired to Chippi's `ThemeProvider`. |
+| Home sections | `site/home/{hero,proof,trust,cta}.tsx` | promise → proof → trust → ask. Headlines in serif Times; mockups built from the product's own card/row/pill vocabulary. |
 
-The route-group `layout.tsx` mounts ScrollProgress + nav + footer, so **every**
-logged-out page inherits the look. Home sections live in
-`components/marketing/fortitudo/home/**`. The shared `MarketingHero` /
-`MarketingCTA` and the home-kit `Eyebrow` were retuned to this system so the
-sub-pages (realtors, brokerages, integrations, company, pricing, status) cohere.
+Headlines on the calm site use the serif Times (`var(--font-title)`) — the
+product's signature flourish — not `.font-brand`. Primary CTAs are the
+foreground pill (`bg-foreground`), same as the product; orange is reserved for
+the Chippi mark. Trial copy is honest: a 7-day free trial that **requires a
+card** ("7 days free, then $97/mo. Cancel anytime"). Never "free, no card" —
+there is no free plan.
 
-### Where the discipline still holds
+### The legacy studio-ASCII system (`components/marketing/fortitudo/`)
+
+Still live on the sub-pages + auth until they migrate. Surviving pieces:
+
+| Piece | File | Notes |
+|---|---|---|
+| ASCII field | `ascii-field.tsx` | Slow canvas glyph field in Chippi orange, reads on light + dark. Behind the sub-page heroes, the auth panel, and `marketing-cta`. |
+| Theme toggle | `theme-toggle.tsx` | Shared with the calm nav. |
+| Marketing hero / CTA | `marketing-hero.tsx`, `marketing-cta.tsx` | ASCII hero + charcoal closing card, used by pricing + status. |
+
+The old home chrome (floating pill `nav.tsx`, charcoal `footer.tsx`,
+`scroll-progress.tsx`) and the home decoration primitives (`gradient-card`,
+`spotlight-card`, `rotating-word`, `dot-flow`, `dot-loader`, `rainbow-button`)
+were **deleted** when the home moved to the calm system — they were home-only.
+
+### Where the discipline still holds (both systems)
 
 - **Copy voice is unchanged** — calm, lowercase verbs, no exclamation marks,
-  no em dashes, no invented metrics. Realtors/brokerages never get phone
-  numbers and Chippi never texts/calls leads; marketing copy never implies it.
+  no em dashes, no invented metrics, no fabricated testimonials. Realtors/
+  brokerages never get phone numbers and Chippi never texts/calls leads;
+  marketing copy never implies it.
 - **The product is off-limits.** If you find yourself reaching for `.font-brand`
   or `bg-brand` as a *primary* outside `components/marketing/**` or the auth
   layout, that's the bug. The product's orange rule (the five contexts) is
