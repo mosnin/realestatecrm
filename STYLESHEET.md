@@ -895,33 +895,29 @@ it competes with these four — usually it should live one click away.
 
 ## The logged-out site (marketing + auth)
 
-The **logged-out** surfaces are mid-migration between two systems:
+The **logged-out marketing site** runs **one** system — the calm site system —
+end to end. The **auth pages** still wear the louder studio-ASCII brand panel
+(the ASCII field), which is the only surviving piece of the old system.
 
-- **The calm site system** (`components/marketing/site/**`) — the target. It
-  matches the product: paper-flat, hairline borders, neutral-first, the serif
-  Times headline the product uses for every page title, and a single foreground
-  primary CTA. Orange stays the rare Chippi signature, not decoration. This is
-  what the **home page** and the **shared chrome** (sticky nav + paper-flat
-  footer) run on today.
-- **The legacy "studio ASCII" system** (`components/marketing/fortitudo/**`,
-  `components/marketing/home/**`, `marketing-*.tsx`) — the loud aesthetic
-  adopted from the fortitudo studio design: an ASCII canvas field, brand-orange
-  primaries, charcoal accent cards. It still powers the **sub-pages** (realtors,
-  brokerages, integrations, company, pricing, status) and the **auth pages**,
-  and is being migrated to the calm system route by route.
+**The calm site system** (`components/marketing/site/**`) matches the product:
+paper-flat, hairline borders, neutral-first, the serif Times headline the
+product uses for every page title, and a single foreground primary CTA. Orange
+stays the rare Chippi signature, not decoration. Every marketing route — home,
+pricing, realtors, brokerages, integrations, company, status, demo — plus the
+shared chrome (sticky nav + paper-flat footer) is on it.
 
-Why the home moved first: the front door makes the first-impression promise of
-the whole product. Chippi's promise is *calm, in control, trustworthy* — you're
-asking a realtor to hand over their inbox and their clients. A loud ASCII pitch
-contradicts that the moment they arrive. The calm site says the same thing the
-product says, so signing up feels like one continuous experience, not a
-costume-change at the door.
+Why it's calm: the front door makes the first-impression promise of the whole
+product. Chippi's promise is *calm, in control, trustworthy* — you're asking a
+realtor to hand over their inbox and their clients. A loud pitch contradicts
+that the moment they arrive. The site says the same thing the product says, so
+signing up feels like one continuous experience, not a costume-change at the
+door.
 
-**Neither system leaks into the product.** Marketing colour/shadow live behind
-opt-in classes (`.font-brand`, `.text-gradient-brand`, `.rounded-marketing-*`)
-or inside `components/marketing/**`. The `no-stray-orange` and
-`no-shadow-on-product-chrome` tests still pass because `components/marketing`
-is outside the strict zone — orange and shadows are *expected* here.
+**The system never leaks into the product.** Marketing colour/shadow live
+behind opt-in classes (`.font-brand`, `.text-gradient-brand`,
+`.rounded-marketing-*`) or inside `components/marketing/**`. The
+`no-stray-orange` and `no-shadow-on-product-chrome` tests still pass because
+`components/marketing` is outside the strict zone.
 
 ### The calm site system (`components/marketing/site/`)
 
@@ -929,33 +925,40 @@ is outside the strict zone — orange and shadows are *expected* here.
 |---|---|---|
 | Sticky nav | `nav.tsx` | Hairline-bottom bar, flat links, foreground CTA. No floating pill, no mega-menu. |
 | Footer | `footer.tsx` | Paper-flat, hairline-top, muted links. No charcoal card. |
-| Reveal | `reveal.tsx` | The ONLY motion: one fade + 12px rise on scroll-in, EASE_OUT, reduced-motion aware. No parallax, tilt, cursor-glow, or scroll-progress bar. |
-| Theme toggle | `fortitudo/theme-toggle.tsx` | Reused as-is — wired to Chippi's `ThemeProvider`. |
-| Home sections | `site/home/{hero,proof,trust,cta}.tsx` | promise → proof → trust → ask. Headlines in serif Times; mockups built from the product's own card/row/pill vocabulary. |
+| Page hero | `page-hero.tsx` | Shared sub-page hero: serif title, grid backdrop, warm wash, foreground CTAs. |
+| Feature row | `feature-row.tsx` | One alternating deep-feature row (copy + framed screenshot slot, flips). |
+| Frame | `frame.tsx` | `BrowserFrame` (window chrome + soft shadow), `ImagePlaceholder` (labeled screenshot slot), `GridBackdrop` (faint dot grid). |
+| Reveal | `reveal.tsx` | The ONLY motion: one fade + small slide on scroll-in, EASE_OUT, reduced-motion aware. No parallax, tilt, cursor-glow, or scroll-progress bar. |
+| Theme toggle | `fortitudo/theme-toggle.tsx` | Reused — wired to Chippi's `ThemeProvider`. |
+| Home sections | `site/home/{hero,logos,features,bento,metrics,enterprise,trust,cta}.tsx` | promise → proof → trust → ask, with product imagery in framed slots. |
 
-Headlines on the calm site use the serif Times (`var(--font-title)`) — the
-product's signature flourish — not `.font-brand`. Primary CTAs are the
-foreground pill (`bg-foreground`), same as the product; orange is reserved for
-the Chippi mark. Trial copy is honest: a 7-day free trial that **requires a
-card** ("7 days free, then $97/mo. Cancel anytime"). Never "free, no card" —
-there is no free plan.
+Headlines use the serif Times (`var(--font-title)`) — the product's signature
+flourish — not `.font-brand`. Primary CTAs are the foreground pill
+(`bg-foreground`), same as the product; orange is reserved for the Chippi mark.
+Tasteful depth (soft shadows on framed screenshots) is allowed in the marketing
+layer; the product stays flat. Trial copy is honest: a 7-day free trial that
+**requires a card** ("7 days free, then $97/mo. Cancel anytime"). Never "free,
+no card" — **there is no free plan.**
 
-### The legacy studio-ASCII system (`components/marketing/fortitudo/`)
+Image slots are labeled `ImagePlaceholder`s (they name the screenshot + ratio),
+so a missing asset reads as an intentional slot, never a broken image.
 
-Still live on the sub-pages + auth until they migrate. Surviving pieces:
+### What's left of the old studio-ASCII system
 
-| Piece | File | Notes |
+Only two files survive, both still in use:
+
+| Piece | File | Used by |
 |---|---|---|
-| ASCII field | `ascii-field.tsx` | Slow canvas glyph field in Chippi orange, reads on light + dark. Behind the sub-page heroes, the auth panel, and `marketing-cta`. |
-| Theme toggle | `theme-toggle.tsx` | Shared with the calm nav. |
-| Marketing hero / CTA | `marketing-hero.tsx`, `marketing-cta.tsx` | ASCII hero + charcoal closing card, used by pricing + status. |
+| ASCII field | `fortitudo/ascii-field.tsx` | the auth brand panel |
+| Theme toggle | `fortitudo/theme-toggle.tsx` | the calm site nav |
 
-The old home chrome (floating pill `nav.tsx`, charcoal `footer.tsx`,
-`scroll-progress.tsx`) and the home decoration primitives (`gradient-card`,
-`spotlight-card`, `rotating-word`, `dot-flow`, `dot-loader`, `rainbow-button`)
-were **deleted** when the home moved to the calm system — they were home-only.
+Everything else — the old home/sub-page components (`components/marketing/home/**`,
+`/realtors/**`, `/diagrams/**`, `marketing-*.tsx`) and the home decoration
+primitives (gradient/spotlight cards, rotating word, dot-flow/loader, rainbow
+button, scroll-progress, the floating pill nav, the charcoal footer) — was
+**deleted** when the site moved to the calm system.
 
-### Where the discipline still holds (both systems)
+### Where the discipline still holds
 
 - **Copy voice is unchanged** — calm, lowercase verbs, no exclamation marks,
   no em dashes, no invented metrics, no fabricated testimonials. Realtors/
