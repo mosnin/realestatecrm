@@ -23,8 +23,9 @@ import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
-  ChevronLeft,
   ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   Users,
   UserCircle,
   Mail,
@@ -945,41 +946,6 @@ function BrokerSidebarConversations() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Edge-handle collapse toggle — a small chevron button that sticks half-off the
-// right edge of the realtor sidebar. Discoverable on hover (idle = ghosted,
-// rail-hover = solid). Mirrors the Linear / VS Code resize-handle pattern.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function EdgeCollapseHandle() {
-  const { collapsed, toggle } = useSidebarCollapsed();
-  const Icon = collapsed ? ChevronRight : ChevronLeft;
-  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={label}
-      title={label}
-      className={cn(
-        // Position: vertical centre of the rail, half-off the right edge.
-        'absolute top-1/2 -right-3 z-30 -translate-y-1/2',
-        // Shape: small square with hairline ring + bg matching the page.
-        'flex items-center justify-center w-6 h-6 rounded-full',
-        'border border-border/70 bg-background text-muted-foreground/70',
-        // Visibility: faded by default; full on rail-hover or self-hover.
-        'opacity-0 group-hover/rail:opacity-100 hover:opacity-100',
-        'hover:text-foreground hover:bg-foreground/[0.04]',
-        'transition-opacity duration-150 active:scale-[0.94]',
-        // Subtle shadow so the handle reads as on top of the rail edge.
-        'shadow-sm shadow-foreground/[0.04]',
-      )}
-    >
-      <Icon size={12} strokeWidth={2} />
-    </button>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Section groupings — sit BETWEEN the existing nav items as small-caps
 // headers. The realtor nav is one flat list in `lib/nav-items.ts` (so any
@@ -1468,7 +1434,7 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0', SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl overflow-hidden shrink-0 m-3', SIDEBAR_WIDTH)}>
         <div className="px-4 pt-5 pb-3">
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
@@ -1530,28 +1496,40 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden transition-[width] duration-200 ease-out', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 overflow-hidden transition-[width] duration-200 ease-out m-3', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
         />
         <div className="relative z-10 flex flex-col h-full">
           {/* Brand mark — in collapsed rail mode it doubles as the expand
               affordance, mirroring the realtor sidebar. */}
-          <div className={cn('pt-5 pb-3', brokerCollapsed ? 'flex justify-center px-2' : 'px-4')}>
+          <div className={cn('pt-5 pb-3', brokerCollapsed ? 'flex justify-center px-2' : 'flex items-center justify-between px-4')}>
             {brokerCollapsed ? (
               <button
                 type="button"
                 onClick={brokerToggle}
                 aria-label="Expand sidebar"
-                className="flex items-center justify-center w-10 h-10 rounded-md transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                title="Expand sidebar"
+                className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground/80 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               >
-                <BrandLogo className="h-5" alt="Chippi" />
+                <PanelLeftOpen size={18} strokeWidth={1.75} />
               </button>
             ) : (
-              <BrandLogo className="h-5" alt="Chippi" />
+              <>
+                <BrandLogo className="h-5" alt="Chippi" />
+                <button
+                  type="button"
+                  onClick={brokerToggle}
+                  aria-label="Collapse sidebar"
+                  title="Collapse sidebar"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                >
+                  <PanelLeftClose size={16} strokeWidth={1.75} />
+                </button>
+              </>
             )}
           </div>
 
@@ -1740,33 +1718,27 @@ function RealtorSidebarShell({
     <aside
       data-dashboard-sidebar
       className={cn(
-        'group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0',
+        'group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 m-3',
         'transition-[width] duration-200 ease-in-out',
         collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH,
       )}
     >
-      {/* Edge-handle collapse toggle — sticks half-off the right edge of the
-          rail so it's discoverable without crowding the nav. Idle = nearly
-          invisible (subtle ring), on rail-hover = visible. Click flips
-          collapsed state via the existing context. */}
-      <EdgeCollapseHandle />
       {/* Brand-warm tint at top — clip width follows the rail so the orange
           wash doesn't hint at content beyond the visible edge. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
       />
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Brand mark — small, monochrome, sets identity without dominating.
-            In collapsed mode the BrandLogo doubles as the expand affordance:
-            tapping the mark flips the rail open. The EdgeCollapseHandle is
-            a thin slice on the right edge; the logo is the big, obvious
-            target you'd reach for anyway. */}
+            Expanded: the logo sits at the left with a panel-collapse button
+            on the right. Collapsed: the logo gives way to an open-panel icon
+            that expands the rail. */}
         <div
           className={cn(
             'pt-5 pb-3',
-            collapsed ? 'flex justify-center px-2' : 'px-4',
+            collapsed ? 'flex justify-center px-2' : 'flex items-center justify-between px-4',
           )}
         >
           {collapsed ? (
@@ -1774,12 +1746,24 @@ function RealtorSidebarShell({
               type="button"
               onClick={toggle}
               aria-label="Expand sidebar"
-              className="flex items-center justify-center w-10 h-10 rounded-md transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              title="Expand sidebar"
+              className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground/80 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
-              <BrandLogo className="h-5" alt="Chippi" />
+              <PanelLeftOpen size={18} strokeWidth={1.75} />
             </button>
           ) : (
-            <BrandLogo className="h-5" alt="Chippi" />
+            <>
+              <BrandLogo className="h-5" alt="Chippi" />
+              <button
+                type="button"
+                onClick={toggle}
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              >
+                <PanelLeftClose size={16} strokeWidth={1.75} />
+              </button>
+            </>
           )}
         </div>
 
@@ -1846,8 +1830,7 @@ function RealtorSidebarShell({
         {/* User footer pinned at bottom, separated by a hairline. The chip
             opens an account-menu popover (Themes, Settings, Notifications,
             Hotkeys, Apps, Referrals, Plans, Help, Trash, Log out). The
-            collapse toggle lives as an edge-handle on the right rail
-            (see EdgeCollapseHandle above) — discoverable on hover. */}
+            collapse toggle is the panel button in the header. */}
         <div className="border-t border-border/50" />
         <SidebarUserMenu
           slug={slug}

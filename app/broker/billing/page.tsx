@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { BillingPage } from '@/components/billing/billing-page';
+import { CreditsSummary } from '@/components/billing/credits-summary';
+import type { PlanId } from '@/lib/plans';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import type { Metadata } from 'next';
@@ -154,6 +156,7 @@ export default async function BrokerBillingPage() {
       <BillingHeader status="Manage your subscription and payment details." />
       <BillingPage
         slug={slug}
+        plan={(((ctx.brokerage as { plan?: string }).plan) ?? 'free') as PlanId}
         subscriptionStatus={subscriptionStatus}
         currentPeriodEnd={currentPeriodEnd}
         cardLast4={cardLast4}
@@ -168,6 +171,7 @@ export default async function BrokerBillingPage() {
             : undefined
         }
       />
+      <CreditsSummary spaceId={spaceRow.id as string} slug={slug} />
     </div>
   );
 }

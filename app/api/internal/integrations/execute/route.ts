@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeToolForEntity, composioConfigured } from '@/lib/integrations/composio';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { userOwnsSpace } from '@/lib/space';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -63,6 +64,15 @@ export async function POST(req: NextRequest) {
       { ok: false, error: 'spaceId, userId, and slug are required' },
       { status: 400 },
     );
+  }
+
+  // The bearer secret authenticates Modal, not the (spaceId, userId) pair in
+  // the body. Verify the user actually owns the space BEFORE the rate-limit so
+  // a mismatched pair can't charge another workspace's budget (or, via execute,
+  // act under the wrong space's bucket). Composio itself is keyed by userId, so
+  // this is defense-in-depth on top of that.
+  if (!(await userOwnsSpace(spaceId, userId))) {
+    return NextResponse.json({ ok: false, error: 'space/user mismatch' }, { status: 403 });
   }
 
   // Per-space cap — the bearer secret authenticates Modal, but a runaway

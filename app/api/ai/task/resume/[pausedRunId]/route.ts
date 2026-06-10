@@ -125,6 +125,20 @@ export async function POST(
     return NextResponse.json({ error: 'Space not found' }, { status: 404 });
   }
 
+  // Re-verify CURRENT ownership, not just that the caller is the user who
+  // paused this run — mirrors resolveToolContext so resume can never act
+  // outside the caller's own space (e.g. if space ownership changed between
+  // pause and resume). paused.userId is the Clerk id; map it to the internal
+  // User id the way resolveToolContext does.
+  const { data: ownerRow } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', auth.userId)
+    .maybeSingle();
+  if (!ownerRow || space.ownerId !== ownerRow.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const abortController = new AbortController();
   const ctx: ToolContext = {
     userId: auth.userId,

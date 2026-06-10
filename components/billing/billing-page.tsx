@@ -72,8 +72,8 @@ interface BillingPageProps {
    * a Space the caller owns. Defaults are the realtor space routes.
    */
   endpoints?: { checkout?: string; portal?: string; cancel?: string };
-  /** The account's plan tier — drives the displayed name + price (lib/plans).
-   *  Defaults to the entry tier; the page used to hardcode "Pro"/$97. */
+  /** The account's plan tier — drives the displayed name + price. Without this
+   *  the page hardcoded "Pro"/$97 and contradicted the real plan shown below. */
   plan?: PlanId;
 }
 
@@ -173,6 +173,7 @@ export function BillingPage({
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
   // Plan name + price come from the single source of truth (lib/plans), not
   // hardcoded — the page used to claim "Pro/$97" for every account.
@@ -203,28 +204,38 @@ export function BillingPage({
 
   // ── Handlers (wired to Stripe once live) ──────────────────────────────────
 
-  async function handleSubscribe() {
-    const res = await fetch(endpoints?.checkout ?? '/api/billing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
+  // Shared POST→redirect handler. Guards against double-submit (a second click
+  // before the first navigates would open a second checkout/portal session) and
+  // follows a {redirect} response (e.g. past_due → billing) instead of silently
+  // doing nothing.
+  async function startBillingFlow(endpoint: string) {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.redirect) { window.location.href = data.redirect; return; }
+      // Nothing to navigate to — surface the error and re-enable the button.
+      console.error('[billing] checkout/portal returned no url', data);
+      if (typeof data.error === 'string') window.alert(data.error);
+      setActionBusy(false);
+    } catch (err) {
+      console.error('[billing] checkout/portal request failed', err);
+      setActionBusy(false);
     }
   }
 
-  async function handleManage() {
-    const res = await fetch(endpoints?.portal ?? '/api/billing/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    }
+  function handleSubscribe() {
+    void startBillingFlow(endpoints?.checkout ?? '/api/billing/checkout');
+  }
+
+  function handleManage() {
+    void startBillingFlow(endpoints?.portal ?? '/api/billing/portal');
   }
 
   async function handleCancel() {
@@ -450,7 +461,7 @@ export function BillingPage({
       {/* ── What's included ── */}
       <SectionBlock
         title="What's included"
-        description="Everything in the Pro plan"
+        description={`Everything in the ${PLAN_NAME} plan`}
       >
         <ul className="space-y-3">
           {PLAN_FEATURES.map(({ icon: Icon, label }) => (

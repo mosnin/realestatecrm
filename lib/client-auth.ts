@@ -26,10 +26,15 @@ const CODE_TTL_MINUTES = 15;
 const MAX_CODE_ATTEMPTS = 6;
 
 function sessionSecret(): Uint8Array {
-  const raw =
-    process.env.CLIENT_AUTH_SECRET ||
-    process.env.CLERK_SECRET_KEY ||
-    'dev-only-insecure-secret';
+  const raw = process.env.CLIENT_AUTH_SECRET || process.env.CLERK_SECRET_KEY;
+  if (!raw) {
+    // Fail closed: never sign client-portal sessions with a hardcoded dev
+    // string — that made forged sessions trivial if both env vars were absent.
+    // CLIENT_AUTH_SECRET is preferred; CLERK_SECRET_KEY stays as a fallback
+    // ONLY so sessions issued before CLIENT_AUTH_SECRET was provisioned remain
+    // valid (otherwise every client is logged out on deploy).
+    throw new Error('CLIENT_AUTH_SECRET (or CLERK_SECRET_KEY) must be set for the client portal');
+  }
   // Domain-separate from any other HMAC use of the same raw secret.
   return new TextEncoder().encode(`client-portal:${raw}`);
 }
@@ -139,6 +144,15 @@ export async function issueCode(
 ): Promise<string | null> {
   const emailLower = email.trim().toLowerCase();
   const code = generateCode();
+  // Invalidate any prior unconsumed codes for this (email, purpose) so only the
+  // newest code is ever valid — closes the window where a resend/race leaves
+  // multiple live codes that each satisfy the one-time guarantee.
+  await supabase
+    .from('ClientAuthCode')
+    .update({ consumedAt: new Date().toISOString() })
+    .eq('emailLower', emailLower)
+    .eq('purpose', purpose)
+    .is('consumedAt', null);
   const { error } = await supabase.from('ClientAuthCode').insert({
     emailLower,
     codeHash: hashCode(code),

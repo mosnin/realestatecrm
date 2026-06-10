@@ -46,11 +46,11 @@ const optionalSchema = z.object({
   // Stripe billing
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  // Legacy single price — Solo's fallback until the tiered products exist.
-  STRIPE_PRICE_ID: z.string().optional(),
-  // Tier price IDs (lib/plans.ts) — set these when the new Stripe products are
-  // created. Solo $97 / Pro $197 bill the Space; Team $497 / Team Plus $897
-  // bill the Brokerage.
+  STRIPE_PRICE_ID: z.string().optional(), // legacy single Solo price (fallback)
+  // Pricing V2 plan + top-up price IDs. Read by lib/plans.ts and the checkout
+  // routes; previously pulled straight from process.env with no schema entry or
+  // boot validation, so a deploy missing one only surfaced at the first failed
+  // checkout. Listed here (typed + boot-warned via the warnGroup below).
   STRIPE_PRICE_SOLO: z.string().optional(),
   STRIPE_PRICE_SOLO_ANNUAL: z.string().optional(),
   STRIPE_PRICE_PRO: z.string().optional(),
@@ -59,6 +59,12 @@ const optionalSchema = z.object({
   STRIPE_PRICE_TEAM_ANNUAL: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_TOPUP_STARTER: z.string().optional(),
+  STRIPE_PRICE_TOPUP_GROWTH: z.string().optional(),
+  STRIPE_PRICE_TOPUP_POWER: z.string().optional(),
+  // Legacy brokerage tier prices still read by the brokerage checkout path.
+  STRIPE_PRICE_STARTER: z.string().optional(),
+  STRIPE_PRICE_ENTERPRISE: z.string().optional(),
 
   // Cron protection
   CRON_SECRET: z.string().optional(),
@@ -136,6 +142,13 @@ export type Env = z.infer<typeof envSchema>;
  */
 const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
   { label: 'Stripe billing', keys: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] },
+  {
+    label: 'Stripe plan/top-up prices',
+    keys: [
+      'STRIPE_PRICE_SOLO', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_TEAM', 'STRIPE_PRICE_TEAM_PLUS',
+      'STRIPE_PRICE_TOPUP_STARTER', 'STRIPE_PRICE_TOPUP_GROWTH', 'STRIPE_PRICE_TOPUP_POWER',
+    ],
+  },
   { label: 'Upstash rate limiting', keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'] },
 ];
 

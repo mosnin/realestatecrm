@@ -54,7 +54,8 @@ export async function GET() {
       .from('Invitation')
       .select('*', { count: 'exact', head: true })
       .eq('brokerageId', brokerage.id)
-      .eq('status', 'pending'),
+      .eq('status', 'pending')
+      .gt('expiresAt', new Date().toISOString()),
   ]);
 
   return NextResponse.json({

@@ -32,6 +32,7 @@ import {
   registerForConnection,
 } from '@/lib/integrations/triggers';
 import { logger } from '@/lib/logger';
+import { isPlatformAdmin } from '@/lib/permissions';
 import type { IntegrationConnectionRow } from '@/lib/integrations/connections';
 
 export const runtime = 'nodejs';
@@ -57,12 +58,17 @@ function bearerOk(header: string | null, secret: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-  }
-  if (!bearerOk(req.headers.get('Authorization'), cronSecret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Auth: a logged-in platform admin (honors the /api/admin/* invariant) OR a
+  // valid CRON_SECRET bearer (ops/CLI invocation has no Clerk session). Either
+  // is sufficient; both fail closed.
+  if (!(await isPlatformAdmin())) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+    }
+    if (!bearerOk(req.headers.get('Authorization'), cronSecret)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const force = new URL(req.url).searchParams.get('force') === '1';

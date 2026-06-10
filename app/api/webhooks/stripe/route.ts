@@ -4,6 +4,8 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
+import { PLANS, TOPUPS, type TopupId, planIdForStripePrice } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -76,27 +78,43 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
 // Disable body parsing — Stripe needs the raw body for signature verification
 export const runtime = 'nodejs';
 
-/** Get current_period_end from the first subscription item. */
+/** Get current_period_end from the first subscription item. Falls back through
+ *  the other "when does access end" timestamps before start_date — on a
+ *  canceled/past_due sub the item's current_period_end can be absent, and
+ *  falling straight to start_date would write a period-end in the PAST, which
+ *  strands any "access until period end" grace logic. */
 function getPeriodEnd(sub: Stripe.Subscription): string {
-  const ts = sub.items.data[0]?.current_period_end ?? sub.start_date;
+  const subAny = sub as unknown as {
+    current_period_end?: number; cancel_at?: number; ended_at?: number;
+  };
+  const ts =
+    sub.items.data[0]?.current_period_end ??
+    subAny.current_period_end ??
+    subAny.cancel_at ??
+    subAny.ended_at ??
+    sub.start_date;
   return new Date(ts * 1000).toISOString();
 }
 
+/** Stripe's `customer` field can be a string id, an expanded object, or null.
+ *  Normalize to the id string so ownership comparisons don't silently break:
+ *  comparing a stored string id against an expanded object is always unequal
+ *  (legit update rejected → account stranded) — or, inverted, always equal
+ *  (guard bypassed). */
+function customerIdOf(
+  customer: string | { id: string } | null | undefined,
+): string | null {
+  if (!customer) return null;
+  return typeof customer === 'string' ? customer : customer.id;
+}
+
 /**
- * Map a brokerage plan → seat limit.
- * starter = 5, team = 15, enterprise = unlimited (NULL).
+ * Map a brokerage plan → seat limit, from the single source of truth in
+ * lib/plans.ts (team = 5, team_plus = 10). Unknown plans → null (no cap set).
  */
 function seatLimitForPlan(plan: string | undefined | null): number | null {
-  switch (plan) {
-    case 'starter':
-      return 5;
-    case 'team':
-      return 15;
-    case 'enterprise':
-      return null;
-    default:
-      return null;
-  }
+  if (plan === 'team' || plan === 'team_plus') return PLANS[plan].includedUsers;
+  return null;
 }
 
 /**
@@ -221,7 +239,7 @@ async function updateBrokerageFromSubscription(
 
   if (opts.includePlanFromMetadata) {
     const plan = subscription.metadata?.plan;
-    if (plan === 'starter' || plan === 'team' || plan === 'enterprise') {
+    if (plan === 'team' || plan === 'team_plus') {
       updateData.plan = plan;
       updateData.seatLimit = seatLimitForPlan(plan);
     }
@@ -266,22 +284,58 @@ async function POSTHandler(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Idempotency check — skip if already processed
+  // Idempotency check — skip events we've already fully processed. The Redis
+  // key is a fast-path optimization, NOT the correctness boundary: it's set
+  // only AFTER the handler succeeds (see end of function). Correctness rests on
+  // DB-level grant idempotency (CreditLot.sourceId unique index), so a Redis
+  // miss can at worst re-run a handler — it can never double-grant.
   const eventKey = `stripe:event:${event.id}`;
   try {
     const alreadyProcessed = await redis.get(eventKey);
     if (alreadyProcessed) {
       return NextResponse.json({ received: true });
     }
-    await redis.set(eventKey, '1', { ex: 86400 }); // Expire after 24h
   } catch {
-    // Redis unavailable — proceed anyway (best effort dedup)
+    // Redis unavailable — proceed; DB-level idempotency is the real backstop.
   }
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Top-up purchase (one-time payment, no subscription) — grant credits.
+        // Idempotent via the event-ID dedupe above, so a retried delivery won't
+        // double-grant. Metadata is set by app/api/billing/credits/checkout.
+        const topupId = session.metadata?.topup as TopupId | undefined;
+        if (topupId && topupId in TOPUPS) {
+          const acctType = session.metadata?.accountType;
+          const acctId = session.metadata?.accountId;
+          if (acctId && (acctType === 'space' || acctType === 'brokerage')) {
+            // Anti-poisoning (mirrors the subscription paths): if the target
+            // account already has a Stripe customer, it must match the payer.
+            // A brand-new account with no customer yet is allowed — the metadata
+            // was server-set from a verified owned space at checkout.
+            const acctTable = acctType === 'space' ? 'Space' : 'Brokerage';
+            const { data: acct } = await supabase
+              .from(acctTable)
+              .select('stripeCustomerId')
+              .eq('id', acctId)
+              .maybeSingle();
+            if (acct?.stripeCustomerId && acct.stripeCustomerId !== (session.customer as string)) {
+              logger.error('[stripe-webhook] top-up account/customer mismatch — rejecting metadata poisoning', {
+                acctType, acctId, sessionCustomer: session.customer,
+              });
+              break;
+            }
+            await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
+            logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+          } else {
+            logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
+          }
+          break;
+        }
+
         if (!session.subscription) break;
 
         const subscription = await stripe.subscriptions.retrieve(
@@ -329,7 +383,7 @@ async function POSTHandler(req: NextRequest) {
           .eq('id', spaceId)
           .maybeSingle();
 
-        if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== (session.customer as string)) {
+        if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== customerIdOf(session.customer)) {
           logger.error('[stripe-webhook] checkout spaceId mismatch — rejecting metadata poisoning attempt', {
             spaceId,
             existingCustomer: targetSpace.stripeCustomerId,
@@ -345,6 +399,11 @@ async function POSTHandler(req: NextRequest) {
         break;
       }
 
+      // A subscription created outside checkout.session.completed (Stripe
+      // Dashboard, API, or trial→paid create) only ever fired `created`, which
+      // had no handler — so status/period/customer never got written until the
+      // first later event. Share the `updated` handler so creation lands too.
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const newStatus = mapStatus(subscription.status);
@@ -374,21 +433,27 @@ async function POSTHandler(req: NextRequest) {
             .eq('id', spaceId)
             .maybeSingle();
 
-          if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== subscription.customer) {
+          if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== customerIdOf(subscription.customer)) {
             logger.error('[stripe-webhook] spaceId metadata mismatch — space belongs to different customer', {
               spaceId,
               spaceCustomer: existingSpace.stripeCustomerId,
-              webhookCustomer: subscription.customer,
+              webhookCustomer: customerIdOf(subscription.customer),
             });
             break; // Reject update — potential metadata poisoning attack
           }
 
           await supabase.from('Space').update(updateData).eq('id', spaceId);
         } else {
-          await supabase
+          // No spaceId metadata (legacy subs): match by subscription id, but
+          // also bind to the subscription's customer so a poisoned/duplicated
+          // stripeSubscriptionId can't overwrite a different customer's Space.
+          const subCustomer = customerIdOf(subscription.customer);
+          let q = supabase
             .from('Space')
             .update(updateData)
             .eq('stripeSubscriptionId', subscription.id);
+          if (subCustomer) q = q.eq('stripeCustomerId', subCustomer);
+          await q;
         }
         // Notify owner of status change
         try { await notifySubscriptionChange(subscription.id, newStatus); } catch (e) { logger.error('[stripe-webhook] subscription notification failed', undefined, e); }
@@ -445,16 +510,54 @@ async function POSTHandler(req: NextRequest) {
         const paidSub = await stripe.subscriptions.retrieve(paidSubId);
         const paidStatus = mapStatus(paidSub.status);
 
+        // Derive the ACTIVE plan from the live subscription's price, not the
+        // checkout-time metadata.plan — that's stamped once and goes STALE on a
+        // portal plan change, so a Solo→Pro upgrade was granted Solo credits +
+        // relabeled Solo, and Pro→Solo kept granting Pro credits at the Solo
+        // price. Falls back to metadata when the price isn't a known plan price.
+        const livePlan = planIdForStripePrice(paidSub.items.data[0]?.price?.id);
+        // Grant monthly credits ONLY on a genuine new-subscription or renewal
+        // invoice. Proration / mid-cycle / manual invoices also fire
+        // payment_succeeded and would each mint an extra full month of credits.
+        const grantableInvoice =
+          invoice.billing_reason === 'subscription_create' ||
+          invoice.billing_reason === 'subscription_cycle';
+
         // Brokerage path
         const brokerageId = paidSub.metadata?.brokerageId;
         if (brokerageId) {
           await updateBrokerageFromSubscription(brokerageId, paidSub, {
             includePlanFromMetadata: true,
           });
+          // Monthly credit grant (best-effort — must never break payment
+          // processing). Idempotent-per-invoice via the event-ID dedupe above.
+          if (grantableInvoice) {
+            try {
+              await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, livePlan ?? paidSub.metadata?.plan ?? '', invoice.id);
+            } catch (e) {
+              logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+            }
+          }
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ───────────────────────────────────────────
+        // Verify the subscription's customer owns the target Space before
+        // crediting it active — mirrors the customer.subscription.updated guard
+        // so a poisoned stripeSubscriptionId can't activate another's space.
+        const { data: paidSpace } = await supabase
+          .from('Space')
+          .select('id, plan, stripeCustomerId')
+          .eq('stripeSubscriptionId', paidSubId)
+          .maybeSingle();
+        if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== customerIdOf(paidSub.customer)) {
+          logger.error('[stripe-webhook] invoice.payment_succeeded customer mismatch — subscription belongs to a different customer', {
+            paidSubId,
+            spaceCustomer: paidSpace.stripeCustomerId,
+            webhookCustomer: paidSub.customer,
+          });
+          break;
+        }
         await supabase
           .from('Space')
           .update({
@@ -462,6 +565,34 @@ async function POSTHandler(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(paidSub),
           })
           .eq('stripeSubscriptionId', paidSubId);
+
+        // Monthly credit grant (best-effort — never break payment processing).
+        // Trust the tier stamped on the subscription metadata (set at checkout);
+        // fall back to the current Space.plan, else Solo. Using the metadata
+        // avoids mislabeling a downgrade (e.g. Pro→Solo) off a stale Space.plan.
+        try {
+          if (paidSpace?.id) {
+            const planId =
+              livePlan ||
+              (paidSub.metadata?.plan as string) ||
+              (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
+            // Keep the plan label in sync even when this invoice isn't grantable
+            // (so a portal plan change is reflected immediately).
+            if (planId !== paidSpace.plan) {
+              await supabase
+                .from('Space')
+                .update({ plan: planId, planActivatedAt: new Date().toISOString() })
+                .eq('id', paidSpace.id);
+            }
+            if (grantableInvoice) {
+              await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+            }
+          } else {
+            logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
+          }
+        } catch (e) {
+          logger.error('[stripe-webhook] space monthly grant failed (paid, credits NOT granted)', { paidSubId }, e);
+        }
 
         // Notify only on active transition (payment recovered past_due subscription)
         if (paidStatus === 'active') {
@@ -510,11 +641,16 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
-        await supabase
+        // ── Existing Space path ──────────────────────────────────────────
+        // Bind to the subscription's customer so a poisoned stripeSubscriptionId
+        // can't force a victim Space to past_due (access denial-of-service).
+        const failedCustomer = customerIdOf(failedSub.customer);
+        let fq = supabase
           .from('Space')
           .update({ stripeSubscriptionStatus: 'past_due' })
           .eq('stripeSubscriptionId', subId);
+        if (failedCustomer) fq = fq.eq('stripeCustomerId', failedCustomer);
+        await fq;
         try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { logger.error('[stripe-webhook] past_due notification failed', undefined, e); }
         break;
       }
@@ -526,6 +662,18 @@ async function POSTHandler(req: NextRequest) {
   } catch (err) {
     logger.error('[stripe-webhook] error processing event', { eventType: event.type }, err);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
+  }
+
+  // Mark processed only AFTER the handler succeeded (every switch case breaks,
+  // so reaching here = success). If it had thrown, the catch returned 500 and
+  // this never runs → Stripe retries → the retry re-runs the handler and
+  // completes the work, with DB-level grant idempotency preventing any
+  // double-grant. Setting the key before processing would silently drop the
+  // event on a mid-handler crash.
+  try {
+    await redis.set(eventKey, '1', { ex: 259200 }); // 72h — covers Stripe's retry window
+  } catch {
+    // Redis unavailable — fine; DB-level idempotency already guards correctness.
   }
 
   return NextResponse.json({ received: true });

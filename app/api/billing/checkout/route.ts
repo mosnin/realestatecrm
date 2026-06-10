@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe, getPriceId } from '@/lib/stripe';
-import { PLANS } from '@/lib/plans';
+import { getStripe, pickSpacePriceId } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { PLANS } from '@/lib/plans';
 
-type BrokeragePlan = 'starter' | 'team' | 'enterprise';
+type BrokeragePlan = 'team' | 'team_plus';
 
 /** Map plan → Stripe price env var. */
 function getBrokeragePriceEnv(plan: BrokeragePlan): string | undefined {
   switch (plan) {
-    case 'starter':
-      return process.env.STRIPE_PRICE_STARTER;
     case 'team':
       return process.env.STRIPE_PRICE_TEAM;
-    case 'enterprise':
-      return process.env.STRIPE_PRICE_ENTERPRISE;
+    case 'team_plus':
+      return process.env.STRIPE_PRICE_TEAM_PLUS;
   }
 }
 
@@ -29,9 +27,16 @@ export async function POST(req: NextRequest) {
       return handleBrokerageCheckout(req, body);
     }
 
-    // ── Existing Space flow (unchanged) ────────────────────────────────────
+    // ── Space flow ─────────────────────────────────────────────────────────
     const { slug } = body;
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+
+    // The tier the buyer selected. Default to Solo for backward compatibility
+    // (the existing client posts only { slug }). This is the single source of
+    // truth for BOTH the price charged and the plan label provisioned, so the
+    // two can never disagree the way they did when price came from a lone
+    // STRIPE_PRICE_ID env and the label was reverse-derived from it.
+    const spacePlan: 'solo' | 'pro' = body?.plan === 'pro' ? 'pro' : 'solo';
 
     const auth = await requireSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
@@ -74,24 +79,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
     }
 
-    // Tier selection — 'solo' (default, $97) or 'pro' ($197) from lib/plans.
-    // Team tiers bill the Brokerage (brokerage branch / sales), never this
-    // Space flow. Unknown plan values collapse to solo rather than erroring so
-    // older clients that send nothing keep working.
-    const spacePlan: 'solo' | 'pro' = body?.plan === 'pro' ? 'pro' : 'solo';
-    let priceId: string | null = PLANS[spacePlan].stripePriceMonthly;
-    if (!priceId && spacePlan === 'solo') {
-      // Legacy fallback: deployments configured the single STRIPE_PRICE_ID
-      // before the tiered products existed in Stripe.
-      try {
-        priceId = getPriceId();
-      } catch {
-        priceId = null;
-      }
-    }
+    // Resolve the Stripe price from the selected tier via lib/plans.ts (single
+    // source of truth). See pickSpacePriceId for the Solo legacy fallback.
+    const priceId = pickSpacePriceId(spacePlan, {
+      soloMonthly: PLANS.solo.stripePriceMonthly,
+      proMonthly: PLANS.pro.stripePriceMonthly,
+      legacy: process.env.STRIPE_PRICE_ID ?? null,
+    });
     if (!priceId) {
       console.error('[checkout] No Stripe price configured for plan:', spacePlan);
-      return NextResponse.json({ error: 'Billing not configured. Contact support.' }, { status: 500 });
+      return NextResponse.json({ error: 'Billing not configured. Contact support.' }, { status: 503 });
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
@@ -148,9 +145,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Only grant a 7-day trial if the user has never used one before.
-    // The plan is stamped on the subscription metadata so the webhook can
-    // record which tier was actually bought.
+    // spacePlan (resolved above from the buyer's selection) is stamped on the
+    // subscription metadata so the webhook grants the right monthly credits and
+    // labels Space.plan to match exactly what was charged.
+
+    // Only grant a 7-day trial if the user has never used one before
     const hasUsedTrial = !!stripeData?.trialUsedAt;
     const subscriptionData: Record<string, unknown> = {
       metadata: { spaceId: space.id, plan: spacePlan },
@@ -204,9 +203,9 @@ async function handleBrokerageCheckout(
 
   // Validate plan input
   const plan = body?.plan as BrokeragePlan | undefined;
-  if (plan !== 'starter' && plan !== 'team' && plan !== 'enterprise') {
+  if (plan !== 'team' && plan !== 'team_plus') {
     return NextResponse.json(
-      { error: 'plan must be one of: starter, team, enterprise' },
+      { error: 'plan must be one of: team, team_plus' },
       { status: 400 },
     );
   }

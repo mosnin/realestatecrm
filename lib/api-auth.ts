@@ -83,6 +83,16 @@ export async function requireActiveSubscription(
 }
 
 /**
+ * Subscription states that pause premium AI under dunning (a lapsed PAID plan).
+ * Deliberately EXCLUDES 'inactive' (free / never-subscribed) and
+ * 'trialing'/'active', so free and trial users are never gated — only an
+ * account whose paid subscription failed payment or was canceled.
+ */
+export function isSubscriptionDelinquent(status: string | null | undefined): boolean {
+  return status === 'past_due' || status === 'canceled' || status === 'unpaid';
+}
+
+/**
  * Verifies the calling user owns the given workspace slug, OR is a
  * broker_owner/broker_admin of the brokerage that manages this space.
  * Returns { userId, space } or a 4xx NextResponse.
@@ -122,20 +132,25 @@ export async function requireSpaceOwner(
     // fetch all, then deterministically prefer broker_owner over broker_admin.
     const { data: memberships } = await supabase
       .from('BrokerageMembership')
-      .select('role, brokerageId')
+      .select('role, brokerageId, createdAt')
       .eq('userId', dbUser.id)
-      .in('role', ['broker_owner', 'broker_admin']);
+      .in('role', ['broker_owner', 'broker_admin'])
+      .order('createdAt', { ascending: true });
 
-    const membership =
-      memberships?.find((m) => m.role === 'broker_owner') ?? memberships?.[0];
+    // The caller may broker-own/admin MORE THAN ONE brokerage. Grant access
+    // when the space's owner belongs to ANY of them. The previous code collapsed
+    // the memberships to a single one (broker_owner-first) and checked only that
+    // brokerage, so e.g. a broker_owner of A who is also broker_admin of B was
+    // wrongly 403'd when opening a space owned by a B member.
+    const brokerBrokerageIds = (memberships ?? []).map((m) => m.brokerageId);
 
-    if (membership) {
-      // Check if the space's owner is a member of the same brokerage
+    if (brokerBrokerageIds.length > 0) {
       const { data: spaceOwnerMembership } = await supabase
         .from('BrokerageMembership')
         .select('id')
-        .eq('brokerageId', membership.brokerageId)
+        .in('brokerageId', brokerBrokerageIds)
         .eq('userId', space.ownerId)
+        .limit(1)
         .maybeSingle();
 
       if (spaceOwnerMembership) {

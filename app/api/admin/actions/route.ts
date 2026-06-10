@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       // or create a sign-in link. For safety, we'll log the action
       // and direct the admin to use Clerk Dashboard for password resets.
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'send_password_reset',
         target: clerkId,
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         message = 'Reset onboard=false and step=1 because workspace is missing.';
       }
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'repair_onboarding',
         target: userId,
@@ -150,6 +150,13 @@ export async function POST(req: NextRequest) {
 
     // ── Update subscription status ───────────────────────────────────────
     if (action === 'update_subscription') {
+      // Per-action daily cap — like issue_refund, this gives away value (can set
+      // a sub 'active' with no Stripe charge), so the shared 30/min admin limit
+      // isn't enough on its own.
+      const { allowed: subAllowed } = await checkRateLimit(`admin:subupdate:${admin.userId}`, 50, 86400);
+      if (!subAllowed) {
+        return NextResponse.json({ error: 'Daily subscription-update limit reached.' }, { status: 429 });
+      }
       const { userId, status, periodEnd } = body as {
         userId: string;
         status: string;
@@ -231,7 +238,7 @@ export async function POST(req: NextRequest) {
 
       if (updateError) throw updateError;
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'update_subscription',
         target: userId,
@@ -255,7 +262,7 @@ export async function POST(req: NextRequest) {
       // Look up the user to get their Clerk ID
       const { data: userRow, error: userError } = await supabase
         .from('User')
-        .select('id, clerkId, email')
+        .select('id, clerkId, email, platformRole')
         .eq('id', userId)
         .maybeSingle();
 
@@ -264,7 +271,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      const target = userRow as { id: string; clerkId: string; email: string };
+      const target = userRow as { id: string; clerkId: string; email: string; platformRole?: string };
+
+      // Never suspend a platform admin: the ban overwrites platformRole with
+      // 'banned' and unsuspend restores it to 'user', so suspending an admin
+      // would permanently strip their admin access (and could lock out the last
+      // admin). Refuse it.
+      if (target.platformRole === 'admin') {
+        return NextResponse.json({ error: 'Cannot suspend a platform admin.' }, { status: 403 });
+      }
 
       // Ban the user in Clerk — prevents them from signing in
       await clerkClient.users.banUser(target.clerkId);
@@ -276,7 +291,7 @@ export async function POST(req: NextRequest) {
         .update({ platformRole: 'banned' })
         .eq('id', userId);
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'suspend_user',
         target: userId,
@@ -319,7 +334,7 @@ export async function POST(req: NextRequest) {
         .update({ platformRole: 'user' })
         .eq('id', userId);
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'unsuspend_user',
         target: userId,
@@ -334,6 +349,12 @@ export async function POST(req: NextRequest) {
 
     // ── Comp free month ─────────────────────────────────────────────────
     if (action === 'comp_free_month') {
+      // Per-action daily cap — comps grant 30 days free service; the shared
+      // 30/min admin limit isn't a meaningful guard for value give-aways.
+      const { allowed: compAllowed } = await checkRateLimit(`admin:comp:${admin.userId}`, 20, 86400);
+      if (!compAllowed) {
+        return NextResponse.json({ error: 'Daily comp limit reached.' }, { status: 429 });
+      }
       const { userId: targetUserId } = body as { userId: string };
       if (!targetUserId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
 
@@ -387,7 +408,7 @@ export async function POST(req: NextRequest) {
         stripePeriodEnd: periodEnd,
       }).eq('id', space.id);
 
-      logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd, stripeUpdated, stripeWarning } });
+      await logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd, stripeUpdated, stripeWarning } });
 
       const message = stripeWarning
         ? `Database updated. ⚠️ ${stripeWarning}`
@@ -443,7 +464,7 @@ export async function POST(req: NextRequest) {
       const refund = await stripe.refunds.create({
         payment_intent: paymentIntentId,
       });
-      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount } });
+      await logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 
@@ -461,7 +482,7 @@ export async function POST(req: NextRequest) {
           expiresInSeconds: 600,
         });
 
-        logAdminAction({
+        await logAdminAction({
           actor: admin.userId,
           action: 'impersonate_user',
           target: clerkId,
@@ -477,7 +498,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (err) {
         console.error('[admin-action] impersonate_user failed', err);
-        logAdminAction({
+        await logAdminAction({
           actor: admin.userId,
           action: 'impersonate_user_failed',
           target: clerkId,
@@ -516,7 +537,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'force_password_reset',
         target: clerkId,
@@ -541,7 +562,7 @@ export async function POST(req: NextRequest) {
 
       await clerkClient.sessions.revokeSession(sessionId);
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'revoke_session',
         target: clerkId ?? sessionId,
@@ -570,7 +591,7 @@ export async function POST(req: NextRequest) {
       );
       const revoked = results.filter((r) => r.ok).length;
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'revoke_all_sessions',
         target: clerkId,
@@ -602,7 +623,7 @@ export async function POST(req: NextRequest) {
       const { sendMfaEnrollmentPrompt } = await import('@/lib/email');
       await sendMfaEnrollmentPrompt({ toEmail: primaryEmail.emailAddress, userName: displayName });
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'send_mfa_prompt',
         target: clerkId,

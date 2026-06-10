@@ -45,6 +45,14 @@ vi.mock('@/lib/telemetry', () => ({
   maybeEmitFirstAction: vi.fn(async () => {}),
 }));
 
+// Per-test override for the Conversation row resolveConversation looks up.
+// Default undefined → the mock returns a non-matching (Space-shaped) row, so a
+// fresh conversation is minted. Set it to inject a specific row — e.g. a
+// reserved broker/team title — to exercise the #303 write-path isolation guard.
+const { convLookup } = vi.hoisted(() => ({
+  convLookup: { row: undefined as undefined | { id: string; spaceId: string; title: string } },
+}));
+
 // Supabase: minimal chainable mock for resolveConversation + loadHistory +
 // hydrateAttachments. The route also reads the User row inside
 // resolveToolContext → we mock that via the context module instead.
@@ -57,7 +65,9 @@ vi.mock('@/lib/supabase', () => {
       obj[m] = vi.fn(() => obj);
     }
     obj.maybeSingle = vi.fn(() =>
-      Promise.resolve({ data: { id: 's_1', slug: 'jane', name: 'Jane', ownerId: 'u_1' } }),
+      Promise.resolve({
+        data: convLookup.row ?? { id: 's_1', slug: 'jane', name: 'Jane', ownerId: 'u_1' },
+      }),
     );
     obj.single = vi.fn(() => Promise.resolve(terminal));
     (obj as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
@@ -121,6 +131,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Restore the saveUserMessage mock implementation after clearAllMocks.
   mockedSaveUser.mockResolvedValue({ messageId: 'msg_user_1' });
+  convLookup.row = undefined;
   // Default to unset — every test sets explicitly.
   delete process.env.CHIPPI_CHAT_RUNTIME;
   process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
@@ -158,6 +169,41 @@ function makeRequest(body: Record<string, unknown> = {}) {
     }),
   }) as unknown as Parameters<typeof POST>[0];
 }
+
+describe('POST /api/ai/task — reserved-title conversationId is not reused (isolation guard, #303)', () => {
+  // A broker_owner also owns their personal realtor space, and the pre-#295
+  // broker/team conversations still live in the shared Conversation table with
+  // a reserved title prefix. resolveConversation must reject a reserved-title
+  // conversationId (same spaceId but [BROKER_CHIPPI]/[BROKERAGE_CHAT] title) so
+  // realtor turns never append to — or read history from — a broker conversation.
+  it('mints a fresh conversation instead of reusing a [BROKER_CHIPPI] one', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    convLookup.row = { id: 'broker_conv_1', spaceId: 's_1', title: '[BROKER_CHIPPI] private notes' };
+    const res = await POST(
+      makeRequest({ message: 'add Preston as a contact', conversationId: 'broker_conv_1' }),
+    );
+    expect(res.status).toBe(200);
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    const call = tsStreamMock.mock.calls[0][0] as { conversationId: string };
+    expect(call.conversationId).not.toBe('broker_conv_1');
+  });
+
+  it('mints a fresh conversation instead of reusing a [BROKERAGE_CHAT] one', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    convLookup.row = { id: 'team_conv_1', spaceId: 's_1', title: '[BROKERAGE_CHAT] standup' };
+    await POST(makeRequest({ message: 'add Preston as a contact', conversationId: 'team_conv_1' }));
+    const call = tsStreamMock.mock.calls[0][0] as { conversationId: string };
+    expect(call.conversationId).not.toBe('team_conv_1');
+  });
+
+  it('reuses a plain realtor conversation in the same space (guard is not over-broad)', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    convLookup.row = { id: 'realtor_conv_1', spaceId: 's_1', title: 'Follow up with the Garcias' };
+    await POST(makeRequest({ message: 'add Preston as a contact', conversationId: 'realtor_conv_1' }));
+    const call = tsStreamMock.mock.calls[0][0] as { conversationId: string };
+    expect(call.conversationId).toBe('realtor_conv_1');
+  });
+});
 
 describe('POST /api/ai/task — input validation', () => {
   it('400 on missing spaceSlug', async () => {
