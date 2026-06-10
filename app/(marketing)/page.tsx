@@ -3,8 +3,9 @@
  *
  * An editorial scroll that says the idea once and shows the product:
  *   promise (hero + workspace shot) → integrations → the loop as alternating
- *   feature rows → the breadth (bento) → an honest metrics band → the
- *   enterprise-trust band → the belief → the ask.
+ *   feature rows → a scroll-cinematic morning (pinned, scroll-as-clock) → the
+ *   breadth (bento) → an honest metrics band → the enterprise-trust band → the
+ *   belief → the ask.
  *
  * Image placeholders (hero, feature rows, studio) are labeled slots for real
  * screenshots. Auth users bounce straight to their workspace (unchanged).
@@ -15,6 +16,7 @@ import { redirect } from 'next/navigation';
 import { Hero } from '@/components/marketing/site/home/hero';
 import { Logos } from '@/components/marketing/site/home/logos';
 import { Features } from '@/components/marketing/site/home/features';
+import { MorningStage } from '@/components/marketing/site/home/morning-stage';
 import { Bento } from '@/components/marketing/site/home/bento';
 import { Metrics } from '@/components/marketing/site/home/metrics';
 import { Enterprise } from '@/components/marketing/site/home/enterprise';
@@ -32,6 +34,7 @@ export default async function MarketingHomePage() {
       <Hero />
       <Logos />
       <Features />
+      <MorningStage />
       <Bento />
       <Metrics />
       <Enterprise />
