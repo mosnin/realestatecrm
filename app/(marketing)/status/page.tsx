@@ -27,7 +27,7 @@
  * No charts, no graphs, no numbers. Hairline borders only. No brand orange.
  */
 
-import { MarketingHero } from '@/components/marketing/marketing-hero';
+import { PageHero } from '@/components/marketing/site/page-hero';
 import { supabase } from '@/lib/supabase';
 import { hasLLMKey } from '@/lib/llm';
 import { composioConfigured } from '@/lib/integrations/composio';
@@ -145,8 +145,8 @@ export default async function StatusPage() {
 
   return (
     <>
-      <MarketingHero
-        eyebrow="STATUS"
+      <PageHero
+        eyebrow="Status"
         title={title}
         sub="Live status of Chippi’s agent, integrations, and dashboard."
       />
