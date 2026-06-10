@@ -72,6 +72,10 @@ const optionalSchema = z.object({
   // LLM routing
   OPENROUTER_API_KEY: z.string().optional(),
 
+  // Apify — optional property-listing scraper (the property-import feature)
+  APIFY_TOKEN: z.string().optional(),
+  APIFY_PROPERTY_ACTOR: z.string().optional(),
+
   // Email / SMS
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),

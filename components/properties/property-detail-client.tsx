@@ -75,6 +75,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
       <div className="rounded-xl border border-border/70 bg-card p-5">
         <h1 className="text-lg font-semibold mb-4">Edit property</h1>
         <PropertyForm
+          slug={slug}
           initial={property}
           onCancel={() => setEditing(false)}
           onSubmit={save}

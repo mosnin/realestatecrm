@@ -59,6 +59,7 @@ export default function NewPropertyPage() {
       </header>
 
       <PropertyForm
+        slug={slug}
         onCancel={() => router.push(`/s/${slug}/properties`)}
         onSubmit={handleSubmit}
         submitting={submitting}

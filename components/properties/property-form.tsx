@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { Property, PropertyListingStatus, PropertyType } from '@/lib/types';
 import { PROPERTY_LISTING_STATUS_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/properties';
+import type { PropertyPrefill } from '@/lib/apify';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +15,8 @@ type FormValues = Partial<Property>;
 
 interface Props {
   initial?: FormValues;
+  /** When set, enables the "import from a listing URL" row (Apify scrape). */
+  slug?: string;
   onCancel: () => void;
   onSubmit: (values: FormValues) => void;
   submitting?: boolean;
@@ -36,15 +39,83 @@ interface Props {
  * the list + detail pages); the editor lets the realtor tap any tile to
  * promote it. The first uploaded photo is featured by default.
  */
-export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, submitLabel = 'Save' }: Props) {
+export function PropertyForm({ initial = {}, slug, onCancel, onSubmit, submitting, submitLabel = 'Save' }: Props) {
   const [v, setV] = useState<FormValues>({
     listingStatus: 'active',
     photos: [],
     ...initial,
   });
 
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setV((prev) => ({ ...prev, [key]: value }));
+  }
+
+  /** Pull a listing's details via Apify and fill empty fields only — the
+   *  realtor's own typing always wins, and they review before saving. */
+  async function importFromUrl() {
+    if (!slug || !importUrl.trim()) return;
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const res = await fetch('/api/properties/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, url: importUrl.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        configured?: boolean;
+        prefill?: PropertyPrefill | null;
+        error?: string;
+      };
+      if (data.configured === false) {
+        setImportMsg('Connect Apify to import listings automatically.');
+        return;
+      }
+      if (!res.ok || !data.prefill) {
+        setImportMsg(data.error ?? "Couldn't read that listing.");
+        return;
+      }
+      const p = data.prefill;
+      const next: FormValues = { ...v };
+      let filled = 0;
+      const fill = <K extends keyof FormValues>(k: K, val: FormValues[K] | null | undefined) => {
+        const cur = next[k];
+        if (val != null && val !== '' && (cur == null || cur === '')) {
+          next[k] = val;
+          filled++;
+        }
+      };
+      fill('address', p.address);
+      fill('unitNumber', p.unitNumber);
+      fill('city', p.city);
+      fill('stateRegion', p.stateRegion);
+      fill('postalCode', p.postalCode);
+      fill('beds', p.beds);
+      fill('baths', p.baths);
+      fill('squareFeet', p.squareFeet);
+      fill('listPrice', p.listPrice);
+      fill('propertyType', p.propertyType);
+      fill('listingUrl', p.listingUrl ?? importUrl.trim());
+      fill('notes', p.notes);
+      if ((!next.photos || next.photos.length === 0) && p.photos.length > 0) {
+        next.photos = p.photos;
+        filled++;
+      }
+      setV(next);
+      setImportMsg(
+        filled > 0
+          ? `Imported ${filled} field${filled === 1 ? '' : 's'} — review before saving.`
+          : 'Nothing new to import.',
+      );
+    } catch {
+      setImportMsg("Couldn't reach the importer. Try again.");
+    } finally {
+      setImporting(false);
+    }
   }
 
   function submit(e: React.FormEvent) {
@@ -84,6 +155,36 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* Import from a listing URL — Apify fills the empty fields below, the
+          realtor reviews. Only shown when the integration can be reached
+          (a slug is in scope); degrades quietly when Apify isn't connected. */}
+      {slug && (
+        <div className="space-y-2 rounded-md border border-dashed border-border/70 bg-muted/20 p-3">
+          <span className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Import from a listing URL
+          </span>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="Paste a public listing link"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={importing || !importUrl.trim()}
+              onClick={importFromUrl}
+            >
+              {importing && <Loader2 className="animate-spin" />}
+              {importing ? 'Importing' : 'Import'}
+            </Button>
+          </div>
+          {importMsg && <p className="text-xs text-muted-foreground">{importMsg}</p>}
+        </div>
+      )}
+
       {/* Photos first — the realtor is showing a house, not filing an MLS
           form. The featured tile sets what the list, the deal card, and
           the listing detail show. */}
