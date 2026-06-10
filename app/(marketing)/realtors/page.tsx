@@ -10,8 +10,6 @@
  * realtors bounce to their workspace.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Smartphone, Globe, Building2 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -96,12 +94,7 @@ const features = [
   },
 ];
 
-export default async function RealtorsPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=realtor');
-  }
-
+export default function RealtorsPage() {
   return (
     <>
       <PageHero

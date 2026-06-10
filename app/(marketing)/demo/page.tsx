@@ -12,18 +12,11 @@
  * URL into CALENDLY_URL below. Empty → a calm placeholder renders instead.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import { DemoBooking } from '@/components/marketing/demo/demo-booking';
 
 export const metadata = { title: 'Book a demo · Chippi' };
 
-export default async function DemoPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=realtor');
-  }
-
+export default function DemoPage() {
   return (
     <div className="bg-background text-foreground">
       <DemoBooking />

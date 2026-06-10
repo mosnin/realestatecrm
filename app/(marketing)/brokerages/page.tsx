@@ -10,8 +10,6 @@
  * workspace; brokers want a walkthrough, so "Book a demo" is prominent.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Users, TimerReset, ShieldCheck } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -98,12 +96,7 @@ const features = [
   },
 ];
 
-export default async function BrokeragesPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=broker');
-  }
-
+export default function BrokeragesPage() {
   return (
     <>
       <PageHero

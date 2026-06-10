@@ -9,8 +9,6 @@
  * (PageHero, Reveal, serif headlines). Auth users bounce to their workspace.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -39,12 +37,7 @@ const BELIEFS = [
   },
 ];
 
-export default async function CompanyPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=realtor');
-  }
-
+export default function CompanyPage() {
   return (
     <>
       <PageHero
