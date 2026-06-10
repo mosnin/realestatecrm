@@ -44,13 +44,13 @@ export interface DirectStreamInput {
   abortController: AbortController;
   /**
    * Called when the direct response signals it needs the agent path. The
-   * caller is expected to fire off the agent flow with the same message
-   * and stream its bytes into the same Response. Return `true` if the
-   * escalation was kicked off (we tag the ChatUsage row 'direct→agent'),
-   * `false` if no escalation is configured (then we just commit the direct
-   * answer as-is).
+   * handler builds the AGENT path's SSE Response for the same message (e.g.
+   * streamTsChatTurn) and returns it; this stream then pipes the agent
+   * response's bytes through verbatim — same SSE protocol, so the browser
+   * just sees the turn continue on the agent route. Return `null` (or throw)
+   * to skip escalation and commit the direct answer as-is.
    */
-  onEscalate?: () => Promise<boolean>;
+  onEscalate?: () => Promise<Response | null>;
 }
 
 interface SseEvent {
@@ -73,8 +73,9 @@ interface SseEvent {
  *   3. text_delta    { delta: '...' }               — whole reply in one shot
  *   4. turn_complete { reason: 'complete' }
  *
- * On escalation we ABORT the direct stream after step 1 + route_picked
- * update and the caller wires the agent stream into the same Response.
+ * On escalation we emit a second route_picked ({route:'agent',
+ * escalated:true}) and pipe the agent path's SSE bytes through this same
+ * Response — the browser sees one continuous stream.
  */
 export function streamDirectTurn(input: DirectStreamInput): Response {
   const encoder = new TextEncoder();
@@ -143,14 +144,26 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             route: 'direct→agent' as ChatRoute,
             runtime: 'ts',
           });
-          const handled = await input.onEscalate().catch((err) => {
+          const agentResponse = await input.onEscalate().catch((err) => {
             logger.warn('[direct-stream] escalation handler threw', { spaceId: input.spaceId }, err);
-            return false;
+            return null;
           });
-          if (handled) {
-            // The caller is streaming the agent path's bytes into this
-            // same Response. Close our stream so we don't interleave.
-            controller.close();
+          if (agentResponse?.body) {
+            // Tell the browser the turn moved to the agent route, then pipe
+            // the agent stream's bytes through verbatim. The agent path
+            // persists its own assistant message and ChatUsage row, so
+            // nothing below this block should run.
+            push({ type: 'route_picked', route: 'agent', escalated: true });
+            const reader = agentResponse.body.getReader();
+            try {
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                controller.enqueue(value);
+              }
+            } finally {
+              reader.releaseLock();
+            }
             return;
           }
           // Couldn't hand off — fall through and commit the direct answer

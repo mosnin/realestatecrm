@@ -747,10 +747,24 @@ export async function POST(req: NextRequest) {
       history: history.map((h) => ({ role: h.role, content: h.content })),
       attachments: turnAttachments,
       abortController,
-      // Escalation hook — when the direct model's reply triggers
-      // shouldEscalate(), hand off to the agent path. Returning false means
-      // "commit the direct answer" (the v1 behaviour).
-      onEscalate: async () => false,
+      // Escalation hook — when the direct model's reply trips
+      // shouldEscalate() ("I can't send that from here…"), re-run the SAME
+      // message on the in-process TS agent (full tool surface) and pipe its
+      // stream through. This was previously hardwired to `false`, so a
+      // misrouted action committed the toolless deflection — the realtor
+      // read that as "Chippi has no tools".
+      onEscalate: async () => {
+        logger.info('[ai/task] direct → agent escalation', { spaceSlug, model: turnModel });
+        return streamTsChatTurn({
+          ctx,
+          conversationId,
+          userMessage: message,
+          history,
+          model: turnModel,
+          attachments: turnAttachments,
+          abortController,
+        });
+      },
     });
   }
 

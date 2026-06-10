@@ -84,16 +84,18 @@ export default async function IntegrationsCallback({
   let toolkit: string | null = null;
   let label: string | null = null;
   let accountFetchError: string | null = null;
+  let accountStatus: string | null = null;
   try {
     const composio = getComposio();
     const account = await composio.connectedAccounts.get(connectedAccountId);
     toolkit = (account?.toolkit?.slug ?? appQuery ?? null) as string | null;
     label = pickLabel(account);
+    accountStatus = ((account as { status?: string } | null)?.status ?? null);
     logger.info('[integrations.callback] account fetched', {
       connectedAccountId,
       toolkit,
       hasLabel: Boolean(label),
-      accountStatus: (account as { status?: string } | null)?.status ?? null,
+      accountStatus,
     });
   } catch (err) {
     accountFetchError = err instanceof Error ? err.message : String(err);
@@ -134,17 +136,24 @@ export default async function IntegrationsCallback({
     await revoke(existing);
   }
 
-  // Upsert by composioConnectionId — the connect route already inserted
-  // a row with this id at initiate-time, so the callback's job is to
-  // update the label (Composio surfaces the connected user's email after
-  // OAuth completes) and ensure status='active'. If the connect route
-  // somehow didn't persist (defensive), upsert falls back to insert.
+  // Upsert by composioConnectionId — the connect route already inserted a
+  // 'pending' row with this id at initiate-time. Promote to 'active' ONLY
+  // when Composio's FETCHED account status confirms ACTIVE — the previous
+  // version trusted an optional ?status= query param (which Composio doesn't
+  // reliably send) and force-activated everything, so abandoned OAuth flows
+  // produced permanently-"active" rows whose tools 401'd in chat. If the
+  // account fetch itself failed, the realtor still landed back here via the
+  // provider redirect — strong signal OAuth completed — so we preserve the
+  // old behavior and activate (the chat-time auth-error path self-corrects
+  // a wrong guess by flipping the row to 'expired').
+  const confirmedActive = accountStatus === null || accountStatus.toUpperCase() === 'ACTIVE';
   const inserted = await upsertByComposioId({
     spaceId: space.id,
     userId,
     toolkit,
     composioConnectionId: connectedAccountId,
     label: label ?? undefined,
+    status: confirmedActive ? 'active' : 'pending',
   });
 
   if (!inserted) {
@@ -163,15 +172,20 @@ export default async function IntegrationsCallback({
     spaceId: space.id,
   });
 
-  // Status from Composio: 'ACTIVE' is the green path. Anything else, we
-  // mark it failed but keep the row so the realtor sees something
-  // happened in the UI.
-  if (status && status.toUpperCase() !== 'ACTIVE') {
-    logger.warn('[integrations.callback] composio returned non-active status', {
+  // Status gate — keyed on the FETCHED account status (authoritative), not
+  // the optional ?status= query param. A non-ACTIVE account stays 'pending'
+  // (the upsert above already wrote that) and the realtor lands back on
+  // settings with the failure reason; the reconcile sweep promotes the row
+  // if Composio later reports ACTIVE.
+  if (!confirmedActive) {
+    logger.warn('[integrations.callback] composio account not ACTIVE at callback', {
       connectedAccountId,
-      status,
+      accountStatus,
+      statusParam: status ?? null,
     });
-    return redirect(buildBackUrl({ ok: false, reason: status, slug: space.slug, toolkit }));
+    return redirect(
+      buildBackUrl({ ok: false, reason: accountStatus ?? 'not_active', slug: space.slug, toolkit }),
+    );
   }
 
   // Register curated triggers ONLY after the connection is confirmed

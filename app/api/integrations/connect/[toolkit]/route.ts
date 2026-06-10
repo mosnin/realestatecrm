@@ -24,7 +24,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { COMING_SOON_TOOLKITS, findIntegration } from '@/lib/integrations/catalog';
 import { initiateConnection } from '@/lib/integrations/composio';
-import { findActive, insertConnection, revoke } from '@/lib/integrations/connections';
+import { findActive, findPending, insertConnection, revoke, setStatus } from '@/lib/integrations/connections';
 import { logger } from '@/lib/logger';
 
 export async function POST(
@@ -64,6 +64,13 @@ export async function POST(
   if (existing) {
     await revoke(existing);
   }
+  // Sweep unfinished initiations from earlier attempts so retries don't
+  // accumulate pending orphans. No Composio delete — these never finished
+  // OAuth, so there may be nothing on Composio's side to delete.
+  const stalePending = await findPending({ spaceId: space.id, userId, toolkit });
+  for (const row of stalePending) {
+    await setStatus({ id: row.id, status: 'revoked' });
+  }
 
   const callbackUrl = composioCallbackUrl();
 
@@ -79,18 +86,20 @@ export async function POST(
     // drop, redirect-to-homepage glitch, or Vercel preview-domain quirk
     // silently lost the row. Composio's `request.id` IS the
     // connectedAccountId we'll get back in the callback (same value), so
-    // this insert is forward-compatible — the callback updates the label
-    // and surfaces success to the user, but the row exists either way.
+    // this insert is forward-compatible.
     //
-    // Failure mode: if the realtor bails on the OAuth screen, we have a
-    // row pointing at an unfinished Composio connection. The chat agent's
-    // first attempt to use it will trip the auth-error reconcile path and
-    // flip the row to 'expired' (amber dot + Reconnect). Acceptable.
+    // status='pending', NOT 'active': this row exists so the connection
+    // can't be lost, but OAuth hasn't completed — the chat agent must not
+    // load tools for it (a half-finished connection 401s and the realtor
+    // reads it as "Chippi lost my integrations"). Promotion to 'active'
+    // happens when the callback confirms Composio's account status, or via
+    // the reconcile sweep on the next /settings load if the callback drops.
     const inserted = await insertConnection({
       spaceId: space.id,
       userId,
       toolkit,
       composioConnectionId: request.id,
+      status: 'pending',
     });
     if (!inserted) {
       logger.error('[integrations.connect] persist-at-connect failed', {
