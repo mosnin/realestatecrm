@@ -66,13 +66,17 @@ const DEFAULT_MAX_TOKENS = 4_096;
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
- * to spelunk the catalog can't run our token bill into the ground. 15
- * gives the agent enough headroom to chain multi-step workflows
- * autonomously (look up a person → read their activity → find their
- * deal → draft a follow-up) without stopping mid-task to ask the
- * realtor a clarifying question.
+ * to spelunk the catalog can't run our token bill into the ground.
+ *
+ * Why 8, not 15: the SDK re-sends the FULL transcript (system prompt +
+ * every tool schema + all accumulated tool outputs) on EVERY inner step
+ * — token cost grows quadratically with the cap. 8 still covers the real
+ * multi-step workflows (look up a person → read activity → find deal →
+ * draft a follow-up is 4-5 steps); anything deeper belongs on
+ * delegate_task, which runs in its own bounded Modal context instead of
+ * re-billing this conversation's transcript.
  */
-const MAX_TURNS_PER_TURN = 15;
+const MAX_TURNS_PER_TURN = 8;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -189,29 +193,71 @@ export function buildChatAgent(
  * — no toast, no surprise, just truth on the page.
  */
 export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]> {
-  if (!composioConfigured()) return [];
+  return (await loadIntegrationToolsDetailed(ctx)).tools;
+}
+
+/** What a turn's integration load actually produced — the prompt builder
+ *  uses this so the model is told the LIVE truth instead of a cached or
+ *  silently-degraded picture. */
+export interface IntegrationLoadResult {
+  tools: SdkTool[];
+  /** Toolkits whose tools are attached THIS turn. */
+  liveToolkits: string[];
+  /** Toolkits the realtor has connected but whose tools could not be
+   *  loaded this turn for a TRANSIENT reason (Composio down, server key
+   *  missing). Auth-dead connections are excluded — those flip to
+   *  'expired' and stop being "connected". The prompt tells the model to
+   *  describe these as temporarily unavailable, NOT as disconnected —
+   *  "I don't have your Gmail" to a realtor who connected Gmail is the
+   *  single most-reported integration bug. */
+  unavailableToolkits: string[];
+}
+
+export async function loadIntegrationToolsDetailed(
+  ctx: ToolContext,
+): Promise<IntegrationLoadResult> {
   let toolkits: string[];
   try {
-    toolkits = await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId });
+    toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
   } catch (err) {
     logger.warn('[sdk-chat] activeToolkits lookup failed — proceeding without integration tools', {
       spaceId: ctx.space.id,
       userId: ctx.userId,
       err: err instanceof Error ? err.message : String(err),
     });
-    return [];
+    return { tools: [], liveToolkits: [], unavailableToolkits: [] };
   }
-  if (toolkits.length === 0) return [];
+  if (toolkits.length === 0) return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+
+  // The realtor HAS connections but the server can't reach Composio at
+  // all (key unset). Silent-empty here is what made a misconfigured
+  // deploy read as "Chippi lost my integrations" — degrade loudly instead.
+  if (!composioConfigured()) {
+    logger.error(
+      '[sdk-chat] COMPOSIO_API_KEY is not configured but this workspace has connected toolkits — integration tools are unavailable for every turn until it is set',
+      { spaceId: ctx.space.id, toolkits },
+    );
+    return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
+  }
 
   // Per-toolkit build lets us attribute auth failures to the right row.
-  // The cost is N round-trips instead of 1, but N is bounded by how
-  // many apps the realtor has connected (typically 2-5).
+  // Builds run in PARALLEL — they're independent Composio fetches (cached
+  // after the first turn), and running them sequentially put N round-trips
+  // on the critical path before the first token.
   const collected: SdkTool[] = [];
-  for (const toolkit of toolkits) {
-    try {
-      const tools = await buildToolkitAgentTools({ toolkit, userId: ctx.userId });
-      collected.push(...tools);
-    } catch (err) {
+  const liveToolkits: string[] = [];
+  const unavailableToolkits: string[] = [];
+  const settled = await Promise.allSettled(
+    toolkits.map((toolkit) => buildToolkitAgentTools({ toolkit, userId: ctx.userId })),
+  );
+  for (let i = 0; i < toolkits.length; i++) {
+    const toolkit = toolkits[i];
+    const outcome = settled[i];
+    if (outcome.status === 'fulfilled') {
+      collected.push(...outcome.value);
+      liveToolkits.push(toolkit);
+    } else {
+      const err = outcome.reason;
       if (isAuthLikeError(err)) {
         // Don't await — keep the chat hot. The DB write is fire-and-
         // forget; worst case is the row stays 'active' for one more
@@ -235,6 +281,7 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
           err: err instanceof Error ? err.message : String(err),
         });
       } else {
+        unavailableToolkits.push(toolkit);
         logger.warn('[sdk-chat] integration tools load failed for toolkit — skipping', {
           spaceId: ctx.space.id,
           userId: ctx.userId,
@@ -245,7 +292,7 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
       // In all error cases, drop this toolkit's tools and keep going.
     }
   }
-  return collected;
+  return { tools: collected, liveToolkits, unavailableToolkits };
 }
 
 /**
@@ -328,16 +375,21 @@ export interface RunChatTurnInput {
  * `result.completed` to know when persistence is safe.
  */
 export async function runChatTurn(input: RunChatTurnInput) {
-  // Load integration tools and personalized instructions in parallel —
-  // both are I/O-bound (Composio fetch + DB snapshot). The SDK's Agent
-  // construction is synchronous so we await both before building.
-  const [integrationTools, instructions] = await Promise.all([
-    loadIntegrationTools(input.ctx),
-    buildPersonalizedSystemPrompt(input.ctx),
-  ]);
+  // Integration tools load first (live truth: which toolkits actually have
+  // tools attached this turn), then the personalized prompt embeds that
+  // truth — previously the prompt's "Connected: …" line came from a 5-minute
+  // cache, so right after connecting Gmail the model HELD the Gmail tools
+  // while its own prompt said Gmail wasn't connected.
+  const integrations = await loadIntegrationToolsDetailed(input.ctx);
+  const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
+    integrations: {
+      liveToolkits: integrations.liveToolkits,
+      unavailableToolkits: integrations.unavailableToolkits,
+    },
+  });
   const agent = buildChatAgent(input.ctx, {
     modelSlug: input.model,
-    integrationTools,
+    integrationTools: integrations.tools,
     instructions,
   });
 
@@ -394,13 +446,16 @@ export interface ResumeChatTurnInput {
  * same way regardless of which path produced them.
  */
 export async function resumeChatTurn(input: ResumeChatTurnInput) {
-  const [integrationTools, instructions] = await Promise.all([
-    loadIntegrationTools(input.ctx),
-    buildPersonalizedSystemPrompt(input.ctx),
-  ]);
+  const integrations = await loadIntegrationToolsDetailed(input.ctx);
+  const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
+    integrations: {
+      liveToolkits: integrations.liveToolkits,
+      unavailableToolkits: integrations.unavailableToolkits,
+    },
+  });
   const agent = buildChatAgent(input.ctx, {
     model: input.model,
-    integrationTools,
+    integrationTools: integrations.tools,
     instructions,
   });
   const state = await restoreRunState(agent, input.serializedState);

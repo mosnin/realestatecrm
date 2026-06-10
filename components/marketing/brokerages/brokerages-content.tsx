@@ -72,7 +72,7 @@ function CtaRow({ className }: { className?: string }) {
         href="/login/realtor?intent=signup"
         className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
       >
-        Start free
+        Start free trial
       </Link>
       <Link
         href="/demo"
@@ -421,7 +421,7 @@ function ClosingCta() {
                 href="/login/realtor?intent=signup"
                 className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-8 text-[15px] font-semibold text-[#2a1402] transition-transform duration-150 active:scale-[0.98]"
               >
-                Start free
+                Start free trial
               </Link>
               <Link
                 href="/demo"

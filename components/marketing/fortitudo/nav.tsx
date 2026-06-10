@@ -203,7 +203,7 @@ export function FortitudoNav() {
                   href="/login/realtor?intent=signup"
                   className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-105 hover:shadow-brand/40"
                 >
-                  Start free
+                  Start free trial
                 </Link>
               </div>
 
@@ -292,7 +292,7 @@ export function FortitudoNav() {
                   onClick={() => setMobileOpen(false)}
                   className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-brand text-sm font-semibold text-brand-foreground transition-all hover:brightness-105"
                 >
-                  Start free
+                  Start free trial
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link

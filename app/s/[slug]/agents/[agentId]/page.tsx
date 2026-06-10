@@ -44,7 +44,7 @@ export default async function EditAgentPage({
   if (!agent || agent.spaceId !== space.id) notFound();
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto pb-12">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{agent.name}</h1>

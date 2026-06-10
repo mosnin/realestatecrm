@@ -20,5 +20,9 @@ export default async function FormAnalyticsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  return <FormAnalytics slug={slug} standalone />;
+  return (
+    <div className="max-w-5xl mx-auto pb-12">
+      <FormAnalytics slug={slug} standalone />
+    </div>
+  );
 }

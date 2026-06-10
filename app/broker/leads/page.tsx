@@ -264,7 +264,7 @@ export default async function BrokerLeadsPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Leads.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

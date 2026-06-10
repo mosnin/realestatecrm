@@ -69,7 +69,7 @@ export default async function ContactsPage({
   // The performance strip sits above the table: the three numbers that move
   // output (time-to-close, conversion, bottleneck) read first, then the book.
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <PerformanceStrip deals={deals} stages={stages} />
       <ContactTable slug={slug} />
     </div>
