@@ -643,6 +643,21 @@ async def chat_turn(item: dict):
         " applying. Use the full URL verbatim; no shortening."
     ) if intake_url else None
 
+    # Broker mode gets brokerage context, NOT the realtor block above — the
+    # broker agent was previously handed the OWNER's personal workspace info
+    # (their intake link + "include it in contact-facing drafts"), which is
+    # realtor-persona instruction injected into the brokerage chief-of-staff.
+    if mode == "broker":
+        workspace_info = (
+            "# Brokerage context\n"
+            f"- Brokerage id: {brokerage_id}\n"
+            f"- Operator role: {broker_role}\n"
+            "- You are the brokerage chief-of-staff. Answer about the TEAM —"
+            " realtors, routing, performance, revenue — through the broker"
+            " tools. You do not have a personal intake link or personal"
+            " integrations in this mode."
+        )
+
     async def event_stream():
         try:
             # ── Tool registry selection — Phase 2/3 plug into BROKER_TOOLS ──
