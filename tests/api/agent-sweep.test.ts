@@ -28,7 +28,7 @@ vi.mock('@/lib/supabase', () => {
     supabaseCalls.push({ table, chain: calls });
 
     const chain: Record<string, unknown> = {};
-    const passthrough = ['select', 'eq', 'in', 'is', 'not', 'gte', 'lt', 'order', 'limit', 'contains'];
+    const passthrough = ['select', 'eq', 'in', 'is', 'not', 'gte', 'lt', 'order', 'limit', 'range', 'contains'];
     for (const method of passthrough) {
       chain[method] = vi.fn((...args: unknown[]) => {
         calls.push([method, args]);
@@ -272,6 +272,18 @@ describe('GET /api/cron/agent-sweep', () => {
       .filter(([k]) => k.toLowerCase() === 'authorization')
       .map(([, v]) => v);
     expect(authValues).toContain('Bearer agent-secret');
+  });
+
+  it('paginates the active-space fetch with .range (no silent PostgREST row cap)', async () => {
+    queueSweep({ spaces: [{ id: 'space_one', slug: 'one' }], pending: [] });
+    await invoke('Bearer test-secret');
+    // The first (and only, since the page is under the page size) Space read
+    // must use .range — proving the fetch is paginated, not an unbounded select
+    // that PostgREST would silently truncate at its default row limit.
+    const spaceRead = supabaseCalls.find((c) => c.table === 'Space');
+    expect(spaceRead).toBeDefined();
+    const methods = spaceRead!.chain.map(([m]) => m);
+    expect(methods).toContain('range');
   });
 
   it('skips a space with ≥10 pending drafts (reason: backlog); does not call Modal for it', async () => {

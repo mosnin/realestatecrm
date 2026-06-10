@@ -18,15 +18,15 @@ export function HomeCTA() {
             Bring your inbox. <span className="text-gradient-brand">Chippi does the rest.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg text-white/65">
-            Seven days free, no credit card. Connect your email and watch the busywork start
-            running itself.
+            Seven days free, then your plan price. Connect your email and watch the busywork
+            start running itself.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/login/realtor?intent=signup"
               className="inline-flex items-center gap-2 rounded-full bg-brand px-8 py-3.5 text-base font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-105 hover:shadow-brand/40"
             >
-              Start free
+              Start free trial
               <ArrowRight className="h-5 w-5" />
             </Link>
             <Link
@@ -36,7 +36,7 @@ export function HomeCTA() {
               Book a demo
             </Link>
           </div>
-          <p className="mt-4 text-xs text-white/40">No credit card required. Cancel anytime.</p>
+          <p className="mt-4 text-xs text-white/40">Seven-day free trial. Cancel anytime.</p>
         </div>
       </div>
     </section>

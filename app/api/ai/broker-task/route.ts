@@ -47,8 +47,8 @@ import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
-import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
+import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
@@ -433,10 +433,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Daily token budget — the realtor route enforces this; the broker route
-    // never did, so a single broker session could chain unmetered Modal agent
-    // turns. Gate against the runtime (funding) space. Fails OPEN so a
-    // transient DB error can't block a legitimate turn.
+    // Daily token budget — gate against the runtime (funding) space, BEFORE
+    // any persistence. Fails OPEN so a transient DB error can't block a
+    // legitimate turn. Default matches the AgentSettings column default
+    // (50_000) — same correction the realtor route carries.
     try {
       const [settingsResult, usageResult] = await Promise.all([
         supabase
@@ -448,7 +448,7 @@ export async function POST(req: NextRequest) {
       ]);
       const dailyTokenBudget: number =
         ((settingsResult.data as { dailyTokenBudget?: number | null } | null)
-          ?.dailyTokenBudget as number | null | undefined) ?? 500_000;
+          ?.dailyTokenBudget as number | null | undefined) ?? 50_000;
       if (usageResult.total >= dailyTokenBudget) {
         logger.warn('[ai/broker-task] daily token budget exceeded', {
           brokerageId,

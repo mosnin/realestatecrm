@@ -65,7 +65,7 @@ export default async function LeadDetailPage({
   const details = lead.scoreDetails as LeadScoreDetails | null;
 
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="max-w-5xl mx-auto space-y-4 pb-12">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
           <Link href={`/s/${slug}/leads`}>

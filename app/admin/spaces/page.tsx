@@ -41,7 +41,7 @@ export default async function AdminSpacesPage() {
   const totalCount = spaces?.length ?? 0;
 
   return (
-    <div className="space-y-8 pb-12 max-w-5xl">
+    <div className="space-y-8 pb-12 max-w-5xl mx-auto">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Management.</p>
         <h1

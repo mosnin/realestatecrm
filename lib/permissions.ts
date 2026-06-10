@@ -27,9 +27,13 @@ export async function isPlatformAdmin(): Promise<boolean> {
   // Authoritative check in DB — the single source of truth for admin role
   const { data } = await supabase
     .from('User')
-    .select('platformRole')
+    .select('platformRole, status')
     .eq('clerkId', session.userId)
     .maybeSingle();
+  // Same offboarding gate as getBrokerContext()/requireAuth(): an offboarded
+  // user loses admin access immediately, not when their Clerk session expires.
+  // Resilient to a missing `status` column (pre-BP1a): undefined !== 'offboarded'.
+  if ((data as { status?: string } | null)?.status === 'offboarded') return false;
   return data?.platformRole === 'admin';
 }
 
@@ -84,11 +88,19 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
     .from('BrokerageMembership')
     .select('*')
     .eq('userId', user.id)
-    .in('role', ['broker_owner', 'broker_admin']);
+    .in('role', ['broker_owner', 'broker_admin'])
+    .order('createdAt', { ascending: true });
   if (!memberships?.length) return null;
 
+  // Deterministic pick for a user who is a broker at more than one brokerage:
+  // broker_owner first, then broker_admin, oldest within a tier (query ordered
+  // by createdAt). The old `?? memberships[0]` fell back to PostgREST insertion
+  // order, so the same user could resolve to a different brokerage run-to-run
+  // and act on the wrong one.
   const membership =
-    memberships.find((m) => m.role === 'broker_owner') ?? memberships[0];
+    memberships.find((m) => m.role === 'broker_owner') ??
+    memberships.find((m) => m.role === 'broker_admin') ??
+    memberships[0];
 
   const { data: brokerage } = await supabase
     .from('Brokerage')
@@ -135,13 +147,17 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
     .from('BrokerageMembership')
     .select('*')
     .eq('userId', user.id)
-    .in('role', ['broker_owner', 'broker_admin', 'realtor_member']);
+    .in('role', ['broker_owner', 'broker_admin', 'realtor_member'])
+    .order('createdAt', { ascending: true });
   if (!memberships?.length) return null;
 
-  // Prefer broker_owner > broker_admin > realtor_member
+  // Prefer broker_owner > broker_admin > realtor_member, oldest within a tier
+  // (query ordered by createdAt) so a multi-brokerage user resolves
+  // deterministically instead of by PostgREST insertion order.
   const membership =
     memberships.find((m) => m.role === 'broker_owner') ??
     memberships.find((m) => m.role === 'broker_admin') ??
+    memberships.find((m) => m.role === 'realtor_member') ??
     memberships[0];
 
   const { data: brokerage } = await supabase

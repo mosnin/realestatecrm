@@ -5,6 +5,7 @@ import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkSeatCapacity } from '@/lib/brokerage-seats';
 
 /**
  * GET /api/invitations/[token]
@@ -148,6 +149,20 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Already a member', roleToAssign: inv.roleToAssign }, { status: 200 });
   }
 
+  // Enforce the brokerage's seat cap at accept time, not just at invite time.
+  // The invite-time check (broker/invite) can be outrun: invites issued under
+  // the cap, concurrent accepts, or memberships added by other paths can push a
+  // brokerage over its paid seats. This pending invite is already counted in
+  // `used` (members + pending), so we ask for 0 additional and simply refuse if
+  // the brokerage is already at/over its limit. Fails closed on infra error.
+  const seat = await checkSeatCapacity(inv.brokerageId, 0);
+  if (!seat.ok) {
+    return NextResponse.json(
+      { error: 'This brokerage has reached its seat limit. Ask the broker to upgrade the plan or free up a seat.' },
+      { status: 402 },
+    );
+  }
+
   // Create membership
   const { error: memberErr } = await supabase
     .from('BrokerageMembership')
@@ -174,13 +189,17 @@ export async function POST(_req: Request, { params }: Params) {
     .eq('id', user.id)
     .eq('status', 'offboarded');
 
-  // Link the user's Space to this brokerage (best-effort)
+  // Adopt this brokerage's intake form-config ONLY if the Space isn't already
+  // linked. Never overwrite an existing link: a realtor already in brokerage A
+  // accepting an invite to brokerage B keeps A as their workspace's form-config
+  // owner. Access comes from the membership row above; Space.brokerageId is only
+  // the intake-config owner.
   const { data: space } = await supabase
     .from('Space')
-    .select('id')
+    .select('id, brokerageId')
     .eq('ownerId', user.id)
     .maybeSingle();
-  if (space) {
+  if (space && !space.brokerageId) {
     await supabase
       .from('Space')
       .update({ brokerageId: inv.brokerageId })
