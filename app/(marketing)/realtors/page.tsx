@@ -1,47 +1,100 @@
 /**
- * `/realtors` — Chippi for the solo realtor who's boots-on-the-ground.
+ * `/realtors` — Chippi for the solo realtor, on the calm site system.
  *
- * The story: a realtor flying solo spends the day in the field — at the
- * showing, in the car, between doors. Chippi is the extra teammate who works
- * alongside them, reachable on the phone, the installed web app, or the office
- * desktop. It reads the inbox, drafts in their voice, books the tour, scores
- * the lead, and keeps every deal current — saving time on the repetitive work
- * so the hours go to closing. Everything lands in one workspace instead of six
- * tabs, and the realtor stays in the driver's seat on every send.
+ * The extra teammate in the field: reachable on the phone, the web app, or the
+ * office desktop; reads the inbox, drafts in your voice, scores the lead, books
+ * the tour, keeps every deal current — and never sends without your tap.
  *
- * This page absorbs the content of the now-retired /features/* pages, told in
- * the homepage's rebuilt vocabulary: AsciiBlob hero atmosphere, serif headlines,
- * Reveal/Stagger motion, live product diagrams, and the home kit throughout.
- *
- * Auth-aware like the homepage: signed-in realtors bounce to their workspace.
+ * Rebuilt from the legacy studio-ASCII version onto the calm vocabulary
+ * (PageHero, FeatureRow, framed screenshot slots). Auth-aware: signed-in
+ * realtors bounce to their workspace.
  */
 
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-
-import { Reveal, Eyebrow } from '@/components/marketing/home/home-kit';
-import { RealtorsHero } from '@/components/marketing/realtors/realtors-hero';
-import { FieldSurfaces } from '@/components/marketing/realtors/field-surfaces';
-import { FeatureRow } from '@/components/marketing/realtors/feature-row';
-import {
-  OnePlace,
-  TailorIt,
-} from '@/components/marketing/realtors/consolidation-tailor';
-import { ClosingCTA } from '@/components/marketing/realtors/closing-cta';
-import {
-  ComposerDraftDiagram,
-  LeadScoreDiagram,
-  CalendarBookingDiagram,
-  KanbanDragDiagram,
-  InboxDiagram,
-  TimelineDiagram,
-} from '@/components/marketing/diagrams';
+import Link from 'next/link';
+import { ArrowRight, Smartphone, Globe, Building2 } from 'lucide-react';
+import { PageHero } from '@/components/marketing/site/page-hero';
+import { FeatureRow } from '@/components/marketing/site/feature-row';
+import { Reveal } from '@/components/marketing/site/reveal';
+import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = {
   title: 'For solo realtors · Chippi',
   description:
-    'Chippi is the extra teammate in the field, reachable on your phone, the web app, or the office desktop. It drafts in your voice, scores the lead, books the tour, and keeps every deal current.',
+    'Chippi is the extra teammate in the field — reachable on your phone, the web app, or the office desktop. It drafts in your voice, scores the lead, books the tour, and keeps every deal current.',
 };
+
+const surfaces = [
+  { Icon: Smartphone, title: 'On your phone', body: 'A tap away between doors and showings — drafts, scores, and bookings in your pocket.' },
+  { Icon: Globe, title: 'In the web app', body: 'Install it once. The full workspace, reachable from any browser, anywhere.' },
+  { Icon: Building2, title: 'At the office', body: 'The same workspace opens wide on the desktop when you’re back at the desk.' },
+];
+
+const features = [
+  {
+    no: '01',
+    eyebrow: 'The reply',
+    title: 'Drafts you’d have written — in your voice.',
+    sub: 'Chippi reads the thread, writes the reply the way you actually write, and stops. You read it, you press send. Or you don’t.',
+    points: [
+      'Trained on how you actually write',
+      'Ready in your inbox before you open the thread',
+      'Never sends without your tap',
+    ],
+    image: { label: 'Draft composer', sublabel: 'Screenshot · 1280 × 960' },
+  },
+  {
+    no: '02',
+    eyebrow: 'First call',
+    title: 'Know who to call first.',
+    sub: 'Every new inquiry comes in scored against your active deals — hot, warm, cold, at a glance, with the reason attached in plain language.',
+    points: [
+      'Multi-signal scoring on each lead',
+      'The quiet hot ones surfaced before they go cold',
+      'Priority order updates as deals move',
+    ],
+    image: { label: 'Lead scoring', sublabel: 'Screenshot · 1280 × 960' },
+    flip: true,
+  },
+  {
+    no: '03',
+    eyebrow: 'Tours',
+    title: 'Book the tour from the thread.',
+    sub: 'Reply with a time. Chippi checks your availability, puts it on the calendar, sends the confirmation, and writes it back to the deal. No tab-switching.',
+    points: [
+      'Proposes times against your open hours',
+      'Two-way Google and Outlook sync',
+      'Confirmation goes back in the thread',
+    ],
+    image: { label: 'Calendar booking', sublabel: 'Screenshot · 1280 × 960' },
+  },
+  {
+    no: '04',
+    eyebrow: 'The inbox',
+    title: 'Your inbox, read and triaged.',
+    sub: 'Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first. It stays quiet when nothing’s worth surfacing.',
+    points: [
+      'Threads, not loose messages',
+      'Scored against your active deals',
+      'Reply from the address your contacts already know',
+    ],
+    image: { label: 'Inbox triage', sublabel: 'Screenshot · 1280 × 960' },
+    flip: true,
+  },
+  {
+    no: '05',
+    eyebrow: 'The pipeline',
+    title: 'A pipeline that doesn’t lie.',
+    sub: 'Drag a card to the next stage and Chippi keeps the value, the dates, and the counterparty in sync. The board reflects reality, not yesterday.',
+    points: [
+      'Auto-updating fields as cards move',
+      'Won/lost reasons logged in plain language',
+      'Every change written to the deal timeline',
+    ],
+    image: { label: 'Pipeline board', sublabel: 'Screenshot · 1280 × 960' },
+  },
+];
 
 export default async function RealtorsPage() {
   const { userId } = await auth();
@@ -50,169 +103,94 @@ export default async function RealtorsPage() {
   }
 
   return (
-    <div className="bg-muted text-foreground">
-      {/* Hero — extra teammate in the field. */}
-      <RealtorsHero />
+    <>
+      <PageHero
+        eyebrow="For solo realtors"
+        title="Your extra teammate in the field."
+        sub="You’re rarely at a desk. Chippi works alongside you — reading the inbox, drafting in your voice, scoring the lead, and booking the tour — so the hours go to closing."
+        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        secondaryCta={{ label: 'Watch demo', href: '/demo' }}
+      />
 
-      {/* In the field — phone / web app / office. */}
-      <section
-        id="in-the-field"
-        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal className="max-w-3xl">
-          <Eyebrow>In the field</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            reachable wherever
-            <span className="text-muted-foreground"> the work is.</span>
-          </h2>
-          <p className="mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-            you&rsquo;re rarely at a desk. Chippi is a tap away on whatever screen is
-            already in your hand, and the same workspace opens wide when you&rsquo;re
-            back at the office.
-          </p>
-        </Reveal>
-        <FieldSurfaces />
+      {/* Reachable everywhere */}
+      <section className="bg-background px-4 py-20 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <Reveal className="max-w-2xl">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              In the field
+            </p>
+            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+              Reachable wherever the work is.
+            </h2>
+          </Reveal>
+          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 sm:grid-cols-3">
+            {surfaces.map((s) => (
+              <Reveal key={s.title}>
+                <div className="h-full bg-background p-7">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
+                    <s.Icon className="h-4 w-4" />
+                  </span>
+                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
       </section>
 
-      {/* The feature sequence — tick-tock, grounded in real capabilities. */}
-      <div className="relative mx-auto max-w-7xl space-y-24 px-6 py-12 md:space-y-32 md:px-8 md:py-16">
-        <div id="the-reply" className="scroll-mt-28">
-        <FeatureRow
-          eyebrow="The reply"
-          title={
-            <>
-              drafts you&rsquo;d have written.
-              <span className="text-muted-foreground"> in your voice.</span>
-            </>
-          }
-          sub="Chippi reads the thread, writes the reply the way you actually write, and stops. you read it, you press send. or you don't."
-          points={[
-            'trained on how you actually write.',
-            'never sends without your tap.',
-            'ready in your inbox before you open the thread.',
-          ]}
-          media={<ComposerDraftDiagram aspect="video" />}
-        />
+      {/* Feature sequence */}
+      <section className="bg-background px-4 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-5xl space-y-24 sm:space-y-32">
+          {features.map((f) => (
+            <FeatureRow key={f.no} {...f} />
+          ))}
         </div>
+      </section>
 
-        <div id="first-call" className="scroll-mt-28">
-        <FeatureRow
-          flip
-          eyebrow="First call"
-          title={
-            <>
-              know who to call
-              <span className="text-muted-foreground"> first.</span>
-            </>
-          }
-          sub="every new inquiry comes in scored against your active deals. hot, warm, cold, at a glance, with the reason attached in plain language."
-          points={[
-            'multi-signal scoring on each lead.',
-            'the quiet hot ones surfaced before they go cold.',
-            'priority order updates as deals move.',
-          ]}
-          media={<LeadScoreDiagram aspect="square" />}
-        />
-        </div>
-
-        <FeatureRow
-          eyebrow="Tours"
-          title={
-            <>
-              book the tour
-              <span className="text-muted-foreground"> from the thread.</span>
-            </>
-          }
-          sub="reply with a time. Chippi checks your availability, puts it on the calendar, sends the confirmation, and writes it back to the deal. no tab-switching."
-          points={[
-            'proposes times against your open hours.',
-            'two-way Google and Outlook sync.',
-            'confirmation goes back in the thread.',
-          ]}
-          media={<CalendarBookingDiagram aspect="wide" />}
-        />
-
-        <FeatureRow
-          flip
-          eyebrow="The pipeline"
-          title={
-            <>
-              a pipeline that
-              <span className="text-muted-foreground"> doesn&rsquo;t lie.</span>
-            </>
-          }
-          sub="drag a card to the next stage; Chippi keeps the value, the dates, and the counterparty in sync. the board reflects reality, not yesterday."
-          points={[
-            'auto-updating fields as cards move.',
-            'won and lost reasons logged in plain language.',
-            'every change written to the deal timeline.',
-          ]}
-          media={<KanbanDragDiagram aspect="video" />}
-        />
-
-        <FeatureRow
-          eyebrow="The inbox"
-          title={
-            <>
-              your inbox,
-              <span className="text-muted-foreground"> read and triaged.</span>
-            </>
-          }
-          sub="Gmail and Outlook plug in. Chippi reads every inbound, weighs it against your live deals, and quietly lifts the one to look at first. it stays quiet when nothing's worth surfacing."
-          points={[
-            'threads, not loose messages.',
-            'scored against your active deals.',
-            'reply, draft, and send from the address your contacts know.',
-          ]}
-          media={<InboxDiagram aspect="square" />}
-        />
-
-        <FeatureRow
-          flip
-          eyebrow="The relationship"
-          title={
-            <>
-              every touch,
-              <span className="text-muted-foreground"> in order.</span>
-            </>
-          }
-          sub="emails, tours, notes, drafts, replies, assembled chronologically per contact. you scroll the relationship; you don't reconstruct it from memory."
-          points={[
-            'tours and meetings logged as they happen.',
-            'Chippi-authored actions tagged on the timeline.',
-            'ask Chippi to recall the history and it does.',
-          ]}
-          media={<TimelineDiagram aspect="wide" />}
-        />
-      </div>
-
-      {/* One workspace, not six tabs — the consolidation payoff. */}
-      <div id="one-workspace" className="scroll-mt-28">
-        <OnePlace />
-      </div>
-
-      {/* Tailored to how you already work — repetitive work handled. */}
-      <TailorIt />
-
-      {/* The one promise — you stay in the driver's seat. */}
-      <section
-        id="stay-in-control"
-        className="relative mx-auto max-w-4xl px-6 py-24 text-center scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal>
-          <Eyebrow>One promise</Eyebrow>
-          <h2 className="mx-auto mt-5 max-w-3xl font-title text-[clamp(2.25rem,4.8vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            you stay in the driver&rsquo;s seat.
+      {/* The promise */}
+      <section className="border-y border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            One promise
+          </p>
+          <h2 style={TITLE_FONT} className="mx-auto mt-4 max-w-2xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+            You stay in the driver’s seat.
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">
-            Chippi does the work; you make the call. approval-first by default,
+          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
+            Chippi does the work; you make the call. Approval-first by default —
             and nothing leaves without your name on it.
           </p>
         </Reveal>
       </section>
 
-      {/* Closing CTA. */}
-      <ClosingCTA />
-    </div>
+      {/* Closing CTA */}
+      <section className="bg-background px-4 py-24 sm:px-6 sm:py-32">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+            Your next deal is already in the inbox.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
+            Connect your email and let Chippi draft the first reply.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/login/realtor?intent=signup"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/demo"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+            >
+              Book a demo
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">7 days free, then $97/mo. Cancel anytime.</p>
+        </Reveal>
+      </section>
+    </>
   );
 }
