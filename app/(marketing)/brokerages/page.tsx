@@ -15,6 +15,7 @@ import { ArrowRight, Users, TimerReset, ShieldCheck } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
+import { RoutingPanel, LeaderboardPanel, TeamChatPanel, MembersPanel } from '@/components/marketing/site/home/more-panels';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = { title: 'For brokerages · Chippi' };
@@ -143,7 +144,21 @@ export default function BrokeragesPage() {
       <section className="bg-background px-4 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl space-y-24 sm:space-y-32">
           {features.map((f) => (
-            <FeatureRow key={f.no} {...f} />
+            <FeatureRow
+              key={f.no}
+              {...f}
+              panel={
+                f.no === '01' ? (
+                  <RoutingPanel />
+                ) : f.no === '02' ? (
+                  <LeaderboardPanel />
+                ) : f.no === '03' ? (
+                  <TeamChatPanel />
+                ) : (
+                  <MembersPanel />
+                )
+              }
+            />
           ))}
         </div>
       </section>

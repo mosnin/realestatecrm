@@ -17,6 +17,9 @@ export interface FeatureRowProps {
   sub: string;
   points: string[];
   image: { label: string; sublabel?: string };
+  /** A live product panel rendered inside the frame. Falls back to a labeled
+   *  placeholder when omitted. */
+  panel?: React.ReactNode;
   url?: string;
   flip?: boolean;
 }
@@ -28,6 +31,7 @@ export function FeatureRow({
   sub,
   points,
   image,
+  panel,
   url = 'app.chippi.ai',
   flip,
 }: FeatureRowProps) {
@@ -59,7 +63,7 @@ export function FeatureRow({
 
       <Reveal from={flip ? 'left' : 'right'} className={flip ? 'lg:order-1' : ''}>
         <BrowserFrame url={url}>
-          <ImagePlaceholder label={image.label} sublabel={image.sublabel} ratio="aspect-[4/3]" />
+          {panel ?? <ImagePlaceholder label={image.label} sublabel={image.sublabel} ratio="aspect-[4/3]" />}
         </BrowserFrame>
       </Reveal>
     </div>

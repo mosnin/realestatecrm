@@ -10,7 +10,7 @@
 
 import { MessageCircle, PenLine, Layers, Megaphone, Users, CheckCheck } from 'lucide-react';
 import { Reveal } from '../reveal';
-import { ImagePlaceholder } from '../frame';
+import { StudioCard } from './more-panels';
 import { TITLE_FONT } from '@/lib/typography';
 
 export function Bento() {
@@ -89,11 +89,7 @@ export function Bento() {
                   Listings &amp; posts, drafted.
                 </h3>
               </div>
-              <ImagePlaceholder
-                label="Studio"
-                ratio="aspect-[16/9]"
-                className="border-t border-border/60"
-              />
+              <StudioCard />
             </Card>
           </Reveal>
 

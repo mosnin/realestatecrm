@@ -15,6 +15,8 @@ import { ArrowRight, Smartphone, Globe, Building2 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
+import { InboxPanel, DraftPanel, CalendarPanel } from '@/components/marketing/site/home/live-panels';
+import { TriagePanel, PipelinePanel } from '@/components/marketing/site/home/more-panels';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = {
@@ -136,7 +138,23 @@ export default function RealtorsPage() {
       <section className="bg-background px-4 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl space-y-24 sm:space-y-32">
           {features.map((f) => (
-            <FeatureRow key={f.no} {...f} />
+            <FeatureRow
+              key={f.no}
+              {...f}
+              panel={
+                f.no === '01' ? (
+                  <DraftPanel />
+                ) : f.no === '02' ? (
+                  <InboxPanel />
+                ) : f.no === '03' ? (
+                  <CalendarPanel />
+                ) : f.no === '04' ? (
+                  <TriagePanel />
+                ) : (
+                  <PipelinePanel />
+                )
+              }
+            />
           ))}
         </div>
       </section>
