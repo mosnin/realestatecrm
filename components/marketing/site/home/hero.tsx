@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { Reveal } from '../reveal';
-import { BrowserFrame, GridBackdrop } from '../frame';
+import { PanelFrame, GridBackdrop } from '../frame';
 import { HeroDemo } from './hero-demo';
 import { TITLE_FONT } from '@/lib/typography';
 
@@ -90,9 +90,9 @@ export function Hero() {
           aria-hidden
           className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,rgba(255,150,79,0.12),transparent_70%)]"
         />
-        <BrowserFrame className="relative" url="app.chippi.ai">
+        <PanelFrame className="relative">
           <HeroDemo />
-        </BrowserFrame>
+        </PanelFrame>
       </Reveal>
     </section>
   );

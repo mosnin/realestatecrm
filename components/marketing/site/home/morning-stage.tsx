@@ -21,7 +21,7 @@ import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } fr
 import { Check, CheckCheck, CalendarCheck, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { EASE_OUT } from '@/lib/motion';
 import { TITLE_FONT } from '@/lib/typography';
-import { BrowserFrame, GridBackdrop } from '../frame';
+import { PanelFrame, GridBackdrop } from '../frame';
 
 type Beat = { time: string; tag: string; label: string };
 
@@ -30,13 +30,6 @@ const BEATS: Beat[] = [
   { time: '8:05 AM', tag: 'Before your coffee', label: 'Replies drafted in your voice' },
   { time: '9:30 AM', tag: 'Straight from the thread', label: 'A tour, booked' },
   { time: '11:00 AM', tag: 'No status meeting', label: 'The pipeline, advanced' },
-];
-
-const FRAME_URL = [
-  'app.chippi.ai/inbox',
-  'app.chippi.ai/drafts',
-  'app.chippi.ai/calendar',
-  'app.chippi.ai/pipeline',
 ];
 
 const HEADLINE = (
@@ -144,7 +137,7 @@ function PinnedStage() {
 
           {/* the frame */}
           <div className="flex items-center">
-            <BrowserFrame url={FRAME_URL[step]} className="w-full">
+            <PanelFrame className="w-full">
               <div className="flex h-[320px] flex-col sm:h-[380px]">
                 <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
                   <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand">
@@ -172,7 +165,7 @@ function PinnedStage() {
                   </AnimatePresence>
                 </div>
               </div>
-            </BrowserFrame>
+            </PanelFrame>
           </div>
         </div>
       </div>
@@ -209,11 +202,11 @@ function StackedStage() {
                 <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{b.tag}</span>
               </div>
               <p className="mt-2 text-lg text-foreground">{b.label}</p>
-              <BrowserFrame url={FRAME_URL[i]} className="mt-4">
+              <PanelFrame className="mt-4">
                 <div className="h-[300px] p-4 sm:p-5">
                   <BeatBody step={i} />
                 </div>
-              </BrowserFrame>
+              </PanelFrame>
             </motion.div>
           ))}
         </div>

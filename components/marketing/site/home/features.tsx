@@ -10,7 +10,7 @@
 
 import { Check } from 'lucide-react';
 import { Reveal } from '../reveal';
-import { BrowserFrame } from '../frame';
+import { PanelFrame } from '../frame';
 import { InboxPanel, DraftPanel, CalendarPanel } from './live-panels';
 
 interface Feature {
@@ -105,9 +105,9 @@ export function Features() {
 
               {/* live panel — Chippi working, not a placeholder */}
               <Reveal from={reverse ? 'left' : 'right'} className={reverse ? 'lg:order-1' : ''}>
-                <BrowserFrame url={`app.chippi.ai/${f.slug}`}>
+                <PanelFrame>
                   {PANELS[f.slug]}
-                </BrowserFrame>
+                </PanelFrame>
               </Reveal>
             </div>
           );

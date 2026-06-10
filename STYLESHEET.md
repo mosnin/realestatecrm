@@ -927,7 +927,7 @@ behind opt-in classes (`.font-brand`, `.text-gradient-brand`,
 | Footer | `footer.tsx` | Paper-flat, hairline-top, muted links. No charcoal card. |
 | Page hero | `page-hero.tsx` | Shared sub-page hero: serif title, grid backdrop, warm wash, foreground CTAs. |
 | Feature row | `feature-row.tsx` | One alternating deep-feature row (copy + framed screenshot slot, flips). |
-| Frame | `frame.tsx` | `BrowserFrame` (window chrome + soft shadow), `ImagePlaceholder` (labeled screenshot slot), `GridBackdrop` (faint dot grid). |
+| Frame | `frame.tsx` | `PanelFrame` (clean hairline frame + soft shadow — no faux browser chrome; the dots-and-URL window costume was cut deliberately, don't reintroduce it), `ImagePlaceholder` (labeled screenshot slot), `GridBackdrop` (faint dot grid). |
 | Reveal | `reveal.tsx` | The ONLY motion: one fade + small slide on scroll-in, EASE_OUT, reduced-motion aware. No parallax, tilt, cursor-glow, or scroll-progress bar. |
 | Theme toggle | `fortitudo/theme-toggle.tsx` | Reused — wired to Chippi's `ThemeProvider`. |
 | Home sections | `site/home/{hero,logos,features,bento,metrics,enterprise,trust,cta}.tsx` | promise → proof → trust → ask, with product imagery in framed slots. |

@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
-import { BrowserFrame, ImagePlaceholder } from '@/components/marketing/site/frame';
+import { PanelFrame, ImagePlaceholder } from '@/components/marketing/site/frame';
 
 // TODO: paste the Calendly inline-embed URL here
 // e.g. 'https://calendly.com/your-org/chippi-walkthrough'
@@ -28,7 +28,7 @@ export function DemoBooking() {
 
       <section className="bg-background px-4 py-20 sm:px-6 sm:py-24">
         <Reveal className="mx-auto max-w-3xl">
-          <BrowserFrame url="calendly.com/chippi">
+          <PanelFrame>
             {CALENDLY_URL ? (
               <iframe
                 src={CALENDLY_URL}
@@ -43,7 +43,7 @@ export function DemoBooking() {
                 ratio="aspect-[4/3]"
               />
             )}
-          </BrowserFrame>
+          </PanelFrame>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Prefer to start now?{' '}

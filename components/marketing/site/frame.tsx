@@ -2,10 +2,11 @@
  * Frame primitives for the calm site — the pieces that make product imagery
  * read as enterprise-grade instead of vibecoded.
  *
- * - BrowserFrame: a window chrome (traffic-light dots + address pill) wrapping
- *   a screenshot or a live mockup, with a tasteful soft shadow. Shadows are
- *   sanctioned in the marketing layer (STYLESHEET.md §Shadows) — the product
- *   stays flat; the pitch is allowed depth.
+ * - PanelFrame: a clean hairline frame with a tasteful soft shadow, wrapping a
+ *   screenshot or a live mockup. No faux browser chrome — the dots-and-URL-bar
+ *   window costume was cut deliberately; the work inside the frame is the
+ *   show. Shadows are sanctioned in the marketing layer (STYLESHEET.md
+ *   §Shadows) — the product stays flat; the pitch is allowed depth.
  * - ImagePlaceholder: a labeled, clearly-intentional slot for a screenshot the
  *   owner drops in later. It says exactly what goes there and at what ratio, so
  *   it never reads as a broken image.
@@ -15,35 +16,21 @@
 import { ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function BrowserFrame({
+export function PanelFrame({
   children,
-  url = 'app.chippi.ai',
   className,
 }: {
   children: React.ReactNode;
-  url?: string;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-marketing-2xl border border-border/70 bg-card shadow-2xl shadow-foreground/[0.08] ring-1 ring-inset ring-white/5',
+        'overflow-hidden rounded-marketing-2xl border border-border/70 bg-background shadow-2xl shadow-foreground/[0.08] ring-1 ring-inset ring-white/5',
         className,
       )}
     >
-      {/* window bar */}
-      <div className="flex items-center gap-2 border-b border-border/60 bg-muted/40 px-4 py-3">
-        <div className="flex gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-border" />
-          <span className="h-2.5 w-2.5 rounded-full bg-border" />
-          <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        </div>
-        <div className="mx-auto flex w-full max-w-xs items-center justify-center gap-1.5 rounded-full border border-border/60 bg-background/70 px-3 py-1">
-          <span className="text-[11px] text-muted-foreground">{url}</span>
-        </div>
-      </div>
-      {/* content */}
-      <div className="bg-background">{children}</div>
+      {children}
     </div>
   );
 }

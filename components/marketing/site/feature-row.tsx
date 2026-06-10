@@ -8,7 +8,7 @@
 
 import { Check } from 'lucide-react';
 import { Reveal } from './reveal';
-import { BrowserFrame, ImagePlaceholder } from './frame';
+import { PanelFrame, ImagePlaceholder } from './frame';
 
 export interface FeatureRowProps {
   no?: string;
@@ -20,7 +20,6 @@ export interface FeatureRowProps {
   /** A live product panel rendered inside the frame. Falls back to a labeled
    *  placeholder when omitted. */
   panel?: React.ReactNode;
-  url?: string;
   flip?: boolean;
 }
 
@@ -32,7 +31,6 @@ export function FeatureRow({
   points,
   image,
   panel,
-  url = 'app.chippi.ai',
   flip,
 }: FeatureRowProps) {
   return (
@@ -62,9 +60,9 @@ export function FeatureRow({
       </Reveal>
 
       <Reveal from={flip ? 'left' : 'right'} className={flip ? 'lg:order-1' : ''}>
-        <BrowserFrame url={url}>
+        <PanelFrame>
           {panel ?? <ImagePlaceholder label={image.label} sublabel={image.sublabel} ratio="aspect-[4/3]" />}
-        </BrowserFrame>
+        </PanelFrame>
       </Reveal>
     </div>
   );
