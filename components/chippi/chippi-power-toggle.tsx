@@ -92,7 +92,7 @@ export function ChippiPowerToggle() {
         title={enabled ? 'Chippi is running — click to pause' : 'Chippi is paused — click to resume'}
         aria-label={enabled ? 'Pause Chippi' : 'Resume Chippi'}
         className={cn(
-          'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50',
+          'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-border/70 text-xs font-medium transition-colors disabled:opacity-50',
           enabled
             ? 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025]'
             : 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25',

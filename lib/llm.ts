@@ -45,17 +45,41 @@ export {
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
+ * Bound third-party LLM latency and cost. The OpenAI SDK defaults to a 600s
+ * (10 min) per-request timeout and 2 silent auto-retries, so a hung or degraded
+ * OpenRouter upstream could hold a serverless function open for minutes and
+ * triple the token spend on every slow call. We cap both:
+ *   - timeout 120s: generous enough that a single (streamed) chat completion
+ *     finishes well within it, but bounded so a hang can't outlive the function.
+ *     A caller with a genuinely longer call can override per-request
+ *     (`client.chat.completions.create(..., { timeout })`).
+ *   - 1 retry (down from 2): still rides out a transient 429/5xx, but halves the
+ *     worst-case cost/latency amplification.
+ */
+const LLM_TIMEOUT_MS = 120_000;
+const LLM_MAX_RETRIES = 1;
+
+/**
  * Build the shared LLM client. Routes through OpenRouter when configured,
  * otherwise OpenAI direct. Throws only when neither key is present.
  */
 export function getLLMClient(): OpenAI {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (openRouterKey) {
-    return new OpenAI({ apiKey: openRouterKey, baseURL: OPENROUTER_BASE_URL });
+    return new OpenAI({
+      apiKey: openRouterKey,
+      baseURL: OPENROUTER_BASE_URL,
+      timeout: LLM_TIMEOUT_MS,
+      maxRetries: LLM_MAX_RETRIES,
+    });
   }
   const openAIKey = process.env.OPENAI_API_KEY;
   if (openAIKey) {
-    return new OpenAI({ apiKey: openAIKey });
+    return new OpenAI({
+      apiKey: openAIKey,
+      timeout: LLM_TIMEOUT_MS,
+      maxRetries: LLM_MAX_RETRIES,
+    });
   }
   throw new Error('No LLM key configured — set OPENROUTER_API_KEY (or OPENAI_API_KEY).');
 }

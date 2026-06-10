@@ -1,6 +1,8 @@
 # ARCHITECTURE.md
 
-System map for Chippi. Based on actual repository contents.
+System map for Chippi.
+
+> ⚠️ **This prose has drifted from the code in places — do not trust it over the source.** For mechanical structure (every route, table, cron, tool) the **canonical, CI-gated** reference is `docs/repo-map.generated.md`; for the symptom→system→files judgment layer, see `SYSTEMS.md`. Known stale spots below have been corrected inline, but the directory map / route names in §2–§3 still describe an older shape (e.g. it mentions `/dashboard` and `/onboarding` routes that **no longer exist** — real post-login routing is `app/auth/redirect`, onboarding UI is `app/setup`). When in doubt, read the code or the generated map.
 
 ---
 
@@ -193,7 +195,7 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 ## 8. Scoring flow
 
 - **Function**: `scoreLeadApplication` in `lib/lead-scoring.ts`
-- **Model**: OpenAI `gpt-4o-mini`, temperature 0 (lead-scoring only; chat agent uses `gpt-5-mini`)
+- **Model**: the lead *score* is deterministic (rules engine, `lib/scoring/`); the AI *summary* enhancement uses `gpt-4.1-mini` (`lib/scoring/enhance.ts`). The chat agent defaults to `x-ai/grok-4.3` (realtor-selected via OpenRouter), NOT `gpt-5-mini`.
 - **Format**: Structured JSON output via `response_format.json_schema`
 - **Input**: name, email, phone, budget, timeline, preferredAreas, notes
 - **Output contract** (`LeadScoringResult`):
@@ -218,11 +220,9 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 
 ## 10. Billing flow
 
-- **Current state**: `SpaceSetting.billingSettings` field exists as a string column.
-- **Settings UI** shows a billing settings input field.
-- **No Stripe package** in dependencies. No Stripe-related API routes.
-- **Intended pricing** (per product context, not confirmed in code): $97/month, 7-day free trial.
-- **Status**: Billing is boundary-sensitive. Treat as not yet implemented.
+- **Billing IS implemented** (brokerage seat-based). `stripe@^20` is a dependency; `lib/stripe.ts` is the client; routes live at `app/api/billing/{checkout,portal,cancel}` plus the `app/api/webhooks/stripe` receiver. Plans/seats: `lib/brokerage-seats.ts`, price IDs via `STRIPE_PRICE_{STARTER,TEAM,ENTERPRISE}`.
+- `SpaceSetting.billingSettings` is a legacy string column, separate from the brokerage Stripe flow.
+- NOTE: this section previously claimed "No Stripe package, billing not implemented" — that was **wrong**; billing exists and is live.
 
 ---
 
@@ -239,9 +239,9 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 
 1. **Legacy Redis path**: `app/actions.ts` and `lib/slugs.ts` use Upstash Redis for slug metadata. The admin dashboard also relies on Redis. Potential for state divergence with Supabase as source of truth.
 2. **Build error suppression**: TypeScript and ESLint errors are ignored during build. Type and lint issues can accumulate silently.
-3. **Billing not implemented**: Field and UI exist but no payment processing. Enabling billing will require Stripe integration and careful boundary work.
+3. **(Stale — resolved)** Billing **is** implemented via Stripe (brokerage seats); see §10. This item previously read "billing not implemented."
 4. **Tenant isolation**: API routes check auth and all vector queries are scoped by `spaceId`, but workspace ownership verification in other routes varies. Sensitive area for security review.
-5. **Onboarding auto-heal**: Both `/dashboard` and `/s/[slug]/layout.tsx` contain onboarding completion auto-heal logic for legacy accounts. Duplicated logic.
+5. **Post-login routing** lives in `app/auth/redirect/page.tsx` (NOT `/dashboard` — that route does not exist) and `app/s/[slug]/layout.tsx`. Onboarding completion is gated by `User.onboard` via `lib/onboarding.ts`.
 6. **Two space creation paths**: `app/api/onboarding/route.ts` (create_space action) and `app/actions.ts` (createSlugAction) both create spaces with different default stage names.
 7. **Vector dependency optional**: pgvector/embeddings failures are silently caught — assistant works without RAG. But scoring requires OpenAI.
 8. **pgvector setup**: The `vector` extension and `DocumentEmbedding` table must be created in Supabase before vector sync works. Run the additions in `supabase/schema.sql` via the Supabase SQL Editor.

@@ -9,7 +9,7 @@ const stats = [
   { value: '24/7', label: 'Works the inbox while you sleep' },
   { value: '< 1 min', label: 'Median first touch on a new lead' },
   { value: '6 → 1', label: 'Tools replaced by one workspace' },
-  { value: '$0', label: 'To start. Seven days, no card' },
+  { value: '7 days', label: 'Free trial. Cancel anytime' },
 ];
 
 export function StatsBand() {

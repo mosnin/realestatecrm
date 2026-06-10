@@ -378,6 +378,7 @@ CREATE TABLE IF NOT EXISTS "BrokerNotification" (
 CREATE TABLE IF NOT EXISTS "AuditLog" (
   id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "clerkId"     text,
+  "actorId"     text,
   "ipAddress"   text,
   action        text NOT NULL,
   resource      text NOT NULL,

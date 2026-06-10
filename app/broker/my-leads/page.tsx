@@ -31,7 +31,7 @@ export default async function MyLeadsPage() {
 
   if (!space) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Your routed leads.</p>
           <h1 className={H1} style={TITLE_FONT}>
@@ -120,7 +120,7 @@ export default async function MyLeadsPage() {
   })();
 
   return (
-    <div className="space-y-6 pb-56 md:pb-24">
+    <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Your routed leads.</p>
         <h1 className={H1} style={TITLE_FONT}>

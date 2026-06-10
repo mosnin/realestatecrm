@@ -302,7 +302,7 @@ export default async function BrokerRealtorsPage() {
   })();
 
   return (
-    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
+    <div className="space-y-6 max-w-4xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Realtors.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

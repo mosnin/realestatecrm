@@ -152,7 +152,7 @@ export default async function CompanyPage() {
               Come see what your day looks like with Chippi.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">
-              Seven days free. No credit card. Bring your inbox and let Chippi
+              Seven days free, cancel anytime. Bring your inbox and let Chippi
               do the rest.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -160,7 +160,7 @@ export default async function CompanyPage() {
                 href="/login/realtor?intent=signup"
                 className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
               >
-                Start free
+                Start free trial
               </Link>
               <Link
                 href="/demo"

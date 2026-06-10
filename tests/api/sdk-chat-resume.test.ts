@@ -82,6 +82,10 @@ beforeEach(() => {
   process.env.CHIPPI_CHAT_RUNTIME = 'ts';
   mockedAuth.mockResolvedValue({ userId: 'user_clerk_123' });
   for (const k of Object.keys(tableQueue)) delete tableQueue[k];
+  // Default: the User lookup (clerkId -> internal id) resolves to the space
+  // owner (SPACE.ownerId), so the resume ownership re-check passes. Override
+  // per-test to exercise the mismatch path.
+  tableQueue.User = [{ data: { id: 'u_1' } }];
   updateMock.mockResolvedValue({ data: [{ id: 'run_1' }], error: null });
 });
 
@@ -193,6 +197,14 @@ describe('POST /api/ai/task/resume/[pausedRunId] — auth + scoping', () => {
     queueSpace(null);
     const res = await POST(makeReq({ approved: true }), params('run_1'));
     expect(res.status).toBe(404);
+  });
+
+  it('403 when the caller no longer owns the space (ownership changed since pause)', async () => {
+    queueRow(ROW);
+    queueSpace({ ...SPACE, ownerId: 'u_other' });
+    // beforeEach maps the caller to 'u_1', which no longer matches the owner.
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(403);
   });
 });
 

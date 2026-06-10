@@ -5,7 +5,16 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 function getKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || process.env.CLERK_SECRET_KEY || '';
+  const secret = process.env.ENCRYPTION_KEY || process.env.CLERK_SECRET_KEY;
+  if (!secret) {
+    // Fail closed: never derive a key from the empty string — sha256("") is a
+    // public constant, so the old `|| ''` fallback made every encrypted value
+    // trivially reversible if both env vars were absent. ENCRYPTION_KEY is
+    // preferred; CLERK_SECRET_KEY stays as a fallback ONLY so data encrypted
+    // before ENCRYPTION_KEY was provisioned still decrypts. Moving to a
+    // dedicated key is a separate re-encryption task, not a silent default.
+    throw new Error('ENCRYPTION_KEY (or CLERK_SECRET_KEY) must be set for encryption');
+  }
   // Derive a 32-byte key from the secret using SHA-256
   return crypto.createHash('sha256').update(secret).digest();
 }
