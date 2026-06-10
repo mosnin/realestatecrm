@@ -119,6 +119,29 @@ export const addPersonTool = defineTool<typeof parameters, AddPersonResult>({
       return { summary: 'Name is required.', display: 'error' };
     }
 
+    // Dedup before insert. The model re-creates people it (or a delegated
+    // sub-agent) already made — delegation is fire-and-forget, so the
+    // orchestrator can't see the child's writes and happily re-issues the
+    // same add_person. A strong match (same email, or same name when no
+    // email is given) returns the existing contact as a SUCCESS so the model
+    // moves on instead of retrying. Also covers the timed-out-write-then-
+    // retry case from the bridge deadline.
+    const email = args.email?.trim() || null;
+    let dupQuery = supabase
+      .from('Contact')
+      .select('id, name, email')
+      .eq('spaceId', ctx.space.id)
+      .limit(1);
+    dupQuery = email ? dupQuery.ilike('email', email) : dupQuery.ilike('name', name);
+    const { data: existing } = await dupQuery.maybeSingle();
+    if (existing) {
+      return {
+        summary: `${existing.name ?? name} is already in the workspace — skipped the duplicate.`,
+        data: { contactId: existing.id as string, name: existing.name as string, leadType: args.leadType ?? 'buyer' },
+        display: 'plain',
+      };
+    }
+
     const id = crypto.randomUUID();
     const leadType: 'buyer' | 'rental' = args.leadType ?? 'buyer';
     const tags = (args.tags ?? []).map((t) => t.trim()).filter((t) => t.length > 0);
@@ -150,7 +173,9 @@ export const addPersonTool = defineTool<typeof parameters, AddPersonResult>({
     if (insertErr || !contactRow) {
       logger.error('[tools.add_person] insert failed', { spaceId: ctx.space.id }, insertErr);
       return {
-        summary: `Failed to add person: ${insertErr?.message ?? 'unknown error'}`,
+        // Full error stays in the logs; the model gets a clean line it can
+        // relay — never a raw Postgres string.
+        summary: 'Failed to add the person — the save didn’t go through. Try again.',
         display: 'error',
       };
     }

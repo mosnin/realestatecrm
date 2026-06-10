@@ -147,6 +147,21 @@ export function buildDelegateTaskTool() {
 
       // Fire-and-forget to Modal. Do NOT await — the chat turn must not block
       // on the sub-agent. The UI's stream subscription carries progress.
+      // But a dispatch failure must not strand the run 'queued' forever with
+      // a live-looking card: flip it to failed + write the terminal event so
+      // the stream ends honestly. Status-guarded so a run the orchestrator
+      // already picked up is never clobbered.
+      const failDispatch = async (why: string) => {
+        logger.error('[delegate_task] Modal swarm dispatch failed', { spaceId: ctx.space.id, runId, why });
+        await supabase
+          .from('SwarmRun')
+          .update({ status: 'failed', errorMessage: why, completedAt: new Date().toISOString() })
+          .eq('id', runId)
+          .eq('status', 'queued');
+        await supabase
+          .from('SwarmEvent')
+          .insert({ swarmRunId: runId, type: 'swarm_failed', data: { error: why } });
+      };
       void fetch(modalSwarmUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,9 +173,11 @@ export function buildDelegateTaskTool() {
           // The orchestrator decomposes the goal itself; no preset custom agents.
           customAgents: [],
         }),
-      }).catch((err) => {
-        logger.error('[delegate_task] Modal swarm trigger failed', { spaceId: ctx.space.id, runId }, err);
-      });
+      })
+        .then((res) => {
+          if (!res.ok) return failDispatch(`backend refused the job (${res.status})`);
+        })
+        .catch(() => failDispatch('backend unreachable'));
 
       const shortGoal = goal.length > 120 ? `${goal.slice(0, 117)}…` : goal;
       return {

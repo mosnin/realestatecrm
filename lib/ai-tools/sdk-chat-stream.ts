@@ -450,9 +450,11 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           }).catch(() => {});
         }
 
-        // Pause path: if the run paused for approval, persist the state,
-        // emit permission_required with the AgentPausedRun id as requestId,
-        // and report the turn as paused.
+        // Pause path: if the run paused for approval, persist the state and
+        // emit the ONE authoritative permission_required, keyed by the
+        // AgentPausedRun id the resume route loads. The mapper deliberately
+        // emits no approval event of its own — a single source of truth means
+        // the card can never carry an id that doesn't exist server-side.
         if (result.interruptions && result.interruptions.length > 0 && result.state) {
           const pausedRunId = await persistPausedRun({
             ctx: input.ctx,
@@ -460,37 +462,51 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             state: result.state,
             interruptions: result.interruptions,
           });
-          if (pausedRunId) {
-            // The mapper already pushed a permission_required event keyed
-            // by callId. Emit a fresh one with the AgentPausedRun id as
-            // requestId so the resume route knows where to PATCH.
-            const approvals = extractApprovals(
-              { interruptions: result.interruptions as Array<{
-                rawItem: { callId?: string; id?: string };
-                name?: string;
-                arguments?: string;
-              }> },
-              ALL_TOOLS,
-            );
-            const first = approvals[0];
-            if (first) {
-              pushEvent({
-                type: 'permission_required',
-                requestId: pausedRunId,
-                callId: first.callId,
-                name: first.toolName,
-                args: asRecord(first.arguments),
-                summary: first.summary,
-                otherPendingCalls: approvals.slice(1).map((a) => ({
-                  callId: a.callId,
-                  name: a.toolName,
-                  args: asRecord(a.arguments),
-                  summary: a.summary,
-                })),
-              });
-            }
+          const approvals = pausedRunId
+            ? extractApprovals(
+                { interruptions: result.interruptions as Array<{
+                  rawItem: { callId?: string; id?: string };
+                  name?: string;
+                  arguments?: string;
+                }> },
+                ALL_TOOLS,
+              )
+            : [];
+          const first = approvals[0];
+          if (pausedRunId && first) {
+            pushEvent({
+              type: 'permission_required',
+              requestId: pausedRunId,
+              callId: first.callId,
+              name: first.toolName,
+              args: asRecord(first.arguments),
+              summary: first.summary,
+              otherPendingCalls: approvals.slice(1).map((a) => ({
+                callId: a.callId,
+                name: a.toolName,
+                args: asRecord(a.arguments),
+                summary: a.summary,
+              })),
+            });
+            pushEvent({ type: 'turn_complete', reason: 'paused' });
+          } else {
+            // Persist failed (or yielded no usable approval) — there is
+            // nothing resumable. Telling the client "paused" here is the bug
+            // that produced the infinite approve→"Not found" loop: a card
+            // with no row behind it. End the turn honestly instead; the
+            // realtor re-asks and the next turn starts clean.
+            logger.error('[ai/task ts] pause not resumable — ending turn', {
+              conversationId: input.conversationId,
+              persisted: Boolean(pausedRunId),
+              approvalCount: approvals.length,
+            });
+            pushEvent({
+              type: 'error',
+              message: chippiErrorMessage('persistence'),
+              code: 'persistence',
+            });
+            pushEvent({ type: 'turn_complete', reason: 'complete' });
           }
-          pushEvent({ type: 'turn_complete', reason: 'paused' });
         } else {
           pushEvent({ type: 'turn_complete', reason: 'complete' });
         }

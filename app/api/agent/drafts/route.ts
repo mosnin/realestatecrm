@@ -29,6 +29,12 @@ export async function GET(req: NextRequest) {
     .order('createdAt', { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
+  if (error) {
+    // A thrown Supabase error became an opaque 500 the inbox silently
+    // swallowed — the realtor saw an EMPTY outbox, indistinguishable from
+    // "no drafts", while the query was actually failing.
+    console.error('[agent/drafts GET] query failed', error);
+    return NextResponse.json({ error: 'Could not load drafts' }, { status: 500 });
+  }
   return NextResponse.json(data ?? []);
 }

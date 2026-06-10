@@ -140,11 +140,21 @@ function buildOneTool(raw: ComposioRawTool, toolkitSlug: string, userId: string)
       // the integrations layer without standing up the Composio client.
       const { executeToolForEntity } = await import('./composio');
       try {
-        const result = await executeToolForEntity({
-          entityId: userId,
-          slug: actionSlug,
-          arguments: (input as Record<string, unknown>) ?? {},
-        });
+        // Composio is a network hop to a third party — the single most
+        // likely thing to hang a live chat turn. Race it against the same
+        // 25s deadline the domain-tool bridge uses so a stuck integration
+        // degrades into a recoverable in-turn error, not a frozen demo.
+        const result = await Promise.race([
+          executeToolForEntity({
+            entityId: userId,
+            slug: actionSlug,
+            arguments: (input as Record<string, unknown>) ?? {},
+          }),
+          new Promise<never>((_, reject) => {
+            const id = setTimeout(() => reject(new Error('__timeout__')), 25_000);
+            (id as { unref?: () => void }).unref?.();
+          }),
+        ]);
         if (result.successful) {
           // The model reads this string. Keep the data compact — full
           // payloads bloat the context; the model rarely needs more
@@ -153,9 +163,12 @@ function buildOneTool(raw: ComposioRawTool, toolkitSlug: string, userId: string)
         }
         return `Error: ${actionSlug} failed — ${result.error ?? 'unknown error'}`;
       } catch (err) {
-        // A thrown error (network, auth) must not land as a raw stack in
-        // the model's context. Reformat to the same `Error: ` prefix the
-        // domain-tool bridge uses so the model continues gracefully.
+        // A thrown error (network, auth, timeout) must not land as a raw
+        // stack in the model's context. Short, internals-free line the
+        // model can paraphrase and recover from.
+        if (err instanceof Error && err.message === '__timeout__') {
+          return `Error: ${actionSlug} took too long and was stopped. Tell the realtor it didn't go through and offer to retry.`;
+        }
         const message = err instanceof Error ? err.message : String(err);
         return `Error: ${actionSlug} failed — ${message}`;
       }

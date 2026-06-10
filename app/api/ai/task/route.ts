@@ -428,8 +428,12 @@ function proxyModalStream({
             } else if (type === 'error') {
               // Persist whatever streamed before the failure so a mid-turn
               // Modal error doesn't erase the assistant message the user saw.
+              // Never forward Modal's raw message — a Python traceback line
+              // in Chippi's bubble is exactly the demo-breaking artifact this
+              // proxy exists to prevent. Log it; speak Chippi on the wire.
+              logger.error('[ai/task] modal turn errored', { spaceId, modalMessage: evt.message });
               await persistOnce();
-              push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+              push(controller, { type: 'error', message: chippiErrorMessage('internal') });
               sentTerminal = true;
             }
           }
@@ -754,17 +758,19 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Agent path → Modal. Two ways in:
-  //   1. CHIPPI_CHAT_RUNTIME=modal forces ALL agent turns through the sandbox.
-  //      This is a deliberate deploy choice, so a missing MODAL_CHAT_URL is a
-  //      misconfiguration we surface loudly (callModalAgent returns 503) rather
-  //      than silently downgrading the whole deploy to the TS runtime.
-  //   2. The realtor picked Agent mode for THIS message. Prefer Modal, but if
-  //      MODAL_CHAT_URL is unset, degrade gracefully to the in-process TS agent
-  //      (it has the full tool surface too) instead of failing the one turn.
+  // Agent path → Modal ONLY when CHIPPI_CHAT_RUNTIME=modal forces the whole
+  // deploy through the sandbox (a deliberate deploy choice, so a missing
+  // MODAL_CHAT_URL is a misconfiguration we surface loudly — callModalAgent
+  // returns 503 — rather than silently downgrading to the TS runtime).
+  //
+  // The per-message "Agent mode → Modal" shortcut was deleted deliberately:
+  // the Python tool set has NO approval gating (its trust model is
+  // draft-to-outbox), so routing an interactive Agent turn to Modal executed
+  // mutations without the confirm-before-write card the realtor was promised.
+  // Agent mode now always runs the in-process TS runtime — full tool surface,
+  // approval gates intact — and reaches Modal for deep work via delegate_task.
   const forcedModal = chatRuntime() === 'modal';
-  const perMessageModal = explicitMode === 'agent' && Boolean(process.env.MODAL_CHAT_URL);
-  if (route === 'agent' && (forcedModal || perMessageModal)) {
+  if (route === 'agent' && forcedModal) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
       ctx,

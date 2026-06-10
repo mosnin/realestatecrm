@@ -51,8 +51,15 @@ export function NotificationBell() {
   }, []);
 
   async function markAllRead() {
-    await fetch('/api/broker/notifications', { method: 'PATCH' });
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    // Only flip local state once the server confirms — marking read locally
+    // on a failed PATCH made the badge reappear on the next load and read
+    // as "notifications never clear".
+    try {
+      const res = await fetch('/api/broker/notifications', { method: 'PATCH' });
+      if (res.ok) setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch {
+      /* network hiccup — badge stays, retried on next open */
+    }
   }
 
   function handleToggle() {

@@ -5,11 +5,11 @@ import {
   Check,
   X,
   Pencil,
-  ShieldCheck,
   Loader2,
   Infinity as InfinityIcon,
   Clock,
   Mail,
+  MessageCircle,
   MessageSquare,
   Send,
 } from 'lucide-react';
@@ -86,6 +86,59 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
     );
   }
   return null;
+}
+
+/** Humanize a camelCase / snake_case arg key: `leadType` → `Lead type`. */
+function humanizeKey(key: string): string {
+  const spaced = key
+    .replace(/_/g, ' ')
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Render one arg value as a short human string; null = skip the row. */
+function humanizeValue(v: unknown): string | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'string') return v.length > 160 ? `${v.slice(0, 160)}…` : v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) {
+    const parts = v.filter((x) => typeof x === 'string' || typeof x === 'number');
+    if (parts.length === 0) return null;
+    return parts.join(', ');
+  }
+  try {
+    const s = JSON.stringify(v);
+    return s.length > 160 ? `${s.slice(0, 160)}…` : s;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Labeled field rows for every tool without a bespoke renderer. Realtors
+ * approve actions, not JSON — the raw object dump read as a developer
+ * artifact in the product's most trust-sensitive moment. JSON survives only
+ * inside the explicit Edit mode.
+ */
+function LabeledArgs({ args }: { args: Record<string, unknown> }) {
+  const rows = Object.entries(args)
+    .map(([k, v]) => ({ key: humanizeKey(k), value: humanizeValue(v) }))
+    .filter((r): r is { key: string; value: string } => r.value !== null);
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-2.5 overflow-hidden rounded-md border border-border/70 bg-background/60">
+      <dl className="divide-y divide-border/60">
+        {rows.map((r) => (
+          <div key={r.key} className="flex items-baseline gap-3 px-2.5 py-1.5 text-[12px]">
+            <dt className="w-24 flex-shrink-0 font-medium text-muted-foreground">{r.key}</dt>
+            <dd className="min-w-0 flex-1 break-words text-foreground/90">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 }
 
 /**
@@ -306,14 +359,14 @@ export function PermissionPromptView({
   const disabled = busy || submitting !== null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/5 px-4 py-3">
+    <div className="rounded-xl border border-border/70 bg-card px-4 py-3.5">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0 text-amber-700 dark:text-amber-400">
-          <ShieldCheck size={15} />
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
+          <MessageCircle size={14} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
-            {isSendEmail ? 'Email draft — review and send' : isSendSms ? 'SMS draft — review and send' : 'Approve before running'}
+          <p className="mb-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            {isSendEmail ? 'Email draft — review and send' : isSendSms ? 'Text draft — review and send' : 'Chippi wants to run this'}
           </p>
           <p className="text-sm font-semibold text-foreground">{prompt.summary}</p>
 
@@ -353,11 +406,9 @@ export function PermissionPromptView({
             (() => {
               const pretty = PrettyArgs({ prompt });
               if (pretty) return pretty;
-              return (
-                <pre className="mt-2.5 text-[11px] bg-background/60 border border-border rounded-md px-2.5 py-1.5 font-mono text-foreground/80 overflow-x-auto">
-                  {JSON.stringify(prompt.args, null, 2)}
-                </pre>
-              );
+              // Labeled rows, never raw JSON — the realtor is approving an
+              // action, not reading a payload. JSON lives behind Edit.
+              return <LabeledArgs args={prompt.args as Record<string, unknown>} />;
             })()
           )}
 
@@ -378,14 +429,17 @@ export function PermissionPromptView({
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions — the product's button vocabulary: foreground pill
+              primary, hairline outline secondary, quiet rose deny. 44px
+              touch targets held via min-height. */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={doApprove}
               disabled={disabled || (isSendTool && composeEmpty)}
               className={cn(
-                'inline-flex items-center gap-1 rounded-md bg-foreground text-background px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-all',
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-semibold text-background',
+                'transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
             >
@@ -404,7 +458,7 @@ export function PermissionPromptView({
                 onClick={doAlwaysAllow}
                 disabled={disabled}
                 title={`Auto-approve ${prompt.name} for the rest of this chat`}
-                className="inline-flex items-center gap-1 rounded-md border border-foreground/20 bg-background hover:bg-muted px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-xs font-semibold text-foreground transition-all duration-150 hover:bg-foreground/[0.04] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting === 'always' ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -418,7 +472,7 @@ export function PermissionPromptView({
               type="button"
               onClick={doDeny}
               disabled={disabled}
-              className="inline-flex items-center gap-1 rounded-md border border-rose-400/50 bg-background text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-rose-700 transition-all duration-150 hover:bg-rose-500/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:text-rose-400"
             >
               {submitting === 'deny' ? (
                 <Loader2 size={12} className="animate-spin" />

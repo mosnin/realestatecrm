@@ -33,6 +33,9 @@ interface CardState {
   agentCount: number | null;
   /** Agents that have reported completion. */
   completed: number;
+  /** Agents that failed — tracked separately so the card never reports a
+   *  failed agent as "done". */
+  failed: number;
   /** Latest live "thinking" line from any agent. */
   activity: string | null;
   result: string | null;
@@ -70,7 +73,7 @@ function reducer(state: CardState, action: Action): CardState {
     case 'agent_completed':
       return { ...state, completed: state.completed + 1 };
     case 'agent_failed':
-      return { ...state, completed: state.completed + 1 };
+      return { ...state, failed: state.failed + 1 };
     case 'audit_started':
       return { ...state, status: 'auditing', activity: 'Synthesizing results…' };
     case 'swarm_completed':
@@ -129,13 +132,14 @@ function statusLine(s: CardState): string {
       return 'Planning the work…';
     case 'running':
       if (s.agentCount != null) {
-        return s.activity ?? `Working — ${s.completed}/${s.agentCount} done`;
+        const base = `Working — ${s.completed}/${s.agentCount} done`;
+        return s.activity ?? (s.failed > 0 ? `${base}, ${s.failed} failed` : base);
       }
       return s.activity ?? 'Working…';
     case 'auditing':
       return s.activity ?? 'Pulling it together…';
     case 'completed':
-      return 'Done';
+      return s.failed > 0 ? `Done — ${s.failed} step${s.failed === 1 ? '' : 's'} failed` : 'Done';
     case 'failed':
       return 'Failed';
     case 'cancelled':
@@ -152,6 +156,7 @@ export function SubagentTaskBlockView({ block }: SubagentTaskBlockViewProps) {
     status: 'queued',
     agentCount: null,
     completed: 0,
+    failed: 0,
     activity: null,
     result: null,
     error: null,

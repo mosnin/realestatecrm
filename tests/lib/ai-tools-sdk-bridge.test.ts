@@ -132,16 +132,17 @@ describe('toSdkTool', () => {
     expect(out).toBe('Error: something snapped');
   });
 
-  it('catches a throwing handler so a stack trace never reaches the model context', async () => {
+  it('catches a throwing handler and REDACTS the raw message — internals never reach the model context', async () => {
     const def = defineTool({
       name: 'flaky_op',
       description: 'flaky',
       parameters: z.object({}),
       requiresApproval: false,
       handler: async () => {
-        // The kind of exception a real DB / network call might throw —
-        // we'd rather see "Error: flaky_op failed — Connection refused"
-        // than a multi-line stack ending up in the chat transcript.
+        // The kind of exception a real DB / network call might throw. The
+        // model gets a clean recoverable line; the raw string stays in the
+        // server logs only (Postgres/SDK jargon parroted into the chat was
+        // a real failure mode).
         throw new Error('Connection refused');
       },
     });
@@ -149,7 +150,8 @@ describe('toSdkTool', () => {
     const sdk = toSdkTool(def, makeCtx());
     const out = await sdk.invoke(new RunContext(), JSON.stringify({}));
 
-    expect(out).toBe('Error: flaky_op failed — Connection refused');
+    expect(out).toContain('Error: flaky_op hit a problem');
+    expect(out).not.toContain('Connection refused');
   });
 
   it('catches non-Error throws (e.g. a plain string) without crashing the run', async () => {
@@ -167,7 +169,8 @@ describe('toSdkTool', () => {
     const sdk = toSdkTool(def, makeCtx());
     const out = await sdk.invoke(new RunContext(), JSON.stringify({}));
 
-    expect(out).toBe('Error: rude_op failed — something exploded');
+    expect(out).toContain('Error: rude_op hit a problem');
+    expect(out).not.toContain('something exploded');
   });
 });
 

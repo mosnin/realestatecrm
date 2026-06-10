@@ -183,6 +183,12 @@ function proxyModalStream({
       const textChunks: string[] = [];
       const blocks: MessageBlock[] = [];
       let persisted = false;
+      // Track whether a terminal browser frame (turn_complete | error) ever
+      // hit the wire. Modal can be killed mid-stream (600s container timeout,
+      // dropped socket) and end the SSE with NO done/error frame — without
+      // this guarantee the broker's EventSource hangs open forever. Ported
+      // from the realtor proxy, which fixed the same failure class.
+      let sentTerminal = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
         persisted = true;
@@ -276,9 +282,11 @@ function proxyModalStream({
                   : textChunks.join('');
               await persistOnce(finalText);
               push(controller, { type: 'turn_complete', reason: 'complete' });
+              sentTerminal = true;
             } else if (type === 'error') {
               await persistOnce();
-              push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+              push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+              sentTerminal = true;
             }
           }
         }
@@ -296,6 +304,7 @@ function proxyModalStream({
                     : textChunks.join('');
                 await persistOnce(finalText);
                 push(controller, { type: 'turn_complete', reason: 'complete' });
+                sentTerminal = true;
               }
             } catch {
               // ignore malformed trailing line
@@ -306,9 +315,17 @@ function proxyModalStream({
         if (!abortController.signal.aborted) {
           logger.error('[ai/broker-task] modal stream read error', { brokerageId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          sentTerminal = true;
         }
       } finally {
+        // Safety net — the stream ended with no done/error frame. Persist
+        // whatever streamed (idempotent) AND guarantee exactly one terminal
+        // frame so the browser unlocks instead of hanging open forever.
         await persistOnce();
+        if (!sentTerminal && !abortController.signal.aborted) {
+          logger.warn('[ai/broker-task] modal stream ended with no terminal event', { brokerageId });
+          push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+        }
         controller.close();
         reader.releaseLock();
       }

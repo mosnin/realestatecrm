@@ -58,10 +58,16 @@ export async function POST(
   { params }: { params: Promise<{ pausedRunId: string }> },
 ) {
   // Guardrail: this endpoint only makes sense when the TS runtime is on.
-  // If someone hits it on a default-modal deploy we 404 — keeps the
-  // contract honest with the flag.
+  // If someone hits it on a default-modal deploy that's a deploy invariant
+  // violation — log it loudly (it means the UI showed an approval card a
+  // Modal deploy can never resume) and answer in Chippi's voice so the
+  // realtor isn't left staring at a raw "Not found".
   if (chatRuntime() !== 'ts') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    logger.error('[ai/task resume] resume hit on a modal-runtime deploy — approval cards cannot work here');
+    return NextResponse.json(
+      { error: "I can't pick that one back up on this setup. Ask me again and I'll redo it fresh." },
+      { status: 404 },
+    );
   }
 
   const { pausedRunId } = await params;
@@ -98,18 +104,29 @@ export async function POST(
     logger.error('[ai/task resume] load failed', { pausedRunId }, error);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
-  if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!row) {
+    return NextResponse.json(
+      { error: "I lost the thread on that one — it may have already gone through or timed out. Ask me again and I'll redo it." },
+      { status: 404 },
+    );
+  }
   const paused = row as PausedRunRow;
   if (paused.userId !== auth.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   if (paused.status !== 'pending') {
-    return NextResponse.json({ error: `Run is ${paused.status}` }, { status: 409 });
+    return NextResponse.json(
+      { error: "I already handled that one. If it didn't take, ask me again and I'll redo it." },
+      { status: 409 },
+    );
   }
   if (paused.expiresAt && new Date(paused.expiresAt).getTime() < Date.now()) {
     // Best-effort flip; ignore failures — the request is over either way.
     await supabase.from('AgentPausedRun').update({ status: 'expired' }).eq('id', paused.id);
-    return NextResponse.json({ error: 'Run expired' }, { status: 410 });
+    return NextResponse.json(
+      { error: "That one sat too long and expired. Tell me again and I'll line it back up." },
+      { status: 410 },
+    );
   }
 
   // Resolve the space row from the stored spaceId. We don't reuse
@@ -172,7 +189,10 @@ export async function POST(
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
   if (!marked || marked.length === 0) {
-    return NextResponse.json({ error: 'Run is already resumed' }, { status: 409 });
+    return NextResponse.json(
+      { error: "I'm already on that one — give it a beat." },
+      { status: 409 },
+    );
   }
 
   return streamTsResumeTurn({

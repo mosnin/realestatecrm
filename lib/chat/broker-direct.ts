@@ -134,7 +134,13 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
           signal: input.abortController.signal,
         });
 
-        if (result.text) push({ type: 'text_delta', delta: result.text });
+        // Empty completion → honest line instead of a blank bubble stamped
+        // "complete" (same fix as the realtor direct path).
+        if (result.text.trim()) {
+          push({ type: 'text_delta', delta: result.text });
+        } else {
+          push({ type: 'text_delta', delta: 'I came back empty on that one — mind rephrasing it?' });
+        }
         push({ type: 'turn_complete', reason: 'complete' });
 
         if (result.text.trim()) {

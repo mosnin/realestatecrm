@@ -84,24 +84,35 @@ export async function POST() {
   }
 
   // Fast path — fire the Modal webhook so the run starts now instead of at the
-  // next heartbeat. Fire-and-forget (a Modal run takes minutes); a rejection
-  // is harmless because the trigger above is already durably queued.
+  // next heartbeat. AWAIT the acceptance (with a short timeout): the old
+  // fire-and-forget claimed `method:'modal'` before knowing whether Modal took
+  // the job, so under a Modal outage the toast said "On it" and nothing ever
+  // happened. Now a refused/timed-out webhook falls through to the honest
+  // queued answer (the Redis trigger above is the durable record).
   // user_id is the caller's Clerk userId — the entity whose Composio
-  // connections the autonomous run uses. Passing it explicitly removes the
-  // silent-null path on the Modal side.
+  // connections the autonomous run uses.
   if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
-    fetch(MODAL_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        space_id: space.id,
-        secret: AGENT_INTERNAL_SECRET,
-        user_id: userId,
-      }),
-    }).catch((err) => {
-      console.error('[agent/run-now] Modal webhook background error', err);
-    });
-    return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
+    try {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 5_000);
+      const res = await fetch(MODAL_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          space_id: space.id,
+          secret: AGENT_INTERNAL_SECRET,
+          user_id: userId,
+        }),
+        signal: ac.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
+      }
+      console.error('[agent/run-now] Modal webhook refused', res.status);
+    } catch (err) {
+      console.error('[agent/run-now] Modal webhook unreachable', err);
+    }
   }
 
   if (queued) {

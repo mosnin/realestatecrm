@@ -211,6 +211,32 @@ export function ChippiWorkspace({
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
 
+  // ── Approval mode — approve-first vs autonomous ───────────────────────────
+  // One decision, two states: Chippi asks before acting (default, the
+  // marketing promise) or runs autonomously and auto-approves its own tool
+  // calls. Persisted per workspace; the composer's segmented control flips it.
+  const APPROVAL_MODE_KEY = `chippi:approval-mode:${slug}`;
+  const [approvalMode, setApprovalMode] = useState<'approve' | 'auto'>('approve');
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(APPROVAL_MODE_KEY) === 'auto') setApprovalMode('auto');
+    } catch {
+      /* private mode — default stands */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const setApprovalModePersisted = useCallback(
+    (mode: 'approve' | 'auto') => {
+      setApprovalMode(mode);
+      try {
+        window.localStorage.setItem(APPROVAL_MODE_KEY, mode);
+      } catch {
+        /* private mode — in-memory only */
+      }
+    },
+    [APPROVAL_MODE_KEY],
+  );
+
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
 
@@ -228,7 +254,10 @@ export function ChippiWorkspace({
     deny,
     alwaysAllow,
     abort,
+    retryLastMessage,
+    rateLimitSeconds,
   } = useAgentTask({
+    autoApprove: approvalMode === 'auto',
     spaceSlug: slug,
     conversationId: activeConversationId,
     // Broker variant routes through `/api/ai/broker-task` — the broker
@@ -274,49 +303,12 @@ export function ChippiWorkspace({
     },
   });
 
-  // ── Retry support ────────────────────────────────────────────────────────
-  // Store the last user message so the retry button can re-send it without
-  // the user having to retype. Populated on every send() call.
-  const lastUserMsgRef = useRef<string>('');
-
-  // retryLastMessage — re-send the last user message. Falls back to the ref
-  // when the hook doesn't export retryLastMessage (current state of the hook).
-  const retryLastMessage = useCallback(async () => {
-    if (!lastUserMsgRef.current || isStreaming) return;
-    await send(lastUserMsgRef.current);
-  }, [send, isStreaming]);
-
-  // ── Rate-limit countdown ──────────────────────────────────────────────────
-  // When the hook surfaces a rate_limited error, start a local 60-second
-  // countdown so the composer shows "Ready in 0:59…" feedback.
-  const RATE_LIMIT_TEXT = "You've been moving fast";
-  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
-  const rateLimitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (agentError && agentError.includes(RATE_LIMIT_TEXT)) {
-      // Clear any existing timer before starting a fresh one.
-      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-      setRateLimitSeconds(60);
-      rateLimitTimerRef.current = setInterval(() => {
-        setRateLimitSeconds((s) => {
-          if (s <= 1) {
-            if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-            rateLimitTimerRef.current = null;
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    }
-  }, [agentError]);
-
-  // Clean up the interval on unmount.
-  useEffect(() => {
-    return () => {
-      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-    };
-  }, []);
+  // Retry + the rate-limit countdown both come from the hook now. The
+  // workspace used to run its own copies — retry re-sent a local string ref
+  // (dropping attachments and silently downgrading agent→chat), and the
+  // countdown started by substring-matching the error copy (one copy edit
+  // away from never firing) with a hardcoded 60s instead of the server's
+  // Retry-After. Two sources of truth, both worse — deleted.
 
   // Wrap approve / alwaysAllow so the moment the realtor approves a
   // celebrate-able tool, the prompt's surface flips into the win sentence.
@@ -689,10 +681,7 @@ export function ChippiWorkspace({
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
 
-      // Record the full text so the retry button can replay it.
-      lastUserMsgRef.current = contextPrefix + text;
-      // Drive the warmup status: only Agent turns spin up Modal and earn the
-      // cycling sandbox lines.
+      // Drive the warmup status line for this turn.
       setActiveTurnMode(mode);
 
       // Opt-in send chime. Gated inside softTap() so the call site stays
@@ -847,32 +836,36 @@ export function ChippiWorkspace({
   // Once real assistant text starts flowing, currentAction → null and
   // the indicator slides out — the chat bubble takes over.
 
-  // Map in-flight tool call names to human-readable status phrases.
+  // Map in-flight tool call names to human-readable status phrases. Verbs
+  // that could fire back-to-back in one turn get DISTINCT lines — two
+  // consecutive identical phrases render as a frozen status (the indicator
+  // keys its transition on the string), which reads as "stuck", which reads
+  // as broken. Same family, different words.
   const TOOL_ACTION_MAP: Record<string, string> = {
     search_contacts: 'Searching your contacts…',
-    find_person: 'Searching your contacts…',
-    get_contact: 'Looking up contact…',
-    pipeline_summary: 'Analyzing your pipeline…',
-    find_stuck_deals: 'Analyzing your pipeline…',
-    find_deal: 'Looking up deals…',
-    search_deals: 'Looking up deals…',
-    schedule_tour: 'Checking the calendar…',
-    reschedule_tour: 'Checking the calendar…',
+    find_person: 'Finding the right person…',
+    get_contact: 'Pulling up the contact…',
+    pipeline_summary: 'Reading the pipeline…',
+    find_stuck_deals: 'Looking for stalled deals…',
+    find_deal: 'Pulling up the deal…',
+    search_deals: 'Searching your deals…',
+    schedule_tour: 'Booking the tour…',
+    reschedule_tour: 'Moving the tour…',
     find_tours: 'Checking the calendar…',
     send_email: 'Drafting your email…',
-    draft_email: 'Drafting your email…',
-    send_sms: 'Drafting your message…',
-    draft_sms: 'Drafting your message…',
+    draft_email: 'Writing the email…',
+    send_sms: 'Drafting your text…',
+    draft_sms: 'Writing the text…',
     recall_history: 'Checking history…',
-    set_followup: 'Updating follow-up…',
-    clear_followup: 'Updating follow-up…',
-    create_deal: 'Updating deal…',
-    mark_deal_won: 'Updating deal…',
-    mark_deal_lost: 'Updating deal…',
-    note_on_person: 'Adding note…',
-    note_on_deal: 'Adding note…',
+    set_followup: 'Setting the follow-up…',
+    clear_followup: 'Clearing the follow-up…',
+    create_deal: 'Creating the deal…',
+    mark_deal_won: 'Marking it won…',
+    mark_deal_lost: 'Marking it lost…',
+    note_on_person: 'Noting it on the contact…',
+    note_on_deal: 'Noting it on the deal…',
     planner: 'Building a plan…',
-    create_plan: 'Building a plan…',
+    create_plan: 'Laying out the steps…',
   };
 
   // Best-effort: map tool name keywords to which plan step is likely active.
@@ -937,19 +930,16 @@ export function ChippiWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tailMessage, liveCallIds]);
 
-  // ── Alive warmup status — Agent (Modal) spin-up ────────────────────────────
-  // An Agent turn pays a Modal warmup before the first token. Rather than a
-  // dead "Thinking…" sitting there, cycle a few honest status lines so the
-  // wait feels alive. Chat turns are a single fast call — they keep the plain
-  // "Thinking…" because inventing sandbox steps for them would be a lie.
+  // ── Alive warmup status ────────────────────────────────────────────────────
+  // Agent turns run IN-PROCESS (no Modal hop, no sandbox) — the old cycling
+  // lines ("Setting up the sandbox…", "Loading your tools…") narrated
+  // infrastructure that wasn't running, and because the cycle reset to zero
+  // every turn, the same fictional line led EVERY response. Status theater
+  // reads as a glitching droid. Now: every turn opens on the same honest
+  // "Thinking…" and only a genuinely long wait escalates the line — never a
+  // claim about machinery.
   const AGENT_WARMUP_PHRASES = useMemo(
-    () => [
-      'Setting up the sandbox…',
-      'Loading your tools…',
-      'Getting context…',
-      'Lining up the work…',
-      'Almost there…',
-    ],
+    () => ['Thinking…', 'Working on it…', 'Still on it — a longer one…'],
     [],
   );
   // The runtime the in-flight turn is running on. Set on each send.
@@ -972,9 +962,19 @@ export function ChippiWorkspace({
       setWarmupIndex(0);
       return;
     }
-    const id = setInterval(() => setWarmupIndex((i) => i + 1), 1700);
+    // Reduced-motion: hold the first phrase still — the swap every few
+    // seconds is motion someone asked us not to make.
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+    // Escalate slowly (one step every 5s, capped at the last phrase) — the
+    // line should change only when the wait has genuinely earned it.
+    const id = setInterval(
+      () => setWarmupIndex((i) => Math.min(i + 1, AGENT_WARMUP_PHRASES.length - 1)),
+      5000,
+    );
     return () => clearInterval(id);
-  }, [isWarmingUp, activeTurnMode]);
+  }, [isWarmingUp, activeTurnMode, AGENT_WARMUP_PHRASES.length]);
 
   const currentAction = useMemo<string | null>(() => {
     if (!isStreaming || !tailMessage) return null;
@@ -1040,14 +1040,53 @@ export function ChippiWorkspace({
         onSend={handleSend}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
-        disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
+        // NOT disabled on pendingApproval — typing past a stuck approval card
+        // is the realtor's escape hatch (send() abandons the prompt cleanly).
+        // Locking the composer with no Stop button was a dead end.
+        disabled={isStreaming || rateLimitSeconds > 0}
         isLoading={isStreaming}
         prefill={prefill ?? undefined}
         skills={skills}
         showModeSwitch={true}
       />
+      {/* One quiet line under the composer: the approval-mode control —
+          approve-first (the default promise) vs autonomous (Chippi acts
+          without asking). Segmented per the system vocabulary. */}
+      <div className="flex items-center justify-center pt-2">
+        <div className="inline-flex items-center rounded-full bg-foreground/[0.04] p-0.5">
+          {(
+            [
+              { id: 'approve' as const, label: 'Approve first' },
+              { id: 'auto' as const, label: 'Autonomous' },
+            ]
+          ).map((m) => {
+            const active = approvalMode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setApprovalModePersisted(m.id)}
+                aria-pressed={active}
+                className={cn(
+                  'relative rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-150',
+                  active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="approval-mode-pill"
+                    className="absolute inset-0 rounded-full border border-border/70 bg-background"
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                )}
+                <span className="relative">{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {/* Rate-limit countdown — shown below the composer when the API is
-          throttling. Counts down from 60 s and disappears automatically. */}
+          throttling. Counts down the server's Retry-After and disappears. */}
       {rateLimitSeconds > 0 && (
         <p className="text-xs text-muted-foreground/70 text-center py-2">
           Ready in {Math.floor(rateLimitSeconds / 60)}:{String(rateLimitSeconds % 60).padStart(2, '0')}
@@ -1424,7 +1463,7 @@ export function ChippiWorkspace({
                             />
                             {/* Inline retry button — shown on the tail error
                                 message so the realtor doesn't have to retype. */}
-                            {isTail && agentError && !isStreaming && lastUserMsgRef.current && (
+                            {isTail && agentError && !isStreaming && (
                               <button
                                 type="button"
                                 onClick={() => void retryLastMessage()}

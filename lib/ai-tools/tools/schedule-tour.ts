@@ -105,7 +105,10 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
           display: 'error',
         };
       }
-      throw err;
+      // A billing-infrastructure hiccup must not kill the whole turn — the
+      // gate FAILS OPEN like the chat route's pre-stream gate: log it, book
+      // the tour, let the charge below settle the ledger.
+      logger.warn('[tools.schedule_tour] credit gate errored — failing open', { spaceId: ctx.space.id }, err);
     }
 
     // Resolve guest from Contact when provided.
@@ -238,7 +241,13 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
       minute: '2-digit',
     });
     const where = args.propertyAddress ? ` at ${args.propertyAddress}` : '';
-    await chargeWorkflow(ctx.space.id, 'tour_booking');
+    // The Tour row is already committed — a charge failure here must not
+    // surface as "the tour failed" (it didn't; it's booked). Log and move on.
+    try {
+      await chargeWorkflow(ctx.space.id, 'tour_booking');
+    } catch (err) {
+      logger.error('[tools.schedule_tour] chargeWorkflow failed after booking', { spaceId: ctx.space.id }, err);
+    }
     return {
       summary: `Tour scheduled for ${guestName || 'guest'}${where} — ${prettyTime}.`,
       data: {

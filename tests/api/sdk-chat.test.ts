@@ -328,16 +328,18 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('explicit mode:agent forces Modal even for a generic question', async () => {
+  it('explicit mode:agent runs IN-PROCESS even when MODAL_CHAT_URL is set — Modal has no approval gating', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
-    // "what's a CMA?" is generic Q&A the heuristic router would keep on the
-    // direct path. The explicit Agent pick sends it to Modal (the mandatory
-    // acting runtime) so the realtor's chosen runtime is honored.
+    // The per-message Agent→Modal shortcut was deleted deliberately: the
+    // Python tool set executes mutations with NO approval prompt, so routing
+    // an interactive Agent turn there bypassed the confirm-before-write
+    // promise. Agent mode stays on the TS runtime (approval gates intact);
+    // Modal is reached only via CHIPPI_CHAT_RUNTIME=modal or delegate_task.
     await POST(makeRequest({ message: "what's a CMA?", mode: 'agent' }));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
     expect(directStreamMock).not.toHaveBeenCalled();
-    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('mode:agent degrades to the in-process TS agent when MODAL_CHAT_URL is unset', async () => {

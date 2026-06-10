@@ -50,6 +50,46 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
 
   useEffect(() => { setMounted(true); }, []);
 
+  // ── Seen state ─────────────────────────────────────────────────────────────
+  // These notifications are DERIVED from live CRM data (no row to mark read),
+  // so the unread badge tracks a per-device seen map: id → content signature.
+  // Opening the panel marks everything currently shown as seen — the badge
+  // clears, exactly what "I viewed my notifications" means. When the
+  // underlying data changes (a 4th lead lands, a tour moves), the signature
+  // changes and the item counts as new again. Items stay LISTED in the panel
+  // — they're things needing action — only the badge semantics change.
+  const SEEN_KEY = `chippi:notif-seen:${slug}`;
+  const [seen, setSeen] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SEEN_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, string>;
+        if (parsed && typeof parsed === 'object') setSeen(parsed);
+      }
+    } catch {
+      /* corrupt / private mode — everything reads unseen */
+    }
+  }, [SEEN_KEY]);
+
+  const signatureOf = (n: Notification) => `${n.title}|${n.description}`;
+
+  const markAllSeen = useCallback(() => {
+    setNotifications((current) => {
+      setSeen((prev) => {
+        const next = { ...prev };
+        for (const n of current) next[n.id] = signatureOf(n);
+        try {
+          window.localStorage.setItem(SEEN_KEY, JSON.stringify(next));
+        } catch {
+          /* quota / private mode — in-memory still clears the badge */
+        }
+        return next;
+      });
+      return current;
+    });
+  }, [SEEN_KEY]);
+
   const loadNotifications = useCallback(async () => {
     try {
       const res = await fetch(`/api/notifications?slug=${encodeURIComponent(slug)}`);
@@ -107,8 +147,9 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
     router.push(href);
   }
 
-  const highCount = notifications.filter((n) => n.priority === 'high').length;
-  const totalCount = notifications.length;
+  const unseen = notifications.filter((n) => seen[n.id] !== signatureOf(n));
+  const highCount = unseen.filter((n) => n.priority === 'high').length;
+  const totalCount = unseen.length;
 
   const dropdown = open && mounted ? createPortal(
     <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)}>
@@ -167,10 +208,15 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
     <>
       <button
         ref={btnRef}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          // Opening the panel = viewing — mark everything shown as seen so
+          // the badge clears the way every inbox on earth behaves.
+          if (!open) markAllSeen();
+          setOpen(!open);
+        }}
         className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         title="Notifications"
-        aria-label={totalCount > 0 ? `${totalCount} notifications` : 'Notifications'}
+        aria-label={totalCount > 0 ? `${totalCount} new notifications` : 'Notifications'}
       >
         <Bell size={14} strokeWidth={1.75} />
         {totalCount > 0 && (

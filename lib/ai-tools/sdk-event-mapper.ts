@@ -23,7 +23,6 @@
  */
 
 import type { PushableEvent } from './events';
-import { extractApprovals, type ApprovalPrompt } from './sdk-bridge';
 import type { ToolDefinition, ToolResult } from './types';
 
 // ── Loose shapes ───────────────────────────────────────────────────────────
@@ -91,19 +90,20 @@ type SummariseSource = {
 /**
  * Map one SDK event to one (or zero) Pushable SSE events.
  *
- * The `registry` is the realtor-facing tool list — we use it ONLY to render
- * the approval summary via `extractApprovals`. The chat route passes
- * `ALL_TOOLS` down so summaries match the model's actual catalog.
+ * The `registry` parameter is kept for signature stability (callers pass the
+ * tool catalog) but is no longer read: approval prompts are emitted solely by
+ * the stream pump after the paused run persists, so the mapper has nothing to
+ * summarise.
  */
 export function mapSdkEvent(
   event: SdkStreamEventLike,
-  registry: readonly SummariseSource[] = [],
+  _registry: readonly SummariseSource[] = [],
 ): PushableEvent | null {
   switch (event.type) {
     case 'raw_model_stream_event':
       return mapRawModelEvent(event);
     case 'run_item_stream_event':
-      return mapRunItemEvent(event, registry);
+      return mapRunItemEvent(event);
     case 'agent_updated_stream_event':
       return mapAgentUpdated(event);
     default:
@@ -121,10 +121,7 @@ function mapRawModelEvent(event: RawModelEvent): PushableEvent | null {
   return null;
 }
 
-function mapRunItemEvent(
-  event: RunItemEvent,
-  registry: readonly SummariseSource[],
-): PushableEvent | null {
+function mapRunItemEvent(event: RunItemEvent): PushableEvent | null {
   switch (event.name) {
     case 'tool_called': {
       // SDK's `tool_call_item` carries `rawItem` shaped per protocol.
@@ -159,27 +156,15 @@ function mapRunItemEvent(
     }
 
     case 'tool_approval_requested': {
-      // Reuse the bridge's extractor so the realtor-facing summary is the
-      // exact same text the existing UI already renders.
-      const approvals = extractApprovals(
-        { interruptions: [interruptionFrom(event.item)] },
-        registry,
-      );
-      const first: ApprovalPrompt | undefined = approvals[0];
-      if (!first) return null;
-      return {
-        type: 'permission_required',
-        // PR 1: requestId mirrors the callId until the resume route assigns
-        // the AgentPausedRun id. The chat UI doesn't use requestId for
-        // anything other than echoing it back on approve/deny — both are
-        // rewritten downstream to the AgentPausedRun id when the route
-        // persists the paused run.
-        requestId: first.callId,
-        callId: first.callId,
-        name: first.toolName,
-        args: asRecord(first.arguments),
-        summary: first.summary,
-      };
+      // Suppressed. The stream pump emits the ONE authoritative
+      // `permission_required` after the run completes and the paused run is
+      // persisted — keyed by the real AgentPausedRun id the resume route can
+      // load. This mapper used to emit an early placeholder keyed by callId
+      // ("rewritten downstream"), but last-write-wins on the client meant any
+      // persist failure left the placeholder standing: approve then POSTed to
+      // /resume/<callId>, found no row, and 404'd in a loop. One event, one
+      // source of truth — the card may land a frame later; it can never lie.
+      return null;
     }
 
     case 'message_output_created': {
@@ -248,10 +233,6 @@ function parseJsonObject(s: string | undefined): Record<string, unknown> {
   }
 }
 
-function asRecord(v: unknown): Record<string, unknown> {
-  return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
-}
-
 function stringifyOutput(o: unknown): string {
   if (typeof o === 'string') return o;
   if (o == null) return '';
@@ -267,18 +248,6 @@ function stringifyOutput(o: unknown): string {
     }
   }
   return String(o);
-}
-
-function interruptionFrom(item: RunItemEvent['item']) {
-  // Shape extractApprovals expects: { name, arguments, rawItem: {...} }
-  return {
-    name: item.toolName ?? item.rawItem?.name ?? item.name ?? '',
-    arguments: item.rawItem?.arguments ?? item.arguments ?? '',
-    rawItem: {
-      callId: item.rawItem?.callId,
-      id: item.rawItem?.id,
-    },
-  };
 }
 
 // Re-export for tests + consumers — nothing else depends on it but the

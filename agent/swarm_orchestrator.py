@@ -262,20 +262,45 @@ async def run_swarm(payload: dict) -> None:
                 return_exceptions=True,
             )
 
+        # Cancellation check — the cancel route flips the row to 'cancelled'
+        # while we run; without this re-check the terminal write below
+        # blindly overwrote it back to 'completed' ~30s after the user
+        # cancelled (and the stream got a second, contradictory terminal).
+        run_state = await db.table("SwarmRun").select("status").eq("id", swarm_run_id).execute()
+        if run_state.data and run_state.data[0].get("status") == "cancelled":
+            logger.info("swarm_cancelled_midrun", swarm_run_id=swarm_run_id)
+            return
+
         # Audit phase
-        await db.table("SwarmRun").update({"status": "auditing"}).eq("id", swarm_run_id).execute()
+        await db.table("SwarmRun").update({"status": "auditing"}).eq("id", swarm_run_id).neq("status", "cancelled").execute()
         await emit_event(db, swarm_run_id, "audit_started", {"message": "Synthesizing results..."})
 
         # Reload members with outputs
         members_result = await db.table("SwarmMember").select("name,role,output,status").eq("swarmRunId", swarm_run_id).execute()
-        final_result = await audit_results(goal, members_result.data or [], client)
+        member_rows = members_result.data or []
 
-        # Complete
+        # All-failed guard: synthesizing over nothing but error strings and
+        # stamping the run 'completed' showed a green "Done" card over a
+        # total failure. Zero completed members = a failed run, plainly.
+        completed_members = [m for m in member_rows if m.get("status") == "completed"]
+        if member_rows and not completed_members:
+            error_line = "Every sub-agent failed — nothing to synthesize."
+            await db.table("SwarmRun").update({
+                "status": "failed",
+                "errorMessage": error_line,
+                "completedAt": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", swarm_run_id).neq("status", "cancelled").execute()
+            await emit_event(db, swarm_run_id, "swarm_failed", {"error": error_line})
+            return
+
+        final_result = await audit_results(goal, member_rows, client)
+
+        # Complete — status-guarded so a cancelled run stays cancelled.
         await db.table("SwarmRun").update({
             "status": "completed",
             "result": final_result,
             "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", swarm_run_id).execute()
+        }).eq("id", swarm_run_id).neq("status", "cancelled").execute()
         await emit_event(db, swarm_run_id, "swarm_completed", {"result": final_result})
 
     except Exception as exc:
@@ -284,5 +309,5 @@ async def run_swarm(payload: dict) -> None:
             "status": "failed",
             "errorMessage": str(exc),
             "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", swarm_run_id).execute()
+        }).eq("id", swarm_run_id).neq("status", "cancelled").execute()
         await emit_event(db, swarm_run_id, "swarm_failed", {"error": str(exc)})

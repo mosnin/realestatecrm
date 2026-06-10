@@ -128,26 +128,26 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         // "I'd need to actually...", hand off to the agent path with the
         // same user message. We've burnt one cheap completion either way.
         if (input.onEscalate && shouldEscalate(result.text)) {
-          // Tag this attempt with the escalation route. The agent path
-          // will write its OWN ChatUsage row tagged 'agent' so the
-          // breakdown shows both: a 'direct→agent' direct attempt that
-          // led to an 'agent' fulfilment.
-          await recordChatUsage({
-            spaceId: input.spaceId,
-            userId: input.userId,
-            conversationId: input.conversationId,
-            model: input.model,
-            promptTokens: result.usage.promptTokens,
-            completionTokens: result.usage.completionTokens,
-            cachedTokens: result.usage.cachedTokens,
-            route: 'direct→agent' as ChatRoute,
-            runtime: 'ts',
-          });
           const handled = await input.onEscalate().catch((err) => {
             logger.warn('[direct-stream] escalation handler threw', { spaceId: input.spaceId }, err);
             return false;
           });
           if (handled) {
+            // Tag this attempt with the escalation route ONLY when the
+            // handoff actually happened — recording it before knowing
+            // double-billed every detected-but-unhandled escalation (this
+            // turn also fell through to the plain 'direct' row below).
+            await recordChatUsage({
+              spaceId: input.spaceId,
+              userId: input.userId,
+              conversationId: input.conversationId,
+              model: input.model,
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              cachedTokens: result.usage.cachedTokens,
+              route: 'direct→agent' as ChatRoute,
+              runtime: 'ts',
+            });
             // The caller is streaming the agent path's bytes into this
             // same Response. Close our stream so we don't interleave.
             controller.close();
@@ -164,8 +164,17 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         // Emit the entire reply as one text_delta. Streaming token-by-token
         // is a v1 deferred — the wire frames are identical, the UX is just
         // less progressive. Realtor sees the answer the moment we get it.
-        if (result.text) {
+        //
+        // An EMPTY completion (content filter, truncation, provider hiccup)
+        // used to ship a blank bubble stamped "complete" — a silent nothing.
+        // Say so instead; the realtor rephrases and moves on.
+        if (result.text.trim()) {
           push({ type: 'text_delta', delta: result.text });
+        } else {
+          push({
+            type: 'text_delta',
+            delta: 'I came back empty on that one — mind rephrasing it?',
+          });
         }
         push({ type: 'turn_complete', reason: 'complete' });
 

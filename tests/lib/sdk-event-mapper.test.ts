@@ -150,7 +150,11 @@ describe('mapSdkEvent — tool calls', () => {
 });
 
 describe('mapSdkEvent — approval requests', () => {
-  it('maps tool_approval_requested to permission_required with realtor-facing summary', () => {
+  it('suppresses tool_approval_requested — the stream pump emits the ONE authoritative permission_required keyed by the persisted AgentPausedRun id', () => {
+    // The mapper used to emit an early placeholder keyed by callId, relying
+    // on the pump's later event to overwrite it. Any persist failure left
+    // the placeholder standing → approve resumed against a nonexistent row
+    // → "Not found" forever. One event, one source of truth.
     const out = mapSdkEvent(
       {
         type: 'run_item_stream_event',
@@ -166,35 +170,7 @@ describe('mapSdkEvent — approval requests', () => {
       },
       REGISTRY,
     );
-    expect(out).toEqual({
-      type: 'permission_required',
-      requestId: 'call_xyz',
-      callId: 'call_xyz',
-      name: 'send_email',
-      args: { to: 'jane@x.com', subject: 'Hi' },
-      summary: 'Email jane@x.com: Hi',
-    });
-  });
-
-  it('falls back to a generic summary when the tool is unknown to the registry', () => {
-    const out = mapSdkEvent(
-      {
-        type: 'run_item_stream_event',
-        name: 'tool_approval_requested',
-        item: {
-          type: 'tool_approval_item',
-          toolName: 'mystery_tool',
-          rawItem: { callId: 'c', arguments: '{}' },
-        },
-      },
-      [],
-    );
-    expect(out).toMatchObject({
-      type: 'permission_required',
-      callId: 'c',
-      name: 'mystery_tool',
-      summary: 'Run mystery_tool',
-    });
+    expect(out).toBeNull();
   });
 });
 

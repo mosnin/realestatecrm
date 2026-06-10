@@ -36,11 +36,16 @@ export async function PATCH() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await supabase
+  const { error } = await supabase
     .from('BrokerNotification')
     .update({ read: true })
     .eq('brokerageId', ctx.brokerage.id)
     .eq('read', false);
+  if (error) {
+    // Surface the failure — returning success on a failed write left the
+    // client showing read while the DB still said unread.
+    return NextResponse.json({ error: 'Could not mark notifications read' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

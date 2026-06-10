@@ -79,6 +79,12 @@ export interface UseAgentTaskOptions {
   conversationsEndpoint?: string;
   resumeEndpointBase?: string;
   conversationCreatePayload?: Record<string, unknown>;
+  /**
+   * Autonomous mode — when true, every approval prompt is auto-approved the
+   * moment it lands (same path as "Always allow", but for ALL tools). The
+   * composer's mode selector drives this; default false = approve-first.
+   */
+  autoApprove?: boolean;
 }
 
 export interface UseAgentTaskResult {
@@ -139,6 +145,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     conversationsEndpoint = '/api/ai/conversations',
     resumeEndpointBase = '/api/ai/task/resume',
     conversationCreatePayload,
+    autoApprove = false,
   } = options;
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -233,10 +240,19 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // setter is async and would lose data on the same tick.
   const reasoningBufferRef = useRef<string>('');
   // Fix 2: remember the last user input so the UI can offer a one-tap retry.
-  const lastUserInputRef = useRef<{ text: string; attachmentIds?: string[] } | null>(null);
+  const lastUserInputRef = useRef<{
+    text: string;
+    attachmentIds?: string[];
+    mode?: ChatMode;
+  } | null>(null);
   // Fix 3: store the Retry-After value so the countdown effect can read it
   // without closing over stale state inside consumeStream.
   const rateLimitSecondsRef = useRef(0);
+  // Synchronous re-entrancy lock for approve/deny. `isStreaming` is React
+  // state and lags a tick — a manual click racing the auto-approve effect
+  // could fire two resume POSTs for the same requestId before either saw
+  // the flag. A ref is the correct lock.
+  const resumeInFlightRef = useRef(false);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -468,6 +484,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         const startedAt = turnStartedAtRef.current;
         reasoningBufferRef.current = '';
         turnStartedAtRef.current = null;
+        const paused = event.reason === 'paused';
         if (targetId) {
           setMessages((prev) =>
             prev.map((m) => {
@@ -494,17 +511,22 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           );
         }
         setStreamingReasoning('');
-        setActivePlan(null);
+        // A paused turn isn't done — the plan stays up so the continuation
+        // after approval doesn't lose its progress card.
+        if (!paused) setActivePlan(null);
         return;
       }
 
       case 'error': {
-        // Server hands us a Chippi-voiced line in `message`; if it didn't
-        // (older server, raw fallback), pick one from the code.
-        const text =
-          event.message && event.message.length < 400
-            ? event.message
-            : chippiErrorMessage(event.code ?? 'internal');
+        // Trust the code, not the string. When the server attaches a code it
+        // also wrote a Chippi-voiced message from the same table — mapping
+        // through the code locally is equivalent AND immune to a raw upstream
+        // string (a Modal exception, a proxy artifact) sneaking into the
+        // transcript dressed as Chippi. No code → classify the raw text into
+        // a code and speak from the table.
+        const text = event.code
+          ? chippiErrorMessage(event.code)
+          : chippiErrorMessage(classifyError(event.message ?? ''));
         landChippiError(text);
         return;
       }
@@ -523,6 +545,25 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       abortRef.current = controller;
       setIsStreaming(true);
       setError(null);
+
+      // Inactivity watchdog — the only defense against a half-open socket.
+      // The server guarantees a terminal frame, but on a flaky network those
+      // bytes can simply never arrive and reader.read() neither resolves nor
+      // rejects: isStreaming stays true forever and the composer is locked
+      // until a full reload. 120s of silence (Modal sub-tasks stream progress
+      // well inside that) aborts the stream and lands a calm network error
+      // instead. Re-armed on every chunk.
+      const WATCHDOG_MS = 120_000;
+      let watchdogFired = false;
+      let watchdogId: ReturnType<typeof setTimeout> | null = null;
+      const armWatchdog = () => {
+        if (watchdogId) clearTimeout(watchdogId);
+        watchdogId = setTimeout(() => {
+          watchdogFired = true;
+          controller.abort();
+        }, WATCHDOG_MS);
+      };
+      armWatchdog();
 
       try {
         const res = await fetch(url, {
@@ -573,16 +614,21 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          armWatchdog();
           for (const event of parser.feed(value)) applyEvent(event);
         }
         for (const event of parser.end()) applyEvent(event);
       } catch (err) {
         const aborted = (err as { name?: string }).name === 'AbortError';
-        if (!aborted) {
+        if (!aborted || watchdogFired) {
+          // A real failure — including the watchdog tripping on a silent
+          // stream (the user didn't abort; the network went away under us).
           const raw = err instanceof Error ? err.message : 'Network error';
-          landChippiError(chippiErrorMessage(classifyError(raw)));
+          landChippiError(
+            chippiErrorMessage(watchdogFired ? 'network' : classifyError(raw)),
+          );
         } else {
-          // Aborted: just tidy the trailing empty assistant bubble.
+          // User-initiated abort: just tidy the trailing empty assistant bubble.
           const targetId = streamingMsgIdRef.current;
           if (targetId) {
             setMessages((prev) =>
@@ -595,6 +641,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           }
         }
       } finally {
+        if (watchdogId) clearTimeout(watchdogId);
         abortRef.current = null;
         streamingMsgIdRef.current = null;
         setIsStreaming(false);
@@ -639,8 +686,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       // photo with no caption. Block when both text AND attachments are empty.
       if ((!trimmed && !hasAttachments) || isStreaming) return;
 
-      // Fix 2: record immediately so retryLastMessage always has current data.
-      lastUserInputRef.current = { text: trimmed, ...(hasAttachments ? { attachmentIds } : {}) };
+      // Fix 2: record immediately so retryLastMessage always has current data
+      // — including the mode, so a retried Agent turn doesn't silently
+      // downgrade to the chat path.
+      lastUserInputRef.current = {
+        text: trimmed,
+        mode,
+        ...(hasAttachments ? { attachmentIds } : {}),
+      };
 
       // Optimistic UI: push the user message + a streaming assistant
       // placeholder BEFORE we await conversation creation. This is what
@@ -694,40 +747,55 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const approve = useCallback(
     async (requestId: string, editedArgs?: Record<string, unknown>) => {
-      if (isStreaming) return;
-      // Start a new assistant bubble for the continuation. Matches the
-      // server's persistence model (it saves a second Message row).
-      const contId = newId();
-      const contMsg: UiMessage = {
-        id: contId,
-        role: 'assistant',
-        blocks: [],
-        streaming: true,
-      };
-      streamingMsgIdRef.current = contId;
-      setMessages((prev) => [...prev, contMsg]);
+      if (isStreaming || resumeInFlightRef.current) return;
+      resumeInFlightRef.current = true;
+      try {
+        // Clear the card optimistically — it's being acted on, and it must
+        // NOT survive a failed resume. Leaving it mounted on a non-OK
+        // response was the second half of the infinite approve→"Not found"
+        // loop: the error landed but the card stayed, inviting the same
+        // doomed click forever. If the continuation pauses again, the server
+        // re-emits permission_required and the card comes back fresh.
+        setPendingApproval(null);
+        // Start a new assistant bubble for the continuation. Matches the
+        // server's persistence model (it saves a second Message row).
+        const contId = newId();
+        const contMsg: UiMessage = {
+          id: contId,
+          role: 'assistant',
+          blocks: [],
+          streaming: true,
+        };
+        streamingMsgIdRef.current = contId;
+        setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
-        approved: true,
-        ...(editedArgs ? { editedArgs } : {}),
-      });
+        await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
+          approved: true,
+          ...(editedArgs ? { editedArgs } : {}),
+        });
+      } finally {
+        resumeInFlightRef.current = false;
+      }
     },
     [isStreaming, consumeStream, resumeEndpointBase],
   );
 
   const deny = useCallback(
     async (requestId: string) => {
-      if (isStreaming) return;
-      // Snapshot the prompt before the stream's `permission_resolved` event
-      // clears it — we use the snapshot to pre-populate PermissionBlocks
-      // on the continuation bubble so the denial is visible immediately,
-      // matching what the server persists for this turn.
+      if (isStreaming || resumeInFlightRef.current) return;
+      resumeInFlightRef.current = true;
+      // Snapshot the prompt before clearing it — we use the snapshot to
+      // pre-populate PermissionBlocks on the continuation bubble so the
+      // denial is visible immediately, matching what the server persists.
       //
       // The snapshot includes otherPendingCalls (forwarded from the
       // server's permission_required event): a deny cascades to every
       // mutating call in the batch, so we show a block per cascaded call
       // too — not only the one the user clicked on.
       const snapshot = pendingApproval;
+      // Cleared optimistically for the same reason as approve(): the card
+      // must not outlive the decision, success or failure.
+      setPendingApproval(null);
       const contId = newId();
       const initialBlocks: MessageBlock[] = [];
       if (snapshot) {
@@ -759,9 +827,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
-        approved: false,
-      });
+      try {
+        await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
+          approved: false,
+        });
+      } finally {
+        resumeInFlightRef.current = false;
+      }
     },
     [isStreaming, pendingApproval, consumeStream, resumeEndpointBase],
   );
@@ -777,11 +849,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     [pendingApproval, approve],
   );
 
-  // Fix 2: stable retry callback — calls send() with whatever was last sent.
+  // Fix 2: stable retry callback — replays exactly what was last sent:
+  // text, attachments, AND mode (an Agent retry stays an Agent turn).
   const retryLastMessage = useCallback(async () => {
     const last = lastUserInputRef.current;
     if (!last) return;
-    await send(last.text, last.attachmentIds);
+    await send(last.text, last.attachmentIds, last.mode);
   }, [send]);
 
   // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
@@ -798,23 +871,25 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [rateLimitSeconds]);
 
   // Auto-approve whenever we're paused on a tool the user has pre-trusted
-  // for this chat. Runs after the initial turn's stream closes — that's the
-  // moment `pendingApproval` flips to a value AND `isStreaming` goes false.
-  // The autoApprovedRef guard (declared above) stops React 18's strict-mode
-  // double-invocation from firing two approve requests for the same
-  // requestId (setIsStreaming isn't visible yet on the synchronous second
-  // pass) and also lets the conversation-change effect clear it.
+  // for this chat — or on ANY tool when the composer's mode selector is set
+  // to autonomous (`autoApprove`). Runs after the initial turn's stream
+  // closes — that's the moment `pendingApproval` flips to a value AND
+  // `isStreaming` goes false. The autoApprovedRef guard (declared above)
+  // stops React 18's strict-mode double-invocation from firing two approve
+  // requests for the same requestId (setIsStreaming isn't visible yet on
+  // the synchronous second pass) and also lets the conversation-change
+  // effect clear it.
   useEffect(() => {
     if (!pendingApproval) {
       autoApprovedRef.current = null;
       return;
     }
     if (isStreaming) return;
-    if (!allowedTools.has(pendingApproval.name)) return;
+    if (!autoApprove && !allowedTools.has(pendingApproval.name)) return;
     if (autoApprovedRef.current === pendingApproval.requestId) return;
     autoApprovedRef.current = pendingApproval.requestId;
     void approve(pendingApproval.requestId);
-  }, [pendingApproval, isStreaming, allowedTools, approve]);
+  }, [pendingApproval, isStreaming, allowedTools, autoApprove, approve]);
 
   return {
     messages,

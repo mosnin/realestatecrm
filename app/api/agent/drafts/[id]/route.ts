@@ -110,7 +110,10 @@ export async function PATCH(
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('[agent/drafts PATCH] dismiss update failed', updateError);
+      return NextResponse.json({ error: 'Could not update the draft' }, { status: 500 });
+    }
 
     void audit({
       actorClerkId: userId,
@@ -179,7 +182,22 @@ export async function PATCH(
     .select()
     .single();
 
-  if (updateError) throw updateError;
+  if (updateError) {
+    // The message may already be OUT (delivery ran before this write). A
+    // thrown opaque 500 here invited a re-approve → double-send. Say exactly
+    // what happened instead, mirroring batch-approve's update_failed shape.
+    console.error('[agent/drafts PATCH] status update failed after delivery', updateError);
+    return NextResponse.json(
+      {
+        error: 'update_failed',
+        deliverySent: deliveryResult.sent,
+        note: deliveryResult.sent
+          ? 'The message was sent, but the draft status could not be saved. Do not approve it again.'
+          : 'The draft status could not be saved.',
+      },
+      { status: 500 },
+    );
+  }
 
   void audit({
     actorClerkId: userId,

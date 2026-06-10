@@ -3,20 +3,18 @@
  * ship. The list is grouped by category and within each category by
  * read-only first, then mutating (approval-gated) — keep that order.
  *
- * ─── Important: dual-runtime split ────────────────────────────────────────
+ * ─── Important: runtime reality ───────────────────────────────────────────
  *
- * These TypeScript tools run in the Next.js loop (`lib/ai-tools/loop.ts`)
- * — the deprecated approval-resume path and the in-process sub-agent
- * skills. **The realtor's chat agent runs in Modal/Python** and has its
- * OWN tool catalog at `agent/tools/*.py`.
+ * **These TypeScript tools ARE the realtor's live chat catalog.** The
+ * default chat runtime is in-process TS (`lib/ai-tools/sdk-chat.ts` via
+ * `sdk-bridge.toSdkTool`) — adding a tool here adds it to the chat.
  *
- * Adding a tool here does NOT add it to the chat the realtor uses. The
- * two lists are hand-maintained today. If you need a new verb available
- * to the chat agent, you also need a Python equivalent in `agent/tools/`.
- *
- * The right fix is to consolidate runtimes (one source of truth) or
- * generate the Python catalog from this list at deploy time. Until that
- * lands, this comment exists to keep us honest about the gap.
+ * The Modal/Python catalog at `agent/tools/*.py` serves the AUTONOMOUS
+ * runs and `delegate_task` sub-agents only (plus the opt-in
+ * CHIPPI_CHAT_RUNTIME=modal whole-turn fallback, which has NO approval
+ * gating — interactive Agent mode deliberately never routes there). The
+ * two lists are hand-maintained; a verb that must exist in both worlds
+ * needs both implementations.
  *
  * ─── Contract ─────────────────────────────────────────────────────────────
  *

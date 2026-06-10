@@ -37,7 +37,32 @@
 
 import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@openai/agents';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
+
+/**
+ * Per-call deadline for every tool that runs through the bridge. The layer
+ * has exactly one other timeout — the 90s stream idle watchdog — which means
+ * a hung external dependency (Composio, Resend, Telnyx, Wasabi, a slow DB)
+ * froze the whole chat for 90 seconds before anything moved. 25s is generous
+ * for a real call and short enough that the model stays alive to recover
+ * ("that took too long — want me to retry?") instead of the turn dying.
+ *
+ * The losing handler is NOT cancelled (no cooperative abort plumbing in the
+ * handlers today), so a timed-out write may still land later — create tools
+ * dedup on retry for exactly this reason.
+ */
+const TOOL_TIMEOUT_MS = 25_000;
+
+class ToolTimeoutError extends Error {}
+
+function toolDeadline(name: string): Promise<never> {
+  return new Promise((_, reject) => {
+    const id = setTimeout(() => reject(new ToolTimeoutError(name)), TOOL_TIMEOUT_MS);
+    // Don't let the losing timer hold the event loop open.
+    (id as { unref?: () => void }).unref?.();
+  });
+}
 
 const DEFAULT_MODEL = 'gpt-5-mini';
 
@@ -86,21 +111,23 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
     needsApproval,
     async execute(input) {
       try {
-        const result: ToolResult = await def.handler(input as never, ctx);
+        const result: ToolResult = await Promise.race([
+          def.handler(input as never, ctx),
+          toolDeadline(def.name),
+        ]);
         return serialiseResult(result);
       } catch (err) {
-        // A tool handler threw instead of returning { display: 'error' }.
-        // Without this catch, the raw exception (or stack trace shape)
-        // would land in the model's context — and from there, in the
-        // realtor's chat. Reformat to the same `Error: ` prefix the
-        // success/error paths use so the model continues normally and
-        // can paraphrase to the realtor in Chippi voice.
-        //
-        // We log the original at warn — the actual stack stays in our
-        // server logs for debugging; only the friendly summary reaches
-        // the model.
-        const message = err instanceof Error ? err.message : String(err);
-        return `Error: ${def.name} failed — ${message}`;
+        // A tool handler threw (or timed out) instead of returning
+        // { display: 'error' }. Without this catch, the raw exception would
+        // land in the model's context — and from there, in the realtor's
+        // chat. The full error stays in our server logs; the model gets a
+        // short, internals-free line it can paraphrase in Chippi voice and
+        // recover from. Never hand Postgres/SDK strings to the model.
+        logger.warn('[sdk-bridge] tool failed', { tool: def.name }, err);
+        if (err instanceof ToolTimeoutError) {
+          return `Error: ${def.name} took too long and was stopped. Tell the realtor it didn't go through and offer to try again.`;
+        }
+        return `Error: ${def.name} hit a problem and didn't complete. Tell the realtor plainly and offer to try again.`;
       }
     },
   });
