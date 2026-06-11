@@ -1,251 +1,349 @@
 /**
- * `/brokerages` — Chippi for the brokerage and its floor, on the calm site
- * system.
+ * `/brokerages` — the floor story, on the white + pastel system.
  *
- * The one idea: give every agent an extra teammate, and give yourself the whole
- * room on one surface — leads routed, deals tracked, bottlenecks surfaced.
+ * Arc: PageHero ("Every agent on your floor, with a Chippi behind them") →
+ * routing/visibility/roles as a features-split-style section (copy beside
+ * a composed skeleton illustration: lead routed → agent assigned → broker
+ * view) → the pastel gradient pillars card (Routing, Floor view,
+ * Role-based control as white glass cells, honest enterprise notes) →
+ * the centered closing CTA. Brokers buy through a walkthrough, so the
+ * closing primary is "Book a demo".
  *
- * Rebuilt from the legacy studio-ASCII version (BrokeragesContent) onto the calm
- * vocabulary (PageHero, FeatureRow, inverse band). Auth users bounce to their
- * workspace; brokers want a walkthrough, so "Book a demo" is prominent.
+ * Layout law: open white split → pastel gradient card → open CTA, with
+ * mt-24 sm:mt-32 air between beats. No stock photography, no mock-UI
+ * panels. Honesty: Chippi drafts; every send goes through the agent.
  */
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { FeatureGrid } from '@/components/marketing/site/section';
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  Check,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
-import { FeatureRow } from '@/components/marketing/site/feature-row';
-import { Reveal } from '@/components/marketing/site/reveal';
-import { RoutingPanel, LeaderboardPanel, TeamChatPanel, MembersPanel } from '@/components/marketing/site/home/more-panels';
-import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
-import { Feature197 } from '@/components/ui/accordion-feature-section';
-import { TITLE_FONT } from '@/lib/typography';
 
-export const metadata = { title: 'For brokerages · Chippi' };
+export const metadata = {
+  title: 'For brokerages · Chippi',
+  description:
+    'Give every agent on the floor a Chippi — leads routed to the right agent, approval-first drafts, and a live floor view with role-based controls and an audit log.',
+};
 
-const empower = [
+/* ── Copy ──────────────────────────────────────────────────────────────── */
+
+const FLOOR_FEATURES = [
   {
-    kicker: 'Every agent',
-    title: 'A teammate, not a tool',
-    body: 'Each realtor keeps their own Chippi workspace — it reads their inbox, drafts in their voice, and keeps every deal current. You add a team layer on top.',
+    icon: ArrowRightLeft,
+    title: 'Routing on arrival',
+    body: 'Auto-assign by territory and load, or hand-pick the agent and write the brief. Every assignment is logged with the reason.',
   },
   {
-    kicker: 'Time',
-    title: 'The busywork, compressed',
-    body: 'First touch, follow-ups, tour booking, deal updates — the repetitive work runs itself. The floor spends its hours on the conversations that close.',
+    icon: Users,
+    title: 'The floor on one screen',
+    body: 'Deals active, drafts pending, follow-ups due — per agent, read live from the work itself, not a status meeting.',
   },
   {
-    kicker: 'Trust',
-    title: 'Nothing leaves unsigned',
-    body: 'Chippi drafts; the realtor approves. Every send goes through the person whose name is on it. The floor stays in the driver’s seat.',
+    icon: ShieldCheck,
+    title: 'Roles that keep it clean',
+    body: 'Owner, admin, and member — three roles, no permissions matrix. Each agent keeps their own workspace; you get the rollup.',
   },
 ];
 
-const signals = [
-  { label: 'Stalled', body: 'Active deals nobody has touched in a week.' },
-  { label: 'Overdue', body: 'Follow-ups the floor promised and missed.' },
-  { label: 'Going cold', body: 'Hot leads with no recent contact.' },
+const PILLARS = [
+  {
+    icon: ArrowRightLeft,
+    title: 'Routing',
+    body: 'Every lead lands with the right agent — by territory, by load, or by your hand-pick. The reason is logged either way.',
+  },
+  {
+    icon: Users,
+    title: 'Floor view',
+    body: 'Who is closing, what stalled, which follow-ups slipped — the whole room on one surface, live from the work.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Role-based control',
+    body: 'Roles decide who sees what. Private drafts and notes stay private; the aggregate numbers stay yours.',
+  },
 ];
 
-const features = [
-  {
-    no: '01',
-    eyebrow: 'Lead distribution',
-    title: 'Every lead, the right realtor.',
-    sub: 'Auto-assign by territory and load, or hand-pick the realtor and write the brief. Chippi can reassign to anyone on the floor with the reason logged to the activity trail.',
-    points: [
-      'Auto-assignment, weighted by who has room',
-      'Hand-pick and reassign — always your override',
-      'Every assignment logged, with the reason, per realtor',
-    ],
-    image: { label: 'Lead routing', sublabel: 'Screenshot · 1280 × 960' },
-  },
-  {
-    no: '02',
-    eyebrow: 'Performance',
-    title: 'See what the floor is closing.',
-    sub: 'Ask Chippi to roll up any realtor’s week: deals active, won, and lost; new and hot leads; drafts pending and their approval rate. The numbers come from the work, not a status meeting.',
-    points: [
-      'Per-realtor rollups across deals, leads, and drafts',
-      'Response time and pipeline value, live',
-      'A sortable leaderboard the floor can see',
-    ],
-    image: { label: 'Team leaderboard', sublabel: 'Screenshot · 1280 × 960' },
-    flip: true,
-  },
-  {
-    no: '03',
-    eyebrow: 'Team chat',
-    title: 'Talk shop, on the same page.',
-    sub: 'Channels that live with the deal, not next to it. Mention @chippi in a channel and it answers in line — where the deal stands, a drafted reply, a number pulled from the record.',
-    points: [
-      'Per-deal channels, archived on close',
-      'Mention @chippi to pull it into the thread',
-      'Chippi stays out of general channels unless invited',
-    ],
-    image: { label: 'Team chat', sublabel: 'Screenshot · 1280 × 960' },
-  },
-  {
-    no: '04',
-    eyebrow: 'Members & roles',
-    title: 'Who belongs, and what they see.',
-    sub: 'Three roles, no permissions matrix. Owner runs the show, Admin manages the floor, Member is the realtor doing the work. Admins see the rollup; private drafts and notes stay private.',
-    points: [
-      'Owner, Admin, Member — three tiers, no more',
-      'Invite by link with the role pre-set',
-      'Aggregate metrics are team-visible; private surfaces stay private',
-    ],
-    image: { label: 'Members & roles', sublabel: 'Screenshot · 1280 × 960' },
-    flip: true,
-  },
+const ENTERPRISE_NOTES = [
+  'Approval-first — drafts wait for the agent',
+  'Role-based controls for owners and admins',
+  'An audit log of every action Chippi takes',
 ];
+
+/* ── Shared bits ───────────────────────────────────────────────────────── */
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+      <span aria-hidden className="text-[#ff4b29]">
+        ✦
+      </span>
+      {children}
+    </p>
+  );
+}
+
+/* ── Floor flow — skeleton illustration (routed → assigned → broker) ───── */
+
+function FloorIllustration() {
+  return (
+    <div className="relative h-64 rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] ring-1 ring-inset ring-black/5 sm:h-72">
+      {/* New lead */}
+      <div className="absolute left-3 top-4 w-[42%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-5 sm:top-5">
+        <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">NEW LEAD</span>
+          <span className="text-[9px] text-amber-600">Routing</span>
+        </div>
+        <div className="space-y-1.5 p-2">
+          <div className="flex items-center gap-2 text-[9px] text-neutral-700 sm:text-[10px]">
+            <span className="h-2 w-2 flex-shrink-0 rounded bg-yellow-500" />
+            <span className="truncate">Maya · buyer</span>
+          </div>
+          <div className="h-1.5 w-full rounded bg-neutral-100" />
+          <div className="h-1.5 w-3/4 rounded bg-neutral-100" />
+        </div>
+      </div>
+
+      {/* Flow: routed */}
+      <div className="absolute left-1/2 top-[20%] z-10 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-black/5 bg-white shadow-sm">
+        <ArrowRightLeft className="h-3 w-3 text-[#ff4b29]" />
+      </div>
+
+      {/* Assigned */}
+      <div className="absolute right-3 top-10 w-[44%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:right-5">
+        <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">ASSIGNED</span>
+          <span className="h-2 w-2 rounded-full bg-green-500/70" />
+        </div>
+        <div className="space-y-2 p-2">
+          <div className="flex items-center gap-2 text-[9px] text-neutral-700 sm:text-[10px]">
+            <span className="h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29] ring-2 ring-white" />
+            <span className="truncate">J. Alvarez</span>
+          </div>
+          <div className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+            Draft ready to review
+          </div>
+        </div>
+      </div>
+
+      {/* Flow: into the broker view */}
+      <div className="absolute right-[24%] top-[56%] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-black/5 bg-white shadow-sm">
+        <ArrowRight className="h-3 w-3 rotate-90 text-[#ff4b29]" />
+      </div>
+
+      {/* Broker view */}
+      <div className="absolute bottom-4 left-1/2 w-[80%] -translate-x-1/2 rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur">
+        <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">FLOOR VIEW</span>
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[9px] text-neutral-600">Broker</span>
+        </div>
+        <div className="space-y-1 p-2">
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
+            <span className="flex items-center gap-2 text-neutral-700">
+              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
+              <span className="truncate">Alvarez</span>
+            </span>
+            <span className="text-amber-600">Draft pending</span>
+          </div>
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
+            <span className="flex items-center gap-2 text-neutral-700">
+              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-gradient-to-r from-green-400 to-green-600" />
+              <span className="truncate">Chen</span>
+            </span>
+            <span className="text-green-600">Tour booked</span>
+          </div>
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
+            <span className="flex items-center gap-2 text-neutral-700">
+              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-gradient-to-r from-purple-400 to-purple-600" />
+              <span className="truncate">Patel</span>
+            </span>
+            <span className="text-blue-600">Follow-up due</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
 
 export default function BrokeragesPage() {
   return (
-    <>
+    <div>
       <PageHero
-        eyebrow="For brokerages and teams"
-        title="One agent for the whole floor."
-        sub="Give every agent an extra teammate, and give yourself the whole room on one surface. Chippi routes the leads, tracks what the floor is closing, and surfaces where deals stall."
+        eyebrow="For brokerages & teams"
+        title="Every agent on your floor, with a Chippi behind them"
+        sub="Leads route to the right agent, every send stays approval-first, and you see the whole floor on one surface — live from the work, not a status meeting."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Empower the floor */}
-      <section className="bg-background px-4 py-20 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-5xl">
-          <Reveal className="max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Empower the floor
-            </p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              Give every agent an extra{' '}
-              <PointerHighlight>
-                <span>teammate</span>
-              </PointerHighlight>
-              .
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              A brokerage doesn’t fail on features — it fails when the realtors stop
-              logging in. Chippi makes the floor faster first, and gives you the room
-              as a byproduct.
-            </p>
-          </Reveal>
-          <div className="mt-10">
-            <FeatureGrid items={empower} />
-          </div>
-        </div>
-      </section>
+      {/* The floor flow — open white split, air after the hero */}
+      <section className="pt-12 sm:pt-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="grid gap-12 lg:grid-cols-2">
+            {/* Copy, stats, CTA */}
+            <div>
+              <Eyebrow>The floor</Eyebrow>
+              <h2 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+                Every lead routed, every deal visible, every send approved.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+                Chippi adds a brokerage layer on top of each agent&apos;s
+                workspace: routing on the way in, a live floor view on the way
+                through, and roles that keep the lines clean.
+              </p>
 
-      {/* Feature sequence */}
-      <section className="bg-background px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-5xl space-y-24 sm:space-y-32">
-          {features.map((f) => (
-            <FeatureRow
-              key={f.no}
-              {...f}
-              panel={
-                f.no === '01' ? (
-                  <RoutingPanel />
-                ) : f.no === '02' ? (
-                  <LeaderboardPanel />
-                ) : f.no === '03' ? (
-                  <TeamChatPanel />
-                ) : (
-                  <MembersPanel />
-                )
-              }
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Everything the floor runs on — accordion walkthrough */}
-      <section className="border-t border-border/60 bg-background">
-        <Feature197 />
-      </section>
-
-      {/* Bottlenecks */}
-      <section className="bg-background px-4 pb-8 sm:px-6">
-        <div className="mx-auto max-w-5xl">
-          <Reveal className="max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Productivity &amp; bottlenecks
-            </p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              Find where deals stall. Then unblock them.
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Ask Chippi how the floor is doing and it reads the real work, not a
-              spreadsheet someone updated last week. The bottleneck surfaces; you
-              decide the move.
-            </p>
-          </Reveal>
-          <div className="mt-10">
-            <FeatureGrid
-              items={signals.map((s) => ({ kicker: 'Surfaced', title: s.label, body: s.body }))}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* One place — inverse band */}
-      <section className="bg-background px-4 py-20 sm:px-6">
-        <Reveal className="mx-auto max-w-5xl">
-          <div className="overflow-hidden rounded-marketing-3xl bg-[#111113] px-8 py-14 sm:px-12">
-            <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-              <div className="max-w-xl">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/45">
-                  One place, not six tools
-                </p>
-                <h2 style={TITLE_FONT} className="mt-3 text-3xl leading-tight tracking-tight text-white sm:text-[2.5rem]">
-                  All the data, one surface.
-                </h2>
-                <p className="mt-4 text-sm leading-relaxed text-white/55">
-                  CRM, inbox, calendar, templates, files, team chat, and the floor
-                  dashboard. One agent runs all of it, and they finally agree.
-                </p>
+              <div className="mt-8 space-y-5 border-t border-neutral-200 pt-6">
+                {FLOOR_FEATURES.map(({ icon: Icon, title, body }) => (
+                  <div key={title} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <Icon className="h-4 w-4 text-[#ff4b29]" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-zinc-950">{title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-neutral-600">{body}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="shrink-0 text-right">
-                <div style={TITLE_FONT} className="text-[clamp(3rem,8vw,5rem)] leading-none tracking-tight text-brand">
-                  6 → 1
+
+              <div className="mt-8 border-t border-neutral-200 pt-6">
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
+                    <p className="mt-1 text-xs text-neutral-600">
+                      Approval-first — every send goes through the agent whose name is on it
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
+                    <p className="mt-1 text-xs text-neutral-600">
+                      Integrations across email, calendar, and lead sources
+                    </p>
+                  </div>
                 </div>
-                <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-white/45">
-                  tools, replaced by one workspace
-                </p>
+              </div>
+
+              <div className="mt-8 border-t border-neutral-200 pt-6">
+                <Link
+                  href="/demo"
+                  className="inline-flex cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-xl border-0 bg-gradient-to-b from-neutral-700 to-neutral-900 px-5 pb-2.5 pt-2.5 text-center align-baseline text-base leading-none text-white no-underline shadow-[0_2.8px_2.2px_rgba(0,_0,_0,_0.034),_0_6.7px_5.3px_rgba(0,_0,_0,_0.048),_0_12.5px_10px_rgba(0,_0,_0,_0.06),_0_22.3px_17.9px_rgba(0,_0,_0,_0.072),_0_41.8px_33.4px_rgba(0,_0,_0,_0.086),_0_100px_80px_rgba(0,_0,_0,_0.12)] outline-none transition-all duration-150 hover:opacity-85 focus:outline-none focus:ring-4 focus:ring-black/50"
+                >
+                  Book a demo
+                </Link>
+              </div>
+            </div>
+
+            {/* Illustration — pastel frame, white glass card */}
+            <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+              <article
+                className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.72)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.65)',
+                }}
+              >
+                <div className="p-6 sm:p-10">
+                  <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                    <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">
+                      Floor flow
+                    </h3>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                      <Users className="h-4 w-4 text-[#ff4b29]" />
+                      Broker view
+                    </span>
+                  </div>
+
+                  <FloorIllustration />
+
+                  <p className="mt-6 text-sm text-neutral-500">
+                    A lead lands, the right agent gets it, and you see it happen —
+                    with the reason logged.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The pillars — pastel gradient card, white glass cells */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+            {/* Pastel decor orbs */}
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+
+            <div className="relative p-6 sm:p-10 lg:p-14">
+              <span className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] text-neutral-600">
+                {'// THE BROKERAGE LAYER'}
+              </span>
+              <h2 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+                Three pillars hold the floor
+              </h2>
+              <p className="mt-4 max-w-2xl text-base text-neutral-600 md:text-lg">
+                Routing on the way in, visibility on the way through, control
+                over who sees what — with approval-first underneath all three.
+              </p>
+
+              <div className="mt-10 grid gap-6 md:grid-cols-3">
+                {PILLARS.map(({ icon: Icon, title, body }) => (
+                  <div
+                    key={title}
+                    className="rounded-2xl bg-white/80 p-6 ring-1 ring-black/5 backdrop-blur"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <Icon className="h-5 w-5 text-[#ff4b29]" />
+                    </div>
+                    <h3 className="mt-4 text-xl font-semibold tracking-tight text-zinc-950">
+                      {title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-600">{body}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Honest enterprise notes */}
+              <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-black/10 pt-6">
+                {ENTERPRISE_NOTES.map((note) => (
+                  <span key={note} className="flex items-center gap-2 text-sm text-neutral-700">
+                    <Check className="h-4 w-4 flex-shrink-0 text-[#ff4b29]" />
+                    {note}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
-        </Reveal>
+        </div>
       </section>
 
-      {/* Closing CTA */}
-      <section className="bg-background px-4 pb-24 sm:px-6 sm:pb-32">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
-            Bring your floor to Chippi.
+      {/* The ask — centered closing CTA, demo-first for brokers */}
+      <section className="mt-24 px-6 pb-8 sm:mt-32 sm:pb-12">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            Put a Chippi behind every agent.
           </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-            The realtors keep what they already do. The brokerage sees what it never
-            could. We’ll help you move.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-            >
-              Start free trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div className="mt-8 flex justify-center">
             <Link
               href="/demo"
-              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Book a demo
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </Reveal>
+          <p className="mt-4 text-sm text-neutral-500">
+            7 days free, then $97/mo. Cancel anytime.
+          </p>
+        </div>
       </section>
-    </>
+    </div>
   );
 }
