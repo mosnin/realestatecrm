@@ -45,7 +45,7 @@ export default function MarketingLayout({
 }) {
   return (
     <div
-      className={`${display.variable} ${accent.variable} flex min-h-screen flex-col bg-[#f3f1ed] text-[#141414] dark:bg-[#0a0a0b] dark:text-[#f5f5f4]`}
+      className={`${display.variable} ${accent.variable} flex min-h-screen flex-col bg-[#dcdce4] text-[#16161a] dark:bg-[#0a0a0b] dark:text-[#f5f5f4]`}
       style={{ '--font-title': 'var(--font-display)' } as React.CSSProperties}
     >
       {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}

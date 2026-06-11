@@ -134,7 +134,7 @@ export function EyebrowChip({
         className,
       )}
     >
-      <span aria-hidden className={cn('text-[13px] leading-none', light ? 'text-white' : 'text-[#ff5a24]')}>
+      <span aria-hidden className={cn('text-[13px] leading-none', light ? 'text-white' : 'text-[#ff4b29]')}>
         ✦
       </span>
       {children}
@@ -150,9 +150,9 @@ const TONE_SURFACE: Record<Exclude<Tone, 'plain'>, string> = {
   // Paper card on the canvas — the default content surface.
   card: 'bg-white text-[#141414] dark:bg-[#151517] dark:text-[#f5f5f4] shadow-[0_1px_2px_rgba(20,16,12,0.04),0_12px_40px_-18px_rgba(20,16,12,0.12)]',
   // A half-step off the canvas — quiet grouping.
-  tint: 'bg-[#e9e6df] text-[#141414] dark:bg-[#141416] dark:text-[#f5f5f4]',
+  tint: 'bg-[#e9e9ee] text-[#141414] dark:bg-[#141416] dark:text-[#f5f5f4]',
   // The signal block — vermillion doing brand work.
-  brand: 'bg-[#ff5a24] text-white',
+  brand: 'bg-[#ff4b29] text-white',
   // The contrast band.
   dark: 'bg-[#0d0d0f] text-white',
 };
@@ -269,8 +269,8 @@ export function FeatureGrid({
     >
       {items.map((f) => (
         <StaggerItem key={f.title}>
-          <div className="group h-full rounded-3xl bg-[#f3f1ed] p-7 transition-transform duration-200 hover:-translate-y-1 dark:bg-[#1c1c1f]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff5a24] dark:text-[#ff8a5c]">
+          <div className="group h-full rounded-3xl bg-[#f4f4f6] p-7 transition-transform duration-200 hover:-translate-y-1 dark:bg-[#1c1c1f]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff4b29] dark:text-[#ff8a5c]">
               {f.kicker}
             </p>
             <h3 className="font-display mt-3 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-[#141414] dark:text-white">
@@ -303,7 +303,7 @@ export function StatStrip({
     >
       {stats.map((s) => (
         <StaggerItem key={s.label}>
-          <div className="h-full rounded-3xl bg-[#f3f1ed] px-6 py-8 dark:bg-[#1c1c1f]">
+          <div className="h-full rounded-3xl bg-[#f4f4f6] px-6 py-8 dark:bg-[#1c1c1f]">
             <p className="font-display text-[2.5rem] font-bold leading-none tracking-[-0.03em] text-[#141414] dark:text-white sm:text-[3.25rem]">
               {s.value}
             </p>

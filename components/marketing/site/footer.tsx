@@ -47,7 +47,7 @@ export function SiteFooter() {
             </div>
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-12 w-fit items-center justify-center gap-2 rounded-full bg-[#ff5a24] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#ee4d18] active:scale-[0.98]"
+              className="inline-flex h-12 w-fit items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
               <ArrowRight className="h-4 w-4" />

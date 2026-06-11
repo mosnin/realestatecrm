@@ -206,7 +206,7 @@ export function SiteNav() {
                   </Link>
                   <Link
                     href={SIGNUP}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#ff5a24] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#ee4d18] active:scale-[0.98]"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#ff4b29] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
                   >
                     Start free trial
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -381,7 +381,7 @@ export function SiteNav() {
               </motion.nav>
 
               <div className="space-y-3 border-t border-border/60 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5">
-                <Link href={SIGNUP} onClick={closeAll} className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-[#ff5a24] text-sm font-semibold text-white">
+                <Link href={SIGNUP} onClick={closeAll} className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-[#ff4b29] text-sm font-semibold text-white">
                   Start free trial
                   <ArrowRight className="h-4 w-4" />
                 </Link>

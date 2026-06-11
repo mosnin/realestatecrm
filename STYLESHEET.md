@@ -931,6 +931,11 @@ NexusSci gradient hero card.
   avatar imagery — all sanctioned. A wall of gray placeholder boxes reads as
   unfinished AI slop. If a product screenshot doesn't exist yet, use rich
   stock imagery as the stand-in.
+- **No mock-UI panels. BANNED.** The animated fake product cards
+  (`live-panels`, `more-panels`, `PanelFrame` mocks, hand-drawn inbox/draft/
+  calendar simulations) are dead on marketing surfaces — the owner rejected
+  them outright. Cards are photography-led (like the references) with
+  floating chip accents at most, until real product screenshots exist.
 - **Component-native design wins.** When the owner provides a component,
   keep its shadows, gradients, radii, photography, and animation. Recolor
   off-brand accents to the signal vermillion / Chippi orange where the accent
