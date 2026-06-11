@@ -42,13 +42,21 @@ interface NavGroup {
 
 const GROUPS: NavGroup[] = [
   {
+    label: 'Product',
+    href: '/studio',
+    items: [
+      { icon: Megaphone, label: 'Content studio', desc: 'Listing posts and emails, on the go', href: '/studio' },
+      { icon: Home, label: 'Properties', desc: 'Every listing in one place, synced', href: '/properties' },
+      { icon: FolderOpen, label: 'Files', desc: 'Every document, found in one search', href: '/files' },
+      { icon: Users, label: 'People', desc: 'Leads scored, followed up, in one place', href: '/people' },
+      { icon: KanbanSquare, label: 'Deals', desc: 'A pipeline that runs itself', href: '/deals' },
+    ],
+  },
+  {
     label: 'For realtors',
     href: '/realtors',
     items: [
       { icon: PenLine, label: 'Drafts in your voice', desc: 'Replies written before you open the thread', href: '/realtors' },
-      { icon: Megaphone, label: 'Content studio', desc: 'Listing posts and emails, on the go', href: '/studio' },
-      { icon: Home, label: 'Your properties', desc: 'Every listing in one place, synced', href: '/properties' },
-      { icon: FolderOpen, label: 'Files in one place', desc: 'Every document, found in one search', href: '/files' },
       { icon: Target, label: 'Know who to call first', desc: 'Every lead scored against your live deals', href: '/realtors' },
       { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time — Chippi books and logs it', href: '/realtors' },
       { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six open tabs', href: '/realtors' },
