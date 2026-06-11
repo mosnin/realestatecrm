@@ -18,14 +18,14 @@
  * still call `auth()` from their own server component before rendering.
  */
 
-import { Inter_Tight, Instrument_Serif } from 'next/font/google';
+import { Bricolage_Grotesque, Instrument_Serif } from 'next/font/google';
 import { SiteNav } from '@/components/marketing/site/nav';
 import { SiteFooter } from '@/components/marketing/site/footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
-const display = Inter_Tight({
+const display = Bricolage_Grotesque({
   subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
+  weight: ['300', '400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-display',
 });

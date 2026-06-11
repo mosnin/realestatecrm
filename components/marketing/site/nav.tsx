@@ -16,6 +16,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, ChevronDown, ArrowRight,
@@ -125,9 +126,13 @@ const GROUPS: NavGroup[] = [
 const SIGNUP = '/login/realtor?intent=signup';
 
 export function SiteNav() {
+  const pathname = usePathname();
   const [open, setOpen] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
+  // The homepage hero card carries its own black pill nav (the reference
+  // composition) — the floating global nav stands down there only.
+  const onHome = pathname === '/';
 
   // Close the mega menu on outside-click + Escape.
   useEffect(() => {
@@ -158,6 +163,9 @@ export function SiteNav() {
     hidden: { opacity: 0, y: 14 },
     show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } },
   };
+
+  // After all hooks: the homepage renders its own in-card nav.
+  if (onHome) return null;
 
   return (
     <>
