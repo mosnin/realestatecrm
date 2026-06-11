@@ -1,201 +1,278 @@
 /**
- * `/bio` — the realtor's public bio: one link that carries your listings,
- * your tour-booking link, and a contact form — every tap feeding Chippi.
- * Hero pairs the pitch with a phone-frame mock of the bio page (placeholder
- * tiles, no external images), then how-it-captures, then the ask.
+ * `/bio` — the realtor&apos;s public page, on the white + pastel system.
+ *
+ * Arc: PageHero opener → open light split (copy beside a pastel-framed
+ * glass card holding a skeleton bio page: avatar, links, listing tiles,
+ * tap → scored lead strip) → soft white bento with owner image slots →
+ * pastel CTA card. One idea: one link carries bio + listings + tour
+ * booking, and every lead it captures lands in the same loop.
  */
 
 import Link from 'next/link';
-import { ArrowRight, CalendarCheck, MessageCircle, Home, MapPin } from 'lucide-react';
-import { Reveal } from '@/components/marketing/site/reveal';
-import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
-import { PanelFrame } from '@/components/marketing/site/frame';
-import { DraftPanel } from '@/components/marketing/site/home/live-panels';
-import { TITLE_FONT } from '@/lib/typography';
+import {
+  ArrowRight,
+  CalendarCheck,
+  Home,
+  ImagePlus,
+  Link2,
+  MessageSquare,
+} from 'lucide-react';
+import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { PageHero } from '@/components/marketing/site/page-hero';
 
 export const metadata = {
   title: 'Your public bio · Chippi',
   description:
-    'One link in every profile — your listings, your booking link, your contact form. Every visitor who taps becomes a scored lead in Chippi, followed up in your voice.',
+    'One link with your bio, your listings, and tour booking built in. Every visitor who taps lands in the same loop — scored, with a reply drafted in your voice for your approval.',
 };
 
-function BioPhone() {
+/** Owner image slot — exactly the FeaturesBento vocabulary. */
+function ImageSlot({ name }: { name: string }) {
   return (
-    <div className="mx-auto w-[290px] overflow-hidden rounded-[2.4rem] border border-border/70 bg-card p-2 shadow-2xl shadow-foreground/[0.12] ring-1 ring-inset ring-white/5">
-      <div className="overflow-hidden rounded-[1.9rem] border border-border/60 bg-background">
-        {/* header */}
-        <div className="flex flex-col items-center bg-gradient-to-b from-brand-subtle to-background px-5 pb-5 pt-8">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full border border-border/60 bg-foreground/10 text-lg font-semibold text-foreground/70">
-            AR
-          </span>
-          <p className="mt-3 text-base font-semibold text-foreground">Alex Rivera</p>
-          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="h-3 w-3" /> Oakland · Berkeley · Alameda
-          </p>
-          <p className="mt-2 max-w-[210px] text-center text-[11px] leading-relaxed text-muted-foreground">
-            Helping East Bay buyers and sellers land the right home.
-          </p>
-        </div>
-        {/* links */}
-        <div className="space-y-2 px-4 pb-6">
-          <div className="flex items-center gap-2.5 rounded-xl border border-brand/30 bg-brand-subtle px-3.5 py-2.5">
-            <CalendarCheck className="h-4 w-4 flex-shrink-0 text-brand" />
-            <span className="text-sm font-medium text-foreground">Book a tour with me</span>
-          </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5">
-            <Home className="h-4 w-4 flex-shrink-0 text-brand" />
-            <span className="text-sm text-foreground">My active listings</span>
-          </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5">
-            <MessageCircle className="h-4 w-4 flex-shrink-0 text-brand" />
-            <span className="text-sm text-foreground">Ask me anything</span>
-          </div>
-          {/* listing tiles */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            {[
-              { addr: '14 Oak St', price: '$1.2M' },
-              { addr: '5 Birch Ln', price: '$960K' },
-            ].map((l) => (
-              <div key={l.addr} className="overflow-hidden rounded-xl border border-border/60">
-                <div
-                  className="flex h-16 items-center justify-center bg-muted/40"
-                  style={{
-                    backgroundImage: 'radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)',
-                    backgroundSize: '14px 14px',
-                  }}
-                >
-                  <Home className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="px-2 py-1.5">
-                  <p className="truncate text-[11px] font-medium text-foreground">{l.addr}</p>
-                  <p className="text-[10px] tabular-nums text-muted-foreground">{l.price}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="pt-2 text-center text-[10px] text-muted-foreground">
-            Powered by <span className="font-medium text-brand">Chippi</span>
-          </p>
-        </div>
+    <div
+      data-slot={name}
+      className="mt-8 flex h-64 items-center justify-center rounded-2xl bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5 sm:h-72"
+    >
+      <div className="flex flex-col items-center gap-2 text-center">
+        <ImagePlus className="h-5 w-5 text-neutral-300" />
+        <p className="text-xs text-neutral-400">
+          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+        </p>
       </div>
     </div>
   );
 }
 
-const CAPTURES = [
-  { kicker: 'Tours', title: 'Taps become tours', body: 'The booking link checks your real availability. A confirmed tour lands on your calendar — and the visitor lands in your book, scored.' },
-  { kicker: 'Leads', title: 'Questions become leads', body: '"Ask me anything" goes straight to Chippi. It drafts the reply in your voice and queues it for your tap.' },
-  { kicker: 'One link', title: 'Everywhere you are', body: 'Instagram, Zillow, your email signature, the open-house QR code — one URL keeps every channel feeding the same pipeline.' },
+const BENTO = [
+  {
+    slot: 'bio-page',
+    title: 'Your page, your name.',
+    sub: 'Bio, listings, and booking on one link you can drop anywhere — Instagram, Zillow, the QR by the door.',
+  },
+  {
+    slot: 'bio-booking',
+    title: 'Tour booking built in.',
+    sub: 'Visitors pick from your real availability and the tour lands on your calendar.',
+  },
+  {
+    slot: 'bio-leads',
+    title: 'Every tap becomes a lead.',
+    sub: 'Questions land in Chippi scored, with a reply drafted in your voice for your tap.',
+  },
+  {
+    slot: 'bio-brand',
+    title: 'On brand by default.',
+    sub: 'Your photo, your markets, your story — set once, current everywhere the link lives.',
+  },
 ];
 
 export default function BioPage() {
   return (
-    <>
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-16 sm:px-6 sm:pt-36">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[360px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
-        />
-        <div className="relative mx-auto grid max-w-5xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
-          <Reveal className="text-center lg:text-left">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Your public bio</p>
-            <h1 className="mt-5 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-[3.25rem]" style={TITLE_FONT}>
-              One link. Every lead.
-            </h1>
-            <p className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-muted-foreground lg:mx-0">
-              Your listings, your booking link, your contact form — on one page with your
-              name on it. Every visitor who taps becomes a scored lead in Chippi.
+    <div>
+      <PageHero
+        eyebrow="Your public page"
+        title="One link. Bio, listings, bookings."
+        sub="Your public page carries your story, your active listings, and a tour-booking link — and every lead it captures lands in the same loop: scored, drafted, ready for your tap."
+        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        secondaryCta={{ label: 'Book a demo', href: '/demo' }}
+      />
+
+      {/* Open light split — air after the hero */}
+      <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
+        <div className="grid gap-12 lg:grid-cols-2">
+          {/* Copy, hairline list, stats, quiet link */}
+          <div>
+            <h2 className="text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              A page that works the room.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Not a brochure — a front door. Everything a lead wants to do next
+              is one tap deep, and every tap feeds the pipeline.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <Link
-                href="/login/realtor?intent=signup"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-              >
-                Claim your bio
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <Link2 className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">One URL everywhere</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Instagram, Zillow, your email signature, the open-house
+                      QR — one link feeding one pipeline.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <CalendarCheck className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">Tours book themselves</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Visitors pick from your real availability. The tour lands
+                      on your calendar; the lead lands scored.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">24/7</span>
+                  <p className="mt-1 text-xs text-neutral-600">Capturing while you are out showing</p>
+                </div>
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
+                  <p className="mt-1 text-xs text-neutral-600">Approval-first on every drafted reply</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
               <Link
                 href="/capture"
-                className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+                className="inline-flex items-center gap-2 text-sm font-medium text-zinc-950 transition-colors hover:text-neutral-600"
               >
-                All capture channels
+                See every capture channel
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <BioPhone />
-          </Reveal>
-        </div>
-      </section>
+          </div>
 
-      {/* What it captures */}
-      <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
-        <div className="mx-auto max-w-5xl">
-          <Reveal className="max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Built to capture</p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              A bio page that works the room.
-            </h2>
-          </Reveal>
-          <div className="mt-10">
-            <FeatureGrid items={CAPTURES} />
+          {/* Pastel frame, white glass card, skeleton bio page */}
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+            <article
+              className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
+              style={{
+                background: 'rgba(255, 255, 255, 0.72)',
+                border: '1px solid rgba(255, 255, 255, 0.65)',
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Your page</h3>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                    <Link2 className="h-4 w-4 text-[#ff4b29]" />
+                    One link
+                  </span>
+                </div>
+
+                {/* Phone-shaped skeleton of the public page */}
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                  <div className="mx-auto w-full max-w-[240px] rounded-2xl border border-black/5 bg-white/90 p-4 shadow-sm">
+                    <div className="mx-auto h-12 w-12 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
+                    <div className="mx-auto mt-3 h-2 w-20 rounded bg-neutral-900" />
+                    <div className="mx-auto mt-1.5 h-2 w-28 rounded bg-neutral-200" />
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center gap-2 rounded-lg bg-[#ff4b29]/10 px-2.5 py-2">
+                        <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0 text-[#ff4b29]" />
+                        <span className="text-[10px] font-semibold text-zinc-950">Book a tour</span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 ring-1 ring-black/5">
+                        <Home className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
+                        <span className="text-[10px] font-medium text-neutral-700">Active listings</span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 ring-1 ring-black/5">
+                        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
+                        <span className="text-[10px] font-medium text-neutral-700">Ask a question</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="h-12 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="h-12 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[9px] text-neutral-400">
+                    <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Tap</span>
+                    <span aria-hidden>→</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Scored lead</span>
+                    <span aria-hidden>→</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Drafted reply</span>
+                  </div>
+                </div>
+
+                {/* Two-up */}
+                <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Every tap captured</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Bookings, questions, and listing interest land in Chippi,
+                      scored on arrival.
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">A draft waiting</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      By the time you look, the reply is written in your voice
+                      for your tap.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      {/* Proof — from tap to drafted reply */}
-      <section className="bg-background px-4 pb-20 sm:px-6 sm:pb-28">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-          <Reveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">From tap to reply</p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              A visitor asks. Chippi answers — in your voice.
-            </h2>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
-              Every &quot;ask me anything&quot; lands in Chippi, gets scored against your
-              book, and comes back as a drafted reply waiting for your tap. The bio page
-              isn&apos;t a brochure — it&apos;s a front door with someone working it.
-            </p>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <PanelFrame>
-              <DraftPanel />
-            </PanelFrame>
-          </Reveal>
-        </div>
+      {/* Soft bento — owner image slots, big air above */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            One link
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            A public page that feeds the pipeline.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            Your page, your bookings, your leads, your brand — wired into the
+            same loop as everything else Chippi works.
+          </p>
+        </FadeUp>
+        <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">
+          {BENTO.map((cell) => (
+            <StaggerItem key={cell.slot} className="h-full">
+              <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                <h3 className="text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+                  {cell.title}
+                </h3>
+                <p className="mt-3 text-base leading-relaxed text-neutral-500">{cell.sub}</p>
+                <ImageSlot name={cell.slot} />
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
       </section>
 
-      <DarkStatBand
-        eyebrow="The outcome"
-        title="One link that closes."
-        stats={[
-          { value: '1', label: 'link, everywhere' },
-          { value: '24/7', label: 'capturing & replying' },
-          { value: '0', label: 'missed taps' },
-        ]}
-      />
-
-      {/* Closing CTA */}
-      <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
-            Put your link to work.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-            Claim your bio, drop the link everywhere, and let Chippi work whoever shows up.
-          </p>
-          <div className="mt-8">
+      {/* Pastel CTA card */}
+      <section className="mt-24 px-4 sm:mt-32">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+          <FadeUp className="relative mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
+            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              Put your link to work.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+              Claim your page, drop the link everywhere, and meet every tap
+              with a draft.
+            </p>
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+              className="mt-9 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </Reveal>
+            <p className="mt-4 text-sm text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
+          </FadeUp>
+        </div>
       </section>
-    </>
+    </div>
   );
 }
