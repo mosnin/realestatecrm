@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, ChevronDown, ArrowRight,
   PenLine, Target, CalendarCheck, KanbanSquare, Megaphone, Home, FolderOpen,
-  GitBranch, BarChart3, MessagesSquare, Users, MessageCircle,
+  GitBranch, BarChart3, MessagesSquare, Users, MessageCircle, Link2,
   Plug, Building2, Activity, PlayCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,8 @@ const GROUPS: NavGroup[] = [
       { icon: FolderOpen, label: 'Files', desc: 'Every document, found in one search', href: '/files' },
       { icon: Users, label: 'People', desc: 'Leads scored, followed up, in one place', href: '/people' },
       { icon: KanbanSquare, label: 'Deals', desc: 'A pipeline that runs itself', href: '/deals' },
+      { icon: Target, label: 'Capture leads', desc: 'Forms, property pages, tour links', href: '/capture' },
+      { icon: Link2, label: 'Public bio', desc: 'One link that feeds your pipeline', href: '/bio' },
     ],
   },
   {
