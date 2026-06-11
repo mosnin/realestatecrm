@@ -1,9 +1,9 @@
 /**
- * Footer — the black contrast card.
+ * Footer — the pastel bookend.
  *
- * An inset rounded near-black card on the canvas (the Arist-style close):
- * a big display sign-off line + the signal CTA up top, link columns below,
- * meta row at the bottom. Replaces the paper-flat hairline footer.
+ * An inset rounded card washed white → soft peach/pink (mirroring the hero
+ * card, per the white + pastel-orange direction): display sign-off line +
+ * the signal CTA up top, link columns below, meta row at the bottom.
  */
 
 import Link from 'next/link';
@@ -31,17 +31,17 @@ const columns = {
 
 export function SiteFooter() {
   return (
-    <footer className="px-3 pb-3 sm:px-4 sm:pb-4">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#0d0d0f] text-white sm:rounded-[2.75rem]">
+    <footer className="px-3 pb-3 pt-16 sm:px-4 sm:pb-4 sm:pt-24">
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-[#fff3ea] to-[#ffe2d2] text-[#16161a] ring-1 ring-black/5 sm:rounded-[2.75rem]">
         <div className="px-5 py-14 sm:px-10 sm:py-16 lg:px-14">
           {/* Sign-off + CTA */}
-          <div className="flex flex-col gap-8 border-b border-white/10 pb-12 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-8 border-b border-black/10 pb-12 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                <span aria-hidden className="text-[#ff7a47]">✦</span>
+              <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                <span aria-hidden className="text-[#ff4b29]">✦</span>
                 Chippi
               </p>
-              <p className="font-display mt-4 max-w-md text-3xl font-bold leading-[1.05] tracking-[-0.03em] sm:text-4xl">
+              <p className="mt-4 max-w-md text-3xl font-bold leading-[1.05] tracking-[-0.03em] text-zinc-950 sm:text-4xl">
                 The busywork runs itself. The hours go to closing.
               </p>
             </div>
@@ -57,14 +57,14 @@ export function SiteFooter() {
           {/* Link columns */}
           <div className="grid grid-cols-2 gap-8 pt-12 md:grid-cols-4">
             <div className="col-span-2 md:col-span-1">
-              <p className="max-w-xs text-sm leading-relaxed text-white/55">
+              <p className="max-w-xs text-sm leading-relaxed text-neutral-600">
                 The agentic OS for real-estate agents and brokerages — every
                 realtor with Chippi doing real work for them.
               </p>
             </div>
             {Object.entries(columns).map(([heading, items]) => (
               <div key={heading}>
-                <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
                   {heading}
                 </h4>
                 <ul className="mt-4 space-y-2.5">
@@ -72,7 +72,7 @@ export function SiteFooter() {
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-white/65 transition-colors hover:text-white"
+                        className="text-sm text-neutral-600 transition-colors hover:text-zinc-950"
                       >
                         {link.label}
                       </Link>
@@ -84,15 +84,15 @@ export function SiteFooter() {
           </div>
 
           {/* Meta row */}
-          <div className="mt-12 flex flex-col items-center gap-2 border-t border-white/10 pt-6 sm:flex-row sm:justify-between">
-            <p className="text-xs text-white/40">
+          <div className="mt-12 flex flex-col items-center gap-2 border-t border-black/10 pt-6 sm:flex-row sm:justify-between">
+            <p className="text-xs text-neutral-500">
               &copy; {new Date().getFullYear()} Chippi. All rights reserved.
             </p>
             <Link
               href="/status"
-              className="inline-flex items-center gap-2 text-xs text-white/40 transition-colors hover:text-white"
+              className="inline-flex items-center gap-2 text-xs text-neutral-500 transition-colors hover:text-zinc-950"
             >
-              <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-400" />
+              <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-500" />
               All systems operational.
             </Link>
           </div>

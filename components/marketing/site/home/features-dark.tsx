@@ -1,18 +1,12 @@
 'use client';
 
 /**
- * FeaturesDark — the owner-provided dark glass feature section, exact.
- *
- * One near-black rounded-3xl card (ring-white/10, blurred white orbs as
- * decor) holding five glass feature cards in a 2-column grid: left column
- * carries the heading + two cards (typing demo, analytics), right column
- * three cards (collaboration avatars + progress, workflow status dots,
- * security checklist). Native design kept verbatim — glass gradients,
- * rings, radii, monochrome white-on-dark — content tailored to Chippi.
- *
- * The source's typing demo <script> is ported to a reduced-motion-aware
- * hook; the vestigial pricing script (referencing elements that don't
- * exist in the markup) was dead code and is not ported.
+ * FeaturesDark — the owner-provided five-card glass feature section,
+ * reskinned to the WHITE scheme with pastel-orange gradients (owner
+ * direction): one big rounded card washed white→peach, soft orange decor
+ * orbs, and five glass cards with subtle warm gradient fills. Structure,
+ * grid, and the mini live demos (typing drafts, pipeline stats, team
+ * avatars + progress, status dots, security checklist) are unchanged.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -64,13 +58,13 @@ function TypingDemo() {
     return () => clearTimeout(timer);
   }, [reduce]);
 
-  return <div className="h-8 font-mono text-xs text-white/60">{text}</div>;
+  return <div className="h-8 font-mono text-xs text-neutral-500">{text}</div>;
 }
 
-/** Glass demo shell — verbatim from the source. */
+/** Glass demo shell — white glass on the warm card. */
 function DemoShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-gradient-to-b from-white/5 to-white/[0.03] p-4 ring-1 ring-white/10 backdrop-blur">
+    <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5 backdrop-blur">
       {children}
     </div>
   );
@@ -78,7 +72,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
 
 function DemoLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="mb-3 flex items-center gap-2 text-sm text-white/80">
+    <div className="mb-3 flex items-center gap-2 text-sm text-neutral-800">
       {icon}
       <span className="font-medium">{label}</span>
     </div>
@@ -87,8 +81,8 @@ function DemoLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-transparent p-5 ring-1 ring-white/10 md:p-6">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/5 to-transparent" />
+    <section className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#fff3ea] p-5 shadow-[0_2px_14px_rgba(80,40,15,0.06)] ring-1 ring-black/5 md:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/40 to-transparent" />
       {children}
     </section>
   );
@@ -97,8 +91,8 @@ function CardShell({ children }: { children: React.ReactNode }) {
 function CardTitle({ title, body }: { title: string; body: string }) {
   return (
     <>
-      <h3 className="font-display mt-5 text-xl font-semibold tracking-tight text-white md:text-2xl">{title}</h3>
-      <p className="mt-1.5 text-sm text-white/70">{body}</p>
+      <h3 className="mt-5 text-xl font-semibold tracking-tight text-zinc-950 md:text-2xl">{title}</h3>
+      <p className="mt-1.5 text-sm text-neutral-600">{body}</p>
     </>
   );
 }
@@ -112,25 +106,25 @@ const COLLAB_AVATARS = [
 export function FeaturesDark() {
   return (
     <section id="features" className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
-      <div className="relative overflow-hidden rounded-3xl bg-neutral-950 ring-1 ring-white/10 backdrop-blur sm:rounded-[2.75rem]">
-        {/* Subtle decor (neutral) */}
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/[0.06] blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+        {/* Pastel decor orbs */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
 
         <div className="grid grid-cols-1 items-stretch lg:grid-cols-2">
           {/* LEFT */}
           <div className="flex flex-col p-6 sm:p-10">
             {/* Eyebrow */}
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-zinc-300/90">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] text-neutral-600">
               {'// FEATURES'}
             </span>
 
             {/* Heading */}
-            <h2 className="font-display mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
               Everything you need<span className="block">to run your book</span>
             </h2>
 
-            <p className="mt-4 max-w-2xl text-base text-zinc-300/90 md:text-lg">
+            <p className="mt-4 max-w-2xl text-base text-neutral-600 md:text-lg">
               An agent that works your leads end to end — reading, drafting,
               booking, and logging while you close.
             </p>
@@ -141,14 +135,14 @@ export function FeaturesDark() {
               <CardShell>
                 <DemoShell>
                   <DemoLabel
-                    icon={<MessageCircle className="h-4 w-4 text-white/80" />}
+                    icon={<MessageCircle className="h-4 w-4 text-[#ff4b29]" />}
                     label="Chippi Draft Assistant"
                   />
                   <div className="space-y-3">
-                    <div className="rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
+                    <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
-                          <p className="mb-2 text-sm text-white/90">Reply drafted before you open the thread</p>
+                          <p className="mb-2 text-sm text-neutral-800">Reply drafted before you open the thread</p>
                           <TypingDemo />
                         </div>
                       </div>
@@ -165,19 +159,19 @@ export function FeaturesDark() {
               <CardShell>
                 <DemoShell>
                   <DemoLabel
-                    icon={<TrendingUp className="h-4 w-4 text-white/80" />}
+                    icon={<TrendingUp className="h-4 w-4 text-[#ff4b29]" />}
                     label="Pipeline Insights"
                   />
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
-                      <p className="mb-1 text-xs text-white/60">Leads worked</p>
-                      <p className="text-2xl font-semibold text-white">142</p>
-                      <p className="mt-1 text-xs text-white/70">scored on arrival</p>
+                    <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
+                      <p className="mb-1 text-xs text-neutral-500">Leads worked</p>
+                      <p className="text-2xl font-semibold text-zinc-950">142</p>
+                      <p className="mt-1 text-xs text-neutral-600">scored on arrival</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
-                      <p className="mb-1 text-xs text-white/60">Follow-ups</p>
-                      <p className="text-2xl font-semibold text-white">94%</p>
-                      <p className="mt-1 text-xs text-white/70">on time, automatically</p>
+                    <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
+                      <p className="mb-1 text-xs text-neutral-500">Follow-ups</p>
+                      <p className="text-2xl font-semibold text-zinc-950">94%</p>
+                      <p className="mt-1 text-xs text-neutral-600">on time, automatically</p>
                     </div>
                   </div>
                 </DemoShell>
@@ -196,7 +190,7 @@ export function FeaturesDark() {
             {/* Card 3: Collaboration */}
             <CardShell>
               <DemoShell>
-                <DemoLabel icon={<Users className="h-4 w-4 text-white/80" />} label="Team Workspaces" />
+                <DemoLabel icon={<Users className="h-4 w-4 text-[#ff4b29]" />} label="Team Workspaces" />
                 <div className="flex items-center gap-2">
                   {COLLAB_AVATARS.map((src, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -204,18 +198,21 @@ export function FeaturesDark() {
                       key={src}
                       src={src}
                       alt="user"
-                      className={`h-8 w-8 rounded-full object-cover ring-2 ring-white/20 ${i > 0 ? '-ml-3' : ''}`}
+                      className={`h-8 w-8 rounded-full object-cover ring-2 ring-white ${i > 0 ? '-ml-3' : ''}`}
                     />
                   ))}
-                  <div className="-ml-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-2 ring-white/20">
-                    <span className="text-xs text-white/80">+5</span>
+                  <div className="-ml-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/5 ring-2 ring-white">
+                    <span className="text-xs text-neutral-700">+5</span>
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-white/60" style={{ width: '68%' }} />
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]"
+                      style={{ width: '68%' }}
+                    />
                   </div>
-                  <p className="text-xs text-white/60">8 agents active on the floor</p>
+                  <p className="text-xs text-neutral-500">8 agents active on the floor</p>
                 </div>
               </DemoShell>
               <CardTitle
@@ -227,18 +224,18 @@ export function FeaturesDark() {
             {/* Card 4: Workflow Automation */}
             <CardShell>
               <DemoShell>
-                <DemoLabel icon={<Workflow className="h-4 w-4 text-white/80" />} label="Always-On Agent" />
+                <DemoLabel icon={<Workflow className="h-4 w-4 text-[#ff4b29]" />} label="Always-On Agent" />
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-white/70">
-                    <div className="h-2 w-2 rounded-full bg-white/60" />
+                  <div className="flex items-center gap-2 text-xs text-neutral-600">
+                    <div className="h-2 w-2 rounded-full bg-[#ff4b29]" />
                     <span>Inbox watch enabled</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-white/70">
-                    <div className="h-2 w-2 rounded-full bg-white/50" />
+                  <div className="flex items-center gap-2 text-xs text-neutral-600">
+                    <div className="h-2 w-2 rounded-full bg-[#ff4b29]/70" />
                     <span>Calendar sync active</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-white/70">
-                    <div className="h-2 w-2 rounded-full bg-white/40" />
+                  <div className="flex items-center gap-2 text-xs text-neutral-600">
+                    <div className="h-2 w-2 rounded-full bg-[#ff4b29]/40" />
                     <span>CRM writeback running</span>
                   </div>
                 </div>
@@ -253,20 +250,20 @@ export function FeaturesDark() {
             <CardShell>
               <DemoShell>
                 <DemoLabel
-                  icon={<ShieldCheck className="h-4 w-4 text-white/80" />}
+                  icon={<ShieldCheck className="h-4 w-4 text-[#ff4b29]" />}
                   label="Security &amp; Control"
                 />
-                <ul className="space-y-2 text-sm text-white/80">
+                <ul className="space-y-2 text-sm text-neutral-700">
                   <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-[18px] w-[18px] text-white/70" />
+                    <Check className="mt-0.5 h-[18px] w-[18px] text-[#ff4b29]" />
                     <span>Approval-first by default</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-[18px] w-[18px] text-white/70" />
+                    <Check className="mt-0.5 h-[18px] w-[18px] text-[#ff4b29]" />
                     <span>Role-based broker controls</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-[18px] w-[18px] text-white/70" />
+                    <Check className="mt-0.5 h-[18px] w-[18px] text-[#ff4b29]" />
                     <span>A log of every action it takes</span>
                   </li>
                 </ul>

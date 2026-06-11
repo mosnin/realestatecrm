@@ -5,9 +5,10 @@
  *
  * Left: big slate headline, hairline-divided "core features" list with
  * tinted icon circles, a two-up stat row, and the deep-shadow dark gradient
- * button. Right: a photo-backed rounded-[36px] frame holding a dark glass
- * card with a composed mini-dashboard illustration (deal board, Chippi log,
- * progress, avatars), a two-up feature grid, and a quiet text CTA.
+ * button. Right: a pastel-orange gradient rounded-[36px] frame holding a
+ * white glass card with a composed mini-dashboard illustration (deal board,
+ * Chippi log, progress, avatars), a two-up feature grid, and a quiet text
+ * CTA. White scheme + pastel orange, per owner direction.
  *
  * Native design verbatim; blue accents recolored to brand; copy and the
  * illustration's content tailored to Chippi. Stats are defensible facts —
@@ -16,9 +17,6 @@
 
 import Link from 'next/link';
 import { ArrowRight, FileText, MessageSquare, Users } from 'lucide-react';
-
-const PHOTO_BG =
-  'https://hoirqrkdgbmvpwutwuwj-all.supabase.co/storage/v1/object/public/assets/assets/347ae071-e53a-4247-a97a-e708e4ae14a7_1600w.jpg';
 
 export function FeaturesSplit() {
   return (
@@ -99,76 +97,73 @@ export function FeaturesSplit() {
           </div>
         </div>
 
-        {/* Diagram — photo-framed dark glass card */}
-        <div
-          className="relative rounded-[36px] bg-cover p-5"
-          style={{ backgroundImage: `url(${PHOTO_BG})` }}
-        >
+        {/* Diagram — pastel-gradient frame, white glass card */}
+        <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
           <article
             className="group relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl transition-shadow hover:shadow-md"
             style={{
-              background: 'rgba(17, 17, 17, 0.7)',
+              background: 'rgba(255, 255, 255, 0.72)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(64, 64, 64, 0.35)',
+              border: '1px solid rgba(255, 255, 255, 0.65)',
             }}
           >
             <div className="p-6 sm:p-10">
               <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-                <h3 className="font-display text-2xl font-semibold tracking-tight text-white">Chippi Workflows</h3>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-neutral-300 sm:text-xs">
-                  <Users className="h-4 w-4 text-[#ff8a5c]" />
+                <h3 className="font-display text-2xl font-semibold tracking-tight text-zinc-950">Chippi Workflows</h3>
+                <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                  <Users className="h-4 w-4 text-[#ff4b29]" />
                   Live sync
                 </span>
               </div>
 
               {/* Illustration */}
-              <div className="relative mb-8 h-56 rounded-2xl bg-gradient-to-b from-neutral-900 to-neutral-800 ring-1 ring-inset ring-white/5 sm:h-64">
+              <div className="relative mb-8 h-56 rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] ring-1 ring-inset ring-black/5 sm:h-64">
                 {/* Deal board */}
-                <div className="absolute left-3 top-4 h-[52%] w-[70%] rounded-2xl border border-neutral-800 bg-neutral-900/90 shadow-sm backdrop-blur sm:left-6 sm:top-6">
-                  <div className="flex items-center justify-between border-b border-neutral-800/70 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-400 sm:text-xs">DEAL BOARD</span>
+                <div className="absolute left-3 top-4 h-[52%] w-[70%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-6 sm:top-6">
+                  <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">DEAL BOARD</span>
                     <div className="flex items-center gap-1">
                       <div className="h-3 w-3 rounded-full bg-green-500/70" />
-                      <span className="text-[10px] text-green-400">Active</span>
+                      <span className="text-[10px] text-green-600">Active</span>
                     </div>
                   </div>
                   <div className="space-y-1.5 p-2">
                     <div className="flex items-center justify-between text-[10px] sm:text-xs">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded bg-blue-400" />
-                        <span className="text-neutral-300">Maya · 14 Oak St</span>
+                        <div className="h-2 w-2 rounded bg-blue-500" />
+                        <span className="text-neutral-700">Maya · 14 Oak St</span>
                       </div>
-                      <span className="text-blue-400">Tour Sat 2:00</span>
+                      <span className="text-blue-600">Tour Sat 2:00</span>
                     </div>
                     <div className="flex items-center justify-between text-[10px] sm:text-xs">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded bg-green-400" />
-                        <span className="text-neutral-300">Tom · refi question</span>
+                        <span className="text-neutral-700">Tom · refi question</span>
                       </div>
-                      <span className="text-green-400">Replied</span>
+                      <span className="text-green-600">Replied</span>
                     </div>
                     <div className="flex items-center justify-between text-[10px] sm:text-xs">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded bg-yellow-400" />
-                        <span className="text-neutral-300">Dana · browsing</span>
+                        <div className="h-2 w-2 rounded bg-yellow-500" />
+                        <span className="text-neutral-700">Dana · browsing</span>
                       </div>
-                      <span className="text-yellow-400">Follow-up set</span>
+                      <span className="text-yellow-600">Follow-up set</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Chippi log */}
-                <div className="absolute right-4 top-5 h-[68%] w-[38%] rounded-2xl border border-neutral-800 bg-neutral-900/90 shadow-sm backdrop-blur sm:right-6 sm:top-7">
-                  <div className="flex items-center justify-between border-b border-neutral-800/70 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-400 sm:text-xs">CHIPPI LOG</span>
+                <div className="absolute right-4 top-5 h-[68%] w-[38%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:right-6 sm:top-7">
+                  <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">CHIPPI LOG</span>
                     <div className="h-2 w-2 rounded-full bg-green-500" />
                   </div>
                   <div className="space-y-2 p-2">
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
                       <div className="min-w-0">
-                        <div className="mb-0.5 text-[9px] text-neutral-400">Chippi</div>
-                        <div className="rounded-lg bg-white/10 px-2 py-1 text-[9px] text-neutral-300">
+                        <div className="mb-0.5 text-[9px] text-neutral-500">Chippi</div>
+                        <div className="rounded-lg bg-black/5 px-2 py-1 text-[9px] text-neutral-700">
                           Drafted 3 replies
                         </div>
                       </div>
@@ -176,8 +171,8 @@ export function FeaturesSplit() {
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-green-400 to-green-600" />
                       <div className="min-w-0">
-                        <div className="mb-0.5 text-[9px] text-neutral-400">You</div>
-                        <div className="rounded-lg bg-white/10 px-2 py-1 text-[9px] text-neutral-300">
+                        <div className="mb-0.5 text-[9px] text-neutral-500">You</div>
+                        <div className="rounded-lg bg-black/5 px-2 py-1 text-[9px] text-neutral-700">
                           Approved · sent
                         </div>
                       </div>
@@ -186,19 +181,19 @@ export function FeaturesSplit() {
                 </div>
 
                 {/* Progress */}
-                <div className="absolute bottom-10 left-6 h-[28%] w-[55%] rounded-2xl border border-neutral-800 bg-neutral-900/90 shadow-sm backdrop-blur sm:bottom-12 sm:left-12">
-                  <div className="flex items-center justify-between border-b border-neutral-800/70 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-400 sm:text-xs">TODAY</span>
-                    <span className="text-[10px] text-green-400">78%</span>
+                <div className="absolute bottom-10 left-6 h-[28%] w-[55%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:bottom-12 sm:left-12">
+                  <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">TODAY</span>
+                    <span className="text-[10px] text-green-600">78%</span>
                   </div>
                   <div className="p-2">
-                    <div className="h-2 overflow-hidden rounded-full bg-neutral-800">
+                    <div className="h-2 overflow-hidden rounded-full bg-black/10">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#ff7a47] to-green-400"
+                        className="h-full rounded-full bg-gradient-to-r from-[#ff7a47] to-green-500"
                         style={{ width: '78%' }}
                       />
                     </div>
-                    <div className="mt-1 flex justify-between text-[9px] text-neutral-400">
+                    <div className="mt-1 flex justify-between text-[9px] text-neutral-500">
                       <span>9 leads worked</span>
                       <span>2 awaiting approval</span>
                     </div>
@@ -207,11 +202,11 @@ export function FeaturesSplit() {
 
                 {/* Team avatars */}
                 <div className="absolute bottom-4 right-4 flex -space-x-1">
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29] ring-2 ring-neutral-800" />
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-green-400 to-green-600 ring-2 ring-neutral-800" />
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 ring-2 ring-neutral-800" />
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700 ring-2 ring-neutral-800">
-                    <span className="text-[8px] text-neutral-300">+2</span>
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29] ring-2 ring-white" />
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-green-400 to-green-600 ring-2 ring-white" />
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 ring-2 ring-white" />
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black/10 ring-2 ring-white">
+                    <span className="text-[8px] text-neutral-700">+2</span>
                   </div>
                 </div>
               </div>
@@ -219,15 +214,15 @@ export function FeaturesSplit() {
               {/* Features grid */}
               <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <h4 className="text-lg font-semibold tracking-tight text-white">Approval-first Drafts</h4>
-                  <p className="mt-2 text-sm text-neutral-400">
+                  <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Approval-first Drafts</h4>
+                  <p className="mt-2 text-sm text-neutral-500">
                     Every reply waits for your tap. Edit, send, or skip — the
                     decision stays yours on every thread.
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold tracking-tight text-white">Pipeline Tracking</h4>
-                  <p className="mt-2 text-sm text-neutral-400">
+                  <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Pipeline Tracking</h4>
+                  <p className="mt-2 text-sm text-neutral-500">
                     Deals advance themselves as things happen, with every move
                     logged in plain language.
                   </p>
@@ -238,7 +233,7 @@ export function FeaturesSplit() {
               <div>
                 <Link
                   href="/chippi"
-                  className="inline-flex items-center gap-2 text-xs font-medium text-neutral-100 hover:text-neutral-300"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-zinc-950 hover:text-neutral-600"
                 >
                   See Chippi at work
                   <ArrowRight className="h-4 w-4" />

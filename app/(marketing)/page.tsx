@@ -18,6 +18,7 @@ import { redirect } from 'next/navigation';
 import { Hero } from '@/components/marketing/site/home/hero';
 import { FeaturesSplit } from '@/components/marketing/site/home/features-split';
 import { HowItWorks } from '@/components/marketing/site/home/how-it-works';
+import { FeaturesBento } from '@/components/marketing/site/home/features-bento';
 import { FeaturesDark } from '@/components/marketing/site/home/features-dark';
 
 export default async function MarketingHomePage() {
@@ -40,7 +41,12 @@ export default async function MarketingHomePage() {
         <HowItWorks />
       </div>
 
-      {/* Dark glass card — full tone break, big breathing room above */}
+      {/* Soft bento — owner image slots, big air above */}
+      <div className="mt-24 sm:mt-32">
+        <FeaturesBento />
+      </div>
+
+      {/* Pastel glass card — tone shift, big breathing room above */}
       <div className="mt-24 sm:mt-32">
         <FeaturesDark />
       </div>
