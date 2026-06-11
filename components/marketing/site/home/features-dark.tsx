@@ -85,11 +85,9 @@ function DemoLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
-function CardShell({ children, withBg = false }: { children: React.ReactNode; withBg?: boolean }) {
+function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <section
-      className={`group relative overflow-hidden rounded-3xl p-5 ring-1 ring-white/10 md:p-6 ${withBg ? 'bg-white/[0.04]' : ''}`}
-    >
+    <section className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-transparent p-5 ring-1 ring-white/10 md:p-6">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/5 to-transparent" />
       {children}
     </section>
@@ -113,7 +111,7 @@ const COLLAB_AVATARS = [
 
 export function FeaturesDark() {
   return (
-    <section id="features" className="relative z-10 mx-auto max-w-7xl px-4 pb-16 pt-2.5 sm:px-4 sm:pt-4 lg:px-4">
+    <section id="features" className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
       <div className="relative overflow-hidden rounded-3xl bg-neutral-950 ring-1 ring-white/10 backdrop-blur sm:rounded-[2.75rem]">
         {/* Subtle decor (neutral) */}
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/[0.06] blur-3xl" />
@@ -196,7 +194,7 @@ export function FeaturesDark() {
           {/* RIGHT (3 cards) */}
           <div className="flex flex-col gap-6 p-6 sm:p-10 lg:col-start-2">
             {/* Card 3: Collaboration */}
-            <CardShell withBg>
+            <CardShell>
               <DemoShell>
                 <DemoLabel icon={<Users className="h-4 w-4 text-white/80" />} label="Team Workspaces" />
                 <div className="flex items-center gap-2">
