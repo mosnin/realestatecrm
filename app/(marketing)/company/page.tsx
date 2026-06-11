@@ -1,20 +1,19 @@
 /**
- * `/company` — Chippi's founding story, on the calm site system.
+ * `/company` — Chippi's founding story, on the bold-canvas system.
  *
  * One idea: the world moved to AI; real estate didn't — so two people who'd
  * lived the gap built Chippi to close it. Mission → the gap → the founders →
- * beliefs → a calm close.
+ * beliefs → a close.
  *
- * Rebuilt off the legacy studio-ASCII version onto the shared vocabulary
- * (PageHero, FadeUp, serif headlines). Auth users bounce to their workspace.
+ * PageHero opener, story paragraphs in an open white section, beliefs as a
+ * 2×2 grid of white soft-shadow cards, founder cards, vermillion closing CTA.
  */
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
-import { FadeUp } from '@/components/marketing/site/section';
+import { FadeUp, EyebrowChip } from '@/components/marketing/site/section';
 import { Founders } from '@/components/marketing/company/founders';
-import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = { title: 'Company · Chippi' };
 
@@ -46,16 +45,14 @@ export default function CompanyPage() {
         sub="We built Chippi because the tools agents and brokerages live in were drawn for a slower era. The work shouldn’t be the chrome. The work should be the deals."
       />
 
-      {/* The gap */}
-      <section className="bg-background px-4 py-24 sm:px-6 sm:py-28">
+      {/* The gap — open white */}
+      <section className="px-4 pt-6 sm:px-6 sm:pt-10">
         <FadeUp className="mx-auto max-w-3xl">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            The gap
-          </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+          <EyebrowChip>The gap</EyebrowChip>
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
             The work moved on. The software didn’t.
           </h2>
-          <div className="mt-6 space-y-5 text-lg leading-relaxed text-muted-foreground">
+          <div className="mt-6 space-y-5 text-lg leading-relaxed text-neutral-600">
             <p>
               An agent’s day is mostly attention management — email, calendar, replies,
               follow-ups, pipeline updates. The actual selling, the listening and judging
@@ -72,16 +69,14 @@ export default function CompanyPage() {
       </section>
 
       {/* Founders */}
-      <section className="border-y border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
         <div className="mx-auto max-w-5xl">
           <FadeUp className="mx-auto max-w-3xl text-center">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              The founders
-            </p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+            <EyebrowChip className="justify-center">The founders</EyebrowChip>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
               Built by people who know the work.
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
               Orlando and Preston teamed up to solve the problem from both ends: the agent’s
               day and the brokerage’s floor.
             </p>
@@ -92,51 +87,55 @@ export default function CompanyPage() {
         </div>
       </section>
 
-      {/* Beliefs */}
-      <section className="bg-background px-4 py-24 sm:px-6 sm:py-28">
-        <FadeUp className="mx-auto max-w-3xl">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            What we believe
-          </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-            A few things we won’t move on.
-          </h2>
-          <ul className="mt-10 divide-y divide-border/60 border-y border-border/60">
-            {BELIEFS.map((b) => (
-              <li key={b.title} className="py-7">
-                <h3 className="text-[17px] font-semibold tracking-tight text-foreground">{b.title}</h3>
-                <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{b.body}</p>
-              </li>
+      {/* Beliefs — 2×2 white soft-shadow cards */}
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <FadeUp className="mx-auto max-w-3xl text-center">
+            <EyebrowChip className="justify-center">What we believe</EyebrowChip>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              A few things we won’t move on.
+            </h2>
+          </FadeUp>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">
+            {BELIEFS.map((b, i) => (
+              <FadeUp key={b.title} delay={i * 0.05}>
+                <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                  <h3 className="text-xl font-semibold tracking-tight text-zinc-950">
+                    {b.title}
+                  </h3>
+                  <p className="mt-3 text-base leading-relaxed text-neutral-600">{b.body}</p>
+                </div>
+              </FadeUp>
             ))}
-          </ul>
-        </FadeUp>
+          </div>
+        </div>
       </section>
 
       {/* Close */}
-      <section className="bg-background px-4 pb-24 sm:px-6 sm:pb-32">
+      <section className="mt-24 px-4 pb-24 sm:mt-32 sm:px-6 sm:pb-32">
         <FadeUp className="mx-auto max-w-3xl text-center">
-          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+          <h2 className="mx-auto max-w-xl text-3xl font-semibold leading-tight tracking-tight text-zinc-950 sm:text-4xl">
             Come see what your day looks like with Chippi.
           </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-neutral-600">
             Bring your inbox and let Chippi do the rest.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/demo"
-              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+              className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white px-7 text-[15px] font-semibold text-zinc-950 transition-colors duration-150 hover:bg-black/[0.04]"
             >
               Book a demo
             </Link>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">7 days free, then $97/mo. Cancel anytime.</p>
+          <p className="mt-4 text-xs text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
         </FadeUp>
       </section>
     </>

@@ -1,6 +1,7 @@
 /**
- * DemoBooking — the /demo body on the calm site system. One focal element: the
- * scheduler, in a browser frame.
+ * DemoBooking — the /demo scheduler on the bold-canvas system. One focal
+ * element: the scheduler, in a white soft-shadow card. The page opener
+ * (PageHero) lives in `app/(marketing)/demo/page.tsx`.
  *
  * Swapping in the real Calendly is one line: paste the inline-embed URL into
  * CALENDLY_URL. Empty → a calm placeholder; set → a responsive iframe. We do
@@ -9,9 +10,8 @@
  */
 
 import Link from 'next/link';
-import { PageHero } from '@/components/marketing/site/page-hero';
+import { CalendarRange } from 'lucide-react';
 import { Reveal } from '@/components/marketing/site/reveal';
-import { PanelFrame, ImagePlaceholder } from '@/components/marketing/site/frame';
 
 // TODO: paste the Calendly inline-embed URL here
 // e.g. 'https://calendly.com/your-org/chippi-walkthrough'
@@ -19,44 +19,40 @@ const CALENDLY_URL = '';
 
 export function DemoBooking() {
   return (
-    <>
-      <PageHero
-        eyebrow="Book a demo"
-        title="See Chippi run your floor."
-        sub="For brokerages and teams sizing up Chippi. Pick a time and we’ll walk your floor through it live — the inbox, the drafts, the deals it keeps current — then answer how it fits your book."
-      />
+    <section className="px-4 pb-24 pt-2 sm:px-6 sm:pb-32">
+      <Reveal className="mx-auto max-w-3xl">
+        <div className="overflow-hidden rounded-3xl bg-white p-3 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-4">
+          {CALENDLY_URL ? (
+            <iframe
+              src={CALENDLY_URL}
+              title="Book a demo with Chippi"
+              className="min-h-[680px] w-full rounded-2xl border-0 bg-white"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex aspect-[4/3] flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] text-center ring-1 ring-inset ring-black/5">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#ff4b29] ring-1 ring-black/5">
+                <CalendarRange className="h-5 w-5" />
+              </span>
+              <p className="mt-3 text-sm font-semibold tracking-tight text-zinc-950">Scheduler</p>
+              <p className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500">
+                Paste CALENDLY_URL to go live
+              </p>
+            </div>
+          )}
+        </div>
 
-      <section className="bg-background px-4 py-20 sm:px-6 sm:py-24">
-        <Reveal className="mx-auto max-w-3xl">
-          <PanelFrame>
-            {CALENDLY_URL ? (
-              <iframe
-                src={CALENDLY_URL}
-                title="Book a demo with Chippi"
-                className="min-h-[680px] w-full border-0 bg-background"
-                loading="lazy"
-              />
-            ) : (
-              <ImagePlaceholder
-                label="Scheduler"
-                sublabel="Paste CALENDLY_URL to go live"
-                ratio="aspect-[4/3]"
-              />
-            )}
-          </PanelFrame>
-
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Prefer to start now?{' '}
-            <Link
-              href="/login/realtor?intent=signup"
-              className="font-medium text-foreground underline-offset-4 transition-colors hover:underline"
-            >
-              Start your free trial
-            </Link>
-            .
-          </p>
-        </Reveal>
-      </section>
-    </>
+        <p className="mt-8 text-center text-sm text-neutral-600">
+          Prefer to start now?{' '}
+          <Link
+            href="/login/realtor?intent=signup"
+            className="font-semibold text-[#ff4b29] transition-colors hover:text-[#e84418]"
+          >
+            Start your free trial
+          </Link>
+          .
+        </p>
+      </Reveal>
+    </section>
   );
 }

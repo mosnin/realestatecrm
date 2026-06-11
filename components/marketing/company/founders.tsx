@@ -1,11 +1,12 @@
 /**
- * Founders — the two-up section on the calm site system. Each founder gets a
- * square headshot slot (labeled ImagePlaceholder — the owner swaps real media
- * in), a name, a role, and a short bio. No fabricated photo files.
+ * Founders — two white soft-shadow cards on the bold-canvas system. Each
+ * founder gets a square headshot slot (an owner image slot, same vocabulary
+ * as the home bento — swap real media in), a name, a role, and a short bio.
+ * No fabricated photo files.
  */
 
+import { ImagePlus } from 'lucide-react';
 import { Reveal } from '@/components/marketing/site/reveal';
-import { ImagePlaceholder } from '@/components/marketing/site/frame';
 
 const FOUNDERS = [
   {
@@ -22,17 +23,30 @@ const FOUNDERS = [
 
 export function Founders() {
   return (
-    <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-12">
+    <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2">
       {FOUNDERS.map((f, i) => (
         <Reveal key={f.name} delay={i * 0.06}>
-          <div className="overflow-hidden rounded-xl border border-border/70">
-            <ImagePlaceholder label={f.name} sublabel="Headshot · square" ratio="aspect-square" />
+          <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+            <div
+              data-slot={`founder-${f.name.toLowerCase()}`}
+              className="flex aspect-square items-center justify-center rounded-2xl bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5"
+            >
+              <div className="flex flex-col items-center gap-2 text-center">
+                <ImagePlus className="h-5 w-5 text-neutral-300" />
+                <p className="text-xs text-neutral-400">
+                  Image placeholder —{' '}
+                  <span className="font-medium text-neutral-500">{f.name} · headshot</span>
+                </p>
+              </div>
+            </div>
+            <h3 className="mt-6 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+              {f.name}
+            </h3>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              {f.role}
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-neutral-600">{f.bio}</p>
           </div>
-          <h3 className="mt-6 text-[22px] font-semibold tracking-tight text-foreground">{f.name}</h3>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            {f.role}
-          </p>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{f.bio}</p>
         </Reveal>
       ))}
     </div>

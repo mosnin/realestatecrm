@@ -5,11 +5,11 @@
  * as a tool while it works — pulling data out of your workflows and writing
  * results back where they belong.
  *
- * The catalog is rendered straight from `lib/integrations/catalog.ts` (the
- * source of truth). We don't invent integrations or blurbs here; the page is
- * a faithful surface over that data. Bespoke body lives in
- * `components/marketing/integrations/integrations-page.tsx` because it needs
- * the home-kit motion + AsciiBlob atmosphere (client).
+ * The owner-provided IntegrationHero opens the page; the body below it is
+ * `components/marketing/integrations/integrations-page.tsx`. The catalog is
+ * rendered straight from `lib/integrations/catalog.ts` (the source of truth).
+ * We don't invent integrations or blurbs here; the page is a faithful surface
+ * over that data.
  */
 
 import IntegrationHero from '@/components/ui/integration-hero';

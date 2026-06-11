@@ -5,21 +5,26 @@
  * lands here, reads one sentence about what they'll see, and books a time.
  * No second ask competing — just a quiet "start now" line under the calendar.
  *
- * Auth users bounce to their workspace (same pattern as the homepage); a
- * signed-in realtor doesn't need to book a sales walkthrough.
- *
- * Swapping in the real scheduler is ONE line: paste the Calendly inline-embed
- * URL into CALENDLY_URL below. Empty → a calm placeholder renders instead.
+ * Bold-canvas shell: PageHero opener, then the DemoBooking scheduler in a
+ * white soft-shadow card. Swapping in the real scheduler is ONE line: paste
+ * the Calendly inline-embed URL into CALENDLY_URL in
+ * `components/marketing/demo/demo-booking.tsx`. Empty → a calm placeholder.
  */
 
+import { PageHero } from '@/components/marketing/site/page-hero';
 import { DemoBooking } from '@/components/marketing/demo/demo-booking';
 
 export const metadata = { title: 'Book a demo · Chippi' };
 
 export default function DemoPage() {
   return (
-    <div className="bg-background text-foreground">
+    <>
+      <PageHero
+        eyebrow="See it live"
+        title="See Chippi run your floor."
+        sub="For brokerages and teams sizing up Chippi. Pick a time and we’ll walk your floor through it live — the inbox, the drafts, the deals it keeps current — then answer how it fits your book."
+      />
       <DemoBooking />
-    </div>
+    </>
   );
 }

@@ -1,16 +1,16 @@
 /**
  * `/status` — system status. Honest, calm, no theatre.
  *
- * Apple-discipline: a silent serif hero, then a hairline-divided list of the
- * surfaces a realtor depends on, each carrying a single dot.
+ * Bold-canvas shell: PageHero opener, then the checks as white soft-shadow
+ * rows, each carrying a single dot.
  *
  * This page tells the TRUTH at request time. It probes the subsystems we can
  * actually verify from the server — the database, the agent's LLM + Modal
  * runtime, and the integrations layer — and renders what it finds:
  *
  *   - emerald  → operational (the check ran and passed)
- *   - rose     → degraded    (the check ran and failed)
- *   - muted    → unknown     (the check could not be performed — e.g. a
+ *   - amber    → degraded    (the check ran and failed)
+ *   - neutral  → unknown     (the check could not be performed — e.g. a
  *                             dependency isn't configured in this env)
  *
  * We do NOT paint a green dot we can't stand behind. A status page that lies
@@ -24,7 +24,7 @@
  * connection) lives behind auth on the integrations page — it can't be shown
  * truthfully on a public marketing page, so it isn't faked here.
  *
- * No charts, no graphs, no numbers. Hairline borders only. No brand orange.
+ * No charts, no graphs, no numbers.
  */
 
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -93,8 +93,8 @@ function checkIntegrations(): Health {
 
 const DOT: Record<Health, string> = {
   operational: 'bg-emerald-500',
-  degraded: 'bg-rose-500',
-  unknown: 'bg-muted-foreground/40',
+  degraded: 'bg-amber-500',
+  unknown: 'bg-neutral-300',
 };
 
 const LABEL: Record<Health, string> = {
@@ -105,9 +105,9 @@ const LABEL: Record<Health, string> = {
 
 function StatusRow({ label, health }: Subsystem) {
   return (
-    <li className="flex items-center justify-between gap-4 py-4">
-      <span className="text-sm text-foreground">{label}</span>
-      <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+    <li className="flex items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
+      <span className="text-sm font-medium text-zinc-950">{label}</span>
+      <span className="inline-flex items-center gap-2 text-sm text-neutral-500">
         <span
           aria-hidden
           className={`inline-block size-2 rounded-full ${DOT[health]}`}
@@ -151,18 +151,18 @@ export default async function StatusPage() {
         sub="Live status of Chippi’s agent, integrations, and dashboard."
       />
 
-      <section className="relative pb-24 md:pb-32">
-        <div className="mx-auto max-w-2xl px-6 md:px-8">
-          <ul className="divide-y divide-border/60 border-t border-b border-border/60">
+      <section className="px-4 pb-24 pt-2 sm:px-6 sm:pb-32">
+        <div className="mx-auto max-w-2xl">
+          <ul className="space-y-3">
             {subsystems.map((s) => (
               <StatusRow key={s.label} label={s.label} health={s.health} />
             ))}
           </ul>
-          <p className="mt-6 text-sm text-muted-foreground">
+          <p className="mt-8 text-sm text-neutral-500">
             Subscribe to status updates at{' '}
             <a
               href="mailto:status@chippi.app"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
+              className="underline underline-offset-2 transition-colors hover:text-zinc-950"
             >
               status@chippi.app
             </a>
