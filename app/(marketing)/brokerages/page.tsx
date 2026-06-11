@@ -17,6 +17,7 @@ import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { RoutingPanel, LeaderboardPanel, TeamChatPanel, MembersPanel } from '@/components/marketing/site/home/more-panels';
 import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
+import { Feature197 } from '@/components/ui/accordion-feature-section';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = { title: 'For brokerages · Chippi' };
@@ -166,6 +167,11 @@ export default function BrokeragesPage() {
             />
           ))}
         </div>
+      </section>
+
+      {/* Everything the floor runs on — accordion walkthrough */}
+      <section className="border-t border-border/60 bg-background">
+        <Feature197 />
       </section>
 
       {/* Bottlenecks */}

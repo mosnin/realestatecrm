@@ -10,6 +10,7 @@ import { ArrowRight, MessageCircle, PenLine, KanbanSquare, Megaphone } from 'luc
 import IntroAnimation from '@/components/ui/scroll-morph-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
+import FeaturesTailark from '@/components/ui/features-tailark';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = {
@@ -51,6 +52,11 @@ export default function MeetChippiPage() {
             Approval-first by default; nothing leaves without your name on it.
           </p>
         </Reveal>
+      </section>
+
+      {/* A teammate in every part of the day — soft feature cards */}
+      <section className="border-t border-border/60 bg-background">
+        <FeaturesTailark />
       </section>
 
       {/* Where it works */}
