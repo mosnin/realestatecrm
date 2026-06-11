@@ -1,19 +1,23 @@
 /**
- * `/properties` — every listing in one place, synced from whatever CRM the
- * realtor already uses. The hero is a deck of throwable property cards over a
- * message; each card wears the CRM it synced in from. Then a calm "how the
- * sync works" band and the ask.
+ * `/properties` — every property in one place, on the white + pastel system.
+ *
+ * Arc: PageHero opener → open light split (copy beside a pastel-framed
+ * glass property record: listing, photos & docs, showings) → soft white
+ * bento with owner image slots → pastel CTA card. One idea: the listing
+ * carries everything — synced from the CRMs you already run.
  */
 
 import Link from 'next/link';
-import { ArrowRight, RefreshCw, Building2, MapPin } from 'lucide-react';
-import { FeatureGrid } from '@/components/marketing/site/section';
-import { Reveal } from '@/components/marketing/site/reveal';
 import {
-  DraggableCardContainer,
-  DraggableCardBody,
-} from '@/components/marketing/site/properties/draggable-card';
-import { TITLE_FONT } from '@/lib/typography';
+  ArrowRight,
+  CalendarCheck,
+  FileText,
+  ImagePlus,
+  Paperclip,
+  RefreshCw,
+} from 'lucide-react';
+import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { PageHero } from '@/components/marketing/site/page-hero';
 
 export const metadata = {
   title: 'Properties · Chippi',
@@ -21,183 +25,293 @@ export const metadata = {
     'Every listing in one place — synced from kvCORE, Follow-up Boss, Compass, Salesforce, and more. Chippi keeps your properties current across every tool you already use.',
 };
 
-interface Prop {
-  address: string;
-  city: string;
-  price: string;
-  beds: string;
-  status: 'Active' | 'Pending' | 'New';
-  source: string;
-  className: string;
-  photo: string;
-}
-
-const PROPERTIES: Prop[] = [
-  { address: '14 Oak St', city: 'Oakland, CA', price: '$1,200,000', beds: '3 bd · 2 ba · 1,840 sqft', status: 'Active', source: 'kvCORE', className: 'absolute left-[8%] top-[8%] rotate-[-6deg]' , photo: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=640&h=420&fit=crop&q=80' },
-  { address: '220 Marina Blvd', city: 'San Francisco, CA', price: '$2,400,000', beds: '4 bd · 3 ba · 2,600 sqft', status: 'Active', source: 'Follow-up Boss', className: 'absolute left-[36%] top-[2%] rotate-[5deg]' , photo: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=640&h=420&fit=crop&q=80' },
-  { address: '88 Pine Ave', city: 'Alameda, CA', price: '$740,000', beds: '2 bd · 1 ba · 1,100 sqft', status: 'Pending', source: 'Compass', className: 'absolute left-[60%] top-[12%] rotate-[8deg]' , photo: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&h=420&fit=crop&q=80' },
-  { address: '5 Birch Ln', city: 'Berkeley, CA', price: '$960,000', beds: '3 bd · 2 ba · 1,520 sqft', status: 'Active', source: 'Salesforce', className: 'absolute left-[14%] top-[44%] rotate-[4deg]' , photo: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=640&h=420&fit=crop&q=80' },
-  { address: '31 Harbor Way', city: 'Sausalito, CA', price: '$1,800,000', beds: '4 bd · 3 ba · 2,310 sqft', status: 'Active', source: 'HubSpot', className: 'absolute left-[44%] top-[48%] rotate-[-5deg]' , photo: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=640&h=420&fit=crop&q=80' },
-  { address: '410 Sunset Dr', city: 'Oakland, CA', price: '$620,000', beds: '2 bd · 2 ba · 980 sqft', status: 'New', source: 'Added by you', className: 'absolute left-[66%] top-[42%] rotate-[7deg]' , photo: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=640&h=420&fit=crop&q=80' },
-];
-
-const STATUS_TONE: Record<Prop['status'], string> = {
-  Active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-  Pending: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  New: 'bg-brand-subtle text-brand',
-};
-
-function PropertyCardInner({ p }: { p: Prop }) {
+/** Owner image slot — exactly the FeaturesBento vocabulary. */
+function ImageSlot({ name }: { name: string }) {
   return (
-    <>
-      <div className="-mx-5 -mt-5 mb-4 h-36 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={p.photo} alt={p.address} className="h-full w-full object-cover" loading="lazy" draggable={false} />
+    <div
+      data-slot={name}
+      className="mt-8 flex h-64 items-center justify-center rounded-2xl bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5 sm:h-72"
+    >
+      <div className="flex flex-col items-center gap-2 text-center">
+        <ImagePlus className="h-5 w-5 text-neutral-300" />
+        <p className="text-xs text-neutral-400">
+          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+        </p>
       </div>
-      <div className="flex items-start justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-          <Building2 className="h-4 w-4" />
-        </span>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_TONE[p.status]}`}>
-          {p.status}
-        </span>
-      </div>
-      <p className="mt-4 text-lg font-semibold text-foreground">{p.address}</p>
-      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-        <MapPin className="h-3 w-3" /> {p.city}
-      </p>
-      <p className="mt-3 text-xl font-semibold tabular-nums text-foreground" style={TITLE_FONT}>{p.price}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{p.beds}</p>
-      <div className="mt-4 flex items-center gap-1.5 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-        <RefreshCw className="h-3 w-3 text-brand" />
-        Synced · <span className="font-medium text-foreground">{p.source}</span>
-      </div>
-    </>
+    </div>
   );
 }
 
-const SYNC = [
+const BENTO = [
   {
-    kicker: 'Two-way sync',
-    title: 'Every CRM, both directions',
-    body: 'Connect kvCORE, Follow-up Boss, Compass, Salesforce — Chippi pulls every listing in and writes changes back. No double entry, no stale copy.',
+    slot: 'properties-board',
+    title: 'The whole portfolio.',
+    sub: 'Active, pending, closed — every property on one board you can actually read.',
   },
   {
-    kicker: 'One truth',
-    title: 'Update once, right everywhere',
-    body: 'Status, price, photos, and the deal behind it live in one place — correct everywhere your contacts see it.',
+    slot: 'properties-sync',
+    title: 'Synced, not migrated.',
+    sub: 'Chippi pulls listings from the CRM you already run and writes changes back. No double entry.',
   },
   {
-    kicker: 'One search',
-    title: 'The whole portfolio answers',
-    body: 'Ask Chippi for “active listings under $1M in Oakland” and it answers across every source, in plain language.',
+    slot: 'properties-media',
+    title: 'Photos and docs attached.',
+    sub: 'Disclosures, photos, and files live on the listing they belong to — found in one search.',
+  },
+  {
+    slot: 'properties-showings',
+    title: 'Showings on the listing.',
+    sub: 'Every tour sits on the property and on your calendar, with nothing retyped.',
   },
 ];
 
 export default function PropertiesPage() {
   return (
-    <>
-      {/* Hero — the deck of listings */}
-      <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-28 pb-12 sm:px-6 sm:pt-32">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[360px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
-        />
-        <div className="relative mx-auto max-w-3xl text-center">
-          <Reveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Properties</p>
-          </Reveal>
-          <Reveal delay={0.05}>
-            <h1 className="mt-5 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-[3.5rem]" style={TITLE_FONT}>
-              Every listing, one place.
-            </h1>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Chippi pulls your properties in from every CRM you already use and keeps them
-              current — so the portfolio is always one search away. Toss the cards around.
-            </p>
-          </Reveal>
-        </div>
+    <div>
+      <PageHero
+        eyebrow="Properties"
+        title="Every property. One place."
+        sub="Chippi syncs your listings in from the CRMs you already run and keeps them current — photos, documents, and showings attached to the listing, one search away."
+        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        secondaryCta={{ label: 'Book a demo', href: '/demo' }}
+      />
 
-        {/* Draggable deck */}
-        <DraggableCardContainer className="relative mx-auto mt-4 hidden h-[560px] w-full max-w-5xl items-center justify-center overflow-clip md:flex">
-          <p
-            className="pointer-events-none absolute top-1/2 max-w-sm -translate-y-1/2 text-center text-3xl leading-tight tracking-tight text-muted-foreground/40 lg:text-4xl"
-            style={TITLE_FONT}
-          >
-            Drag them. They land where they belong — together.
-          </p>
-          {PROPERTIES.map((p) => (
-            <DraggableCardBody key={p.address} className={p.className}>
-              <PropertyCardInner p={p} />
-            </DraggableCardBody>
-          ))}
-        </DraggableCardContainer>
-
-        {/* Mobile: a calm stacked grid (dragging a deck on a phone is no fun) */}
-        <div className="mx-auto mt-10 grid max-w-md grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
-          {PROPERTIES.slice(0, 4).map((p) => (
-            <div key={p.address} className="rounded-2xl border border-border/70 bg-card p-5">
-              <PropertyCardInner p={p} />
-            </div>
-          ))}
-        </div>
-
-        <Reveal delay={0.15}>
-          <div className="mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-            >
-              Start free trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/integrations"
-              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
-            >
-              See integrations
-            </Link>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* How the sync works */}
-      <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
-        <div className="mx-auto max-w-5xl">
-          <Reveal className="max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Synced, not migrated</p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+      {/* Open light split — air after the hero */}
+      <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
+        <div className="grid gap-12 lg:grid-cols-2">
+          {/* Copy, hairline list, stats, dark button */}
+          <div>
+            <h2 className="text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
               Bring your listings. Keep your tools.
             </h2>
-          </Reveal>
-          <div className="mt-10">
-            <FeatureGrid items={SYNC} />
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Chippi is not another place to retype your portfolio. It syncs
+              with the stack you already run and keeps one record honest.
+            </p>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">Synced from your CRM</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Connect kvCORE, Follow Up Boss, Compass — listings flow
+                      in and changes flow back. No double entry, no stale copy.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <Paperclip className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">Everything attached</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Photos, disclosures, and showings live on the listing
+                      they belong to — not across five tabs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
+                  <p className="mt-1 text-xs text-neutral-600">Integrations across CRMs, email, and calendar</p>
+                </div>
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">24/7</span>
+                  <p className="mt-1 text-xs text-neutral-600">Sync that keeps every record current</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <Link
+                href="/integrations"
+                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-neutral-700 to-neutral-900 px-5 py-2.5 text-base leading-none text-white shadow-[0_2.8px_2.2px_rgba(0,_0,_0,_0.034),_0_6.7px_5.3px_rgba(0,_0,_0,_0.048),_0_12.5px_10px_rgba(0,_0,_0,_0.06),_0_22.3px_17.9px_rgba(0,_0,_0,_0.072),_0_41.8px_33.4px_rgba(0,_0,_0,_0.086),_0_100px_80px_rgba(0,_0,_0,_0.12)] transition-all duration-150 hover:opacity-85"
+              >
+                Explore integrations
+              </Link>
+            </div>
+          </div>
+
+          {/* Pastel frame, white glass card, skeleton property record */}
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+            <article
+              className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
+              style={{
+                background: 'rgba(255, 255, 255, 0.72)',
+                border: '1px solid rgba(255, 255, 255, 0.65)',
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">14 Oak St</h3>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                    <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
+                    Live sync
+                  </span>
+                </div>
+
+                {/* One record: listing, media & docs, showings */}
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                  <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-black/5 pb-2">
+                      <span className="text-[10px] tracking-widest text-neutral-500">PROPERTY</span>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                        Active
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex items-center gap-3">
+                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="h-2 w-24 rounded bg-neutral-900" />
+                        <div className="mt-1.5 h-2 w-32 rounded bg-neutral-200" />
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[9px] text-neutral-500">
+                        <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
+                        kvCORE
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-black/5 pb-2">
+                      <span className="text-[10px] tracking-widest text-neutral-500">PHOTOS &amp; DOCS</span>
+                      <span className="text-[10px] text-neutral-400">Attached</span>
+                    </div>
+                    <div className="mt-2.5 grid grid-cols-3 gap-2">
+                      <div className="h-10 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
+                      <div className="h-10 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
+                      <div className="h-10 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
+                    </div>
+                    <div className="mt-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
+                        <div className="h-1.5 w-24 rounded bg-neutral-200" />
+                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                          Filed
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
+                        <div className="h-1.5 w-32 rounded bg-neutral-200" />
+                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                          Filed
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-black/5 pb-2">
+                      <span className="text-[10px] tracking-widest text-neutral-500">SHOWINGS</span>
+                      <span className="text-[10px] text-neutral-400">This week</span>
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between text-[10px]">
+                      <span className="flex items-center gap-1.5 text-neutral-700">
+                        <CalendarCheck className="h-3 w-3 text-[#ff4b29]" />
+                        Buyer tour · Sat 2:00
+                      </span>
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
+                        On calendar
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                      <span className="flex items-center gap-1.5 text-neutral-700">
+                        <CalendarCheck className="h-3 w-3 text-neutral-400" />
+                        Open house · Sun 1–3
+                      </span>
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-600">
+                        Scheduled
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Two-up */}
+                <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">One record per property</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      The listing carries its photos, documents, and tours —
+                      one click deep from the deal.
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Written back</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Change a price once and it is right everywhere your
+                      stack looks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      {/* Closing CTA */}
-      <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
-            Your whole portfolio, in one window.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-            Connect a CRM and watch your listings land — current, searchable, and tied to the deal.
+      {/* Soft bento — owner image slots, big air above */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            The property record
           </p>
-          <div className="mt-8">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            One listing. Everything attached.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            The board, the sync, the media, the showings — one record that
+            carries it all.
+          </p>
+        </FadeUp>
+        <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">
+          {BENTO.map((cell) => (
+            <StaggerItem key={cell.slot} className="h-full">
+              <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                <h3 className="text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+                  {cell.title}
+                </h3>
+                <p className="mt-3 text-base leading-relaxed text-neutral-500">{cell.sub}</p>
+                <ImageSlot name={cell.slot} />
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </section>
+
+      {/* Pastel CTA card */}
+      <section className="mt-24 px-4 sm:mt-32">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+          <FadeUp className="relative mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
+            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              Your whole portfolio, one window.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+              Connect a CRM and watch the listings land — current, attached,
+              and one search away.
+            </p>
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+              className="mt-9 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </Reveal>
+            <p className="mt-4 text-sm text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
+          </FadeUp>
+        </div>
       </section>
-    </>
+    </div>
   );
 }

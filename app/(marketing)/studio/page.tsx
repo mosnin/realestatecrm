@@ -1,17 +1,27 @@
 /**
- * `/studio` — Chippi's content studio, on the calm site system.
+ * `/studio` — the content studio, on the white + pastel system.
  *
- * One idea: make the listing content on the go. The hero is a cover-flow of
- * the posts Chippi drafts (mocked from the product's own card vocabulary, not
- * stock photos), then a calm "how it works" band and the ask.
+ * Arc: PageHero opener → open light split (copy beside a pastel-framed
+ * glass card showing one listing becoming the post, the story, and the
+ * email) → soft white bento with owner image slots → pastel CTA card.
+ * One idea: the listing becomes the content — drafted in your voice,
+ * formatted per channel, on the go.
  */
 
 import Link from 'next/link';
-import { ArrowRight, Home, CalendarCheck, BadgeCheck, TrendingUp, Mail } from 'lucide-react';
-import { FeatureGrid } from '@/components/marketing/site/section';
-import { Reveal } from '@/components/marketing/site/reveal';
-import { Coverflow } from '@/components/marketing/site/studio/coverflow';
-import { TITLE_FONT } from '@/lib/typography';
+import type { LucideIcon } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowRight,
+  Camera,
+  ImagePlus,
+  Instagram,
+  Mail,
+  PenLine,
+  Share2,
+} from 'lucide-react';
+import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { PageHero } from '@/components/marketing/site/page-hero';
 
 export const metadata = {
   title: 'Content studio · Chippi',
@@ -19,220 +29,271 @@ export const metadata = {
     'Chippi drafts your listing posts, stories, and emails — in your voice, from your phone. Just listed, open house, just sold, market updates: written and ready while you’re in the field.',
 };
 
-/* A single mocked piece of Studio output — a phone-shaped social post. */
-function PostCard({
-  tag,
-  Icon,
-  photo,
-  headline,
-  meta,
-  caption,
-  tags,
-}: {
-  tag: string;
-  Icon: React.ElementType;
-  photo: string;
-  headline: string;
-  meta: string;
-  caption: string;
-  tags: string[];
-}) {
+/** Owner image slot — exactly the FeaturesBento vocabulary. */
+function ImageSlot({ name }: { name: string }) {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-2xl shadow-foreground/[0.10] ring-1 ring-inset ring-white/5">
-      {/* media */}
-      <div className="relative flex flex-1 flex-col justify-between p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo} alt={headline} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/20" />
-        <div className="relative flex items-center justify-between">
-          <span className="rounded-full bg-background/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground backdrop-blur-sm">
-            {tag}
-          </span>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground backdrop-blur-sm">
-            <Icon className="h-4 w-4" />
-          </span>
-        </div>
-        <div className="relative">
-          <p className="text-[15px] font-semibold leading-snug text-white">{headline}</p>
-          <p className="mt-0.5 text-[11px] text-white/75">{meta}</p>
-        </div>
-      </div>
-      {/* caption */}
-      <div className="border-t border-border/60 bg-background p-3.5">
-        <div className="flex items-center gap-1.5">
-          <span className="flex h-4 w-4 items-center justify-center rounded bg-brand text-[9px] font-bold text-brand-foreground">C</span>
-          <span className="text-[11px] font-medium text-muted-foreground">@yourbrand</span>
-        </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-foreground/80">{caption}</p>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {tags.map((t) => (
-            <span key={t} className="text-[10px] font-medium text-brand">{t}</span>
-          ))}
-        </div>
+    <div
+      data-slot={name}
+      className="mt-8 flex h-64 items-center justify-center rounded-2xl bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5 sm:h-72"
+    >
+      <div className="flex flex-col items-center gap-2 text-center">
+        <ImagePlus className="h-5 w-5 text-neutral-300" />
+        <p className="text-xs text-neutral-400">
+          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+        </p>
       </div>
     </div>
   );
 }
 
-const CARDS = [
-  <PostCard
-    key="listed"
-    tag="Just listed"
-    Icon={Home}
-    photo="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=640&h=900&fit=crop&q=80"
-    headline="14 Oak St — just listed"
-    meta="$1,200,000 · 3 bd · 2 ba · Oakland"
-    caption="Light-filled craftsman steps from the lake. Open this weekend — DM for a private tour."
-    tags={['#justlisted', '#oakland', '#forsale']}
-  />,
-  <PostCard
-    key="open"
-    tag="Open house"
-    Icon={CalendarCheck}
-    photo="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&h=900&fit=crop&q=80"
-    headline="Open Sat 1–3 PM"
-    meta="220 Marina Blvd · waterfront"
-    caption="Come see the view in person. Coffee’s on us. Saturday 1–3, see you there."
-    tags={['#openhouse', '#marina', '#realestate']}
-  />,
-  <PostCard
-    key="sold"
-    tag="Just sold"
-    Icon={BadgeCheck}
-    photo="https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=640&h=900&fit=crop&q=80"
-    headline="Sold — over asking"
-    meta="88 Pine Ave · 6 days on market"
-    caption="Another one closed. Thinking of selling? Let’s talk about what your home is worth today."
-    tags={['#justsold', '#sold', '#thankyou']}
-  />,
-  <PostCard
-    key="price"
-    tag="Price improved"
-    Icon={TrendingUp}
-    photo="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=640&h=900&fit=crop&q=80"
-    headline="New price — $960,000"
-    meta="5 Birch Ln · was $995,000"
-    caption="Priced to move. Three beds, big yard, top schools. Book a showing this week."
-    tags={['#pricedrop', '#newprice', '#homeforsale']}
-  />,
-  <PostCard
-    key="market"
-    tag="Market update"
-    Icon={Mail}
-    photo="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=640&h=900&fit=crop&q=80"
-    headline="Your November market, in 60 seconds"
-    meta="Email · sent to 1,240 contacts"
-    caption="Inventory’s up 8%, rates eased. Here’s what it means if you’re buying or selling."
-    tags={['#marketupdate', '#newsletter']}
-  />,
+const CHANNELS: { label: string; icon: LucideIcon; tone: string }[] = [
+  { label: 'Post', icon: Instagram, tone: 'text-purple-600' },
+  { label: 'Story', icon: Camera, tone: 'text-blue-600' },
+  { label: 'Email', icon: Mail, tone: 'text-emerald-600' },
 ];
 
-const STEPS = [
+const BENTO = [
   {
-    kicker: 'Step 01',
-    title: 'Drafts in your voice',
-    body: 'Tell Chippi the listing — or just point it at the deal. It writes the post, the story, and the email the way you actually write, ready to tweak.',
+    slot: 'studio-compose',
+    title: 'Compose on the go.',
+    sub: 'Point Chippi at the listing — the post, the story, and the email draft themselves between showings.',
   },
   {
-    kicker: 'Step 02',
-    title: 'Every channel at once',
-    body: 'One listing becomes an Instagram post, a story, a just-listed email, and a flyer — formatted for each, on brand, in seconds.',
+    slot: 'studio-brand',
+    title: 'Your brand voice, learned.',
+    sub: 'Captions that sound like you wrote them, because Chippi learned from how you actually write.',
   },
   {
-    kicker: 'Step 03',
-    title: 'Scheduled or sent',
-    body: 'Approve it and Chippi queues it for the open-house window — or posts now. The whole campaign runs from your phone between showings.',
+    slot: 'studio-schedule',
+    title: 'Scheduled around showings.',
+    sub: 'Approve once and the campaign queues for the open-house window while you keep driving.',
+  },
+  {
+    slot: 'studio-library',
+    title: 'A library that remembers.',
+    sub: 'Every draft, caption, and asset filed by listing — ready to reuse on the next one.',
   },
 ];
 
 export default function StudioPage() {
   return (
-    <>
-      {/* Hero — the cover-flow of content */}
-      <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-16 sm:px-6 sm:pt-36">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[360px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
-        />
-        <div className="relative mx-auto max-w-3xl text-center">
-          <Reveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Content studio
-            </p>
-          </Reveal>
-          <Reveal delay={0.05}>
-            <h1 className="mt-5 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-[3.5rem]" style={TITLE_FONT}>
-              Make the content on the go.
-            </h1>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Just listed, open house, just sold, the monthly market email — Chippi drafts it
-              in your voice and formats it for every channel. From your phone, between showings.
-            </p>
-          </Reveal>
-        </div>
+    <div>
+      <PageHero
+        eyebrow="Content studio"
+        title="The listing becomes the content."
+        sub="Just listed, open house, just sold — Chippi drafts the post, the story, and the email in your voice, formatted for every channel, before you leave the driveway."
+        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        secondaryCta={{ label: 'Book a demo', href: '/demo' }}
+      />
 
-        <Reveal delay={0.15} className="relative mx-auto mt-12 max-w-4xl">
-          <Coverflow cards={CARDS} />
-        </Reveal>
-
-        <Reveal delay={0.2}>
-          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-            >
-              Start free trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/demo"
-              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
-            >
-              Watch demo
-            </Link>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* How it works */}
-      <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
-        <div className="mx-auto max-w-5xl">
-          <Reveal className="max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              How it works
-            </p>
-            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              A whole campaign, from one listing.
+      {/* Open light split — air after the hero */}
+      <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
+        <div className="grid gap-12 lg:grid-cols-2">
+          {/* Copy, hairline list, stats, dark button */}
+          <div>
+            <h2 className="text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              One listing in. Every channel out.
             </h2>
-          </Reveal>
-          <div className="mt-10">
-            <FeatureGrid items={STEPS} />
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Chippi turns the listing into the whole campaign — written the way
+              you write, formatted for where it goes.
+            </p>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <PenLine className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">Drafted in your voice</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Chippi learns from what you have already written. The
+                      captions sound like you — not a content mill.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <Share2 className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-zinc-950">Formatted per channel</h3>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      The Instagram post, the story, and the just-listed email
+                      each arrive sized and worded for the channel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">24/7</span>
+                  <p className="mt-1 text-xs text-neutral-600">Drafting while you are at the showing</p>
+                </div>
+                <div>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
+                  <p className="mt-1 text-xs text-neutral-600">Approval-first — nothing posts without you</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <Link
+                href="/chippi"
+                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-neutral-700 to-neutral-900 px-5 py-2.5 text-base leading-none text-white shadow-[0_2.8px_2.2px_rgba(0,_0,_0,_0.034),_0_6.7px_5.3px_rgba(0,_0,_0,_0.048),_0_12.5px_10px_rgba(0,_0,_0,_0.06),_0_22.3px_17.9px_rgba(0,_0,_0,_0.072),_0_41.8px_33.4px_rgba(0,_0,_0,_0.086),_0_100px_80px_rgba(0,_0,_0,_0.12)] transition-all duration-150 hover:opacity-85"
+              >
+                See Chippi at work
+              </Link>
+            </div>
+          </div>
+
+          {/* Pastel frame, white glass card, skeleton illustration */}
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+            <article
+              className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
+              style={{
+                background: 'rgba(255, 255, 255, 0.72)',
+                border: '1px solid rgba(255, 255, 255, 0.65)',
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">From one listing</h3>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                    <PenLine className="h-4 w-4 text-[#ff4b29]" />
+                    Drafts ready
+                  </span>
+                </div>
+
+                {/* Listing → three channel drafts */}
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                  <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-black/5 pb-2">
+                      <span className="text-[10px] tracking-widest text-neutral-500">NEW LISTING</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500/80" />
+                        Live
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex items-center gap-3">
+                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="h-2 w-28 rounded bg-neutral-900" />
+                        <div className="mt-1.5 h-2 w-20 rounded bg-neutral-200" />
+                      </div>
+                      <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-medium text-[#ff4b29]">
+                        Just listed
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="my-3 flex justify-center">
+                    <ArrowDown className="h-4 w-4 text-neutral-400" />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {CHANNELS.map((c) => (
+                      <div
+                        key={c.label}
+                        className="rounded-xl border border-black/5 bg-white/90 p-2.5 shadow-sm sm:p-3"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <c.icon className={`h-3 w-3 ${c.tone}`} strokeWidth={2} />
+                          <span className="text-[9px] font-medium uppercase tracking-wide text-neutral-500">
+                            {c.label}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          <div className="h-1 w-full rounded bg-neutral-200" />
+                          <div className="h-1 w-4/5 rounded bg-neutral-200" />
+                          <div className="h-1 w-3/5 rounded bg-neutral-200" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Two-up */}
+                <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Brand voice, learned</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Every caption is written the way you write — tuned per
+                      channel, never copy-pasted.
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Approve and go</h4>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Tap to approve from your phone; the campaign queues for
+                      the right window.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      {/* Closing CTA */}
-      <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
-            Post the listing before you leave the driveway.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-            Chippi drafts it the moment a listing goes live. You approve; it posts.
+      {/* Soft bento — owner image slots, big air above */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            Inside the studio
           </p>
-          <div className="mt-8">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            Everything the listing needs to make noise.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            Compose, brand, schedule, library — one studio that fits in the
+            time between showings.
+          </p>
+        </FadeUp>
+        <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">
+          {BENTO.map((cell) => (
+            <StaggerItem key={cell.slot} className="h-full">
+              <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                <h3 className="text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+                  {cell.title}
+                </h3>
+                <p className="mt-3 text-base leading-relaxed text-neutral-500">{cell.sub}</p>
+                <ImageSlot name={cell.slot} />
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </section>
+
+      {/* Pastel CTA card */}
+      <section className="mt-24 px-4 sm:mt-32">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+          <FadeUp className="relative mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
+            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              Post the listing before you leave the driveway.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+              Chippi drafts the campaign the moment the listing goes live. You
+              approve; it goes.
+            </p>
             <Link
               href="/login/realtor?intent=signup"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+              className="mt-9 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </Reveal>
+            <p className="mt-4 text-sm text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
+          </FadeUp>
+        </div>
       </section>
-    </>
+    </div>
   );
 }
