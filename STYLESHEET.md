@@ -62,7 +62,7 @@ back a layer.
 | Auth | **Clerk** (`@clerk/nextjs`). Component overrides in `globals.css` `.cl-*` selectors. |
 | Data | **Supabase** (`@supabase/supabase-js`) + browser client in `lib/supabase-browser.ts`, server in `lib/supabase.ts`. |
 | Realtime | Supabase Postgres CDC via `hooks/use-realtime.ts`. |
-| Fonts | **Product**: all system / local — SF Pro from the OS, Times New Roman as the serif. **Logged-out site**: marketing/auth display type uses the `.font-brand` utility bound to `--font-brand`, currently the clean system display stack (SF Pro Display). No web font is loaded. Swap the one `--font-brand` line in `globals.css` to wire a distinct display face. |
+| Fonts | **Product**: all system / local — SF Pro from the OS, Times New Roman as the serif. **Logged-out site**: Inter Tight (display) + Instrument Serif italic (accent), loaded via next/font in `app/(marketing)/layout.tsx` as `--font-display` / `--font-accent` — marketing route group only; the product never loads a web font. |
 
 If a feature looks like it needs a new dep, the bar is high — it almost never does. The list above is the whole vocabulary.
 
@@ -895,63 +895,64 @@ it competes with these four — usually it should live one click away.
 
 ## The logged-out site (marketing + auth)
 
-The **marketing site is a rich, component-driven showcase.** It is NOT bound
-by the product's paper-flat restraint — that discipline exists for the
-logged-in workspace and stops at the front door. The owner directs the
-marketing aesthetic by handing over reference components; they are integrated
-**faithfully** — their imagery, their depth, their motion — tailored to
-Chippi's copy and brand, not drained into the product's neutral vocabulary.
+**The marketing site is its own visual world: BOLD CANVAS.** It shares
+nothing with the product's paper-flat restraint except honesty. The old
+"calm site system" — serif Times headlines, foreground-pill CTAs,
+neutral-first gray-on-white, hairline minimalism — is **dead on marketing
+surfaces**. Do not resurrect it. If a marketing screen looks like the
+product's chrome, the screen is wrong.
 
-Marketing-layer rules (deliberately different from the product):
+### The one idea
 
-- **Real imagery, never gray slots.** Stock photography (Unsplash et al.),
-  brand icon sets, demo logo CDNs, and avatar imagery are all sanctioned.
-  The old `ImagePlaceholder` "labeled screenshot slot" doctrine is DEAD on
-  marketing surfaces — a wall of dot-grid gray boxes reads as unfinished AI
-  slop, the exact opposite of enterprise. If a real product screenshot
-  isn't available yet, use rich stock imagery as the stand-in, not a gray box.
+The page is a tinted canvas; the content lives in **big rounded
+color-blocked cards** that alternate and build rhythm. Color does the brand
+work. Type is huge, tight, and confident. Reference DNA: Arist's vermillion
+blocking, the UXBoost card-on-canvas bento + italic-serif accent, the
+NexusSci gradient hero card.
+
+### The vocabulary (all in `components/marketing/site/section.tsx` + `app/(marketing)/layout.tsx`)
+
+| Piece | What it is |
+|---|---|
+| **Canvas** | Page bg `#f3f1ed` light / `#0a0a0b` dark — set once in the marketing layout. Content never sits on bare white pages. |
+| **Cards** | `<Section tone>` — `card` (white paper + soft shadow), `tint` (canvas half-step), `brand` (signal vermillion `#ff5a24`, white text), `dark` (near-black `#0d0d0f`). Radius `rounded-[2rem] sm:rounded-[2.75rem]`. Alternate tones for rhythm. |
+| **Display type** | **Inter Tight** via next/font (`--font-display`, `.font-display`) — headlines are big (`text-5xl–7xl` hero, `~2.75rem` sections), bold, tracking −0.03/−0.04em. The marketing layout overrides `--font-title` → display, so legacy serif call sites resolve to it automatically. |
+| **Accent serif** | **Instrument Serif italic** (`--font-accent`, `.font-accent`, `<Accent>`): one italic phrase inside a headline — the flourish. Use once per screen, not once per section. |
+| **Signal color** | Vermillion `#ff5a24` (hover `#ee4d18`; `#ff7a47`/`#ff8a5c` on dark). It IS the marketing brand color: primary CTAs, ✦ glyphs, kickers, stat numbers. The product's five-context orange rule does NOT apply out here. |
+| **Eyebrows** | `<EyebrowChip>` — ✦ glyph + bold small caps. Never the product's muted SECTION_LABEL. |
+| **Stats** | `<StatStrip>` (tint cells, giant display numbers) and `<DarkStatBand>` (black card, vermillion numbers). Stat-forward pages win — but only numbers we can defend. |
+| **Hero** | The home hero is a rounded canvas card filled with the owner's `GradientBackground` shader (`components/ui/paper-design-shader-background.tsx` — vermillion→gold→raspberry GrainGradient, theme-aware, reduced-motion parks it). Sub-pages open with `PageHero`: chip → display headline → vermillion pill. |
+| **Footer** | The black contrast card (`footer.tsx`): display sign-off line + signal CTA + link columns. |
+| **Nav** | Floating pill nav + mega menu (`nav.tsx`); primary CTA is the vermillion pill. |
+
+### Marketing-layer rules
+
+- **Real imagery, never gray slots.** Stock photography, brand icon sets,
+  avatar imagery — all sanctioned. A wall of gray placeholder boxes reads as
+  unfinished AI slop. If a product screenshot doesn't exist yet, use rich
+  stock imagery as the stand-in.
 - **Component-native design wins.** When the owner provides a component,
   keep its shadows, gradients, radii, photography, and animation. Recolor
-  off-brand accents (indigo/blue/purple) to Chippi orange where the accent
-  carries brand meaning — and change nothing else without being asked.
-- **Motion is welcome.** Marquees, carousels, scroll choreography, 3D cards,
-  hover reveals — all sanctioned on marketing pages. Keep reduced-motion
-  fallbacks; never let an effect trap page scroll.
-- Serif Times stays the headline voice and the foreground pill stays the
-  primary CTA, so the pages still read as one family.
-- Honesty still holds for CLAIMS: no fabricated customer testimonials, no
-  invented metrics presented as real, honest trial copy ("7 days free, then
-  $97/mo"). Illustrative imagery is fine; fake social proof is not.
+  off-brand accents to the signal vermillion / Chippi orange where the accent
+  carries brand meaning — change nothing else without being asked.
+- **Motion is welcome.** Shaders, marquees, carousels, scroll choreography,
+  parallax, hover lifts. Keep reduced-motion fallbacks; never trap page
+  scroll.
+- **Shadows, gradients, and depth are welcome.** Paper-flat is a product
+  rule, not a marketing rule.
+- **Honesty holds for CLAIMS** (unchanged, non-negotiable): no fabricated
+  customer testimonials, no invented metrics presented as real, honest trial
+  copy ("7 days free, then $97/mo. Cancel anytime"). **There is no free
+  plan** — never "free, no card." Realtors/brokerages never get phone
+  numbers and Chippi never texts/calls leads; copy never implies it.
 
 **The marketing system never leaks into the product.** Everything lives in
-`components/marketing/**`, `components/ui/*` marketing blocks, or opt-in
-classes (`.font-brand`, `.rounded-marketing-*`, `.liquid-glass`). The
-`no-stray-orange` and `no-shadow-on-product-chrome` tests guard the product
-dirs; the marketing layer is outside the strict zone by design.
-
-### The calm site system (`components/marketing/site/`)
-
-| Piece | File | Notes |
-|---|---|---|
-| Sticky nav | `nav.tsx` | Hairline-bottom bar, flat links, foreground CTA. No floating pill, no mega-menu. |
-| Footer | `footer.tsx` | Paper-flat, hairline-top, muted links. No charcoal card. |
-| Page hero | `page-hero.tsx` | Shared sub-page hero: serif title, grid backdrop, warm wash, foreground CTAs. |
-| Feature row | `feature-row.tsx` | One alternating deep-feature row (copy + framed screenshot slot, flips). |
-| Frame | `frame.tsx` | `PanelFrame` (clean hairline frame + soft shadow — no faux browser chrome; the dots-and-URL window costume was cut deliberately, don't reintroduce it), `ImagePlaceholder` (labeled screenshot slot), `GridBackdrop` (faint dot grid). |
-| Reveal | `reveal.tsx` | The ONLY motion: one fade + small slide on scroll-in, EASE_OUT, reduced-motion aware. No parallax, tilt, cursor-glow, or scroll-progress bar. |
-| Theme toggle | `fortitudo/theme-toggle.tsx` | Reused — wired to Chippi's `ThemeProvider`. |
-| Home sections | `site/home/{hero,logos,features,bento,metrics,enterprise,trust,cta}.tsx` | promise → proof → trust → ask, with product imagery in framed slots. |
-
-Headlines use the serif Times (`var(--font-title)`) — the product's signature
-flourish — not `.font-brand`. Primary CTAs are the foreground pill
-(`bg-foreground`), same as the product; orange is reserved for the Chippi mark.
-Tasteful depth (soft shadows on framed screenshots) is allowed in the marketing
-layer; the product stays flat. Trial copy is honest: a 7-day free trial that
-**requires a card** ("7 days free, then $97/mo. Cancel anytime"). Never "free,
-no card" — **there is no free plan.**
-
-Image slots are labeled `ImagePlaceholder`s (they name the screenshot + ratio),
-so a missing asset reads as an intentional slot, never a broken image.
+`components/marketing/**`, `components/ui/*` marketing blocks, the marketing
+layout, or opt-in classes (`.font-display`, `.font-accent`, `.font-brand`,
+`.liquid-glass`). The `no-stray-orange` and `no-shadow-on-product-chrome`
+tests guard the product dirs; the marketing layer is outside the strict zone
+by design. The product keeps system fonts — the marketing web fonts load
+only in the `(marketing)` route group.
 
 ### What's left of the old studio-ASCII system
 

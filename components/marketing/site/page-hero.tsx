@@ -1,17 +1,15 @@
 /**
- * PageHero — the calm sub-page hero, shared across the logged-out site.
+ * PageHero — the shared sub-page opener, bold-canvas edition.
  *
- * Same vocabulary as the home hero (serif Times title, grid backdrop, warm
- * wash, foreground primary CTA) but compact and headline-only, so realtors,
- * brokerages, pricing, etc. all open the same way. Replaces the legacy
- * MarketingHero (ASCII field + orange primary).
+ * Sits straight on the canvas: ✦ chip eyebrow, a big display headline
+ * (Inter Tight, supports an <Accent> italic span), one sub line, and the
+ * signal-vermillion primary pill. Every sub-page opens the same way so the
+ * site reads as one voice — just no longer a quiet one.
  */
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { Reveal } from './reveal';
-import { GridBackdrop } from './frame';
-import { TITLE_FONT } from '@/lib/typography';
+import { FadeUp, EyebrowChip } from './section';
 
 interface CtaLink {
   label: string;
@@ -26,46 +24,36 @@ export function PageHero({
   secondaryCta,
 }: {
   eyebrow: string;
-  title: string;
+  title: React.ReactNode;
   sub?: string;
   primaryCta?: CtaLink;
   secondaryCta?: CtaLink;
 }) {
   return (
-    <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-16 sm:px-6 sm:pt-36 sm:pb-20">
-      <GridBackdrop />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[360px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
-      />
-      <div className="relative mx-auto max-w-3xl text-center">
-        <Reveal>
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {eyebrow}
-          </p>
-        </Reveal>
-        <Reveal delay={0.05}>
-          <h1
-            className="mt-5 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-[3.5rem]"
-            style={TITLE_FONT}
-          >
+    <section className="px-4 pb-10 pt-32 sm:px-6 sm:pb-14 sm:pt-40">
+      <div className="mx-auto max-w-3xl text-center">
+        <FadeUp>
+          <EyebrowChip className="justify-center">{eyebrow}</EyebrowChip>
+        </FadeUp>
+        <FadeUp delay={0.05}>
+          <h1 className="font-display mt-6 text-balance text-[2.75rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#141414] dark:text-white sm:text-6xl">
             {title}
           </h1>
-        </Reveal>
+        </FadeUp>
         {sub ? (
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
+          <FadeUp delay={0.1}>
+            <p className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-[#141414]/65 dark:text-white/60 sm:text-lg">
               {sub}
             </p>
-          </Reveal>
+          </FadeUp>
         ) : null}
         {primaryCta || secondaryCta ? (
-          <Reveal delay={0.15}>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <FadeUp delay={0.15}>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {primaryCta ? (
                 <Link
                   href={primaryCta.href}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff5a24] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#ee4d18] active:scale-[0.98]"
                 >
                   {primaryCta.label}
                   <ArrowRight className="h-4 w-4" />
@@ -74,13 +62,13 @@ export function PageHero({
               {secondaryCta ? (
                 <Link
                   href={secondaryCta.href}
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-[#141414]/15 bg-white px-7 text-[15px] font-semibold text-[#141414] transition-colors duration-150 hover:bg-[#141414]/[0.04] dark:border-white/15 dark:bg-[#151517] dark:text-white dark:hover:bg-white/[0.06]"
                 >
                   {secondaryCta.label}
                 </Link>
               ) : null}
             </div>
-          </Reveal>
+          </FadeUp>
         ) : null}
       </div>
     </section>

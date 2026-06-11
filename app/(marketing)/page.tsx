@@ -49,8 +49,8 @@ export default async function MarketingHomePage() {
         </div>
       </Section>
 
-      {/* Voices + the stack — rounded card section */}
-      <Section tone="card">
+      {/* Voices + the stack — tint card for rhythm against the paper cards */}
+      <Section tone="tint">
         <SectionHeader
           eyebrow="In their words"
           title="One agent, the whole job."

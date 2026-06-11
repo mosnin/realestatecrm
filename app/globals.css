@@ -1013,6 +1013,17 @@
   letter-spacing: 0.01em;
 }
 
+/* ── Bold-canvas marketing type (logged-out site only) ──────────────────────
+ * --font-display / --font-accent are injected by app/(marketing)/layout.tsx
+ * via next/font (Inter Tight + Instrument Serif). Fallbacks keep the classes
+ * harmless anywhere the variables aren't mounted. */
+.font-display {
+  font-family: var(--font-display, var(--font-brand));
+}
+.font-accent {
+  font-family: var(--font-accent, Georgia, 'Times New Roman', serif);
+}
+
 /* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */
 .text-gradient-brand {
   background: linear-gradient(135deg, #ff964f, #ffb27a, #ffc994);

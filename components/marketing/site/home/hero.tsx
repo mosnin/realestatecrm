@@ -1,177 +1,92 @@
 'use client';
 
 /**
- * Hero — full-screen video opener.
+ * Hero — the gradient-card opener.
  *
- * Recreated to the owner's exact spec: a raw, undimmed background video
- * (no overlay of any kind), Inter typography, a character-by-character
- * headline entrance (30ms stagger, 500ms per character, after a 200ms hold),
- * timed fade-ins for the subheading (800ms), buttons (1200ms), and the
- * "liquid glass" tag card (1400ms, bottom-right on large screens). Content
- * sits at the bottom of the viewport; the site's fixed pill nav floats above.
+ * One huge rounded canvas card filled with the owner's GrainGradient shader
+ * (vermillion → gold → raspberry, theme-aware, reduced-motion parks it),
+ * with the promise set in the display face and an italic-serif accent.
+ * White pill primary on the hot surface; glass secondary. Honest trial line.
  *
- * Inter is loaded via next/font (the Next-idiomatic equivalent of the spec's
- * <link> tags — preconnected, self-hosted, no render blocking) and scoped to
- * this section so the logged-in product keeps its own type system.
- *
- * Reduced-motion: everything renders composed immediately — the staggered
- * entrance is the one thing we won't make someone sit through twice.
+ * Replaces the full-screen video hero (placeholder VC copy) — the gradient
+ * card is the brand's first impression now.
  */
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Inter } from 'next/font/google';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
+import { GradientBackground } from '@/components/ui/paper-design-shader-background';
+import { Accent } from '@/components/marketing/site/section';
+import { EASE_OUT } from '@/lib/motion';
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
-  display: 'swap',
-});
-
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4';
-
-const HEADLINE = 'Shaping tomorrow\nwith vision and action.';
-const CHAR_DELAY_MS = 30;
-const CHAR_DURATION_MS = 500;
-const HEADLINE_START_MS = 200;
-
-function useReducedMotionFlag(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    setReduce(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  }, []);
-  return reduce;
-}
-
-/** Fades children in after `delay` ms over `duration` ms. */
-function FadeIn({
+function Enter({
   delay,
-  duration = 1000,
-  className = '',
   children,
+  className,
 }: {
   delay: number;
-  duration?: number;
-  className?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
-  const reduce = useReducedMotionFlag();
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(id);
-  }, [delay]);
-  const shown = visible || reduce;
+  const reduce = useReducedMotion();
   return (
-    <div
-      className={`transition-opacity ${shown ? 'opacity-100' : 'opacity-0'} ${className}`}
-      style={{ transitionDuration: `${duration}ms` }}
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease: EASE_OUT, delay }}
+      className={className}
     >
       {children}
-    </div>
-  );
-}
-
-/**
- * Character-by-character headline. Splits on \n into lines, each line into
- * chars; every char enters from translateX(-18px) with a stagger of
- * (lineIndex * lineLength * 30ms) + (charIndex * 30ms) after the initial hold.
- */
-function AnimatedHeading({ text }: { text: string }) {
-  const reduce = useReducedMotionFlag();
-  const [started, setStarted] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setStarted(true), HEADLINE_START_MS);
-    return () => clearTimeout(id);
-  }, []);
-  const lit = started || reduce;
-  const lines = text.split('\n');
-  return (
-    <h1
-      className="mb-4 text-4xl font-normal md:text-5xl lg:text-6xl xl:text-7xl"
-      style={{ letterSpacing: '-0.04em' }}
-    >
-      {lines.map((line, lineIndex) => (
-        <span key={lineIndex} className="block">
-          {Array.from(line).map((char, charIndex) => (
-            <span
-              key={charIndex}
-              className="inline-block"
-              style={{
-                opacity: lit ? 1 : 0,
-                transform: lit ? 'translateX(0)' : 'translateX(-18px)',
-                transition: reduce
-                  ? 'none'
-                  : `opacity ${CHAR_DURATION_MS}ms, transform ${CHAR_DURATION_MS}ms`,
-                transitionDelay: reduce
-                  ? '0ms'
-                  : `${lineIndex * line.length * CHAR_DELAY_MS + charIndex * CHAR_DELAY_MS}ms`,
-              }}
-            >
-              {char === ' ' ? ' ' : char}
-            </span>
-          ))}
-        </span>
-      ))}
-    </h1>
+    </motion.div>
   );
 }
 
 export function Hero() {
   return (
-    <section
-      className={`relative h-screen overflow-hidden bg-black text-white antialiased ${inter.className}`}
-    >
-      {/* Raw video — no overlay, no dimming, per spec. */}
-      <video
-        className="absolute inset-0 h-full w-full object-cover"
-        src={VIDEO_URL}
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+    <section className="px-3 pb-3 pt-20 sm:px-4 sm:pb-4 sm:pt-24">
+      <div className="relative mx-auto flex min-h-[78vh] max-w-7xl flex-col items-center justify-center overflow-hidden rounded-[2rem] px-5 py-20 text-center sm:rounded-[2.75rem] sm:px-10">
+        <GradientBackground />
+        {/* Scrim — keeps the headline readable over the hot zone. */}
+        <div aria-hidden className="absolute inset-0 -z-10 bg-black/25" />
 
-      {/* Content — pinned to the bottom of the viewport. The site's fixed
-          pill nav floats above this section; no second navbar here. */}
-      <div className="relative z-10 flex h-full flex-col px-6 md:px-12 lg:px-16">
-        <div className="flex flex-1 flex-col justify-end pb-12 lg:grid lg:grid-cols-2 lg:items-end lg:pb-16">
-          {/* Left — headline, subheading, buttons */}
-          <div>
-            <AnimatedHeading text={HEADLINE} />
-            <FadeIn delay={800}>
-              <p className="mb-5 text-base text-gray-300 md:text-lg">
-                We back visionaries and craft ventures that define what comes next.
-              </p>
-            </FadeIn>
-            <FadeIn delay={1200}>
-              <div className="flex flex-wrap gap-4">
-                <Link
-                  href="/login/realtor?intent=signup"
-                  className="rounded-lg bg-white px-8 py-3 font-medium text-black transition-colors hover:bg-gray-100"
-                >
-                  Start a Chat
-                </Link>
-                <Link
-                  href="/demo"
-                  className="liquid-glass rounded-lg border border-white/20 px-8 py-3 font-medium text-white transition-colors hover:bg-white hover:text-black"
-                >
-                  Explore Now
-                </Link>
-              </div>
-            </FadeIn>
+        <Enter delay={0.05}>
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+            <span aria-hidden>✦</span>
+            Meet Chippi — your AI teammate
+          </p>
+        </Enter>
+
+        <Enter delay={0.15}>
+          <h1 className="font-display mx-auto mt-7 max-w-4xl text-balance text-5xl font-bold leading-[1.02] tracking-[-0.04em] text-white sm:text-6xl lg:text-7xl">
+            Your leads, worked <Accent>while you close.</Accent>
+          </h1>
+        </Enter>
+
+        <Enter delay={0.3}>
+          <p className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-white/85 sm:text-lg">
+            Chippi reads every inbound, drafts replies in your voice, books the
+            tours, and keeps your pipeline current — approval-first, always.
+          </p>
+        </Enter>
+
+        <Enter delay={0.45}>
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/login/realtor?intent=signup"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-[#141414] transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/demo"
+              className="inline-flex h-12 items-center justify-center rounded-full border border-white/40 bg-white/10 px-7 text-[15px] font-semibold text-white backdrop-blur-sm transition-colors duration-150 hover:bg-white/20"
+            >
+              Book a demo
+            </Link>
           </div>
-
-          {/* Right — glass tag, bottom-right on large screens */}
-          <FadeIn delay={1400} className="mt-8 flex items-end justify-start lg:mt-0 lg:justify-end">
-            <div className="liquid-glass rounded-xl border border-white/20 px-6 py-3">
-              <p className="text-lg font-light md:text-xl lg:text-2xl">
-                Investing. Building. Advisory.
-              </p>
-            </div>
-          </FadeIn>
-        </div>
+          <p className="mt-4 text-[13px] text-white/70">7 days free, then $97/mo. Cancel anytime.</p>
+        </Enter>
       </div>
     </section>
   );
