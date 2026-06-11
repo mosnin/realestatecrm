@@ -1,0 +1,244 @@
+/**
+ * `/studio` — Chippi's content studio, on the calm site system.
+ *
+ * One idea: make the listing content on the go. The hero is a cover-flow of
+ * the posts Chippi drafts (mocked from the product's own card vocabulary, not
+ * stock photos), then a calm "how it works" band and the ask.
+ */
+
+import Link from 'next/link';
+import { ArrowRight, PenLine, Megaphone, CalendarClock, Home, CalendarCheck, BadgeCheck, TrendingUp, Mail } from 'lucide-react';
+import { Reveal } from '@/components/marketing/site/reveal';
+import { Coverflow } from '@/components/marketing/site/studio/coverflow';
+import { TITLE_FONT } from '@/lib/typography';
+
+export const metadata = {
+  title: 'Content studio · Chippi',
+  description:
+    'Chippi drafts your listing posts, stories, and emails — in your voice, from your phone. Just listed, open house, just sold, market updates: written and ready while you’re in the field.',
+};
+
+/* A single mocked piece of Studio output — a phone-shaped social post. */
+function PostCard({
+  tag,
+  Icon,
+  tone,
+  headline,
+  meta,
+  caption,
+  tags,
+}: {
+  tag: string;
+  Icon: React.ElementType;
+  tone: string;
+  headline: string;
+  meta: string;
+  caption: string;
+  tags: string[];
+}) {
+  return (
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-2xl shadow-foreground/[0.10] ring-1 ring-inset ring-white/5">
+      {/* media */}
+      <div className={`relative flex flex-1 flex-col justify-between p-4 ${tone}`}>
+        <div className="flex items-center justify-between">
+          <span className="rounded-full bg-background/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground backdrop-blur-sm">
+            {tag}
+          </span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground backdrop-blur-sm">
+            <Icon className="h-4 w-4" />
+          </span>
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold leading-snug text-foreground">{headline}</p>
+          <p className="mt-0.5 text-[11px] text-foreground/70">{meta}</p>
+        </div>
+      </div>
+      {/* caption */}
+      <div className="border-t border-border/60 bg-background p-3.5">
+        <div className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-brand text-[9px] font-bold text-brand-foreground">C</span>
+          <span className="text-[11px] font-medium text-muted-foreground">@yourbrand</span>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-foreground/80">{caption}</p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tags.map((t) => (
+            <span key={t} className="text-[10px] font-medium text-brand">{t}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CARDS = [
+  <PostCard
+    key="listed"
+    tag="Just listed"
+    Icon={Home}
+    tone="bg-gradient-to-br from-brand-subtle to-muted/40"
+    headline="14 Oak St — just listed"
+    meta="$1,200,000 · 3 bd · 2 ba · Oakland"
+    caption="Light-filled craftsman steps from the lake. Open this weekend — DM for a private tour."
+    tags={['#justlisted', '#oakland', '#forsale']}
+  />,
+  <PostCard
+    key="open"
+    tag="Open house"
+    Icon={CalendarCheck}
+    tone="bg-gradient-to-br from-muted/50 to-brand-subtle"
+    headline="Open Sat 1–3 PM"
+    meta="220 Marina Blvd · waterfront"
+    caption="Come see the view in person. Coffee’s on us. Saturday 1–3, see you there."
+    tags={['#openhouse', '#marina', '#realestate']}
+  />,
+  <PostCard
+    key="sold"
+    tag="Just sold"
+    Icon={BadgeCheck}
+    tone="bg-gradient-to-br from-emerald-500/12 to-muted/40"
+    headline="Sold — over asking"
+    meta="88 Pine Ave · 6 days on market"
+    caption="Another one closed. Thinking of selling? Let’s talk about what your home is worth today."
+    tags={['#justsold', '#sold', '#thankyou']}
+  />,
+  <PostCard
+    key="price"
+    tag="Price improved"
+    Icon={TrendingUp}
+    tone="bg-gradient-to-br from-brand-subtle to-muted/30"
+    headline="New price — $960,000"
+    meta="5 Birch Ln · was $995,000"
+    caption="Priced to move. Three beds, big yard, top schools. Book a showing this week."
+    tags={['#pricedrop', '#newprice', '#homeforsale']}
+  />,
+  <PostCard
+    key="market"
+    tag="Market update"
+    Icon={Mail}
+    tone="bg-gradient-to-br from-muted/50 to-brand-subtle/70"
+    headline="Your November market, in 60 seconds"
+    meta="Email · sent to 1,240 contacts"
+    caption="Inventory’s up 8%, rates eased. Here’s what it means if you’re buying or selling."
+    tags={['#marketupdate', '#newsletter']}
+  />,
+];
+
+const STEPS = [
+  {
+    Icon: PenLine,
+    title: 'Drafts in your voice',
+    body: 'Tell Chippi the listing — or just point it at the deal. It writes the post, the story, and the email the way you actually write, ready to tweak.',
+  },
+  {
+    Icon: Megaphone,
+    title: 'Every channel at once',
+    body: 'One listing becomes an Instagram post, a story, a just-listed email, and a flyer — formatted for each, on brand, in seconds.',
+  },
+  {
+    Icon: CalendarClock,
+    title: 'Scheduled or sent',
+    body: 'Approve it and Chippi queues it for the open-house window — or posts now. The whole campaign runs from your phone between showings.',
+  },
+];
+
+export default function StudioPage() {
+  return (
+    <>
+      {/* Hero — the cover-flow of content */}
+      <section className="relative overflow-hidden border-b border-border/60 bg-background px-4 pt-32 pb-16 sm:px-6 sm:pt-36">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[360px] bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--brand-subtle),transparent_70%)]"
+        />
+        <div className="relative mx-auto max-w-3xl text-center">
+          <Reveal>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Content studio
+            </p>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h1 className="mt-5 text-[2.5rem] leading-[1.05] tracking-tight text-foreground sm:text-[3.5rem]" style={TITLE_FONT}>
+              Make the content on the go.
+            </h1>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              Just listed, open house, just sold, the monthly market email — Chippi drafts it
+              in your voice and formats it for every channel. From your phone, between showings.
+            </p>
+          </Reveal>
+        </div>
+
+        <Reveal delay={0.15} className="relative mx-auto mt-12 max-w-4xl">
+          <Coverflow cards={CARDS} />
+        </Reveal>
+
+        <Reveal delay={0.2}>
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/login/realtor?intent=signup"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/demo"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border/70 bg-background px-6 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+            >
+              Watch demo
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* How it works */}
+      <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
+        <div className="mx-auto max-w-5xl">
+          <Reveal className="max-w-2xl">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              How it works
+            </p>
+            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+              A whole campaign, from one listing.
+            </h2>
+          </Reveal>
+          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
+            {STEPS.map((s) => (
+              <Reveal key={s.title}>
+                <div className="h-full bg-background p-7">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
+                    <s.Icon className="h-4 w-4" />
+                  </span>
+                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Closing CTA */}
+      <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+            Post the listing before you leave the driveway.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
+            Chippi drafts it the moment a listing goes live. You approve; it posts.
+          </p>
+          <div className="mt-8">
+            <Link
+              href="/login/realtor?intent=signup"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+    </>
+  );
+}
