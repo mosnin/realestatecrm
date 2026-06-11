@@ -11,7 +11,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, Users, TimerReset, ShieldCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { FeatureGrid } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
@@ -24,18 +25,18 @@ export const metadata = { title: 'For brokerages · Chippi' };
 
 const empower = [
   {
-    Icon: Users,
-    title: 'Every agent, a teammate',
-    body: 'Each realtor keeps their own Chippi workspace — it reads their inbox, drafts in their voice, and keeps every deal current. You add a team layer on top; you never take their workspace away.',
+    kicker: 'Every agent',
+    title: 'A teammate, not a tool',
+    body: 'Each realtor keeps their own Chippi workspace — it reads their inbox, drafts in their voice, and keeps every deal current. You add a team layer on top.',
   },
   {
-    Icon: TimerReset,
-    title: 'Time, compressed',
+    kicker: 'Time',
+    title: 'The busywork, compressed',
     body: 'First touch, follow-ups, tour booking, deal updates — the repetitive work runs itself. The floor spends its hours on the conversations that close.',
   },
   {
-    Icon: ShieldCheck,
-    title: 'Nothing leaves without a name on it',
+    kicker: 'Trust',
+    title: 'Nothing leaves unsigned',
     body: 'Chippi drafts; the realtor approves. Every send goes through the person whose name is on it. The floor stays in the driver’s seat.',
   },
 ];
@@ -130,18 +131,8 @@ export default function BrokeragesPage() {
               as a byproduct.
             </p>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {empower.map((s) => (
-              <Reveal key={s.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <s.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={empower} />
           </div>
         </div>
       </section>
@@ -190,15 +181,10 @@ export default function BrokeragesPage() {
               decide the move.
             </p>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 sm:grid-cols-3">
-            {signals.map((s) => (
-              <Reveal key={s.label}>
-                <div className="h-full bg-background p-7">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-brand">{s.label}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-foreground/80">{s.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid
+              items={signals.map((s) => ({ kicker: 'Surfaced', title: s.label, body: s.body }))}
+            />
           </div>
         </div>
       </section>

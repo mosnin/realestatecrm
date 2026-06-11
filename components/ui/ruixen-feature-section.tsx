@@ -84,7 +84,7 @@ const integrations = [
 
 export default function RuixenSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+    <section className="mx-auto max-w-7xl py-2 sm:py-4">
       <div className="relative grid grid-cols-1 lg:grid-cols-2">
         {/* Left Block */}
         <div className="flex flex-col items-start justify-center border border-border/60 p-4 sm:p-6 lg:p-8">

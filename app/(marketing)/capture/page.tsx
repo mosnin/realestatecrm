@@ -5,7 +5,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, ClipboardList, Home, CalendarCheck, UserRound } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
 import FeatureSection from '@/components/ui/feature-section';
@@ -19,24 +20,24 @@ export const metadata = {
 
 const DOORS = [
   {
-    Icon: ClipboardList,
-    title: 'Intake forms',
+    kicker: 'Forms',
+    title: 'Intake, anywhere',
     body: 'Branded forms you drop anywhere — every submission lands in Chippi scored, with the first reply already drafted.',
   },
   {
-    Icon: Home,
-    title: 'Property pages',
+    kicker: 'Property pages',
+    title: 'Listings that capture',
     body: 'Every listing gets a public page with "ask about this home" built in. Questions become scored leads tied to the property.',
   },
   {
-    Icon: CalendarCheck,
-    title: 'Tour links',
+    kicker: 'Tour links',
+    title: 'Bookings become leads',
     body: 'Share a booking link; buyers pick a time that works. The tour lands on your calendar and the lead lands in your book.',
   },
   {
-    Icon: UserRound,
-    title: 'Your public bio',
-    body: 'One link in every profile. Your listings, your booking link, your contact form — all feeding Chippi.',
+    kicker: 'Your bio',
+    title: 'One link in every profile',
+    body: 'Your listings, your booking link, your contact form — all feeding Chippi.',
   },
 ];
 
@@ -54,19 +55,7 @@ export default function CapturePage() {
       {/* The four doors */}
       <section className="bg-background px-4 pb-8 sm:px-6">
         <div className="mx-auto max-w-5xl">
-          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 sm:grid-cols-2 lg:grid-cols-4">
-            {DOORS.map((d) => (
-              <Reveal key={d.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <d.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{d.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{d.body}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <FeatureGrid items={DOORS} columns={4} />
         </div>
       </section>
 
@@ -74,6 +63,16 @@ export default function CapturePage() {
       <section className="border-y border-border/60 bg-muted/10">
         <FeatureSection />
       </section>
+
+      <DarkStatBand
+        eyebrow="The outcome"
+        title="Every door, one pipeline."
+        stats={[
+          { value: '4+', label: 'capture channels' },
+          { value: '2 min', label: 'to first reply' },
+          { value: '0', label: 'missed leads' },
+        ]}
+      />
 
       {/* Closing CTA */}
       <section className="bg-background px-4 py-24 sm:px-6 sm:py-28">

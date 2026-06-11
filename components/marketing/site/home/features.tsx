@@ -87,7 +87,7 @@ export function Features() {
                     {f.eyebrow}
                   </span>
                 </div>
-                <h2 className="mt-5 text-[26px] font-semibold leading-[1.2] tracking-tight text-foreground sm:text-[32px]">
+                <h2 className="mt-5 text-[26px] leading-[1.18] tracking-tight text-foreground sm:text-[32px]" style={{ fontFamily: "var(--font-title)" }}>
                   {f.title}
                 </h2>
                 <p className="mt-4 text-base leading-relaxed text-muted-foreground">{f.body}</p>

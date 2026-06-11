@@ -4,7 +4,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, MoveRight, CheckCircle2, Bot } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { PipelineBoard } from '@/components/marketing/site/deals/pipeline-board';
@@ -17,9 +18,9 @@ export const metadata = {
 };
 
 const FEATURES = [
-  { Icon: MoveRight, title: 'Deals advance themselves', body: 'Tour booked, offer in, lender cleared — Chippi moves the card and keeps the value, dates, and counterparty in sync. The board is never stale.' },
-  { Icon: CheckCircle2, title: 'Every outcome logged', body: 'Won and lost reasons captured in plain language and written to the timeline, so your numbers come from the work — not a spreadsheet someone forgot to update.' },
-  { Icon: Bot, title: 'Assist — or fully autonomous', body: 'Approve-first by default. Flip Chippi to autonomous and it runs the routine moves itself: nudges, follow-ups, stage changes — and tells you what it did.' },
+  { kicker: 'Self-driving', title: 'Deals advance themselves', body: 'Tour booked, offer in, lender cleared — Chippi moves the card and keeps the value, dates, and counterparty in sync.' },
+  { kicker: 'Logged', title: 'Every outcome, in plain language', body: 'Won and lost reasons written to the timeline, so your numbers come from the work — not a forgotten spreadsheet.' },
+  { kicker: 'Your call', title: 'Assist — or fully autonomous', body: 'Approve-first by default. Flip to autonomous and Chippi runs the routine moves itself — and tells you what it did.' },
 ];
 
 export default function DealsPage() {
@@ -49,21 +50,21 @@ export default function DealsPage() {
               You close. Chippi keeps the board honest.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <Reveal key={f.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <f.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{f.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={FEATURES} />
           </div>
         </div>
       </section>
+
+      <DarkStatBand
+        eyebrow="The outcome"
+        title="The board is never stale."
+        stats={[
+          { value: '100%', label: 'board accuracy' },
+          { value: '6 → 1', label: 'tools replaced' },
+          { value: '24/7', label: 'advancing deals' },
+        ]}
+      />
 
       {/* Closing CTA */}
       <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">

@@ -6,7 +6,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, RefreshCw, Search, Building2, MapPin } from 'lucide-react';
+import { ArrowRight, RefreshCw, Building2, MapPin } from 'lucide-react';
+import { FeatureGrid } from '@/components/marketing/site/section';
 import { Reveal } from '@/components/marketing/site/reveal';
 import {
   DraggableCardContainer,
@@ -77,19 +78,19 @@ function PropertyCardInner({ p }: { p: Prop }) {
 
 const SYNC = [
   {
-    Icon: RefreshCw,
-    title: 'Two-way sync, every CRM',
+    kicker: 'Two-way sync',
+    title: 'Every CRM, both directions',
     body: 'Connect kvCORE, Follow-up Boss, Compass, Salesforce — Chippi pulls every listing in and writes changes back. No double entry, no stale copy.',
   },
   {
-    Icon: Building2,
-    title: 'One source of truth',
-    body: 'Status, price, photos, and the deal behind it live in one place. Update it once; it’s right everywhere your contacts see it.',
+    kicker: 'One truth',
+    title: 'Update once, right everywhere',
+    body: 'Status, price, photos, and the deal behind it live in one place — correct everywhere your contacts see it.',
   },
   {
-    Icon: Search,
-    title: 'Found in one search',
-    body: 'Ask Chippi for “active listings under $1M in Oakland” and it answers from the whole portfolio — across every source — in plain language.',
+    kicker: 'One search',
+    title: 'The whole portfolio answers',
+    body: 'Ask Chippi for “active listings under $1M in Oakland” and it answers across every source, in plain language.',
   },
 ];
 
@@ -171,18 +172,8 @@ export default function PropertiesPage() {
               Bring your listings. Keep your tools.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {SYNC.map((s) => (
-              <Reveal key={s.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <s.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={SYNC} />
           </div>
         </div>
       </section>

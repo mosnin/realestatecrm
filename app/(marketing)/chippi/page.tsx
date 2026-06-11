@@ -6,7 +6,7 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, MessageCircle, PenLine, KanbanSquare, Megaphone } from 'lucide-react';
+import { ArrowRight, MessageCircle } from 'lucide-react';
 import IntroAnimation from '@/components/ui/scroll-morph-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
@@ -20,9 +20,9 @@ export const metadata = {
 };
 
 const SURFACES = [
-  { Icon: PenLine, title: 'In your inbox', body: 'Reads every inbound, drafts the reply in your voice, never sends without your tap.', href: '/realtors' },
-  { Icon: KanbanSquare, title: 'On your pipeline', body: 'Advances deals as things happen and logs every outcome in plain language.', href: '/deals' },
-  { Icon: Megaphone, title: 'In your marketing', body: 'Drafts the just-listed post, the story, and the email — formatted for every channel.', href: '/studio' },
+  { kicker: 'The inbox', title: 'In your inbox', body: 'Reads every inbound, drafts the reply in your voice, never sends without your tap.', href: '/realtors' },
+  { kicker: 'The pipeline', title: 'On your deals', body: 'Advances deals as things happen and logs every outcome in plain language.', href: '/deals' },
+  { kicker: 'The marketing', title: 'In your content', body: 'Drafts the just-listed post, the story, and the email — formatted for every channel.', href: '/studio' },
 ];
 
 export default function MeetChippiPage() {
@@ -62,15 +62,13 @@ export default function MeetChippiPage() {
       {/* Where it works */}
       <section className="bg-background px-4 pb-20 sm:px-6 sm:pb-28">
         <div className="mx-auto max-w-5xl">
-          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {SURFACES.map((s) => (
               <Reveal key={s.title}>
-                <Link href={s.href} className="group block h-full bg-background p-7 transition-colors hover:bg-foreground/[0.02]">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <s.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                <Link href={s.href} className="group block h-full rounded-3xl border border-border/60 bg-background p-7 transition-colors duration-200 hover:border-border">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-brand">{s.kicker}</p>
+                  <h3 className="mt-3 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
+                  <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
                   <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground">
                     See it work
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />

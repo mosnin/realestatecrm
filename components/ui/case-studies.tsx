@@ -3,14 +3,15 @@
 /**
  * Casestudies — the provided metrics + quote section (react-countup scroll-spy
  * numbers, alternating image/quote rows), tailored to Chippi: realtor and
- * broker stories with honest workflow metrics, dashboard imagery from the
- * provided demo CDN.
+ * broker stories with honest workflow metrics, each story proven by one of
+ * the product's own live animated panels.
  */
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { Inbox, KanbanSquare, Building2 } from "lucide-react";
-import Image from "next/image";
+import { PanelFrame } from "@/components/marketing/site/frame";
+import { InboxPanel } from "@/components/marketing/site/home/live-panels";
+import { PipelinePanel, LeaderboardPanel } from "@/components/marketing/site/home/more-panels";
 
 // Avoid SSR hydration issues by loading react-countup on the client.
 const CountUp = dynamic(() => import("react-countup"), { ssr: false });
@@ -107,9 +108,7 @@ export default function Casestudies() {
         "Chippi reads every inbound overnight, scores it against live deals, and has the reply drafted in the realtor's own voice — the morning starts with decisions, not triage.",
       name: "The solo realtor",
       role: "Inbox → reply → booked tour",
-      image:
-        "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-gradient.png",
-      icon: Inbox,
+      panel: "inbox",
       metrics: [
         { value: "2 min", label: "To first response", sub: "From inbound lead to drafted reply" },
         { value: "0", label: "Leads slipping", sub: "Every inbound scored and queued" },
@@ -122,9 +121,7 @@ export default function Casestudies() {
         "Tours, offers, and closings advance their own cards. The board reflects reality — not whatever got typed in last week — and every won/lost reason is logged in plain language.",
       name: "The producing team",
       role: "Deals → stages → outcomes",
-      image:
-        "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-02.png",
-      icon: KanbanSquare,
+      panel: "pipeline",
       metrics: [
         { value: "100%", label: "Board accuracy", sub: "Stages written from real activity" },
         { value: "6 → 1", label: "Tools replaced", sub: "CRM, inbox, calendar, files, chat, content" },
@@ -137,9 +134,7 @@ export default function Casestudies() {
         "Leads route by territory and load, the leaderboard pulls from real work, and stalled deals surface themselves. Brokers see the room without running a status meeting.",
       name: "The brokerage",
       role: "Routing → performance → bottlenecks",
-      image:
-        "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/featured-01.png",
-      icon: Building2,
+      panel: "floor",
       metrics: [
         { value: "30 sec", label: "To route a lead", sub: "Auto-assigned, reason logged" },
         { value: "24/7", label: "Floor coverage", sub: "Chippi works while the floor sleeps" },
@@ -148,25 +143,10 @@ export default function Casestudies() {
   ];
 
   return (
-    <section className="bg-background py-24 sm:py-32" aria-labelledby="case-studies-heading">
-      <div className="container mx-auto px-6">
-        {/* Header */}
-        <div className="mx-auto flex max-w-2xl flex-col gap-4 text-center">
-          <h2
-            id="case-studies-heading"
-            className="text-4xl font-semibold text-foreground md:text-5xl"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Real workflows, run by Chippi
-          </h2>
-          <p className="text-muted-foreground">
-            From the solo realtor&apos;s inbox to the brokerage floor — the same agent,
-            doing the work end to end.
-          </p>
-        </div>
-
-        {/* Cases */}
-        <div className="mt-20 flex flex-col gap-20">
+    <section className="py-2 sm:py-4" aria-labelledby="case-studies-heading">
+      <div className="container mx-auto">
+        {/* Cases (the page's SectionHeader carries the heading) */}
+        <div className="flex flex-col gap-20">
           {caseStudies.map((study, idx) => {
             const reversed = idx % 2 === 1;
             return (
@@ -183,14 +163,11 @@ export default function Casestudies() {
                       : "border-border/60",
                   ].join(" ")}
                 >
-                  <Image
-                    src={study.image}
-                    alt={`${study.name} dashboard`}
-                    width={300}
-                    height={400}
-                    className="aspect-[29/35] h-auto w-full max-w-60 rounded-2xl object-cover ring-1 ring-border transition-all duration-300 hover:scale-105"
-                    loading="lazy"
-                  />
+                  <div className="w-full max-w-sm flex-shrink-0">
+                    <PanelFrame>
+                      {study.panel === "inbox" ? <InboxPanel /> : study.panel === "pipeline" ? <PipelinePanel /> : <LeaderboardPanel />}
+                    </PanelFrame>
+                  </div>
                   <figure className="flex flex-col justify-between gap-8 text-left">
                     <blockquote className="text-left text-lg leading-relaxed text-foreground sm:text-xl">
                       <h3 className="text-left text-lg font-normal leading-relaxed text-foreground sm:text-xl">

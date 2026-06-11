@@ -6,8 +6,11 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, Link2, CalendarCheck, MessageCircle, Home, MapPin } from 'lucide-react';
+import { ArrowRight, CalendarCheck, MessageCircle, Home, MapPin } from 'lucide-react';
 import { Reveal } from '@/components/marketing/site/reveal';
+import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
+import { PanelFrame } from '@/components/marketing/site/frame';
+import { DraftPanel } from '@/components/marketing/site/home/live-panels';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = {
@@ -80,9 +83,9 @@ function BioPhone() {
 }
 
 const CAPTURES = [
-  { Icon: CalendarCheck, title: 'Taps become tours', body: 'The booking link checks your real availability. A confirmed tour lands on your calendar — and the visitor lands in your book, scored.' },
-  { Icon: MessageCircle, title: 'Questions become leads', body: '"Ask me anything" goes straight to Chippi. It drafts the reply in your voice and queues it for your tap.' },
-  { Icon: Link2, title: 'One link, everywhere', body: 'Instagram, Zillow, your email signature, the open-house QR code — one URL keeps every channel feeding the same pipeline.' },
+  { kicker: 'Tours', title: 'Taps become tours', body: 'The booking link checks your real availability. A confirmed tour lands on your calendar — and the visitor lands in your book, scored.' },
+  { kicker: 'Leads', title: 'Questions become leads', body: '"Ask me anything" goes straight to Chippi. It drafts the reply in your voice and queues it for your tap.' },
+  { kicker: 'One link', title: 'Everywhere you are', body: 'Instagram, Zillow, your email signature, the open-house QR code — one URL keeps every channel feeding the same pipeline.' },
 ];
 
 export default function BioPage() {
@@ -135,21 +138,43 @@ export default function BioPage() {
               A bio page that works the room.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {CAPTURES.map((c) => (
-              <Reveal key={c.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <c.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{c.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={CAPTURES} />
           </div>
         </div>
       </section>
+
+      {/* Proof — from tap to drafted reply */}
+      <section className="bg-background px-4 pb-20 sm:px-6 sm:pb-28">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <Reveal>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">From tap to reply</p>
+            <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
+              A visitor asks. Chippi answers — in your voice.
+            </h2>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+              Every &quot;ask me anything&quot; lands in Chippi, gets scored against your
+              book, and comes back as a drafted reply waiting for your tap. The bio page
+              isn&apos;t a brochure — it&apos;s a front door with someone working it.
+            </p>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <PanelFrame>
+              <DraftPanel />
+            </PanelFrame>
+          </Reveal>
+        </div>
+      </section>
+
+      <DarkStatBand
+        eyebrow="The outcome"
+        title="One link that closes."
+        stats={[
+          { value: '1', label: 'link, everywhere' },
+          { value: '24/7', label: 'capturing & replying' },
+          { value: '0', label: 'missed taps' },
+        ]}
+      />
 
       {/* Closing CTA */}
       <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">

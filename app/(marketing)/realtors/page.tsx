@@ -11,7 +11,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, Smartphone, Globe, Building2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
@@ -27,9 +28,9 @@ export const metadata = {
 };
 
 const surfaces = [
-  { Icon: Smartphone, title: 'On your phone', body: 'A tap away between doors and showings — drafts, scores, and bookings in your pocket.' },
-  { Icon: Globe, title: 'In the web app', body: 'Install it once. The full workspace, reachable from any browser, anywhere.' },
-  { Icon: Building2, title: 'At the office', body: 'The same workspace opens wide on the desktop when you’re back at the desk.' },
+  { kicker: 'On your phone', title: 'A tap away between showings', body: 'Drafts, scores, and bookings in your pocket — between doors, in the car, at the open house.' },
+  { kicker: 'In the web app', title: 'The full workspace, anywhere', body: 'Install it once. Reachable from any browser, with everything in sync.' },
+  { kicker: 'At the office', title: 'Opens wide at the desk', body: 'The same workspace stretches out on the desktop when you’re back at base.' },
 ];
 
 const features = [
@@ -119,18 +120,8 @@ export default function RealtorsPage() {
               Reachable wherever the work is.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 sm:grid-cols-3">
-            {surfaces.map((s) => (
-              <Reveal key={s.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <s.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={surfaces} />
           </div>
         </div>
       </section>
@@ -195,6 +186,16 @@ export default function RealtorsPage() {
           </p>
         </Reveal>
       </section>
+
+      <DarkStatBand
+        eyebrow="The outcome"
+        title="Hours back, every week."
+        stats={[
+          { value: '2 min', label: 'to first reply' },
+          { value: '24/7', label: 'watching the inbox' },
+          { value: '0', label: 'leads slipping' },
+        ]}
+      />
 
       {/* Closing CTA */}
       <section className="bg-background px-4 py-24 sm:px-6 sm:py-32">

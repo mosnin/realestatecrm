@@ -37,7 +37,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Every inbound read and scored against your live deals — the one that matters lifted to the top.",
       url: "/realtors",
-      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-02.png",
+      image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=600&fit=crop&q=80",
     },
     {
       id: "item-2",
@@ -45,7 +45,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Replies written the way you actually write, waiting before you open the thread. Nothing sends without your tap.",
       url: "/realtors",
-      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-gradient.png",
+      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80",
     },
     {
       id: "item-3",
@@ -53,7 +53,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Deals advance as things happen — tours booked, offers in, outcomes logged in plain language.",
       url: "/deals",
-      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/featured-01.png",
+      image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=600&fit=crop&q=80",
     },
     {
       id: "item-4",
@@ -61,7 +61,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Just listed, open house, just sold — drafted and formatted for every channel from your phone.",
       url: "/studio",
-      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/featured-06.png",
+      image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=600&fit=crop&q=80",
     },
     {
       id: "item-5",
@@ -96,17 +96,21 @@ export default function GalleryHoverCarousel({
   }, [carouselApi]);
 
   return (
-    <section className="bg-background py-24 sm:py-32">
+    <section className="py-2 sm:py-4">
       <div className="container mx-auto px-6">
-        <div className="mb-8 flex flex-col justify-between md:mb-14 md:flex-row md:items-end lg:mb-16">
-          <div className="max-w-2xl">
-            <h3 className="text-lg font-medium leading-relaxed text-foreground sm:text-xl lg:text-3xl">
-              {heading}{" "}
-              <span className="text-sm text-muted-foreground sm:text-base lg:text-3xl">
-                Hover a card to see what each piece does — then open it on its own page.
-              </span>
-            </h3>
-          </div>
+        <div className="mb-8 flex flex-col justify-between md:flex-row md:items-end">
+          {heading ? (
+            <div className="max-w-2xl">
+              <h3 className="text-lg leading-relaxed text-foreground sm:text-xl lg:text-3xl" style={{ fontFamily: "var(--font-title)" }}>
+                {heading}{" "}
+                <span className="text-sm text-muted-foreground sm:text-base lg:text-3xl">
+                  Hover a card to see what each piece does — then open it on its own page.
+                </span>
+              </h3>
+            </div>
+          ) : (
+            <div />
+          )}
           <div className="mt-4 flex gap-2 md:mt-0">
             <Button
               variant="outline"

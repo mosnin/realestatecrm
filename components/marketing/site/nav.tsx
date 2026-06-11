@@ -37,6 +37,14 @@ interface MegaItem {
 interface NavGroup {
   label: string;
   href: string;
+  /** The featured tile on the left of the mega panel — the group's one story. */
+  featured: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    cta: string;
+    href: string;
+  };
   items: MegaItem[];
 }
 
@@ -44,44 +52,71 @@ const GROUPS: NavGroup[] = [
   {
     label: 'Product',
     href: '/chippi',
+    featured: {
+      eyebrow: 'Meet Chippi',
+      title: 'All your leads, worked while you close.',
+      body: 'The agent inside your CRM — it reads, scores, drafts, books, and follows up.',
+      cta: 'Meet Chippi',
+      href: '/chippi',
+    },
     items: [
-      { icon: MessageCircle, label: 'Meet Chippi', desc: 'All your leads, worked while you close', href: '/chippi' },
-      { icon: Megaphone, label: 'Content studio', desc: 'Listing posts and emails, on the go', href: '/studio' },
-      { icon: Home, label: 'Properties', desc: 'Every listing in one place, synced', href: '/properties' },
-      { icon: FolderOpen, label: 'Files', desc: 'Every document, found in one search', href: '/files' },
-      { icon: Users, label: 'People', desc: 'Leads scored, followed up, in one place', href: '/people' },
+      { icon: Users, label: 'People', desc: 'Leads scored and followed up', href: '/people' },
       { icon: KanbanSquare, label: 'Deals', desc: 'A pipeline that runs itself', href: '/deals' },
-      { icon: Target, label: 'Capture leads', desc: 'Forms, property pages, tour links', href: '/capture' },
-      { icon: Link2, label: 'Public bio', desc: 'One link that feeds your pipeline', href: '/bio' },
+      { icon: Home, label: 'Properties', desc: 'Every listing, synced', href: '/properties' },
+      { icon: Megaphone, label: 'Content studio', desc: 'Posts and emails, on the go', href: '/studio' },
+      { icon: FolderOpen, label: 'Files', desc: 'Every document, one search', href: '/files' },
+      { icon: Target, label: 'Capture leads', desc: 'Forms, pages, tour links', href: '/capture' },
+      { icon: Link2, label: 'Public bio', desc: 'One link, every lead', href: '/bio' },
     ],
   },
   {
     label: 'For realtors',
     href: '/realtors',
+    featured: {
+      eyebrow: 'For solo realtors',
+      title: 'Your extra teammate in the field.',
+      body: 'Drafts in your voice, leads scored, tours booked — from your phone, between showings.',
+      cta: 'See the realtor story',
+      href: '/realtors',
+    },
     items: [
-      { icon: PenLine, label: 'Drafts in your voice', desc: 'Replies written before you open the thread', href: '/realtors' },
-      { icon: Target, label: 'Know who to call first', desc: 'Every lead scored against your live deals', href: '/realtors' },
-      { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time — Chippi books and logs it', href: '/realtors' },
-      { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six open tabs', href: '/realtors' },
+      { icon: PenLine, label: 'Drafts in your voice', desc: 'Written before you open the thread', href: '/realtors' },
+      { icon: Target, label: 'Know who to call first', desc: 'Scored against your live deals', href: '/people' },
+      { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time — it’s handled', href: '/realtors' },
+      { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six tabs', href: '/deals' },
     ],
   },
   {
     label: 'For brokerages',
     href: '/brokerages',
+    featured: {
+      eyebrow: 'For brokerages & teams',
+      title: 'One agent for the whole floor.',
+      body: 'Leads routed, performance visible, bottlenecks surfaced — every agent gets a teammate.',
+      cta: 'See the brokerage story',
+      href: '/brokerages',
+    },
     items: [
-      { icon: GitBranch, label: 'Lead routing', desc: 'The right lead to the right agent, logged', href: '/brokerages' },
-      { icon: BarChart3, label: 'See the whole floor', desc: 'Performance and bottlenecks at a glance', href: '/brokerages' },
-      { icon: MessagesSquare, label: 'Team chat', desc: 'Per-deal channels with @chippi in line', href: '/brokerages' },
-      { icon: Users, label: 'Members & roles', desc: 'Owner, admin, member — no permissions maze', href: '/brokerages' },
+      { icon: GitBranch, label: 'Lead routing', desc: 'Right lead, right agent, logged', href: '/brokerages' },
+      { icon: BarChart3, label: 'The whole floor', desc: 'Performance at a glance', href: '/brokerages' },
+      { icon: MessagesSquare, label: 'Team chat', desc: 'Per-deal channels, @chippi in line', href: '/brokerages' },
+      { icon: Users, label: 'Members & roles', desc: 'Three roles, no permissions maze', href: '/brokerages' },
     ],
   },
   {
     label: 'Resources',
     href: '/company',
+    featured: {
+      eyebrow: 'See it live',
+      title: 'Watch Chippi run a floor.',
+      body: 'A 15-minute walkthrough on your own numbers — the inbox, the drafts, the board.',
+      cta: 'Book a demo',
+      href: '/demo',
+    },
     items: [
-      { icon: Plug, label: 'Integrations', desc: 'Connect the tools you already use', href: '/integrations' },
+      { icon: Plug, label: 'Integrations', desc: 'The tools you already use', href: '/integrations' },
       { icon: Building2, label: 'Company', desc: 'Why we built Chippi', href: '/company' },
-      { icon: PlayCircle, label: 'Book a demo', desc: 'See it run on your own floor', href: '/demo' },
+      { icon: PlayCircle, label: 'Book a demo', desc: 'See it on your own floor', href: '/demo' },
       { icon: Activity, label: 'Status', desc: 'Live system status', href: '/status' },
     ],
   },
@@ -189,43 +224,86 @@ export function SiteNav() {
               </div>
             </div>
 
-            {/* Desktop mega panel */}
+            {/* Desktop mega panel — featured story left, link list right */}
             <AnimatePresence>
-              {open && (
-                <motion.div
-                  key={open}
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: EASE_OUT }}
-                  className="absolute left-1/2 top-[calc(100%+10px)] hidden w-[560px] -translate-x-1/2 lg:block"
-                  onMouseLeave={() => setOpen(null)}
-                >
-                  <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/95 p-3 shadow-2xl shadow-black/10 ring-1 ring-inset ring-white/10 backdrop-blur-2xl">
-                    <div className="grid grid-cols-2 gap-1">
-                      {GROUPS.find((g) => g.label === open)?.items.map((it) => {
-                        const Icon = it.icon;
-                        return (
-                          <Link
-                            key={it.label}
-                            href={it.href}
-                            onClick={closeAll}
-                            className="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-foreground/[0.05]"
-                          >
-                            <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border/60 bg-brand-subtle text-brand transition-transform duration-150 group-hover:scale-105">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block text-sm font-medium text-foreground">{it.label}</span>
-                              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{it.desc}</span>
-                            </span>
-                          </Link>
-                        );
-                      })}
+              {open && (() => {
+                const group = GROUPS.find((g) => g.label === open);
+                if (!group) return null;
+                const twoCol = group.items.length > 4;
+                return (
+                  <motion.div
+                    key={open}
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: EASE_OUT }}
+                    className="absolute left-1/2 top-[calc(100%+10px)] hidden w-[720px] -translate-x-1/2 lg:block"
+                    onMouseLeave={() => setOpen(null)}
+                  >
+                    <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-2xl shadow-black/10 ring-1 ring-inset ring-white/10 backdrop-blur-2xl">
+                      <div className="grid grid-cols-[280px_1fr]">
+                        {/* Featured tile — the group's one story */}
+                        <Link
+                          href={group.featured.href}
+                          onClick={closeAll}
+                          className="group/feat relative flex flex-col justify-between overflow-hidden border-r border-border/60 bg-gradient-to-br from-brand-subtle via-background to-background p-6"
+                        >
+                          <div
+                            aria-hidden
+                            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(255,150,79,0.18),transparent_70%)]"
+                          />
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">
+                              {group.featured.eyebrow}
+                            </p>
+                            <p
+                              className="mt-3 text-[19px] leading-snug tracking-tight text-foreground"
+                              style={{ fontFamily: 'var(--font-title)' }}
+                            >
+                              {group.featured.title}
+                            </p>
+                            <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                              {group.featured.body}
+                            </p>
+                          </div>
+                          <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+                            {group.featured.cta}
+                            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover/feat:translate-x-0.5" />
+                          </span>
+                        </Link>
+
+                        {/* Link list */}
+                        <div className="p-4">
+                          <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {group.label}
+                          </p>
+                          <div className={cn('grid gap-0.5', twoCol ? 'grid-cols-2' : 'grid-cols-1')}>
+                            {group.items.map((it) => {
+                              const Icon = it.icon;
+                              return (
+                                <Link
+                                  key={it.label}
+                                  href={it.href}
+                                  onClick={closeAll}
+                                  className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-foreground/[0.05]"
+                                >
+                                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background text-muted-foreground transition-colors duration-150 group-hover:border-brand/40 group-hover:bg-brand-subtle group-hover:text-brand">
+                                    <Icon className="h-[15px] w-[15px]" />
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[13px] font-medium text-foreground">{it.label}</span>
+                                    <span className="block truncate text-[11px] leading-snug text-muted-foreground">{it.desc}</span>
+                                  </span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           </div>
         </div>

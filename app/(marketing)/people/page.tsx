@@ -6,7 +6,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, Flame, Bell, History, Users } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { FeatureGrid, DarkStatBand } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { Reveal } from '@/components/marketing/site/reveal';
 import CustomersTableCard, { type Customer } from '@/components/ui/customers-table-card';
@@ -27,9 +28,9 @@ const CLIENTS: Customer[] = [
 ];
 
 const FEATURES = [
-  { Icon: Flame, title: 'Scored on arrival', body: 'Every new lead lands with a tier and a reason — hot, warm, cold — weighed against your live deals, so you call the right one first.' },
-  { Icon: Bell, title: 'Followed up, automatically', body: 'Chippi watches for the leads going quiet and drafts the nudge before they cool. Nothing slips while you’re showing houses.' },
-  { Icon: History, title: 'One timeline per person', body: 'Every email, text, tour, and note in one place. Open a contact and see the whole relationship — not five scattered tools.' },
+  { kicker: 'On arrival', title: 'Scored with a reason', body: 'Every new lead lands with a tier — hot, warm, cold — weighed against your live deals, so you call the right one first.' },
+  { kicker: 'Automatic', title: 'Followed up before they cool', body: 'Chippi watches for the leads going quiet and drafts the nudge in time. Nothing slips while you’re showing houses.' },
+  { kicker: 'One timeline', title: 'The whole relationship, in view', body: 'Every email, text, tour, and note on one timeline — not five scattered tools.' },
 ];
 
 export default function PeoplePage() {
@@ -65,28 +66,25 @@ export default function PeoplePage() {
               The relationship, kept warm.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <Reveal key={f.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <f.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{f.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={FEATURES} />
           </div>
         </div>
       </section>
 
+      <DarkStatBand
+        eyebrow="The outcome"
+        title="No lead goes cold."
+        stats={[
+          { value: '24/7', label: 'watching the inbox' },
+          { value: '2 min', label: 'to first touch' },
+          { value: '0', label: 'leads slipping' },
+        ]}
+      />
+
       {/* Closing CTA */}
       <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
         <Reveal className="mx-auto max-w-3xl text-center">
-          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brand-subtle text-brand">
-            <Users className="h-5 w-5" />
-          </span>
           <h2 style={TITLE_FONT} className="mx-auto mt-5 max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
             Never let a good lead go cold.
           </h2>

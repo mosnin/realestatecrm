@@ -7,7 +7,11 @@ const isProtectedRoute = createRouteMatcher([
   '/s/(.*)',
   '/setup(.*)',
   '/admin(.*)',
-  '/broker(.*)',
+  // Exact segment + children only. The old '/broker(.*)' pattern also
+  // matched '/brokerAGES' — sending every visitor to the public
+  // /brokerages marketing page to the login screen instead.
+  '/broker',
+  '/broker/(.*)',
   '/invite/(.*)',
   '/join/(.*)',
   '/auth/(.*)',
@@ -79,12 +83,24 @@ const isFullyPublicRoute = createRouteMatcher([
   // which keeps Clerk middleware so the homepage can detect auth users
   // and redirect them to their workspace (see `app/(marketing)/page.tsx`).
   '/realtors',
+  '/brokerages',
   '/teams',
   '/teams/(.*)',
   '/features',
   '/features/(.*)',
   '/pricing',
   '/about',
+  '/company',
+  '/demo',
+  '/integrations',           // marketing integrations page (catalog surface)
+  '/studio',
+  '/properties',
+  '/files',
+  '/people',
+  '/deals',
+  '/capture',
+  '/bio',
+  '/chippi',                 // "Meet Chippi" marketing page
   '/status',                 // marketing system-status page
   '/legal',                  // legal hub + the documents under it
   '/legal/(.*)',

@@ -7,7 +7,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, PenLine, Megaphone, CalendarClock, Home, CalendarCheck, BadgeCheck, TrendingUp, Mail } from 'lucide-react';
+import { ArrowRight, Home, CalendarCheck, BadgeCheck, TrendingUp, Mail } from 'lucide-react';
+import { FeatureGrid } from '@/components/marketing/site/section';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { Coverflow } from '@/components/marketing/site/studio/coverflow';
 import { TITLE_FONT } from '@/lib/typography';
@@ -128,17 +129,17 @@ const CARDS = [
 
 const STEPS = [
   {
-    Icon: PenLine,
+    kicker: 'Step 01',
     title: 'Drafts in your voice',
     body: 'Tell Chippi the listing — or just point it at the deal. It writes the post, the story, and the email the way you actually write, ready to tweak.',
   },
   {
-    Icon: Megaphone,
+    kicker: 'Step 02',
     title: 'Every channel at once',
     body: 'One listing becomes an Instagram post, a story, a just-listed email, and a flyer — formatted for each, on brand, in seconds.',
   },
   {
-    Icon: CalendarClock,
+    kicker: 'Step 03',
     title: 'Scheduled or sent',
     body: 'Approve it and Chippi queues it for the open-house window — or posts now. The whole campaign runs from your phone between showings.',
   },
@@ -206,18 +207,8 @@ export default function StudioPage() {
               A whole campaign, from one listing.
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-marketing-2xl border border-border/60 bg-border/60 md:grid-cols-3">
-            {STEPS.map((s) => (
-              <Reveal key={s.title}>
-                <div className="h-full bg-background p-7">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
-                    <s.Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-10">
+            <FeatureGrid items={STEPS} />
           </div>
         </div>
       </section>
