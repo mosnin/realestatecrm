@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, ChevronDown, ArrowRight,
   PenLine, Target, CalendarCheck, KanbanSquare, Megaphone, Home, FolderOpen,
-  GitBranch, BarChart3, MessagesSquare, Users,
+  GitBranch, BarChart3, MessagesSquare, Users, MessageCircle,
   Plug, Building2, Activity, PlayCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,8 +43,9 @@ interface NavGroup {
 const GROUPS: NavGroup[] = [
   {
     label: 'Product',
-    href: '/studio',
+    href: '/chippi',
     items: [
+      { icon: MessageCircle, label: 'Meet Chippi', desc: 'All your leads, worked while you close', href: '/chippi' },
       { icon: Megaphone, label: 'Content studio', desc: 'Listing posts and emails, on the go', href: '/studio' },
       { icon: Home, label: 'Properties', desc: 'Every listing in one place, synced', href: '/properties' },
       { icon: FolderOpen, label: 'Files', desc: 'Every document, found in one search', href: '/files' },

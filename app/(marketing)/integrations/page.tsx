@@ -12,6 +12,7 @@
  * the home-kit motion + AsciiBlob atmosphere (client).
  */
 
+import IntegrationHero from '@/components/ui/integration-hero';
 import { IntegrationsPage } from '@/components/marketing/integrations/integrations-page';
 
 export const metadata = {
@@ -21,5 +22,10 @@ export const metadata = {
 };
 
 export default function Page() {
-  return <IntegrationsPage />;
+  return (
+    <>
+      <IntegrationHero />
+      <IntegrationsPage />
+    </>
+  );
 }

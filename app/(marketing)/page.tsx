@@ -18,10 +18,11 @@ import { Logos } from '@/components/marketing/site/home/logos';
 import { Features } from '@/components/marketing/site/home/features';
 import { MorningStage } from '@/components/marketing/site/home/morning-stage';
 import { Bento } from '@/components/marketing/site/home/bento';
+import GalleryHoverCarousel from '@/components/ui/gallery-hover-carousel';
 import { Metrics } from '@/components/marketing/site/home/metrics';
 import { Enterprise } from '@/components/marketing/site/home/enterprise';
 import { Trust } from '@/components/marketing/site/home/trust';
-import { CTA } from '@/components/marketing/site/home/cta';
+import CTAWithVerticalMarquee from '@/components/ui/cta-with-text-marquee';
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -36,10 +37,11 @@ export default async function MarketingHomePage() {
       <Features />
       <MorningStage />
       <Bento />
+      <GalleryHoverCarousel />
       <Metrics />
       <Enterprise />
       <Trust />
-      <CTA />
+      <CTAWithVerticalMarquee />
     </div>
   );
 }
