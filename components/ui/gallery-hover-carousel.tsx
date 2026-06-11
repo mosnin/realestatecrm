@@ -37,7 +37,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Every inbound read and scored against your live deals — the one that matters lifted to the top.",
       url: "/realtors",
-      image: "",
+      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-02.png",
     },
     {
       id: "item-2",
@@ -45,7 +45,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Replies written the way you actually write, waiting before you open the thread. Nothing sends without your tap.",
       url: "/realtors",
-      image: "",
+      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/dashboard-gradient.png",
     },
     {
       id: "item-3",
@@ -53,7 +53,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Deals advance as things happen — tours booked, offers in, outcomes logged in plain language.",
       url: "/deals",
-      image: "",
+      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/featured-01.png",
     },
     {
       id: "item-4",
@@ -61,7 +61,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Just listed, open house, just sold — drafted and formatted for every channel from your phone.",
       url: "/studio",
-      image: "",
+      image: "https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/featured-06.png",
     },
     {
       id: "item-5",
@@ -69,7 +69,7 @@ export default function GalleryHoverCarousel({
       summary:
         "Contracts, disclosures, photos — auto-filed to the right deal and found in one search.",
       url: "/files",
-      image: "",
+      image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80",
     },
   ],
 }: {

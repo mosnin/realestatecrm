@@ -895,29 +895,39 @@ it competes with these four — usually it should live one click away.
 
 ## The logged-out site (marketing + auth)
 
-The **logged-out marketing site** runs **one** system — the calm site system —
-end to end. The **auth pages** still wear the louder studio-ASCII brand panel
-(the ASCII field), which is the only surviving piece of the old system.
+The **marketing site is a rich, component-driven showcase.** It is NOT bound
+by the product's paper-flat restraint — that discipline exists for the
+logged-in workspace and stops at the front door. The owner directs the
+marketing aesthetic by handing over reference components; they are integrated
+**faithfully** — their imagery, their depth, their motion — tailored to
+Chippi's copy and brand, not drained into the product's neutral vocabulary.
 
-**The calm site system** (`components/marketing/site/**`) matches the product:
-paper-flat, hairline borders, neutral-first, the serif Times headline the
-product uses for every page title, and a single foreground primary CTA. Orange
-stays the rare Chippi signature, not decoration. Every marketing route — home,
-pricing, realtors, brokerages, integrations, company, status, demo — plus the
-shared chrome (sticky nav + paper-flat footer) is on it.
+Marketing-layer rules (deliberately different from the product):
 
-Why it's calm: the front door makes the first-impression promise of the whole
-product. Chippi's promise is *calm, in control, trustworthy* — you're asking a
-realtor to hand over their inbox and their clients. A loud pitch contradicts
-that the moment they arrive. The site says the same thing the product says, so
-signing up feels like one continuous experience, not a costume-change at the
-door.
+- **Real imagery, never gray slots.** Stock photography (Unsplash et al.),
+  brand icon sets, demo logo CDNs, and avatar imagery are all sanctioned.
+  The old `ImagePlaceholder` "labeled screenshot slot" doctrine is DEAD on
+  marketing surfaces — a wall of dot-grid gray boxes reads as unfinished AI
+  slop, the exact opposite of enterprise. If a real product screenshot
+  isn't available yet, use rich stock imagery as the stand-in, not a gray box.
+- **Component-native design wins.** When the owner provides a component,
+  keep its shadows, gradients, radii, photography, and animation. Recolor
+  off-brand accents (indigo/blue/purple) to Chippi orange where the accent
+  carries brand meaning — and change nothing else without being asked.
+- **Motion is welcome.** Marquees, carousels, scroll choreography, 3D cards,
+  hover reveals — all sanctioned on marketing pages. Keep reduced-motion
+  fallbacks; never let an effect trap page scroll.
+- Serif Times stays the headline voice and the foreground pill stays the
+  primary CTA, so the pages still read as one family.
+- Honesty still holds for CLAIMS: no fabricated customer testimonials, no
+  invented metrics presented as real, honest trial copy ("7 days free, then
+  $97/mo"). Illustrative imagery is fine; fake social proof is not.
 
-**The system never leaks into the product.** Marketing colour/shadow live
-behind opt-in classes (`.font-brand`, `.text-gradient-brand`,
-`.rounded-marketing-*`) or inside `components/marketing/**`. The
-`no-stray-orange` and `no-shadow-on-product-chrome` tests still pass because
-`components/marketing` is outside the strict zone.
+**The marketing system never leaks into the product.** Everything lives in
+`components/marketing/**`, `components/ui/*` marketing blocks, or opt-in
+classes (`.font-brand`, `.rounded-marketing-*`, `.liquid-glass`). The
+`no-stray-orange` and `no-shadow-on-product-chrome` tests guard the product
+dirs; the marketing layer is outside the strict zone by design.
 
 ### The calm site system (`components/marketing/site/`)
 

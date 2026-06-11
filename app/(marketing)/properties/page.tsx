@@ -28,15 +28,16 @@ interface Prop {
   status: 'Active' | 'Pending' | 'New';
   source: string;
   className: string;
+  photo: string;
 }
 
 const PROPERTIES: Prop[] = [
-  { address: '14 Oak St', city: 'Oakland, CA', price: '$1,200,000', beds: '3 bd · 2 ba · 1,840 sqft', status: 'Active', source: 'kvCORE', className: 'absolute left-[8%] top-[8%] rotate-[-6deg]' },
-  { address: '220 Marina Blvd', city: 'San Francisco, CA', price: '$2,400,000', beds: '4 bd · 3 ba · 2,600 sqft', status: 'Active', source: 'Follow-up Boss', className: 'absolute left-[36%] top-[2%] rotate-[5deg]' },
-  { address: '88 Pine Ave', city: 'Alameda, CA', price: '$740,000', beds: '2 bd · 1 ba · 1,100 sqft', status: 'Pending', source: 'Compass', className: 'absolute left-[60%] top-[12%] rotate-[8deg]' },
-  { address: '5 Birch Ln', city: 'Berkeley, CA', price: '$960,000', beds: '3 bd · 2 ba · 1,520 sqft', status: 'Active', source: 'Salesforce', className: 'absolute left-[14%] top-[44%] rotate-[4deg]' },
-  { address: '31 Harbor Way', city: 'Sausalito, CA', price: '$1,800,000', beds: '4 bd · 3 ba · 2,310 sqft', status: 'Active', source: 'HubSpot', className: 'absolute left-[44%] top-[48%] rotate-[-5deg]' },
-  { address: '410 Sunset Dr', city: 'Oakland, CA', price: '$620,000', beds: '2 bd · 2 ba · 980 sqft', status: 'New', source: 'Added by you', className: 'absolute left-[66%] top-[42%] rotate-[7deg]' },
+  { address: '14 Oak St', city: 'Oakland, CA', price: '$1,200,000', beds: '3 bd · 2 ba · 1,840 sqft', status: 'Active', source: 'kvCORE', className: 'absolute left-[8%] top-[8%] rotate-[-6deg]' , photo: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=640&h=420&fit=crop&q=80' },
+  { address: '220 Marina Blvd', city: 'San Francisco, CA', price: '$2,400,000', beds: '4 bd · 3 ba · 2,600 sqft', status: 'Active', source: 'Follow-up Boss', className: 'absolute left-[36%] top-[2%] rotate-[5deg]' , photo: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=640&h=420&fit=crop&q=80' },
+  { address: '88 Pine Ave', city: 'Alameda, CA', price: '$740,000', beds: '2 bd · 1 ba · 1,100 sqft', status: 'Pending', source: 'Compass', className: 'absolute left-[60%] top-[12%] rotate-[8deg]' , photo: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&h=420&fit=crop&q=80' },
+  { address: '5 Birch Ln', city: 'Berkeley, CA', price: '$960,000', beds: '3 bd · 2 ba · 1,520 sqft', status: 'Active', source: 'Salesforce', className: 'absolute left-[14%] top-[44%] rotate-[4deg]' , photo: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=640&h=420&fit=crop&q=80' },
+  { address: '31 Harbor Way', city: 'Sausalito, CA', price: '$1,800,000', beds: '4 bd · 3 ba · 2,310 sqft', status: 'Active', source: 'HubSpot', className: 'absolute left-[44%] top-[48%] rotate-[-5deg]' , photo: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=640&h=420&fit=crop&q=80' },
+  { address: '410 Sunset Dr', city: 'Oakland, CA', price: '$620,000', beds: '2 bd · 2 ba · 980 sqft', status: 'New', source: 'Added by you', className: 'absolute left-[66%] top-[42%] rotate-[7deg]' , photo: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=640&h=420&fit=crop&q=80' },
 ];
 
 const STATUS_TONE: Record<Prop['status'], string> = {
@@ -48,6 +49,10 @@ const STATUS_TONE: Record<Prop['status'], string> = {
 function PropertyCardInner({ p }: { p: Prop }) {
   return (
     <>
+      <div className="-mx-5 -mt-5 mb-4 h-36 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.photo} alt={p.address} className="h-full w-full object-cover" loading="lazy" draggable={false} />
+      </div>
       <div className="flex items-start justify-between">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-brand-subtle text-brand">
           <Building2 className="h-4 w-4" />

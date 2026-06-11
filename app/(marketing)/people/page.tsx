@@ -2,7 +2,7 @@
  * `/people` — every lead and client in one place, scored and followed up.
  * Hero (PageHero, consistent with the other sub-pages) → the provided
  * CustomersTableCard as the "how people are managed" centerpiece → how-it-works
- * feature cards → CTA. Headshots are initials placeholders.
+ * feature cards → CTA. Headshots are stock stand-ins until real imagery lands.
  */
 
 import Link from 'next/link';
@@ -19,11 +19,11 @@ export const metadata = {
 };
 
 const CLIENTS: Customer[] = [
-  { id: 1, date: '2h ago', status: 'Active', statusVariant: 'warning', name: 'Maya Patel · buyer', initials: 'MP', revenue: '$1,200,000' },
-  { id: 2, date: '5h ago', status: 'Active', statusVariant: 'warning', name: 'Sara Voss · seller', initials: 'SV', revenue: '$2,400,000' },
-  { id: 3, date: '1d ago', status: 'Closed', statusVariant: 'success', name: 'Bernard Ng', initials: 'BN', revenue: '$890,000' },
-  { id: 4, date: '2d ago', status: 'Active', statusVariant: 'warning', name: 'Eli Vance · buyer', initials: 'EV', revenue: '$815,000' },
-  { id: 5, date: '6d ago', status: 'Lost', statusVariant: 'danger', name: 'Dana Lee', initials: 'DL', revenue: '$640,000' },
+  { id: 1, date: '2h ago', status: 'Active', statusVariant: 'warning', name: 'Maya Patel · buyer', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop&crop=faces&q=80', revenue: '$1,200,000' },
+  { id: 2, date: '5h ago', status: 'Active', statusVariant: 'warning', name: 'Sara Voss · seller', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=faces&q=80', revenue: '$2,400,000' },
+  { id: 3, date: '1d ago', status: 'Closed', statusVariant: 'success', name: 'Bernard Ng', avatar: 'https://avatars.githubusercontent.com/u/31113941?v=4', revenue: '$890,000' },
+  { id: 4, date: '2d ago', status: 'Active', statusVariant: 'warning', name: 'Eli Vance · buyer', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=faces&q=80', revenue: '$815,000' },
+  { id: 5, date: '6d ago', status: 'Lost', statusVariant: 'danger', name: 'Dana Lee', avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=64&h=64&fit=crop&crop=faces&q=80', revenue: '$640,000' },
 ];
 
 const FEATURES = [

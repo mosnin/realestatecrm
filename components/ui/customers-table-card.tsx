@@ -17,7 +17,7 @@ export type Customer = {
   status: 'Closed' | 'Lost' | 'Active'
   statusVariant: 'success' | 'danger' | 'warning'
   name: string
-  initials: string
+  avatar: string
   revenue: string
 }
 
@@ -29,10 +29,10 @@ export type CustomersTableCardProps = {
 }
 
 const DEFAULT_CUSTOMERS: Customer[] = [
-  { id: 1, date: 'Oct 31', status: 'Closed', statusVariant: 'success', name: 'Bernard Ng', initials: 'BN', revenue: '$1,200,000' },
-  { id: 2, date: 'Oct 21', status: 'Active', statusVariant: 'warning', name: 'Maya Patel', initials: 'MP', revenue: '$740,000' },
-  { id: 3, date: 'Oct 15', status: 'Closed', statusVariant: 'success', name: 'Glodie Roy', initials: 'GR', revenue: '$2,400,000' },
-  { id: 4, date: 'Oct 12', status: 'Lost', statusVariant: 'danger', name: 'Theo Marsh', initials: 'TM', revenue: '$620,000' },
+  { id: 1, date: 'Oct 31', status: 'Closed', statusVariant: 'success', name: 'Bernard Ng', avatar: 'https://avatars.githubusercontent.com/u/31113941?v=4', revenue: '$1,200,000' },
+  { id: 2, date: 'Oct 21', status: 'Active', statusVariant: 'warning', name: 'Maya Patel', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop&crop=faces&q=80', revenue: '$740,000' },
+  { id: 3, date: 'Oct 15', status: 'Closed', statusVariant: 'success', name: 'Glodie Roy', avatar: 'https://avatars.githubusercontent.com/u/99137927?v=4', revenue: '$2,400,000' },
+  { id: 4, date: 'Oct 12', status: 'Lost', statusVariant: 'danger', name: 'Theo Marsh', avatar: 'https://avatars.githubusercontent.com/u/68236786?v=4', revenue: '$620,000' },
 ]
 
 const Badge = ({
@@ -102,9 +102,10 @@ export default function CustomersTableCard({
                 </td>
                 <td>
                   <div className="flex items-center gap-2">
-                    <span className="flex size-7 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-medium text-foreground/70 ring-1 ring-border/60">
-                      {customer.initials}
-                    </span>
+                    <div className="size-7 overflow-hidden rounded-full ring-1 ring-border/60">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={customer.avatar} alt={customer.name} width={28} height={28} loading="lazy" />
+                    </div>
                     <span className="truncate font-medium text-foreground">{customer.name}</span>
                   </div>
                 </td>

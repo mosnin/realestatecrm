@@ -22,7 +22,7 @@ export const metadata = {
 function PostCard({
   tag,
   Icon,
-  tone,
+  photo,
   headline,
   meta,
   caption,
@@ -30,7 +30,7 @@ function PostCard({
 }: {
   tag: string;
   Icon: React.ElementType;
-  tone: string;
+  photo: string;
   headline: string;
   meta: string;
   caption: string;
@@ -39,8 +39,11 @@ function PostCard({
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-2xl shadow-foreground/[0.10] ring-1 ring-inset ring-white/5">
       {/* media */}
-      <div className={`relative flex flex-1 flex-col justify-between p-4 ${tone}`}>
-        <div className="flex items-center justify-between">
+      <div className="relative flex flex-1 flex-col justify-between p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo} alt={headline} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/20" />
+        <div className="relative flex items-center justify-between">
           <span className="rounded-full bg-background/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground backdrop-blur-sm">
             {tag}
           </span>
@@ -48,9 +51,9 @@ function PostCard({
             <Icon className="h-4 w-4" />
           </span>
         </div>
-        <div>
-          <p className="text-[15px] font-semibold leading-snug text-foreground">{headline}</p>
-          <p className="mt-0.5 text-[11px] text-foreground/70">{meta}</p>
+        <div className="relative">
+          <p className="text-[15px] font-semibold leading-snug text-white">{headline}</p>
+          <p className="mt-0.5 text-[11px] text-white/75">{meta}</p>
         </div>
       </div>
       {/* caption */}
@@ -75,7 +78,7 @@ const CARDS = [
     key="listed"
     tag="Just listed"
     Icon={Home}
-    tone="bg-gradient-to-br from-brand-subtle to-muted/40"
+    photo="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=640&h=900&fit=crop&q=80"
     headline="14 Oak St — just listed"
     meta="$1,200,000 · 3 bd · 2 ba · Oakland"
     caption="Light-filled craftsman steps from the lake. Open this weekend — DM for a private tour."
@@ -85,7 +88,7 @@ const CARDS = [
     key="open"
     tag="Open house"
     Icon={CalendarCheck}
-    tone="bg-gradient-to-br from-muted/50 to-brand-subtle"
+    photo="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&h=900&fit=crop&q=80"
     headline="Open Sat 1–3 PM"
     meta="220 Marina Blvd · waterfront"
     caption="Come see the view in person. Coffee’s on us. Saturday 1–3, see you there."
@@ -95,7 +98,7 @@ const CARDS = [
     key="sold"
     tag="Just sold"
     Icon={BadgeCheck}
-    tone="bg-gradient-to-br from-emerald-500/12 to-muted/40"
+    photo="https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=640&h=900&fit=crop&q=80"
     headline="Sold — over asking"
     meta="88 Pine Ave · 6 days on market"
     caption="Another one closed. Thinking of selling? Let’s talk about what your home is worth today."
@@ -105,7 +108,7 @@ const CARDS = [
     key="price"
     tag="Price improved"
     Icon={TrendingUp}
-    tone="bg-gradient-to-br from-brand-subtle to-muted/30"
+    photo="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=640&h=900&fit=crop&q=80"
     headline="New price — $960,000"
     meta="5 Birch Ln · was $995,000"
     caption="Priced to move. Three beds, big yard, top schools. Book a showing this week."
@@ -115,7 +118,7 @@ const CARDS = [
     key="market"
     tag="Market update"
     Icon={Mail}
-    tone="bg-gradient-to-br from-muted/50 to-brand-subtle/70"
+    photo="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=640&h=900&fit=crop&q=80"
     headline="Your November market, in 60 seconds"
     meta="Email · sent to 1,240 contacts"
     caption="Inventory’s up 8%, rates eased. Here’s what it means if you’re buying or selling."

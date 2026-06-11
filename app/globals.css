@@ -1065,6 +1065,16 @@
   0% { background-position: 0%; }
   100% { background-position: 200%; }
 }
+.animate-rainbow { animation: rainbow 4s linear infinite; }
+
+/* Rainbow glow stops (marketing ruixen section). Warm, brand-adjacent. */
+:root {
+  --color-1: 25 95% 62%;
+  --color-2: 35 95% 60%;
+  --color-3: 15 90% 60%;
+  --color-4: 45 95% 58%;
+  --color-5: 5 90% 62%;
+}
 
 @keyframes pulse-brand {
   0%, 100% { box-shadow: 0 0 20px rgba(255, 150, 79, 0.3); }

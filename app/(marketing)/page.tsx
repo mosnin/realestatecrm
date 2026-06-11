@@ -14,13 +14,15 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { Hero } from '@/components/marketing/site/home/hero';
-import { Logos } from '@/components/marketing/site/home/logos';
+import { Logos3 } from '@/components/ui/logos3';
 import { Features } from '@/components/marketing/site/home/features';
 import { MorningStage } from '@/components/marketing/site/home/morning-stage';
 import { Bento } from '@/components/marketing/site/home/bento';
 import GalleryHoverCarousel from '@/components/ui/gallery-hover-carousel';
+import RuixenSection from '@/components/ui/ruixen-feature-section';
 import { Metrics } from '@/components/marketing/site/home/metrics';
 import { Enterprise } from '@/components/marketing/site/home/enterprise';
+import Casestudies from '@/components/ui/case-studies';
 import { Trust } from '@/components/marketing/site/home/trust';
 import CTAWithVerticalMarquee from '@/components/ui/cta-with-text-marquee';
 
@@ -33,13 +35,15 @@ export default async function MarketingHomePage() {
   return (
     <div className="bg-background text-foreground">
       <Hero />
-      <Logos />
+      <Logos3 />
       <Features />
       <MorningStage />
       <Bento />
       <GalleryHoverCarousel />
+      <RuixenSection />
       <Metrics />
       <Enterprise />
+      <Casestudies />
       <Trust />
       <CTAWithVerticalMarquee />
     </div>

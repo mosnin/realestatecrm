@@ -27,7 +27,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com",
+      "img-src 'self' data: blob: https:",
       "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
@@ -45,6 +45,21 @@ const nextConfig: NextConfig = {
   // makes Next.js require() it from node_modules instead, with intact
   // relative paths.
   serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  // Remote imagery for the marketing site's rich sections — stock
+  // photography, demo logo CDNs, brand icon sets, avatar hosts. Marketing
+  // only; product imagery stays first-party (Wasabi signed URLs use <img>).
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'plus.unsplash.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'cdn-icons-png.flaticon.com' },
+      { protocol: 'https', hostname: 'deifkwefumgah.cloudfront.net' },
+      { protocol: 'https', hostname: 'www.shadcnblocks.com' },
+      { protocol: 'https', hostname: 'shadcnblocks.com' },
+      { protocol: 'https', hostname: 'pub-940ccf6255b54fa799a9b01050e6c227.r2.dev' },
+    ],
+  },
   async headers() {
     return [
       {

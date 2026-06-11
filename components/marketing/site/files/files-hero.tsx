@@ -27,19 +27,23 @@ function FileTile({
   Icon,
   name,
   meta,
-  tone,
+  photo,
   className,
 }: {
   Icon: React.ElementType;
   name: string;
   meta: string;
-  tone: string;
+  photo: string;
   className?: string;
 }) {
   return (
     <div className={`rounded-2xl border border-border/70 bg-card p-2 shadow-2xl shadow-foreground/[0.10] ring-1 ring-inset ring-white/5 ${className ?? ''}`}>
-      <div className={`flex h-28 items-center justify-center rounded-xl ${tone}`}>
-        <Icon className="h-9 w-9 text-foreground/70" />
+      <div className="relative h-28 overflow-hidden rounded-xl">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo} alt={name} className="h-full w-full object-cover" loading="lazy" />
+        <span className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-background/85 text-foreground backdrop-blur-sm">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
       </div>
       <p className="mt-2 truncate px-1 text-xs font-medium text-foreground">{name}</p>
       <p className="truncate px-1 text-[11px] text-muted-foreground">{meta}</p>
@@ -112,7 +116,7 @@ export function FilesHero() {
             transition={{ duration: 0.5, ease: EASE_OUT }}
             className="absolute left-1/2 top-0 w-44 -translate-x-1/2"
           >
-            <FileTile Icon={FileText} name="Listing agreement.pdf" meta="14 Oak St · signed" tone="bg-gradient-to-br from-brand-subtle to-muted/40" />
+            <FileTile Icon={FileText} name="Listing agreement.pdf" meta="14 Oak St · signed" photo="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=640&h=420&fit=crop&q=80" />
           </motion.div>
           <motion.div
             initial={reduce ? false : { opacity: 0, scale: 0.85 }}
@@ -120,7 +124,7 @@ export function FilesHero() {
             transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.12 }}
             className="absolute right-0 top-1/3 w-40"
           >
-            <FileTile Icon={ImageIcon} name="Front exterior.jpg" meta="220 Marina Blvd" tone="bg-gradient-to-br from-muted/60 to-brand-subtle" />
+            <FileTile Icon={ImageIcon} name="Front exterior.jpg" meta="220 Marina Blvd" photo="https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=640&h=420&fit=crop&q=80" />
           </motion.div>
           <motion.div
             initial={reduce ? false : { opacity: 0, scale: 0.85 }}
@@ -128,7 +132,7 @@ export function FilesHero() {
             transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.24 }}
             className="absolute bottom-0 left-0 w-40"
           >
-            <FileTile Icon={FileSpreadsheet} name="CMA — 88 Pine.pdf" meta="Comp analysis" tone="bg-gradient-to-br from-muted/50 to-muted/20" />
+            <FileTile Icon={FileSpreadsheet} name="CMA — 88 Pine.pdf" meta="Comp analysis" photo="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=640&h=420&fit=crop&q=80" />
           </motion.div>
         </div>
       </div>

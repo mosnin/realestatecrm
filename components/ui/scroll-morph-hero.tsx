@@ -2,11 +2,11 @@
 
 /**
  * Scroll-morph hero — the provided IntroAnimation, tailored to Chippi:
- * the cards are LEAD HEADSHOT PLACEHOLDERS (initials tiles — no external
- * images), the copy is "All your leads in one place", and colors ride the
- * theme tokens. Mechanics preserved exactly: scatter → line → circle intro,
- * virtual-scroll morph from circle to a bottom arc, parallax, flip-on-hover.
- * Reduced motion renders a calm static avatar grid instead of the choreography.
+ * the cards are lead HEADSHOTS (stock portrait photography standing in until
+ * real customer imagery exists), the copy is "All your leads in one place",
+ * and colors ride the theme tokens. Mechanics preserved exactly: scatter →
+ * line → circle intro, virtual-scroll morph from circle to a bottom arc,
+ * parallax, flip-on-hover. Reduced motion renders a static headshot grid.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -18,6 +18,7 @@ interface Person {
     initials: string;
     name: string;
     tag: string;
+    photo: string;
 }
 
 interface FlipCardProps {
@@ -29,15 +30,7 @@ interface FlipCardProps {
 const IMG_WIDTH = 60;
 const IMG_HEIGHT = 85;
 
-/* Warm placeholder tones for the headshot tiles — brand-adjacent, no photos. */
-const TILE_TONES = [
-    'from-brand-subtle to-muted/60',
-    'from-muted/70 to-brand-subtle',
-    'from-foreground/[0.06] to-brand-subtle',
-    'from-brand-subtle to-foreground/[0.04]',
-];
-
-function FlipCard({ person, index, target }: FlipCardProps) {
+function FlipCard({ person, target }: FlipCardProps) {
     return (
         <motion.div
             animate={{
@@ -63,15 +56,21 @@ function FlipCard({ person, index, target }: FlipCardProps) {
                 transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
                 whileHover={{ rotateY: 180 }}
             >
-                {/* Front Face — headshot placeholder */}
+                {/* Front Face — headshot */}
                 <div
-                    className={`absolute inset-0 flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br shadow-lg ${TILE_TONES[index % TILE_TONES.length]}`}
+                    className="absolute inset-0 h-full w-full overflow-hidden rounded-xl bg-muted shadow-lg"
                     style={{ backfaceVisibility: "hidden" }}
                 >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-semibold text-foreground/70">
-                        {person.initials}
-                    </span>
-                    <p className="mt-1.5 max-w-full truncate px-1 text-[8px] font-medium text-foreground/70">{person.name}</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={person.photo}
+                        alt={person.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-1.5 pb-1 pt-4">
+                        <p className="truncate text-[8px] font-medium text-white">{person.name}</p>
+                    </div>
                 </div>
 
                 {/* Back Face */}
@@ -93,26 +92,26 @@ const TOTAL_IMAGES = 20;
 const MAX_SCROLL = 3000;
 
 const PEOPLE: Person[] = [
-    { initials: 'MP', name: 'Maya P.', tag: 'Hot' },
-    { initials: 'TR', name: 'Tom R.', tag: 'Warm' },
-    { initials: 'SV', name: 'Sara V.', tag: 'Hot' },
-    { initials: 'EV', name: 'Eli V.', tag: 'Warm' },
-    { initials: 'DL', name: 'Dana L.', tag: 'New' },
-    { initials: 'BN', name: 'Bernard N.', tag: 'Closed' },
-    { initials: 'PN', name: 'Priya N.', tag: 'Hot' },
-    { initials: 'GR', name: 'Glodie R.', tag: 'Warm' },
-    { initials: 'JM', name: 'Jon M.', tag: 'New' },
-    { initials: 'AS', name: 'Ana S.', tag: 'Hot' },
-    { initials: 'KL', name: 'Kim L.', tag: 'Warm' },
-    { initials: 'OB', name: 'Omar B.', tag: 'New' },
-    { initials: 'CW', name: 'Cara W.', tag: 'Hot' },
-    { initials: 'FH', name: 'Finn H.', tag: 'Warm' },
-    { initials: 'LT', name: 'Lena T.', tag: 'New' },
-    { initials: 'RD', name: 'Ray D.', tag: 'Closed' },
-    { initials: 'NB', name: 'Nina B.', tag: 'Hot' },
-    { initials: 'VM', name: 'Vic M.', tag: 'Warm' },
-    { initials: 'IS', name: 'Isla S.', tag: 'New' },
-    { initials: 'HG', name: 'Hugo G.', tag: 'Warm' },
+    { initials: 'MP', name: 'Maya P.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'TR', name: 'Tom R.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'SV', name: 'Sara V.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'EV', name: 'Eli V.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'DL', name: 'Dana L.', tag: 'New' , photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'BN', name: 'Bernard N.', tag: 'Closed' , photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'PN', name: 'Priya N.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'GR', name: 'Glodie R.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'JM', name: 'Jon M.', tag: 'New' , photo: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'AS', name: 'Ana S.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'KL', name: 'Kim L.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'OB', name: 'Omar B.', tag: 'New' , photo: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'CW', name: 'Cara W.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'FH', name: 'Finn H.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'LT', name: 'Lena T.', tag: 'New' , photo: 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'RD', name: 'Ray D.', tag: 'Closed' , photo: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'NB', name: 'Nina B.', tag: 'Hot' , photo: 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'VM', name: 'Vic M.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'IS', name: 'Isla S.', tag: 'New' , photo: 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=300&h=420&fit=crop&crop=faces&q=80' },
+    { initials: 'HG', name: 'Hugo G.', tag: 'Warm' , photo: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=300&h=420&fit=crop&crop=faces&q=80' },
 ];
 
 const lerp = (start: number, end: number, t: number) => start * (1 - t) + end * t;
@@ -270,13 +269,9 @@ export default function IntroAnimation() {
                 </div>
                 <div className="mx-auto mt-10 grid max-w-2xl grid-cols-5 gap-3 sm:grid-cols-10">
                     {PEOPLE.map((p, i) => (
-                        <div
-                            key={p.name}
-                            className={`flex aspect-[60/85] flex-col items-center justify-center rounded-xl border border-border/60 bg-gradient-to-br ${TILE_TONES[i % TILE_TONES.length]}`}
-                        >
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-semibold text-foreground/70">
-                                {p.initials}
-                            </span>
+                        <div key={p.name} className="aspect-[60/85] overflow-hidden rounded-xl border border-border/60 bg-muted">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={p.photo} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
                         </div>
                     ))}
                 </div>
