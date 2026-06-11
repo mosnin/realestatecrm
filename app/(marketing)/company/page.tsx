@@ -5,14 +5,14 @@
  * lived the gap built Chippi to close it. Mission → the gap → the founders →
  * beliefs → a calm close.
  *
- * Rebuilt off the legacy studio-ASCII version onto the calm vocabulary
- * (PageHero, Reveal, serif headlines). Auth users bounce to their workspace.
+ * Rebuilt off the legacy studio-ASCII version onto the shared vocabulary
+ * (PageHero, FadeUp, serif headlines). Auth users bounce to their workspace.
  */
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
-import { Reveal } from '@/components/marketing/site/reveal';
+import { FadeUp } from '@/components/marketing/site/section';
 import { Founders } from '@/components/marketing/company/founders';
 import { TITLE_FONT } from '@/lib/typography';
 
@@ -48,7 +48,7 @@ export default function CompanyPage() {
 
       {/* The gap */}
       <section className="bg-background px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl">
+        <FadeUp className="mx-auto max-w-3xl">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             The gap
           </p>
@@ -68,13 +68,13 @@ export default function CompanyPage() {
               the whole reason Chippi exists.
             </p>
           </div>
-        </Reveal>
+        </FadeUp>
       </section>
 
       {/* Founders */}
       <section className="border-y border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-5xl">
-          <Reveal className="mx-auto max-w-3xl text-center">
+          <FadeUp className="mx-auto max-w-3xl text-center">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
               The founders
             </p>
@@ -85,7 +85,7 @@ export default function CompanyPage() {
               Orlando and Preston teamed up to solve the problem from both ends: the agent’s
               day and the brokerage’s floor.
             </p>
-          </Reveal>
+          </FadeUp>
           <div className="mt-14">
             <Founders />
           </div>
@@ -94,7 +94,7 @@ export default function CompanyPage() {
 
       {/* Beliefs */}
       <section className="bg-background px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl">
+        <FadeUp className="mx-auto max-w-3xl">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             What we believe
           </p>
@@ -109,12 +109,12 @@ export default function CompanyPage() {
               </li>
             ))}
           </ul>
-        </Reveal>
+        </FadeUp>
       </section>
 
       {/* Close */}
       <section className="bg-background px-4 pb-24 sm:px-6 sm:pb-32">
-        <Reveal className="mx-auto max-w-3xl text-center">
+        <FadeUp className="mx-auto max-w-3xl text-center">
           <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
             Come see what your day looks like with Chippi.
           </h2>
@@ -137,7 +137,7 @@ export default function CompanyPage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">7 days free, then $97/mo. Cancel anytime.</p>
-        </Reveal>
+        </FadeUp>
       </section>
     </>
   );

@@ -6,9 +6,9 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, MessageCircle } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import IntroAnimation from '@/components/ui/scroll-morph-hero';
-import { Reveal } from '@/components/marketing/site/reveal';
+import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
 import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
 import FeaturesTailark from '@/components/ui/features-tailark';
 import { TITLE_FONT } from '@/lib/typography';
@@ -35,11 +35,11 @@ export default function MeetChippiPage() {
 
       {/* What Chippi is */}
       <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brand-subtle text-brand">
-            <MessageCircle className="h-5 w-5" />
-          </span>
-          <h2 style={TITLE_FONT} className="mx-auto mt-5 max-w-2xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+        <FadeUp className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            What Chippi is
+          </p>
+          <h2 style={TITLE_FONT} className="mx-auto mt-4 max-w-2xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
             Not another tool. A{' '}
             <PointerHighlight>
               <span>teammate</span>
@@ -51,7 +51,7 @@ export default function MeetChippiPage() {
             scoring, drafting, booking, updating — and brings you the decisions, not the busywork.
             Approval-first by default; nothing leaves without your name on it.
           </p>
-        </Reveal>
+        </FadeUp>
       </section>
 
       {/* A teammate in every part of the day — soft feature cards */}
@@ -62,9 +62,9 @@ export default function MeetChippiPage() {
       {/* Where it works */}
       <section className="bg-background px-4 pb-20 sm:px-6 sm:pb-28">
         <div className="mx-auto max-w-5xl">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {SURFACES.map((s) => (
-              <Reveal key={s.title}>
+              <StaggerItem key={s.title}>
                 <Link href={s.href} className="group block h-full rounded-3xl border border-border/60 bg-background p-7 transition-colors duration-200 hover:border-border">
                   <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-brand">{s.kicker}</p>
                   <h3 className="mt-3 text-[17px] font-semibold leading-snug text-foreground">{s.title}</h3>
@@ -74,15 +74,15 @@ export default function MeetChippiPage() {
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
                   </span>
                 </Link>
-              </Reveal>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
       {/* Closing CTA */}
       <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
+        <FadeUp className="mx-auto max-w-3xl text-center">
           <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
             Put Chippi on your book.
           </h2>
@@ -98,7 +98,7 @@ export default function MeetChippiPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </Reveal>
+        </FadeUp>
       </section>
     </>
   );

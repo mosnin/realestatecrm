@@ -1,14 +1,14 @@
 /**
- * `/` (home): Chippi homepage on the calm site system.
+ * `/` (home): the Chippi homepage on the shared marketing system.
  *
- * An editorial scroll that says the idea once and shows the product:
- *   promise (hero + workspace shot) → integrations → the loop as alternating
- *   feature rows → a scroll-cinematic morning (pinned, scroll-as-clock) → the
- *   breadth (bento) → an honest metrics band → the enterprise-trust band → the
- *   belief → the ask.
+ * One arc, no repeats — each beat earns its place and none restates another:
+ *   promise (video hero) → the stack it joins (logos) → the loop, shown
+ *   (feature rows) → a whole morning (pinned stage) → the breadth (gallery
+ *   card) → voices + integrations (ruixen card) → built for the enterprise
+ *   floor → results (case-studies card) → the ask (marquee CTA).
  *
- * Image placeholders (hero, feature rows, studio) are labeled slots for real
- * screenshots. Auth users bounce straight to their workspace (unchanged).
+ * Cards (rounded surfaces) break the lower half; the live product panels carry
+ * the proof. Auth users bounce straight to their workspace (unchanged).
  */
 
 import { auth } from '@clerk/nextjs/server';
@@ -30,11 +30,6 @@ export default async function MarketingHomePage() {
     redirect('/auth/redirect?intent=realtor');
   }
 
-  // One arc, no repeats: promise (video hero) → the stack it joins (logos) →
-  // the loop, shown (feature rows) → a whole morning (pinned stage) → the
-  // breadth (feature carousel) → voices + integrations (ruixen) → built for
-  // the enterprise floor → results (case studies) → the ask (marquee CTA).
-  // Bento, Metrics, and Trust were cut: each repeated a stronger section.
   return (
     <div className="bg-background text-foreground">
       <Hero />

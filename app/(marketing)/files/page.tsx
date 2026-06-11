@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { Reveal } from '@/components/marketing/site/reveal';
+import { FadeUp } from '@/components/marketing/site/section';
 import { FilesHero } from '@/components/marketing/site/files/files-hero';
 import { GooeyFiles } from '@/components/marketing/site/files/gooey-files';
 import { TITLE_FONT } from '@/lib/typography';
@@ -25,7 +25,7 @@ export default function FilesPage() {
       {/* Gooey showcase — find anything */}
       <section className="bg-background px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-5xl">
-          <Reveal className="mx-auto max-w-2xl text-center">
+          <FadeUp className="mx-auto max-w-2xl text-center">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
               Everything filed
             </p>
@@ -36,7 +36,7 @@ export default function FilesPage() {
               Chippi sorts every file by deal, client, and type the moment it lands. No naming
               conventions, no nested folders — just ask, and it’s there.
             </p>
-          </Reveal>
+          </FadeUp>
           <div className="mt-14">
             <GooeyFiles />
           </div>
@@ -45,7 +45,7 @@ export default function FilesPage() {
 
       {/* Closing CTA */}
       <section className="border-t border-border/60 bg-muted/20 px-4 py-24 sm:px-6 sm:py-28">
-        <Reveal className="mx-auto max-w-3xl text-center">
+        <FadeUp className="mx-auto max-w-3xl text-center">
           <h2 style={TITLE_FONT} className="mx-auto max-w-xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
             Stop hunting for the contract.
           </h2>
@@ -61,7 +61,7 @@ export default function FilesPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </Reveal>
+        </FadeUp>
       </section>
     </>
   );
