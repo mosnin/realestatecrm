@@ -16,6 +16,7 @@ import { PageHero } from '@/components/marketing/site/page-hero';
 import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { RoutingPanel, LeaderboardPanel, TeamChatPanel, MembersPanel } from '@/components/marketing/site/home/more-panels';
+import { PointerHighlight } from '@/components/marketing/site/pointer-highlight';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = { title: 'For brokerages · Chippi' };
@@ -116,7 +117,11 @@ export default function BrokeragesPage() {
               Empower the floor
             </p>
             <h2 style={TITLE_FONT} className="mt-3 text-3xl tracking-tight text-foreground sm:text-[2.5rem]">
-              Give every agent an extra teammate.
+              Give every agent an extra{' '}
+              <PointerHighlight>
+                <span>teammate</span>
+              </PointerHighlight>
+              .
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
               A brokerage doesn’t fail on features — it fails when the realtors stop

@@ -17,6 +17,7 @@ import { FeatureRow } from '@/components/marketing/site/feature-row';
 import { Reveal } from '@/components/marketing/site/reveal';
 import { InboxPanel, DraftPanel, CalendarPanel } from '@/components/marketing/site/home/live-panels';
 import { TriagePanel, PipelinePanel } from '@/components/marketing/site/home/more-panels';
+import { HeroHighlight, Highlight } from '@/components/marketing/site/hero-highlight';
 import { TITLE_FONT } from '@/lib/typography';
 
 export const metadata = {
@@ -132,6 +133,26 @@ export default function RealtorsPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Your second brain */}
+      <section className="border-y border-border/60">
+        <HeroHighlight containerClassName="px-4 py-24 sm:py-28">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Your second brain
+            </p>
+            <h2 style={TITLE_FONT} className="mx-auto mt-4 max-w-2xl text-3xl leading-tight tracking-tight text-foreground sm:text-[2.5rem]">
+              It remembers every client, every thread — and drafts every reply{' '}
+              <Highlight>in your voice</Highlight>.
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
+              Chippi learns how you actually write and keeps the whole book of business in
+              its head, so the reply is waiting before you open the thread — and it still
+              sounds like you.
+            </p>
+          </div>
+        </HeroHighlight>
       </section>
 
       {/* Feature sequence */}
