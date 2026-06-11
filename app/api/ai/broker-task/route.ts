@@ -478,18 +478,15 @@ export async function POST(req: NextRequest) {
   // the realtor chat uses. Action verbs (reassign, route, send) fall through to
   // Modal, where the BROKER_TOOLS catalog lives.
   //
-  // The composer's Chat/Agent switch wins over the heuristic when present:
-  // 'chat' → the lean in-process direct path, 'agent' → the full tool surface
-  // on Modal. An absent mode (older client) falls back to decideRoute so
-  // nothing breaks. Mirrors the realtor route (app/api/ai/task) exactly.
+  // The composer's Chat/Agent switch: 'agent' forces the full tool surface on
+  // Modal; 'chat' is a PREFERENCE for the in-process direct path, not an
+  // override. Action turns (reassign, route, send) reach Modal even in Chat
+  // mode — the direct path has no tools and its prompt can only deflect.
+  // An absent mode (older client) falls back to decideRoute so nothing
+  // breaks. Mirrors the realtor route (app/api/ai/task) exactly.
   const explicitMode: 'chat' | 'agent' | null =
     body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
-  const route =
-    explicitMode === 'chat'
-      ? 'direct'
-      : explicitMode === 'agent'
-        ? 'agent'
-        : decideRoute(message);
+  const route = explicitMode === 'agent' ? 'agent' : decideRoute(message);
   if (route === 'direct') {
     logger.info('[ai/broker-task] router → direct (in-process)', { brokerageId });
     return streamBrokerDirectTurn({

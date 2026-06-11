@@ -700,18 +700,19 @@ export async function POST(req: NextRequest) {
     id: a.id,
     mimeType: a.mime_type,
   }));
-  // Explicit per-message mode from the composer's Chat/Agent switch wins over
-  // the heuristic router. 'chat' maps to the lean direct path (no tools, no
-  // loop — the 500k-token fix); 'agent' maps to the full tool surface. An
-  // absent mode (older client) falls back to decideRoute so nothing breaks.
+  // Explicit per-message mode from the composer's Chat/Agent switch:
+  // 'agent' forces the full tool surface; 'chat' is a PREFERENCE for the lean
+  // direct path (no tools, no loop — the 500k-token fix), not an override.
+  // When the heuristic detects an action verb or a workspace-data read
+  // ("schedule a tour", "who are my leads"), the turn routes 'agent' even in
+  // Chat mode — the direct path has no tools and can only deflect, and its
+  // escalation hook is a stub (onEscalate → false below), so honoring 'chat'
+  // on an action turn made Chippi a chatbot that tells the realtor to
+  // rephrase. Absent mode (older client) falls back to decideRoute.
   const explicitMode: 'chat' | 'agent' | null =
     body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
   const route =
-    explicitMode === 'chat'
-      ? 'direct'
-      : explicitMode === 'agent'
-        ? 'agent'
-        : decideRoute(message, routerAttachments);
+    explicitMode === 'agent' ? 'agent' : decideRoute(message, routerAttachments);
 
   // Resolve the model for THIS turn: the workspace model forced to something
   // the active provider can actually serve (kills the grok-slug-to-OpenAI
