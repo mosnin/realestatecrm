@@ -79,9 +79,20 @@ const DEFAULT_MAX_TOKENS = 4_096;
  * decisions. The UI renders `data` separately via the surrounding event
  * stream — same as today.
  */
-export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: ToolContext) {
-  const needsApproval =
-    def.requiresApproval === false
+export function toSdkTool<TArgs, TData>(
+  def: ToolDefinition<TArgs, TData>,
+  ctx: ToolContext,
+  opts?: { autonomous?: boolean },
+) {
+  // Autonomous mode — the "just go" switch. When the realtor runs Chippi
+  // like Claude Code's auto-accept, every tool executes without pausing for
+  // approval, so a multi-step task runs end to end in one turn instead of
+  // stopping at each write for a confirm card. When off (the default), the
+  // per-tool gating below stands and the realtor approves each action. This
+  // is purely additive: an undefined/false flag leaves behavior identical.
+  const needsApproval = opts?.autonomous
+    ? false
+    : def.requiresApproval === false
       ? false
       : def.requiresApproval === 'maybe'
         ? async (_runCtx: RunContext, input: unknown) => {

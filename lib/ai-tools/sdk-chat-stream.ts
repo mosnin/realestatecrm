@@ -58,6 +58,8 @@ interface StreamTsChatTurnInput {
   model?: string;
   /** Attachments for this turn (images / PDFs), hydrated to signed URLs. */
   attachments?: MultimodalAttachment[];
+  /** Autonomous mode — run continuously, no approval pauses (Claude Code style). */
+  autonomous?: boolean;
   abortController: AbortController;
 }
 
@@ -105,6 +107,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         history,
         model: input.model,
         attachments: input.attachments,
+        autonomous: input.autonomous,
       });
       return { result: result as unknown as SdkResultLike };
     },

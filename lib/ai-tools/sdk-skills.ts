@@ -24,7 +24,7 @@ import type { ToolContext } from './types';
  *  quiet hot persons, and overdue follow-ups in one paragraph. */
 export function buildPipelineAnalystAgent(
   ctx: ToolContext,
-  opts: { model?: string | Model } = {},
+  opts: { model?: string | Model; autonomous?: boolean } = {},
 ): Agent {
   return buildSkillAgent('pipeline-analyst', ctx, opts);
 }
@@ -33,7 +33,7 @@ export function buildPipelineAnalystAgent(
  *  recommends the next reasonable action. */
 export function buildContactResearcherAgent(
   ctx: ToolContext,
-  opts: { model?: string | Model } = {},
+  opts: { model?: string | Model; autonomous?: boolean } = {},
 ): Agent {
   return buildSkillAgent('contact-researcher', ctx, opts);
 }
@@ -42,7 +42,7 @@ export function buildContactResearcherAgent(
  *  plan and surfaces it via `create_plan` before any domain tools run. */
 export function buildPlannerAgent(
   ctx: ToolContext,
-  opts: { model?: string | Model } = {},
+  opts: { model?: string | Model; autonomous?: boolean } = {},
 ): Agent {
   return buildSkillAgent('planner', ctx, opts);
 }

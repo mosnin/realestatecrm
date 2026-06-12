@@ -93,9 +93,18 @@ export function buildChatAgent(
     modelSlug?: string | null;
     integrationTools?: SdkTool[];
     instructions?: string;
+    /**
+     * Autonomous mode — build every tool with approval gating OFF so the
+     * run executes continuously (Claude Code auto-accept). Threaded down to
+     * `toSdkTool` for the domain tools, the delegate orchestrator, and the
+     * skill sub-agents. Default (undefined/false) keeps approve-first gating.
+     */
+    autonomous?: boolean;
   } = {},
 ): Agent {
-  const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+  const domainTools = ALL_TOOLS.map((t: ToolDefinition) =>
+    toSdkTool(t, ctx, { autonomous: opts.autonomous }),
+  );
 
   // The model every agent in this turn runs on. Either an explicit override
   // (tests / A-B), or the realtor's workspace model resolved to the active
@@ -108,13 +117,17 @@ export function buildChatAgent(
   // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
   // its progress back inline. See tools/delegate-task.ts + the system prompt's
   // "when to delegate" guidance.
-  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
+  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx, {
+    autonomous: opts.autonomous,
+  });
 
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  // They share the parent's Model instance so they hit the same provider/key.
-  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: agentModel });
-  const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel });
-  const planner = buildPlannerAgent(ctx, { model: agentModel });
+  // They share the parent's Model instance so they hit the same provider/key,
+  // and the same autonomous flag so a sub-agent's tool call can't reintroduce
+  // a pause the top-level run was told to skip.
+  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: agentModel, autonomous: opts.autonomous });
+  const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel, autonomous: opts.autonomous });
+  const planner = buildPlannerAgent(ctx, { model: agentModel, autonomous: opts.autonomous });
 
   // Each sub-agent gets an explicit, small per-run turn cap. Without this, the
   // SDK runs every `asTool` sub-agent with its DEFAULT_MAX_TURNS (10), and the
@@ -320,6 +333,12 @@ export interface RunChatTurnInput {
    * the card") no longer has to detour through Modal.
    */
   attachments?: MultimodalAttachment[];
+  /**
+   * Autonomous mode — run continuously without approval pauses (Claude Code
+   * auto-accept). Threaded into `buildChatAgent` so every tool is built with
+   * `needsApproval: false`. Default (undefined/false) = approve-first gating.
+   */
+  autonomous?: boolean;
 }
 
 /**
@@ -339,6 +358,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
     modelSlug: input.model,
     integrationTools,
     instructions,
+    autonomous: input.autonomous,
   });
 
   // The trailing user turn. With attachments, encode SDK-native multimodal

@@ -104,6 +104,13 @@ interface PostBody {
    * Absent (older client) → fall back to the heuristic router.
    */
   mode?: 'chat' | 'agent' | string;
+  /**
+   * Autonomous mode — when true, the agent path builds every tool with
+   * approval gating OFF so the run executes continuously (Claude Code
+   * auto-accept) instead of stopping at each write for a confirm card.
+   * Only affects the agent path; the direct path has no tools to gate.
+   */
+  autonomous?: boolean;
 }
 
 function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
@@ -808,6 +815,7 @@ export async function POST(req: NextRequest) {
     history,
     model: turnModel,
     attachments: turnAttachments,
+    autonomous: body.autonomous === true,
     abortController,
   });
 }

@@ -174,6 +174,67 @@ describe('toSdkTool', () => {
   });
 });
 
+describe('toSdkTool — autonomous mode', () => {
+  // Autonomous mode is the "just go" switch: the realtor runs Chippi like
+  // Claude Code's auto-accept and every tool executes without a confirm card.
+  // The contract is simple and load-bearing — with { autonomous: true }, a
+  // tool that would normally pause resolves needsApproval to false, so the
+  // SDK run never interrupts and a multi-step task runs end to end.
+  it('forces needsApproval false for a normally-gated mutating tool', async () => {
+    const def = defineTool({
+      name: 'send_email',
+      description: 'send an email',
+      parameters: z.object({ to: z.string() }),
+      requiresApproval: true,
+      summariseCall: (args) => `Email ${args.to}`,
+      rateLimit: { max: 60, windowSeconds: 3600 },
+      handler: async () => ({ summary: 'sent' }),
+    });
+
+    const sdk = toSdkTool(def, makeCtx(), { autonomous: true });
+    const approves = await sdk.needsApproval(new RunContext(), { to: 'x@y.com' });
+    expect(approves).toBe(false);
+  });
+
+  it("forces needsApproval false for a 'maybe' tool WITHOUT consulting shouldApprove", async () => {
+    const shouldApprove = vi.fn(() => true);
+    const def = defineTool({
+      name: 'maybe_send',
+      description: 'maybe send',
+      parameters: z.object({ count: z.number() }),
+      requiresApproval: 'maybe',
+      shouldApprove: shouldApprove as (args: { count: number }, ctx: ToolContext) => boolean,
+      summariseCall: (args) => `Process ${args.count}`,
+      rateLimit: { max: 60, windowSeconds: 3600 },
+      handler: async () => ({ summary: 'done' }),
+    });
+
+    const sdk = toSdkTool(def, makeCtx(), { autonomous: true });
+    const approves = await sdk.needsApproval(new RunContext(), { count: 5 });
+    expect(approves).toBe(false);
+    // Autonomous short-circuits before the per-tool heuristic runs.
+    expect(shouldApprove).not.toHaveBeenCalled();
+  });
+
+  it('leaves approve-first gating intact when autonomous is false/omitted', async () => {
+    const def = defineTool({
+      name: 'mutate_thing',
+      description: 'mutate',
+      parameters: z.object({ id: z.string() }),
+      requiresApproval: true,
+      summariseCall: (args) => `Mutate ${args.id}`,
+      rateLimit: { max: 60, windowSeconds: 3600 },
+      handler: async () => ({ summary: 'mutated' }),
+    });
+
+    const gatedDefault = toSdkTool(def, makeCtx());
+    expect(await gatedDefault.needsApproval(new RunContext(), { id: 'x' })).toBe(true);
+
+    const gatedExplicit = toSdkTool(def, makeCtx(), { autonomous: false });
+    expect(await gatedExplicit.needsApproval(new RunContext(), { id: 'x' })).toBe(true);
+  });
+});
+
 describe('toSdkTool — strict-mode schema rewriting', () => {
   /**
    * Walk the produced JSON schema and assert that NO constraint OpenAI

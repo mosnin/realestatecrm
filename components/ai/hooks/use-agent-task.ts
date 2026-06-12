@@ -739,10 +739,16 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         conversationId: convId,
         message: trimmed,
         mode,
+        // Autonomous mode — tells the agent path to run continuously without
+        // approval pauses (Claude Code auto-accept). Same switch that drives
+        // the client-side auto-approve fallback; sending it server-side means
+        // the run never interrupts in the first place, so a multi-step task
+        // executes end to end instead of stopping at each write.
+        autonomous: autoApprove,
         ...(hasAttachments ? { attachmentIds } : {}),
       });
     },
-    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
+    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint, autoApprove],
   );
 
   const approve = useCallback(

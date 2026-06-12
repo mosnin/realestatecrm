@@ -255,13 +255,17 @@ function pickTools(names: readonly string[], slug: string): ToolDefinition[] {
 export function buildSkillAgent(
   slug: string,
   ctx: ToolContext,
-  opts: { model?: string | Model } = {},
+  opts: { model?: string | Model; autonomous?: boolean } = {},
 ): Agent {
   const def = loadSkillDefinitions().find((d) => d.slug === slug);
   if (!def) {
     throw new Error(`skill loader: no skill found with slug "${slug}"`);
   }
-  const tools = pickTools(def.frontmatter.tools ?? [], slug).map((t) => toSdkTool(t, ctx));
+  // Autonomous flows down from the parent chat agent — a skill's write tool
+  // must not reintroduce an approval pause the top-level run was told to skip.
+  const tools = pickTools(def.frontmatter.tools ?? [], slug).map((t) =>
+    toSdkTool(t, ctx, { autonomous: opts.autonomous }),
+  );
   // A `Model` instance (passed by the chat runtime) carries our OpenRouter-
   // first client; a bare slug string would resolve against the SDK's default
   // (keyless OpenAI) provider and fail on OpenRouter-only deploys. Prefer the
