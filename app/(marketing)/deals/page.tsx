@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, FileText, ImagePlus } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { ResultsStat } from '@/components/marketing/site/home/results-stat';
 
 export const metadata = {
   title: 'Deals · Chippi',
@@ -262,6 +263,11 @@ export default function DealsPage() {
           </Stagger>
         </div>
       </section>
+
+      {/* The pipeline, added up — gray stat card */}
+      <div className="mt-24 sm:mt-32">
+        <ResultsStat />
+      </div>
 
       {/* CTA */}
       <section className="mt-24 px-4 sm:mt-32 sm:px-6">

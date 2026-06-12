@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
+import { FeatureList } from '@/components/marketing/site/home/feature-list';
 
 export const metadata = {
   title: 'For realtors · Chippi',
@@ -307,6 +308,11 @@ export default function RealtorsPage() {
           </div>
         </div>
       </section>
+
+      {/* Everything Chippi runs — interactive feature list */}
+      <div className="mt-24 sm:mt-32">
+        <FeatureList />
+      </div>
 
       {/* The ask — centered closing CTA */}
       <section className="mt-24 px-6 pb-8 sm:mt-32 sm:pb-12">

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
+import { LeadOrbit } from '@/components/marketing/site/home/lead-orbit';
 
 export const metadata = {
   title: 'Capture leads · Chippi',
@@ -253,6 +254,11 @@ export default function CapturePage() {
           ))}
         </Stagger>
       </section>
+
+      {/* Lead qualification, run by a teammate — saturated brand beat */}
+      <div className="mt-24 sm:mt-32">
+        <LeadOrbit />
+      </div>
 
       {/* Pastel CTA card */}
       <section className="mt-24 px-4 sm:mt-32">

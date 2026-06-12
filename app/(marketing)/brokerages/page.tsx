@@ -23,6 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
+import { ResultsStat } from '@/components/marketing/site/home/results-stat';
 
 export const metadata = {
   title: 'For brokerages · Chippi',
@@ -323,6 +324,11 @@ export default function BrokeragesPage() {
           </div>
         </div>
       </section>
+
+      {/* Pipeline at a glance — gray card, cool tone before the warm close */}
+      <div className="mt-24 sm:mt-32">
+        <ResultsStat />
+      </div>
 
       {/* The ask — centered closing CTA, demo-first for brokers */}
       <section className="mt-24 px-6 pb-8 sm:mt-32 sm:pb-12">

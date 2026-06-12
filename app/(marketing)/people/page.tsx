@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { FeatureList } from '@/components/marketing/site/home/feature-list';
 
 export const metadata = {
   title: 'People · Chippi',
@@ -199,6 +200,11 @@ export default function PeoplePage() {
           </FadeUp>
         </div>
       </section>
+
+      {/* Everything Chippi runs — interactive pill rows, a change of texture */}
+      <div className="mt-24 sm:mt-32">
+        <FeatureList />
+      </div>
 
       {/* The three pillars — white shadow cards */}
       <section className="mt-24 sm:mt-32">

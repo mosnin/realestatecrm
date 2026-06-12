@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
+import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 
 export const metadata = {
   title: 'Your public bio · Chippi',
@@ -249,30 +250,10 @@ export default function BioPage() {
         </Stagger>
       </section>
 
-      {/* Pastel CTA card */}
-      <section className="mt-24 px-4 sm:mt-32">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
-          <FadeUp className="relative mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
-            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
-              Put your link to work.
-            </h2>
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-              Claim your page, drop the link everywhere, and meet every tap
-              with a draft.
-            </p>
-            <Link
-              href="/login/realtor?intent=signup"
-              className="mt-9 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
-            >
-              Start free trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <p className="mt-4 text-sm text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
-          </FadeUp>
-        </div>
-      </section>
+      {/* Break-up closer */}
+      <div className="mt-24 sm:mt-32">
+        <CloudCta />
+      </div>
     </div>
   );
 }

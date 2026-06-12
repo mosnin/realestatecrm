@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { LeadOrbit } from '@/components/marketing/site/home/lead-orbit';
 
 export const metadata = {
   title: 'Meet Chippi',
@@ -254,6 +255,11 @@ export default function MeetChippiPage() {
           </Stagger>
         </div>
       </section>
+
+      {/* Lead qualification — animated brand-gradient orbit */}
+      <div className="mt-24 sm:mt-32">
+        <LeadOrbit />
+      </div>
 
       {/* The approval promise — pastel card */}
       <section className="mt-24 px-4 sm:mt-32">
