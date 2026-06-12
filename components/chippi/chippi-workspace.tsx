@@ -19,10 +19,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
-import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
+import { MessageActions, textFromBlocks } from '@/components/ai/blocks/message-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
-import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
@@ -1402,7 +1401,7 @@ export function ChippiWorkspace({
                       return (
                         <motion.div
                           key={msg.id}
-                          className="flex gap-3"
+                          className="group flex gap-3"
                           initial={animateEntrance ? { opacity: 0, y: 8 } : false}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
@@ -1473,21 +1472,44 @@ export function ChippiWorkspace({
                                 Try again
                               </button>
                             )}
+                            {/* Copy / read-aloud — revealed on hover once the
+                                turn has settled. */}
+                            {!(msg.streaming && isStreaming) && (
+                              <MessageActions text={textFromBlocks(msg.blocks)} />
+                            )}
                           </div>
                         </motion.div>
                       );
                     }
+                    const isLastUserMessage =
+                      msg.role === 'user' &&
+                      i === messages.map((m) => m.role).lastIndexOf('user');
                     return (
-                      <Transcript
-                        key={msg.id}
-                        blocks={msg.blocks}
-                        role={msg.role}
-                        streaming={msg.streaming && isStreaming}
-                        liveCallIds={liveCallIds}
-                        onUserIntent={(text) => {
-                          void handleSend(text, [], undefined);
-                        }}
-                      />
+                      <div key={msg.id} className="group">
+                        <Transcript
+                          blocks={msg.blocks}
+                          role={msg.role}
+                          streaming={msg.streaming && isStreaming}
+                          liveCallIds={liveCallIds}
+                          onUserIntent={(text) => {
+                            void handleSend(text, [], undefined);
+                          }}
+                        />
+                        {/* Edit-and-resend on the latest user message: hands the
+                            text back to the composer via prefill. */}
+                        {isLastUserMessage && !isStreaming && (
+                          <MessageActions
+                            className="mt-1 justify-end"
+                            text={textFromBlocks(msg.blocks)}
+                            onEdit={() =>
+                              setPrefill({
+                                text: textFromBlocks(msg.blocks),
+                                nonce: Date.now(),
+                              })
+                            }
+                          />
+                        )}
+                      </div>
                     );
                   })}
 
@@ -1525,26 +1547,11 @@ export function ChippiWorkspace({
                     )}
                   </AnimatePresence>
 
-                  {/* Suggested follow-ups — visible only when the conversation
-                      is idle (no thinking, no streaming, no error) and the
-                      last turn was an assistant turn with completed tool
-                      content. Click → fires the chip text as the next user
-                      message. Removes the typing step for the obvious next
-                      move (Claude / ChatGPT pattern). */}
-                  {!showThinking && !isStreaming && !agentError && (() => {
-                    const last = messages[messages.length - 1];
-                    if (!last || last.role !== 'assistant' || !last.blocks) return null;
-                    const suggestions = getSuggestionsForTurn(last.blocks);
-                    if (suggestions.length === 0) return null;
-                    return (
-                      <SuggestedActions
-                        suggestions={suggestions}
-                        onSelect={(text) => {
-                          void handleSend(text, [], undefined);
-                        }}
-                      />
-                    );
-                  })()}
+                  {/* Per-turn suggestion chips were removed by owner direction:
+                      they kept reappearing under every response (including
+                      broken turns, where the generic defaults made Chippi look
+                      lost). Message-level actions (copy / speak / edit) replace
+                      them as the post-turn affordance. */}
 
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode

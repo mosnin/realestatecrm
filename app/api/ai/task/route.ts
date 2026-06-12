@@ -772,16 +772,26 @@ export async function POST(req: NextRequest) {
   // approval gates intact — and reaches Modal for deep work via delegate_task.
   const forcedModal = chatRuntime() === 'modal';
   if (route === 'agent' && forcedModal) {
-    logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
-    return callModalAgent({
-      ctx,
-      conversationId,
-      message,
-      history,
-      hydratedAttachments,
-      abortController,
-      spaceSlug,
-    });
+    if (process.env.MODAL_CHAT_URL) {
+      logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
+      return callModalAgent({
+        ctx,
+        conversationId,
+        message,
+        history,
+        hydratedAttachments,
+        abortController,
+        spaceSlug,
+      });
+    }
+    // CHIPPI_CHAT_RUNTIME=modal without MODAL_CHAT_URL used to surface a raw
+    // "Agent backend not configured" error to the realtor. The in-process TS
+    // runtime is fully capable, so fall back to it and log the misconfig
+    // instead of failing the turn.
+    logger.warn(
+      '[ai/task] CHIPPI_CHAT_RUNTIME=modal but MODAL_CHAT_URL unset — falling back to in-process TS runtime',
+      { spaceSlug },
+    );
   }
 
   // ── Default: in-process TS runtime (PRIMARY) ─────────────────────────────
