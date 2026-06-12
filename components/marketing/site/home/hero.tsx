@@ -88,7 +88,17 @@ function ArcadeSlot() {
       }
     }
     window.addEventListener('message', onArcadeIframeMessage);
-    return () => window.removeEventListener('message', onArcadeIframeMessage);
+
+    // Register on mount too, not only on arcade-init, so a popout request
+    // works even when arcade-init fired before this listener attached. Captured
+    // for the unmount cleanup, which unregisters the handler.
+    const arcadeIframe = iframeRef.current;
+    arcadeIframe?.contentWindow?.postMessage({ event: 'register-popout-handler' }, '*');
+
+    return () => {
+      arcadeIframe?.contentWindow?.postMessage({ event: 'unregister-popout-handler' }, '*');
+      window.removeEventListener('message', onArcadeIframeMessage);
+    };
   }, []);
 
   const openTour = () => {
