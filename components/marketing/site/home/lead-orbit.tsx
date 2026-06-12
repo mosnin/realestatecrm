@@ -1,17 +1,16 @@
 'use client';
 
 /**
- * LeadOrbit — the reference's animated acquisition orbit, tailored to Chippi
- * lead qualification. A saturated brand-gradient card: headline top-left with
- * an italic-serif accent, a dashed orbit with the Chippi hub at the top and
- * lead avatars rotating around it (counter-rotated to stay upright), and a
- * center stack of step cards that CYCLES upward — showing each lead move
- * through the loop (received → scored → drafted → booked), the top card lit
- * and the ones below fading. A header card carries a progress bar that fills
- * with the active step. Request-a-demo pill bottom-left, honest blurb right.
+ * LeadOrbit — animated lead-qualification orbit (reference-matched), tailored
+ * to Chippi. Brand-gradient card: lead headshots ring the dashed orbit
+ * (counter-rotated to stay upright), the Chippi hub sits at the top, and the
+ * center step stack CYCLES upward through the real loop (received → scored →
+ * drafted → booked) with a progress bar that fills per step.
  *
- * Reduced motion: orbit parks and the step stack rests on the first state.
- * The source's "reduce time-to-hire by 80%" metric claim is NOT carried over.
+ * Headshots are pravatar portraits (reliable public CDN, real faces). The
+ * card stack is narrower than the ring so it sits cleanly inside it. Reduced
+ * motion parks the orbit and rests the stack. The source's "80%" metric claim
+ * is NOT carried over.
  */
 
 import { useEffect, useState } from 'react';
@@ -21,18 +20,19 @@ import { ArrowRight, CalendarCheck, FileText, Flame, PenLine, Rocket } from 'luc
 import { Accent } from '@/components/marketing/site/section';
 
 const AVATARS = [
-  'https://hoirqrkdgbmvpwutwuwj-all.supabase.co/storage/v1/object/public/assets/assets/4c9aa348-4474-47a8-8f1e-3fe52ac8d2b9_320w.webp',
-  'https://hoirqrkdgbmvpwutwuwj-all.supabase.co/storage/v1/object/public/assets/assets/ca687bcc-f3d6-4ed6-9efe-e0fd4cbe69a9_320w.webp',
-  'https://hoirqrkdgbmvpwutwuwj-all.supabase.co/storage/v1/object/public/assets/assets/39e15168-9f77-4837-9a4b-89c74b8bc38b_320w.webp',
-  'https://hoirqrkdgbmvpwutwuwj-all.supabase.co/storage/v1/object/public/assets/assets/a7a0f0f5-9a19-4888-87bf-ff8780ff8008_320w.jpg',
+  'https://i.pravatar.cc/160?img=12',
+  'https://i.pravatar.cc/160?img=5',
+  'https://i.pravatar.cc/160?img=13',
+  'https://i.pravatar.cc/160?img=32',
 ];
 
-/* Lower-hemisphere + sides; the hub sits at top (270°). [cos, sin] at r=50%. */
+/* On-ring positions [cos, sin] at full radius. Hub holds the top (270°);
+ * avatars take the sides + bottom so they never sit under the center cards. */
 const POS = [
-  { x: 1, y: 0 }, // right
-  { x: -1, y: 0 }, // left
-  { x: 0.5, y: 0.866 }, // lower-right
-  { x: -0.5, y: 0.866 }, // lower-left
+  { x: 1, y: 0.05 }, // right
+  { x: -1, y: 0.05 }, // left
+  { x: 0.5, y: 0.86 }, // lower-right
+  { x: -0.5, y: 0.86 }, // lower-left
 ];
 
 const STEPS = [
@@ -42,9 +42,9 @@ const STEPS = [
   { id: 'booked', icon: CalendarCheck, label: 'Tour booked · Sat 2:00' },
 ];
 
-const VISIBLE = 3; // step cards shown in the conveyor
-const ROW_H = 56; // px per step card slot
-const SPIN = 34; // seconds per avatar revolution
+const VISIBLE = 3;
+const ROW_H = 54;
+const SPIN = 36;
 
 export function LeadOrbit() {
   const reduce = useReducedMotion();
@@ -70,7 +70,7 @@ export function LeadOrbit() {
           }}
         />
 
-        <div className="relative grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative grid items-center gap-12 lg:grid-cols-2">
           {/* Headline */}
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/80">Chippi</p>
@@ -89,66 +89,62 @@ export function LeadOrbit() {
                 <ArrowRight className="h-4 w-4" />
               </span>
             </Link>
+            <p className="mt-8 max-w-sm text-sm leading-relaxed text-white/85">
+              Chippi scores every lead the moment it lands and drafts the first
+              reply in your voice — approval-first, so the decision stays{' '}
+              <Accent className="text-white">yours.</Accent>
+            </p>
           </div>
 
           {/* Orbit */}
-          <div className="relative mx-auto aspect-square w-full max-w-[520px]">
+          <div className="relative mx-auto aspect-square w-full max-w-[460px]">
             {/* dashed ring */}
-            <div className="absolute inset-[10%] rounded-full border border-dashed border-white/45" />
-            {/* node dots on the ring */}
-            {POS.map((p, idx) => (
-              <span
-                key={`dot-${idx}`}
-                aria-hidden
-                className="absolute h-2 w-2 rounded-full bg-white/70"
-                style={{ left: `calc(50% + ${p.x * 40}% )`, top: `calc(50% + ${p.y * 40}% )`, transform: 'translate(-50%,-50%)' }}
-              />
-            ))}
+            <div className="absolute inset-[3%] rounded-full border border-dashed border-white/45" />
 
             {/* Chippi hub at top */}
-            <div className="absolute left-1/2 top-[10%] z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-[#28203a] shadow-lg">
+            <div className="absolute left-1/2 top-[3%] z-30 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-[#28203a] shadow-lg">
               <span aria-hidden className="text-xl text-[#ff8a5c]">✦</span>
             </div>
 
             {/* rotating avatar layer */}
             <motion.div
-              className="absolute inset-[10%]"
+              className="absolute inset-[3%]"
               animate={reduce ? undefined : { rotate: 360 }}
               transition={{ duration: SPIN, ease: 'linear', repeat: Infinity }}
             >
               {POS.map((p, idx) => (
                 <div
                   key={idx}
-                  className="absolute h-14 w-14"
-                  style={{ left: `calc(50% + ${p.x * 50}% )`, top: `calc(50% + ${p.y * 50}% )`, transform: 'translate(-50%, -50%)' }}
+                  className="absolute h-[52px] w-[52px]"
+                  style={{ left: `calc(50% + ${p.x * 50}%)`, top: `calc(50% + ${p.y * 50}%)`, transform: 'translate(-50%, -50%)' }}
                 >
                   <motion.div
-                    className="h-14 w-14 overflow-hidden rounded-full bg-white p-[3px] shadow-lg ring-1 ring-white/60"
+                    className="h-[52px] w-[52px] overflow-hidden rounded-full bg-white p-[3px] shadow-lg ring-1 ring-black/5"
                     animate={reduce ? undefined : { rotate: -360 }}
                     transition={{ duration: SPIN, ease: 'linear', repeat: Infinity }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={AVATARS[idx]} alt="" className="h-full w-full rounded-full object-cover" />
+                    <img src={AVATARS[idx]} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" />
                   </motion.div>
                 </div>
               ))}
             </motion.div>
 
-            {/* Center dialog stack */}
-            <div className="absolute left-1/2 top-1/2 z-10 w-[80%] max-w-[320px] -translate-x-1/2 -translate-y-1/2 space-y-3">
+            {/* Center step stack — narrower than the ring */}
+            <div className="absolute left-1/2 top-1/2 z-20 w-[64%] max-w-[260px] -translate-x-1/2 -translate-y-1/2 space-y-3">
               {/* header card with progress */}
-              <div className="rounded-2xl bg-white p-4 text-zinc-950 shadow-[0_18px_50px_-18px_rgba(20,10,5,0.5)]">
-                <div className="mb-3 flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4b29]/10 text-[#ff4b29]">
-                    <Rocket className="h-4 w-4" />
+              <div className="rounded-2xl bg-white p-3.5 text-zinc-950 shadow-[0_18px_50px_-18px_rgba(20,10,5,0.5)]">
+                <div className="mb-2.5 flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ff4b29]/10 text-[#ff4b29]">
+                    <Rocket className="h-3.5 w-3.5" />
                   </span>
-                  <span className="text-sm font-semibold">Lead qualification</span>
+                  <span className="text-[13px] font-semibold">Lead qualification</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   {STEPS.map((_, seg) => (
                     <motion.span
                       key={seg}
-                      className="h-2 flex-1 rounded-full"
+                      className="h-1.5 flex-1 rounded-full"
                       animate={{ backgroundColor: seg <= active ? '#ff4b29' : '#ececf0' }}
                       transition={{ duration: 0.4 }}
                     />
@@ -159,11 +155,10 @@ export function LeadOrbit() {
               {/* cycling step conveyor */}
               <div className="relative overflow-hidden" style={{ height: VISIBLE * ROW_H }}>
                 {STEPS.map((step) => {
-                  // slot = position relative to the active step (0 = top/lit)
                   const slot = (STEPS.indexOf(step) - active + STEPS.length) % STEPS.length;
                   const StepIcon = step.icon;
                   const hidden = slot >= VISIBLE;
-                  const opacity = hidden ? 0 : [1, 0.6, 0.35][slot];
+                  const opacity = hidden ? 0 : [1, 0.62, 0.34][slot];
                   return (
                     <motion.div
                       key={step.id}
@@ -173,20 +168,20 @@ export function LeadOrbit() {
                       style={{ pointerEvents: 'none' }}
                     >
                       <div
-                        className={`flex items-center gap-2.5 rounded-2xl p-3.5 ${
+                        className={`flex items-center gap-2 rounded-2xl p-3 ${
                           slot === 0
                             ? 'bg-white text-zinc-950 shadow-[0_18px_50px_-18px_rgba(20,10,5,0.5)] ring-1 ring-[#ff4b29]/30'
-                            : 'bg-white/80 text-zinc-700'
+                            : 'bg-white/85 text-zinc-700'
                         }`}
                       >
                         <span
-                          className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${
                             slot === 0 ? 'bg-[#ff4b29]/10 text-[#ff4b29]' : 'bg-black/[0.04] text-zinc-500'
                           }`}
                         >
-                          <StepIcon className="h-4 w-4" />
+                          <StepIcon className="h-3.5 w-3.5" />
                         </span>
-                        <span className="text-sm font-medium">{step.label}</span>
+                        <span className="truncate text-[13px] font-medium">{step.label}</span>
                       </div>
                     </motion.div>
                   );
@@ -195,13 +190,6 @@ export function LeadOrbit() {
             </div>
           </div>
         </div>
-
-        {/* Honest blurb */}
-        <p className="relative mt-10 max-w-md text-sm leading-relaxed text-white/85 lg:absolute lg:bottom-12 lg:right-12 lg:mt-0 lg:text-right">
-          Chippi scores every lead the moment it lands and drafts the first reply
-          in your voice — approval-first, so the decision stays{' '}
-          <Accent className="text-white">yours.</Accent>
-        </p>
       </div>
     </section>
   );

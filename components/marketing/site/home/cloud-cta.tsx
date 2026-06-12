@@ -1,32 +1,24 @@
 /**
  * CloudCta — the reference's sky band, tailored to Chippi as a calm CTA
- * breaker. Soft gray rounded card, scattered white cloud blobs, a centered
- * two-tone headline, a black "View Demo" pill with a circular arrow, a
- * paper-plane illustration (Chippi sending the reply), and a quiet link row
- * along the bottom. Pure decoration + one CTA — it exists to break up space.
+ * breaker. Soft gray rounded card, a scattered cloud field kept clear of the
+ * rounded corners (so nothing clips), a centered two-tone headline, the black
+ * "View Demo" pill with a circular arrow, and a paper-plane illustration
+ * (Chippi sending the reply). Pure decoration + one CTA — it breaks up space.
  */
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { TwoTone } from './two-tone';
 
+/* Clouds live inside a safe inset (12%–78% horizontal, 16%–66% vertical) so
+ * none touch the card's rounded corners or edges. */
 const CLOUDS = [
-  { top: '12%', left: '6%', w: 120 },
-  { top: '8%', left: '70%', w: 150 },
-  { top: '26%', left: '40%', w: 90 },
-  { top: '20%', left: '88%', w: 80 },
-  { top: '48%', left: '4%', w: 140 },
-  { top: '40%', left: '82%', w: 130 },
-  { top: '64%', left: '22%', w: 100 },
-  { top: '70%', left: '66%', w: 110 },
-];
-
-const LINKS = [
-  { label: 'Product', href: '/chippi' },
-  { label: 'Pricing', href: '/pricing' },
-  { label: 'Book a demo', href: '/demo' },
-  { label: 'Company', href: '/company' },
-  { label: 'Integrations', href: '/integrations' },
+  { top: '18%', left: '14%', w: 120 },
+  { top: '16%', left: '70%', w: 110 },
+  { top: '40%', left: '20%', w: 90 },
+  { top: '34%', left: '78%', w: 130 },
+  { top: '60%', left: '12%', w: 130 },
+  { top: '58%', left: '74%', w: 100 },
 ];
 
 function Cloud({ w }: { w: number }) {
@@ -40,7 +32,7 @@ function Cloud({ w }: { w: number }) {
 /** Paper plane — Chippi sending the reply. */
 function PaperPlane() {
   return (
-    <svg viewBox="0 0 240 160" className="h-auto w-full max-w-sm" aria-hidden>
+    <svg viewBox="0 0 240 160" className="h-auto w-full max-w-xs" aria-hidden>
       <path d="M18 84 L222 20 L150 150 L120 104 Z" fill="#ffffff" stroke="#0d0c0e" strokeWidth="3" strokeLinejoin="round" />
       <path d="M120 104 L222 20 L150 150 Z" fill="#f0f0f3" stroke="#0d0c0e" strokeWidth="3" strokeLinejoin="round" />
       <path d="M120 104 L222 20" stroke="#0d0c0e" strokeWidth="3" strokeLinecap="round" />
@@ -53,8 +45,8 @@ function PaperPlane() {
 export function CloudCta() {
   return (
     <section className="px-3 sm:px-4">
-      <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#e3e4e9] px-5 pb-8 pt-16 dark:bg-[#1a1a1f] sm:rounded-[2.75rem] sm:px-10 sm:pb-10 sm:pt-20">
-        {/* Cloud field */}
+      <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#e3e4e9] px-5 pb-16 pt-16 dark:bg-[#1a1a1f] sm:rounded-[2.75rem] sm:px-10 sm:pb-20 sm:pt-20">
+        {/* Cloud field (clear of the corners) */}
         {CLOUDS.map((c, i) => (
           <span
             key={i}
@@ -93,19 +85,6 @@ export function CloudCta() {
         {/* Paper plane */}
         <div className="relative z-10 mt-10 flex justify-center">
           <PaperPlane />
-        </div>
-
-        {/* Quiet link row */}
-        <div className="relative z-10 mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-black/5 pt-6 dark:border-white/10">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="text-sm font-medium text-zinc-700 transition-colors hover:text-zinc-950 dark:text-white/70 dark:hover:text-white"
-            >
-              {l.label}
-            </Link>
-          ))}
         </div>
       </div>
     </section>
