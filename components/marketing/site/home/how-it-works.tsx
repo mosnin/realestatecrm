@@ -132,7 +132,7 @@ export function HowItWorks() {
           <StepCard
             step="STEP 2"
             title="Chippi drafts &amp; books"
-            body="Every lead gets scored, a reply drafted in your voice, and tour times proposed against your real availability."
+            body="Every lead gets scored, a reply drafted in your voice for your approval, and tour times proposed from your calendar."
           >
             <div className="relative h-48 overflow-hidden rounded-2xl border border-neutral-200 bg-gradient-to-br from-neutral-50 to-neutral-100 p-4 dark:border-white/10 dark:from-white/[0.06] dark:to-white/[0.02] sm:h-56">
               <div className="grid h-full grid-cols-2 gap-3">

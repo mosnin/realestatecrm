@@ -42,8 +42,8 @@ export function FeaturesSplit() {
                     <div>
                       <h5 className="font-medium text-slate-900 dark:text-white">Instant Drafting</h5>
                       <p className="mt-1 text-sm text-slate-600 dark:text-white/60">
-                        Replies written in your voice the moment a lead lands, with the
-                        deal history and intake link already in context.
+                        Replies written in your voice with the deal history and
+                        intake link already in context, ready the moment you ask.
                       </p>
                     </div>
                   </div>

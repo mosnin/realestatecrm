@@ -90,9 +90,9 @@ export function LeadOrbit() {
               </span>
             </Link>
             <p className="mt-8 max-w-sm text-sm leading-relaxed text-white/85">
-              Chippi scores every lead the moment it lands and drafts the first
-              reply in your voice, approval-first, so the decision stays{' '}
-              <Accent className="text-white">yours.</Accent>
+              Chippi scores every lead the moment it lands. Connect your inbox
+              and it drafts the first reply in your voice for your approval, so
+              the decision stays <Accent className="text-white">yours.</Accent>
             </p>
           </div>
 

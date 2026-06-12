@@ -4,10 +4,10 @@
  *
  * Grounded in the real /api/cron/daily-briefing job: a digest of hot leads,
  * stalled deals, today's tours, and follow-ups due, delivered email + SMS +
- * push at the realtor's local 7am, with autonomous-sweep drafts already
- * waiting. Dark contrast band (the only dark beat on the page) with a
- * skeleton "brief" card. Two-tone headline written inline (TwoTone's dim is
- * dark-on-light, so on a dark band we hand-tone with white / white-45).
+ * push at the realtor's local 7am. It triages the day; it does not claim to
+ * have done the work overnight. Dark contrast band (the only dark beat on the
+ * page) with a skeleton "brief" card. Two-tone headline written inline
+ * (TwoTone's dim is dark-on-light, so on a dark band we hand-tone white/45).
  */
 
 import { Bell, CalendarClock, Flame, Sun, TrendingDown } from 'lucide-react';
@@ -17,7 +17,7 @@ const ROWS = [
   { icon: Flame, label: 'Hot leads to call first', meta: '3 ranked', tone: 'text-[#ff8a5c]' },
   { icon: TrendingDown, label: 'Deals that stalled', meta: '2 flagged', tone: 'text-amber-400' },
   { icon: CalendarClock, label: "Today's tours", meta: '1 confirmed', tone: 'text-sky-400' },
-  { icon: Bell, label: 'Follow-ups due', meta: '4 drafted', tone: 'text-emerald-400' },
+  { icon: Bell, label: 'Follow-ups due', meta: '4 due', tone: 'text-emerald-400' },
 ];
 
 export function BriefingSection() {
@@ -29,12 +29,12 @@ export function BriefingSection() {
           <div>
             <EyebrowChip light>Morning briefing</EyebrowChip>
             <h2 className="mt-5 text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl">
-              Wake up to the work <span className="text-white/45">already done.</span>
+              Wake up to your day, <span className="text-white/45">already sorted.</span>
             </h2>
             <p className="mt-5 max-w-md text-base leading-relaxed text-white/70">
               Every morning at 7, Chippi hands you the brief: who is hot, which
-              deals stalled, today&apos;s tours, and the follow-ups due, with the
-              drafts already written and waiting for your tap.
+              deals stalled, today&apos;s tours, and the follow-ups due, so you
+              know exactly where to start.
             </p>
             <div className="mt-7 flex flex-wrap gap-2">
               {['Email', 'Text', 'Push'].map((c) => (
@@ -57,7 +57,7 @@ export function BriefingSection() {
                 </span>
                 <div>
                   <p className="text-sm font-semibold">Good morning. Here&apos;s your day.</p>
-                  <p className="text-[11px] text-white/45">7:00 AM · drafted overnight</p>
+                  <p className="text-[11px] text-white/45">7:00 AM · your day, sorted</p>
                 </div>
               </div>
               <div className="space-y-2.5">

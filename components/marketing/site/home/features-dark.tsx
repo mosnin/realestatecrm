@@ -125,8 +125,8 @@ export function FeaturesDark() {
             </h2>
 
             <p className="mt-4 max-w-2xl text-base text-neutral-600 md:text-lg">
-              An agent that works your leads end to end, reading, drafting,
-              booking, and logging while you close.
+              An agent that works your book end to end: scoring leads, drafting
+              in your voice, booking tours, and logging it all while you close.
             </p>
 
             {/* Cards */}
@@ -142,7 +142,7 @@ export function FeaturesDark() {
                     <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
-                          <p className="mb-2 text-sm text-neutral-800">Reply drafted before you open the thread</p>
+                          <p className="mb-2 text-sm text-neutral-800">A reply in your voice, ready for your tap</p>
                           <TypingDemo />
                         </div>
                       </div>
@@ -151,7 +151,7 @@ export function FeaturesDark() {
                 </DemoShell>
                 <CardTitle
                   title="Replies in your voice"
-                  body="Every inbound gets a draft learned from how you actually write. Read it, tweak it, send it, nothing leaves without your tap."
+                  body="Ask Chippi for a reply and it is written from how you actually write. Connect your inbox and it drafts them into an approval inbox for you. Read it, tweak it, send it. Nothing leaves without your tap."
                 />
               </CardShell>
 
