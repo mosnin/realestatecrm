@@ -15,12 +15,12 @@
  *     `openai/gpt-*` on OpenRouter. NEVER `new OpenAI(...)` directly for LLM
  *     work — that bypasses OpenRouter and breaks OpenRouter-only deploys.
  *
- *   - **Audio only** — Whisper transcription, TTS, and the Realtime API —
- *     talks to the OpenAI API directly (`process.env.OPENAI_API_KEY`), because
- *     OpenRouter does not expose those endpoints. Those routes
- *     (`app/api/ai/transcribe|speak|realtime-session`, the Telnyx voice
- *     webhook) are the ONLY sanctioned direct-OpenAI callers. If you find a
- *     direct OpenAI client anywhere else doing text completion, it's a bug.
+ *   - **Audio only** — Whisper transcription and TTS — talk to the OpenAI API
+ *     directly (`process.env.OPENAI_API_KEY`), because OpenRouter does not
+ *     expose those endpoints. Those routes (`app/api/ai/transcribe|speak`, the
+ *     Telnyx voice webhook) are the ONLY sanctioned direct-OpenAI callers. If
+ *     you find a direct OpenAI client anywhere else doing text completion, it's
+ *     a bug.
  *
  * OpenRouter is OpenAI-API-compatible, so the only difference from calling
  * OpenAI directly is the base URL + key.

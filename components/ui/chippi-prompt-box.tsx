@@ -10,7 +10,6 @@ import {
   Briefcase,
   FileText,
   Paperclip,
-  Mic,
   Square,
   StopCircle,
   Plus,
@@ -96,7 +95,6 @@ interface ChippiPromptBoxProps {
   ) => void;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
-  onVoiceStart?: () => void;
   /** Called when the Send button has transformed into Stop (i.e. the
    *  parent is streaming). The parent is expected to abort the active
    *  stream. When omitted, the Send button stays disabled while loading
@@ -196,7 +194,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       onSend,
       onMentionSearch,
       onAttach,
-      onVoiceStart,
       onAbort,
       disabled = false,
       isLoading = false,
@@ -766,14 +763,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
 
     function startRecording() {
       if (disabled || isLoading) return;
-      // When the parent wires its own voice surface (the workspace mounts a
-      // dedicated VoiceMode dialog), defer to it entirely — the local
-      // recorder UI is a fallback for chat surfaces without one. Avoids
-      // having two simultaneous voice interfaces.
-      if (onVoiceStart) {
-        onVoiceStart();
-        return;
-      }
       setIsRecording(true);
     }
 
@@ -790,7 +779,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     //   streaming + onAbort  → live Stop (matches ChatGPT / Claude)
     //   streaming, no onAbort → disabled Stop placeholder
     //   has content          → Send (ArrowUp)
-    //   has voice mode       → Mic that opens voice mode (NOT dictation)
     //   else                 → inert Send slot for layout consistency
     function renderRightButton() {
       if (isLoading) {
@@ -859,33 +847,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         );
       }
 
-      if (onVoiceStart) {
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => onVoiceStart()}
-                disabled={disabled}
-                aria-label="Start voice mode"
-                className={cn(
-                  'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                  'bg-foreground/[0.06] text-muted-foreground/70 hover:text-foreground',
-                  'hover:bg-foreground/[0.08] transition-all duration-150 active:scale-[0.96]',
-                  disabled && 'cursor-not-allowed opacity-60',
-                )}
-              >
-                <Mic size={15} strokeWidth={2} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              Voice mode
-            </TooltipContent>
-          </Tooltip>
-        );
-      }
-
-      // No mic, no content — show inert send slot for layout consistency
+      // No content — show inert send slot for layout consistency
       return (
         <button
           type="button"

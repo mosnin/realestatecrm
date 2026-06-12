@@ -1,42 +1,44 @@
 /**
- * BreadthBand, the "more than the inbox" beat (audit fix: breadth should read
- * as an agentic OS, not a follow-up tool). Four real, under-told capabilities,
- * framed honestly:
+ * BreadthBand, the "more than the inbox" beat: breadth should read as an
+ * agentic OS, not a follow-up tool. Four capabilities, each tied to a real
+ * tool in the live registry (lib/ai-tools/tools), framed honestly:
  *
- * - Voice: realtime voice chat + Whisper + TTS (conversational, NOT outbound
- *   calling, copy says you talk to Chippi).
- * - Deep work: delegate_task spawns a swarm research session with live
- *   progress (research/observe, the sub-agents don't mutate the workspace).
- * - Memory: store/recall_memory keeps weighted observations.
- * - Agent-editable capture: add_intake_question rewrites the live form.
+ * - Deep work: delegate_task spawns a focused sub-agent run with live
+ *   progress (delegate-task.ts).
+ * - Tours: check_availability + propose_tour_times + schedule_tour book
+ *   against the realtor's real calendar (and reschedule / cancel).
+ * - Pipeline: find_stuck_deals + find_quiet_hot_persons + find_overdue_
+ *   followups + pipeline_summary surface what's slipping.
+ * - Recall: recall_history pulls up the logged calls, meetings, and notes
+ *   on a contact on demand.
  *
  * White open grid, two-tone headline.
  */
 
-import { Brain, ListChecks, Mic, Telescope } from 'lucide-react';
+import { Activity, CalendarCheck, History, Telescope } from 'lucide-react';
 import { TwoTone } from './two-tone';
 import { EyebrowChip, FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
 
 const CELLS = [
   {
-    icon: Mic,
-    title: 'Talk to Chippi.',
-    body: 'Speak instead of type. Chippi listens, answers, and works the task hands-free between showings.',
-  },
-  {
     icon: Telescope,
     title: 'Deep work on demand.',
-    body: 'Hand Chippi a research job and it spins up a focused work session, streaming progress while it digs.',
+    body: 'Hand Chippi a bigger job and it spins up a focused work session, streaming progress while it digs.',
   },
   {
-    icon: Brain,
-    title: 'A second brain.',
-    body: 'Chippi remembers what matters: who went quiet, how you like to write, the context behind every deal.',
+    icon: CalendarCheck,
+    title: 'Books against your calendar.',
+    body: 'Chippi checks your real availability, proposes tour times, and books them. Reschedules and cancels too.',
   },
   {
-    icon: ListChecks,
-    title: 'Capture that edits itself.',
-    body: 'Ask Chippi to add a question to your intake form and it rewrites the live form. No builder, no dev.',
+    icon: Activity,
+    title: 'Watches your pipeline.',
+    body: 'Stalled deals, hot leads gone quiet, follow-ups overdue. Chippi surfaces what is slipping before you look.',
+  },
+  {
+    icon: History,
+    title: 'Total recall.',
+    body: 'Ask about anyone and Chippi pulls up every logged call, meeting, and note you have on them in seconds.',
   },
 ];
 
@@ -50,7 +52,7 @@ export function BreadthBand() {
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
           The inbox loop is where it starts. Chippi runs across your whole day,
-          by voice, on deep work, with a memory of every deal.
+          booking tours, watching the pipeline, recalling every detail you logged.
         </p>
       </FadeUp>
 
