@@ -1,5 +1,5 @@
 /**
- * `/pricing` — Chippi V2 tiers on the bold-canvas system.
+ * `/pricing`, Chippi V2 tiers on the bold-canvas system.
  *
  * No free tier: every plan starts with a 7-day trial that requires a card.
  * Individuals (Solo / Pro), teams (Team / Team Plus), then brokerage expansion.
@@ -43,7 +43,7 @@ const EXPANSION: { range: string; mo: number; yr: number }[] = [
   { range: '100–199 agents', mo: 39, yr: 32 },
 ];
 
-// Premium workflows shown on the table. `chat_turn` is intentionally omitted —
+// Premium workflows shown on the table. `chat_turn` is intentionally omitted, 
 // the per-turn chat meter is an internal cost ceiling, not an advertised
 // "premium workflow" (routine chat reads as ~free).
 const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
@@ -63,15 +63,15 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What are credits?',
-    a: 'High-value agentic actions draw from a monthly credit balance — a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
+    a: 'High-value agentic actions draw from a monthly credit balance, a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
   },
   {
     q: 'What happens when I run out of credits?',
-    a: 'Buy a one-time top-up anytime, or move up a plan for a larger monthly allocation and a better rate. Your workspace never locks — only the premium AI workflows pause.',
+    a: 'Buy a one-time top-up anytime, or move up a plan for a larger monthly allocation and a better rate. Your workspace never locks, only the premium AI workflows pause.',
   },
   {
     q: 'How does brokerage pricing work?',
-    a: 'Add an agent and billing updates automatically — the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
+    a: 'Add an agent and billing updates automatically, the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
   },
 ];
 
@@ -130,7 +130,7 @@ export default function PricingPage() {
       <PageHero
         eyebrow="Pricing"
         title="Pricing that scales with your team."
-        sub="Every plan starts with a 7-day free trial. Move up as you grow — premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
+        sub="Every plan starts with a 7-day free trial. Move up as you grow, premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
         primaryCta={{ label: 'Start free trial', href: SIGNUP }}
         secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
@@ -200,7 +200,7 @@ export default function PricingPage() {
                 <tr>
                   <td className="px-5 py-3 text-zinc-950">200+ agents</td>
                   <td className="px-5 py-3 text-neutral-500" colSpan={2}>
-                    Custom — performance pricing available.{' '}
+                    Custom, performance pricing available.{' '}
                     <Link href="/demo" className="font-medium text-[#ff4b29] hover:underline">Talk to sales</Link>
                   </td>
                 </tr>

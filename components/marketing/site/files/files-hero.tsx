@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * FilesHero — the /files opener, adapted from the source two-column hero.
- * Recolored to the calm system (no blue/purple/green shapes — washed brand +
+ * FilesHero, the /files opener, adapted from the source two-column hero.
+ * Recolored to the calm system (no blue/purple/green shapes, washed brand +
  * muted), and the people-photo collage swapped for mock file tiles (a
  * contract, a listing photo, a CMA) so nothing 404s. framer-motion entrance,
  * reduced-motion aware via variants that collapse to a plain fade.
@@ -73,7 +73,7 @@ export function FilesHero() {
             Every file, one place.
           </motion.h1>
           <motion.p variants={item} className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-muted-foreground lg:mx-0">
-            Contracts, disclosures, listing photos, CMAs — Chippi files every document to
+            Contracts, disclosures, listing photos, CMAs, Chippi files every document to
             the right deal automatically, so you find it in one search instead of five folders.
           </motion.p>
           <motion.div variants={item} className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
@@ -106,7 +106,7 @@ export function FilesHero() {
           </motion.div>
         </motion.div>
 
-        {/* Right — floating file tiles */}
+        {/* Right, floating file tiles */}
         <div className="relative mx-auto h-[380px] w-full max-w-md sm:h-[440px]">
           <motion.div aria-hidden className="absolute left-1/4 top-2 h-16 w-16 rounded-full bg-brand-subtle" {...float} />
           <motion.div aria-hidden className="absolute bottom-6 right-1/4 h-12 w-12 rounded-lg bg-muted" {...float} />
@@ -132,7 +132,7 @@ export function FilesHero() {
             transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.24 }}
             className="absolute bottom-0 left-0 w-40"
           >
-            <FileTile Icon={FileSpreadsheet} name="CMA — 88 Pine.pdf" meta="Comp analysis" photo="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=640&h=420&fit=crop&q=80" />
+            <FileTile Icon={FileSpreadsheet} name="CMA, 88 Pine.pdf" meta="Comp analysis" photo="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=640&h=420&fit=crop&q=80" />
           </motion.div>
         </div>
       </div>

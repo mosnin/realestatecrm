@@ -1,11 +1,11 @@
 /**
- * DemoBooking — the /demo scheduler on the bold-canvas system. One focal
+ * DemoBooking, the /demo scheduler on the bold-canvas system. One focal
  * element: the scheduler, in a white soft-shadow card. The page opener
  * (PageHero) lives in `app/(marketing)/demo/page.tsx`.
  *
  * Swapping in the real Calendly is one line: paste the inline-embed URL into
  * CALENDLY_URL. Empty → a calm placeholder; set → a responsive iframe. We do
- * NOT load Calendly's external widget.js — no new dependency, the swap stays a
+ * NOT load Calendly's external widget.js, no new dependency, the swap stays a
  * one-liner.
  */
 

@@ -1,14 +1,14 @@
 /**
- * `/integrations` — every app Chippi can work inside, through Composio.
+ * `/integrations`, every app Chippi can work inside, through Composio.
  *
  * One idea: connect the tools you already pay for, and Chippi calls each one
- * as a tool while it works — pulling data out of your workflows and writing
+ * as a tool while it works, pulling data out of your workflows and writing
  * results back where they belong.
  *
  * The owner-provided IntegrationHero opens the page. Below it we add a
  * category grid (lucide icon in a tinted circle per category, with example
  * tools), then the existing
- * `components/marketing/integrations/integrations-page.tsx` body — which
+ * `components/marketing/integrations/integrations-page.tsx` body, which
  * carries the single "how it works" three-step block, the catalog rendered
  * straight from `lib/integrations/catalog.ts` (the source of truth), and the
  * closing CTA. We don't invent integrations or blurbs here; the page is a
@@ -35,7 +35,7 @@ export const metadata = {
     'Connect the tools you already use. Chippi connects through Composio, then calls each one as a tool while it works, pulling data from and pushing data into your existing workflows.',
 };
 
-/* Categories — the shape of the catalog, one card each. Example tools are
+/* Categories, the shape of the catalog, one card each. Example tools are
  * drawn straight from lib/integrations/catalog.ts so nothing is invented. */
 const CATEGORIES: { icon: LucideIcon; title: string; body: string; tools: string }[] = [
   {
@@ -92,7 +92,7 @@ export default function Page() {
     <>
       <IntegrationHero />
 
-      {/* Categories — tinted-circle icon cards, one per shape of the catalog */}
+      {/* Categories, tinted-circle icon cards, one per shape of the catalog */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <Eyebrow>Every category</Eyebrow>
@@ -100,7 +100,7 @@ export default function Page() {
             The whole stack a realtor runs on.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            50+ apps across the categories that matter — connect the ones you
+            50+ apps across the categories that matter, connect the ones you
             already pay for and Chippi reaches for each as it works.
           </p>
         </FadeUp>

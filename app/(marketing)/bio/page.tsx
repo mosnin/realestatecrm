@@ -1,5 +1,5 @@
 /**
- * `/bio` — the realtor&apos;s public page, on the white + pastel system.
+ * `/bio`, the realtor&apos;s public page, on the white + pastel system.
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
  * glass card holding a skeleton bio page: avatar, links, listing tiles,
@@ -30,10 +30,10 @@ import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 export const metadata = {
   title: 'Your public bio · Chippi',
   description:
-    'One link with your bio, your listings, and tour booking built in. Every visitor who taps lands in the same loop — scored, with a reply drafted in your voice for your approval.',
+    'One link with your bio, your listings, and tour booking built in. Every visitor who taps lands in the same loop, scored, with a reply drafted in your voice for your approval.',
 };
 
-/** ✦-glyph eyebrow chip — same treatment as the exemplar sub-pages. */
+/** ✦-glyph eyebrow chip, same treatment as the exemplar sub-pages. */
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <p className="inline-flex items-center justify-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -45,7 +45,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Owner image slot — exactly the FeaturesBento vocabulary. */
+/** Owner image slot, exactly the FeaturesBento vocabulary. */
 function ImageSlot({ name }: { name: string }) {
   return (
     <div
@@ -55,14 +55,14 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
   );
 }
 
-/** Page-local skeleton — the public bio page as a lead sees it: avatar, name,
+/** Page-local skeleton, the public bio page as a lead sees it: avatar, name,
  *  link buttons, listing tiles. Gray/white mock cards in the pastel glass
  *  frame, the same vocabulary as ChippiAtWork. */
 function BioPreview() {
@@ -159,7 +159,7 @@ const BENTO = [
   {
     slot: 'bio-page',
     title: 'Your page, your name.',
-    sub: 'Bio, listings, and booking on one link you can drop anywhere — Instagram, Zillow, the QR by the door.',
+    sub: 'Bio, listings, and booking on one link you can drop anywhere, Instagram, Zillow, the QR by the door.',
   },
   {
     slot: 'bio-booking',
@@ -174,22 +174,22 @@ const BENTO = [
   {
     slot: 'bio-brand',
     title: 'On brand by default.',
-    sub: 'Your photo, your markets, your story — set once, current everywhere the link lives.',
+    sub: 'Your photo, your markets, your story, set once, current everywhere the link lives.',
   },
 ];
 
-/* What the page actually does — the four jobs of the link, as a tinted
+/* What the page actually does, the four jobs of the link, as a tinted
  * FeatureGrid (a tonal half-step off the white canvas). */
 const DOES = [
   {
     kicker: 'Capture',
     title: 'Captures every lead',
-    body: 'A name, a number, a question — whoever taps lands in Chippi scored, with the context already attached.',
+    body: 'A name, a number, a question, whoever taps lands in Chippi scored, with the context already attached.',
   },
   {
     kicker: 'Listings',
     title: 'Shows your listings',
-    body: 'Active properties laid out as tiles, current the moment a status changes — no page to rebuild.',
+    body: 'Active properties laid out as tiles, current the moment a status changes, no page to rebuild.',
   },
   {
     kicker: 'Booking',
@@ -209,12 +209,12 @@ export default function BioPage() {
       <PageHero
         eyebrow="Your public page"
         title="One link. Bio, listings, bookings."
-        sub="Your public page carries your story, your active listings, and a tour-booking link — and every lead it captures lands in the same loop: scored, drafted, ready for your tap."
+        sub="Your public page carries your story, your active listings, and a tour-booking link, and every lead it captures lands in the same loop: scored, drafted, ready for your tap."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Open light split — air after the hero */}
+      {/* Open light split, air after the hero */}
       <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Copy, hairline list, stats, quiet link */}
@@ -223,7 +223,7 @@ export default function BioPage() {
               A page that works the room.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-              Not a brochure — a front door. Everything a lead wants to do next
+              Not a brochure, a front door. Everything a lead wants to do next
               is one tap deep, and every tap feeds the pipeline.
             </p>
 
@@ -237,7 +237,7 @@ export default function BioPage() {
                     <h3 className="font-semibold tracking-tight text-zinc-950">One URL everywhere</h3>
                     <p className="mt-1 text-sm text-neutral-600">
                       Instagram, Zillow, your email signature, the open-house
-                      QR — one link feeding one pipeline.
+                      QR, one link feeding one pipeline.
                     </p>
                   </div>
                 </div>
@@ -356,7 +356,7 @@ export default function BioPage() {
         </div>
       </section>
 
-      {/* Soft bento — owner image slots, big air above */}
+      {/* Soft bento, owner image slots, big air above */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -367,7 +367,7 @@ export default function BioPage() {
             A public page that feeds the pipeline.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            Your page, your bookings, your leads, your brand — wired into the
+            Your page, your bookings, your leads, your brand, wired into the
             same loop as everything else Chippi works.
           </p>
         </FadeUp>
@@ -386,7 +386,7 @@ export default function BioPage() {
         </Stagger>
       </section>
 
-      {/* The four jobs of the link — tinted FeatureGrid, a tonal half-step off
+      {/* The four jobs of the link, tinted FeatureGrid, a tonal half-step off
           the white run above. */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
@@ -395,7 +395,7 @@ export default function BioPage() {
             One tap, four jobs, one loop.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            Capture, listings, booking, hand-off — every tap does real work and
+            Capture, listings, booking, hand-off, every tap does real work and
             ends up in the same pipeline Chippi runs.
           </p>
         </FadeUp>
@@ -406,7 +406,7 @@ export default function BioPage() {
         />
       </section>
 
-      {/* The visitor&apos;s view — a fuller page-local phone-bio skeleton in
+      {/* The visitor&apos;s view, a fuller page-local phone-bio skeleton in
           the pastel glass frame. */}
       <section className="mx-auto mt-24 max-w-7xl px-6 sm:mt-32">
         <div className="grid items-center gap-12 lg:grid-cols-2">
@@ -416,7 +416,7 @@ export default function BioPage() {
               What a lead sees when they tap.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-              Your face, your name, your markets — then the three things they
+              Your face, your name, your markets, then the three things they
               came to do, one tap deep. No app to download, no form to slog
               through.
             </p>
@@ -428,7 +428,7 @@ export default function BioPage() {
                 <div>
                   <h3 className="font-semibold tracking-tight text-zinc-950">Your story up top</h3>
                   <p className="mt-1 text-sm text-neutral-600">
-                    Photo, name, and the markets you work — set once, current
+                    Photo, name, and the markets you work, set once, current
                     everywhere the link lives.
                   </p>
                 </div>
@@ -441,7 +441,7 @@ export default function BioPage() {
                   <h3 className="font-semibold tracking-tight text-zinc-950">Listings, always live</h3>
                   <p className="mt-1 text-sm text-neutral-600">
                     Active properties laid out as tiles, current the moment a
-                    status changes — no page to rebuild.
+                    status changes, no page to rebuild.
                   </p>
                 </div>
               </div>

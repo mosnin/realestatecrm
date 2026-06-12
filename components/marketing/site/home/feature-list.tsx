@@ -1,5 +1,5 @@
 /**
- * FeatureList — the reference's interactive pill-row list, tailored to
+ * FeatureList, the reference's interactive pill-row list, tailored to
  * Chippi. Two-tone headline, three pastel tag pills, then five rounded-full
  * rows: title · middle label · right description · chevron. One row is the
  * highlighted vermillion state; the rest light up on hover (CSS only, no JS).
@@ -41,7 +41,7 @@ const ROWS: Row[] = [
   {
     title: "A pipeline that's current",
     label: 'Auto-advanced',
-    desc: 'Deals move themselves as things happen — the board shows today.',
+    desc: 'Deals move themselves as things happen, the board shows today.',
     href: '/deals',
   },
   {
@@ -53,7 +53,7 @@ const ROWS: Row[] = [
   {
     title: 'Approval-first control',
     label: 'You sign off',
-    desc: 'Nothing leaves without your tap — every action on the record.',
+    desc: 'Nothing leaves without your tap, every action on the record.',
     href: '/chippi',
   },
 ];

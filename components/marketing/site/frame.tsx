@@ -1,12 +1,12 @@
 /**
- * Frame primitives for the calm site — the pieces that make product imagery
+ * Frame primitives for the calm site, the pieces that make product imagery
  * read as enterprise-grade instead of vibecoded.
  *
  * - PanelFrame: a clean hairline frame with a tasteful soft shadow, wrapping a
- *   screenshot or a live mockup. No faux browser chrome — the dots-and-URL-bar
+ *   screenshot or a live mockup. No faux browser chrome, the dots-and-URL-bar
  *   window costume was cut deliberately; the work inside the frame is the
  *   show. Shadows are sanctioned in the marketing layer (STYLESHEET.md
- *   §Shadows) — the product stays flat; the pitch is allowed depth.
+ *   §Shadows), the product stays flat; the pitch is allowed depth.
  * - ImagePlaceholder: a labeled, clearly-intentional slot for a screenshot the
  *   owner drops in later. It says exactly what goes there and at what ratio, so
  *   it never reads as a broken image.

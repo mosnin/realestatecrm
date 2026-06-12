@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * LeadOrbit — animated lead-qualification orbit (reference-matched), tailored
+ * LeadOrbit, animated lead-qualification orbit (reference-matched), tailored
  * to Chippi. Brand-gradient card: lead headshots ring the dashed orbit
  * (counter-rotated to stay upright), the Chippi hub sits at the top, and the
  * center step stack CYCLES upward through the real loop (received → scored →
@@ -37,7 +37,7 @@ const POS = [
 
 const STEPS = [
   { id: 'received', icon: FileText, label: 'Application received' },
-  { id: 'scored', icon: Flame, label: 'Scored — Hot · 82' },
+  { id: 'scored', icon: Flame, label: 'Scored, Hot · 82' },
   { id: 'drafted', icon: PenLine, label: 'Reply drafted · your voice' },
   { id: 'booked', icon: CalendarCheck, label: 'Tour booked · Sat 2:00' },
 ];
@@ -91,7 +91,7 @@ export function LeadOrbit() {
             </Link>
             <p className="mt-8 max-w-sm text-sm leading-relaxed text-white/85">
               Chippi scores every lead the moment it lands and drafts the first
-              reply in your voice — approval-first, so the decision stays{' '}
+              reply in your voice, approval-first, so the decision stays{' '}
               <Accent className="text-white">yours.</Accent>
             </p>
           </div>
@@ -130,7 +130,7 @@ export function LeadOrbit() {
               ))}
             </motion.div>
 
-            {/* Center step stack — narrower than the ring */}
+            {/* Center step stack, narrower than the ring */}
             <div className="absolute left-1/2 top-1/2 z-20 w-[64%] max-w-[260px] -translate-x-1/2 -translate-y-1/2 space-y-3">
               {/* header card with progress */}
               <div className="rounded-2xl bg-white p-3.5 text-zinc-950 shadow-[0_18px_50px_-18px_rgba(20,10,5,0.5)]">

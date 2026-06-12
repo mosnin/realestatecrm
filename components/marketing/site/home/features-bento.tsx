@@ -1,10 +1,10 @@
 /**
- * FeaturesBento — the owner-provided 2×2 soft-card bento, exact.
+ * FeaturesBento, the owner-provided 2×2 soft-card bento, exact.
  *
  * Four white rounded cards with very soft diffuse shadows: title with a
  * period, two-line gray sub, and a large soft visual area. The visual areas
  * are OWNER IMAGE SLOTS by explicit direction ("leave image placeholders so
- * I can provide my own") — swap each <ImageSlot/> for the provided asset:
+ * I can provide my own"), swap each <ImageSlot/> for the provided asset:
  *
  *   <img src="..." alt="..." className="h-full w-full rounded-2xl object-cover" />
  */
@@ -20,7 +20,7 @@ const CELLS = [
   {
     slot: 'scoring',
     title: 'Lead scoring that thinks.',
-    sub: 'Hot, warm, cold — with the reason,\nthe moment a lead lands.',
+    sub: 'Hot, warm, cold, with the reason,\nthe moment a lead lands.',
   },
   {
     slot: 'pipeline',
@@ -30,7 +30,7 @@ const CELLS = [
   {
     slot: 'approvals',
     title: 'Approval-first control.',
-    sub: 'Nothing sends without your tap —\nguardrails and auditing built in.',
+    sub: 'Nothing sends without your tap, \nguardrails and auditing built in.',
   },
 ];
 
@@ -43,7 +43,7 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>

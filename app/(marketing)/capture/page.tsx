@@ -1,11 +1,11 @@
 /**
- * `/capture` — intake forms that feed the loop, on the white + pastel system.
+ * `/capture`, intake forms that feed the loop, on the white + pastel system.
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
  * glass card: intake form → scored lead with drafted-reply chips) → white
  * shadow trio (Instant scoring / Your voice / Approval-first) → pastel CTA
  * card. One idea: a lead lands, gets scored, a reply drafts itself, tour
- * times are proposed — you just approve.
+ * times are proposed, you just approve.
  */
 
 import Link from 'next/link';
@@ -29,14 +29,14 @@ import { LeadOrbit } from '@/components/marketing/site/home/lead-orbit';
 export const metadata = {
   title: 'Capture leads · Chippi',
   description:
-    'Intake forms that feed the loop — every lead lands in Chippi scored, with a reply drafted in your voice and tour times ready to book. Nothing sends without your approval.',
+    'Intake forms that feed the loop, every lead lands in Chippi scored, with a reply drafted in your voice and tour times ready to book. Nothing sends without your approval.',
 };
 
 const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Zap,
     title: 'Instant scoring.',
-    body: 'Hot, warm, or cold the second the form lands — with the reason attached, not just a number.',
+    body: 'Hot, warm, or cold the second the form lands, with the reason attached, not just a number.',
   },
   {
     icon: PenLine,
@@ -46,16 +46,16 @@ const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: ShieldCheck,
     title: 'Approval-first.',
-    body: 'Nothing sends without your tap. Edit it, send it, or skip it — every thread stays yours.',
+    body: 'Nothing sends without your tap. Edit it, send it, or skip it, every thread stays yours.',
   },
 ];
 
-/* The capture channels — 2×2 owner image-slot bento, FeaturesBento style. */
+/* The capture channels, 2×2 owner image-slot bento, FeaturesBento style. */
 const CHANNELS = [
   {
     slot: 'web-form',
     title: 'On your website.',
-    sub: 'Embed the form anywhere — every\nfill comes back scored and drafted.',
+    sub: 'Embed the form anywhere, every\nfill comes back scored and drafted.',
   },
   {
     slot: 'qr-sign',
@@ -65,7 +65,7 @@ const CHANNELS = [
   {
     slot: 'social-link',
     title: 'In your link in bio.',
-    sub: 'Drop the form on your public page —\nthe profile link that actually books.',
+    sub: 'Drop the form on your public page, \nthe profile link that actually books.',
   },
   {
     slot: 'import',
@@ -74,22 +74,22 @@ const CHANNELS = [
   },
 ];
 
-/* The three steps — capture → score → first reply, HowItWorks style. */
+/* The three steps, capture → score → first reply, HowItWorks style. */
 const STEPS: { label: string; title: string; body: string }[] = [
   {
     label: 'STEP 1',
     title: 'A lead lands.',
-    body: 'From your form, your QR, or your bio link — the moment someone asks, it lands in Chippi with the request in context.',
+    body: 'From your form, your QR, or your bio link, the moment someone asks, it lands in Chippi with the request in context.',
   },
   {
     label: 'STEP 2',
     title: 'It scores itself.',
-    body: 'Hot, warm, or cold with the reason spelled out — budget, timeline, intent — so you know who to call first.',
+    body: 'Hot, warm, or cold with the reason spelled out, budget, timeline, intent, so you know who to call first.',
   },
   {
     label: 'STEP 3',
     title: 'A reply is ready.',
-    body: 'The first message drafts itself in your voice with tour times from your real calendar. You tap approve — nothing sends without it.',
+    body: 'The first message drafts itself in your voice with tour times from your real calendar. You tap approve, nothing sends without it.',
   },
 ];
 
@@ -113,7 +113,7 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
@@ -129,7 +129,7 @@ function StepPill({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** One step card — pill + skeleton mock + title + body. */
+/** One step card, pill + skeleton mock + title + body. */
 function StepCard({
   label,
   title,
@@ -170,12 +170,12 @@ export default function CapturePage() {
       <PageHero
         eyebrow="Capture leads"
         title="Forms that feed the loop."
-        sub="A lead lands on your form, gets scored with the reason, a reply drafts itself in your voice, and tour times are proposed. You tap approve — that is the whole job."
+        sub="A lead lands on your form, gets scored with the reason, a reply drafts itself in your voice, and tour times are proposed. You tap approve, that is the whole job."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Open light split — air after the hero */}
+      {/* Open light split, air after the hero */}
       <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Copy, hairline list, stats, quiet link */}
@@ -197,7 +197,7 @@ export default function CapturePage() {
                   <div>
                     <h3 className="font-semibold tracking-tight text-zinc-950">Scored on arrival</h3>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Hot, warm, or cold with the reason attached — the moment
+                      Hot, warm, or cold with the reason attached, the moment
                       the form lands, not at the end of the day.
                     </p>
                   </div>
@@ -225,7 +225,7 @@ export default function CapturePage() {
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
-                  <p className="mt-1 text-xs text-neutral-600">Approval-first — nothing sends without you</p>
+                  <p className="mt-1 text-xs text-neutral-600">Approval-first, nothing sends without you</p>
                 </div>
               </div>
             </div>
@@ -324,7 +324,7 @@ export default function CapturePage() {
                   <div>
                     <h4 className="text-lg font-semibold tracking-tight text-zinc-950">The reason, not a number</h4>
                     <p className="mt-2 text-sm text-neutral-500">
-                      Every score explains itself — budget, timeline, intent —
+                      Every score explains itself, budget, timeline, intent, 
                       so you can trust the queue.
                     </p>
                   </div>
@@ -342,7 +342,7 @@ export default function CapturePage() {
         </div>
       </section>
 
-      {/* White shadow trio — big air above */}
+      {/* White shadow trio, big air above */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -373,10 +373,10 @@ export default function CapturePage() {
         </Stagger>
       </section>
 
-      {/* Capture → score → first reply — HowItWorks-style steps card */}
+      {/* Capture → score → first reply, HowItWorks-style steps card */}
       <section className="mx-auto mt-24 w-full max-w-7xl px-4 sm:mt-32 sm:px-6">
         <div className="rounded-3xl border border-neutral-200/70 bg-white p-6 shadow-[0_24px_70px_-30px_rgba(20,20,40,0.18)] sm:p-8">
-          {/* Header — giant headline + hairline + sub, how-it-works exact */}
+          {/* Header, giant headline + hairline + sub, how-it-works exact */}
           <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:gap-6">
             <h2 className="text-[40px] font-semibold leading-[0.95] tracking-tight text-zinc-950 sm:text-5xl lg:text-6xl">
               Lands to first reply.
@@ -393,7 +393,7 @@ export default function CapturePage() {
           <div className="mt-4 h-px bg-neutral-200" />
 
           <Stagger className="mt-8 grid grid-cols-1 gap-8 sm:gap-10 lg:grid-cols-3">
-            {/* STEP 1 — lands */}
+            {/* STEP 1, lands */}
             <StaggerItem className="h-full">
               <StepCard label={STEPS[0].label} title={STEPS[0].title} body={STEPS[0].body}>
                 <StepMock>
@@ -416,7 +416,7 @@ export default function CapturePage() {
               </StepCard>
             </StaggerItem>
 
-            {/* STEP 2 — scores */}
+            {/* STEP 2, scores */}
             <StaggerItem className="h-full">
               <StepCard label={STEPS[1].label} title={STEPS[1].title} body={STEPS[1].body}>
                 <StepMock>
@@ -440,7 +440,7 @@ export default function CapturePage() {
               </StepCard>
             </StaggerItem>
 
-            {/* STEP 3 — first reply ready */}
+            {/* STEP 3, first reply ready */}
             <StaggerItem className="h-full">
               <StepCard label={STEPS[2].label} title={STEPS[2].title} body={STEPS[2].body}>
                 <StepMock>
@@ -473,7 +473,7 @@ export default function CapturePage() {
         </div>
       </section>
 
-      {/* The capture channels — 2×2 owner image-slot bento */}
+      {/* The capture channels, 2×2 owner image-slot bento */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp className="mx-auto max-w-2xl text-center">
@@ -483,7 +483,7 @@ export default function CapturePage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
               One form, every channel. However a lead arrives, it enters the same
-              loop — scored, drafted, waiting for your tap.
+              loop, scored, drafted, waiting for your tap.
             </p>
           </FadeUp>
           <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">
@@ -504,7 +504,7 @@ export default function CapturePage() {
         </div>
       </section>
 
-      {/* Lead qualification, run by a teammate — saturated brand beat */}
+      {/* Lead qualification, run by a teammate, saturated brand beat */}
       <div className="mt-24 sm:mt-32">
         <LeadOrbit />
       </div>
@@ -519,7 +519,7 @@ export default function CapturePage() {
               Put the form to work tonight.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-              Drop it on your site, your public page, the open-house QR — every
+              Drop it on your site, your public page, the open-house QR, every
               fill comes back scored and drafted.
             </p>
             <Link

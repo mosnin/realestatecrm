@@ -1,27 +1,27 @@
 /**
- * `/status` — system status. Honest, calm, no theatre.
+ * `/status`, system status. Honest, calm, no theatre.
  *
  * Bold-canvas shell: PageHero opener, then the checks as white soft-shadow
  * rows, each carrying a single dot.
  *
  * This page tells the TRUTH at request time. It probes the subsystems we can
- * actually verify from the server — the database, the agent's LLM + Modal
- * runtime, and the integrations layer — and renders what it finds:
+ * actually verify from the server, the database, the agent's LLM + Modal
+ * runtime, and the integrations layer, and renders what it finds:
  *
  *   - emerald  → operational (the check ran and passed)
  *   - amber    → degraded    (the check ran and failed)
- *   - neutral  → unknown     (the check could not be performed — e.g. a
+ *   - neutral  → unknown     (the check could not be performed, e.g. a
  *                             dependency isn't configured in this env)
  *
  * We do NOT paint a green dot we can't stand behind. A status page that lies
  * is worse than no status page. We also do NOT invent uptime percentages or
- * an incident history — those would be unverifiable claims. When there is a
+ * an incident history, those would be unverifiable claims. When there is a
  * real incident feed to wire, it earns its place here; until then the page
  * stays a calm, honest fact about right now.
  *
  * Only the three subsystems we can verify without a logged-in user are listed.
  * The per-user, per-workspace health (a realtor's own Gmail/Calendar
- * connection) lives behind auth on the integrations page — it can't be shown
+ * connection) lives behind auth on the integrations page, it can't be shown
  * truthfully on a public marketing page, so it isn't faked here.
  *
  * No charts, no graphs, no numbers.
@@ -34,7 +34,7 @@ import { composioConfigured } from '@/lib/integrations/composio';
 
 export const metadata = { title: 'Status · Chippi' };
 
-// Always evaluate at request time — a status page must never be cached into a
+// Always evaluate at request time, a status page must never be cached into a
 // stale "operational" snapshot.
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +48,7 @@ interface Subsystem {
 /**
  * Probe the primary database. Mirrors the `/api/health` DB probe: a single
  * bounded read. A thrown error or a query error is degraded; success is
- * operational. There is no "unknown" path here — the DB is always reachable
+ * operational. There is no "unknown" path here, the DB is always reachable
  * to attempt, so the check always produces a real verdict.
  */
 async function checkDatabase(): Promise<Health> {
@@ -64,7 +64,7 @@ async function checkDatabase(): Promise<Health> {
  * The agent (Chippi) needs two things to do real work: an LLM provider key
  * and a Modal runtime URL. We can only verify CONFIGURATION from here, not a
  * live round-trip (that path is authenticated and rate-shaped). Missing config
- * is reported as "unknown" rather than "operational" — we won't claim the
+ * is reported as "unknown" rather than "operational", we won't claim the
  * agent is up when we can't see the keys it needs.
  */
 function checkAgent(): Health {
@@ -120,7 +120,7 @@ function StatusRow({ label, health }: Subsystem) {
 
 export default async function StatusPage() {
   // Each probe is independently guarded so one failing check can never throw
-  // the page — the worst case for any single subsystem is "unknown".
+  // the page, the worst case for any single subsystem is "unknown".
   const [database, agent, integrations] = await Promise.all([
     checkDatabase(),
     Promise.resolve(checkAgent()),
@@ -136,7 +136,7 @@ export default async function StatusPage() {
   const anyDegraded = subsystems.some((s) => s.health === 'degraded');
   const allOperational = subsystems.every((s) => s.health === 'operational');
 
-  // The headline is the one focal sentence — it must match the dots below it.
+  // The headline is the one focal sentence, it must match the dots below it.
   const title = anyDegraded
     ? 'We’re looking into an issue.'
     : allOperational

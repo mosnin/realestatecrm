@@ -1,5 +1,5 @@
 /**
- * `/chippi` — Meet Chippi. PageHero ("Not another tool. A teammate.") →
+ * `/chippi`, Meet Chippi. PageHero ("Not another tool. A teammate.") →
  * what Chippi does (open split: the five verbs + a skeleton illustration in
  * the pastel frame) → where it works (trio of white shadow cards into
  * /realtors /deals /studio) → the approval promise (pastel card) → CTA.
@@ -22,10 +22,10 @@ import { LeadOrbit } from '@/components/marketing/site/home/lead-orbit';
 export const metadata = {
   title: 'Meet Chippi',
   description:
-    'Chippi is the agent inside your CRM — it reads every inbound, scores it with the reason, drafts in your voice, books against your real calendar, and logs it all in plain language. Nothing sends without your approval.',
+    'Chippi is the agent inside your CRM, it reads every inbound, scores it with the reason, drafts in your voice, books against your real calendar, and logs it all in plain language. Nothing sends without your approval.',
 };
 
-/* What Chippi does — the five verbs, features-split list style. */
+/* What Chippi does, the five verbs, features-split list style. */
 const VERBS = [
   {
     icon: Inbox,
@@ -35,7 +35,7 @@ const VERBS = [
   {
     icon: Gauge,
     title: 'Scores',
-    body: 'Hot, warm, cold — with the reason, so you call the right person first.',
+    body: 'Hot, warm, cold, with the reason, so you call the right person first.',
   },
   {
     icon: PenLine,
@@ -54,12 +54,12 @@ const VERBS = [
   },
 ];
 
-/* Where it works — white cards linking into the product pages. */
+/* Where it works, white cards linking into the product pages. */
 const SURFACES = [
   {
     kicker: 'The inbox',
     title: 'In your inbox',
-    body: 'Reads every inbound and drafts the reply in your voice — nothing sends without your tap.',
+    body: 'Reads every inbound and drafts the reply in your voice, nothing sends without your tap.',
     href: '/realtors',
   },
   {
@@ -71,7 +71,7 @@ const SURFACES = [
   {
     kicker: 'The marketing',
     title: 'In your content',
-    body: 'Drafts the just-listed post, the story, and the email — formatted for every channel.',
+    body: 'Drafts the just-listed post, the story, and the email, formatted for every channel.',
     href: '/studio',
   },
 ];
@@ -87,7 +87,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Skeleton illustration — lead in, draft waiting, everything logged. */
+/** Skeleton illustration, lead in, draft waiting, everything logged. */
 function ChippiAtWork() {
   return (
     <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
@@ -168,12 +168,12 @@ export default function MeetChippiPage() {
       <PageHero
         eyebrow="Meet Chippi"
         title="Not another tool. A teammate."
-        sub="Chippi lives inside your CRM and works the hours between closings — reading, scoring, drafting, booking, logging. You get the decisions, not the busywork."
+        sub="Chippi lives inside your CRM and works the hours between closings, reading, scoring, drafting, booking, logging. You get the decisions, not the busywork."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* What Chippi does — open split, skeleton illustration */}
+      {/* What Chippi does, open split, skeleton illustration */}
       <section className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <FadeUp>
@@ -209,7 +209,7 @@ export default function MeetChippiPage() {
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                   <p className="mt-1 text-xs text-neutral-600">
-                    Approval-first — nothing sends without you
+                    Approval-first, nothing sends without you
                   </p>
                 </div>
               </div>
@@ -222,7 +222,7 @@ export default function MeetChippiPage() {
         </div>
       </section>
 
-      {/* Where it works — white shadow cards into the product pages */}
+      {/* Where it works, white shadow cards into the product pages */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp>
@@ -256,12 +256,12 @@ export default function MeetChippiPage() {
         </div>
       </section>
 
-      {/* Lead qualification — animated brand-gradient orbit */}
+      {/* Lead qualification, animated brand-gradient orbit */}
       <div className="mt-24 sm:mt-32">
         <LeadOrbit />
       </div>
 
-      {/* The approval promise — pastel card */}
+      {/* The approval promise, pastel card */}
       <section className="mt-24 px-4 sm:mt-32">
         <FadeUp>
           <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
@@ -273,7 +273,7 @@ export default function MeetChippiPage() {
                 Nothing leaves without your name on it.
               </h2>
               <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-                Chippi drafts; you approve. Every reply waits for your tap — edit,
+                Chippi drafts; you approve. Every reply waits for your tap, edit,
                 send, or skip. On every thread, every time.
               </p>
             </div>

@@ -1,5 +1,5 @@
 /**
- * FeatureRow — a single alternating deep-feature row, shared across sub-pages.
+ * FeatureRow, a single alternating deep-feature row, shared across sub-pages.
  *
  * Copy on one side, a framed screenshot slot on the other, flipping with
  * `flip`. Same vocabulary as the home Features section so realtors, brokerages,

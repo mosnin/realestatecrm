@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Live product panels for the home feature rows — the antidote to placeholder
+ * Live product panels for the home feature rows, the antidote to placeholder
  * gray boxes. Each panel is a self-contained, animate-on-scroll mock built from
  * the product's real card/row/pill vocabulary: the inbox scores a lead, Chippi
  * types a reply, the tour books and the pipeline updates. They come alive when
@@ -76,7 +76,7 @@ export function InboxPanel() {
           />
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          <span className="font-medium text-brand">Chippi</span> ranked your inbox — Maya first.
+          <span className="font-medium text-brand">Chippi</span> ranked your inbox, Maya first.
         </p>
       </div>
     </div>
@@ -86,7 +86,7 @@ export function InboxPanel() {
 /* ── Reply: Chippi types the draft in your voice ───────────────────────────── */
 
 const DRAFT =
-  'Hi Maya — thanks for reaching out about 14 Oak. It’s still available, and I have Saturday at 2:00 open if you’d like to see it in person.';
+  'Hi Maya, thanks for reaching out about 14 Oak. It’s still available, and I have Saturday at 2:00 open if you’d like to see it in person.';
 
 export function DraftPanel() {
   const ref = useRef<HTMLDivElement>(null);
@@ -153,7 +153,7 @@ export function CalendarPanel() {
   const lit = reduce || inView;
 
   const rows = [
-    { Icon: CalendarCheck, text: 'Saturday · 2:00 PM — 14 Oak St' },
+    { Icon: CalendarCheck, text: 'Saturday · 2:00 PM, 14 Oak St' },
     { Icon: ArrowUpRight, text: 'Maya Patel → Touring' },
     { Icon: CheckCheck, text: 'Confirmation sent · written to the deal' },
   ];

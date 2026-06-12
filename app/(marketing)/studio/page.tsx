@@ -1,10 +1,10 @@
 /**
- * `/studio` — the content studio, on the white + pastel system.
+ * `/studio`, the content studio, on the white + pastel system.
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
  * glass card showing one listing becoming the post, the story, and the
  * email) → soft white bento with owner image slots → pastel CTA card.
- * One idea: the listing becomes the content — drafted in your voice,
+ * One idea: the listing becomes the content, drafted in your voice,
  * formatted per channel, on the go.
  */
 
@@ -28,10 +28,10 @@ import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 export const metadata = {
   title: 'Content studio · Chippi',
   description:
-    'Chippi drafts your listing posts, stories, and emails — in your voice, from your phone. Just listed, open house, just sold, market updates: written and ready while you’re in the field.',
+    'Chippi drafts your listing posts, stories, and emails, in your voice, from your phone. Just listed, open house, just sold, market updates: written and ready while you’re in the field.',
 };
 
-/** Owner image slot — exactly the FeaturesBento vocabulary. */
+/** Owner image slot, exactly the FeaturesBento vocabulary. */
 function ImageSlot({ name }: { name: string }) {
   return (
     <div
@@ -41,7 +41,7 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
@@ -54,13 +54,13 @@ const CHANNELS: { label: string; icon: LucideIcon; tone: string }[] = [
   { label: 'Email', icon: Mail, tone: 'text-emerald-600' },
 ];
 
-/* What Chippi writes — the content types it drafts from one listing. */
+/* What Chippi writes, the content types it drafts from one listing. */
 const CONTENT_TYPES: { icon: LucideIcon; kicker: string; title: string; body: string }[] = [
   {
     icon: Instagram,
     kicker: 'Just listed',
     title: 'The feed post.',
-    body: 'A caption sized for the grid — the hook, the details, the call to come see it.',
+    body: 'A caption sized for the grid, the hook, the details, the call to come see it.',
   },
   {
     icon: Camera,
@@ -86,7 +86,7 @@ const BENTO = [
   {
     slot: 'studio-compose',
     title: 'Compose on the go.',
-    sub: 'Point Chippi at the listing — the post, the story, and the email draft themselves between showings.',
+    sub: 'Point Chippi at the listing, the post, the story, and the email draft themselves between showings.',
   },
   {
     slot: 'studio-brand',
@@ -101,11 +101,11 @@ const BENTO = [
   {
     slot: 'studio-library',
     title: 'A library that remembers.',
-    sub: 'Every draft, caption, and asset filed by listing — ready to reuse on the next one.',
+    sub: 'Every draft, caption, and asset filed by listing, ready to reuse on the next one.',
   },
 ];
 
-/** Floating STEP pill — the HowItWorks step marker, on the white system. */
+/** Floating STEP pill, the HowItWorks step marker, on the white system. */
 function StepPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="absolute -top-3 left-6 inline-flex items-center rounded-full border border-neutral-200 bg-white px-3.5 py-1 text-xs font-medium tracking-tight text-neutral-800">
@@ -144,12 +144,12 @@ export default function StudioPage() {
       <PageHero
         eyebrow="Content studio"
         title="The listing becomes the content."
-        sub="Just listed, open house, just sold — Chippi drafts the post, the story, and the email in your voice, formatted for every channel, before you leave the driveway."
+        sub="Just listed, open house, just sold, Chippi drafts the post, the story, and the email in your voice, formatted for every channel, before you leave the driveway."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Open light split — air after the hero */}
+      {/* Open light split, air after the hero */}
       <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Copy, hairline list, stats, dark button */}
@@ -158,7 +158,7 @@ export default function StudioPage() {
               One listing in. Every channel out.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-              Chippi turns the listing into the whole campaign — written the way
+              Chippi turns the listing into the whole campaign, written the way
               you write, formatted for where it goes.
             </p>
 
@@ -172,7 +172,7 @@ export default function StudioPage() {
                     <h3 className="font-semibold tracking-tight text-zinc-950">Drafted in your voice</h3>
                     <p className="mt-1 text-sm text-neutral-600">
                       Chippi learns from what you have already written. The
-                      captions sound like you — not a content mill.
+                      captions sound like you, not a content mill.
                     </p>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function StudioPage() {
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
-                  <p className="mt-1 text-xs text-neutral-600">Approval-first — nothing posts without you</p>
+                  <p className="mt-1 text-xs text-neutral-600">Approval-first, nothing posts without you</p>
                 </div>
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function StudioPage() {
                   <div>
                     <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Brand voice, learned</h4>
                     <p className="mt-2 text-sm text-neutral-500">
-                      Every caption is written the way you write — tuned per
+                      Every caption is written the way you write, tuned per
                       channel, never copy-pasted.
                     </p>
                   </div>
@@ -303,7 +303,7 @@ export default function StudioPage() {
         </div>
       </section>
 
-      {/* Three steps to a post — HowItWorks rhythm, white shadow STEP cards */}
+      {/* Three steps to a post, HowItWorks rhythm, white shadow STEP cards */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -315,16 +315,16 @@ export default function StudioPage() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
             You take one photo at the listing. Chippi does the writing and the
-            scheduling — you just tap approve.
+            scheduling, you just tap approve.
           </p>
         </FadeUp>
         <Stagger className="mt-12 grid grid-cols-1 items-stretch gap-8 sm:gap-10 lg:grid-cols-3">
-          {/* STEP 1 — Snap a photo */}
+          {/* STEP 1, Snap a photo */}
           <StaggerItem className="h-full">
             <StepCard
               step="STEP 1"
               title="Snap the photo"
-              body="Take one shot at the door — just listed, open house, just sold. That is the whole input."
+              body="Take one shot at the door, just listed, open house, just sold. That is the whole input."
             >
               <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fff1e6] p-4 sm:h-48">
                 <div className="mx-auto flex h-full max-w-[12rem] items-center justify-center">
@@ -345,12 +345,12 @@ export default function StudioPage() {
             </StepCard>
           </StaggerItem>
 
-          {/* STEP 2 — Chippi drafts */}
+          {/* STEP 2, Chippi drafts */}
           <StaggerItem className="h-full">
             <StepCard
               step="STEP 2"
               title="Chippi drafts it"
-              body="The caption, the story, and the email write themselves in your voice — sized for each channel."
+              body="The caption, the story, and the email write themselves in your voice, sized for each channel."
             >
               <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fff1e6] p-4 sm:h-48">
                 <div className="grid h-full grid-cols-3 gap-2 sm:gap-3">
@@ -381,7 +381,7 @@ export default function StudioPage() {
             </StepCard>
           </StaggerItem>
 
-          {/* STEP 3 — Schedule everywhere */}
+          {/* STEP 3, Schedule everywhere */}
           <StaggerItem className="h-full">
             <StepCard
               step="STEP 3"
@@ -421,7 +421,7 @@ export default function StudioPage() {
         </Stagger>
       </section>
 
-      {/* What Chippi writes — content-type catalog, white feature cards */}
+      {/* What Chippi writes, content-type catalog, white feature cards */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -432,7 +432,7 @@ export default function StudioPage() {
             One photo. Four ways to show it off.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            The same listing, written four ways — each one sized and worded for
+            The same listing, written four ways, each one sized and worded for
             where it lands.
           </p>
         </FadeUp>
@@ -456,7 +456,7 @@ export default function StudioPage() {
         </Stagger>
       </section>
 
-      {/* Soft bento — owner image slots, big air above */}
+      {/* Soft bento, owner image slots, big air above */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -467,7 +467,7 @@ export default function StudioPage() {
             Everything the listing needs to make noise.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            Compose, brand, schedule, library — one studio that fits in the
+            Compose, brand, schedule, library, one studio that fits in the
             time between showings.
           </p>
         </FadeUp>

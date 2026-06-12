@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Marketing page transition — a template remounts on every route change
+ * Marketing page transition, a template remounts on every route change
  * inside the (marketing) group, so each page arrives with one subtle
  * fade-rise. Quiet by design (no exit choreography, no layout shift risk);
  * reduced-motion renders instantly.

@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * GooeyFiles — the "every file in one place" showcase. The source gooey-tab
+ * GooeyFiles, the "every file in one place" showcase. The source gooey-tab
  * demo, recolored to the calm system (muted blob instead of #efefef, brand
  * for the active label) and filled with the documents a realtor actually
  * keeps. The SVG goo filter merges the sliding active pill into the panel so
- * the categories feel like one liquid surface. Reduced motion still works —
+ * the categories feel like one liquid surface. Reduced motion still works, 
  * the tab just snaps instead of morphing.
  */
 
@@ -15,19 +15,19 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 const TABS = [
   {
     title: 'Contracts',
-    files: ['Listing agreement — 14 Oak St.pdf', 'Buyer rep — Maya Patel.pdf', 'Counteroffer — 88 Pine Ave.pdf', 'Closing disclosure — 5 Birch Ln.pdf'],
+    files: ['Listing agreement, 14 Oak St.pdf', 'Buyer rep, Maya Patel.pdf', 'Counteroffer, 88 Pine Ave.pdf', 'Closing disclosure, 5 Birch Ln.pdf'],
   },
   {
     title: 'Listings',
-    files: ['Front exterior — 220 Marina.jpg', 'MLS sheet — 14 Oak St.pdf', 'Floor plan — 31 Harbor Way.png', 'Just-listed flyer — 5 Birch.pdf'],
+    files: ['Front exterior, 220 Marina.jpg', 'MLS sheet, 14 Oak St.pdf', 'Floor plan, 31 Harbor Way.png', 'Just-listed flyer, 5 Birch.pdf'],
   },
   {
     title: 'Clients',
-    files: ['Pre-approval — Tom Reyes.pdf', 'ID verification — Maya Patel.pdf', 'Wishlist — Dana Lee.md', 'Referral note — Sara Voss.pdf'],
+    files: ['Pre-approval, Tom Reyes.pdf', 'ID verification, Maya Patel.pdf', 'Wishlist, Dana Lee.md', 'Referral note, Sara Voss.pdf'],
   },
   {
     title: 'Marketing',
-    files: ['Open-house post — Saturday.png', 'Email — November market.pdf', 'Story — Just sold.mp4', 'Postcard — farm area.pdf'],
+    files: ['Open-house post, Saturday.png', 'Email, November market.pdf', 'Story, Just sold.mp4', 'Postcard, farm area.pdf'],
   },
 ];
 

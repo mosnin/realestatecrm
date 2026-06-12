@@ -1,10 +1,10 @@
 /**
- * `/properties` — every property in one place, on the white + pastel system.
+ * `/properties`, every property in one place, on the white + pastel system.
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
  * glass property record: listing, photos & docs, showings) → soft white
  * bento with owner image slots → pastel CTA card. One idea: the listing
- * carries everything — synced from the CRMs you already run.
+ * carries everything, synced from the CRMs you already run.
  */
 
 import Link from 'next/link';
@@ -25,10 +25,10 @@ import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 export const metadata = {
   title: 'Properties · Chippi',
   description:
-    'Every listing in one place — synced from kvCORE, Follow-up Boss, Compass, Salesforce, and more. Chippi keeps your properties current across every tool you already use.',
+    'Every listing in one place, synced from kvCORE, Follow-up Boss, Compass, Salesforce, and more. Chippi keeps your properties current across every tool you already use.',
 };
 
-/** Owner image slot — exactly the FeaturesBento vocabulary. */
+/** Owner image slot, exactly the FeaturesBento vocabulary. */
 function ImageSlot({ name }: { name: string }) {
   return (
     <div
@@ -38,7 +38,7 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
@@ -49,7 +49,7 @@ const BENTO = [
   {
     slot: 'properties-board',
     title: 'The whole portfolio.',
-    sub: 'Active, pending, closed — every property on one board you can actually read.',
+    sub: 'Active, pending, closed, every property on one board you can actually read.',
   },
   {
     slot: 'properties-sync',
@@ -59,7 +59,7 @@ const BENTO = [
   {
     slot: 'properties-media',
     title: 'Photos and docs attached.',
-    sub: 'Disclosures, photos, and files live on the listing they belong to — found in one search.',
+    sub: 'Disclosures, photos, and files live on the listing they belong to, found in one search.',
   },
   {
     slot: 'properties-showings',
@@ -73,12 +73,12 @@ const SYNC: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: RefreshCw,
     title: 'Sync from any CRM.',
-    body: 'kvCORE, Follow Up Boss, Compass, Salesforce — connect once and listings flow in on their own.',
+    body: 'kvCORE, Follow Up Boss, Compass, Salesforce, connect once and listings flow in on their own.',
   },
   {
     icon: LayoutGrid,
     title: 'Manage in one window.',
-    body: 'Active, pending, and closed sit on a single board — no tab-hopping between five systems.',
+    body: 'Active, pending, and closed sit on a single board, no tab-hopping between five systems.',
   },
   {
     icon: ArrowLeftRight,
@@ -102,7 +102,7 @@ const PORTFOLIO: { addr: string; source: string; status: keyof typeof STATUS_TON
   { addr: '5 Maple Row', source: 'Salesforce', status: 'Closed', w: 'w-36' },
 ];
 
-/** Skeleton "portfolio window" — many listings, many sources, one board. */
+/** Skeleton "portfolio window", many listings, many sources, one board. */
 function PortfolioWindow() {
   return (
     <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
@@ -154,7 +154,7 @@ function PortfolioWindow() {
               ))}
             </div>
 
-            {/* Footer — one window summary */}
+            {/* Footer, one window summary */}
             <div className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 ring-1 ring-inset ring-black/5">
               <span className="text-[10px] text-neutral-600">All listings · one window</span>
               <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-700">
@@ -175,12 +175,12 @@ export default function PropertiesPage() {
       <PageHero
         eyebrow="Properties"
         title="Every property. One place."
-        sub="Chippi syncs your listings in from the CRMs you already run and keeps them current — photos, documents, and showings attached to the listing, one search away."
+        sub="Chippi syncs your listings in from the CRMs you already run and keeps them current, photos, documents, and showings attached to the listing, one search away."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Open light split — air after the hero */}
+      {/* Open light split, air after the hero */}
       <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Copy, hairline list, stats, dark button */}
@@ -202,7 +202,7 @@ export default function PropertiesPage() {
                   <div>
                     <h3 className="font-semibold tracking-tight text-zinc-950">Synced from your CRM</h3>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Connect kvCORE, Follow Up Boss, Compass — listings flow
+                      Connect kvCORE, Follow Up Boss, Compass, listings flow
                       in and changes flow back. No double entry, no stale copy.
                     </p>
                   </div>
@@ -215,7 +215,7 @@ export default function PropertiesPage() {
                     <h3 className="font-semibold tracking-tight text-zinc-950">Everything attached</h3>
                     <p className="mt-1 text-sm text-neutral-600">
                       Photos, disclosures, and showings live on the listing
-                      they belong to — not across five tabs.
+                      they belong to, not across five tabs.
                     </p>
                   </div>
                 </div>
@@ -344,7 +344,7 @@ export default function PropertiesPage() {
                   <div>
                     <h4 className="text-lg font-semibold tracking-tight text-zinc-950">One record per property</h4>
                     <p className="mt-2 text-sm text-neutral-500">
-                      The listing carries its photos, documents, and tours —
+                      The listing carries its photos, documents, and tours, 
                       one click deep from the deal.
                     </p>
                   </div>
@@ -362,7 +362,7 @@ export default function PropertiesPage() {
         </div>
       </section>
 
-      {/* Sync in, manage in one window — feature row + portfolio window */}
+      {/* Sync in, manage in one window, feature row + portfolio window */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -374,7 +374,7 @@ export default function PropertiesPage() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
             Connect the CRMs you already run. Chippi pulls every listing into one
-            board and writes your changes back — no double entry, no stale copy.
+            board and writes your changes back, no double entry, no stale copy.
           </p>
         </FadeUp>
 
@@ -394,14 +394,14 @@ export default function PropertiesPage() {
           ))}
         </Stagger>
 
-        {/* One board, every source — copy beside the skeleton portfolio window */}
+        {/* One board, every source, copy beside the skeleton portfolio window */}
         <div className="mt-12 grid gap-12 lg:grid-cols-2 lg:items-center sm:mt-16">
           <FadeUp>
             <h3 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
               Five systems, read as one.
             </h3>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-              Active, pending, and closed sit on a single board — each row labeled
+              Active, pending, and closed sit on a single board, each row labeled
               with the source it came from, each kept current as the source moves.
             </p>
 
@@ -414,7 +414,7 @@ export default function PropertiesPage() {
                   <div>
                     <h4 className="font-semibold tracking-tight text-zinc-950">One board to read</h4>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Every listing in one window with a status you can scan — no
+                      Every listing in one window with a status you can scan, no
                       tab-hopping between five tools to see where things stand.
                     </p>
                   </div>
@@ -441,7 +441,7 @@ export default function PropertiesPage() {
         </div>
       </section>
 
-      {/* Soft bento — owner image slots, big air above */}
+      {/* Soft bento, owner image slots, big air above */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -452,7 +452,7 @@ export default function PropertiesPage() {
             One listing. Everything attached.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-            The board, the sync, the media, the showings — one record that
+            The board, the sync, the media, the showings, one record that
             carries it all.
           </p>
         </FadeUp>

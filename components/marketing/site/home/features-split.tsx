@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * FeaturesSplit — the owner-provided light split section, exact.
+ * FeaturesSplit, the owner-provided light split section, exact.
  *
  * Left: big slate headline, hairline-divided "core features" list with
  * tinted icon circles, a two-up stat row, and the deep-shadow dark gradient
@@ -11,7 +11,7 @@
  * CTA. White scheme + pastel orange, per owner direction.
  *
  * Native design verbatim; blue accents recolored to brand; copy and the
- * illustration's content tailored to Chippi. Stats are defensible facts —
+ * illustration's content tailored to Chippi. Stats are defensible facts, 
  * the source's review-count/percent claims were fabricated and are not used.
  */
 
@@ -42,7 +42,7 @@ export function FeaturesSplit() {
                     <div>
                       <h5 className="font-medium text-slate-900 dark:text-white">Instant Drafting</h5>
                       <p className="mt-1 text-sm text-slate-600 dark:text-white/60">
-                        Replies written in your voice the moment a lead lands — with the
+                        Replies written in your voice the moment a lead lands, with the
                         deal history and intake link already in context.
                       </p>
                     </div>
@@ -55,7 +55,7 @@ export function FeaturesSplit() {
                       <h5 className="font-medium text-slate-900 dark:text-white">Smart Pipeline Management</h5>
                       <p className="mt-1 text-sm text-slate-600 dark:text-white/60">
                         Automated stage updates, follow-up scheduling, and plain-language
-                        logging — the board reflects today, not last week.
+                        logging, the board reflects today, not last week.
                       </p>
                     </div>
                   </div>
@@ -80,7 +80,7 @@ export function FeaturesSplit() {
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">100%</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-white/60">Approval-first — nothing sends without you</p>
+                  <p className="text-xs text-slate-600 dark:text-white/60">Approval-first, nothing sends without you</p>
                 </div>
               </div>
             </div>
@@ -97,7 +97,7 @@ export function FeaturesSplit() {
           </div>
         </div>
 
-        {/* Diagram — pastel-gradient frame, white glass card */}
+        {/* Diagram, pastel-gradient frame, white glass card */}
         <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
           <article
             className="group relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl transition-shadow hover:shadow-md"
@@ -216,7 +216,7 @@ export function FeaturesSplit() {
                 <div>
                   <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Approval-first Drafts</h4>
                   <p className="mt-2 text-sm text-neutral-500">
-                    Every reply waits for your tap. Edit, send, or skip — the
+                    Every reply waits for your tap. Edit, send, or skip, the
                     decision stays yours on every thread.
                   </p>
                 </div>

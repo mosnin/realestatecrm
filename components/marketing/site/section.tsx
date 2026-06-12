@@ -1,22 +1,22 @@
 'use client';
 
 /**
- * The marketing section system — "bold canvas" edition.
+ * The marketing section system, "bold canvas" edition.
  *
  * The page is a tinted canvas; content lives in big rounded color-blocked
  * cards that alternate and build rhythm (white paper, soft tint, signal
  * vermillion, true black). Display type is Inter Tight (--font-display),
  * the accent flourish is Instrument Serif italic (--font-accent), and the
- * signal color does real brand work — eyebrow glyphs, kickers, stats, CTAs.
+ * signal color does real brand work, eyebrow glyphs, kickers, stats, CTAs.
  *
  * Exports (API stable so every page rides the system):
- * - <Section tone>    — plain | card (paper) | tint | brand (vermillion) | dark
- * - <SectionHeader>   — ✦ chip eyebrow → big display headline → sub
- * - <Accent>          — italic serif accent span inside a headline
- * - <FeatureGrid>     — tinted feature cells: kicker → title → body
- * - <StatStrip>       — the giant-number cells row (92% / +30% / 500k style)
- * - <DarkStatBand>    — black card with display stats
- * - <FadeUp>/<Stagger>/<StaggerItem>/<Parallax> — scroll motion, reduced-aware
+ * - <Section tone>, plain | card (paper) | tint | brand (vermillion) | dark
+ * - <SectionHeader>, ✦ chip eyebrow → big display headline → sub
+ * - <Accent>, italic serif accent span inside a headline
+ * - <FeatureGrid>, tinted feature cells: kicker → title → body
+ * - <StatStrip>, the giant-number cells row (92% / +30% / 500k style)
+ * - <DarkStatBand>, black card with display stats
+ * - <FadeUp>/<Stagger>/<StaggerItem>/<Parallax>, scroll motion, reduced-aware
  */
 
 import { useRef } from 'react';
@@ -109,7 +109,7 @@ export function Parallax({
 
 /* ── The signal accent + accent serif ──────────────────────────────────── */
 
-/** Italic serif accent inside a display headline — the "Revolutionize" move. */
+/** Italic serif accent inside a display headline, the "Revolutionize" move. */
 export function Accent({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <em className={cn('font-accent font-normal italic tracking-normal', className)}>{children}</em>
@@ -147,11 +147,11 @@ export function EyebrowChip({
 type Tone = 'plain' | 'card' | 'tint' | 'brand' | 'dark';
 
 const TONE_SURFACE: Record<Exclude<Tone, 'plain'>, string> = {
-  // Paper card on the canvas — the default content surface.
+  // Paper card on the canvas, the default content surface.
   card: 'bg-white text-[#141414] dark:bg-[#151517] dark:text-[#f5f5f4] shadow-[0_1px_2px_rgba(20,16,12,0.04),0_12px_40px_-18px_rgba(20,16,12,0.12)]',
-  // A half-step off the canvas — quiet grouping.
+  // A half-step off the canvas, quiet grouping.
   tint: 'bg-[#e9e9ee] text-[#141414] dark:bg-[#141416] dark:text-[#f5f5f4]',
-  // The signal block — vermillion doing brand work.
+  // The signal block, vermillion doing brand work.
   brand: 'bg-[#ff4b29] text-white',
   // The contrast band.
   dark: 'bg-[#0d0d0f] text-white',
@@ -205,7 +205,7 @@ export function SectionHeader({
   title: React.ReactNode;
   sub?: string;
   align?: 'left' | 'center';
-  /** White-text treatment — pass on `brand` and `dark` tones. */
+  /** White-text treatment, pass on `brand` and `dark` tones. */
   dark?: boolean;
   className?: string;
 }) {
@@ -241,7 +241,7 @@ export function SectionHeader({
   );
 }
 
-/* ── Feature grid — tinted cells, kicker → title → body ────────────────── */
+/* ── Feature grid, tinted cells, kicker → title → body ────────────────── */
 
 export interface FeatureCell {
   kicker: string;
@@ -284,7 +284,7 @@ export function FeatureGrid({
   );
 }
 
-/* ── Stat strip — the giant-number cells (92% / +30% / 500k look) ──────── */
+/* ── Stat strip, the giant-number cells (92% / +30% / 500k look) ──────── */
 
 export function StatStrip({
   stats,

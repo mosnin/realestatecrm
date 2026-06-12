@@ -1,5 +1,5 @@
 /**
- * `/people` — Contacts. PageHero ("Every contact, a living record.") → who
+ * `/people`, Contacts. PageHero ("Every contact, a living record.") → who
  * to call first (open split: scoring with the reason + the timeline of every
  * touch, with a skeleton contact-record illustration in the pastel frame) →
  * the three pillars (Scoring / Timeline / Segments white shadow cards) →
@@ -25,15 +25,15 @@ import { FeatureList } from '@/components/marketing/site/home/feature-list';
 export const metadata = {
   title: 'People · Chippi',
   description:
-    'Every contact, a living record — scored with the reason the moment they land, every email, text, tour, and note on one timeline, and segments that stay current as the record changes.',
+    'Every contact, a living record, scored with the reason the moment they land, every email, text, tour, and note on one timeline, and segments that stay current as the record changes.',
 };
 
-/* The three pillars — white shadow cards. */
+/* The three pillars, white shadow cards. */
 const PILLARS = [
   {
     kicker: 'Scoring',
     title: 'A score with its reasons.',
-    body: 'Hot, warm, cold — never a bare number. The why is attached, so you know it before you dial.',
+    body: 'Hot, warm, cold, never a bare number. The why is attached, so you know it before you dial.',
   },
   {
     kicker: 'Timeline',
@@ -43,29 +43,29 @@ const PILLARS = [
   {
     kicker: 'Segments',
     title: 'Lists that stay current.',
-    body: 'Renters, buyers, past clients, gone quiet — segments built from the record, so they update themselves as it changes.',
+    body: 'Renters, buyers, past clients, gone quiet, segments built from the record, so they update themselves as it changes.',
   },
 ];
 
-/* Skeleton timeline rows — every touch on one record. */
+/* Skeleton timeline rows, every touch on one record. */
 const TOUCHES = [
-  { icon: Mail, tone: 'text-blue-600', text: 'Email — replied, wants a Saturday tour' },
-  { icon: CalendarCheck, tone: 'text-emerald-600', text: 'Tour — proposed for Sat 2:00' },
-  { icon: PenLine, tone: 'text-[#ff4b29]', text: 'Draft — follow-up waiting for your tap' },
-  { icon: FileText, tone: 'text-neutral-500', text: 'Note — has a guarantor, March move' },
+  { icon: Mail, tone: 'text-blue-600', text: 'Email, replied, wants a Saturday tour' },
+  { icon: CalendarCheck, tone: 'text-emerald-600', text: 'Tour, proposed for Sat 2:00' },
+  { icon: PenLine, tone: 'text-[#ff4b29]', text: 'Draft, follow-up waiting for your tap' },
+  { icon: FileText, tone: 'text-neutral-500', text: 'Note, has a guarantor, March move' },
 ];
 
-/* How the score reads — what goes into Hot / Warm / Cold, the reason on each. */
+/* How the score reads, what goes into Hot / Warm / Cold, the reason on each. */
 const SCORING = [
   {
     kicker: 'Hot',
     title: 'Ready to move.',
-    body: 'Pre-approved, touring this week, replying within the hour — the score names exactly why they jumped the queue.',
+    body: 'Pre-approved, touring this week, replying within the hour, the score names exactly why they jumped the queue.',
   },
   {
     kicker: 'Warm',
     title: 'Worth a nudge.',
-    body: 'Real intent, softer timeline. Browsing, asking questions, not booked yet — a follow-up keeps them from drifting.',
+    body: 'Real intent, softer timeline. Browsing, asking questions, not booked yet, a follow-up keeps them from drifting.',
   },
   {
     kicker: 'Cold',
@@ -80,16 +80,16 @@ const SCORING = [
   {
     kicker: 'Source',
     title: 'Where they came from.',
-    body: 'Form, referral, open house, import — the origin rides along, so you read each lead in the right context.',
+    body: 'Form, referral, open house, import, the origin rides along, so you read each lead in the right context.',
   },
   {
     kicker: 'Segments',
     title: 'Lists that keep themselves.',
-    body: 'Renters, buyers, past clients, gone quiet — built from the record and re-sorted the moment it changes.',
+    body: 'Renters, buyers, past clients, gone quiet, built from the record and re-sorted the moment it changes.',
   },
 ];
 
-/* Skeleton roster rows — a contact list, each scored with a one-line reason. */
+/* Skeleton roster rows, a contact list, each scored with a one-line reason. */
 const ROSTER: {
   initials: string;
   band: string;
@@ -132,7 +132,7 @@ const ROSTER: {
   },
 ];
 
-/* Living segments — lists built from the record, each with a live count and
+/* Living segments, lists built from the record, each with a live count and
    the rule that fills it. Counts are illustrative skeleton data, not claims. */
 const SEGMENTS: { name: string; count: string; rule: string; tone: string }[] = [
   {
@@ -172,7 +172,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Skeleton contact-record illustration — score with the reason + timeline. */
+/** Skeleton contact-record illustration, score with the reason + timeline. */
 function ContactRecordSketch() {
   return (
     <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
@@ -196,7 +196,7 @@ function ContactRecordSketch() {
           </div>
 
           <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
-            {/* The person — scored, with the reason */}
+            {/* The person, scored, with the reason */}
             <div className="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
@@ -214,7 +214,7 @@ function ContactRecordSketch() {
               </div>
             </div>
 
-            {/* The timeline — every touch */}
+            {/* The timeline, every touch */}
             <div className="mt-3 rounded-2xl border border-black/5 bg-white/90 shadow-sm">
               <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
                 <span className="text-[10px] tracking-widest text-neutral-500">TIMELINE</span>
@@ -236,12 +236,12 @@ function ContactRecordSketch() {
   );
 }
 
-/** Skeleton contact-list — a roster, each row scored with a one-line reason. */
+/** Skeleton contact-list, a roster, each row scored with a one-line reason. */
 function ContactRoster() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
       <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
-        {/* List head — a sort, the way you'd actually triage */}
+        {/* List head, a sort, the way you'd actually triage */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
             People
@@ -280,12 +280,12 @@ function ContactRoster() {
   );
 }
 
-/** Skeleton segments illustration — living lists, each with a count + its rule. */
+/** Skeleton segments illustration, living lists, each with a count + its rule. */
 function SegmentsSketch() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
       <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
-        {/* List head — segments stay current on their own */}
+        {/* List head, segments stay current on their own */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
             Segments
@@ -332,13 +332,13 @@ export default function PeoplePage() {
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Who to call first — open split, skeleton contact record */}
+      {/* Who to call first, open split, skeleton contact record */}
       <section className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <FadeUp>
             <Eyebrow>The record</Eyebrow>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-              Who to call first — and why.
+              Who to call first, and why.
             </h2>
 
             <div className="mt-8 border-t border-neutral-200 pt-6">
@@ -350,7 +350,7 @@ export default function PeoplePage() {
                   <div>
                     <h3 className="font-medium text-zinc-950">Scored with the reason</h3>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Hot, warm, cold the moment a lead lands — with the why spelled
+                      Hot, warm, cold the moment a lead lands, with the why spelled
                       out, so you can trust the number and act on it.
                     </p>
                   </div>
@@ -381,7 +381,7 @@ export default function PeoplePage() {
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                   <p className="mt-1 text-xs text-neutral-600">
-                    Approval-first — nothing sends without you
+                    Approval-first, nothing sends without you
                   </p>
                 </div>
               </div>
@@ -394,12 +394,12 @@ export default function PeoplePage() {
         </div>
       </section>
 
-      {/* Everything Chippi runs — interactive pill rows, a change of texture */}
+      {/* Everything Chippi runs, interactive pill rows, a change of texture */}
       <div className="mt-24 sm:mt-32">
         <FeatureList />
       </div>
 
-      {/* The three pillars — white shadow cards */}
+      {/* The three pillars, white shadow cards */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp>
@@ -426,7 +426,7 @@ export default function PeoplePage() {
         </div>
       </section>
 
-      {/* How people are scored & segmented — feature grid + skeleton roster */}
+      {/* How people are scored & segmented, feature grid + skeleton roster */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp>
@@ -435,7 +435,7 @@ export default function PeoplePage() {
               The book sorts itself by who is ready.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-              Hot, warm, cold — each with the reason, the last touch, and the
+              Hot, warm, cold, each with the reason, the last touch, and the
               source. So the right name is always at the top of the list.
             </p>
           </FadeUp>
@@ -449,7 +449,7 @@ export default function PeoplePage() {
         </div>
       </section>
 
-      {/* Living segments — open split, skeleton segment lists */}
+      {/* Living segments, open split, skeleton segment lists */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
@@ -459,7 +459,7 @@ export default function PeoplePage() {
                 Your book, grouped the way you work it.
               </h2>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-                Segments are not lists you maintain — they are rules the record
+                Segments are not lists you maintain, they are rules the record
                 fills for you. A lead crosses the line and it lands in the right
                 group on its own.
               </p>
@@ -473,7 +473,7 @@ export default function PeoplePage() {
                     <div>
                       <h3 className="font-medium text-zinc-950">Built from the record</h3>
                       <p className="mt-1 text-sm text-neutral-600">
-                        Ready to tour, active buyers, gone quiet, past clients —
+                        Ready to tour, active buyers, gone quiet, past clients, 
                         each segment is a rule, not a list you have to keep by hand.
                       </p>
                     </div>
@@ -485,7 +485,7 @@ export default function PeoplePage() {
                     <div>
                       <h3 className="font-medium text-zinc-950">Re-sorted as the book moves</h3>
                       <p className="mt-1 text-sm text-neutral-600">
-                        A reply lands, a tour books, a week goes quiet — the segments
+                        A reply lands, a tour books, a week goes quiet, the segments
                         re-draw themselves, so the right group is always current.
                       </p>
                     </div>

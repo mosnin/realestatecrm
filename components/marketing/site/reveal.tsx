@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Reveal — the site's one motion primitive.
+ * Reveal, the site's one motion primitive.
  *
  * A single fade + small slide as a block scrolls into view, on the product's
  * EASE_OUT curve. Supports a direction so feature rows can rise, or slide in

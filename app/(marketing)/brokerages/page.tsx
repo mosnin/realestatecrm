@@ -1,5 +1,5 @@
 /**
- * `/brokerages` — the floor story, on the white + pastel system.
+ * `/brokerages`, the floor story, on the white + pastel system.
  *
  * Arc: PageHero ("Every agent on your floor, with a Chippi behind them") →
  * routing/visibility/roles as a features-split-style section (copy beside
@@ -28,7 +28,7 @@ import { ResultsStat } from '@/components/marketing/site/home/results-stat';
 export const metadata = {
   title: 'For brokerages · Chippi',
   description:
-    'Give every agent on the floor a Chippi — leads routed to the right agent, approval-first drafts, and a live floor view with role-based controls and an audit log.',
+    'Give every agent on the floor a Chippi, leads routed to the right agent, approval-first drafts, and a live floor view with role-based controls and an audit log.',
 };
 
 /* ── Copy ──────────────────────────────────────────────────────────────── */
@@ -42,12 +42,12 @@ const FLOOR_FEATURES = [
   {
     icon: Users,
     title: 'The floor on one screen',
-    body: 'Deals active, drafts pending, follow-ups due — per agent, read live from the work itself, not a status meeting.',
+    body: 'Deals active, drafts pending, follow-ups due, per agent, read live from the work itself, not a status meeting.',
   },
   {
     icon: ShieldCheck,
     title: 'Roles that keep it clean',
-    body: 'Owner, admin, and member — three roles, no permissions matrix. Each agent keeps their own workspace; you get the rollup.',
+    body: 'Owner, admin, and member, three roles, no permissions matrix. Each agent keeps their own workspace; you get the rollup.',
   },
 ];
 
@@ -55,12 +55,12 @@ const PILLARS = [
   {
     icon: ArrowRightLeft,
     title: 'Routing',
-    body: 'Every lead lands with the right agent — by territory, by load, or by your hand-pick. The reason is logged either way.',
+    body: 'Every lead lands with the right agent, by territory, by load, or by your hand-pick. The reason is logged either way.',
   },
   {
     icon: Users,
     title: 'Floor view',
-    body: 'Who is closing, what stalled, which follow-ups slipped — the whole room on one surface, live from the work.',
+    body: 'Who is closing, what stalled, which follow-ups slipped, the whole room on one surface, live from the work.',
   },
   {
     icon: ShieldCheck,
@@ -70,7 +70,7 @@ const PILLARS = [
 ];
 
 const ENTERPRISE_NOTES = [
-  'Approval-first — drafts wait for the agent',
+  'Approval-first, drafts wait for the agent',
   'Role-based controls for owners and admins',
   'An audit log of every action Chippi takes',
 ];
@@ -88,7 +88,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ── Floor flow — skeleton illustration (routed → assigned → broker) ───── */
+/* ── Floor flow, skeleton illustration (routed → assigned → broker) ───── */
 
 function FloorIllustration() {
   return (
@@ -178,12 +178,12 @@ export default function BrokeragesPage() {
       <PageHero
         eyebrow="For brokerages & teams"
         title="Every agent on your floor, with a Chippi behind them"
-        sub="Leads route to the right agent, every send stays approval-first, and you see the whole floor on one surface — live from the work, not a status meeting."
+        sub="Leads route to the right agent, every send stays approval-first, and you see the whole floor on one surface, live from the work, not a status meeting."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* The floor flow — open white split, air after the hero */}
+      {/* The floor flow, open white split, air after the hero */}
       <section className="pt-12 sm:pt-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-12 lg:grid-cols-2">
@@ -218,7 +218,7 @@ export default function BrokeragesPage() {
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                     <p className="mt-1 text-xs text-neutral-600">
-                      Approval-first — every send goes through the agent whose name is on it
+                      Approval-first, every send goes through the agent whose name is on it
                     </p>
                   </div>
                   <div>
@@ -240,7 +240,7 @@ export default function BrokeragesPage() {
               </div>
             </div>
 
-            {/* Illustration — pastel frame, white glass card */}
+            {/* Illustration, pastel frame, white glass card */}
             <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
               <article
                 className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
@@ -264,7 +264,7 @@ export default function BrokeragesPage() {
                   <FloorIllustration />
 
                   <p className="mt-6 text-sm text-neutral-500">
-                    A lead lands, the right agent gets it, and you see it happen —
+                    A lead lands, the right agent gets it, and you see it happen, 
                     with the reason logged.
                   </p>
                 </div>
@@ -274,7 +274,7 @@ export default function BrokeragesPage() {
         </div>
       </section>
 
-      {/* The pillars — pastel gradient card, white glass cells */}
+      {/* The pillars, pastel gradient card, white glass cells */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
@@ -291,7 +291,7 @@ export default function BrokeragesPage() {
               </h2>
               <p className="mt-4 max-w-2xl text-base text-neutral-600 md:text-lg">
                 Routing on the way in, visibility on the way through, control
-                over who sees what — with approval-first underneath all three.
+                over who sees what, with approval-first underneath all three.
               </p>
 
               <div className="mt-10 grid gap-6 md:grid-cols-3">
@@ -325,12 +325,12 @@ export default function BrokeragesPage() {
         </div>
       </section>
 
-      {/* Pipeline at a glance — gray card, cool tone before the warm close */}
+      {/* Pipeline at a glance, gray card, cool tone before the warm close */}
       <div className="mt-24 sm:mt-32">
         <ResultsStat />
       </div>
 
-      {/* The ask — centered closing CTA, demo-first for brokers */}
+      {/* The ask, centered closing CTA, demo-first for brokers */}
       <section className="mt-24 px-6 pb-8 sm:mt-32 sm:pb-12">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">

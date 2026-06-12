@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * Coverflow — a 3D cover-flow carousel of content cards. Adapted from the
+ * Coverflow, a 3D cover-flow carousel of content cards. Adapted from the
  * source feature-carousel to render arbitrary card nodes (real Studio output
  * mocks) instead of external <img> tiles, so nothing 404s and the cards read
  * as actual posts. Auto-advances; arrows scrub. Reduced motion: no auto-play,
- * no blur — the center card and its neighbors sit still.
+ * no blur, the center card and its neighbors sit still.
  */
 
 import React from 'react';

@@ -1,5 +1,5 @@
 /**
- * HowItWorks — the owner-provided white-card steps section, exact.
+ * HowItWorks, the owner-provided white-card steps section, exact.
  *
  * A white rounded-3xl card with a deep soft shadow: giant tracking-tighter
  * "How it works." headline beside a hairline separator + gray sub, then a
@@ -98,7 +98,7 @@ export function HowItWorks() {
       <div className="mt-4 h-px bg-neutral-200 dark:bg-white/10" />
 
       <div className="relative z-10 mt-6 grid grid-cols-1 items-stretch gap-8 sm:mt-8 sm:gap-10 lg:grid-cols-12">
-        {/* STEP 1 — Connect */}
+        {/* STEP 1, Connect */}
         <div className="lg:col-span-4">
           <StepCard
             step="STEP 1"
@@ -127,7 +127,7 @@ export function HowItWorks() {
           </StepCard>
         </div>
 
-        {/* STEP 2 — Chippi works */}
+        {/* STEP 2, Chippi works */}
         <div className="lg:col-span-4">
           <StepCard
             step="STEP 2"
@@ -162,7 +162,7 @@ export function HowItWorks() {
           </StepCard>
         </div>
 
-        {/* STEP 3 — Approve & track */}
+        {/* STEP 3, Approve & track */}
         <div className="lg:col-span-4">
           <StepCard
             step="STEP 3"

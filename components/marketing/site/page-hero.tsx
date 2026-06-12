@@ -1,10 +1,10 @@
 /**
- * PageHero — the shared sub-page opener, bold-canvas edition.
+ * PageHero, the shared sub-page opener, bold-canvas edition.
  *
  * Sits straight on the canvas: ✦ chip eyebrow, a big display headline
  * (Inter Tight, supports an <Accent> italic span), one sub line, and the
  * signal-vermillion primary pill. Every sub-page opens the same way so the
- * site reads as one voice — just no longer a quiet one.
+ * site reads as one voice, just no longer a quiet one.
  */
 
 import Link from 'next/link';

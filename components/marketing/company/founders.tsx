@@ -1,7 +1,7 @@
 /**
- * Founders — two white soft-shadow cards on the bold-canvas system. Each
+ * Founders, two white soft-shadow cards on the bold-canvas system. Each
  * founder gets a square headshot slot (an owner image slot, same vocabulary
- * as the home bento — swap real media in), a name, a role, and a short bio.
+ * as the home bento, swap real media in), a name, a role, and a short bio.
  * No fabricated photo files.
  */
 
@@ -17,7 +17,7 @@ const FOUNDERS = [
   {
     name: 'Preston',
     role: 'Co-founder',
-    bio: 'A decade building in e-commerce, software, and technology. Recently built groundbreaking AI agent-orchestration frameworks alongside several products of his own — the machinery that lets an agent do real work, not just answer questions.',
+    bio: 'A decade building in e-commerce, software, and technology. Recently built groundbreaking AI agent-orchestration frameworks alongside several products of his own, the machinery that lets an agent do real work, not just answer questions.',
   },
 ];
 
@@ -34,7 +34,7 @@ export function Founders() {
               <div className="flex flex-col items-center gap-2 text-center">
                 <ImagePlus className="h-5 w-5 text-neutral-300" />
                 <p className="text-xs text-neutral-400">
-                  Image placeholder —{' '}
+                  Image placeholder, {' '}
                   <span className="font-medium text-neutral-500">{f.name} · headshot</span>
                 </p>
               </div>

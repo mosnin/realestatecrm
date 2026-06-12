@@ -1,5 +1,5 @@
 /**
- * `/files` — every document filed to the right deal, on the white + pastel
+ * `/files`, every document filed to the right deal, on the white + pastel
  * system.
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
@@ -28,7 +28,7 @@ import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 export const metadata = {
   title: 'Files · Chippi',
   description:
-    'Contracts, disclosures, listing photos, CMAs — Chippi files every document to the right deal automatically, so you find it in one search instead of digging through folders.',
+    'Contracts, disclosures, listing photos, CMAs, Chippi files every document to the right deal automatically, so you find it in one search instead of digging through folders.',
 };
 
 const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
@@ -40,7 +40,7 @@ const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Search,
     title: 'One search.',
-    body: 'Ask in plain language — the contract, the disclosure, the photo surface without a folder in sight.',
+    body: 'Ask in plain language, the contract, the disclosure, the photo surface without a folder in sight.',
   },
   {
     icon: FileText,
@@ -49,13 +49,13 @@ const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
   },
 ];
 
-/* What auto-files itself — the document types Chippi reads and routes. */
+/* What auto-files itself, the document types Chippi reads and routes. */
 const DOC_TYPES: { icon: LucideIcon; kicker: string; title: string; body: string }[] = [
   {
     icon: FileSignature,
     kicker: 'Contracts',
     title: 'Purchase agreements.',
-    body: 'Read on arrival and filed to the deal — the version you need, where you look.',
+    body: 'Read on arrival and filed to the deal, the version you need, where you look.',
   },
   {
     icon: ShieldCheck,
@@ -67,7 +67,7 @@ const DOC_TYPES: { icon: LucideIcon; kicker: string; title: string; body: string
     icon: ImageIcon,
     kicker: 'Listing photos',
     title: 'Photo sets.',
-    body: 'Attached to the listing they belong to — pulled up beside it in one search.',
+    body: 'Attached to the listing they belong to, pulled up beside it in one search.',
   },
   {
     icon: BarChart3,
@@ -83,12 +83,12 @@ export default function FilesPage() {
       <PageHero
         eyebrow="Files"
         title="Filed to the right deal. Automatically."
-        sub="Contracts, disclosures, photos — every document that lands in your inbox is read, matched, and filed to its deal. When you need one, it is one search away."
+        sub="Contracts, disclosures, photos, every document that lands in your inbox is read, matched, and filed to its deal. When you need one, it is one search away."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* Open light split — air after the hero */}
+      {/* Open light split, air after the hero */}
       <section className="mx-auto mt-12 max-w-7xl px-6 sm:mt-16">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Copy, hairline list, stats, quiet link */}
@@ -111,7 +111,7 @@ export default function FilesPage() {
                     <h3 className="font-semibold tracking-tight text-zinc-950">Auto-filed on arrival</h3>
                     <p className="mt-1 text-sm text-neutral-600">
                       Attachments are read, matched to the deal, and filed the
-                      moment they land — no naming conventions, no folders.
+                      moment they land, no naming conventions, no folders.
                     </p>
                   </div>
                 </div>
@@ -122,7 +122,7 @@ export default function FilesPage() {
                   <div>
                     <h3 className="font-semibold tracking-tight text-zinc-950">One search, plain language</h3>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Ask for the 14 Oak St disclosure and it surfaces — with
+                      Ask for the 14 Oak St disclosure and it surfaces, with
                       the deal context around it.
                     </p>
                   </div>
@@ -226,7 +226,7 @@ export default function FilesPage() {
                   <div>
                     <h4 className="text-lg font-semibold tracking-tight text-zinc-950">No folders, no naming</h4>
                     <p className="mt-2 text-sm text-neutral-500">
-                      Chippi reads the document and knows where it goes — you
+                      Chippi reads the document and knows where it goes, you
                       never file a thing.
                     </p>
                   </div>
@@ -244,7 +244,7 @@ export default function FilesPage() {
         </div>
       </section>
 
-      {/* White shadow trio — big air above */}
+      {/* White shadow trio, big air above */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -275,7 +275,7 @@ export default function FilesPage() {
         </Stagger>
       </section>
 
-      {/* What auto-files — pastel-wash band, white doc-type cards */}
+      {/* What auto-files, pastel-wash band, white doc-type cards */}
       <section className="mt-24 px-4 sm:mt-32 sm:px-6">
         <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />

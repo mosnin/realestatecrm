@@ -1,8 +1,8 @@
 /**
- * ResultsStat — the reference's stat + radial card, tailored and KEPT HONEST.
+ * ResultsStat, the reference's stat + radial card, tailored and KEPT HONEST.
  *
  * The source's "20% / 84%" metric claims and fabricated customer logos
- * (Pratt & Whitney, Honeywell) are NOT carried over — no invented numbers,
+ * (Pratt & Whitney, Honeywell) are NOT carried over, no invented numbers,
  * no fake social proof. Instead: the concentric arcs are an illustrative
  * pipeline (New → Won, the outer ring vermillion), the focal stat is the
  * defensible "24/7", and the floating cards show Chippi's own events
@@ -53,7 +53,7 @@ function Radial() {
   );
 }
 
-/* A floating Chippi-event card — replaces the fabricated customer logos. */
+/* A floating Chippi-event card, replaces the fabricated customer logos. */
 function EventCard({
   icon,
   title,
@@ -103,7 +103,7 @@ export function ResultsStat() {
             <div className="mt-10">
               <p className="text-6xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-7xl">24/7</p>
               <p className="mt-2 max-w-xs text-base leading-snug text-neutral-600 dark:text-white/60">
-                Chippi works your book around the clock — approval-first, always.
+                Chippi works your book around the clock, approval-first, always.
               </p>
             </div>
           </div>
@@ -115,13 +115,13 @@ export function ResultsStat() {
             </div>
             <EventCard
               icon={<PenLine className="h-4 w-4" />}
-              title="Reply drafted — Maya"
+              title="Reply drafted, Maya"
               meta="in your voice · awaiting approval"
               className="absolute -top-2 right-0 w-60 max-w-[80%]"
             />
             <EventCard
               icon={<CalendarCheck className="h-4 w-4" />}
-              title="Tour booked — 14 Oak St"
+              title="Tour booked, 14 Oak St"
               meta="Saturday · 2:00 PM"
               className="absolute bottom-2 right-2 w-60 max-w-[80%]"
             />

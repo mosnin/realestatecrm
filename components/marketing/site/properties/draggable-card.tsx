@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Draggable property cards — the physics-y throwable cards from the source
+ * Draggable property cards, the physics-y throwable cards from the source
  * component, recolored to the calm card vocabulary (bg-card + hairline + the
  * sanctioned marketing shadow, not bg-neutral). Used on /properties to make
  * "every listing in one place" feel tactile: toss the cards around, they

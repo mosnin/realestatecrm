@@ -1,5 +1,5 @@
 /**
- * Footer — the pastel bookend.
+ * Footer, the pastel bookend.
  *
  * An inset rounded card washed white → soft peach/pink (mirroring the hero
  * card, per the white + pastel-orange direction): display sign-off line +
@@ -58,7 +58,7 @@ export function SiteFooter() {
           <div className="grid grid-cols-2 gap-8 pt-12 md:grid-cols-4">
             <div className="col-span-2 md:col-span-1">
               <p className="max-w-xs text-sm leading-relaxed text-neutral-600">
-                The agentic OS for real-estate agents and brokerages — every
+                The agentic OS for real-estate agents and brokerages, every
                 realtor with Chippi doing real work for them.
               </p>
             </div>

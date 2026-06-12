@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * PointerHighlight — draws a hand-pointer + a rectangle around an inline word
+ * PointerHighlight, draws a hand-pointer + a rectangle around an inline word
  * as it scrolls into view. We use it to mark the moments the copy talks about
- * working WITH Chippi (collaborate, teammate, alongside) — so the brand mark
+ * working WITH Chippi (collaborate, teammate, alongside), so the brand mark
  * (orange) is earned here, not decoration. Reduced motion renders the box
  * already drawn, pointer parked, no travel.
  */

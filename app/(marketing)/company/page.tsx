@@ -1,7 +1,7 @@
 /**
- * `/company` — Chippi's founding story, on the bold-canvas system.
+ * `/company`, Chippi's founding story, on the bold-canvas system.
  *
- * One idea: the world moved to AI; real estate didn't — so two people who'd
+ * One idea: the world moved to AI; real estate didn't, so two people who'd
  * lived the gap built Chippi to close it. Mission → the gap → the founders →
  * beliefs → a close.
  *
@@ -20,7 +20,7 @@ export const metadata = { title: 'Company · Chippi' };
 const BELIEFS = [
   {
     title: 'Configuration is failure to decide.',
-    body: 'Settings, toggles, customization layers — they’re admissions the team couldn’t pick. Picking is the work. We won’t make your day harder so our spec was easier.',
+    body: 'Settings, toggles, customization layers, they’re admissions the team couldn’t pick. Picking is the work. We won’t make your day harder so our spec was easier.',
   },
   {
     title: 'Nothing leaves without your name on it.',
@@ -28,7 +28,7 @@ const BELIEFS = [
   },
   {
     title: 'Chippi has one voice.',
-    body: 'Wherever Chippi shows up — a draft card, a toast, an activity row — the same signature carries through. Nothing else does. It’s how you learn to trust the agent across every surface.',
+    body: 'Wherever Chippi shows up, a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It’s how you learn to trust the agent across every surface.',
   },
   {
     title: 'No numbers we can’t defend.',
@@ -45,7 +45,7 @@ export default function CompanyPage() {
         sub="We built Chippi because the tools agents and brokerages live in were drawn for a slower era. The work shouldn’t be the chrome. The work should be the deals."
       />
 
-      {/* The gap — open white */}
+      {/* The gap, open white */}
       <section className="px-4 pt-6 sm:px-6 sm:pt-10">
         <FadeUp className="mx-auto max-w-3xl">
           <EyebrowChip>The gap</EyebrowChip>
@@ -54,14 +54,14 @@ export default function CompanyPage() {
           </h2>
           <div className="mt-6 space-y-5 text-lg leading-relaxed text-neutral-600">
             <p>
-              An agent’s day is mostly attention management — email, calendar, replies,
+              An agent’s day is mostly attention management, email, calendar, replies,
               follow-ups, pipeline updates. The actual selling, the listening and judging
               and knowing, happens in maybe ten percent of it.
             </p>
             <p>
               Everywhere else, that other ninety percent has started to run itself. In real
               estate it still doesn’t. The tools are stuck a generation behind what’s now
-              possible. That distance — between what could happen and what actually does — is
+              possible. That distance, between what could happen and what actually does, is
               the whole reason Chippi exists.
             </p>
           </div>
@@ -87,7 +87,7 @@ export default function CompanyPage() {
         </div>
       </section>
 
-      {/* Beliefs — 2×2 white soft-shadow cards */}
+      {/* Beliefs, 2×2 white soft-shadow cards */}
       <section className="mt-24 px-4 sm:mt-32 sm:px-6">
         <div className="mx-auto max-w-5xl">
           <FadeUp className="mx-auto max-w-3xl text-center">

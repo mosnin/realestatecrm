@@ -1,5 +1,5 @@
 /**
- * `/deals` — Pipelines. PageHero ("A pipeline that runs itself.") → how the
+ * `/deals`, Pipelines. PageHero ("A pipeline that runs itself.") → how the
  * board runs (open split: self-advancing stages + plain-language log, with a
  * skeleton kanban illustration in the pastel frame) → 2×2 bento of owner
  * image slots (deals-board / deals-log / deals-forecast / deals-handoff) →
@@ -15,10 +15,10 @@ import { ResultsStat } from '@/components/marketing/site/home/results-stat';
 export const metadata = {
   title: 'Deals · Chippi',
   description:
-    'A pipeline that runs itself. Stages advance as things actually happen, every move lands in a plain-language log, and the board reflects today — not last week.',
+    'A pipeline that runs itself. Stages advance as things actually happen, every move lands in a plain-language log, and the board reflects today, not last week.',
 };
 
-/* Skeleton kanban data — three columns, cards with status chips. */
+/* Skeleton kanban data, three columns, cards with status chips. */
 const COLUMNS = [
   {
     name: 'NEW',
@@ -43,7 +43,7 @@ const COLUMNS = [
   },
 ];
 
-/* The full stage ladder — one deal row per stage, with a status pill. */
+/* The full stage ladder, one deal row per stage, with a status pill. */
 const STAGES: {
   name: string;
   count: string;
@@ -94,13 +94,13 @@ const STAGES: {
   },
 ];
 
-/* What each stage means — the narrative behind the ladder, tinted-cell grid.
+/* What each stage means, the narrative behind the ladder, tinted-cell grid.
    No invented metrics: this describes what enters a stage and what moves it. */
 const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
   {
     kicker: 'New',
     title: 'A lead just landed.',
-    body: 'Scored with the reason the moment it arrives, and a reply already drafted in your voice — waiting for your tap.',
+    body: 'Scored with the reason the moment it arrives, and a reply already drafted in your voice, waiting for your tap.',
   },
   {
     kicker: 'Contacted',
@@ -120,28 +120,28 @@ const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
   {
     kicker: 'Won',
     title: 'Closed, with the reason.',
-    body: 'The deal lands in Won and the why is on the record — so the next handoff reads like a colleague briefed it.',
+    body: 'The deal lands in Won and the why is on the record, so the next handoff reads like a colleague briefed it.',
   },
 ];
 
-/* Honest facts — no invented conversion metrics. */
+/* Honest facts, no invented conversion metrics. */
 const FACTS: { value: string; label: string }[] = [
   { value: '24/7', label: 'The board stays current around the clock' },
-  { value: '100%', label: 'Approval-first — outreach never sends without you' },
+  { value: '100%', label: 'Approval-first, outreach never sends without you' },
   { value: '50+', label: 'Integrations across email, calendar, and CRMs' },
 ];
 
-/* The 2×2 bento — owner image slots, FeaturesBento style exactly. */
+/* The 2×2 bento, owner image slots, FeaturesBento style exactly. */
 const CELLS = [
   {
     slot: 'deals-board',
     title: 'The board, current.',
-    sub: 'Stages advance as things happen —\nit reflects today, not last week.',
+    sub: 'Stages advance as things happen, \nit reflects today, not last week.',
   },
   {
     slot: 'deals-log',
     title: 'Every move, logged.',
-    sub: 'A plain-language history on every deal —\nthe why, not just the what.',
+    sub: 'A plain-language history on every deal, \nthe why, not just the what.',
   },
   {
     slot: 'deals-forecast',
@@ -151,7 +151,7 @@ const CELLS = [
   {
     slot: 'deals-handoff',
     title: 'Handoffs with the history.',
-    sub: 'The whole record rides along —\nnothing retyped, nothing lost.',
+    sub: 'The whole record rides along, \nnothing retyped, nothing lost.',
   },
 ];
 
@@ -175,14 +175,14 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
   );
 }
 
-/** Skeleton kanban illustration — three columns + the plain-language log. */
+/** Skeleton kanban illustration, three columns + the plain-language log. */
 function PipelineSketch() {
   return (
     <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
@@ -203,7 +203,7 @@ function PipelineSketch() {
             </span>
           </div>
 
-          {/* The board — three columns */}
+          {/* The board, three columns */}
           <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {COLUMNS.map((col) => (
@@ -235,7 +235,7 @@ function PipelineSketch() {
             </div>
           </div>
 
-          {/* The log — plain language */}
+          {/* The log, plain language */}
           <div className="mt-4 rounded-2xl border border-black/5 bg-white/90 shadow-sm">
             <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
               <span className="text-[10px] tracking-widest text-neutral-500">CHIPPI LOG</span>
@@ -244,11 +244,11 @@ function PipelineSketch() {
             <div className="space-y-2 p-3 text-[10px] text-neutral-600 sm:text-xs">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#ff4b29]" />
-                <span>Moved Maya to Touring — tour booked for Saturday</span>
+                <span>Moved Maya to Touring, tour booked for Saturday</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#ff4b29]/50" />
-                <span>Marked 14 Oak St lost — chose another rental, reason logged</span>
+                <span>Marked 14 Oak St lost, chose another rental, reason logged</span>
               </div>
             </div>
           </div>
@@ -258,7 +258,7 @@ function PipelineSketch() {
   );
 }
 
-/** The five-stage ladder — a wide skeleton board, one deal row per stage. */
+/** The five-stage ladder, a wide skeleton board, one deal row per stage. */
 function StageLadder() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
@@ -298,7 +298,7 @@ function StageLadder() {
                   {stage.pill}
                 </span>
               </div>
-              {/* Ghost rows — the stack behind */}
+              {/* Ghost rows, the stack behind */}
               <div className="mt-2 space-y-2">
                 <div className="rounded-xl border border-black/5 bg-white/70 p-2.5">
                   <div className="h-1.5 w-3/4 rounded bg-neutral-200/90" />
@@ -323,12 +323,12 @@ export default function DealsPage() {
       <PageHero
         eyebrow="Deals"
         title="A pipeline that runs itself."
-        sub="Stages advance as things actually happen, and every move lands in a plain-language log. The board reflects today — not last week."
+        sub="Stages advance as things actually happen, and every move lands in a plain-language log. The board reflects today, not last week."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* How the board runs — open split, skeleton kanban */}
+      {/* How the board runs, open split, skeleton kanban */}
       <section className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <FadeUp>
@@ -346,7 +346,7 @@ export default function DealsPage() {
                   <div>
                     <h3 className="font-medium text-zinc-950">Stages advance themselves</h3>
                     <p className="mt-1 text-sm text-neutral-600">
-                      Tour booked, application in, docs signed — the card moves the
+                      Tour booked, application in, docs signed, the card moves the
                       moment it happens, and the dates and value stay in sync.
                     </p>
                   </div>
@@ -377,7 +377,7 @@ export default function DealsPage() {
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                   <p className="mt-1 text-xs text-neutral-600">
-                    Approval-first — outreach never sends without you
+                    Approval-first, outreach never sends without you
                   </p>
                 </div>
               </div>
@@ -390,7 +390,7 @@ export default function DealsPage() {
         </div>
       </section>
 
-      {/* The bento — owner image slots */}
+      {/* The bento, owner image slots */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Stagger className="grid gap-6 sm:grid-cols-2 sm:gap-8">
@@ -411,7 +411,7 @@ export default function DealsPage() {
         </div>
       </section>
 
-      {/* The full stage ladder — wide skeleton board + honest facts */}
+      {/* The full stage ladder, wide skeleton board + honest facts */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp className="mx-auto max-w-2xl text-center">
@@ -421,7 +421,7 @@ export default function DealsPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
               Five stages, every deal where it actually is. Chippi slides each
-              card forward the moment the work happens — you never drag a thing.
+              card forward the moment the work happens, you never drag a thing.
             </p>
           </FadeUp>
           <FadeUp delay={0.1} className="mt-12">
@@ -431,7 +431,7 @@ export default function DealsPage() {
         </div>
       </section>
 
-      {/* What each stage means — narrative tinted-cell grid */}
+      {/* What each stage means, narrative tinted-cell grid */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp>
@@ -440,7 +440,7 @@ export default function DealsPage() {
               What happens in each column.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
-              The board is not just where a deal sits — it is what Chippi did to
+              The board is not just where a deal sits, it is what Chippi did to
               get it there. Here is the work behind every move.
             </p>
           </FadeUp>
@@ -448,7 +448,7 @@ export default function DealsPage() {
         </div>
       </section>
 
-      {/* The pipeline, added up — gray stat card */}
+      {/* The pipeline, added up, gray stat card */}
       <div className="mt-24 sm:mt-32">
         <ResultsStat />
       </div>
@@ -460,7 +460,7 @@ export default function DealsPage() {
             Let the board run itself.
           </h2>
           <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-neutral-600">
-            Connect your inbox and calendar — Chippi keeps every deal current
+            Connect your inbox and calendar, Chippi keeps every deal current
             from first touch to close.
           </p>
           <div className="mt-9 flex justify-center">

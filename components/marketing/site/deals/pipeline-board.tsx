@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * PipelineBoard — an animate-on-scroll kanban that shows Chippi advancing a
+ * PipelineBoard, an animate-on-scroll kanban that shows Chippi advancing a
  * deal through the stages on its own. Calm-system vocabulary; the "moved by
  * Chippi" card lands with a brand highlight. Reduced motion: composed, still.
  */

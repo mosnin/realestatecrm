@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * SiteNav — the logged-out pill nav.
+ * SiteNav, the logged-out pill nav.
  *
  * A floating, frosted pill centered at the top: brand left, mega-menu groups
  * center, theme + auth right. Desktop groups open rich mega panels (icon tile +
  * label + description) with a calm fade-rise. Mobile is a full-screen pullout
- * that takes over the page with a staggered reveal. Honest CTAs only — a
+ * that takes over the page with a staggered reveal. Honest CTAs only, a
  * 7-day trial, never "free, no card".
  *
  * Built on framer-motion + the product's EASE_OUT so motion stays premium and
@@ -37,7 +37,7 @@ interface MegaItem {
 interface NavGroup {
   label: string;
   href: string;
-  /** The featured tile on the left of the mega panel — the group's one story. */
+  /** The featured tile on the left of the mega panel, the group's one story. */
   featured: {
     eyebrow: string;
     title: string;
@@ -55,7 +55,7 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'Meet Chippi',
       title: 'All your leads, worked while you close.',
-      body: 'The agent inside your CRM — it reads, scores, drafts, books, and follows up.',
+      body: 'The agent inside your CRM, it reads, scores, drafts, books, and follows up.',
       cta: 'Meet Chippi',
       href: '/chippi',
     },
@@ -75,14 +75,14 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'For solo realtors',
       title: 'Your extra teammate in the field.',
-      body: 'Drafts in your voice, leads scored, tours booked — from your phone, between showings.',
+      body: 'Drafts in your voice, leads scored, tours booked, from your phone, between showings.',
       cta: 'See the realtor story',
       href: '/realtors',
     },
     items: [
       { icon: PenLine, label: 'Drafts in your voice', desc: 'Written before you open the thread', href: '/realtors' },
       { icon: Target, label: 'Know who to call first', desc: 'Scored against your live deals', href: '/people' },
-      { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time — it’s handled', href: '/realtors' },
+      { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time, it’s handled', href: '/realtors' },
       { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six tabs', href: '/deals' },
     ],
   },
@@ -92,7 +92,7 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'For brokerages & teams',
       title: 'One agent for the whole floor.',
-      body: 'Leads routed, performance visible, bottlenecks surfaced — every agent gets a teammate.',
+      body: 'Leads routed, performance visible, bottlenecks surfaced, every agent gets a teammate.',
       cta: 'See the brokerage story',
       href: '/brokerages',
     },
@@ -109,7 +109,7 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'See it live',
       title: 'Watch Chippi run a floor.',
-      body: 'A 15-minute walkthrough on your own numbers — the inbox, the drafts, the board.',
+      body: 'A 15-minute walkthrough on your own numbers, the inbox, the drafts, the board.',
       cta: 'Book a demo',
       href: '/demo',
     },
@@ -224,7 +224,7 @@ export function SiteNav() {
               </div>
             </div>
 
-            {/* Desktop mega panel — featured story left, link list right */}
+            {/* Desktop mega panel, featured story left, link list right */}
             <AnimatePresence>
               {open && (() => {
                 const group = GROUPS.find((g) => g.label === open);
@@ -242,7 +242,7 @@ export function SiteNav() {
                   >
                     <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-2xl shadow-black/10 ring-1 ring-inset ring-white/10 backdrop-blur-2xl">
                       <div className="grid grid-cols-[280px_1fr]">
-                        {/* Featured tile — the group's one story */}
+                        {/* Featured tile, the group's one story */}
                         <Link
                           href={group.featured.href}
                           onClick={closeAll}

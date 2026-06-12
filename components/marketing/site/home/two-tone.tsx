@@ -1,5 +1,5 @@
 /**
- * TwoTone — the reference's alternating black/gray headline treatment.
+ * TwoTone, the reference's alternating black/gray headline treatment.
  *
  * Pass an array of word-groups; `dim` ones render muted, the rest in
  * near-black. One signature shared across the cloud band, the interactive

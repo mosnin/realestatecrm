@@ -1,5 +1,5 @@
 /**
- * `/realtors` — the solo agent's story, on the white + pastel system.
+ * `/realtors`, the solo agent's story, on the white + pastel system.
  *
  * Arc: PageHero ("Your book, worked while you close") → the follow-up loop
  * as a features-split-style section (copy beside a composed skeleton
@@ -8,7 +8,7 @@
  *
  * Layout law: open white split → white shadow cards → open CTA, with
  * mt-24 sm:mt-32 air between beats. No stock photography, no mock-UI
- * panels — owner image slots and skeleton illustrations only. Honesty:
+ * panels, owner image slots and skeleton illustrations only. Honesty:
  * Chippi drafts and proposes; the realtor approves every send.
  */
 
@@ -36,7 +36,7 @@ import { FeatureList } from '@/components/marketing/site/home/feature-list';
 export const metadata = {
   title: 'For realtors · Chippi',
   description:
-    'Chippi works your book while you close — reading the inbox, drafting replies in your voice, and proposing tour times against your real calendar. Nothing sends without your tap.',
+    'Chippi works your book while you close, reading the inbox, drafting replies in your voice, and proposing tour times against your real calendar. Nothing sends without your tap.',
 };
 
 /* ── Copy ──────────────────────────────────────────────────────────────── */
@@ -68,7 +68,7 @@ const BENTO_CELLS = [
   {
     slot: 'realtor-drafts',
     title: 'Drafts in your voice.',
-    sub: 'Every reply written and waiting —\nsent only when you tap send.',
+    sub: 'Every reply written and waiting, \nsent only when you tap send.',
   },
   {
     slot: 'realtor-tours',
@@ -78,19 +78,19 @@ const BENTO_CELLS = [
   {
     slot: 'realtor-log',
     title: 'A log you can trust.',
-    sub: 'Every action written down in plain\nlanguage — what happened, and why.',
+    sub: 'Every action written down in plain\nlanguage, what happened, and why.',
   },
 ];
 
-/* Honest signal stats for the vermillion break-band — the same three claims
+/* Honest signal stats for the vermillion break-band, the same three claims
  * this site already stands behind, nothing invented. */
 const BAND_STATS: { value: string; label: string }[] = [
   { value: '24/7', label: 'Working your book around the clock' },
-  { value: '100%', label: 'Approval-first — nothing sends without your tap' },
+  { value: '100%', label: 'Approval-first, nothing sends without your tap' },
   { value: '50+', label: 'Tools connect in two minutes' },
 ];
 
-/* The first day, in three steps — white shadow steps, tinted-circle icons. */
+/* The first day, in three steps, white shadow steps, tinted-circle icons. */
 const START_STEPS: { n: string; icon: typeof Inbox; title: string; body: string }[] = [
   {
     n: '01',
@@ -125,7 +125,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Owner image slot — exactly the FeaturesBento vocabulary. */
+/** Owner image slot, exactly the FeaturesBento vocabulary. */
 function ImageSlot({ name }: { name: string }) {
   return (
     <div
@@ -135,14 +135,14 @@ function ImageSlot({ name }: { name: string }) {
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
         <p className="text-xs text-neutral-400">
-          Image placeholder — <span className="font-medium text-neutral-500">{name}</span>
+          Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
     </div>
   );
 }
 
-/* ── The loop — skeleton illustration (inbox → draft → booked) ─────────── */
+/* ── The loop, skeleton illustration (inbox → draft → booked) ─────────── */
 
 function LoopIllustration() {
   return (
@@ -223,7 +223,7 @@ function LoopIllustration() {
   );
 }
 
-/* ── Stack illustration — connected tools feeding one loop ─────────────── */
+/* ── Stack illustration, connected tools feeding one loop ─────────────── */
 
 const STACK_ROWS: { icon: typeof Inbox; label: string; note: string }[] = [
   { icon: Inbox, label: 'Inbox', note: 'Gmail · Outlook' },
@@ -290,7 +290,7 @@ export default function RealtorsPage() {
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
-      {/* The loop — open white split, air after the hero */}
+      {/* The loop, open white split, air after the hero */}
       <section className="pt-12 sm:pt-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-12 lg:grid-cols-2">
@@ -303,7 +303,7 @@ export default function RealtorsPage() {
               <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
                 Chippi runs one loop all day: read the inbound, draft the reply
                 in your voice, propose times from your real calendar. You
-                approve — it logs the rest.
+                approve, it logs the rest.
               </p>
 
               <div className="mt-8 space-y-5 border-t border-neutral-200 pt-6">
@@ -331,7 +331,7 @@ export default function RealtorsPage() {
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                     <p className="mt-1 text-xs text-neutral-600">
-                      Approval-first — nothing sends without your tap
+                      Approval-first, nothing sends without your tap
                     </p>
                   </div>
                 </div>
@@ -347,7 +347,7 @@ export default function RealtorsPage() {
               </div>
             </div>
 
-            {/* Illustration — pastel frame, white glass card */}
+            {/* Illustration, pastel frame, white glass card */}
             <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
               <article
                 className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
@@ -380,7 +380,7 @@ export default function RealtorsPage() {
         </div>
       </section>
 
-      {/* The proof grid — 2×2 bento, owner image slots */}
+      {/* The proof grid, 2×2 bento, owner image slots */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-6 sm:grid-cols-2 sm:gap-8">
@@ -402,7 +402,7 @@ export default function RealtorsPage() {
         </div>
       </section>
 
-      {/* Signal break-band — vermillion, to snap the white run between the
+      {/* Signal break-band, vermillion, to snap the white run between the
           bento and the feature list. Honest stats only. */}
       <div className="mt-24 sm:mt-32">
         <Section tone="brand">
@@ -433,7 +433,7 @@ export default function RealtorsPage() {
         </Section>
       </div>
 
-      {/* The first day — white shadow steps, tinted-circle icons */}
+      {/* The first day, white shadow steps, tinted-circle icons */}
       <section className="mt-24 sm:mt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <FadeUp className="mx-auto max-w-2xl text-center">
@@ -472,7 +472,7 @@ export default function RealtorsPage() {
         </div>
       </section>
 
-      {/* Plugs into your stack — pastel-gradient band, the color break that
+      {/* Plugs into your stack, pastel-gradient band, the color break that
           snaps the white run between the white steps and the white feature
           list. Soft pastel wash + a page-local skeleton of the connected
           stack. Honest counts: 50+ tools, two minutes to connect. */}
@@ -488,7 +488,7 @@ export default function RealtorsPage() {
                   It works inside the tools you already pay for.
                 </h2>
                 <p className="mt-4 max-w-md text-base leading-relaxed text-neutral-600 sm:text-lg">
-                  Your inbox, your calendar, your CRM, your e-sign — Chippi
+                  Your inbox, your calendar, your CRM, your e-sign, Chippi
                   connects to each over OAuth and reaches for the right one as it
                   works. No migration, no rip-and-replace.
                 </p>
@@ -519,12 +519,12 @@ export default function RealtorsPage() {
         </FadeUp>
       </section>
 
-      {/* Everything Chippi runs — interactive feature list */}
+      {/* Everything Chippi runs, interactive feature list */}
       <div className="mt-24 sm:mt-32">
         <FeatureList />
       </div>
 
-      {/* The ask — centered closing CTA */}
+      {/* The ask, centered closing CTA */}
       <section className="mt-24 px-6 pb-8 sm:mt-32 sm:pb-12">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">

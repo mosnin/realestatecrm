@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * IntegrationHero — the provided two-row counter-scrolling icon marquee,
+ * IntegrationHero, the provided two-row counter-scrolling icon marquee,
  * exact: floating white icon coins (flaticon brand set, per the source),
  * grid backdrop, fade edges. Copy + CTA tailored to Chippi. Animation
  * classes live in globals (animate-scroll-left/right, reduced-motion aware).
@@ -53,7 +53,7 @@ export default function IntegrationHero() {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
           50+ apps connect in two minutes. Chippi calls each one as a tool while it
-          works — no migration, no double entry.
+          works, no migration, no double entry.
         </p>
         <Link
           href="/login/realtor?intent=signup"

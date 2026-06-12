@@ -14,7 +14,7 @@
  *
  * Fonts: bundled Tinos (Times-compatible OFL serif) + Inter (OFL sans)
  * fetched once at edge runtime. We don't use system fonts because Satori
- * won't render them — the OG must look identical wherever it's previewed.
+ * won't render them, the OG must look identical wherever it's previewed.
  */
 
 import { ImageResponse } from 'next/og';
@@ -53,7 +53,7 @@ export default async function Image() {
           justifyContent: 'space-between',
         }}
       >
-        {/* Top row: Chippi wordmark in serif. Tiny — the visual is the title. */}
+        {/* Top row: Chippi wordmark in serif. Tiny, the visual is the title. */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span
             style={{

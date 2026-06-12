@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * FeaturesDark — the owner-provided five-card glass feature section,
+ * FeaturesDark, the owner-provided five-card glass feature section,
  * reskinned to the WHITE scheme with pastel-orange gradients (owner
  * direction): one big rounded card washed white→peach, soft orange decor
  * orbs, and five glass cards with subtle warm gradient fills. Structure,
@@ -19,7 +19,7 @@ import {
   Workflow,
 } from 'lucide-react';
 
-const TYPING_TEXT = 'Hi Maya — Saturday at 2:00 works. Want me to send the address?';
+const TYPING_TEXT = 'Hi Maya, Saturday at 2:00 works. Want me to send the address?';
 
 function useReducedMotionFlag(): boolean {
   const [reduce, setReduce] = useState(false);
@@ -61,7 +61,7 @@ function TypingDemo() {
   return <div className="h-8 font-mono text-xs text-neutral-500">{text}</div>;
 }
 
-/** Glass demo shell — white glass on the warm card. */
+/** Glass demo shell, white glass on the warm card. */
 function DemoShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5 backdrop-blur">
@@ -125,7 +125,7 @@ export function FeaturesDark() {
             </h2>
 
             <p className="mt-4 max-w-2xl text-base text-neutral-600 md:text-lg">
-              An agent that works your leads end to end — reading, drafting,
+              An agent that works your leads end to end, reading, drafting,
               booking, and logging while you close.
             </p>
 
@@ -151,7 +151,7 @@ export function FeaturesDark() {
                 </DemoShell>
                 <CardTitle
                   title="Replies in your voice"
-                  body="Every inbound gets a draft learned from how you actually write. Read it, tweak it, send it — nothing leaves without your tap."
+                  body="Every inbound gets a draft learned from how you actually write. Read it, tweak it, send it, nothing leaves without your tap."
                 />
               </CardShell>
 
@@ -177,7 +177,7 @@ export function FeaturesDark() {
                 </DemoShell>
                 <CardTitle
                   title="A pipeline that reflects reality"
-                  body="Deals advance themselves as things happen. The board shows today — not last week."
+                  body="Deals advance themselves as things happen. The board shows today, not last week."
                 />
               </CardShell>
             </div>
@@ -242,7 +242,7 @@ export function FeaturesDark() {
               </DemoShell>
               <CardTitle
                 title="Autonomous follow-up"
-                body="Set the guardrails once and Chippi works the quiet hours — nudging leads, booking tours, logging every move."
+                body="Set the guardrails once and Chippi works the quiet hours, nudging leads, booking tours, logging every move."
               />
             </CardShell>
 
@@ -270,7 +270,7 @@ export function FeaturesDark() {
               </DemoShell>
               <CardTitle
                 title="Enterprise-grade control"
-                body="An agent you can hand your book to has to earn it. Guardrails, roles, and auditing are built in — not bolted on."
+                body="An agent you can hand your book to has to earn it. Guardrails, roles, and auditing are built in, not bolted on."
               />
             </CardShell>
           </div>

@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * HeroHighlight — a dot-grid band that lights up under the cursor (in the
+ * HeroHighlight, a dot-grid band that lights up under the cursor (in the
  * Chippi orange), with a <Highlight> that sweeps a warm marker behind a phrase.
  * We use it for the "second brain / drafts in your voice" moments. The accent
- * is brand orange, not the source component's indigo — orange is the Chippi
+ * is brand orange, not the source component's indigo, orange is the Chippi
  * signature, and these lines are about Chippi. Reduced motion: marker arrives
  * already drawn.
  */
@@ -45,7 +45,7 @@ export function HeroHighlight({
       )}
       onMouseMove={handleMouseMove}
     >
-      {/* base dot grid — neutral in both themes */}
+      {/* base dot grid, neutral in both themes */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-60 dark:hidden"
@@ -56,7 +56,7 @@ export function HeroHighlight({
         className="pointer-events-none absolute inset-0 hidden opacity-60 dark:block"
         style={dotPattern('rgb(38 38 38)')}
       />
-      {/* the warm reveal that follows the cursor — Chippi orange */}
+      {/* the warm reveal that follows the cursor, Chippi orange */}
       <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"

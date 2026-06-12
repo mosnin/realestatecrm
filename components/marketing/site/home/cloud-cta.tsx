@@ -1,9 +1,9 @@
 /**
- * CloudCta — the reference's sky band, tailored to Chippi as a calm CTA
+ * CloudCta, the reference's sky band, tailored to Chippi as a calm CTA
  * breaker. Soft gray rounded card, a scattered cloud field kept clear of the
  * rounded corners (so nothing clips), a centered two-tone headline, the black
  * "View Demo" pill with a circular arrow, and a paper-plane illustration
- * (Chippi sending the reply). Pure decoration + one CTA — it breaks up space.
+ * (Chippi sending the reply). Pure decoration + one CTA, it breaks up space.
  */
 
 import Link from 'next/link';
@@ -29,7 +29,7 @@ function Cloud({ w }: { w: number }) {
   );
 }
 
-/** Paper plane — Chippi sending the reply. */
+/** Paper plane, Chippi sending the reply. */
 function PaperPlane() {
   return (
     <svg viewBox="0 0 240 160" className="h-auto w-full max-w-xs" aria-hidden>

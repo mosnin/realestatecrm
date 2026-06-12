@@ -1,17 +1,17 @@
 'use client';
 
 /**
- * Hero — the Supermi composition, exact.
+ * Hero, the Supermi composition, exact.
  *
  * One big rounded pastel card: soft white-to-peach/pink gradient with a
  * faint grid. The site's floating pill nav (SiteNav) hovers above the card;
- * inside, the centered stack — white uppercase badge pill, giant near-black
- * display headline, two-line gray sub, single white "Get Started" pill —
+ * inside, the centered stack, white uppercase badge pill, giant near-black
+ * display headline, two-line gray sub, single white "Get Started" pill, 
  * and the app window slot at the bottom, clipped by the card edge.
  *
  * The window is the ARCADE DEMO: the owner's popout embed. A hidden fixed
  * iframe (height 0) hosts the tour; the window shows the demo's cover
- * screenshot and, on click, posts `request-popout-open` — the Arcade
+ * screenshot and, on click, posts `request-popout-open`, the Arcade
  * handler expands the iframe fullscreen and collapses it on close, per the
  * provided embed script.
  */
@@ -28,7 +28,7 @@ const ARCADE_COVER =
   'https://cdn.arcade.software/cdn-cgi/image/width=960,fit=scale-down,format=auto,quality=90,dpr=2/extension-uploads%2FNQCViB7eeI8K9ZCIUT9s%2Fimage%2Fb9a7d24f-b6ee-44a8-9030-852128020d0e.png';
 
 /* The card's pastel backdrop: white top melting into pink (bottom-left) and
- * peach (bottom-right), plus a faint 64px grid — per the reference image. */
+ * peach (bottom-right), plus a faint 64px grid, per the reference image. */
 const CARD_BG: React.CSSProperties = {
   backgroundColor: '#f6f4f5',
   backgroundImage: [
@@ -63,7 +63,7 @@ function Enter({
   );
 }
 
-/** The dashboard window — Arcade popout demo (owner's embed, ported). */
+/** The dashboard window, Arcade popout demo (owner's embed, ported). */
 function ArcadeSlot() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -97,7 +97,7 @@ function ArcadeSlot() {
 
   return (
     <>
-      {/* Hidden fixed iframe — expands fullscreen when the popout opens. */}
+      {/* Hidden fixed iframe, expands fullscreen when the popout opens. */}
       <iframe
         ref={iframeRef}
         src={ARCADE_SRC}
@@ -119,7 +119,7 @@ function ArcadeSlot() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={ARCADE_COVER}
-          alt="Chippi dashboard — interactive tour preview"
+          alt="Chippi dashboard, interactive tour preview"
           className="h-full w-full object-cover object-top"
         />
         <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-200 group-hover:bg-black/10">
@@ -144,7 +144,7 @@ export function Hero() {
         className="relative isolate mx-auto max-w-[1400px] overflow-hidden rounded-[2rem] sm:rounded-[2.5rem]"
         style={CARD_BG}
       >
-        {/* Centered stack — top padding clears the site's floating pill nav */}
+        {/* Centered stack, top padding clears the site's floating pill nav */}
         <div className="mx-auto flex max-w-4xl flex-col items-center px-4 pt-28 text-center sm:pt-32">
           <Enter delay={0.05}>
             <span className="inline-flex items-center rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#1c1720] shadow-[0_2px_12px_rgba(40,20,10,0.08)]">
@@ -177,7 +177,7 @@ export function Hero() {
           </Enter>
         </div>
 
-        {/* App window — the arcade.so demo slot, clipped by the card bottom */}
+        {/* App window, the arcade.so demo slot, clipped by the card bottom */}
         <Enter delay={0.4} className="mt-12 px-4 sm:mt-16 sm:px-10">
           <ArcadeSlot />
         </Enter>

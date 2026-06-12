@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * More live panels — the brokerage feature rows, the two extra realtor rows
+ * More live panels, the brokerage feature rows, the two extra realtor rows
  * (inbox triage + the pipeline board), and the content-studio bento card.
  * Same animate-on-scroll vocabulary as live-panels.tsx; shared <Panel> wrapper
  * provides the in-view flag + the frame height. Reduced-motion: composed, still.
@@ -109,7 +109,7 @@ export function LeaderboardPanel() {
               </Row>
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-muted-foreground">Pulled from real activity — not a status meeting.</p>
+          <p className="mt-4 text-[11px] text-muted-foreground">Pulled from real activity, not a status meeting.</p>
         </>
       )}
     </Panel>
@@ -183,7 +183,7 @@ export function MembersPanel() {
 
 export function TriagePanel() {
   const threads = [
-    { from: 'Maya Patel', subj: 'Re: 14 Oak St — can we see it Saturday?', label: 'Buyer', top: true },
+    { from: 'Maya Patel', subj: 'Re: 14 Oak St, can we see it Saturday?', label: 'Buyer', top: true },
     { from: 'Tom Reyes', subj: 'Quick refinance question', label: 'Refi' },
     { from: 'Market Digest', subj: 'Your weekly neighborhood update', label: 'Promo', dim: true },
   ];
@@ -213,7 +213,7 @@ export function TriagePanel() {
               </Row>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground"><span className="font-medium text-brand">Chippi</span> lifted Maya to the top — the rest can wait.</p>
+          <p className="mt-3 text-[11px] text-muted-foreground"><span className="font-medium text-brand">Chippi</span> lifted Maya to the top, the rest can wait.</p>
         </>
       )}
     </Panel>
@@ -269,14 +269,14 @@ export function PipelinePanel() {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground"><span className="font-medium text-brand">Maya</span> advanced to Touring — the board updated itself.</p>
+          <p className="mt-3 text-[11px] text-muted-foreground"><span className="font-medium text-brand">Maya</span> advanced to Touring, the board updated itself.</p>
         </>
       )}
     </Panel>
   );
 }
 
-/* ── Content studio (home bento card — compact, fills the slot) ────────────── */
+/* ── Content studio (home bento card, compact, fills the slot) ────────────── */
 
 export function StudioCard() {
   const ref = useRef<HTMLDivElement>(null);
@@ -290,7 +290,7 @@ export function StudioCard() {
           <PenLine className="h-3.5 w-3.5 text-brand" />
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Drafting · just listed</span>
         </div>
-        <p className="mt-2.5 text-sm font-medium text-foreground">14 Oak St — just listed</p>
+        <p className="mt-2.5 text-sm font-medium text-foreground">14 Oak St, just listed</p>
         <div className="mt-2 space-y-1.5">
           {[100, 84, 62].map((w, i) => (
             <motion.div
