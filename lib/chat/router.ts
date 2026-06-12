@@ -56,6 +56,18 @@ const ACTION_VERBS_RE =
 const WORKSPACE_QUERY_RE =
   /\b(show|find|search|look\s?up|lookup|list|see|view|pull|display|surface|who(?:'?s| is| are)?|which|whose|overdue|hottest|hot|warm|cold|stuck|stalled|quiet|pipeline|deals?|leads?|contacts?|people|person|clients?|prospects?|buyers?|sellers?|listings?|propert(?:y|ies)|tours?|showings?|follow[\s-]?ups?|calendar|agenda|schedule|today|tomorrow|this week|inbox|drafts?|offers?|commissions?|stages?|scores?|plan my|my day|my week|my pipeline|my leads|my deals|my contacts|my schedule|my calendar)\b/i;
 
+/**
+ * Capability / intent questions: the realtor asking what Chippi can do, or
+ * addressing it directly to act ("can you …", "do you have a CRM?", "help me
+ * …", "what can you do", "your tools"). These carry no action verb and often
+ * no workspace noun, so they used to fall to the toolless direct path, whose
+ * persona then DENIED having a CRM/tools and told the realtor to rephrase, the
+ * "Chippi acts like none of it exists" bug. Route them to the agent, which has
+ * the tools and a capability-aware prompt and can actually answer or act.
+ */
+const CAPABILITY_RE =
+  /\b(?:can|could|will|would|do|does|are)\s+you\b|\bhelp\s+me\b|\bwhat\s+(?:can|do)\s+you\b|\bwho\s+are\s+you\b|\bable\s+to\b|\byour\s+(?:tools?|crm|capabilit\w*|features?|abilit\w*)\b/i;
+
 export type RouteDecision = 'direct' | 'agent';
 
 export interface RouteAttachment {
@@ -99,6 +111,12 @@ export function decideRoute(
     // tool-capable agent than answer a data question with a toolless LLM that
     // has no access to the workspace.
     if (WORKSPACE_QUERY_RE.test(text)) {
+      return 'agent';
+    }
+    // Capability / "can you …" intent questions reach the agent so Chippi
+    // answers from its real tool surface instead of the direct persona
+    // denying it has one.
+    if (CAPABILITY_RE.test(text)) {
       return 'agent';
     }
     return 'direct';

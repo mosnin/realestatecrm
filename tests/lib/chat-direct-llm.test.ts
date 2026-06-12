@@ -148,7 +148,14 @@ describe('CHIPPI_INSTRUCTIONS_LITE', () => {
     expect(CHIPPI_INSTRUCTIONS_LITE).toMatch(/answer/i);
   });
 
-  it('makes it clear there are no tools on this path', () => {
-    expect(CHIPPI_INSTRUCTIONS_LITE.toLowerCase()).toMatch(/no.*action|do not take action|action path/);
+  it('never lets the persona deny its own tools or tell the realtor to rephrase', () => {
+    const lower = CHIPPI_INSTRUCTIONS_LITE.toLowerCase();
+    // The fix for "Chippi acts like it has no CRM/tools": the lite persona
+    // must forbid denial, not instruct it.
+    expect(lower).toMatch(/never/);
+    expect(lower).toMatch(/rephrase/);
+    expect(lower).toMatch(/full agent|tools|crm/);
+    // and must NOT carry the old deflection language.
+    expect(lower).not.toMatch(/do not take action|action path/);
   });
 });
