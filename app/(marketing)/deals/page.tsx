@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, FileText, ImagePlus } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
-import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { FadeUp, FeatureGrid, Stagger, StaggerItem, StatStrip } from '@/components/marketing/site/section';
 import { ResultsStat } from '@/components/marketing/site/home/results-stat';
 
 export const metadata = {
@@ -41,6 +41,94 @@ const COLUMNS = [
       { chip: 'Approved', tone: 'bg-emerald-100 text-emerald-700' },
     ],
   },
+];
+
+/* The full stage ladder — one deal row per stage, with a status pill. */
+const STAGES: {
+  name: string;
+  count: string;
+  deal: string;
+  meta: string;
+  pill: string;
+  tone: string;
+}[] = [
+  {
+    name: 'New',
+    count: '6',
+    deal: 'Priya · 2-bed rental',
+    meta: 'Landed 9m ago',
+    pill: 'Scored · Hot',
+    tone: 'bg-[#ff4b29]/10 text-[#ff4b29]',
+  },
+  {
+    name: 'Contacted',
+    count: '4',
+    deal: 'Maya · loft downtown',
+    meta: 'Reply sent',
+    pill: 'Awaiting back',
+    tone: 'bg-amber-100 text-amber-700',
+  },
+  {
+    name: 'Touring',
+    count: '3',
+    deal: '14 Oak St · the Lees',
+    meta: 'Sat 2:00',
+    pill: 'Tour booked',
+    tone: 'bg-blue-100 text-blue-700',
+  },
+  {
+    name: 'Offer',
+    count: '2',
+    deal: 'Devon · 3-bed colonial',
+    meta: 'Docs in',
+    pill: 'Under review',
+    tone: 'bg-indigo-100 text-indigo-700',
+  },
+  {
+    name: 'Won',
+    count: '5',
+    deal: 'Sasha · garden unit',
+    meta: 'Closed today',
+    pill: 'Approved',
+    tone: 'bg-emerald-100 text-emerald-700',
+  },
+];
+
+/* What each stage means — the narrative behind the ladder, tinted-cell grid.
+   No invented metrics: this describes what enters a stage and what moves it. */
+const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
+  {
+    kicker: 'New',
+    title: 'A lead just landed.',
+    body: 'Scored with the reason the moment it arrives, and a reply already drafted in your voice — waiting for your tap.',
+  },
+  {
+    kicker: 'Contacted',
+    title: 'The first reply is out.',
+    body: 'You approved the draft and it sent. The card carries who you are waiting on and when you last reached them.',
+  },
+  {
+    kicker: 'Touring',
+    title: 'A time is on the calendar.',
+    body: 'Tour proposed against your real availability and booked. Confirmations and reminders ride along automatically.',
+  },
+  {
+    kicker: 'Offer',
+    title: 'Paperwork is moving.',
+    body: 'Application in, documents filed to the deal. The stage advances itself as each piece signs, nothing retyped.',
+  },
+  {
+    kicker: 'Won',
+    title: 'Closed, with the reason.',
+    body: 'The deal lands in Won and the why is on the record — so the next handoff reads like a colleague briefed it.',
+  },
+];
+
+/* Honest facts — no invented conversion metrics. */
+const FACTS: { value: string; label: string }[] = [
+  { value: '24/7', label: 'The board stays current around the clock' },
+  { value: '100%', label: 'Approval-first — outreach never sends without you' },
+  { value: '50+', label: 'Integrations across email, calendar, and CRMs' },
 ];
 
 /* The 2×2 bento — owner image slots, FeaturesBento style exactly. */
@@ -170,6 +258,65 @@ function PipelineSketch() {
   );
 }
 
+/** The five-stage ladder — a wide skeleton board, one deal row per stage. */
+function StageLadder() {
+  return (
+    <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[680px] grid-cols-5 gap-3 sm:gap-4">
+          {STAGES.map((stage, i) => (
+            <div key={stage.name} className="flex flex-col">
+              {/* Column head */}
+              <div className="flex items-center justify-between px-1 pb-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                  {stage.name}
+                </span>
+                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
+                  {stage.count}
+                </span>
+              </div>
+              {/* Active deal card */}
+              <div className="rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fdf4ee] p-3 shadow-sm ring-1 ring-inset ring-black/5">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-7 w-7 flex-shrink-0 rounded-full ${
+                      i === STAGES.length - 1
+                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                        : 'bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]'
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] font-semibold text-zinc-950">
+                      {stage.deal}
+                    </div>
+                    <div className="truncate text-[10px] text-neutral-500">{stage.meta}</div>
+                  </div>
+                </div>
+                <span
+                  className={`mt-2.5 inline-flex rounded-full px-2 py-0.5 text-[9px] font-medium ${stage.tone}`}
+                >
+                  {stage.pill}
+                </span>
+              </div>
+              {/* Ghost rows — the stack behind */}
+              <div className="mt-2 space-y-2">
+                <div className="rounded-xl border border-black/5 bg-white/70 p-2.5">
+                  <div className="h-1.5 w-3/4 rounded bg-neutral-200/90" />
+                  <div className="mt-1.5 h-1.5 w-1/2 rounded bg-neutral-200/70" />
+                </div>
+                <div className="rounded-xl border border-black/5 bg-white/60 p-2.5">
+                  <div className="h-1.5 w-2/3 rounded bg-neutral-200/80" />
+                  <div className="mt-1.5 h-1.5 w-2/5 rounded bg-neutral-200/60" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DealsPage() {
   return (
     <>
@@ -261,6 +408,43 @@ export default function DealsPage() {
               </StaggerItem>
             ))}
           </Stagger>
+        </div>
+      </section>
+
+      {/* The full stage ladder — wide skeleton board + honest facts */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <FadeUp className="mx-auto max-w-2xl text-center">
+            <Eyebrow>The stages</Eyebrow>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              New to Won, one clean ladder.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+              Five stages, every deal where it actually is. Chippi slides each
+              card forward the moment the work happens — you never drag a thing.
+            </p>
+          </FadeUp>
+          <FadeUp delay={0.1} className="mt-12">
+            <StageLadder />
+          </FadeUp>
+          <StatStrip stats={FACTS} className="mt-8" />
+        </div>
+      </section>
+
+      {/* What each stage means — narrative tinted-cell grid */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <FadeUp>
+            <Eyebrow>Stage by stage</Eyebrow>
+            <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              What happens in each column.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              The board is not just where a deal sits — it is what Chippi did to
+              get it there. Here is the work behind every move.
+            </p>
+          </FadeUp>
+          <FeatureGrid items={STAGE_STORY} columns={3} className="mt-12" />
         </div>
       </section>
 

@@ -12,10 +12,14 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
+  BarChart3,
+  FileSignature,
   FileText,
   FolderOpen,
+  Image as ImageIcon,
   Mail,
   Search,
+  ShieldCheck,
 } from 'lucide-react';
 import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -42,6 +46,34 @@ const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
     icon: FileText,
     title: 'Deal context.',
     body: 'Files live on the deal, next to the people, the showings, and the conversation they belong to.',
+  },
+];
+
+/* What auto-files itself — the document types Chippi reads and routes. */
+const DOC_TYPES: { icon: LucideIcon; kicker: string; title: string; body: string }[] = [
+  {
+    icon: FileSignature,
+    kicker: 'Contracts',
+    title: 'Purchase agreements.',
+    body: 'Read on arrival and filed to the deal — the version you need, where you look.',
+  },
+  {
+    icon: ShieldCheck,
+    kicker: 'Disclosures',
+    title: 'Seller disclosures.',
+    body: 'Matched to the property the moment they land, so nothing slips the timeline.',
+  },
+  {
+    icon: ImageIcon,
+    kicker: 'Listing photos',
+    title: 'Photo sets.',
+    body: 'Attached to the listing they belong to — pulled up beside it in one search.',
+  },
+  {
+    icon: BarChart3,
+    kicker: 'CMAs',
+    title: 'Market analyses.',
+    body: 'Comps and valuations filed to the deal they were run for, ready when you present.',
   },
 ];
 
@@ -241,6 +273,47 @@ export default function FilesPage() {
             </StaggerItem>
           ))}
         </Stagger>
+      </section>
+
+      {/* What auto-files — pastel-wash band, white doc-type cards */}
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+          <div className="relative px-6 py-16 sm:px-10 sm:py-20 lg:px-14">
+            <FadeUp className="mx-auto max-w-2xl text-center">
+              <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                <span aria-hidden className="text-[#ff4b29]">✦</span>
+                What files itself
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+                Every kind of paper a deal drags along.
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+                Whatever lands in your inbox, Chippi reads it and routes it to the
+                deal it belongs to.
+              </p>
+            </FadeUp>
+            <Stagger className="mt-12 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+              {DOC_TYPES.map((d) => (
+                <StaggerItem key={d.kicker} className="h-full">
+                  <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <d.icon className="h-4 w-4 text-[#ff4b29]" />
+                    </div>
+                    <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
+                      {d.kicker}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold tracking-tight text-zinc-950">
+                      {d.title}
+                    </h3>
+                    <p className="mt-2.5 text-sm leading-relaxed text-neutral-500">{d.body}</p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+        </div>
       </section>
 
       {/* Break-up closer */}

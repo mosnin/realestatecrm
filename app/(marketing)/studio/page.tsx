@@ -12,7 +12,9 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDown,
+  CalendarClock,
   Camera,
+  Clapperboard,
   ImagePlus,
   Instagram,
   Mail,
@@ -52,6 +54,34 @@ const CHANNELS: { label: string; icon: LucideIcon; tone: string }[] = [
   { label: 'Email', icon: Mail, tone: 'text-emerald-600' },
 ];
 
+/* What Chippi writes — the content types it drafts from one listing. */
+const CONTENT_TYPES: { icon: LucideIcon; kicker: string; title: string; body: string }[] = [
+  {
+    icon: Instagram,
+    kicker: 'Just listed',
+    title: 'The feed post.',
+    body: 'A caption sized for the grid — the hook, the details, the call to come see it.',
+  },
+  {
+    icon: Camera,
+    kicker: 'Story',
+    title: 'The vertical story.',
+    body: 'A full-bleed story frame for the open house, worded to swipe up and tour.',
+  },
+  {
+    icon: Mail,
+    kicker: 'Email',
+    title: 'The just-listed email.',
+    body: 'A note to your sphere with the listing, the photos, and the showing times.',
+  },
+  {
+    icon: Clapperboard,
+    kicker: 'Reel',
+    title: 'The walkthrough reel.',
+    body: 'A shot list and on-screen captions for the tour clip, ready to film and post.',
+  },
+];
+
 const BENTO = [
   {
     slot: 'studio-compose',
@@ -74,6 +104,39 @@ const BENTO = [
     sub: 'Every draft, caption, and asset filed by listing — ready to reuse on the next one.',
   },
 ];
+
+/** Floating STEP pill — the HowItWorks step marker, on the white system. */
+function StepPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="absolute -top-3 left-6 inline-flex items-center rounded-full border border-neutral-200 bg-white px-3.5 py-1 text-xs font-medium tracking-tight text-neutral-800">
+      {children}
+    </span>
+  );
+}
+
+/** Bordered step card with a skeleton mock above the copy. */
+function StepCard({
+  step,
+  title,
+  body,
+  children,
+}: {
+  step: string;
+  title: string;
+  body: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative flex h-full flex-col rounded-[28px] border border-black/5 bg-white p-6 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] transition-transform duration-200 hover:-translate-y-1 sm:p-8">
+      <StepPill>{step}</StepPill>
+      {children}
+      <h3 className="mt-6 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+        {title}
+      </h3>
+      <p className="mt-2 text-base leading-relaxed text-neutral-500">{body}</p>
+    </div>
+  );
+}
 
 export default function StudioPage() {
   return (
@@ -238,6 +301,159 @@ export default function StudioPage() {
             </article>
           </div>
         </div>
+      </section>
+
+      {/* Three steps to a post — HowItWorks rhythm, white shadow STEP cards */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            Three steps to a post
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            Snap it. Approve it. It is everywhere.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            You take one photo at the listing. Chippi does the writing and the
+            scheduling — you just tap approve.
+          </p>
+        </FadeUp>
+        <Stagger className="mt-12 grid grid-cols-1 items-stretch gap-8 sm:gap-10 lg:grid-cols-3">
+          {/* STEP 1 — Snap a photo */}
+          <StaggerItem className="h-full">
+            <StepCard
+              step="STEP 1"
+              title="Snap the photo"
+              body="Take one shot at the door — just listed, open house, just sold. That is the whole input."
+            >
+              <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fff1e6] p-4 sm:h-48">
+                <div className="mx-auto flex h-full max-w-[12rem] items-center justify-center">
+                  <div className="w-full rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                    <div className="aspect-[4/3] w-full rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                    <div className="mt-2.5 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] text-neutral-600">
+                        <Camera className="h-3 w-3 text-[#ff4b29]" />
+                        14 Oak St
+                      </span>
+                      <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-medium text-[#ff4b29]">
+                        Just listed
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </StepCard>
+          </StaggerItem>
+
+          {/* STEP 2 — Chippi drafts */}
+          <StaggerItem className="h-full">
+            <StepCard
+              step="STEP 2"
+              title="Chippi drafts it"
+              body="The caption, the story, and the email write themselves in your voice — sized for each channel."
+            >
+              <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fff1e6] p-4 sm:h-48">
+                <div className="grid h-full grid-cols-3 gap-2 sm:gap-3">
+                  {CHANNELS.map((c) => (
+                    <div
+                      key={c.label}
+                      className="flex flex-col rounded-xl border border-black/5 bg-white/90 p-2.5 shadow-sm"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <c.icon className={`h-3 w-3 ${c.tone}`} strokeWidth={2} />
+                        <span className="text-[9px] font-medium uppercase tracking-wide text-neutral-500">
+                          {c.label}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="h-1 w-full rounded bg-neutral-200" />
+                        <div className="h-1 w-4/5 rounded bg-neutral-200" />
+                        <div className="h-1 w-3/5 rounded bg-neutral-200" />
+                      </div>
+                      <div className="mt-auto flex items-center gap-1 pt-2">
+                        <PenLine className="h-2.5 w-2.5 text-[#ff4b29]" />
+                        <div className="h-1 w-6 rounded bg-[#ff4b29]/40" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </StepCard>
+          </StaggerItem>
+
+          {/* STEP 3 — Schedule everywhere */}
+          <StaggerItem className="h-full">
+            <StepCard
+              step="STEP 3"
+              title="Schedule everywhere"
+              body="Approve once from your phone and the campaign queues for the open-house window across every channel."
+            >
+              <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fff1e6] p-4 sm:h-48">
+                <div className="h-full w-full rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-black/5 pb-2">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-neutral-700">
+                      <CalendarClock className="h-3 w-3 text-[#ff4b29]" />
+                      Open-house window
+                    </span>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                      Queued
+                    </span>
+                  </div>
+                  <div className="mt-2.5 space-y-1.5">
+                    {CHANNELS.map((c) => (
+                      <div key={c.label} className="flex items-center gap-2">
+                        <c.icon className={`h-3 w-3 flex-shrink-0 ${c.tone}`} strokeWidth={2} />
+                        <div className="h-1.5 flex-1 rounded bg-neutral-200" />
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-600">
+                          Sat
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-emerald-50/60 px-2 py-1.5 ring-1 ring-emerald-100">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="text-[9px] font-medium text-neutral-700">Approved · scheduled</span>
+                  </div>
+                </div>
+              </div>
+            </StepCard>
+          </StaggerItem>
+        </Stagger>
+      </section>
+
+      {/* What Chippi writes — content-type catalog, white feature cards */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            What Chippi writes
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            One photo. Four ways to show it off.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            The same listing, written four ways — each one sized and worded for
+            where it lands.
+          </p>
+        </FadeUp>
+        <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
+          {CONTENT_TYPES.map((c) => (
+            <StaggerItem key={c.kicker} className="h-full">
+              <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                  <c.icon className="h-4 w-4 text-[#ff4b29]" />
+                </div>
+                <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
+                  {c.kicker}
+                </p>
+                <h3 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950">
+                  {c.title}
+                </h3>
+                <p className="mt-2.5 text-sm leading-relaxed text-neutral-500">{c.body}</p>
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
       </section>
 
       {/* Soft bento — owner image slots, big air above */}

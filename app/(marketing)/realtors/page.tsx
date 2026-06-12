@@ -18,10 +18,19 @@ import {
   CalendarCheck,
   ImagePlus,
   Inbox,
+  Link2,
   MessageSquare,
+  PenLine,
   ShieldCheck,
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
+import {
+  EyebrowChip,
+  FadeUp,
+  Section,
+  Stagger,
+  StaggerItem,
+} from '@/components/marketing/site/section';
 import { FeatureList } from '@/components/marketing/site/home/feature-list';
 
 export const metadata = {
@@ -70,6 +79,36 @@ const BENTO_CELLS = [
     slot: 'realtor-log',
     title: 'A log you can trust.',
     sub: 'Every action written down in plain\nlanguage — what happened, and why.',
+  },
+];
+
+/* Honest signal stats for the vermillion break-band — the same three claims
+ * this site already stands behind, nothing invented. */
+const BAND_STATS: { value: string; label: string }[] = [
+  { value: '24/7', label: 'Working your book around the clock' },
+  { value: '100%', label: 'Approval-first — nothing sends without your tap' },
+  { value: '50+', label: 'Tools connect in two minutes' },
+];
+
+/* The first day, in three steps — white shadow steps, tinted-circle icons. */
+const START_STEPS: { n: string; icon: typeof Inbox; title: string; body: string }[] = [
+  {
+    n: '01',
+    icon: Link2,
+    title: 'Connect your inbox',
+    body: 'Link Gmail or Outlook and your calendar in two minutes. Chippi learns your voice from how you already write.',
+  },
+  {
+    n: '02',
+    icon: PenLine,
+    title: 'Chippi drafts the replies',
+    body: 'Every inbound is read and scored, the reply written in your voice, and tour times proposed from your real availability.',
+  },
+  {
+    n: '03',
+    icon: ShieldCheck,
+    title: 'You tap to send',
+    body: 'Approve, edit, or skip. The tour books, the thread updates, and the whole move lands in a plain-language log.',
   },
 ];
 
@@ -178,6 +217,60 @@ function LoopIllustration() {
             Tour · Sat 2:00
           </span>
           <span className="truncate pl-2 text-neutral-500">Logged to the deal</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Stack illustration — connected tools feeding one loop ─────────────── */
+
+const STACK_ROWS: { icon: typeof Inbox; label: string; note: string }[] = [
+  { icon: Inbox, label: 'Inbox', note: 'Gmail · Outlook' },
+  { icon: CalendarCheck, label: 'Calendar', note: 'Google · Calendly' },
+  { icon: MessageSquare, label: 'CRM', note: 'HubSpot · Salesforce' },
+  { icon: PenLine, label: 'E-sign', note: 'DocuSign' },
+];
+
+function StackIllustration() {
+  return (
+    <div className="rounded-3xl bg-white/70 p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.18)] ring-1 ring-black/5 backdrop-blur sm:p-5">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-[10px] tracking-widest text-neutral-500">CONNECTED</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-black/5 bg-white/90 px-2 py-0.5 text-[9px] text-neutral-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500/80" />
+            OAuth · live
+          </span>
+        </div>
+
+        {/* Connected tools */}
+        <div className="space-y-2">
+          {STACK_ROWS.map(({ icon: Icon, label, note }) => (
+            <div
+              key={label}
+              className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 px-3 py-2 shadow-sm"
+            >
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                <Icon className="h-3.5 w-3.5 text-[#ff4b29]" />
+              </div>
+              <span className="text-[11px] font-semibold text-zinc-950">{label}</span>
+              <span className="ml-auto truncate pl-2 text-[10px] text-neutral-500">{note}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Funnel into Chippi */}
+        <div className="mt-3 flex items-center justify-center">
+          <ArrowRight className="h-3.5 w-3.5 rotate-90 text-[#ff4b29]" />
+        </div>
+        <div className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 px-3 py-2.5 shadow-sm">
+          <span className="h-7 w-7 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-zinc-950">Chippi</div>
+            <div className="text-[10px] text-neutral-500">Reaches for each tool as it works</div>
+          </div>
+          <ShieldCheck className="ml-auto h-4 w-4 flex-shrink-0 text-[#ff4b29]" />
         </div>
       </div>
     </div>
@@ -307,6 +400,123 @@ export default function RealtorsPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Signal break-band — vermillion, to snap the white run between the
+          bento and the feature list. Honest stats only. */}
+      <div className="mt-24 sm:mt-32">
+        <Section tone="brand">
+          <div className="flex flex-col gap-12 lg:flex-row lg:items-end lg:justify-between">
+            <FadeUp className="max-w-xl">
+              <EyebrowChip light>The promise</EyebrowChip>
+              <h2 className="mt-5 text-balance text-[2rem] font-semibold leading-[1.05] tracking-tight text-white sm:text-[2.75rem]">
+                You close the deals. Chippi works the hours in between.
+              </h2>
+              <p className="mt-4 max-w-md text-base leading-relaxed text-white/80 sm:text-lg">
+                Every reply still waits for your name on it. Chippi just makes
+                sure there is always one ready.
+              </p>
+            </FadeUp>
+            <Stagger className="grid flex-shrink-0 grid-cols-3 gap-8 sm:gap-12">
+              {BAND_STATS.map((s) => (
+                <StaggerItem key={s.label}>
+                  <p className="text-[clamp(2.25rem,5vw,3.5rem)] font-semibold leading-none tracking-tight text-white">
+                    {s.value}
+                  </p>
+                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                    {s.label}
+                  </p>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+        </Section>
+      </div>
+
+      {/* The first day — white shadow steps, tinted-circle icons */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <FadeUp className="mx-auto max-w-2xl text-center">
+            <p className="inline-flex items-center justify-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              <span aria-hidden className="text-[#ff4b29]">✦</span>
+              Getting started
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              Live by this afternoon.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+              No migration, no onboarding call. Connect the inbox you already
+              use and Chippi starts working the leads today.
+            </p>
+          </FadeUp>
+          <Stagger className="mt-12 grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
+            {START_STEPS.map(({ n, icon: Icon, title, body }) => (
+              <StaggerItem key={n} className="h-full">
+                <div className="flex h-full flex-col rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <Icon className="h-4 w-4 text-[#ff4b29]" />
+                    </div>
+                    <span className="text-sm font-semibold tracking-[0.14em] text-[#ff4b29]">
+                      {n}
+                    </span>
+                  </div>
+                  <h3 className="mt-5 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+                    {title}
+                  </h3>
+                  <p className="mt-3 text-base leading-relaxed text-neutral-500">{body}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </div>
+      </section>
+
+      {/* Plugs into your stack — pastel-gradient band, the color break that
+          snaps the white run between the white steps and the white feature
+          list. Soft pastel wash + a page-local skeleton of the connected
+          stack. Honest counts: 50+ tools, two minutes to connect. */}
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <FadeUp>
+          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
+            <div className="relative grid items-center gap-12 px-6 py-14 sm:px-10 sm:py-20 lg:grid-cols-2 lg:px-14">
+              <div>
+                <Eyebrow>Already in your stack</Eyebrow>
+                <h2 className="mt-5 text-balance text-[2rem] font-semibold leading-[1.05] tracking-tight text-zinc-950 sm:text-[2.75rem]">
+                  It works inside the tools you already pay for.
+                </h2>
+                <p className="mt-4 max-w-md text-base leading-relaxed text-neutral-600 sm:text-lg">
+                  Your inbox, your calendar, your CRM, your e-sign — Chippi
+                  connects to each over OAuth and reaches for the right one as it
+                  works. No migration, no rip-and-replace.
+                </p>
+                <div className="mt-8 grid max-w-md grid-cols-2 gap-6 border-t border-black/10 pt-6">
+                  <div>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
+                    <p className="mt-1 text-xs text-neutral-600">Tools connect in two minutes</p>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">OAuth</span>
+                    <p className="mt-1 text-xs text-neutral-600">No keys to copy, no scripts to wire</p>
+                  </div>
+                </div>
+                <div className="mt-8 border-t border-black/10 pt-6">
+                  <Link
+                    href="/integrations"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-zinc-950 transition-colors hover:text-neutral-600"
+                  >
+                    See every integration
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+
+              <StackIllustration />
+            </div>
+          </div>
+        </FadeUp>
       </section>
 
       {/* Everything Chippi runs — interactive feature list */}

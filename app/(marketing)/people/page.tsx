@@ -15,9 +15,11 @@ import {
   History,
   Mail,
   PenLine,
+  RefreshCw,
+  Users,
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
-import { FadeUp, Stagger, StaggerItem } from '@/components/marketing/site/section';
+import { FadeUp, FeatureGrid, Stagger, StaggerItem } from '@/components/marketing/site/section';
 import { FeatureList } from '@/components/marketing/site/home/feature-list';
 
 export const metadata = {
@@ -51,6 +53,112 @@ const TOUCHES = [
   { icon: CalendarCheck, tone: 'text-emerald-600', text: 'Tour — proposed for Sat 2:00' },
   { icon: PenLine, tone: 'text-[#ff4b29]', text: 'Draft — follow-up waiting for your tap' },
   { icon: FileText, tone: 'text-neutral-500', text: 'Note — has a guarantor, March move' },
+];
+
+/* How the score reads — what goes into Hot / Warm / Cold, the reason on each. */
+const SCORING = [
+  {
+    kicker: 'Hot',
+    title: 'Ready to move.',
+    body: 'Pre-approved, touring this week, replying within the hour — the score names exactly why they jumped the queue.',
+  },
+  {
+    kicker: 'Warm',
+    title: 'Worth a nudge.',
+    body: 'Real intent, softer timeline. Browsing, asking questions, not booked yet — a follow-up keeps them from drifting.',
+  },
+  {
+    kicker: 'Cold',
+    title: 'Not now, not gone.',
+    body: 'Early, unqualified, or gone quiet. Parked in a segment that wakes them when the moment turns.',
+  },
+  {
+    kicker: 'Last touch',
+    title: 'Time since you spoke.',
+    body: 'Every record carries when you last connected, so the ones slipping past a week surface before they go cold.',
+  },
+  {
+    kicker: 'Source',
+    title: 'Where they came from.',
+    body: 'Form, referral, open house, import — the origin rides along, so you read each lead in the right context.',
+  },
+  {
+    kicker: 'Segments',
+    title: 'Lists that keep themselves.',
+    body: 'Renters, buyers, past clients, gone quiet — built from the record and re-sorted the moment it changes.',
+  },
+];
+
+/* Skeleton roster rows — a contact list, each scored with a one-line reason. */
+const ROSTER: {
+  initials: string;
+  band: string;
+  reason: string;
+  tag: string;
+  tagTone: string;
+  dot: string;
+}[] = [
+  {
+    initials: 'PM',
+    band: 'w-28',
+    reason: 'Pre-approved · touring Saturday',
+    tag: 'Hot',
+    tagTone: 'bg-[#ff4b29]/10 text-[#ff4b29]',
+    dot: 'bg-[#ff4b29]',
+  },
+  {
+    initials: 'DL',
+    band: 'w-24',
+    reason: 'Asked about parking · no date yet',
+    tag: 'Warm',
+    tagTone: 'bg-amber-100 text-amber-700',
+    dot: 'bg-amber-500',
+  },
+  {
+    initials: 'SR',
+    band: 'w-32',
+    reason: 'Quiet 12 days · past client',
+    tag: 'Cold',
+    tagTone: 'bg-neutral-200 text-neutral-600',
+    dot: 'bg-neutral-400',
+  },
+  {
+    initials: 'MK',
+    band: 'w-20',
+    reason: 'Referral · budget confirmed',
+    tag: 'Hot',
+    tagTone: 'bg-[#ff4b29]/10 text-[#ff4b29]',
+    dot: 'bg-[#ff4b29]',
+  },
+];
+
+/* Living segments — lists built from the record, each with a live count and
+   the rule that fills it. Counts are illustrative skeleton data, not claims. */
+const SEGMENTS: { name: string; count: string; rule: string; tone: string }[] = [
+  {
+    name: 'Ready to tour',
+    count: '12',
+    rule: 'Hot · replied this week',
+    tone: 'bg-[#ff4b29]/10 text-[#ff4b29]',
+  },
+  {
+    name: 'Active buyers',
+    count: '38',
+    rule: 'Browsing · budget confirmed',
+    tone: 'bg-blue-100 text-blue-700',
+  },
+  {
+    name: 'Gone quiet',
+    count: '21',
+    rule: 'No touch in 14 days',
+    tone: 'bg-amber-100 text-amber-700',
+  },
+  {
+    name: 'Past clients',
+    count: '64',
+    rule: 'Closed · keep warm',
+    tone: 'bg-emerald-100 text-emerald-700',
+  },
 ];
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -122,6 +230,91 @@ function ContactRecordSketch() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton contact-list — a roster, each row scored with a one-line reason. */
+function ContactRoster() {
+  return (
+    <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+        {/* List head — a sort, the way you'd actually triage */}
+        <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+            People
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] text-neutral-500 ring-1 ring-black/5">
+            <Gauge className="h-3 w-3 text-[#ff4b29]" />
+            Sorted by score
+          </span>
+        </div>
+        <div className="mt-2.5 space-y-2">
+          {ROSTER.map((row) => (
+            <div
+              key={row.initials}
+              className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 p-2.5 shadow-sm"
+            >
+              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[10px] font-semibold text-neutral-500">
+                {row.initials}
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${row.dot}`}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`h-2 rounded bg-neutral-900/80 ${row.band}`} />
+                <div className="mt-1.5 text-[10px] text-neutral-500 sm:text-[11px]">{row.reason}</div>
+              </div>
+              <span
+                className={`inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${row.tagTone}`}
+              >
+                {row.tag}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton segments illustration — living lists, each with a count + its rule. */
+function SegmentsSketch() {
+  return (
+    <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+        {/* List head — segments stay current on their own */}
+        <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+            Segments
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] text-neutral-500 ring-1 ring-black/5">
+            <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
+            Re-sorted just now
+          </span>
+        </div>
+        <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {SEGMENTS.map((seg) => (
+            <div
+              key={seg.name}
+              className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-950">
+                  <Users className="h-3 w-3 text-neutral-400" />
+                  {seg.name}
+                </span>
+                <span
+                  className={`inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums ${seg.tone}`}
+                >
+                  {seg.count}
+                </span>
+              </div>
+              <div className="mt-2 text-[10px] text-neutral-500 sm:text-[11px]">{seg.rule}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -230,6 +423,81 @@ export default function PeoplePage() {
               </StaggerItem>
             ))}
           </Stagger>
+        </div>
+      </section>
+
+      {/* How people are scored & segmented — feature grid + skeleton roster */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <FadeUp>
+            <Eyebrow>How the score reads</Eyebrow>
+            <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              The book sorts itself by who is ready.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Hot, warm, cold — each with the reason, the last touch, and the
+              source. So the right name is always at the top of the list.
+            </p>
+          </FadeUp>
+
+          <div className="mt-12 grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
+            <FeatureGrid items={SCORING} columns={2} />
+            <FadeUp delay={0.1}>
+              <ContactRoster />
+            </FadeUp>
+          </div>
+        </div>
+      </section>
+
+      {/* Living segments — open split, skeleton segment lists */}
+      <section className="mt-24 sm:mt-32">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+            <FadeUp>
+              <Eyebrow>Living segments</Eyebrow>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+                Your book, grouped the way you work it.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+                Segments are not lists you maintain — they are rules the record
+                fills for you. A lead crosses the line and it lands in the right
+                group on its own.
+              </p>
+
+              <div className="mt-8 border-t border-neutral-200 pt-6">
+                <div className="space-y-5">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <Users className="h-4 w-4 text-[#ff4b29]" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-zinc-950">Built from the record</h3>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        Ready to tour, active buyers, gone quiet, past clients —
+                        each segment is a rule, not a list you have to keep by hand.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                      <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-zinc-950">Re-sorted as the book moves</h3>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        A reply lands, a tour books, a week goes quiet — the segments
+                        re-draw themselves, so the right group is always current.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </FadeUp>
+
+            <FadeUp delay={0.1}>
+              <SegmentsSketch />
+            </FadeUp>
+          </div>
         </div>
       </section>
 

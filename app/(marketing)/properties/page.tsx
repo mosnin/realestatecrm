@@ -8,10 +8,13 @@
  */
 
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
 import {
+  ArrowLeftRight,
   CalendarCheck,
   FileText,
   ImagePlus,
+  LayoutGrid,
   Paperclip,
   RefreshCw,
 } from 'lucide-react';
@@ -64,6 +67,107 @@ const BENTO = [
     sub: 'Every tour sits on the property and on your calendar, with nothing retyped.',
   },
 ];
+
+/* The "sync in, manage in one window" feature row. */
+const SYNC: { icon: LucideIcon; title: string; body: string }[] = [
+  {
+    icon: RefreshCw,
+    title: 'Sync from any CRM.',
+    body: 'kvCORE, Follow Up Boss, Compass, Salesforce — connect once and listings flow in on their own.',
+  },
+  {
+    icon: LayoutGrid,
+    title: 'Manage in one window.',
+    body: 'Active, pending, and closed sit on a single board — no tab-hopping between five systems.',
+  },
+  {
+    icon: ArrowLeftRight,
+    title: 'Changes written back.',
+    body: 'Edit a price or a status here and Chippi pushes it to every source. One record, kept honest.',
+  },
+];
+
+/* Status pill tones for the portfolio-window rows. */
+const STATUS_TONE: Record<string, string> = {
+  Active: 'bg-emerald-50 text-emerald-700',
+  Pending: 'bg-amber-50 text-amber-700',
+  Closed: 'bg-neutral-100 text-neutral-600',
+};
+
+/* Rows for the skeleton portfolio window. */
+const PORTFOLIO: { addr: string; source: string; status: keyof typeof STATUS_TONE; w: string }[] = [
+  { addr: '14 Oak St', source: 'kvCORE', status: 'Active', w: 'w-28' },
+  { addr: '208 Birch Ave', source: 'Follow Up Boss', status: 'Pending', w: 'w-32' },
+  { addr: '91 Cedar Ct', source: 'Compass', status: 'Active', w: 'w-24' },
+  { addr: '5 Maple Row', source: 'Salesforce', status: 'Closed', w: 'w-36' },
+];
+
+/** Skeleton "portfolio window" — many listings, many sources, one board. */
+function PortfolioWindow() {
+  return (
+    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+      <div
+        className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
+        style={{
+          background: 'rgba(255, 255, 255, 0.72)',
+          border: '1px solid rgba(255, 255, 255, 0.65)',
+        }}
+      >
+        <div className="p-6 sm:p-8">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Your portfolio</h3>
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+              <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
+              4 sources synced
+            </span>
+          </div>
+
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+            {/* Column header */}
+            <div className="flex items-center gap-3 px-1 pb-2 text-[9px] uppercase tracking-widest text-neutral-400">
+              <span className="flex-1">Property</span>
+              <span className="hidden sm:inline">Source</span>
+              <span className="w-16 text-right">Status</span>
+            </div>
+
+            <div className="space-y-2">
+              {PORTFOLIO.map((row) => (
+                <div
+                  key={row.addr}
+                  className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm"
+                >
+                  <div className="h-9 w-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-medium text-neutral-800">{row.addr}</div>
+                    <div className={`mt-1.5 h-1.5 ${row.w} rounded bg-neutral-200`} />
+                  </div>
+                  <span className="hidden items-center gap-1 text-[9px] text-neutral-500 sm:inline-flex">
+                    <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
+                    {row.source}
+                  </span>
+                  <span
+                    className={`w-16 rounded-full px-2 py-0.5 text-center text-[9px] font-medium ${STATUS_TONE[row.status]}`}
+                  >
+                    {row.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer — one window summary */}
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 ring-1 ring-inset ring-black/5">
+              <span className="text-[10px] text-neutral-600">All listings · one window</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Up to date
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PropertiesPage() {
   return (
@@ -255,6 +359,85 @@ export default function PropertiesPage() {
               </div>
             </article>
           </div>
+        </div>
+      </section>
+
+      {/* Sync in, manage in one window — feature row + portfolio window */}
+      <section className="mx-auto mt-24 max-w-7xl px-4 sm:mt-32 sm:px-6">
+        <FadeUp className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            <span aria-hidden className="text-[#ff4b29]">✦</span>
+            Sync in, manage in one window
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+            Your listings flow in. You never retype them.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+            Connect the CRMs you already run. Chippi pulls every listing into one
+            board and writes your changes back — no double entry, no stale copy.
+          </p>
+        </FadeUp>
+
+        <Stagger className="mt-12 grid gap-6 sm:gap-8 lg:grid-cols-3">
+          {SYNC.map((item) => (
+            <StaggerItem key={item.title} className="h-full">
+              <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                  <item.icon className="h-4 w-4 text-[#ff4b29]" />
+                </div>
+                <h3 className="mt-5 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-base leading-relaxed text-neutral-500">{item.body}</p>
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+
+        {/* One board, every source — copy beside the skeleton portfolio window */}
+        <div className="mt-12 grid gap-12 lg:grid-cols-2 lg:items-center sm:mt-16">
+          <FadeUp>
+            <h3 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              Five systems, read as one.
+            </h3>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Active, pending, and closed sit on a single board — each row labeled
+              with the source it came from, each kept current as the source moves.
+            </p>
+
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <LayoutGrid className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold tracking-tight text-zinc-950">One board to read</h4>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Every listing in one window with a status you can scan — no
+                      tab-hopping between five tools to see where things stand.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
+                    <ArrowLeftRight className="h-4 w-4 text-[#ff4b29]" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold tracking-tight text-zinc-950">Honest both ways</h4>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      Edit a price or a status here and the change is pushed back
+                      to its source. One record, true everywhere your stack looks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </FadeUp>
+
+          <FadeUp delay={0.1}>
+            <PortfolioWindow />
+          </FadeUp>
         </div>
       </section>
 
