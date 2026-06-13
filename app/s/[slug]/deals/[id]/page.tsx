@@ -29,6 +29,7 @@ import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealDeadlines } from '@/components/deals/deal-deadlines';
 import { DealCloseDateField } from '@/components/deals/deal-close-date-field';
 import { DealCommissionSplits } from '@/components/deals/deal-commission-splits';
 import { DealDocuments } from '@/components/deals/deal-documents';
@@ -629,6 +630,22 @@ export default async function DealDetailPage({
 
             {activeTab === 'tasks' && (
               <div className="space-y-6">
+                {/* Contract-to-close cockpit read — the dated contingency
+                    timeline + what's-at-risk line, fed by the same checklist
+                    rows the editor below renders. The deadlines view is the
+                    read; the checklist is where dates + ticks happen. */}
+                <DealDeadlines
+                  items={checklist}
+                  deal={{
+                    status,
+                    closeDate,
+                    followUpAt,
+                    nextAction,
+                    nextActionDueAt,
+                    stageChangedAt,
+                    updatedAt,
+                  }}
+                />
                 <DealChecklist dealId={id} initial={checklist} />
                 <DealMilestones dealId={id} initialMilestones={milestones} />
               </div>

@@ -22,6 +22,7 @@
 import {
   isTriggerEvent,
   parseImmediateEvents,
+  enrollPlaysForTrigger,
   type TriggerEvent,
 } from '@/lib/agent/trigger-policy';
 
@@ -150,6 +151,12 @@ export async function fireAgentTrigger(input: FireTriggerInput): Promise<FireTri
   if (!pushRes.ok) {
     return { queued: false, reason: 'redis_push_failed' };
   }
+
+  // Proactive nurture: auto-enroll the contact on a play for the events that
+  // have an obvious default sequence (new_lead → speed_to_lead, tour_completed
+  // → post_tour). Fire-and-forget + idempotent — never blocks or breaks the
+  // trigger that's already queued above.
+  void enrollPlaysForTrigger(input.event, input.spaceId, input.contactId);
 
   const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
   const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';

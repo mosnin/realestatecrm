@@ -116,6 +116,37 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
       );
     }
 
+    // After-Close hook: a win turns this deal's people into past clients so
+    // the sphere sweep can start anniversary + retention touches. Additive
+    // and non-fatal — a contact-update hiccup must never block the win.
+    try {
+      const closedAt = new Date().toISOString();
+      const { data: links } = await supabase
+        .from('DealContact')
+        .select('contactId')
+        .eq('dealId', args.dealId);
+      const contactIds = (links ?? [])
+        .map((l) => (l as { contactId: string | null }).contactId)
+        .filter((id): id is string => Boolean(id));
+      if (contactIds.length > 0) {
+        const { error: stageErr } = await supabase
+          .from('Contact')
+          .update({ relationshipStage: 'past_client', lastClosedAt: closedAt, updatedAt: closedAt })
+          .in('id', contactIds)
+          .eq('spaceId', ctx.space.id)
+          .is('brokerageId', null);
+        if (stageErr) {
+          logger.warn(
+            '[tools.mark_deal_won] past-client promotion failed',
+            { dealId: args.dealId },
+            stageErr,
+          );
+        }
+      }
+    } catch (err) {
+      logger.warn('[tools.mark_deal_won] past-client promotion threw', { dealId: args.dealId }, err);
+    }
+
     const { data: refreshed } = await supabase
       .from('Deal')
       .select('*')

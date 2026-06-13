@@ -40,6 +40,11 @@ import { archivePersonTool } from './archive-person';
 import { mergePersonsTool } from './merge-persons';
 import { noteOnPersonTool } from './note-on-person';
 
+// Relationships — After-Close lifecycle (sphere / retention / referral)
+import { scheduleSphereTouchTool } from './schedule-sphere-touch';
+import { logReferralTool } from './log-referral';
+import { updateRelationshipStageTool } from './update-relationship-stage';
+
 // Deals — find + lifecycle + activity capture
 import { findDealTool } from './find-deal';
 import { createDealTool } from './create-deal';
@@ -52,6 +57,11 @@ import { markDealWonTool } from './mark-deal-won';
 import { markDealLostTool } from './mark-deal-lost';
 import { noteOnDealTool } from './note-on-deal';
 import { addChecklistItemTool } from './add-checklist-item';
+
+// Deal deadlines — dated contingency reminders on the checklist
+import { setDealDeadlineTool } from './set-deal-deadline';
+import { completeDealDeadlineTool } from './complete-deal-deadline';
+import { listDealDeadlinesTool } from './list-deal-deadlines';
 
 // Tours
 import { scheduleTourTool } from './schedule-tour';
@@ -104,6 +114,9 @@ import { attachFileToPropertyTool } from './attach-file-to-property';
 // Planning
 import { createPlanTool } from './plan';
 
+// Plays — nurture-play enrollment
+import { enrollInPlayTool } from './enroll-in-play';
+
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
  * intentionally NOT in this list — it gets added at the `registry` layer.
@@ -126,6 +139,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
   mergePersonsTool as ToolDefinition,
   noteOnPersonTool as ToolDefinition,
 
+  // ── Relationships ──────────────────────────────────────────────────────
+  scheduleSphereTouchTool as ToolDefinition,
+  logReferralTool as ToolDefinition,
+  updateRelationshipStageTool as ToolDefinition,
+
   // ── Deals ──────────────────────────────────────────────────────────────
   findDealTool as ToolDefinition,
   createDealTool as ToolDefinition,
@@ -138,6 +156,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
   markDealLostTool as ToolDefinition,
   noteOnDealTool as ToolDefinition,
   addChecklistItemTool as ToolDefinition,
+
+  // ── Deal deadlines ─────────────────────────────────────────────────────
+  listDealDeadlinesTool as ToolDefinition,
+  setDealDeadlineTool as ToolDefinition,
+  completeDealDeadlineTool as ToolDefinition,
 
   // ── Tours ──────────────────────────────────────────────────────────────
   scheduleTourTool as ToolDefinition,
@@ -187,4 +210,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,
+
+  // ── Plays ──────────────────────────────────────────────────────────────
+  enrollInPlayTool as ToolDefinition,
 ];

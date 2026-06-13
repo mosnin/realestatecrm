@@ -10,6 +10,8 @@ import {
   Building2,
   FolderOpen,
   Aperture,
+  HeartHandshake,
+  Waypoints,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -68,9 +70,19 @@ export const realtorNavItems: NavItem[] = [
     ],
   },
   {
+    href: '/after-close',
+    label: 'Relationships',
+    icon: HeartHandshake,
+  },
+  {
     href: '/deals',
     label: 'Deals',
     icon: Briefcase,
+  },
+  {
+    href: '/plays',
+    label: 'Plays',
+    icon: Waypoints,
   },
   {
     href: '/calendar',

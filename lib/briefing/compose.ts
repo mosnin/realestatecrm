@@ -25,12 +25,14 @@ import {
 
 import { pipelineSource } from './signal-sources/pipeline';
 import { leadsSource } from './signal-sources/leads';
+import { afterCloseSource } from './signal-sources/after-close';
 import { calendarSource } from './signal-sources/calendar';
 import { draftsSource } from './signal-sources/drafts';
 import { calendarGoogleSource } from './signal-sources/calendar-google';
 import { gmailSource } from './signal-sources/gmail';
 import { hubspotSource } from './signal-sources/hubspot';
 import { slackSource } from './signal-sources/slack';
+import { coachSource } from './signal-sources/coach';
 import { composeMomentum } from './momentum';
 import { composeTomorrow } from './tomorrow';
 import { pickBestTip, tipToCard } from './tips/tips-source';
@@ -47,12 +49,14 @@ import { pickBestTip, tipToCard } from './tips/tips-source';
 const SOURCES: SignalGatherer[] = [
   pipelineSource,
   leadsSource,
+  afterCloseSource,
   calendarSource,
   draftsSource,
   calendarGoogleSource,
   gmailSource,
   hubspotSource,
   slackSource,
+  coachSource,
 ];
 
 /**
