@@ -7,7 +7,7 @@
  * render lives in <PublicProfile/>.
  */
 
-import type { Viewport } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
@@ -31,11 +31,14 @@ export const viewport: Viewport = {
  *  the page revalidates every 60s so freshness is fine. Legacy values
  *  that start with `http(s)://` are URLs already; pass through verbatim.
  */
-async function resolveStoredPhoto(value: string | null | undefined): Promise<string | null> {
+async function resolveStoredPhoto(
+  value: string | null | undefined,
+  ttlSeconds: number = 60 * 60 * 24,
+): Promise<string | null> {
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value; // legacy URL, render as-is
   try {
-    return await getSignedDownloadUrl(value, 60 * 60 * 24);
+    return await getSignedDownloadUrl(value, ttlSeconds);
   } catch (err) {
     logger.warn('[p/[slug]] signed url failed', {
       keyPreview: value.slice(0, 60),
@@ -67,6 +70,76 @@ async function clerkImageUrlFor(clerkId: string | null | undefined): Promise<str
 }
 
 export const revalidate = 60;
+
+/** Share + SEO metadata for the realtor's storefront. This page exists to be
+ *  pasted into a social bio, so the preview card MUST be the realtor (their
+ *  name + cover/face), never the root layout's generic "Chippi — Agentic OS"
+ *  marketing card. Paid tiers are white-label; a Chippi-branded share card
+ *  would leak the vendor at the exact moment the realtor shares their link. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
+  if (!space) return {};
+
+  const [{ data: settings }, { data: owner }, { data: profileRow }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('businessName, bio, realtorPhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+    supabase.from('User').select('name, avatar, clerkId').eq('id', space.ownerId).maybeSingle(),
+    supabase
+      .from('ProfilePage')
+      .select('enabled, headline, coverPhotoUrl, profilePhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+  ]);
+
+  // Unpublished page → no rich card (the page itself 404s for visitors).
+  if (profileRow?.enabled === false) return {};
+
+  const businessName = settings?.businessName || space.name;
+  const agentName = owner?.name || businessName;
+  const description =
+    profileRow?.headline?.trim() ||
+    settings?.bio?.trim() ||
+    `Get started with ${agentName}.`;
+
+  // OG image mirrors the face the visitor sees: realtor-curated cover first,
+  // then their chosen portrait, then the dashboard face, then Clerk. Signed
+  // for the 7-day SigV4 max (the bucket isn't anonymously readable) because
+  // share crawlers fetch lazily and re-scrape over days; Clerk URLs are
+  // already public + stable.
+  const ogKey =
+    profileRow?.coverPhotoUrl ||
+    profileRow?.profilePhotoUrl ||
+    settings?.realtorPhotoUrl ||
+    owner?.avatar ||
+    null;
+  const ogImage =
+    (await resolveStoredPhoto(ogKey, 60 * 60 * 24 * 7)) ??
+    (await clerkImageUrlFor(owner?.clerkId));
+
+  return {
+    title: businessName,
+    description,
+    openGraph: {
+      title: businessName,
+      description,
+      images: ogImage ? [{ url: ogImage }] : undefined,
+    },
+    twitter: {
+      card: ogImage ? 'summary_large_image' : 'summary',
+      title: businessName,
+      description,
+      images: ogImage ? [ogImage] : undefined,
+    },
+  };
+}
 
 interface ProfileConfig {
   enabled: boolean;

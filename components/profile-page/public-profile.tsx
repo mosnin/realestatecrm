@@ -461,9 +461,13 @@ export function PublicProfile({
                 </span>
               )}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">@{slug}</p>
-            {headline && (
-              <p className="mt-2 text-sm text-foreground">{headline}</p>
+            {/* One line about the realtor: their curated headline if set,
+                else the shared bio. One slot, not two — the name is the
+                focal note; this recedes to muted underneath it. */}
+            {(headline || bio) && (
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                {headline || bio}
+              </p>
             )}
 
             {socialEntries.length > 0 && (
@@ -482,10 +486,6 @@ export function PublicProfile({
                 ))}
               </div>
             )}
-
-            {bio && (
-              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{bio}</p>
-            )}
           </div>
         </header>
 
@@ -501,7 +501,7 @@ export function PublicProfile({
                   className="group flex items-center gap-3 rounded-2xl px-5 py-4 transition-transform duration-150 active:scale-[0.99]"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">Start your application</p>
+                    <p className="text-sm font-semibold">Get started</p>
                     <p className="truncate text-xs opacity-75">
                       A few quick questions about what you&apos;re looking for.
                     </p>
