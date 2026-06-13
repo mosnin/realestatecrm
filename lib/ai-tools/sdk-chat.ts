@@ -39,6 +39,7 @@ import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
+import { getChatTools } from './toolsets';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
@@ -97,9 +98,19 @@ export function buildChatAgent(
     modelSlug?: string | null;
     integrationTools?: SdkTool[];
     instructions?: string;
+    /**
+     * The user's message for THIS turn. When present, the agent ships only
+     * CORE + the toolsets the message implies (`toolsets.ts`) instead of the
+     * whole catalog — the token-furnace fix. Omitted on the resume path,
+     * which falls back to the full catalog (a safe superset of whatever the
+     * paused run referenced).
+     */
+    userMessage?: string;
   } = {},
 ): Agent {
-  const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+  const selectedDomain =
+    opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
+  const domainTools = selectedDomain.map((t: ToolDefinition) => toSdkTool(t, ctx));
 
   // The model every agent in this turn runs on. Either an explicit override
   // (tests / A-B), or the realtor's workspace model resolved to the active
@@ -391,6 +402,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
     modelSlug: input.model,
     integrationTools: integrations.tools,
     instructions,
+    userMessage: input.userMessage,
   });
 
   // The trailing user turn. With attachments, encode SDK-native multimodal

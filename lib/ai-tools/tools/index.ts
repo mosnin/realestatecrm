@@ -31,6 +31,7 @@ import type { ToolDefinition } from '../types';
 
 // People — find + state changes + activity capture
 import { findPersonTool } from './find-person';
+import { listContactsTool } from './list-contacts';
 import { addPersonTool } from './add-person';
 import { logCallTool } from './log-call';
 import { logMeetingTool } from './log-meeting';
@@ -117,6 +118,7 @@ import { createPlanTool } from './plan';
 export const ALL_TOOLS: ToolDefinition[] = [
   // ── People ─────────────────────────────────────────────────────────────
   findPersonTool as ToolDefinition,
+  listContactsTool as ToolDefinition,
   addPersonTool as ToolDefinition,
   logCallTool as ToolDefinition,
   logMeetingTool as ToolDefinition,
