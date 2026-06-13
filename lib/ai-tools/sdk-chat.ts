@@ -36,7 +36,6 @@ import { getAgentModel } from './agent-model';
 import { resolveChatModel } from '@/lib/llm';
 import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multimodal';
 import { buildDelegateTaskTool } from './tools/delegate-task';
-import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import { getChatTools } from './toolsets';
@@ -77,7 +76,7 @@ const DEFAULT_MAX_TOKENS = 4_096;
  * delegate_task, which runs in its own bounded Modal context instead of
  * re-billing this conversation's transcript.
  */
-const MAX_TURNS_PER_TURN = 8;
+const MAX_TURNS_PER_TURN = 6;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -125,41 +124,12 @@ export function buildChatAgent(
   // "when to delegate" guidance.
   const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
 
-  // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  // They share the parent's Model instance so they hit the same provider/key.
-  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: agentModel });
-  const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel });
-  const planner = buildPlannerAgent(ctx, { model: agentModel });
-
-  // Each sub-agent gets an explicit, small per-run turn cap. Without this, the
-  // SDK runs every `asTool` sub-agent with its DEFAULT_MAX_TURNS (10), and the
-  // parent's own cap does NOT bound the children — so a single request that
-  // fans out (e.g. "deep dive on my leads" -> research_person per lead) could
-  // chain dozens of uncapped sub-runs, each re-sending its growing transcript,
-  // into millions of tokens before failing. A tight cap collapses that blast
-  // radius while still leaving room for each skill's legitimate tool sequence
-  // (find_person -> find_deal -> recall_history -> answer).
-  const SUBAGENT_MAX_TURNS = 5;
-  const skillTools = [
-    pipelineAnalyst.asTool({
-      toolName: 'analyze_pipeline',
-      toolDescription:
-        'Analyze the pipeline for stuck deals, quiet hot persons, and overdue follow-ups.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-    contactResearcher.asTool({
-      toolName: 'research_person',
-      toolDescription:
-        'Research everything we know about a person and recommend the next action.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-    planner.asTool({
-      toolName: 'planner',
-      toolDescription:
-        'Break a complex multi-step task into a concrete execution plan before starting work. Call this first when the user asks for something that requires several distinct actions.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-  ];
+  // Per-turn sub-agents removed (token redesign L2). `analyze_pipeline`,
+  // `research_person`, and `planner` used to be attached as tools on EVERY
+  // turn, and each ran its own multi-turn sub-loop that re-shipped a growing
+  // transcript — a large, mostly-wasted token cost. The model now chains the
+  // core read tools inline; `delegate_task` remains for genuinely deep,
+  // explicitly-requested jobs (its own bounded Modal run).
 
   // Personalized prompt is async — it loads a snapshot of the realtor's
   // pipeline + connected apps. Callers that already awaited it pass it
@@ -168,7 +138,7 @@ export function buildChatAgent(
   return new Agent({
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
-    tools: [delegateTool, ...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
+    tools: [delegateTool, ...domainTools, ...(opts.integrationTools ?? [])],
     model: agentModel,
     // Chat completions across every OpenRouter provider. maxTokens caps the
     // pre-charge (see DEFAULT_MAX_TOKENS). No `reasoning` setting: that's a
