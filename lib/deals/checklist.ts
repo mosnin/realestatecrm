@@ -32,6 +32,12 @@ export interface DealChecklistItem {
   label: string;
   dueAt: string | null;
   completedAt: string | null;
+  /** DealContact roles to remind before dueAt (e.g. ['lender','title']). */
+  assignedRoles: string[];
+  /** Draft a reminder this many days before dueAt; null = no reminder. */
+  reminderLeadDays: number | null;
+  /** One-shot guard: when the reminder draft was created. */
+  reminderSentAt: string | null;
   position: number;
   createdAt: string;
   updatedAt: string;

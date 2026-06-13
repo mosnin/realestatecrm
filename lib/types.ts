@@ -187,6 +187,16 @@ export type TrackingPixels = {
   customHeadScript?: string;
 };
 
+/** After-Close lifecycle: where a contact sits in the relationship arc.
+ *  Mirrors the Contact.relationshipStage CHECK constraint. */
+export type RelationshipStage =
+  | 'lead'
+  | 'prospect'
+  | 'client'
+  | 'past_client'
+  | 'referral_target'
+  | 'dormant';
+
 export type Contact = {
   id: string;
   spaceId: string;
@@ -226,6 +236,16 @@ export type Contact = {
   referralSource: string | null;
   /** Hide this contact from the main People view until this date. */
   snoozedUntil: Date | null;
+  // After-Close engine (see migration 20260705000000). Nullable/defaulted so
+  // existing Contact constructors keep compiling until the feature wires them.
+  /** Where this person sits in the relationship arc. Defaults to 'lead'. */
+  relationshipStage?: RelationshipStage;
+  /** When this contact's most recent deal closed — drives anniversary touches. */
+  lastClosedAt?: Date | null;
+  /** Next scheduled sphere/retention touch (independent of followUpAt). */
+  nextTouchAt?: Date | null;
+  /** Last time we asked this contact for a referral (rate-limits the ask). */
+  referralAskedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
