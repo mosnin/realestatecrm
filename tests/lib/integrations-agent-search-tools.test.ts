@@ -158,6 +158,18 @@ describe('call_integration_tool — approval parity', () => {
     expect(approves).toBe(false);
     expect(actionNeedsApprovalMock).toHaveBeenCalledWith('GMAIL_FETCH_EMAILS', 'gmail');
   });
+
+  it('resolves a MULTI-WORD toolkit from the connected list, not the slug split', async () => {
+    // microsoft_teams is a `messaging` toolkit (always-gate, even reads).
+    // Splitting on the first underscore yields 'microsoft' and misses the
+    // gate; resolving against the connected toolkits keeps it correct.
+    actionNeedsApprovalMock.mockReturnValue(true);
+    const [, call] = buildIntegrationSearchTools(makeCtx(), ['gmail', 'microsoft_teams']) as Array<{
+      needsApproval: (c: RunContext, i: unknown) => Promise<boolean>;
+    }>;
+    await call.needsApproval(new RunContext(), { slug: 'MICROSOFT_TEAMS_GET_CHANNEL', arguments_json: '{}' });
+    expect(actionNeedsApprovalMock).toHaveBeenCalledWith('MICROSOFT_TEAMS_GET_CHANNEL', 'microsoft_teams');
+  });
 });
 
 describe('call_integration_tool — execution', () => {

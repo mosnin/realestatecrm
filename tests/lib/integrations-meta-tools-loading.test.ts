@@ -85,11 +85,13 @@ describe('loadIntegrationMetaTools — constant footprint', () => {
     expect(out.unavailableToolkits).toEqual([]);
   });
 
-  it('passes the turn context through to the meta-tool builder', async () => {
-    activeToolkitsMock.mockResolvedValue(['gmail']);
+  it('passes the turn context AND connected toolkits through to the meta-tool builder', async () => {
+    // The toolkit list is what lets call_integration_tool resolve the real
+    // toolkit for the approval gate (multi-word toolkits like microsoft_teams).
+    activeToolkitsMock.mockResolvedValue(['gmail', 'microsoft_teams']);
     const ctx = makeCtx();
     await loadIntegrationMetaTools(ctx);
-    expect(buildIntegrationSearchToolsMock).toHaveBeenCalledWith(ctx);
+    expect(buildIntegrationSearchToolsMock).toHaveBeenCalledWith(ctx, ['gmail', 'microsoft_teams']);
   });
 });
 

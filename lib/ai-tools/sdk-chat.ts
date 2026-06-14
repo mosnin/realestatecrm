@@ -348,7 +348,7 @@ export async function loadIntegrationMetaTools(ctx: ToolContext): Promise<Integr
     );
     return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
   }
-  return { tools: buildIntegrationSearchTools(ctx), liveToolkits: toolkits, unavailableToolkits: [] };
+  return { tools: buildIntegrationSearchTools(ctx, toolkits), liveToolkits: toolkits, unavailableToolkits: [] };
 }
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────

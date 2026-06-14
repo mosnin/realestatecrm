@@ -30,20 +30,47 @@ import { logger } from '@/lib/logger';
 /** Cap the execute result echoed into context — it re-sends on later steps. */
 const MAX_RESULT_CHARS = 4_000;
 
-/** Derive a toolkit slug from an action slug (GMAIL_SEND_EMAIL → gmail). Used
- *  only for the approval-category lookup; the action-segment check in
- *  `actionNeedsApproval` is the real safety net and works on the slug alone. */
+/** Normalise a slug for prefix comparison: lowercase, underscores removed.
+ *  `MICROSOFT_TEAMS` and `microsoft_teams` both become `microsoftteams`. */
+function normalizeSlug(s: string): string {
+  return s.toLowerCase().replace(/_/g, '');
+}
+
+/** Last-resort toolkit guess from an action slug (GMAIL_SEND_EMAIL → gmail).
+ *  Only used when the real connected-toolkit list isn't available. */
 function toolkitFromSlug(slug: string): string {
   const i = slug.indexOf('_');
   return (i > 0 ? slug.slice(0, i) : slug).toLowerCase();
 }
 
 /**
+ * Resolve the REAL toolkit for an action slug by matching it against the
+ * realtor's connected toolkits. Splitting on the first underscore is wrong for
+ * multi-word toolkits — `MICROSOFT_TEAMS_GET_CHANNEL` would yield `microsoft`,
+ * which misses the catalog's `microsoft_teams` (a `messaging` toolkit that must
+ * always gate, even reads). Matching the normalised connected slugs (longest
+ * first) fixes that; we only fall back to the naive split when the list is
+ * empty. Getting the toolkit right matters for the category-based approval gate
+ * — the slug-segment check (send/post/...) is the other half of the safety net.
+ */
+function resolveToolkit(slug: string, activeToolkits: string[]): string {
+  const n = normalizeSlug(slug);
+  const match = [...activeToolkits]
+    .sort((a, b) => normalizeSlug(b).length - normalizeSlug(a).length)
+    .find((tk) => n.startsWith(normalizeSlug(tk)));
+  return match ?? toolkitFromSlug(slug);
+}
+
+/**
  * Build the two integration meta-tools, bound to this turn's context. Cheap:
  * no Composio call at build time — the search hits Composio only when the
  * model actually calls find_integration_tool.
+ *
+ * `activeToolkits` is the realtor's connected toolkit list (from
+ * `loadIntegrationMetaTools`); it lets `call_integration_tool` resolve the
+ * exact toolkit for the approval gate instead of guessing from the slug.
  */
-export function buildIntegrationSearchTools(ctx: ToolContext): SdkTool[] {
+export function buildIntegrationSearchTools(ctx: ToolContext, activeToolkits: string[] = []): SdkTool[] {
   const findTool = tool({
     name: 'find_integration_tool',
     description:
@@ -112,7 +139,7 @@ export function buildIntegrationSearchTools(ctx: ToolContext): SdkTool[] {
     // straight through. Same policy the old per-action path used.
     needsApproval: async (_runCtx: unknown, input: unknown) => {
       const slug = ((input ?? {}) as { slug?: string }).slug ?? '';
-      return actionNeedsApproval(slug, toolkitFromSlug(slug));
+      return actionNeedsApproval(slug, resolveToolkit(slug, activeToolkits));
     },
     async execute(input: unknown) {
       const { slug, arguments_json } = (input ?? {}) as { slug?: string; arguments_json?: string };
