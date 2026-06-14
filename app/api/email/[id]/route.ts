@@ -10,8 +10,8 @@
  * message slug returns the body without query-DSL gymnastics that
  * GMAIL_FETCH_EMAILS demands.
  *
- * Plain text body, v1: rich HTML is a follow-up. We strip the HTML if
- * the provider didn't give us a text alternative.
+ * Returns both a plain-text body (for reply quoting) and a sanitized HTML
+ * body (for rich, Gmail-like rendering in a sandboxed iframe on the client).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,6 +22,7 @@ import {
   findEmailConnection,
   PROVIDER_MAIL_SLUGS,
 } from '@/lib/communication/connect';
+import DOMPurify from 'isomorphic-dompurify';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -36,6 +37,8 @@ export interface EmailMessageOut {
   cc: { name: string; address: string }[];
   subject: string | null;
   body: string;
+  /** Sanitized HTML body for rich rendering; null when only plain text exists. */
+  bodyHtml: string | null;
   sentAt: string;
   starred: boolean;
   /** Open-in-Gmail web link when the provider returned one. */
@@ -145,32 +148,74 @@ function decodeBase64Url(value: string): string {
   }
 }
 
-function extractBody(m: GmailRawMessage): string {
-  if (typeof m.messageText === 'string' && m.messageText.trim().length > 0) {
-    return m.messageText;
-  }
+function looksLikeHtml(s: string): boolean {
+  return /<(?:html|body|div|table|p|br|span|a|img|head|meta|style|ul|ol|h[1-6])\b/i.test(s);
+}
 
-  // Dig into payload.parts for text/plain first, then fall back to
-  // text/html and strip.
-  const parts = m.payload?.parts ?? [];
-  let plainData = '';
-  let htmlData = '';
-  for (const part of parts) {
+/**
+ * Pull BOTH a plain-text body (for reply quoting) and an HTML body (for rich
+ * rendering) out of the Gmail payload. Gmail stores the body in any of several
+ * places depending on the message; check them in order and keep the first
+ * plain and first HTML found.
+ */
+function extractBodies(m: GmailRawMessage): { text: string; html: string } {
+  let plain = '';
+  let html = '';
+
+  // 1. Multipart: dedicated text/plain and text/html parts.
+  for (const part of m.payload?.parts ?? []) {
     const data = part?.body?.data;
     if (!data) continue;
-    if (part.mimeType === 'text/plain' && !plainData) plainData = data;
-    else if (part.mimeType === 'text/html' && !htmlData) htmlData = data;
+    if (part.mimeType === 'text/plain' && !plain) plain = decodeBase64Url(data);
+    else if (part.mimeType === 'text/html' && !html) html = decodeBase64Url(data);
   }
-  if (plainData) return decodeBase64Url(plainData);
-  if (htmlData) return stripHtml(decodeBase64Url(htmlData));
 
+  // 2. Composio's convenience field — may carry either flavour.
+  if (typeof m.messageText === 'string' && m.messageText.trim()) {
+    if (looksLikeHtml(m.messageText)) {
+      if (!html) html = m.messageText;
+    } else if (!plain) {
+      plain = m.messageText;
+    }
+  }
+
+  // 3. Single-part messages carry the body directly on payload.body.
   const directBody = m.payload?.body?.data;
-  if (directBody) return decodeBase64Url(directBody);
+  if (directBody) {
+    const decoded = decodeBase64Url(directBody);
+    if (looksLikeHtml(decoded)) {
+      if (!html) html = decoded;
+    } else if (!plain) {
+      plain = decoded;
+    }
+  }
 
-  const p = m.preview;
-  if (typeof p === 'string') return p;
-  if (p && typeof p.body === 'string') return p.body;
-  return '';
+  // 4. Last resort: the preview snippet (always plain).
+  if (!plain && !html) {
+    const p = m.preview;
+    if (typeof p === 'string') plain = p;
+    else if (p && typeof p.body === 'string') plain = p.body;
+  }
+
+  // Text is what replies quote; derive it from the HTML when that's all we have.
+  const text = plain || (html ? stripHtml(html) : '');
+  return { text, html };
+}
+
+/**
+ * Sanitize an email's HTML before it leaves the server. Strips scripts, event
+ * handlers, frames and forms while keeping the presentational markup + inline
+ * styles that make the email render like it does in Gmail. The client also
+ * renders this inside a sandboxed iframe (no allow-scripts), so this is defense
+ * in depth, not the only line.
+ */
+function sanitizeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    WHOLE_DOCUMENT: true,
+    ADD_ATTR: ['target'],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'noscript', 'base'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+  });
 }
 
 export async function GET(
@@ -231,6 +276,7 @@ export async function GET(
     const tos = parseAddresses(raw.to);
     const ccs = parseAddresses(raw.cc);
     const labels = Array.isArray(raw.labelIds) ? raw.labelIds : [];
+    const bodies = extractBodies(raw);
     const message: EmailMessageOut = {
       id: raw.messageId ?? messageId,
       threadId: raw.threadId ?? raw.messageId ?? messageId,
@@ -239,7 +285,8 @@ export async function GET(
       to: tos,
       cc: ccs,
       subject: (raw.subject ?? '').trim() || null,
-      body: extractBody(raw),
+      body: bodies.text,
+      bodyHtml: bodies.html ? sanitizeEmailHtml(bodies.html) : null,
       sentAt: raw.messageTimestamp
         ? new Date(gmailInstantMs(raw)).toISOString()
         : new Date().toISOString(),
