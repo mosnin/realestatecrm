@@ -13,6 +13,7 @@ from errors import from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool, with_retry
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -609,3 +610,53 @@ async def request_deal_review(
         "dealId": deal_id,
         "status": "open",
     }
+
+
+@function_tool(strict_mode=False)
+async def delete_deal(
+    ctx: RunContextWrapper[AgentContext],
+    deal_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a deal; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Deletes checklist items, documents, and review requests via DB cascade
+    # (the commission ledger is retained). Prefer marking the deal lost
+    # (update_deal status) when the realtor wants to keep history.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Deal")
+        .select("id,title")
+        .eq("id", deal_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    title = check.data.get("title") or "this deal"
+
+    if not confirmed:
+        return confirmation_required(
+            entity="deal", label=title, entity_id=deal_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Deal",
+        entity="deal",
+        entity_id=deal_id,
+        label=title,
+        reason=reason,
+    )
