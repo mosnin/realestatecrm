@@ -667,7 +667,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: message });
+    await saveUserMessage({
+      spaceId: ctx.space.id,
+      conversationId,
+      content: message,
+      attachmentIds: body.attachmentIds,
+    });
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
