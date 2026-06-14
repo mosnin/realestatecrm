@@ -1,19 +1,42 @@
 /**
- * Marketing route group layout.
+ * Marketing route group layout, the "bold canvas" shell.
  *
- * Every page under `app/(marketing)/` renders inside this shell — nav at
- * top, footer at bottom, content fills the middle. The dashboard chrome
- * (Sidebar, Header) is NOT mounted here.
+ * Every page under `app/(marketing)/` renders inside this shell. The marketing
+ * site is its own visual world, deliberately split from the product:
  *
- * The marketing site is public — we don't load Clerk for unauth visitors.
+ *  - Canvas, not paper: the page background is a tinted canvas (warm bone in
+ *    light, near-black in dark) and content lives in big rounded color-blocked
+ *    cards that sit ON it.
+ *  - Display type: Inter Tight (via next/font, self-hosted) is the headline
+ *    voice; Instrument Serif italic is the accent flourish. `--font-title` is
+ *    overridden HERE so every legacy serif-Times headline in the marketing
+ *    tree resolves to the display face, the product (outside this group)
+ *    keeps its own type system untouched.
+ *
+ * The marketing site is public, we don't load Clerk for unauth visitors.
  * Auth-aware pages (the homepage redirects auth users to their workspace)
  * still call `auth()` from their own server component before rendering.
  */
 
-import { FortitudoNav } from '@/components/marketing/fortitudo/nav';
-import { FortitudoFooter } from '@/components/marketing/fortitudo/footer';
-import { ScrollProgress } from '@/components/marketing/fortitudo/scroll-progress';
+import { Bricolage_Grotesque, Instrument_Serif } from 'next/font/google';
+import { SiteNav } from '@/components/marketing/site/nav';
+import { SiteFooter } from '@/components/marketing/site/footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
+
+const display = Bricolage_Grotesque({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-display',
+});
+
+const accent = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
+  display: 'swap',
+  variable: '--font-accent',
+});
 
 export default function MarketingLayout({
   children,
@@ -21,15 +44,15 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}
+    <div
+      className={`${display.variable} ${accent.variable} font-display flex min-h-screen flex-col bg-white text-[#16161a] dark:bg-[#0a0a0b] dark:text-[#f5f5f4]`}
+      style={{ '--font-title': 'var(--font-display)' } as React.CSSProperties}
+    >
+      {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      {/* fortitudo "studio ASCII" chrome: thin scroll bar, floating pill nav,
-          inset charcoal footer. Every logged-out page inherits the look. */}
-      <ScrollProgress />
-      <FortitudoNav />
+      <SiteNav />
       <main className="flex-1">{children}</main>
-      <FortitudoFooter />
+      <SiteFooter />
     </div>
   );
 }

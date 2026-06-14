@@ -243,21 +243,24 @@ describe('editorial voice — canonical CTA verbs', () => {
 });
 
 // ── No emoji except the curly arrow ────────────────────────────────────────
-// The brand uses one decorative glyph: the rightward curly arrow `→`
-// (U+2192) on the primary "Tell Chippi →" pill. Anything else — sparkles,
-// rockets, party poppers — is consumer-app theater, not the calm,
-// confident voice we want. Em-dash (—), en-dash (–), ellipsis (…), curly
-// quotes are typography, not emoji; they are allowed.
+// The brand uses two decorative glyphs: the rightward curly arrow `→`
+// (U+2192) on the primary "Tell Chippi →" pill, and the four-pointed star
+// `✦` (U+2726) — the eyebrow-chip accent across the redesigned marketing
+// site. Anything else — rockets, party poppers, faces — is consumer-app
+// theater, not the calm, confident voice we want. Em-dash (—), en-dash (–),
+// ellipsis (…), curly quotes are typography, not emoji; they are allowed.
 //
 // We target the actual emoji codepoint blocks so we don't trip on Unicode
 // punctuation. If a future emoji bleeds in (e.g. an icon was pasted instead
 // of imported from lucide), this catches it.
 describe('editorial voice — emoji policy', () => {
   const audited = readAudited();
-  // Symbols + Pictographs, Supplemental Symbols (incl. emoji),
-  // Transport, Misc Symbols, Dingbats. We exclude U+2192 (→) explicitly.
+  // Symbols + Pictographs, Supplemental Symbols (incl. emoji), Transport,
+  // Misc Symbols, Dingbats. We exclude the two brand glyphs — U+2192 (→) and
+  // U+2726 (✦) — the latter by splitting the Dingbats range around it, so
+  // every other emoji/dingbat is still caught.
   const EMOJI_RE =
-    /[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2700}-\u{27BF}]/u;
+    /[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2700}-\u{2725}\u{2727}-\u{27BF}]/u;
 
   it('no emoji glyphs in audited files (curly arrow → is allowed)', () => {
     const offenders: Array<{ path: string; sample: string }> = [];
