@@ -44,6 +44,7 @@ import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
 import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
+import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -323,8 +324,38 @@ export function isAuthLikeError(err: unknown): boolean {
   return false;
 }
 
-// ── Fresh-turn entry point ─────────────────────────────────────────────────
+/**
+ * Integration tools for a chat turn — the SCALABLE path (token redesign).
+ * Instead of pre-loading every connected toolkit's actions (~30 schemas × N
+ * toolkits, re-shipped every step), attach two meta-tools — find_integration_tool
+ * + call_integration_tool — that search and execute on demand. Build-time cost
+ * is ~0 (no Composio fetch here); the action schema is fetched only when the
+ * model actually calls find_integration_tool. Still reports the connected
+ * toolkits so the prompt can tell the model which apps are reachable.
+ */
+export async function loadIntegrationMetaTools(ctx: ToolContext): Promise<IntegrationLoadResult> {
+  let toolkits: string[];
+  try {
+    toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
+  } catch (err) {
+    logger.warn('[sdk-chat] activeToolkits lookup failed — no integration tools', {
+      spaceId: ctx.space.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+  }
+  if (toolkits.length === 0) return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+  if (!composioConfigured()) {
+    logger.error(
+      '[sdk-chat] COMPOSIO_API_KEY not configured but this workspace has connected toolkits — integration tools unavailable until it is set',
+      { spaceId: ctx.space.id, toolkits },
+    );
+    return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
+  }
+  return { tools: buildIntegrationSearchTools(ctx, toolkits), liveToolkits: toolkits, unavailableToolkits: [] };
+}
 
+// ── Fresh-turn entry point ─────────────────────────────────────────────────
 export interface ChatHistoryRow {
   role: 'user' | 'assistant';
   content: string;
@@ -374,7 +405,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // truth — previously the prompt's "Connected: …" line came from a 5-minute
   // cache, so right after connecting Gmail the model HELD the Gmail tools
   // while its own prompt said Gmail wasn't connected.
-  const integrations = await loadIntegrationToolsDetailed(input.ctx);
+  const integrations = await loadIntegrationMetaTools(input.ctx);
   const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
     integrations: {
       liveToolkits: integrations.liveToolkits,
@@ -441,7 +472,7 @@ export interface ResumeChatTurnInput {
  * same way regardless of which path produced them.
  */
 export async function resumeChatTurn(input: ResumeChatTurnInput) {
-  const integrations = await loadIntegrationToolsDetailed(input.ctx);
+  const integrations = await loadIntegrationMetaTools(input.ctx);
   const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
     integrations: {
       liveToolkits: integrations.liveToolkits,
