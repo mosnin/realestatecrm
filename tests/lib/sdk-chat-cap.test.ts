@@ -17,9 +17,10 @@ describe('sdk-chat tool-call ceiling', () => {
   it('caps tool-call iterations at 6 per turn', () => {
     // Deliberately lowered 15 → 8 → 6 across the agent token redesign: the SDK
     // re-sends the full transcript + every tool schema on EVERY inner step,
-    // so cost grows quadratically with the cap. With toolset retrieval most
-    // real workflows resolve in a couple of calls; 6 still covers genuine
-    // multi-step work and deeper jobs belong on delegate_task.
+    // so cost grows quadratically with the cap. With toolset retrieval and the
+    // integration meta-tools (find/call), most real workflows resolve in a
+    // couple of calls; 6 still covers genuine multi-step work and deeper jobs
+    // belong on delegate_task.
     const source = readFileSync(
       join(__dirname, '..', '..', 'lib', 'ai-tools', 'sdk-chat.ts'),
       'utf-8',
