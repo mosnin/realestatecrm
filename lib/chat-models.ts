@@ -18,6 +18,11 @@ export interface ChatModelOption {
 
 export const CHAT_MODELS: ChatModelOption[] = [
   {
+    id: 'deepseek/deepseek-v4-flash',
+    label: 'DeepSeek V4 Flash',
+    tagline: 'Fast, very low cost, with a huge context window — the everyday default.',
+  },
+  {
     id: 'x-ai/grok-4.3',
     label: 'Grok 4.3',
     tagline: 'Quick, direct, strong with fresh real-world context.',
@@ -45,7 +50,7 @@ export const CHAT_MODELS: ChatModelOption[] = [
 ];
 
 /** The model used when a workspace hasn't picked one. */
-export const DEFAULT_CHAT_MODEL = 'x-ai/grok-4.3';
+export const DEFAULT_CHAT_MODEL = 'deepseek/deepseek-v4-flash';
 
 /** Allowlist check — gate user-supplied model slugs before persisting. */
 export function isValidChatModel(value: unknown): value is string {

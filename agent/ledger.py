@@ -43,6 +43,7 @@ MODEL_PRICES: dict[str, dict[str, float]] = {
     "openai/gpt-4.1-mini":       {"in": 0.40, "out": 1.60},
     "openai/gpt-4o-mini":        {"in": 0.15, "out": 0.60},
     "x-ai/grok-4.3":             {"in": 1.25, "out": 2.50},
+    "deepseek/deepseek-v4-flash": {"in": 0.14, "out": 0.28},
     "anthropic/claude-opus-4.7": {"in": 5.00, "out": 25.00},
     "moonshotai/kimi-k2.6":      {"in": 0.73, "out": 3.49},
     "qwen/qwen3.6-flash":        {"in": 0.19, "out": 1.13},

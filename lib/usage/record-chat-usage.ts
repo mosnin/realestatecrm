@@ -34,6 +34,7 @@ const MODEL_PRICES: Record<string, { in: number; out: number }> = {
   'openai/gpt-4.1-mini': { in: 0.4, out: 1.6 },
   'openai/gpt-4o-mini': { in: 0.15, out: 0.6 },
   'x-ai/grok-4.3': { in: 1.25, out: 2.5 },
+  'deepseek/deepseek-v4-flash': { in: 0.14, out: 0.28 },
   'anthropic/claude-opus-4.7': { in: 5.0, out: 25.0 },
   'moonshotai/kimi-k2.6': { in: 0.73, out: 3.49 },
   'qwen/qwen3.6-flash': { in: 0.19, out: 1.13 },

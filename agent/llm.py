@@ -115,10 +115,11 @@ _patch_openai_event_schemas()
 
 
 # The model a workspace gets when it hasn't picked one. OpenRouter slug.
-DEFAULT_CHAT_MODEL = "x-ai/grok-4.3"
+DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash"
 
 # Allowlist of realtor-selectable models — mirrors CHAT_MODELS in lib/llm.ts.
 CHAT_MODELS: tuple[str, ...] = (
+    "deepseek/deepseek-v4-flash",
     "openai/gpt-5.5",
     "anthropic/claude-opus-4.7",
     "x-ai/grok-4.3",
