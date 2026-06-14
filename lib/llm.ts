@@ -33,7 +33,7 @@
 import OpenAI from 'openai';
 
 // Local binding for use in this module (the block below only RE-exports it).
-import { DEFAULT_CHAT_MODEL } from './chat-models';
+import { DEFAULT_CHAT_MODEL, isValidChatModel } from './chat-models';
 
 export {
   CHAT_MODELS,
@@ -128,7 +128,11 @@ export const OPENAI_FALLBACK_CHAT_MODEL = 'gpt-4o-mini';
  * which key the deployment has.
  */
 export function resolveChatModel(requested?: string | null): string {
-  const wanted = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  const candidate = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  // A model that isn't in the registry (e.g. an old per-workspace pick left over
+  // from the since-removed model picker) falls back to the default, so only a
+  // supported model is ever sent to the provider.
+  const wanted = isValidChatModel(candidate) ? candidate : DEFAULT_CHAT_MODEL;
   if (isOpenRouterConfigured()) return wanted;
   // OpenAI-only path: only bare gpt-* models are servable.
   if (wanted.includes('/') || !wanted.toLowerCase().startsWith('gpt')) {

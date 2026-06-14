@@ -34,8 +34,13 @@
  *       block so the realtor knows to switch models. The router can then
  *       choose to escalate or not.
  *
- *   deepseek / moonshotai / qwen / unknown
- *     - Treated as "no vision" — same path as xai. Fall back to text.
+ *   qwen (qwen3.6-flash)
+ *     - Vision-capable (images via the image_url shape). The vision-fallback
+ *       target for the text-only default models.
+ *
+ *   deepseek / moonshotai / unknown
+ *     - Treated as "no vision" — fall back to text. deepseek image turns are
+ *       upgraded to qwen by pickModelForAttachments.
  *
  * v1 cuts: video, audio, docx, image generation (input only — output
  * already exists via generate_studio_image).
@@ -96,7 +101,14 @@ export function isPdfMime(mime: string): boolean {
  * Centralised so the router + the multimodal builder agree.
  */
 export function providerSupportsImages(provider: string): boolean {
-  return provider === 'anthropic' || provider === 'openai' || provider === 'google';
+  // qwen (qwen3.6-flash) is vision-capable and is the vision-fallback target for
+  // the text-only default models (see VISION_FALLBACK_MODEL).
+  return (
+    provider === 'anthropic' ||
+    provider === 'openai' ||
+    provider === 'google' ||
+    provider === 'qwen'
+  );
 }
 
 export function providerSupportsPdfs(provider: string): boolean {
@@ -106,12 +118,13 @@ export function providerSupportsPdfs(provider: string): boolean {
 }
 
 /**
- * The model a turn is upgraded to when its attachments need vision/PDF support
- * the chosen model lacks. Claude is the one registry model that reliably reads
- * BOTH images and PDFs through OpenRouter, so it's the universal upgrade
- * target. Keep this slug in sync with lib/chat-models.ts.
+ * The model an image turn is upgraded to when the chosen model can't see. The
+ * default chat model (DeepSeek V4 Pro) is text-only, so a turn carrying images
+ * switches to qwen3.6-flash — a low-cost vision model — for that turn only.
+ * (PDFs have no reader in the current model set, so they degrade to a text note
+ * via composeFallbackNote.)
  */
-export const VISION_FALLBACK_MODEL = 'anthropic/claude-opus-4.7';
+export const VISION_FALLBACK_MODEL = 'qwen/qwen3.6-flash';
 
 /**
  * Pick the model for a turn so multimodal "just works." If the turn carries
