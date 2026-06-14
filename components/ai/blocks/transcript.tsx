@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { TextBlockView } from './text-block-view';
+import { AttachmentBlockView } from './attachment-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
 import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
@@ -56,6 +57,13 @@ interface TranscriptProps {
    *  picker). The workspace forwards the text as the realtor's next
    *  message. Omit on read-only history surfaces. */
   onUserIntent?: (text: string) => void;
+  /**
+   * Optimistic object URLs for just-sent attachments, keyed by attachment id.
+   * Lets a freshly-sent image thumbnail render instantly without waiting on a
+   * signed-URL round-trip. History surfaces omit this — the block view signs
+   * a URL on demand instead.
+   */
+  localUrls?: Record<string, string>;
   className?: string;
 }
 
@@ -73,6 +81,7 @@ export function Transcript({
   pendingApproval,
   approvalCelebration,
   onUserIntent,
+  localUrls,
   className,
 }: TranscriptProps) {
   // Find the last text block so we can scope the streaming caret to it.
@@ -101,13 +110,29 @@ export function Transcript({
     | { kind: 'tool-single'; block: ToolCallBlock }
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
     | { kind: 'subagent'; block: ToolCallBlock }
-    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> };
+    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> }
+    | {
+        kind: 'attachments';
+        blocks: Array<Extract<MessageBlock, { type: 'attachment' }>>;
+        groupId: string;
+      };
 
   const items: RenderItem[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (block.type === 'reasoning') {
       items.push({ kind: 'reasoning', block });
+      continue;
+    }
+    if (block.type === 'attachment') {
+      // Coalesce consecutive attachments into one wrapped chips row, matching
+      // the composer's layout (chips above the message text).
+      const run: Array<Extract<MessageBlock, { type: 'attachment' }>> = [block];
+      while (i + 1 < blocks.length && blocks[i + 1].type === 'attachment') {
+        run.push(blocks[i + 1] as Extract<MessageBlock, { type: 'attachment' }>);
+        i++;
+      }
+      items.push({ kind: 'attachments', blocks: run, groupId: `att-${run[0].id}` });
       continue;
     }
     if (block.type === 'subagent_task') {
@@ -200,6 +225,14 @@ export function Transcript({
             );
           case 'permission':
             return <PermissionBlockView key={`perm-${item.block.callId}`} block={item.block} />;
+          case 'attachments':
+            return (
+              <div key={item.groupId} className="flex flex-wrap gap-2">
+                {item.blocks.map((att) => (
+                  <AttachmentBlockView key={`att-${att.id}`} block={att} localUrl={localUrls?.[att.id]} />
+                ))}
+              </div>
+            );
         }
       })}
 

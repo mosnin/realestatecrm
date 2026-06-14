@@ -60,8 +60,16 @@ function ensureRowShimmerStyles() {
 .dark .an-tool-call-row-shimmer {
   background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%);
 }
+@keyframes an-tool-call-icon-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.an-tool-call-icon-pulse {
+  animation: an-tool-call-icon-pulse 1.6s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .an-tool-call-row-shimmer { animation: none; }
+  .an-tool-call-icon-pulse { animation: none; opacity: 1; }
 }
 `;
   document.head.appendChild(style);
@@ -187,12 +195,6 @@ interface ToolCallBlockViewProps {
   block: ToolCallBlock;
   /** Is this call currently running? Overrides persisted status for live turns. */
   live?: boolean;
-  /**
-   * When true a subtle left accent timeline bar is rendered, signalling this
-   * tool call is part of a multi-step sequence. Wire from the parent once
-   * sequence detection is implemented; default false today.
-   */
-  isPartOfSequence?: boolean;
   /** Interactive cards (availability picker) bubble user intents back up
    *  through this prop. The workspace forwards them as the next user
    *  message. Omitted on read-only history surfaces. */
@@ -203,7 +205,6 @@ interface ToolCallBlockViewProps {
 export function ToolCallBlockView({
   block,
   live,
-  isPartOfSequence = false,
   onUserIntent,
   className,
 }: ToolCallBlockViewProps) {
@@ -324,20 +325,9 @@ export function ToolCallBlockView({
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
-  // Colored left-edge bar carries the status semantic so the row stays
-  // scannable without a card border. The body of the row is borderless
-  // and transparent — see STYLESHEET.md "paper-flat" principle.
-  const accentBar =
-    status === 'running'
-      ? 'bg-muted-foreground/30'
-      : block.display === 'error' || status === 'error'
-        ? 'bg-rose-500/60'
-        : block.display === 'warning'
-          ? 'bg-amber-500/60'
-          : block.display === 'success' && status === 'complete'
-            ? 'bg-emerald-500/60'
-            : 'bg-muted-foreground/20';
-
+  // Rows are borderless and transparent — no left accent bar or card edge —
+  // per STYLESHEET.md "paper-flat" principle. Status reads from the icon tint,
+  // the running-row shimmer, and the error breadcrumb instead.
   // Expand is only useful when there are args or a result summary to show in
   // the collapsible detail pane (not the same as the inline summary).
   const argsEntries = Object.entries(block.args ?? {});
@@ -345,14 +335,10 @@ export function ToolCallBlockView({
 
   return (
     <motion.div
-      className={cn(
-        'group relative flex flex-col',
-        isPartOfSequence && 'border-l border-border/40 ml-1 pl-2',
-        className,
-      )}
-      initial={{ opacity: 0, y: 4 }}
+      className={cn('group relative flex flex-col', className)}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* Compact step row. Collapsed by default — args, summary, and full
           result detail live behind the expand chevron. Three pieces stay
@@ -373,14 +359,9 @@ export function ToolCallBlockView({
           status === 'running' && 'an-tool-call-row-shimmer',
         )}
       >
-        {/* Left accent bar */}
-        <span
-          aria-hidden
-          className={cn('absolute left-0 inset-y-0 w-[3px] rounded-l-lg flex-shrink-0', accentBar)}
-        />
-
-        {/* Tool icon */}
-        <span className={cn('flex-shrink-0', tint)}>
+        {/* Tool icon — gets a gentle pulse while the call is in flight so the
+            running row reads "alive" now that the left accent bar is gone. */}
+        <span className={cn('flex-shrink-0', tint, status === 'running' && 'an-tool-call-icon-pulse')}>
           <Icon size={13} />
         </span>
 

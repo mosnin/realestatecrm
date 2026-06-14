@@ -86,6 +86,17 @@ type Mode = 'draft' | null;
  */
 export type ChatMode = 'chat' | 'agent';
 
+/** Metadata passed up on send so the optimistic user bubble can show the
+ *  attached files as chips/thumbnails before the server round-trips. */
+export interface SentAttachmentMeta {
+  id: string;
+  filename: string;
+  mimeType: string;
+  isImage: boolean;
+  sizeBytes?: number;
+  previewUrl?: string;
+}
+
 interface ChippiPromptBoxProps {
   placeholder?: string;
   onSend?: (
@@ -93,6 +104,9 @@ interface ChippiPromptBoxProps {
     mentions: MentionItem[],
     attachmentIds?: string[],
     mode?: ChatMode,
+    /** Lightweight metadata for the sent files so the optimistic user bubble
+     *  can render chips/thumbnails immediately (before the server persists). */
+    attachmentsMeta?: SentAttachmentMeta[],
   ) => void;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
@@ -121,6 +135,13 @@ interface ChippiPromptBoxProps {
    * there — pass false to hide it.
    */
   showModeSwitch?: boolean;
+  /**
+   * Active conversation id. Used to persist the Chat/Agent choice per
+   * conversation: the realtor's pick STAYS for that thread across sends
+   * (sessionStorage-keyed). Null/undefined → a fresh thread that defaults
+   * to Chat. Switching conversations re-reads the saved choice.
+   */
+  conversationId?: string | null;
 }
 
 type UploadedAttachment = {
@@ -188,6 +209,33 @@ function formatTime(seconds: number) {
   return `${m}:${s}`;
 }
 
+// Chat/Agent choice is sticky PER conversation: once the realtor flips to
+// Agent it stays Agent for that thread across sends. sessionStorage (not
+// localStorage) matches the "for this chat" lifetime used elsewhere in Chippi
+// (the always-allow list) — a fresh tab forgets. Keyed by conversation id so
+// switching threads re-reads that thread's pick; a brand-new thread (no id
+// yet) defaults to Chat.
+const CHAT_MODE_STORAGE_PREFIX = 'chippi-chat-mode:';
+
+function readStoredChatMode(conversationId: string | null): ChatMode {
+  if (!conversationId || typeof window === 'undefined') return 'chat';
+  try {
+    const raw = window.sessionStorage.getItem(CHAT_MODE_STORAGE_PREFIX + conversationId);
+    return raw === 'agent' ? 'agent' : 'chat';
+  } catch {
+    return 'chat';
+  }
+}
+
+function writeStoredChatMode(conversationId: string | null, mode: ChatMode): void {
+  if (!conversationId || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(CHAT_MODE_STORAGE_PREFIX + conversationId, mode);
+  } catch {
+    /* quota / private mode — the in-memory state still drives this session */
+  }
+}
+
 export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromptBoxProps>(
   function ChippiPromptBox(
     {
@@ -204,6 +252,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       prefill,
       skills = [],
       showModeSwitch = true,
+      conversationId = null,
     },
     ref,
   ) {
@@ -224,8 +273,41 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const slashDismissedRef = useRef(false);
 
     const [mode, setMode] = useState<Mode>(null);
-    // Chat (default) vs Agent. Per-message: resets to 'chat' after each send.
-    const [chatMode, setChatMode] = useState<ChatMode>('chat');
+    // Chat (default) vs Agent. STICKY per conversation — the realtor's pick
+    // stays for the thread across sends, restored from sessionStorage on
+    // mount and whenever the conversation changes.
+    const [chatMode, setChatMode] = useState<ChatMode>(() =>
+      readStoredChatMode(conversationId),
+    );
+    const prevConversationIdRef = useRef<string | null>(conversationId);
+    // Sync the choice when the active conversation changes. Two cases:
+    //   1. A fresh thread (null id) just got a real id on its first send —
+    //      carry the realtor's in-flight pick forward and persist it under
+    //      the new id, so an Agent chosen before the first message STAYS
+    //      Agent for the rest of the thread.
+    //   2. Navigating between existing threads — re-read that thread's saved
+    //      pick (defaults to Chat when none was stored).
+    useEffect(() => {
+      const prev = prevConversationIdRef.current;
+      prevConversationIdRef.current = conversationId;
+      if (prev === conversationId) return;
+      if (prev === null && conversationId) {
+        writeStoredChatMode(conversationId, chatMode);
+        return;
+      }
+      setChatMode(readStoredChatMode(conversationId));
+      // chatMode intentionally omitted — we only want this to fire on id change.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conversationId]);
+    // Persisting setter — write the pick so it survives the next send and a
+    // page reload within the session.
+    const selectChatMode = useCallback(
+      (next: ChatMode) => {
+        setChatMode(next);
+        writeStoredChatMode(conversationId, next);
+      },
+      [conversationId],
+    );
     const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
     const [attachError, setAttachError] = useState<string | null>(null);
     const localCounterRef = useRef(0);
@@ -589,28 +671,40 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       const wrapped = mode && base
         ? `[${MODE_META[mode].prefix}: ${base}]`
         : base;
-      const readyAttachmentIds = attachments
-        .filter((a) => a.uploadStatus === 'ready')
-        .map((a) => a.id);
+      const readyAttachments = attachments.filter((a) => a.uploadStatus === 'ready');
+      const readyAttachmentIds = readyAttachments.map((a) => a.id);
       const finalText = wrapped;
       if (!finalText && readyAttachmentIds.length === 0) return;
+      // Metadata for the optimistic user bubble. The object URL is handed off
+      // to the transcript for an instant image thumbnail — so we must NOT
+      // revoke those below (the receiver owns them now).
+      const attachmentsMeta: SentAttachmentMeta[] = readyAttachments.map((a) => ({
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        isImage: a.isImage,
+        sizeBytes: a.sizeBytes,
+        ...(a.isImage && a.previewUrl ? { previewUrl: a.previewUrl } : {}),
+      }));
       onSend?.(
         finalText,
         mentions,
         readyAttachmentIds.length ? readyAttachmentIds : undefined,
         chatMode,
+        attachmentsMeta.length ? attachmentsMeta : undefined,
       );
       setMessage('');
       setMentions([]);
       setMode(null);
-      // Agent is a deliberate per-message choice — snap back to Chat so the
-      // next message doesn't silently run the tool loop the realtor forgot
-      // they'd left on.
-      setChatMode('chat');
+      // Chat/Agent is sticky per conversation now — the realtor's choice
+      // stays for the thread (persisted in selectChatMode), so we do NOT snap
+      // back to Chat after a send. Agent stays Agent until they switch it.
       // Don't DELETE the rows — the server is keeping them as part of the
-      // turn. Just clear local state and revoke object URLs.
+      // turn. Revoke object URLs we did NOT hand off to the transcript;
+      // handed-off image previews stay alive for the optimistic thumbnail.
       for (const a of attachments) {
-        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+        const handedOff = a.isImage && a.uploadStatus === 'ready' && !!a.previewUrl;
+        if (a.previewUrl && !handedOff) URL.revokeObjectURL(a.previewUrl);
       }
       setAttachments([]);
       setAttachError(null);
@@ -1301,9 +1395,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                 )}
               </div>
 
-              {/* Chat ↔ Agent — the per-message runtime switch. Chat answers
-                  fast and reads their data; Agent can act. Resets to Chat
-                  after every send so Agent is always a deliberate choice. */}
+              {/* Chat ↔ Agent — the runtime switch. Chat answers fast and
+                  reads their data; Agent can act. Sticky per conversation:
+                  the pick stays for the thread across sends until changed. */}
               {showModeSwitch && (
               <div
                 role="group"
@@ -1318,7 +1412,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={() => setChatMode(m)}
+                          onClick={() => selectChatMode(m)}
                           disabled={disabled || isLoading || isRecording}
                           aria-pressed={active}
                           className={cn(
