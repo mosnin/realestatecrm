@@ -30,6 +30,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { isPlatformAdmin } from '@/lib/permissions';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import {
   chippiErrorMessage,
@@ -591,6 +592,16 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/task] subscription status check failed — allowing turn', { spaceSlug }, err);
   }
 
+  // Platform admins get unlimited usage: exempt from the budget + credit gates
+  // below. Token usage is still RECORDED downstream (ChatUsage), so an admin's
+  // consumption is tracked — it's just never blocked.
+  let isAdmin = false;
+  try {
+    isAdmin = await isPlatformAdmin();
+  } catch (err) {
+    logger.warn('[ai/task] admin check failed, treating as non-admin', { spaceSlug }, err);
+  }
+
   try {
     // Budget settings + today's usage are independent reads — fetch together.
     const [settingsResult, usageResult] = await Promise.all([
@@ -616,7 +627,7 @@ export async function POST(req: NextRequest) {
         | undefined) ?? 50_000;
     const { total: todayTokens } = usageResult;
 
-    if (todayTokens >= dailyTokenBudget) {
+    if (!isAdmin && todayTokens >= dailyTokenBudget) {
       logger.warn('[ai/task] daily token budget exceeded', {
         spaceId: ctx.space.id,
         todayTokens,
@@ -632,16 +643,19 @@ export async function POST(req: NextRequest) {
   // credits. No-op unless CREDITS_ENFORCED, so this is dormant until credits go
   // live. Joins the daily-token-budget gate above as a pre-stream refusal the
   // chat client already surfaces (same non-OK JSON error shape as 429/400).
-  try {
-    await assertCanSpend(ctx.space.id, 'chat_turn');
-  } catch (err) {
-    if (err instanceof CreditsExhaustedError) {
-      return NextResponse.json(
-        { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
-        { status: 402 },
-      );
+  // Admins skip the credit gate too (unlimited usage).
+  if (!isAdmin) {
+    try {
+      await assertCanSpend(ctx.space.id, 'chat_turn');
+    } catch (err) {
+      if (err instanceof CreditsExhaustedError) {
+        return NextResponse.json(
+          { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
+          { status: 402 },
+        );
+      }
+      throw err;
     }
-    throw err;
   }
 
   let conversationId: string;
