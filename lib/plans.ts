@@ -51,7 +51,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Solo',
     priceMonthly: 97,
     includedUsers: 1,
-    monthlyCredits: 1500,
+    monthlyCredits: 3000,
     account: 'space',
     stripePriceMonthly: env('STRIPE_PRICE_SOLO'),
     stripePriceAnnual: env('STRIPE_PRICE_SOLO_ANNUAL'),
@@ -61,7 +61,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Pro Performer',
     priceMonthly: 197,
     includedUsers: 1,
-    monthlyCredits: 4000,
+    monthlyCredits: 8000,
     account: 'space',
     stripePriceMonthly: env('STRIPE_PRICE_PRO'),
     stripePriceAnnual: env('STRIPE_PRICE_PRO_ANNUAL'),
@@ -71,22 +71,22 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Team',
     priceMonthly: 497,
     includedUsers: 5,
-    monthlyCredits: 12000,
+    monthlyCredits: 24000,
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_ANNUAL'),
-    addUser: { priceMonthly: 79, credits: 1500 },
+    addUser: { priceMonthly: 79, credits: 3000 },
   },
   team_plus: {
     id: 'team_plus',
     label: 'Team Plus',
     priceMonthly: 897,
     includedUsers: 10,
-    monthlyCredits: 25000,
+    monthlyCredits: 50000,
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM_PLUS'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_PLUS_ANNUAL'),
-    addUser: { priceMonthly: 69, credits: 2000 },
+    addUser: { priceMonthly: 69, credits: 4000 },
   },
 };
 
@@ -170,16 +170,22 @@ export const CREDIT_ROLLOVER_DAYS = 30;
  *
  *   margin@full = 1 - (monthlyCredits * CREDIT_COGS_BUDGET_USD) / planPrice
  *
- * The binding tier is the Team Plus add-on seat ($69 / 2000 credits → max
- * $0.0138/credit for exactly 60%). $0.013 holds >= 62% on every tier, leaving a
- * buffer for model-price-estimate / provider-markup error.
+ * The binding tier is the Team Plus add-on seat ($69 / 4,000 credits → max
+ * $0.01725/credit for exactly 60%). $0.0065 holds >= 62% on every tier, leaving
+ * a buffer for model-price-estimate / provider-markup error.
  *
- * The DB trigger 20260627000000_meter_chat_usage_credits.sql is the enforcement
- * point (charges credits/turn = max(1, ceil(costUsd / this)) off each ChatUsage
- * row, model-aware); this constant + helper are the TS-side source of truth for
- * estimation/display. Keep the two in sync.
+ * Halved from the original $0.013 the moment the monthly allotments doubled and
+ * the model lineup moved to the far cheaper DeepSeek / Tencent / qwen set: with
+ * credits 2x and the budget 1/2x, worst-case margins are UNCHANGED while real
+ * usage roughly doubles (actual model COGS sits well under the budget).
+ *
+ * The DB trigger (supabase/migrations/..._meter_chat_usage_credits.sql, then
+ * ..._recalibrate_credit_budget.sql) is the enforcement point (charges
+ * credits/turn = max(1, ceil(costUsd / this)) off each ChatUsage row); this
+ * constant + helper are the TS-side source of truth for estimation/display.
+ * Keep the two in sync.
  */
-export const CREDIT_COGS_BUDGET_USD = 0.013;
+export const CREDIT_COGS_BUDGET_USD = 0.0065;
 
 /** Credits a turn costs given its actual token COGS (model-aware). Floor of 1
  *  so even a near-free turn costs a credit. Mirrors the SQL trigger. */

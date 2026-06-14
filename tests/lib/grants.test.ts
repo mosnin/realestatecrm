@@ -16,19 +16,19 @@ import { TOPUPS } from '@/lib/plans';
 describe('monthlyGrantAmount', () => {
   it('returns the plan base credits', () => {
     expect(monthlyGrantAmount('free')).toBe(0);
-    expect(monthlyGrantAmount('solo')).toBe(1500);
-    expect(monthlyGrantAmount('pro')).toBe(4000);
-    expect(monthlyGrantAmount('team')).toBe(12000);
-    expect(monthlyGrantAmount('team_plus')).toBe(25000);
+    expect(monthlyGrantAmount('solo')).toBe(3000);
+    expect(monthlyGrantAmount('pro')).toBe(8000);
+    expect(monthlyGrantAmount('team')).toBe(24000);
+    expect(monthlyGrantAmount('team_plus')).toBe(50000);
   });
 
   it('adds per-user add-on credits for team tiers', () => {
-    expect(monthlyGrantAmount('team', 2)).toBe(12000 + 2 * 1500);
-    expect(monthlyGrantAmount('team_plus', 3)).toBe(25000 + 3 * 2000);
+    expect(monthlyGrantAmount('team', 2)).toBe(24000 + 2 * 3000);
+    expect(monthlyGrantAmount('team_plus', 3)).toBe(50000 + 3 * 4000);
   });
 
   it('ignores add-on users on plans without an add-on path', () => {
-    expect(monthlyGrantAmount('solo', 5)).toBe(1500);
+    expect(monthlyGrantAmount('solo', 5)).toBe(3000);
     expect(monthlyGrantAmount('free', 5)).toBe(0);
   });
 });
@@ -40,7 +40,7 @@ describe('grant idempotency — sourceId threading', () => {
   it('grantPlanMonthly forwards the invoice id as sourceId to grantCredits', async () => {
     await grantPlanMonthly(acct, 'solo', 'inv_123');
     expect(grantCreditsMock).toHaveBeenCalledWith(
-      acct, 1500, 'monthly_grant', expect.any(Date), 'inv_123',
+      acct, 3000, 'monthly_grant', expect.any(Date), 'inv_123',
     );
   });
 
