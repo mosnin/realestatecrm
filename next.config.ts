@@ -45,6 +45,14 @@ const nextConfig: NextConfig = {
   // makes Next.js require() it from node_modules instead, with intact
   // relative paths.
   serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  // Lint + type-check run in CI (the `lint-typecheck-test` job, on every PR)
+  // before anything reaches main. Re-running them inside `next build` on
+  // Vercel's 8GB machine is redundant and was the cause of an Out-Of-Memory
+  // kill during the post-compile "checking validity of types" phase (the build
+  // compiled fine, then got SIGKILL'd before writing routes-manifest.json).
+  // Skip them in the deploy build; CI stays the gate that blocks bad types.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   async headers() {
     return [
       {
@@ -77,7 +85,10 @@ export default sentryBuildConfigured
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       silent: !process.env.CI,
-      widenClientFileUpload: true,
+      // Widening re-processes every client chunk for sourcemaps, which piled
+      // onto the build's peak memory on the way to the OOM. Off keeps the
+      // upload lean; stacktraces still resolve from the per-chunk maps we ship.
+      widenClientFileUpload: false,
       disableLogger: true,
       automaticVercelMonitors: true,
     })
