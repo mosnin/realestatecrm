@@ -22,7 +22,6 @@ import {
 } from "motion/react";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { peekSwitchFlag } from "@/components/dashboard/account-switch";
 
 // One-shot, per-page-load gate. Module state lives for the lifetime of the JS
 // bundle: it survives client-side navigation (so switching between the realtor
@@ -71,10 +70,13 @@ export function ChippiSplash({
   snapshot: ChippiSnapshot;
 }) {
   // Decide ONCE, on first render, whether this mount should play the splash.
-  // Skip it if it has already played this page load (client-side navigation,
-  // e.g. switching dashboards) or if an account switch is in progress — that
-  // hands the moment to the lighter Chippi-logo swipe instead.
-  const [shouldPlay] = useState(() => !splashPlayed && !peekSwitchFlag());
+  // Skip it ONLY when it has already played this page load (client-side
+  // navigation, e.g. switching dashboards). It plays on every fresh open / PWA
+  // launch / hard refresh. Deliberately NOT gated on the account-switch flag:
+  // that flag lives in sessionStorage, which survives reloads within a tab, so
+  // a stale flag from an earlier switch used to stick on and wrongly suppress
+  // the splash on later opens — the regression this restore fixes.
+  const [shouldPlay] = useState(() => !splashPlayed);
   const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">(
     shouldPlay ? "greeting" : "gone"
   );
