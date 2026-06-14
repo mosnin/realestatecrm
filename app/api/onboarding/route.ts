@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { grantFreeSignup } from '@/lib/billing/grants';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import { resolveSelfServePlan } from '@/lib/plans';
 import { sendWelcomeEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { emit as emitTelemetry } from '@/lib/telemetry';
@@ -247,6 +248,8 @@ export async function POST(req: NextRequest) {
         // Enhanced onboarding fields (User record)
         phone, websiteUrl, mlsId, brokerageAffiliation,
         preferredNotification, timezone, referralSource, biggestPainPoint,
+        // Self-serve tier the buyer chose on the marketing site (solo|pro).
+        plan,
       } = body as {
         slug: string;
         intakePageTitle: string;
@@ -280,7 +283,15 @@ export async function POST(req: NextRequest) {
         timezone?: string;
         referralSource?: string;
         biggestPainPoint?: string;
+        plan?: string;
       };
+
+      // Resolve the chosen self-serve tier (solo|pro). Stored on Space.plan as
+      // the buyer's SELECTION so /subscribe can show + charge the right tier
+      // after onboarding. This is the carrier that survives Clerk's redirects
+      // (the URL param doesn't). The Stripe webhook later reconciles Space.plan
+      // to whatever was actually charged, so a wrong selection self-heals.
+      const selectedPlan = resolveSelfServePlan(plan);
 
       // Block dangerous fields from being injected via request body
       const BLOCKED_FIELDS = ['platformRole', 'clerkId', 'id', 'createdAt', 'updatedAt'];
@@ -408,6 +419,9 @@ export async function POST(req: NextRequest) {
           name: businessName || sanitized,
           emoji: '\u{1F3E0}',
           ownerId: user.id,
+          // Buyer's chosen tier (solo|pro). Drives the /subscribe display +
+          // checkout; reconciled to the charged plan by the Stripe webhook.
+          plan: selectedPlan,
         })
         .select()
         .single();

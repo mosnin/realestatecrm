@@ -26,3 +26,24 @@ describe('planIdForStripePrice', () => {
     expect(planIdForStripePrice(undefined)).toBeNull();
   });
 });
+
+describe('resolveSelfServePlan', () => {
+  it('keeps an explicit pro selection', async () => {
+    const { resolveSelfServePlan } = await import('@/lib/plans');
+    expect(resolveSelfServePlan('pro')).toBe('pro');
+  });
+
+  it('resolves solo for the explicit solo value', async () => {
+    const { resolveSelfServePlan } = await import('@/lib/plans');
+    expect(resolveSelfServePlan('solo')).toBe('solo');
+  });
+
+  it('defaults to solo for anything that is not pro (the historical default)', async () => {
+    const { resolveSelfServePlan } = await import('@/lib/plans');
+    // Missing / unknown / non-self-serve hints all fall back to solo so a lost
+    // selection never charges the wrong (higher) tier or a brokerage tier.
+    for (const v of [undefined, null, '', 'free', 'team', 'team_plus', 'PRO', 'enterprise', 42, {}]) {
+      expect(resolveSelfServePlan(v)).toBe('solo');
+    }
+  });
+});

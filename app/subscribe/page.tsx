@@ -23,6 +23,8 @@ import { Check, Loader2 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { brandOrange } from '@/lib/colors';
 import { TITLE_FONT } from '@/lib/typography';
+import { PLANS, resolveSelfServePlan, type SelfServePlanId } from '@/lib/plans';
+import { readSignupPlan } from '@/lib/signup-plan';
 
 const FEATURES = [
   'I draft every follow-up. You approve.',
@@ -42,14 +44,36 @@ function SubscribeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If no slug in URL, fetch it from the user's space.
+  // Did the URL explicitly pin the tier? If so it wins and we never override it.
+  const urlPlan = searchParams.get('plan');
+  const urlPinnedPlan = urlPlan === 'solo' || urlPlan === 'pro';
+
+  // The tier to show + charge. Resolution order, most-trusted first:
+  //   1. ?plan= on the URL (explicit, e.g. a re-entry from the cancel link).
+  //   2. The plan persisted on the user's Space at onboarding (the carrier
+  //      that survives Clerk's redirects), fetched from /api/auth/me below.
+  //   3. The sessionStorage hint captured at the marketing CTA (transport).
+  //   4. Solo — the historical default for direct visitors.
+  const [plan, setPlan] = useState<SelfServePlanId>(() =>
+    urlPinnedPlan ? (urlPlan as SelfServePlanId) : readSignupPlan() ?? 'solo',
+  );
+  const planDef = PLANS[plan];
+
+  // Resolve slug and the persisted Space.plan from the user's account. We hit
+  // /api/auth/me whenever EITHER is still unresolved — the common gate path
+  // arrives as /subscribe?slug=… (slug set, no plan), so the persisted plan
+  // (the durable carrier) still needs adopting even though the slug is known.
   useEffect(() => {
-    if (slug || !isLoaded || !isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
+    if (slug && urlPinnedPlan) return; // nothing left to resolve
     fetch('/api/auth/me')
       .then((r) => r.json())
-      .then((d) => { if (d.slug) setSlug(d.slug); })
+      .then((d) => {
+        if (!slug && d.slug) setSlug(d.slug);
+        if (!urlPinnedPlan && d.plan) setPlan(resolveSelfServePlan(d.plan));
+      })
       .catch(() => {});
-  }, [slug, isLoaded, isSignedIn]);
+  }, [slug, isLoaded, isSignedIn, urlPinnedPlan, urlPlan]);
 
   // Redirect unauthenticated users.
   if (isLoaded && !isSignedIn) {
@@ -64,7 +88,7 @@ function SubscribeContent() {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, plan }),
       });
       const data = await res.json();
       if (data.url) {
@@ -113,7 +137,7 @@ function SubscribeContent() {
 
         {/* Chippi speaks — the focal element. */}
         <header className="space-y-2 text-center">
-          <p className="text-sm text-muted-foreground">Chippi Solo.</p>
+          <p className="text-sm text-muted-foreground">Chippi {planDef.label}.</p>
           <h1 className="text-3xl leading-tight tracking-tight sm:text-[2.5rem]" style={TITLE_FONT}>
             Let&apos;s keep working together.
           </h1>
@@ -124,15 +148,16 @@ function SubscribeContent() {
 
         {/* Paper-flat panel — hairline border, no shadow. */}
         <div className="mt-8 rounded-xl border border-border/70 bg-card p-6 sm:p-7">
-          {/* Price */}
+          {/* Price — from lib/plans.ts (single source of truth), keyed to the
+              tier the buyer chose so it can't drift from what's charged. */}
           <div className="flex items-end justify-center gap-1.5">
             <span className="text-[2.75rem] leading-none tabular-nums tracking-tight" style={TITLE_FONT}>
-              $97
+              ${planDef.priceMonthly}
             </span>
             <span className="mb-1 text-base text-muted-foreground">/mo</span>
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">
-            7 days free, then $97 a month. Cancel anytime.
+            7 days free, then ${planDef.priceMonthly} a month. Cancel anytime.
           </p>
 
           {/* Features */}

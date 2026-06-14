@@ -1,5 +1,7 @@
 import { AuthPageLayout } from '@/components/auth/auth-page-layout';
 import { ThemedSignUp } from '@/components/auth/clerk-sign-up';
+import { PlanIntentCapture } from '@/components/auth/plan-intent-capture';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { BODY_MUTED, QUIET_LINK } from '@/lib/typography';
@@ -35,6 +37,10 @@ export default async function SignUpPage({
       subheading="Two minutes."
       variant={isBroker ? 'broker' : 'realtor'}
     >
+      {/* Stash any ?plan= from the marketing CTA before Clerk's redirects drop it. */}
+      <Suspense fallback={null}>
+        <PlanIntentCapture />
+      </Suspense>
       <div className="w-full space-y-4">
         <ThemedSignUp
           routing="path"

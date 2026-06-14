@@ -90,6 +90,22 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
 };
 
+/** The self-serve tiers a buyer can pick and check out on their own (no sales).
+ *  Solo/Pro live on the Space; Team/Team Plus are brokerage-scoped and go
+ *  through /demo, so they are intentionally NOT self-serve here. */
+export type SelfServePlanId = 'solo' | 'pro';
+
+/**
+ * Normalize an untrusted plan hint (URL param, sessionStorage, request body)
+ * to a self-serve Space tier. Anything that isn't 'pro' resolves to 'solo' —
+ * the historical default for direct visitors and the safe fallback when the
+ * chosen plan is lost across a redirect. Pure, so the resolution is identical
+ * on the marketing CTA, the onboarding write, and the subscribe display.
+ */
+export function resolveSelfServePlan(raw: unknown): SelfServePlanId {
+  return raw === 'pro' ? 'pro' : 'solo';
+}
+
 /**
  * Reverse lookup: which plan does a Stripe price id belong to? The webhook uses
  * this to derive the ACTIVE plan from the live subscription's price, instead of

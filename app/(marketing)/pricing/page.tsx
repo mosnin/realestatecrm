@@ -19,6 +19,12 @@ export const metadata = { title: 'Pricing · Chippi' };
 
 const SIGNUP = '/login/realtor?intent=signup';
 
+// Self-serve CTA that carries the chosen tier so it survives into onboarding
+// and the subscribe step (Solo/Pro are the only self-serve plans; Team tiers
+// go to /demo). The plan is captured client-side at the auth hop because the
+// query param itself doesn't survive Clerk's redirects — see lib/signup-plan.ts.
+const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}&plan=${plan}`;
+
 type Card = {
   id: keyof typeof PLANS;
   blurb: string;
@@ -27,8 +33,8 @@ type Card = {
 };
 
 const INDIVIDUAL: Card[] = [
-  { id: 'solo', blurb: 'Organize your pipeline and put the core AI workflows to work.', cta: { label: 'Start free trial', href: SIGNUP } },
-  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start free trial', href: SIGNUP }, featured: true },
+  { id: 'solo', blurb: 'Organize your pipeline and put the core AI workflows to work.', cta: { label: 'Start free trial', href: signupHref('solo') } },
+  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start free trial', href: signupHref('pro') }, featured: true },
 ];
 
 const TEAM: Card[] = [
