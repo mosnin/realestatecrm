@@ -31,6 +31,7 @@ import { Loader2, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { rootDomain, cn } from '@/lib/utils';
+import { readSignupPlan } from '@/lib/signup-plan';
 import { OnboardingShell } from './onboarding-shell';
 
 interface Props {
@@ -219,6 +220,8 @@ export function OnboardingRealtor({ defaultName }: Props) {
           businessName: businessName.trim(),
           intakePageTitle: 'Rental Application',
           intakePageIntro: 'Share a few details so I can review your rental fit faster.',
+          // Plan picked on the marketing site → persisted on Space.plan.
+          plan: readSignupPlan() ?? undefined,
         }),
       });
       if (!spaceRes.ok) {

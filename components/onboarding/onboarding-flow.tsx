@@ -14,6 +14,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { readSignupPlan } from '@/lib/signup-plan';
 import { OnboardingShell } from './onboarding-shell';
 import { OnboardingIntro, OnboardingReady } from './onboarding-cinematics';
 import {
@@ -333,6 +334,8 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
           timezone: values.timezone || undefined,
           referralSource: values.hearAbout || undefined,
           biggestPainPoint: null,
+          // Plan picked on the marketing site → persisted on Space.plan.
+          plan: readSignupPlan() ?? undefined,
         }),
       });
       const spaceData = await spaceRes.json().catch(() => ({}));
