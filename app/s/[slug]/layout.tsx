@@ -16,6 +16,7 @@ import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
@@ -263,6 +264,11 @@ export default async function DashboardLayout({
           draftsReady: pendingDraftCount,
         }}
       />
+      {/* Account-switch swipe (broker to realtor and back). Mounted here too so
+          the flag set on switch is CLEARED on arrival. Without it the flag stuck
+          on and ChippiSplash (gated on !peekSwitchFlag) was permanently
+          suppressed on the realtor side after the first account switch. */}
+      <AccountSwitchSwipe />
       {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
           sidebar/header/chat-bar via CSS. Mount near the root so the
           flag is set before any layout reads it. */}
