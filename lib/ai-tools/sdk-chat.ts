@@ -78,6 +78,15 @@ const DEFAULT_MAX_TOKENS = 4_096;
  */
 const MAX_TURNS_PER_TURN = 6;
 
+/**
+ * Cap on prior turns re-sent to the model per reply (token redesign L3). The
+ * full transcript is re-shipped on every inner step, so unbounded history
+ * compounds the per-turn cost. The route already caps at 20; we window to the
+ * most recent turns here — enough for "who was that?" continuity without
+ * re-billing a long thread on every step.
+ */
+const HISTORY_WINDOW = 10;
+
 // ── Agent construction ─────────────────────────────────────────────────────
 
 /**
@@ -390,7 +399,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // either a string OR an `AgentInputItem[]`; we use the array form so
   // the agent sees the conversation, not just the trailing turn.
   const items: AgentInputItem[] = [
-    ...(input.history ?? []).map((row) => ({
+    ...(input.history ?? []).slice(-HISTORY_WINDOW).map((row) => ({
       role: row.role,
       content: row.content,
     })),
