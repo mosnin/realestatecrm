@@ -107,6 +107,24 @@ export function planIdForStripePrice(priceId: string | null | undefined): PlanId
 }
 
 /**
+ * Annual billing discount: a yearly plan costs 12 months MINUS this fraction.
+ * Display-only — the amount actually charged comes from each plan's Stripe
+ * annual price id (stripePriceAnnual). Keep the Stripe annual prices in
+ * agreement with annualPriceFor() so the marketing page can never advertise a
+ * number Stripe doesn't charge.
+ */
+export const ANNUAL_DISCOUNT_RATE = 0.1;
+
+/**
+ * Display annual price (whole USD/yr) for a plan: 12× the monthly price less
+ * ANNUAL_DISCOUNT_RATE, rounded. With the V2 numbers this is Solo $1,048, Pro
+ * $2,128, Team $5,368, Team Plus $9,688. Free returns 0 (no paid annual).
+ */
+export function annualPriceFor(planId: PlanId): number {
+  return Math.round(PLANS[planId].priceMonthly * 12 * (1 - ANNUAL_DISCOUNT_RATE));
+}
+
+/**
  * Credit cost per premium workflow (docs/PRICING_V2_PLAN.md §4.4). The key is
  * the canonical `workflow` string written to CreditTxn.workflow.
  */
