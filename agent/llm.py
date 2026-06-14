@@ -114,16 +114,17 @@ def _patch_openai_event_schemas() -> None:
 _patch_openai_event_schemas()
 
 
-# The model a workspace gets when it hasn't picked one. OpenRouter slug.
-DEFAULT_CHAT_MODEL = "x-ai/grok-4.3"
+# The model Chippi runs on. OpenRouter slug. Mirrors DEFAULT_CHAT_MODEL in
+# lib/chat-models.ts.
+DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-pro"
 
-# Allowlist of realtor-selectable models — mirrors CHAT_MODELS in lib/llm.ts.
+# Allowlist resolve_chat_model() accepts (anything else falls back to the
+# default): the chat model + the swarm worker model (settings.worker_model).
+# The per-workspace picker was removed, so this is an internal allowlist, not a
+# user-facing menu.
 CHAT_MODELS: tuple[str, ...] = (
-    "openai/gpt-5.5",
-    "anthropic/claude-opus-4.7",
-    "x-ai/grok-4.3",
-    "moonshotai/kimi-k2.6",
-    "qwen/qwen3.6-flash",
+    "deepseek/deepseek-v4-pro",
+    "tencent/hy3-preview",
 )
 
 # Embedding model — OpenRouter and OpenAI resolve this to the same
