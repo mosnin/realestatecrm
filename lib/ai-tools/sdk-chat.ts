@@ -39,6 +39,7 @@ import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import { getChatTools } from './toolsets';
+import { withLoopGuard } from './loop-guard';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
@@ -147,7 +148,10 @@ export function buildChatAgent(
   return new Agent({
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
-    tools: [delegateTool, ...domainTools, ...(opts.integrationTools ?? [])],
+    // Loop guard: stop the model from re-calling the same tool with the same
+    // args and burning the turn (code-level smart-stop + retry nudge, no extra
+    // model calls). Fresh per turn — these tool instances aren't shared.
+    tools: withLoopGuard([delegateTool, ...domainTools, ...(opts.integrationTools ?? [])]),
     model: agentModel,
     // Chat completions across every OpenRouter provider. maxTokens caps the
     // pre-charge (see DEFAULT_MAX_TOKENS). No `reasoning` setting: that's a
