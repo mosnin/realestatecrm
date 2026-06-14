@@ -13,6 +13,7 @@
 
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
+import { isPlatformAdmin } from '@/lib/permissions';
 import type { Workflow } from '@/lib/plans';
 
 export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
@@ -35,6 +36,11 @@ export class CreditsExhaustedError extends Error {
  */
 export async function assertCanSpend(spaceId: string, workflow: Workflow, units = 1): Promise<void> {
   if (!CREDITS_ENFORCED) return;
+  // Platform admins (the team with /admin dashboard access) get unlimited usage
+  // for app testing — never blocked by the credit gate. Usage is still recorded;
+  // only the up-front gate is skipped. Checked after the enforcement guard so it
+  // adds zero overhead while CREDITS_ENFORCED is off.
+  if (await isPlatformAdmin()) return;
   const { account } = await resolveBillingAccount(spaceId);
   const balance = await getCreditBalance(account);
   if (balance < workflowCost(workflow, units)) {

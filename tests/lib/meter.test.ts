@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock the account resolver and the DB spend/balance calls so we can exercise
 // the enforcement semantics without a database. workflowCost stays REAL (reads
 // lib/plans.ts) so chat_turn=1 is what actually gates here.
-const { resolveMock, balanceMock, spendMock } = vi.hoisted(() => ({
+const { resolveMock, balanceMock, spendMock, isAdminMock } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   balanceMock: vi.fn(),
   spendMock: vi.fn(),
+  isAdminMock: vi.fn(),
 }));
 
+vi.mock('@/lib/permissions', () => ({ isPlatformAdmin: isAdminMock }));
 vi.mock('@/lib/billing/account', () => ({ resolveBillingAccount: resolveMock }));
 vi.mock('@/lib/billing/credits', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/billing/credits')>();
@@ -28,6 +30,8 @@ describe('credit enforcement (meter)', () => {
     resolveMock.mockReset();
     balanceMock.mockReset();
     spendMock.mockReset();
+    isAdminMock.mockReset();
+    isAdminMock.mockResolvedValue(false); // default: not a platform admin (real gating)
     resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' } });
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -48,6 +52,15 @@ describe('credit enforcement (meter)', () => {
     balanceMock.mockResolvedValue(1);
     const { assertCanSpend } = await loadMeter(true);
     await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+  });
+
+  it('platform admins get unlimited usage — never blocked, even at zero balance', async () => {
+    balanceMock.mockResolvedValue(0); // broke
+    isAdminMock.mockResolvedValue(true);
+    const { assertCanSpend } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+    // Bypassed before it ever reads a balance.
+    expect(balanceMock).not.toHaveBeenCalled();
   });
 
   it('chargeWorkflow debits via spendCredits when ON', async () => {
