@@ -38,6 +38,7 @@ import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { isPlatformAdmin } from '@/lib/permissions';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { saveBrokerUserMessage, saveBrokerAssistantMessage } from '@/lib/agent/broker-persistence';
@@ -470,6 +471,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Platform admins get unlimited usage — exempt from the budget gate.
+    // Token usage is still recorded downstream, so admin consumption is tracked.
+    let isAdmin = false;
+    try {
+      isAdmin = await isPlatformAdmin();
+    } catch (err) {
+      logger.warn('[ai/broker-task] admin check failed, treating as non-admin', { brokerageId }, err);
+    }
+
     // Daily token budget — gate against the runtime (funding) space, BEFORE
     // any persistence. Fails OPEN so a transient DB error can't block a
     // legitimate turn. Default matches the AgentSettings column default
@@ -486,7 +496,7 @@ export async function POST(req: NextRequest) {
       const dailyTokenBudget: number =
         ((settingsResult.data as { dailyTokenBudget?: number | null } | null)
           ?.dailyTokenBudget as number | null | undefined) ?? 50_000;
-      if (usageResult.total >= dailyTokenBudget) {
+      if (!isAdmin && usageResult.total >= dailyTokenBudget) {
         logger.warn('[ai/broker-task] daily token budget exceeded', {
           brokerageId,
           runtimeSpaceId,
