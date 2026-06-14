@@ -13,6 +13,7 @@ from errors import from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
 from tools.base import idempotent_tool, with_retry
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -218,6 +219,30 @@ async def create_contact(
 
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
+# Lead category (Contact.leadType) — buyer vs renter vs seller. This is a
+# SEPARATE axis from the pipeline stage (Contact.type / new_pipeline_type
+# above). "Renter"/"rental" is a leadType, NOT a pipeline stage — see the
+# `lead_type` parameter on update_contact below. Mirrors the DB check
+# constraint on "Contact"."leadType" and create_contact's valid set.
+_VALID_LEAD_TYPES = {"buyer", "rental", "seller"}
+
+# Spoken/written synonyms the model may pass → canonical leadType. Lets
+# "renter" map to the stored "rental" without the realtor learning our enum.
+_LEAD_TYPE_ALIASES = {
+    "renter": "rental",
+    "rent": "rental",
+    "rental": "rental",
+    "tenant": "rental",
+    "lease": "rental",
+    "buyer": "buyer",
+    "buy": "buyer",
+    "purchaser": "buyer",
+    "seller": "seller",
+    "sell": "seller",
+    "listing": "seller",
+    "vendor": "seller",
+}
+
 
 @function_tool(strict_mode=False)
 @idempotent_tool
@@ -226,6 +251,7 @@ async def update_contact(
     contact_id: str,
     reason: str,
     add_tags: list[str] | None = None,
+    lead_type: str | None = None,
     new_pipeline_type: str | None = None,
     follow_up_date: str | None = None,
     brief: str | None = None,
@@ -233,7 +259,12 @@ async def update_contact(
     re_engaged_signal: str | None = None,
 ) -> dict[str, Any]:
     """Update a contact; pass only the fields you want to change."""
-    # add_tags: up to 5 merged with existing. new_pipeline_type: QUALIFICATION|TOUR|APPLICATION.
+    # add_tags: up to 5 merged with existing.
+    # lead_type: the lead CATEGORY — buyer | rental (a.k.a. renter) | seller.
+    #   Use this to make someone a "renter/rental lead" (lead_type='rental') or
+    #   a "buyer"/"seller" lead. This is NOT the pipeline stage.
+    # new_pipeline_type: the pipeline STAGE — QUALIFICATION|TOUR|APPLICATION.
+    #   Do NOT pass buyer/rental/seller here; those are lead_type values.
     # follow_up_date: ISO date. brief: 2-3 sentence agent summary (high-importance memory).
     # score_explanation: plain-English reason for lead score (stored as memory).
     # re_engaged_signal: short string; boosts lead score +12 and logs re-engagement.
@@ -244,7 +275,7 @@ async def update_contact(
 
     check = await (
         db.table("Contact")
-        .select("id,name,type,tags,leadScore")
+        .select("id,name,type,leadType,tags,leadScore")
         .eq("id", contact_id)
         .eq("spaceId", space_id)
         .maybe_single()
@@ -274,11 +305,61 @@ async def update_contact(
             })
             summary_parts.append(f"tagged {clean_tags}")
 
+    # ── Lead type (buyer / rental / seller) ──
+    # The lead CATEGORY, distinct from the pipeline stage. "Make X a renter
+    # lead" lands here as lead_type='renter' → normalized to 'rental'. This is
+    # the correct home for buyer/rental/seller; the previous gap (only
+    # new_pipeline_type existed) is what made the agent mis-route 'rental' into
+    # the pipeline enum and hit the confusing QUALIFICATION/APPLICATION/TOUR error.
+    if lead_type:
+        normalized = _LEAD_TYPE_ALIASES.get(lead_type.strip().lower())
+        if normalized not in _VALID_LEAD_TYPES:
+            agent_err = from_supabase_error({
+                "message": (
+                    "lead_type must be one of buyer, rental (renter), or seller — "
+                    f"got '{lead_type}'."
+                ),
+                "code": None,
+            })
+            return {
+                "error": agent_err.message,
+                "code": agent_err.code,
+                "retryable": agent_err.retryable,
+            }
+        old_lead_type = contact.get("leadType") or "buyer"
+        if old_lead_type != normalized:
+            update["leadType"] = normalized
+            activities.append({
+                "type": "note",
+                "content": f"[Agent] Lead type changed: {old_lead_type} → {normalized}. {reason}",
+                "metadata": {
+                    "source": "agent",
+                    "oldLeadType": old_lead_type,
+                    "newLeadType": normalized,
+                },
+            })
+            summary_parts.append(f"lead type → {normalized}")
+
     # ── Pipeline type ──
     if new_pipeline_type:
         if new_pipeline_type not in _VALID_TYPES:
-            agent_err = from_supabase_error({"message": f"new_pipeline_type must be one of {_VALID_TYPES}", "code": None})
-            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+            # Catch the common confusion: buyer/rental/seller are lead_type
+            # values, not pipeline stages. Point the model at the right field
+            # instead of just rejecting with the bare stage enum.
+            if new_pipeline_type.strip().lower() in _LEAD_TYPE_ALIASES:
+                msg = (
+                    f"'{new_pipeline_type}' is a lead category, not a pipeline stage. "
+                    "Use the lead_type parameter (buyer | rental | seller) for that; "
+                    f"new_pipeline_type must be one of {_VALID_TYPES}."
+                )
+            else:
+                msg = f"new_pipeline_type must be one of {_VALID_TYPES}"
+            agent_err = from_supabase_error({"message": msg, "code": None})
+            return {
+                "error": agent_err.message,
+                "code": agent_err.code,
+                "retryable": agent_err.retryable,
+            }
         old_type = contact.get("type", "QUALIFICATION")
         if old_type != new_pipeline_type:
             update["type"] = new_pipeline_type
@@ -381,3 +462,52 @@ async def update_contact(
         )
 
     return {"ok": True, "contactId": contact_id, "changes": summary_parts or ["no-op"]}
+
+
+@function_tool(strict_mode=False)
+async def delete_contact(
+    ctx: RunContextWrapper[AgentContext],
+    contact_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a contact; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Deletes ContactActivity and related rows via DB cascade. Prefer archiving
+    # (update_contact tags / status) when the realtor only wants it hidden.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Contact")
+        .select("id,name")
+        .eq("id", contact_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    name = check.data.get("name") or "this contact"
+
+    if not confirmed:
+        return confirmation_required(
+            entity="contact", label=name, entity_id=contact_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Contact",
+        entity="contact",
+        entity_id=contact_id,
+        label=name,
+        reason=reason,
+    )

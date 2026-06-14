@@ -62,6 +62,7 @@ export const TOOLSETS: Record<string, readonly string[]> = {
     'mark_person_hot',
     'mark_person_cold',
     'archive_person',
+    'delete_contact',
     'merge_persons',
   ],
   deals: [
@@ -73,15 +74,17 @@ export const TOOLSETS: Record<string, readonly string[]> = {
     'attach_property_to_deal',
     'mark_deal_won',
     'mark_deal_lost',
+    'delete_deal',
     'add_checklist_item',
     'find_stuck_deals',
   ],
-  tours: ['schedule_tour', 'reschedule_tour', 'cancel_tour', 'find_tours'],
+  tours: ['schedule_tour', 'reschedule_tour', 'cancel_tour', 'delete_tour', 'find_tours'],
   properties: [
     'find_property',
     'find_comparable_properties',
     'add_property',
     'update_property_status',
+    'delete_property',
     'note_on_property',
   ],
   calendar: ['check_availability', 'block_time', 'propose_tour_times'],
@@ -94,10 +97,10 @@ export const TOOLSETS: Record<string, readonly string[]> = {
 
 /** Keyword → toolset. Over-inclusive by design; mirrors router.ts regex style. */
 const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
-  ['people', /\b(person|people|contact|lead|buyer|seller|prospect|client|merge|archive|hot|cold|warm|follow|meeting|call|note)\b/i],
-  ['deals', /\b(deal|stage|won|lost|clos(?:e|ing)|offer|checklist|value|price|probability|stuck|stalled|escrow)\b/i],
-  ['tours', /\b(tour|showing|visit|walk-?through|open house)\b/i],
-  ['properties', /\b(propert\w*|listing\w*|home|house|unit|comp|comparable|address|mls)\b/i],
+  ['people', /\b(person|people|contact|lead|buyer|seller|prospect|client|merge|archive|delete|remove|hot|cold|warm|follow|meeting|call|note)\b/i],
+  ['deals', /\b(deal|stage|won|lost|clos(?:e|ing)|offer|checklist|value|price|probability|stuck|stalled|escrow|delete|remove)\b/i],
+  ['tours', /\b(tour|showing|visit|walk-?through|open house|delete|remove)\b/i],
+  ['properties', /\b(propert\w*|listing\w*|home|house|unit|comp|comparable|address|mls|delete|remove)\b/i],
   ['calendar', /\b(calendar|availab\w*|book|slot|appointment|busy|free|block|agenda)\b/i],
   ['comms', /\b(send|email|sms|text|message|packet|reply|forward|reach|outreach|blast)\b/i],
   ['pipeline', /\b(pipeline|quiet|overdue|stuck|stalled|at[\s-]?risk|priority|leak)\b/i],

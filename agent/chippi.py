@@ -10,13 +10,15 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (36 tools):
-  - create_contact / find_contacts / get_contact_activity / update_contact
-  - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
+Tool surface:
+  - create_contact / find_contacts / get_contact_activity / update_contact /
+    delete_contact (two-step confirmed gate)
+  - create_deal / find_deals / update_deal / advance_deal_stage /
+    request_deal_review / delete_deal (two-step confirmed gate)
   - recall_docs
-  - book_tour
+  - book_tour / delete_tour (two-step confirmed gate)
   - route_lead
-  - add_property / send_property_packet
+  - add_property / send_property_packet / delete_property (two-step confirmed gate)
   - recall_memory / store_memory
   - manage_goal
   - draft_message / send_email_now / send_sms_now
@@ -43,8 +45,21 @@ from tools.activities import log_activity_run
 from tools.docs import recall_docs
 from tools.plan import create_plan
 from tools.attachments import read_attachment
-from tools.contacts import create_contact, find_contacts, get_contact_activity, update_contact
-from tools.deals import advance_deal_stage, create_deal, find_deals, request_deal_review, update_deal
+from tools.contacts import (
+    create_contact,
+    delete_contact,
+    find_contacts,
+    get_contact_activity,
+    update_contact,
+)
+from tools.deals import (
+    advance_deal_stage,
+    create_deal,
+    delete_deal,
+    find_deals,
+    request_deal_review,
+    update_deal,
+)
 from tools.drafts import draft_message, send_email_now, send_sms_now
 from tools.goals import manage_goal
 from tools.routines import manage_routines
@@ -53,10 +68,10 @@ from tools.memory_tools import recall_memory, store_memory
 from tools.outcome import outcome
 from tools.portfolio import analyze_portfolio
 from tools.priority import generate_priority_list
-from tools.properties import add_property, send_property_packet
+from tools.properties import add_property, delete_property, send_property_packet
 from tools.questions import ask_realtor
 from tools.routing import route_lead
-from tools.tours import book_tour
+from tools.tours import book_tour, delete_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 from tools.studio import generate_studio_image, edit_studio_image
 
@@ -133,6 +148,17 @@ question, no menu. Don't re-confirm what the realtor explicitly asked.
 - Never claim a write you didn't execute.
 - Never change deal status, value, or title from chat — realtor's call.
   Probability and follow-up dates are fine.
+- Deletes are irreversible and two-step. delete_contact / delete_deal /
+  delete_property / delete_tour first return requires_confirmation; relay
+  that to the realtor, get an explicit yes, THEN re-call the SAME tool with
+  confirmed=true. Never pass confirmed=true on the first call, and never
+  delete in an autonomous/sweep run. Prefer the reversible option (archive a
+  contact, mark a deal lost, set a property off_market, cancel a tour) unless
+  the realtor clearly wants the record gone.
+- "Renter/rental lead", "buyer lead", "seller lead" set the lead CATEGORY:
+  call update_contact with lead_type ('rental' for renter, 'buyer', 'seller').
+  That is NOT the pipeline stage (new_pipeline_type = QUALIFICATION|TOUR|
+  APPLICATION) — never put buyer/rental/seller in new_pipeline_type.
 - For intake form edits, always get_intake_form first; confirm wholesale
   rewrites (save_intake_form) before calling.
 - On tool error, surface briefly and move on. Don't loop.
@@ -229,19 +255,23 @@ def make_chippi_agent(
         find_contacts,
         get_contact_activity,
         update_contact,
+        delete_contact,
         # Deals + lifecycle
         create_deal,
         find_deals,
         update_deal,
         advance_deal_stage,
         request_deal_review,
+        delete_deal,
         # Tours
         book_tour,
+        delete_tour,
         # Routing (brokerages)
         route_lead,
         # Properties + packets
         add_property,
         send_property_packet,
+        delete_property,
         # Memory
         recall_memory,
         store_memory,
