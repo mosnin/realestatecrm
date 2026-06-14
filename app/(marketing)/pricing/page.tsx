@@ -1,19 +1,18 @@
 /**
- * `/pricing` — Chippi V2 three-layer pricing.
+ * `/pricing`, Chippi V2 tiers on the bold-canvas system.
  *
- * Layer 1: platform tiers for individuals (Free / Solo / Pro Performer) and
- * teams (Team / Team Plus). Layer 2: brokerage expansion (auto-expanding
- * per-agent pricing). Premium AI workflows draw from a monthly credit balance.
+ * No free tier: every plan starts with a 7-day trial that requires a card.
+ * Individuals (Solo / Pro), teams (Team / Team Plus), then brokerage expansion.
+ * Premium AI workflows draw from a monthly credit balance.
  *
- * Numbers come from `lib/plans` so the marketing page can't drift from the
- * product's source of truth. Marketing visual system (studio): serif Times for
- * prices, orange accents allowed.
+ * Numbers come from `lib/plans` so the page can't drift from the product's
+ * source of truth.
  */
 
 import Link from 'next/link';
-import { MarketingHero } from '@/components/marketing/marketing-hero';
-import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { ArrowRight } from 'lucide-react';
+import { PageHero } from '@/components/marketing/site/page-hero';
+import { Reveal } from '@/components/marketing/site/reveal';
 import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
 
 export const metadata = { title: 'Pricing · Chippi' };
@@ -27,16 +26,13 @@ type Card = {
   featured?: boolean;
 };
 
-// Every offered plan is paid — there is no free tier on this page. Self-serve
-// plans start with a 7-day Stripe trial (card collected at checkout, charged
-// when the trial ends). PLANS.free remains an internal fallback state only.
 const INDIVIDUAL: Card[] = [
-  { id: 'solo', blurb: 'Organize your pipeline and start using AI workflows.', cta: { label: 'Start Solo', href: SIGNUP } },
-  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start Pro', href: SIGNUP }, featured: true },
+  { id: 'solo', blurb: 'Organize your pipeline and put the core AI workflows to work.', cta: { label: 'Start free trial', href: SIGNUP } },
+  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start free trial', href: SIGNUP }, featured: true },
 ];
 
 const TEAM: Card[] = [
-  { id: 'team', blurb: 'Shared command center for scoring, routing, accountability.', cta: { label: 'Start a team', href: '/demo' } },
+  { id: 'team', blurb: 'A shared command center for scoring, routing, and accountability.', cta: { label: 'Start a team', href: '/demo' } },
   { id: 'team_plus', blurb: 'Brokerage-level workflow without enterprise complexity.', cta: { label: 'Talk to sales', href: '/demo' } },
 ];
 
@@ -47,9 +43,9 @@ const EXPANSION: { range: string; mo: number; yr: number }[] = [
   { range: '100–199 agents', mo: 39, yr: 32 },
 ];
 
-// Premium workflows shown on the pricing table. `chat_turn` is intentionally
-// omitted — the per-turn chat meter is an internal cost ceiling, not one of the
-// advertised "premium workflows" (the copy positions routine chat as ~free).
+// Premium workflows shown on the table. `chat_turn` is intentionally omitted, 
+// the per-turn chat meter is an internal cost ceiling, not an advertised
+// "premium workflow" (routine chat reads as ~free).
 const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
   pipeline_audit: 'Full pipeline audit',
   followup_sequence: 'Follow-up sequence',
@@ -62,16 +58,20 @@ const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>
 
 const FAQ: { q: string; a: string }[] = [
   {
+    q: 'Is there a free plan?',
+    a: 'No. Every plan starts with a 7-day free trial. A card is required to begin, you won’t be charged until the trial ends, and you can cancel anytime before then at no cost.',
+  },
+  {
     q: 'What are credits?',
-    a: 'High-value agentic actions draw from a monthly credit balance — a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
+    a: 'High-value agentic actions draw from a monthly credit balance, a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
   },
   {
     q: 'What happens when I run out of credits?',
-    a: 'Buy a one-time top-up anytime, or upgrade your plan for a larger monthly allocation and a better rate. Your workspace never locks — only the premium AI workflows pause.',
+    a: 'Buy a one-time top-up anytime, or move up a plan for a larger monthly allocation and a better rate. Your workspace never locks, only the premium AI workflows pause.',
   },
   {
     q: 'How does brokerage pricing work?',
-    a: 'Add an agent and billing updates automatically — the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
+    a: 'Add an agent and billing updates automatically, the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
   },
 ];
 
@@ -79,35 +79,45 @@ function PlanCard({ card }: { card: Card }) {
   const p = PLANS[card.id];
   return (
     <div
-      className={`flex flex-col rounded-2xl border p-8 ${
-        card.featured ? 'border-brand/60' : 'border-border/70'
+      className={`flex h-full flex-col rounded-3xl p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 ${
+        card.featured ? 'bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd]' : 'bg-white'
       }`}
     >
-      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+      {card.featured ? (
+        <span className="mb-4 inline-flex w-fit items-center rounded-full bg-[#ff4b29]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#ff4b29]">
+          Most popular
+        </span>
+      ) : null}
+      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
         {p.label}
       </p>
-      <p style={TITLE_FONT} className="mt-4 text-[44px] leading-none tracking-[-0.02em] text-foreground">
-        {p.priceMonthly === 0 ? '$0' : `$${p.priceMonthly}`}
+      <p className="mt-3 text-[40px] font-semibold leading-none tracking-tight text-zinc-950">
+        ${p.priceMonthly}
+        <span className="text-base font-normal text-neutral-500"> /mo</span>
       </p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {p.priceMonthly === 0 ? 'free forever' : 'per month'}
-        {p.includedUsers > 1 ? ` · ${p.includedUsers} users` : ''}
+      <p className="mt-2 text-sm text-neutral-500">
+        {p.includedUsers > 1 ? `${p.includedUsers} users included` : 'for one agent'}
       </p>
-      <p className="mt-5 text-sm text-foreground/85">{card.blurb}</p>
-      <p className="mt-5 text-sm text-foreground">
-        <span style={TITLE_FONT} className="text-xl">
-          {(p.monthlyCredits || p.oneTimeCredits || 0).toLocaleString()}
+      <p className="mt-5 text-sm text-neutral-600">{card.blurb}</p>
+      <p className="mt-5 text-sm">
+        <span className="text-xl font-semibold tracking-tight text-zinc-950">
+          {p.monthlyCredits.toLocaleString()}
         </span>{' '}
-        <span className="text-muted-foreground">
-          credits{p.monthlyCredits ? ' / month' : ' to start'}
-        </span>
+        <span className="text-neutral-500">credits / month</span>
       </p>
-      {p.addUser && (
-        <p className="mt-1 text-xs text-muted-foreground">
+      {p.addUser ? (
+        <p className="mt-1 text-xs text-neutral-500">
           +${p.addUser.priceMonthly}/user · +{p.addUser.credits.toLocaleString()} credits
         </p>
-      )}
-      <Link href={card.cta.href} className={`${PRIMARY_PILL} mt-8 w-full justify-center`}>
+      ) : null}
+      <Link
+        href={card.cta.href}
+        className={`mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-7 text-[15px] font-semibold transition-all duration-150 active:scale-[0.98] ${
+          card.featured
+            ? 'bg-[#ff4b29] text-white hover:bg-[#e84418]'
+            : 'border border-black/10 bg-white text-zinc-950 hover:bg-black/[0.04]'
+        }`}
+      >
         {card.cta.label}
       </Link>
     </div>
@@ -117,55 +127,63 @@ function PlanCard({ card }: { card: Card }) {
 export default function PricingPage() {
   return (
     <>
-      <MarketingHero
-        eyebrow="PRICING"
+      <PageHero
+        eyebrow="Pricing"
         title="Pricing that scales with your team."
-        sub="Every plan starts with a 7-day free trial — card collected at checkout. Premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
+        sub="Every plan starts with a 7-day free trial. Move up as you grow, premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
         primaryCta={{ label: 'Start free trial', href: SIGNUP }}
-        secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
+        secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
       />
 
       {/* Individual plans */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-4xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            For individual agents
-          </p>
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
-            {INDIVIDUAL.map((c) => (
-              <PlanCard key={c.id} card={c} />
+      <section className="px-4 pt-8 sm:px-6 sm:pt-12">
+        <div className="mx-auto max-w-4xl">
+          <Reveal>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              For individual agents
+            </p>
+          </Reveal>
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 sm:gap-8">
+            {INDIVIDUAL.map((c, i) => (
+              <Reveal key={c.id} delay={i * 0.05}>
+                <PlanCard card={c} />
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* Team plans */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-4xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            For teams
-          </p>
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
-            {TEAM.map((c) => (
-              <PlanCard key={c.id} card={c} />
+      <section className="mt-16 px-4 sm:mt-20 sm:px-6">
+        <div className="mx-auto max-w-4xl">
+          <Reveal>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              For teams
+            </p>
+          </Reveal>
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 sm:gap-8">
+            {TEAM.map((c, i) => (
+              <Reveal key={c.id} delay={i * 0.05}>
+                <PlanCard card={c} />
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* Brokerage expansion */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-3xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <Reveal className="mx-auto max-w-3xl">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
             Brokerage expansion
           </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
             Add an agent. Billing updates automatically.
           </h2>
-          <div className="mt-8 overflow-hidden rounded-2xl border border-border/70">
+          <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border/60 text-left text-muted-foreground">
+                <tr className="border-b border-black/5 text-left text-neutral-500">
                   <th className="px-5 py-3 font-medium">Agents</th>
                   <th className="px-5 py-3 font-medium tabular-nums">Monthly / agent</th>
                   <th className="px-5 py-3 font-medium tabular-nums">Annual / agent</th>
@@ -173,97 +191,116 @@ export default function PricingPage() {
               </thead>
               <tbody>
                 {EXPANSION.map((row) => (
-                  <tr key={row.range} className="border-b border-border/60 last:border-0">
-                    <td className="px-5 py-3 text-foreground">{row.range}</td>
-                    <td className="px-5 py-3 tabular-nums text-foreground">${row.mo}</td>
-                    <td className="px-5 py-3 tabular-nums text-foreground">${row.yr}</td>
+                  <tr key={row.range} className="border-b border-black/5 last:border-0">
+                    <td className="px-5 py-3 text-zinc-950">{row.range}</td>
+                    <td className="px-5 py-3 tabular-nums text-zinc-950">${row.mo}</td>
+                    <td className="px-5 py-3 tabular-nums text-zinc-950">${row.yr}</td>
                   </tr>
                 ))}
                 <tr>
-                  <td className="px-5 py-3 text-foreground">200+ agents</td>
-                  <td className="px-5 py-3 text-muted-foreground" colSpan={2}>
-                    Custom — performance pricing available.{' '}
-                    <Link href="/demo" className="text-brand hover:underline">Talk to sales</Link>
+                  <td className="px-5 py-3 text-zinc-950">200+ agents</td>
+                  <td className="px-5 py-3 text-neutral-500" colSpan={2}>
+                    Custom, performance pricing available.{' '}
+                    <Link href="/demo" className="font-medium text-[#ff4b29] hover:underline">Talk to sales</Link>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </Reveal>
       </section>
 
-      {/* Credits explainer */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-3xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+      {/* Credits explainer + top-ups */}
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <Reveal className="mx-auto max-w-3xl">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
             Premium AI workflows
           </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
             Credits are spent when Chippi does real work.
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Every paid plan includes a monthly credit balance. High-value actions cost more; routine ones cost little. Unused credits roll over for 30 days.
+          <p className="mt-3 text-sm leading-relaxed text-neutral-600">
+            Every plan includes a monthly credit balance. High-value actions cost more; routine ones cost little. Unused credits roll over for 30 days.
           </p>
-          <ul className="mt-8 divide-y divide-border/60 border-t border-b border-border/60">
+          <ul className="mt-8 divide-y divide-black/5 overflow-hidden rounded-2xl bg-white shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
             {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[])
               .filter((k) => k in WORKFLOW_LABELS)
               .map((k) => (
-              <li key={k} className="flex items-center justify-between py-3">
-                <span className="text-sm text-foreground">{WORKFLOW_LABELS[k]}</span>
-                <span className="text-sm tabular-nums text-muted-foreground">
-                  {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
-                </span>
-              </li>
-            ))}
+                <li key={k} className="flex items-center justify-between px-5 py-3.5">
+                  <span className="text-sm text-zinc-950">{WORKFLOW_LABELS[k]}</span>
+                  <span className="text-sm tabular-nums text-neutral-500">
+                    {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
+                  </span>
+                </li>
+              ))}
           </ul>
-          <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="mt-10 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
             Need more? One-time top-ups
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {Object.values(TOPUPS).map((t) => (
-              <div key={t.id} className="rounded-2xl border border-border/70 p-5">
-                <p className="text-sm font-medium text-foreground">{t.label}</p>
-                <p style={TITLE_FONT} className="mt-2 text-2xl tabular-nums text-foreground">
+              <div key={t.id} className="rounded-2xl bg-white p-5 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
+                <p className="text-sm font-medium text-zinc-950">{t.label}</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-zinc-950">
                   {t.credits.toLocaleString()}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">credits · ${t.price} one-time</p>
+                <p className="mt-1 text-xs text-neutral-500">credits · ${t.price} one-time</p>
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* FAQ */}
-      <section className="relative py-16 md:py-24">
-        <div className="max-w-3xl mx-auto px-6 md:px-8">
-          <div className="text-center">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          <Reveal className="text-center">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
               Questions
             </p>
-            <h2
-              style={TITLE_FONT}
-              className="mt-4 text-[34px] sm:text-[44px] tracking-[-0.02em] text-foreground"
-            >
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
               What people ask first.
             </h2>
-          </div>
-          <ul className="mt-14 divide-y divide-border/60 border-t border-b border-border/60">
+          </Reveal>
+          <ul className="mt-12 divide-y divide-black/5">
             {FAQ.map((item) => (
-              <li key={item.q} className="py-8">
-                <p className="text-base md:text-lg font-medium text-foreground">{item.q}</p>
-                <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">{item.a}</p>
+              <li key={item.q} className="py-7">
+                <p className="text-base font-semibold text-zinc-950">{item.q}</p>
+                <p className="mt-2.5 text-sm leading-relaxed text-neutral-600">{item.a}</p>
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      <MarketingCTA
-        title="Start your free trial. Grow when you’re ready."
-        sub="Seven days free, cancel anytime. Bring your inbox and let Chippi do the work."
-        primaryCta={{ label: 'Start free trial', href: SIGNUP }}
-        secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
-      />
+      {/* Closing CTA */}
+      <section className="mt-24 px-4 pb-24 sm:mt-32 sm:px-6 sm:pb-32">
+        <Reveal className="mx-auto max-w-5xl">
+          <div className="rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] px-6 py-16 text-center shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:px-10">
+            <h2 className="mx-auto max-w-xl text-3xl font-semibold leading-tight tracking-tight text-zinc-950 sm:text-4xl">
+              Try Chippi free for 7 days.
+            </h2>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href={SIGNUP}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
+              >
+                Start free trial
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/demo"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white px-7 text-[15px] font-semibold text-zinc-950 transition-colors duration-150 hover:bg-black/[0.04]"
+              >
+                Book a demo
+              </Link>
+            </div>
+            <p className="mt-4 text-xs text-neutral-500">
+              Card required · cancel anytime before day 7 at no charge.
+            </p>
+          </div>
+        </Reveal>
+      </section>
     </>
   );
 }
