@@ -32,8 +32,8 @@ describe('creditsForCostUsd', () => {
     expect(creditsForCostUsd(0.0001)).toBe(1);
   });
   it('scales with cost (ceil of cost / budget)', () => {
-    expect(creditsForCostUsd(0.0175)).toBe(2);   // grok turn
-    expect(creditsForCostUsd(0.175)).toBe(14);   // Claude Opus turn
-    expect(creditsForCostUsd(0.30)).toBe(24);    // gpt-5.5 turn
+    expect(creditsForCostUsd(0.0065)).toBe(1);   // exactly one budget unit
+    expect(creditsForCostUsd(0.0066)).toBe(2);   // just over one unit
+    expect(creditsForCostUsd(0.05)).toBe(8);     // ceil(0.05 / 0.0065)
   });
 });
