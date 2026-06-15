@@ -110,11 +110,11 @@ export function AgentCanvas() {
   return (
     <Band className="py-24 sm:py-32">
       {/* Header: eyebrow + serif headline (left), three mini-features (right) */}
-      <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
         <BlurRise>
           <div>
             <Eyebrow>Your AI cowork</Eyebrow>
-            <Serif className="mt-5 text-[2.25rem] leading-[1.05] text-white sm:text-[3.25rem]">
+            <Serif className="mt-5 text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.02] text-white">
               Built to handle
               <br className="hidden sm:block" /> the whole deal.
             </Serif>
@@ -140,7 +140,7 @@ export function AgentCanvas() {
       <BlurRise delay={0.12}>
         <div className="mt-12 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
           <div
-            className="grid lg:grid-cols-[0.82fr_1.18fr]"
+            className="grid lg:grid-cols-[0.66fr_1.34fr]"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
             onFocusCapture={() => setPaused(true)}
@@ -243,7 +243,7 @@ export function AgentCanvas() {
                     animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     exit={reduce ? undefined : { opacity: 0, y: -8, filter: 'blur(8px)' }}
                     transition={{ duration: 0.5, ease: EASE_OUT }}
-                    className="w-full max-w-lg"
+                    className="w-full max-w-xl"
                   >
                     <StepMockup step={active} />
                   </motion.div>

@@ -21,7 +21,7 @@ export function Stats() {
     <Band className="py-20 sm:py-28">
       <div className="grid items-center gap-10 lg:grid-cols-[1fr_auto] lg:gap-20">
         <BlurRise>
-          <p className="max-w-md text-xl leading-snug text-white/85 sm:text-[1.6rem] sm:leading-[1.3]">
+          <p className="max-w-lg text-2xl leading-snug text-white/85 sm:text-[2rem] sm:leading-[1.25]">
             The busywork runs itself, so your hours go to closing — Chippi up and
             running on your book in a day.
           </p>
@@ -30,10 +30,10 @@ export function Stats() {
         <BlurRise delay={0.1}>
           <div className="grid grid-cols-3 divide-x divide-white/[0.1]">
             {STATS.map((s) => (
-              <div key={s.label} className="px-5 first:pl-0 sm:px-8">
+              <div key={s.label} className="px-5 first:pl-0 sm:px-10">
                 <Mono className="text-[10px] text-white/40">{s.label}</Mono>
                 <span
-                  className="mt-3 block text-[2.5rem] font-light leading-none tracking-tight tabular-nums text-white sm:text-[3.25rem]"
+                  className="mt-3 block text-[2.75rem] font-light leading-none tracking-tight tabular-nums text-white sm:text-[3.5rem] lg:text-[4.25rem]"
                   style={{ fontFamily: 'var(--font-sans)' }}
                 >
                   {s.value}

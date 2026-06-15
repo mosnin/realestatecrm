@@ -233,8 +233,8 @@ export function Band({
   id?: string;
 }) {
   return (
-    <section id={id} className={cn('px-5 sm:px-8', className)}>
-      <div className={cn('mx-auto w-full max-w-6xl', innerClassName)}>{children}</div>
+    <section id={id} className={cn('px-5 sm:px-8 lg:px-10', className)}>
+      <div className={cn('mx-auto w-full max-w-[1728px]', innerClassName)}>{children}</div>
     </section>
   );
 }

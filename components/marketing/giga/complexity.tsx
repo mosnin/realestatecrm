@@ -38,7 +38,7 @@ export function Complexity() {
         <div className="lg:sticky lg:top-28 lg:self-start">
           <BlurRise>
             <Eyebrow>Built for complexity</Eyebrow>
-            <Serif className="mt-5 text-[2.25rem] leading-[1.06] text-white sm:text-[3rem]">
+            <Serif className="mt-5 text-[clamp(2.25rem,4vw,3.75rem)] leading-[1.04] text-white">
               Built to handle the
               <br className="hidden sm:block" /> complexity of a brokerage.
             </Serif>
