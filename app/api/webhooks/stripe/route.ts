@@ -353,9 +353,19 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ──────────────────────────────────────────
         const spaceId = session.metadata?.spaceId;
         if (!spaceId) break;
+
+        // Derive the plan from the LIVE subscription price (source of truth),
+        // falling back to the checkout-time metadata.plan. Without this the
+        // Space stayed on 'free' until the first invoice.payment_succeeded —
+        // a customer who completed checkout (and is being charged / trialing)
+        // saw a free tier and the wrong feature gating until the next webhook.
+        const checkoutPlan =
+          planIdForStripePrice(subscription.items.data[0]?.price?.id) ??
+          subscription.metadata?.plan ??
+          null;
 
         const updateData: Record<string, unknown> = {
           stripeCustomerId: session.customer as string,
@@ -363,6 +373,10 @@ async function POSTHandler(req: NextRequest) {
           stripeSubscriptionStatus: mapStatus(subscription.status),
           stripePeriodEnd: getPeriodEnd(subscription),
         };
+        if (checkoutPlan) {
+          updateData.plan = checkoutPlan;
+          updateData.planActivatedAt = new Date().toISOString();
+        }
 
         // Track trial usage — only set once, never reset
         if (subscription.status === 'trialing') {
@@ -545,11 +559,30 @@ async function POSTHandler(req: NextRequest) {
         // Verify the subscription's customer owns the target Space before
         // crediting it active — mirrors the customer.subscription.updated guard
         // so a poisoned stripeSubscriptionId can't activate another's space.
-        const { data: paidSpace } = await supabase
+        let { data: paidSpace } = await supabase
           .from('Space')
           .select('id, plan, stripeCustomerId')
           .eq('stripeSubscriptionId', paidSubId)
           .maybeSingle();
+
+        // First-invoice race: the very first invoice.payment_succeeded can beat
+        // checkout.session.completed, so stripeSubscriptionId isn't written yet
+        // and the lookup above misses → the customer is CHARGED but granted 0
+        // credits. Fall back to the spaceId stamped on the subscription metadata
+        // (mirrors the brokerage path, which already keys off metadata). The
+        // customer-ownership guard below still applies, so this can't be abused
+        // to credit a space the payer doesn't own.
+        if (!paidSpace) {
+          const metaSpaceId = paidSub.metadata?.spaceId;
+          if (metaSpaceId) {
+            const { data: bySpaceId } = await supabase
+              .from('Space')
+              .select('id, plan, stripeCustomerId')
+              .eq('id', metaSpaceId)
+              .maybeSingle();
+            paidSpace = bySpaceId;
+          }
+        }
         if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== customerIdOf(paidSub.customer)) {
           logger.error('[stripe-webhook] invoice.payment_succeeded customer mismatch — subscription belongs to a different customer', {
             paidSubId,
@@ -558,13 +591,20 @@ async function POSTHandler(req: NextRequest) {
           });
           break;
         }
-        await supabase
-          .from('Space')
-          .update({
-            stripeSubscriptionStatus: paidStatus,
-            stripePeriodEnd: getPeriodEnd(paidSub),
-          })
-          .eq('stripeSubscriptionId', paidSubId);
+        // Update by the Space id we resolved (not just by stripeSubscriptionId)
+        // so the fallback path also backfills stripeSubscriptionId + customer,
+        // closing the race for every subsequent event.
+        if (paidSpace?.id) {
+          await supabase
+            .from('Space')
+            .update({
+              stripeCustomerId: customerIdOf(paidSub.customer) ?? undefined,
+              stripeSubscriptionId: paidSubId,
+              stripeSubscriptionStatus: paidStatus,
+              stripePeriodEnd: getPeriodEnd(paidSub),
+            })
+            .eq('id', paidSpace.id);
+        }
 
         // Monthly credit grant (best-effort — never break payment processing).
         // Trust the tier stamped on the subscription metadata (set at checkout);
