@@ -503,7 +503,7 @@ async def _run_locked(
     # entity to call against) and again later when loading those tools.
     # The cron path (`/api/cron/routines`) and any caller that already knows
     # the owner can pass it pre-resolved; everyone else does the lookup here.
-    from integrations import load_integration_tools, resolve_owner_user_id
+    from integrations import active_toolkits, load_integration_tools, resolve_owner_user_id
     if not owner_clerk_id:
         owner_clerk_id = await resolve_owner_user_id(space.id) or ""
 
@@ -536,30 +536,51 @@ async def _run_locked(
     # Clerk userId is the entity whose Composio connections we use.
     # Solo realtors: this is them. Brokerages: it's the broker_owner.
     # Empty list when owner has no integrations or Composio is down.
+    # Autonomous runs have no "current user" — use the workspace OWNER's
+    # connected toolkits + Composio entity. Fetch the toolkit list ONCE and
+    # reuse it for tool-loading AND the prompt, so the model is told exactly
+    # what's connected (mirrors the chat path; otherwise it believes nothing
+    # is connected and refuses or loops discovery).
+    connected_toolkits: list[str] = []
     integration_tools: list = []
     try:
         if owner_clerk_id:
-            integration_tools = await load_integration_tools(space.id, owner_clerk_id)
+            connected_toolkits = await active_toolkits(space.id, owner_clerk_id)
+            integration_tools = await load_integration_tools(
+                space.id, owner_clerk_id, toolkits=connected_toolkits
+            )
     except Exception as ie:  # noqa: BLE001
         log.warning("autonomous_load_integration_tools_failed", error=str(ie)[:200])
 
-    # Workspace info — mirrors the chat path so autonomous drafts include
-    # the realtor's intake URL where it's useful.
+    # Workspace info — mirrors the chat path: names the connected integrations
+    # (so the model routes to them and never says "not connected" for a live
+    # toolkit) plus the realtor's intake URL where it's useful.
     _app_url = (settings.app_url or "").rstrip("/")
     # A localhost app_url (NEXT_PUBLIC_APP_URL missing from the Modal secret)
     # must never become a customer-facing intake link in a drafted message.
     if "localhost" in _app_url or "127.0.0.1" in _app_url:
         _app_url = ""
     intake_url = f"{_app_url}/apply/{space.slug}" if _app_url and space.slug else ""
-    workspace_info = (
-        "# Your workspace\n"
-        f"- Workspace: {space.name} (slug: {space.slug})\n"
+    _toolkit_line = (
+        f"- Connected integrations: {', '.join(sorted(connected_toolkits))}\n"
+        if connected_toolkits
+        else "- Connected integrations: (none)\n"
+    )
+    _intake_line = (
         f"- Intake link (share with new leads): {intake_url}\n"
         "- Include the intake link in any contact-facing draft where it"
         " makes sense — when reaching out to a fresh lead, when asking a"
         " prospect to qualify, when nudging someone who never finished"
-        " applying. Use the full URL verbatim; no shortening."
-    ) if intake_url else None
+        " applying. Use the full URL verbatim; no shortening.\n"
+        if intake_url
+        else ""
+    )
+    workspace_info = (
+        "# Your workspace\n"
+        f"- Workspace: {space.name} (slug: {space.slug})\n"
+        + _toolkit_line
+        + _intake_line
+    )
 
     chippi = make_chippi_agent(
         ai_profile_text=ai_profile,

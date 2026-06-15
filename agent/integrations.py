@@ -311,7 +311,13 @@ def _build_curated_tool(
             )
         # 4xx body carries the Composio envelope (possibleFixes, requestId)
         # the model uses to self-correct. 2xx already carries {ok,data,error}.
-        return body_text or json.dumps({"ok": True, "data": None})
+        if not body_text.strip():
+            # Empty 2xx/3xx body is NOT success (this caused false "done").
+            return json.dumps({
+                "ok": False,
+                "error": f"{slug} returned an empty {resp.status_code} response — treat as failed, not done.",
+            })
+        return body_text
 
     # `additionalProperties: True` matches the TS side (lib/integrations/
     # agent-tools.ts) — Composio re-validates server-side anyway, so loose

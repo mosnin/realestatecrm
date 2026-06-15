@@ -227,4 +227,11 @@ async def call_integration_tool(
                 "error": f"Composio proxy returned {resp.status_code} with empty body for {clean_slug}",
             }
         )
-    return body_text or json.dumps({"ok": True, "data": None})
+    if not body_text.strip():
+        # Empty 2xx/3xx body is NOT success — never report an action done
+        # without a real result envelope (this caused the false "email sent").
+        return json.dumps({
+            "ok": False,
+            "error": f"{clean_slug} returned an empty {resp.status_code} response — treat as failed, not done.",
+        })
+    return body_text
