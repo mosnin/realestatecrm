@@ -65,6 +65,7 @@ import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
  *  enough that a leaked task payload can't be replayed against the assets. */
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -382,18 +383,24 @@ function proxyModalStream({
               });
 
             } else if (type === 'tool_call_result') {
-              const toolName = String(evt.tool ?? 'tool');
-              const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
-              const ok = evt.ok !== false;
-              const summary = String(evt.summary ?? '');
+              // Single source of truth for the browser frame — FORWARDS the
+              // rich-card display + data Modal lifted off the tool output
+              // (weather / stats / contacts / deals / properties / option-list
+              // / question-flow / message-draft / …). This is the Modal-path
+              // hop the previous attempt missed.
+              const frame = mapModalToolResultFrame(evt);
+              const { name: toolName, callId, ok, summary, display } = frame;
+              const data = frame.data;
               // Settle the result onto its tool-call block — by call_id when
-              // present, else the most recent still-unresolved tool call.
+              // present, else the most recent still-unresolved tool call. Carry
+              // the rich data/display so the inline card re-renders on reload.
               for (let i = blocks.length - 1; i >= 0; i--) {
                 const b = blocks[i];
                 if (b.type !== 'tool_call') continue;
                 if (callId ? b.callId === callId : !b.result) {
-                  b.result = { ok, summary };
+                  b.result = { ok, summary, data };
                   b.status = ok ? 'complete' : 'error';
+                  if (display) b.display = display;
                   break;
                 }
               }
@@ -410,13 +417,9 @@ function proxyModalStream({
                 }
                 pendingPlanArgs = null;
               }
-              push(controller, {
-                type: 'tool_call_result',
-                name: toolName,
-                ok,
-                summary,
-                callId,
-              });
+              // Spread into a plain object — `push` takes Record<string,unknown>;
+              // the typed frame interface has no index signature.
+              push(controller, { ...frame });
 
             } else if (type === 'done') {
               const finalText =

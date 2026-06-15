@@ -25,6 +25,49 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     return value
 
 
+def _contacts_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Wrap contact rows in the chat-card envelope.
+
+    Returns the `display: "contacts"` shape the chat surface renders as a
+    DataTable: `{contacts: [...], count, summary, display}`. The whole dict
+    rides across as `data` (modal_app.translate → extract_display_payload),
+    and the renderer dispatch reads `data.contacts`. Row fields stay
+    PRIMITIVES the buildContactsTable mapper expects (id, name, email, phone,
+    scoreLabel, leadType, lastContactedAt/followUpAt) — no nested objects.
+
+    Note: `tags` (a list) is dropped from the card rows so the DataTable's
+    primitives-only contract holds; the model still sees counts/names in the
+    summary and the full rows it needs to answer.
+    """
+    contacts = [
+        {
+            "id": r.get("id"),
+            "name": r.get("name"),
+            "email": r.get("email"),
+            "phone": r.get("phone"),
+            "leadType": r.get("leadType"),
+            "leadScore": r.get("leadScore"),
+            "scoreLabel": r.get("scoreLabel"),
+            "followUpAt": r.get("followUpAt"),
+            "lastContactedAt": r.get("lastContactedAt"),
+        }
+        for r in rows
+    ]
+    count = len(contacts)
+    if count == 0:
+        summary = "No matching contacts."
+    elif count == 1:
+        summary = f"Found 1 contact: {contacts[0].get('name') or 'unnamed'}."
+    else:
+        summary = f"Found {count} contacts."
+    return {
+        "contacts": contacts,
+        "count": count,
+        "summary": summary,
+        "display": "contacts",
+    }
+
+
 @function_tool(strict_mode=False)
 async def find_contacts(
     ctx: RunContextWrapper[AgentContext],
@@ -34,13 +77,15 @@ async def find_contacts(
     overdue_followup_only: bool = False,
     no_followup_quiet_days: int | None = None,
     limit: int = 20,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Find contacts in this space with optional filters."""
     # contact_id: single-contact lookup returns full record (notes, preferences).
     # name_contains: case-insensitive substring. lead_type: rental|buyer.
     # overdue_followup_only: only contacts with followUpAt in the past.
     # no_followup_quiet_days: QUALIFICATION contacts with no follow-up + quiet N+ days.
     # limit: 1-100.
+    # Returns {contacts:[...], count, display:"contacts"} so the chat renders a
+    # contacts table; the realtor sees the card, not a prose row dump.
     space_id = ctx.context.space_id
     db = await supabase()
     limit = max(1, min(100, limit))
@@ -59,12 +104,17 @@ async def find_contacts(
             .execute()
         )
         if not result.data:
-            return []
+            return _contacts_payload([])
         row = result.data
         for field in ("scoreSummary", "preferences", "notes"):
             if field in row:
                 row[field] = _trim(row[field])
-        return [row]
+        # Single-record lookup: surface the FULL record to the model (notes,
+        # preferences, budget) alongside the card envelope, so a "tell me about
+        # X" answer has the detail while still rendering the contact card.
+        payload = _contacts_payload([row])
+        payload["contact"] = row
+        return payload
 
     query = (
         db.table("Contact")
@@ -96,7 +146,7 @@ async def find_contacts(
         )
 
     result = await query.execute()
-    return result.data or []
+    return _contacts_payload(result.data or [])
 
 
 @function_tool(strict_mode=False)

@@ -21,11 +21,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
-import { ContactsResult } from './tool-results/contacts-result';
-import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
-import { PropertiesResult } from './tool-results/properties-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
+import { ContactsTableResult } from './tool-results/contacts-table-result';
+import { DealsTableResult } from './tool-results/deals-table-result';
+import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
+import { StatsResult } from './tool-results/stats-result';
+import { WeatherResult } from './tool-results/weather-result';
+import { OptionListResult } from './tool-results/option-list-result';
+import { QuestionFlowResult } from './tool-results/question-flow-result';
+import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
+import type { OptionListInput, QuestionFlowInput } from './tool-results/tool-ui-mappers';
+import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
 
 /**
  * Row-level shimmer styles for the running state. A gentle gradient sweep
@@ -275,17 +282,29 @@ export function ToolCallBlockView({
     if (status !== 'complete' || !block.result?.ok) return null;
     const data = block.result.data as Record<string, unknown> | undefined;
     if (!data) return null;
+    // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
+    // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-      return <ContactsResult data={data as { contacts: never[] }} />;
+      return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
     }
-    if (block.display === 'deals' && Array.isArray((data as { deals?: unknown[] }).deals)) {
-      return <DealsResult data={data as { deals: never[] }} />;
+    if (block.display === 'deals') {
+      const deals = normalizeDealRows(data);
+      return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
     }
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;
     }
-    if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
-      return <PropertiesResult data={data as { properties: never[] }} />;
+    if (block.display === 'properties') {
+      const properties = normalizePropertyRows(data);
+      return properties.length > 0 ? (
+        <PropertiesCarouselResult properties={properties} onUserIntent={onUserIntent} />
+      ) : null;
+    }
+    if (block.display === 'stats') {
+      return <StatsResult data={data} />;
+    }
+    if (block.display === 'weather') {
+      return <WeatherResult data={data} />;
     }
     if (
       block.display === 'availability-picker' &&
@@ -306,6 +325,25 @@ export function ToolCallBlockView({
           onSelectSlot={onUserIntent}
         />
       );
+    }
+    // ── Interactive clarification (ask_realtor) ──────────────────────────
+    // A small set of choices → OptionList; the realtor's pick rounds back
+    // through onUserIntent as the next turn.
+    if (block.display === 'option-list' && Array.isArray((data as { options?: unknown[] }).options)) {
+      const d = data as unknown as OptionListInput & { prompt?: string };
+      return <OptionListResult input={d} prompt={d.prompt} onUserIntent={onUserIntent} />;
+    }
+    // A branching / multi-step clarification → QuestionFlow; answers round
+    // back through onUserIntent once complete.
+    if (block.display === 'question-flow') {
+      const d = data as unknown as QuestionFlowInput;
+      return <QuestionFlowResult input={d} onUserIntent={onUserIntent} />;
+    }
+    // ── Email draft awaiting approval (draft_message / draft_email) ───────
+    // MessageDraft with Send / Cancel. Send hits the real approve-and-send
+    // endpoint when a draftId is present, else falls back to onUserIntent.
+    if (block.display === 'message-draft' && typeof (data as { body?: unknown }).body === 'string') {
+      return <MessageDraftResult data={data as unknown as MessageDraftData} onUserIntent={onUserIntent} />;
     }
     return null;
   })();
