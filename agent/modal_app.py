@@ -676,6 +676,9 @@ async def chat_turn(item: dict):
                     extra_tools=integration_tools,
                     workspace_info=workspace_info,
                     model=resolved_model,
+                    email_inbox_connected=any(
+                        tk in ("gmail", "outlook") for tk in connected_toolkits
+                    ),
                 )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})

@@ -87,14 +87,23 @@ verbs ("send", "fire off", "ship it", "text them now") honor immediate
 dispatch. Tentative verbs ("draft", "compose", "prepare") and ambiguous
 intent → draft_message.
 
-# Choosing the email sender (IMPORTANT)
-When the realtor has an email inbox connected (gmail or outlook appears in
-workspace_info), SEND THROUGH IT — use the loaded per-toolkit send tool
-(gmail_send_email / outlook_send_email), or find_integration_tool →
-call_integration_tool if it isn't loaded. That inbox is why they connected
-it: mail must go out as them. Use the native send_email_now ONLY when NO
-inbox is connected (it sends from the CRM's shared address). send_sms_now is
-the native SMS path. If the realtor names a transport ("via Gmail"), honor it.
+# Native (Chippi) tools vs the realtor's connected accounts
+Unprefixed tools (create_contact, find_deals, draft_message, …) are Chippi's
+OWN CRM — the system of record. Prefixed tools (gmail_*, outlook_*, hubspot_*,
+slack_*, googlecalendar_*) are the realtor's CONNECTED external accounts.
+- Email / calendar / social / an external CRM → use the connected external
+  tool (pre-loaded if it's in your list; else find_integration_tool →
+  call_integration_tool). Chippi has NO built-in mailer that sends as the
+  realtor — client email MUST go through their connected inbox.
+- Core pipeline data (contacts, deals, tours, properties) → use Chippi's
+  native tools by default. Use an external CRM (e.g. HubSpot) only when the
+  realtor NAMES it ("in HubSpot", "sync to Salesforce"); if it's ambiguous
+  which CRM they mean, ask once.
+- send_email_now, when present, sends a SYSTEM notification from Chippi's own
+  address — NOT the realtor's inbox. It only appears when no inbox is
+  connected. If no inbox is connected and the realtor wants to email a client,
+  prefer draft_message and suggest connecting Gmail/Outlook. send_sms_now is
+  the native SMS path. If the realtor names a transport ("via Gmail"), honor it.
 
 # Modes
 The opening message tells you which:
@@ -227,6 +236,7 @@ def make_chippi_agent(
     extra_tools: list | None = None,
     workspace_info: str | None = None,
     model: str | None = None,
+    email_inbox_connected: bool = False,
 ) -> Agent:
     """
     Build the single Chippi agent. Constructed fresh per run.
@@ -292,7 +302,6 @@ def make_chippi_agent(
         manage_routines,
         # Drafts + outcomes
         draft_message,
-        send_email_now,
         send_sms_now,
         outcome,
         # Insights
@@ -318,6 +327,12 @@ def make_chippi_agent(
         generate_studio_image,
         edit_studio_image,
     ]
+    # send_email_now sends from Chippi's SYSTEM address (Resend), not the
+    # realtor's inbox — wrong for client correspondence. Only expose it when no
+    # email inbox is connected; with gmail/outlook connected the agent must
+    # route through the inbox tool and can't fall back to a system-branded send.
+    if not email_inbox_connected:
+        base_tools.append(send_email_now)
     return Agent[None](
         name="Chippi",
         model=make_chat_model(resolve_chat_model(model)),

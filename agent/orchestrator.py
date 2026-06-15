@@ -587,6 +587,9 @@ async def _run_locked(
         extra_tools=integration_tools,
         workspace_info=workspace_info,
         model=resolve_chat_model(agent_settings.chat_model),
+        email_inbox_connected=any(
+            tk in ("gmail", "outlook") for tk in connected_toolkits
+        ),
     )
     prompt = _build_opening_prompt(space, memory_context, triggers, instruction)
 
