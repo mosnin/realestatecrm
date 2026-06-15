@@ -22,8 +22,8 @@ import { logger } from '@/lib/logger';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
 import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
-import type { ToolContext } from '@/lib/ai-tools/types';
-import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import type { ToolContext, ToolResult } from '@/lib/ai-tools/types';
+import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { runChatTurn, resumeChatTurn } from '@/lib/ai-tools/sdk-chat';
 import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-mapper';
@@ -32,7 +32,7 @@ import {
   parseSubagentRunId,
   stripSubagentMarker,
 } from '@/lib/ai-tools/tools/delegate-task';
-import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
+import { extractApprovals, serializeRunState, type ToolResultSink } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
@@ -97,7 +97,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
     abortController: input.abortController,
     initialEvents,
     model: input.model,
-    start: async () => {
+    start: async (resultSink) => {
       const history = await historyPromise;
       const { result } = await runChatTurn({
         ctx: input.ctx,
@@ -105,6 +105,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         history,
         model: input.model,
         attachments: input.attachments,
+        resultSink,
       });
       return { result: result as unknown as SdkResultLike };
     },
@@ -128,12 +129,13 @@ export function streamTsResumeTurn(input: StreamResumeInput): Response {
     ctx: input.ctx,
     conversationId: input.conversationId,
     abortController: input.abortController,
-    start: async () => {
+    start: async (resultSink) => {
       const { result } = await resumeChatTurn({
         ctx: input.ctx,
         serializedState: input.serializedState,
         callId: input.callId,
         decision: input.decision,
+        resultSink,
       });
       return { result: result as unknown as SdkResultLike };
     },
@@ -197,8 +199,13 @@ interface BuildStreamInput {
   ctx: ToolContext;
   conversationId: string;
   abortController: AbortController;
-  /** Returns the SDK streamed result. Either fresh or resumed. */
-  start: () => Promise<{ result: SdkResultLike }>;
+  /**
+   * Returns the SDK streamed result. Either fresh or resumed. Receives the
+   * per-turn `resultSink` so the agent's tools can stash their structured
+   * `data`/`display` keyed by call id; the pump reads it back on
+   * `tool_call_result`.
+   */
+  start: (resultSink: ToolResultSink) => Promise<{ result: SdkResultLike }>;
   /**
    * Events to push immediately after the stream opens, before the agent
    * call fires. Used to relay compaction notices assembled before the
@@ -285,6 +292,23 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // live task card.
       const subagentBlocks: MessageBlock[] = [];
 
+      // Rich payloads (data + display) captured from tool handlers, keyed by
+      // SDK call id. The bridge writes here via the sink during execute; we
+      // read it back on the matching tool_call_result to attach the payload to
+      // the SSE frame (and the persisted block) WITHOUT it touching the model's
+      // context. See `ToolResultSink` in sdk-bridge.ts.
+      const richByCallId = new Map<string, { data?: unknown; display?: ToolResult['display'] }>();
+      const resultSink: ToolResultSink = (callId, rich) => {
+        richByCallId.set(callId, rich);
+      };
+
+      // Tool-call blocks for THIS turn, in call order, settled as results
+      // arrive. Persisted so a reloaded conversation re-renders the rich
+      // inline cards (contacts table, weather, …) — previously the TS runtime
+      // saved only text + subagent blocks, so tool cards vanished on refresh.
+      const toolBlocks: ToolCallBlock[] = [];
+      const toolBlockByCallId = new Map<string, ToolCallBlock>();
+
       // Drain any events that were queued before the stream opened
       // (e.g. compaction notice assembled in streamTsChatTurn).
       // We define pushEvent first and call it immediately after.
@@ -335,6 +359,20 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // delegate_task call.
           callIdToToolName.set(event.callId, event.name);
 
+          // Open a tool-call block for persistence; settled on its result.
+          // delegate_task is excluded — it persists as a subagent_task block.
+          if (event.name !== DELEGATE_TASK_TOOL_NAME) {
+            const block: ToolCallBlock = {
+              type: 'tool_call',
+              callId: event.callId,
+              name: event.name,
+              args: event.args,
+              status: 'complete',
+            };
+            toolBlocks.push(block);
+            toolBlockByCallId.set(event.callId, block);
+          }
+
           // Fire-and-forget ExecutionStep logging. Never awaited — must not
           // block or affect the stream in any way.
           void logToolCallStart(
@@ -356,6 +394,30 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             } else {
               void logToolCallError(stepId, event.error ?? event.summary).catch(() => {});
             }
+          }
+
+          // Attach the structured payload the tool stashed in the sink so the
+          // rich inline card (contacts table, weather, …) gets its data. The
+          // mapper only carries the summary string; data/display ride here.
+          const rich = richByCallId.get(event.callId);
+          if (rich) {
+            richByCallId.delete(event.callId);
+            if (rich.data !== undefined) event.data = rich.data;
+            if (rich.display) event.display = rich.display;
+          }
+
+          // Settle the persisted tool-call block so a reloaded conversation
+          // re-renders this card with the same data/display.
+          const block = toolBlockByCallId.get(event.callId);
+          if (block) {
+            block.status = event.ok ? 'complete' : 'error';
+            block.result = {
+              ok: event.ok,
+              summary: event.summary,
+              data: rich?.data,
+              error: event.error,
+            };
+            if (rich?.display) block.display = rich.display;
           }
 
           // delegate_task landed → lift the SwarmRun id out of the summary
@@ -396,7 +458,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
       let result: SdkResultLike;
       try {
-        ({ result } = await input.start());
+        ({ result } = await input.start(resultSink));
       } catch (err) {
         const aborted = (err as { name?: string })?.name === 'AbortError';
         if (!aborted) {
@@ -518,11 +580,14 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // backoff cover the transient-network failure mode; a permanent
         // failure surfaces as an error event so the realtor knows the
         // history is stale and can copy what they need before refreshing.
-        if (textBuffer.trim() || subagentBlocks.length > 0) {
-          // Order: the assistant's prose first, then any delegated task cards
-          // it spawned this turn (so the transcript reads "here's what I did,
-          // and here's the deeper job I kicked off").
+        if (textBuffer.trim() || subagentBlocks.length > 0 || toolBlocks.length > 0) {
+          // Order: tool-call cards first (what Chippi looked up / did — incl.
+          // their rich data/display so the inline cards re-render on reload),
+          // then the assistant's prose, then any delegated task cards. Reads
+          // top-to-bottom as "here's what I did, here's the answer, here's the
+          // deeper job I kicked off".
           const blocks: MessageBlock[] = [
+            ...toolBlocks,
             ...(textBuffer.trim() ? [{ type: 'text', content: textBuffer } as MessageBlock] : []),
             ...subagentBlocks,
           ];

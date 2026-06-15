@@ -80,9 +80,13 @@ import { proposeTourTimesTool } from './propose-tour-times';
 
 // Pipeline aggregates
 import { pipelineSummaryTool } from './pipeline-summary';
+import { workspaceStatsTool } from './workspace-stats';
 import { findStuckDealsTool } from './find-stuck-deals';
 import { findQuietHotPersonsTool } from './find-quiet-hot-persons';
 import { findOverdueFollowupsTool } from './find-overdue-followups';
+
+// Tour prep
+import { getWeatherTool } from './get-weather';
 
 // Communication — drafting + sending + post-hoc logging
 import { draftEmailTool } from './draft-email';
@@ -171,9 +175,13 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Pipeline aggregates ────────────────────────────────────────────────
   pipelineSummaryTool as ToolDefinition,
+  workspaceStatsTool as ToolDefinition,
   findStuckDealsTool as ToolDefinition,
   findQuietHotPersonsTool as ToolDefinition,
   findOverdueFollowupsTool as ToolDefinition,
+
+  // ── Tour prep ──────────────────────────────────────────────────────────
+  getWeatherTool as ToolDefinition,
 
   // ── Communication ──────────────────────────────────────────────────────
   draftEmailTool as ToolDefinition,

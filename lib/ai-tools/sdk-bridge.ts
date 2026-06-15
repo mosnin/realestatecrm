@@ -46,15 +46,39 @@ const DEFAULT_MODEL = 'gpt-5-mini';
 const DEFAULT_MAX_TOKENS = 4_096;
 
 /**
+ * Captures a tool's structured `data` + `display` keyed by the SDK call id.
+ *
+ * The SDK's `execute` can only return the model-visible STRING, so the
+ * structured `ToolResult.data` and `.display` would otherwise be dropped on
+ * the floor — and the rich inline cards (contacts table, weather widget, …)
+ * would never receive their payload. The stream pump (`sdk-chat-stream.ts`)
+ * passes a sink here; we write into it from `execute`, then the pump reads it
+ * back on the matching `tool_call_result` event and attaches `data`/`display`
+ * to the SSE frame. This keeps the structured payload OFF the model's context
+ * (no token cost, unlike encoding it in the summary) while still reaching the UI.
+ */
+export type ToolResultSink = (
+  callId: string,
+  rich: { data?: unknown; display?: ToolResult['display'] },
+) => void;
+
+/** Shape of the SDK's third `execute` arg — only the bit we read (the call id). */
+type ToolCallDetailsLike = { toolCall?: { callId?: string } };
+
+/**
  * Convert one of our tools into an SDK `FunctionTool`.
  *
  * The SDK's `execute` returns the model-visible string. We serialize our
  * structured `ToolResult` so the model still sees the `summary` (which is
- * what it actually reasons over) plus enough of `data` for follow-up
- * decisions. The UI renders `data` separately via the surrounding event
- * stream — same as today.
+ * what it actually reasons over). The structured `data`/`display` are routed
+ * to the optional `sink` (keyed by the SDK call id) so the stream pump can
+ * attach them to the UI event WITHOUT putting the payload in the model's view.
  */
-export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: ToolContext) {
+export function toSdkTool<TArgs, TData>(
+  def: ToolDefinition<TArgs, TData>,
+  ctx: ToolContext,
+  sink?: ToolResultSink,
+) {
   const needsApproval =
     def.requiresApproval === false
       ? false
@@ -84,9 +108,16 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
     parameters: strictifySchema(def.parameters as z.ZodObject<z.ZodRawShape>),
     strict: true,
     needsApproval,
-    async execute(input) {
+    async execute(input, _runCtx, details) {
       try {
         const result: ToolResult = await def.handler(input as never, ctx);
+        // Route the structured payload to the stream pump's sink (keyed by
+        // SDK call id) so the rich card gets `data`/`display` while the model
+        // only ever sees the summary string below.
+        if (sink && (result.data !== undefined || result.display)) {
+          const callId = (details as ToolCallDetailsLike | undefined)?.toolCall?.callId;
+          if (callId) sink(callId, { data: result.data, display: result.display });
+        }
         return serialiseResult(result);
       } catch (err) {
         // A tool handler threw instead of returning { display: 'error' }.

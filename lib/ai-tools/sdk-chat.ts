@@ -31,6 +31,7 @@ import {
   restoreRunState,
   applyApprovalDecision,
   type ApprovalDecision,
+  type ToolResultSink,
 } from './sdk-bridge';
 import { getAgentModel } from './agent-model';
 import { resolveChatModel } from '@/lib/llm';
@@ -116,11 +117,19 @@ export function buildChatAgent(
      * paused run referenced).
      */
     userMessage?: string;
+    /**
+     * Optional sink for tool `data`/`display` keyed by SDK call id. The stream
+     * pump passes this so rich-card payloads reach the UI without entering the
+     * model's context. See `ToolResultSink` in sdk-bridge.ts.
+     */
+    resultSink?: ToolResultSink;
   } = {},
 ): Agent {
   const selectedDomain =
     opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
-  const domainTools = selectedDomain.map((t: ToolDefinition) => toSdkTool(t, ctx));
+  const domainTools = selectedDomain.map((t: ToolDefinition) =>
+    toSdkTool(t, ctx, opts.resultSink),
+  );
 
   // The model every agent in this turn runs on. Either an explicit override
   // (tests / A-B), or the realtor's workspace model resolved to the active
@@ -133,7 +142,7 @@ export function buildChatAgent(
   // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
   // its progress back inline. See tools/delegate-task.ts + the system prompt's
   // "when to delegate" guidance.
-  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
+  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx, opts.resultSink);
 
   // Per-turn sub-agents removed (token redesign L2). `analyze_pipeline`,
   // `research_person`, and `planner` used to be attached as tools on EVERY
@@ -392,6 +401,12 @@ export interface RunChatTurnInput {
    * the card") no longer has to detour through Modal.
    */
   attachments?: MultimodalAttachment[];
+  /**
+   * Sink for tool `data`/`display` keyed by SDK call id. The stream pump
+   * creates this and reads it back to attach rich-card payloads to the SSE
+   * `tool_call_result` frame. See `ToolResultSink` in sdk-bridge.ts.
+   */
+  resultSink?: ToolResultSink;
 }
 
 /**
@@ -417,6 +432,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
     integrationTools: integrations.tools,
     instructions,
     userMessage: input.userMessage,
+    resultSink: input.resultSink,
   });
 
   // The trailing user turn. With attachments, encode SDK-native multimodal
@@ -464,6 +480,9 @@ export interface ResumeChatTurnInput {
    */
   callId: string;
   model?: string | Model;
+  /** Sink for tool `data`/`display` on resumed turns (post-approval tool runs
+   *  can also produce rich cards). See `ToolResultSink` in sdk-bridge.ts. */
+  resultSink?: ToolResultSink;
 }
 
 /**
@@ -483,6 +502,7 @@ export async function resumeChatTurn(input: ResumeChatTurnInput) {
     model: input.model,
     integrationTools: integrations.tools,
     instructions,
+    resultSink: input.resultSink,
   });
   const state = await restoreRunState(agent, input.serializedState);
 
