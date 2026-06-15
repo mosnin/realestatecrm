@@ -391,7 +391,7 @@ async def _dispatch_send_now(
         payload["subject"] = subject
 
     try:
-        async with httpx.AsyncClient(timeout=_SEND_NOW_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_SEND_NOW_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/agent/send",
                 json=payload,

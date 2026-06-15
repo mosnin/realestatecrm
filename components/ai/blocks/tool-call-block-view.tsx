@@ -242,10 +242,13 @@ export function ToolCallBlockView({
           tint: 'text-emerald-600 dark:text-emerald-400',
         };
       case 'error':
+        // Neutral, not red — a failed tool mid-task shouldn't alarm the realtor
+        // (the agent routinely tries a few tools). Same muted tone as the other
+        // terminal states; the XCircle glyph still marks it as failed.
         return {
           label: 'Failed',
           iconEl: <XCircle size={12} />,
-          tint: 'text-rose-600 dark:text-rose-400',
+          tint: 'text-muted-foreground',
         };
       case 'denied':
         return {
@@ -407,7 +410,7 @@ export function ToolCallBlockView({
       {inlineError && (
         <p
           role="status"
-          className="text-[12px] text-rose-700 dark:text-rose-400 mt-1 px-1 leading-snug"
+          className="text-[12px] text-muted-foreground mt-1 px-1 leading-snug"
         >
           {inlineError}
         </p>
@@ -456,10 +459,10 @@ export function ToolCallBlockView({
               )}
               {block.result?.error && block.result.ok === false && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                     Error
                   </p>
-                  <p className="text-xs text-rose-700 dark:text-rose-300">{block.result.error}</p>
+                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{block.result.error}</p>
                 </div>
               )}
             </div>

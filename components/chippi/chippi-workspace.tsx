@@ -946,17 +946,15 @@ export function ChippiWorkspace({
 
   // ── Alive warmup status — Agent (Modal) spin-up ────────────────────────────
   // The FIRST Agent turn of a fresh conversation pays a cold Modal warmup
-  // before the first token (sandbox boot + tool load). That one time, we name
-  // the honest steps — "Setting up the sandbox…" et al — so the longer wait
-  // reads as progress, not a hang. Every later turn reuses the warm sandbox,
-  // so the sandbox copy would be a lie; those turns get a calm cycling
-  // "Thinking…" set instead. Chat turns are a single fast call and use the
-  // same thinking cycle.
+  // before the first token. That one time we cycle a warm "getting ready" set
+  // so the longer wait reads as progress, not a hang — but NEVER infra jargon
+  // like "sandbox" (the realtor must not see our plumbing). Every later turn
+  // (and every Chat turn) reuses the warm path and cycles the calm "Thinking…"
+  // set below instead.
   const AGENT_WARMUP_PHRASES = useMemo(
     () => [
-      'Setting up the sandbox…',
-      'Loading your tools…',
-      'Getting context…',
+      'Getting things ready…',
+      'Warming up…',
       'Lining up the work…',
       'Almost there…',
     ],

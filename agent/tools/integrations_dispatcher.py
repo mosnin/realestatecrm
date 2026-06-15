@@ -77,7 +77,7 @@ async def find_integration_tool(
         })
 
     try:
-        async with httpx.AsyncClient(timeout=_SEARCH_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_SEARCH_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/integrations/search",
                 json={
@@ -104,7 +104,10 @@ async def find_integration_tool(
     try:
         data = resp.json()
     except Exception:
-        return json.dumps({"tools": [], "error": "unparseable response"})
+        # Non-JSON body (an unfollowed redirect, a Vercel HTML page, a wrong
+        # NEXT_PUBLIC_APP_URL) — surface status + snippet so it's diagnosable.
+        snippet = (resp.text or "")[:200].replace("\n", " ").strip()
+        return json.dumps({"tools": [], "error": f"non-JSON response ({resp.status_code}): {snippet}"})
 
     tools = data.get("tools") or []
     logger.info(
@@ -158,7 +161,7 @@ async def call_integration_tool(
     )
 
     try:
-        async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/integrations/execute",
                 json={
