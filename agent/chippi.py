@@ -36,6 +36,8 @@ Tool surface:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import structlog
 from agents import Agent
 
@@ -152,6 +154,10 @@ integration. If a named service is NOT in workspace_info, say it isn't
 connected yet and point them to Settings → Integrations.
 
 # Output discipline
+- Format for skimming: short paragraphs, **bold** the key label/name, and a
+  bullet list whenever you present multiple items (emails, events, contacts,
+  deals) — one line each, e.g. "**Tue 2:00 PM** — Tour at 14 Oak St". Never
+  return a wall of text for a list.
 - After generate_studio_image / edit_studio_image: render inline with
   markdown `![](url)`. Never paste the raw URL or the result dict.
 - After draft_message: quote or paraphrase the `nextStep` string. The
@@ -276,6 +282,19 @@ def make_chippi_agent(
         parts.append(workspace_info)
     if ai_profile_text:
         parts.append(ai_profile_text)
+    # Current date/time goes LAST so the stable, cacheable prefix (instructions
+    # + workspace + profile) isn't busted by the per-run timestamp. The model's
+    # training-era date is wrong; it must use this for "today"/"this week" and
+    # for the ranges it passes to calendar/scheduling tools.
+    _now = datetime.now(timezone.utc)
+    parts.append(
+        "# Current date & time\n"
+        f"Right now it is {_now.strftime('%A, %B %d, %Y, %H:%M')} UTC. Use THIS "
+        'for every relative date ("today", "tomorrow", "this week", "next '
+        'month") and pass concrete ranges derived from it to calendar and '
+        "scheduling tools (e.g. GOOGLECALENDAR_EVENTS_LIST timeMin/timeMax). "
+        "Never assume the date from training."
+    )
     instructions = "\n\n".join(parts)
     base_tools = [
         # Contacts
