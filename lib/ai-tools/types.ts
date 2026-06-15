@@ -81,13 +81,6 @@ export interface ToolResult<TData = unknown> {
    *   for rich inline cards.
    * - `properties` → tool-ui ItemCarousel. `stats` → tool-ui StatsDisplay.
    *   `weather` → tool-ui WeatherWidget (tour-prep forecast).
-   * - `message-draft` → tool-ui MessageDraft (an email draft awaiting
-   *   approval; the card's Send / Cancel hit the real draft approve-send /
-   *   discard endpoints).
-   * - `question-flow` → tool-ui QuestionFlow (multi-step guided
-   *   clarification). `option-list` → tool-ui OptionList (a small set of
-   *   selectable choices). Both round-trip the realtor's answer back as the
-   *   next turn.
    */
   display?:
     | 'contacts'
@@ -98,9 +91,6 @@ export interface ToolResult<TData = unknown> {
     | 'stats'
     | 'weather'
     | 'availability-picker'
-    | 'message-draft'
-    | 'question-flow'
-    | 'option-list'
     | 'plain'
     | 'success'
     | 'error'

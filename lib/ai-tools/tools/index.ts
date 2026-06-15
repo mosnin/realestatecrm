@@ -115,9 +115,6 @@ import { attachFileToPropertyTool } from './attach-file-to-property';
 // Planning
 import { createPlanTool } from './plan';
 
-// Clarification — structured ask (OptionList / QuestionFlow)
-import { askRealtorTool } from './ask-realtor';
-
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
  * intentionally NOT in this list — it gets added at the `registry` layer.
@@ -210,7 +207,4 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,
-
-  // ── Clarification ──────────────────────────────────────────────────────
-  askRealtorTool as ToolDefinition,
 ];

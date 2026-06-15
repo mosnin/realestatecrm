@@ -335,33 +335,3 @@ def result_is_ok(output: Any) -> bool:
         if isinstance(parsed, dict):
             return "error" not in parsed
     return True
-
-
-def extract_display_payload(output: Any) -> tuple[str | None, Any]:
-    """Lift a tool result's `display` hint + structured payload for the chat UI.
-
-    The convention across rich-card tools (tools/weather.py, tools/portfolio.py,
-    tools/questions.py, tools/drafts.py) is to return the widget payload at the
-    TOP LEVEL of the result dict alongside a string `display` key. The chat's
-    block renderer dispatches on `display` and validates the payload, so the
-    whole dict can ride across as `data`.
-
-    Returns `(display, data)`. `display` is `None` when the result carries no
-    display hint (the common case — most tools render as plain text). The
-    Agents SDK sometimes serializes the output to a JSON string, so we parse
-    that too. We never surface a failure result as a card.
-    """
-    candidate: Any = output
-    if isinstance(output, str):
-        try:
-            candidate = json.loads(output)
-        except (json.JSONDecodeError, ValueError):
-            return None, None
-    if not isinstance(candidate, dict):
-        return None, None
-    if "error" in candidate:
-        return None, None
-    display = candidate.get("display")
-    if not isinstance(display, str) or not display:
-        return None, None
-    return display, candidate
