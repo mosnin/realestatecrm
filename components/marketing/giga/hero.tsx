@@ -13,6 +13,7 @@
  */
 
 import Link from 'next/link';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { BlurRise, EyebrowPill, Mono, PillPrimary } from './primitives';
 
@@ -29,6 +30,7 @@ const LOGOS = [
 const DEMO = '/demo';
 
 export function Hero() {
+  const reduce = useReducedMotion();
   return (
     <section className="relative isolate min-h-[100svh] overflow-hidden bg-black">
       {/* Full-bleed background photo + scrims */}
@@ -122,16 +124,24 @@ export function Hero() {
       >
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-6 sm:px-8">
           <Mono className="text-[10px] text-white/40">Trusted across modern brokerages</Mono>
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-12">
-            {LOGOS.map((logo) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={logo.alt}
-                src={logo.src}
-                alt={logo.alt}
-                className="h-5 w-auto opacity-50 grayscale invert transition-opacity hover:opacity-80 sm:h-6"
-              />
-            ))}
+          {/* Marquee: a w-max track holding two copies of the logos, animated
+              x: 0 → -50% (exactly one copy) for a seamless infinite scroll. */}
+          <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)]">
+            <motion.div
+              className="flex w-max items-center gap-x-12 sm:gap-x-16"
+              animate={reduce ? undefined : { x: ['0%', '-50%'] }}
+              transition={reduce ? undefined : { duration: 28, ease: 'linear', repeat: Infinity }}
+            >
+              {[...LOGOS, ...LOGOS].map((logo, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${logo.alt}-${i}`}
+                  src={logo.src}
+                  alt={logo.alt}
+                  className="h-5 w-auto shrink-0 opacity-50 grayscale invert sm:h-6"
+                />
+              ))}
+            </motion.div>
           </div>
         </div>
       </BlurRise>

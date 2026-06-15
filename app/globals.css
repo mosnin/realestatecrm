@@ -1035,8 +1035,14 @@
  *
  * Scoped to the shell so the product (dashboard/app) is completely untouched. */
 [data-marketing-shell] {
-  /* High optical size + light weight = the thin, high-contrast serif voice. */
-  --serif-opsz: 144;
+  /* Marketing headlines use the SAME fonts as the product dashboard so the
+     logged-out site and the app read as one brand: the serif --font-title
+     (Times) for headlines and --font-mono for eyebrows. The component-level
+     --font-serif-display / --font-mono-display vars are re-pointed at the
+     dashboard fonts here, so every inline reference resolves to them without
+     editing each component. */
+  --font-serif-display: var(--font-title);
+  --font-mono-display: var(--font-mono);
 }
 [data-marketing-shell] h1,
 [data-marketing-shell] h2,
@@ -1045,14 +1051,12 @@
 [data-marketing-shell] h5,
 [data-marketing-shell] h6,
 [data-marketing-shell] .font-serif-display {
-  font-family: var(--font-serif-display), Georgia, "Times New Roman", serif;
-  font-variation-settings: "opsz" var(--serif-opsz);
-  font-weight: 300;
+  font-family: var(--font-title), Georgia, "Times New Roman", serif;
   letter-spacing: -0.02em;
 }
 /* Eyebrow labels: uppercase monospace, set apart from the serif headings. */
 [data-marketing-shell] .font-mono-display {
-  font-family: var(--font-mono-display), ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 /* ── Bold-canvas marketing type (logged-out site only) ──────────────────────

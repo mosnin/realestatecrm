@@ -3,19 +3,16 @@
 /**
  * SiteHeader — the dark, cinematic sticky header (reference-matched).
  *
- * Behaviour:
- *  - At the very top, the header is transparent and full-bleed over the hero.
- *  - On scroll it collapses into a glassy ROUNDED floating pill: it pulls in
- *    from the edges, gains a backdrop-blur + semi-transparent near-black fill +
- *    a hairline border + soft shadow, and rounds to a pill. Driven by
- *    framer-motion `useScroll` + `useMotionValueEvent` (a threshold flips a
- *    `scrolled` flag; the bar animates between the two states).
+ * Layout: two FLOATING GLASS PILLS over the hero — the brand + nav on the left,
+ * the actions on the right, with open space between them. Both pills carry a
+ * backdrop-blur + translucent near-black fill + hairline border, and deepen
+ * slightly on scroll (the "blur on scroll"), driven by framer-motion
+ * `useScroll` + `useMotionValueEvent` (a threshold flips a `scrolled` flag).
  *
  * Nav:
- *  - Left: the Chippi logo (white treatment, always-dark site).
- *  - Center/left: Agents (opens a blurred mega-menu of Chippi capabilities),
- *    Brokerages, Pricing.
- *  - Right: "Sign in" (text) + "See a demo" (white rounded-full pill).
+ *  - Left pill: the Chippi logo, then Agents (opens a blurred mega-menu of
+ *    Chippi capabilities), Brokerages, Pricing.
+ *  - Right pill: "Sign in" (text) + "See a demo" (white rounded-full pill).
  *  - Mobile: a full-screen blurred takeover.
  *
  * Copy is Chippi/real-estate; only the visual aesthetic matches the reference.
@@ -126,56 +123,40 @@ export function SiteHeader() {
     show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } },
   };
 
+  // Shared glass-pill styling (animated bg/border deepen on scroll).
+  const pillAnimate = {
+    backgroundColor: scrolled ? 'rgba(12,12,12,0.82)' : 'rgba(12,12,12,0.5)',
+    borderColor: scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.07)',
+  };
+  const pillStyle = { backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as React.CSSProperties;
+  const pillTransition = { duration: reduce ? 0 : 0.35, ease: EASE_OUT };
+
   return (
     <>
-      {/* The header is fixed; on scroll the INNER shell pulls in + rounds into
-          a floating glass pill (the outer wrapper just sets the gutters). */}
       <header ref={navRef} className="fixed inset-x-0 top-0 z-50">
-        <motion.div
-          initial={false}
-          animate={{
-            marginTop: scrolled ? 12 : 0,
-            paddingLeft: scrolled ? 16 : 0,
-            paddingRight: scrolled ? 16 : 0,
-          }}
-          transition={{ duration: reduce ? 0 : 0.35, ease: EASE_OUT }}
-          className="mx-auto w-full max-w-7xl px-3 sm:px-5"
-        >
-          <motion.div
-            initial={false}
-            animate={{
-              backgroundColor: scrolled ? 'rgba(12,12,12,0.72)' : 'rgba(10,10,10,0)',
-              borderColor: scrolled ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0)',
-              borderRadius: scrolled ? 9999 : 0,
-              boxShadow: scrolled
-                ? '0 12px 40px -16px rgba(0,0,0,0.7)'
-                : '0 0px 0px 0px rgba(0,0,0,0)',
-            }}
-            // Safari: framer doesn't type -webkit-backdrop-filter, so set both
-            // statically; they re-apply when `scrolled` changes the className.
-            style={{
-              backdropFilter: scrolled ? 'blur(16px)' : 'blur(0px)',
-              WebkitBackdropFilter: scrolled ? 'blur(16px)' : 'blur(0px)',
-            }}
-            transition={{ duration: reduce ? 0 : 0.35, ease: EASE_OUT }}
-            className="relative border"
-          >
-            <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-              {/* Brand (white logo, always-dark site) */}
-              <Link href="/" aria-label="Chippi home" className="flex items-center" onClick={closeAll}>
+        <div className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-5 sm:pt-4">
+          {/* Two floating glass pills with open space between them. */}
+          <div className="relative flex items-center justify-between gap-3">
+            {/* LEFT pill — brand + desktop nav */}
+            <motion.div
+              initial={false}
+              animate={pillAnimate}
+              transition={pillTransition}
+              style={pillStyle}
+              className="flex items-center gap-0.5 rounded-full border px-1.5 shadow-lg shadow-black/20"
+            >
+              <Link href="/" aria-label="Chippi home" className="flex items-center px-3 py-2.5" onClick={closeAll}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
               </Link>
-
-              {/* Desktop nav */}
-              <nav className="hidden items-center gap-1 lg:flex">
+              <nav className="hidden items-center gap-0.5 lg:flex">
                 <button
                   type="button"
                   aria-expanded={agentsOpen}
                   onClick={() => setAgentsOpen((v) => !v)}
                   onMouseEnter={() => setAgentsOpen(true)}
                   className={cn(
-                    'inline-flex cursor-pointer items-center gap-1 rounded-full px-4 py-2 text-sm transition-colors',
+                    'inline-flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-2 text-sm transition-colors',
                     agentsOpen ? 'text-white' : 'text-white/70 hover:text-white',
                   )}
                 >
@@ -189,40 +170,45 @@ export function SiteHeader() {
                     key={l.href}
                     href={l.href}
                     onClick={closeAll}
-                    className="rounded-full px-4 py-2 text-sm text-white/70 transition-colors hover:text-white"
+                    className="rounded-full px-3.5 py-2 text-sm text-white/70 transition-colors hover:text-white"
                   >
                     {l.label}
                   </Link>
                 ))}
               </nav>
+            </motion.div>
 
-              {/* Right */}
-              <div className="flex items-center gap-2">
-                <Link
-                  href={SIGNIN}
-                  className="hidden rounded-full px-4 py-2 text-sm text-white/70 transition-colors hover:text-white lg:inline-flex"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href={DEMO}
-                  className="hidden h-9 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
-                >
-                  See a demo
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-                <button
-                  type="button"
-                  aria-label="Open menu"
-                  onClick={() => setMobileOpen(true)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/[0.08] lg:hidden"
-                >
-                  <Menu size={20} />
-                </button>
-              </div>
-            </div>
+            {/* RIGHT pill — actions */}
+            <motion.div
+              initial={false}
+              animate={pillAnimate}
+              transition={pillTransition}
+              style={pillStyle}
+              className="flex items-center gap-1 rounded-full border p-1.5 shadow-lg shadow-black/20"
+            >
+              <Link
+                href={SIGNIN}
+                className="hidden rounded-full px-3.5 py-1.5 text-sm text-white/70 transition-colors hover:text-white lg:inline-flex"
+              >
+                Sign in
+              </Link>
+              <Link
+                href={DEMO}
+                className="hidden h-9 items-center rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
+              >
+                See a demo
+              </Link>
+              <button
+                type="button"
+                aria-label="Open menu"
+                onClick={() => setMobileOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/[0.08] lg:hidden"
+              >
+                <Menu size={20} />
+              </button>
+            </motion.div>
 
-            {/* Agents mega-menu — blurred panel, featured story + link grid */}
+            {/* Agents mega-menu — blurred panel, anchored under the left pill */}
             <AnimatePresence>
               {agentsOpen && (
                 <motion.div
@@ -231,7 +217,7 @@ export function SiteHeader() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.98 }}
                   transition={{ duration: reduce ? 0 : 0.2, ease: EASE_OUT }}
-                  className="absolute left-1/2 top-[calc(100%+10px)] hidden w-[760px] max-w-[calc(100vw-2rem)] -translate-x-1/2 lg:block"
+                  className="absolute left-0 top-[calc(100%+10px)] hidden w-[760px] max-w-[calc(100vw-2rem)] lg:block"
                   onMouseLeave={() => setAgentsOpen(false)}
                 >
                   <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0d0d0d]/90 shadow-2xl shadow-black/60 backdrop-blur-2xl">
@@ -254,11 +240,8 @@ export function SiteHeader() {
                             {FEATURED.eyebrow}
                           </p>
                           <p
-                            style={{
-                              fontFamily: 'var(--font-serif-display)',
-                              fontVariationSettings: '"opsz" 144',
-                            }}
-                            className="mt-3 text-[22px] font-light leading-snug text-white"
+                            style={{ fontFamily: 'var(--font-serif-display)' }}
+                            className="mt-3 text-[22px] leading-snug text-white"
                           >
                             {FEATURED.title}
                           </p>
@@ -299,8 +282,8 @@ export function SiteHeader() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </header>
 
       {/* Mobile full-screen takeover */}
@@ -321,7 +304,7 @@ export function SiteHeader() {
               exit={{ y: 12, opacity: 0 }}
               transition={{ duration: reduce ? 0 : 0.3, ease: EASE_OUT }}
             >
-              <div className="flex h-16 items-center justify-between px-5">
+              <div className="flex h-16 items-center justify-between px-5 pt-3">
                 <Link href="/" className="flex items-center" onClick={closeAll}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
@@ -347,11 +330,8 @@ export function SiteHeader() {
                     <Link
                       href={l.href}
                       onClick={closeAll}
-                      style={{
-                        fontFamily: 'var(--font-serif-display)',
-                        fontVariationSettings: '"opsz" 144',
-                      }}
-                      className="block py-2 text-3xl font-light text-white"
+                      style={{ fontFamily: 'var(--font-serif-display)' }}
+                      className="block py-2 text-3xl text-white"
                     >
                       {l.label}
                     </Link>
