@@ -33,30 +33,17 @@ async def analyze_portfolio(
         .eq("spaceId", space_id)
         .eq("status", "active")
     )
-    # Won deals across the last 60 days — split into this-30 vs prior-30 so the
-    # KPI card can show an honest period-over-period change. closedAt is set
-    # when a deal transitions to a terminal status (migration deal_close_metrics).
-    cutoff_60d_iso = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
-    won_query = (
-        db.table("Deal")
-        .select("closedAt")
-        .eq("spaceId", space_id)
-        .eq("status", "won")
-        .gte("closedAt", cutoff_60d_iso)
-    )
 
     try:
-        contacts_res, deals_res, won_res = await asyncio.gather(
+        contacts_res, deals_res = await asyncio.gather(
             contacts_query.execute(),
             deals_query.execute(),
-            won_query.execute(),
         )
     except Exception as exc:
         return {"error": f"Portfolio analysis failed: {exc}"}
 
     contacts: list[dict[str, Any]] = contacts_res.data or []
     deals: list[dict[str, Any]] = deals_res.data or []
-    won_deals: list[dict[str, Any]] = won_res.data or []
 
     now = datetime.now(timezone.utc)
     cutoff_30d = now - timedelta(days=30)
@@ -133,51 +120,6 @@ async def analyze_portfolio(
         if d.get("closeDate") and d["closeDate"] <= closing_cutoff
     )
 
-    # Open-pipeline gross (sum of active deal values) for the KPI card — distinct
-    # from probability-weighted pipeline_value above, which the narrative uses.
-    open_pipeline_value = round(sum((d.get("value") or 0) for d in deals), 2)
-
-    # --- Won-this-period (KPI diff) ---------------------------------------------
-    cutoff_30d_iso = cutoff_30d.isoformat()
-    won_this_30 = 0
-    won_prior_30 = 0
-    for w in won_deals:
-        closed = w.get("closedAt")
-        if not closed:
-            continue
-        if closed >= cutoff_30d_iso:
-            won_this_30 += 1
-        else:
-            won_prior_30 += 1
-    # StatsDisplay renders diff.value as a PERCENT; only meaningful with a
-    # non-zero prior window, else omit (never divide-by-zero or fake a count).
-    won_diff_pct = (
-        round((won_this_30 - won_prior_30) / won_prior_30 * 100)
-        if won_prior_30 > 0
-        else None
-    )
-
-    # KPI card payload (StatsDisplay shape) — surfaced via display:'stats'.
-    stats: list[dict[str, Any]] = [
-        {"key": "contacts", "label": "Active contacts", "value": contact_count,
-         "format": {"kind": "number"}},
-        {"key": "deals", "label": "Open deals", "value": len(deals),
-         "format": {"kind": "number"}},
-        {"key": "pipeline", "label": "Pipeline value", "value": round(open_pipeline_value),
-         "format": {"kind": "currency", "currency": "USD", "decimals": 0}},
-        {
-            "key": "won",
-            "label": "Won (30d)",
-            "value": won_this_30,
-            "format": {"kind": "number"},
-            **(
-                {"diff": {"value": won_diff_pct, "decimals": 0, "label": "vs prior 30d"}}
-                if won_diff_pct is not None
-                else {}
-            ),
-        },
-    ]
-
     # --- Narrative insights -----------------------------------------------------
     insights: list[str] = []
 
@@ -241,17 +183,9 @@ async def analyze_portfolio(
         "rental_pct": rental_pct,
         "buyer_pct": buyer_pct,
         "pipeline_value": pipeline_value,
-        "open_pipeline_value": open_pipeline_value,
         "deals_closing_14d": deals_closing_14d,
-        "won_last_30d": won_this_30,
         "avg_lead_score": avg_lead_score,
         "hot_leads": hot_leads,
         "engagement_rate_pct": engagement_rate_pct,
         "insights": insights,
-        # KPI card (StatsDisplay shape) — the chat surface renders this when
-        # display == 'stats'. Envelope fields (id/title) live alongside `stats`.
-        "id": "workspace-stats",
-        "title": "Workspace snapshot",
-        "stats": stats,
-        "display": "stats",
     }

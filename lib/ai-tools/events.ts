@@ -69,13 +69,6 @@ export interface ToolCallResultEvent extends BaseEvent {
   summary: string;
   /** Optional structured payload for rich rendering. Opaque on the wire. */
   data?: unknown;
-  /**
-   * How the UI should render this result. Carried here (not just on
-   * tool_call_start) because the in-process TS runtime only knows a tool's
-   * `display` once the handler has run — the bridge stashes it in a sink and
-   * the stream pump attaches it to THIS event. See sdk-chat-stream.ts.
-   */
-  display?: ToolResult['display'];
   /** Set when ok === false. */
   error?: string;
 }

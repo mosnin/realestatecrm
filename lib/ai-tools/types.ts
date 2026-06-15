@@ -79,8 +79,6 @@ export interface ToolResult<TData = unknown> {
    * - `warning`  → amber: the tool finished but with an important caveat.
    * - `contacts` / `deals` / `tours` / `notes` / `plain` — neutral hints
    *   for rich inline cards.
-   * - `properties` → tool-ui ItemCarousel. `stats` → tool-ui StatsDisplay.
-   *   `weather` → tool-ui WeatherWidget (tour-prep forecast).
    */
   display?:
     | 'contacts'
@@ -88,8 +86,6 @@ export interface ToolResult<TData = unknown> {
     | 'tours'
     | 'notes'
     | 'properties'
-    | 'stats'
-    | 'weather'
     | 'availability-picker'
     | 'plain'
     | 'success'

@@ -21,14 +21,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { ContactsResult } from './tool-results/contacts-result';
+import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
+import { PropertiesResult } from './tool-results/properties-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
-import { ContactsTableResult } from './tool-results/contacts-table-result';
-import { DealsTableResult } from './tool-results/deals-table-result';
-import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
-import { StatsResult } from './tool-results/stats-result';
-import { WeatherResult } from './tool-results/weather-result';
-import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
 
 /**
  * Row-level shimmer styles for the running state. A gentle gradient sweep
@@ -278,29 +275,17 @@ export function ToolCallBlockView({
     if (status !== 'complete' || !block.result?.ok) return null;
     const data = block.result.data as Record<string, unknown> | undefined;
     if (!data) return null;
-    // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
-    // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-      return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
+      return <ContactsResult data={data as { contacts: never[] }} />;
     }
-    if (block.display === 'deals') {
-      const deals = normalizeDealRows(data);
-      return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
+    if (block.display === 'deals' && Array.isArray((data as { deals?: unknown[] }).deals)) {
+      return <DealsResult data={data as { deals: never[] }} />;
     }
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;
     }
-    if (block.display === 'properties') {
-      const properties = normalizePropertyRows(data);
-      return properties.length > 0 ? (
-        <PropertiesCarouselResult properties={properties} onUserIntent={onUserIntent} />
-      ) : null;
-    }
-    if (block.display === 'stats') {
-      return <StatsResult data={data} />;
-    }
-    if (block.display === 'weather') {
-      return <WeatherResult data={data} />;
+    if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
+      return <PropertiesResult data={data as { properties: never[] }} />;
     }
     if (
       block.display === 'availability-picker' &&

@@ -419,10 +419,6 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
               return {
                 ...b,
                 status: event.ok ? 'complete' : 'error',
-                // The in-process runtime only knows a tool's `display` once the
-                // handler ran, so it rides the result event (not just start).
-                // Prefer it; fall back to whatever start carried.
-                display: event.display ?? b.display,
                 result: {
                   ok: event.ok,
                   summary: event.summary,

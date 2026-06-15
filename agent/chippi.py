@@ -24,7 +24,6 @@ Tool surface:
   - draft_message / send_email_now / send_sms_now
   - outcome
   - analyze_portfolio / generate_priority_list
-  - get_weather (keyless tour-prep forecast)
   - process_inbound_message
   - read_attachment
   - ask_realtor
@@ -71,7 +70,6 @@ from tools.memory_tools import recall_memory, store_memory
 from tools.outcome import outcome
 from tools.portfolio import analyze_portfolio
 from tools.priority import generate_priority_list
-from tools.weather import get_weather
 from tools.properties import add_property, delete_property, send_property_packet
 from tools.questions import ask_realtor
 from tools.routing import route_lead
@@ -160,12 +158,6 @@ connected yet and point them to Settings → Integrations.
   bullet list whenever you present multiple items (emails, events, contacts,
   deals) — one line each, e.g. "**Tue 2:00 PM** — Tour at 14 Oak St". Never
   return a wall of text for a list.
-- Rich cards render automatically from a tool's result: find_contacts ->
-  a contacts table, find_deals -> a deals table, properties -> a carousel,
-  analyze_portfolio -> a KPI card, get_weather -> a forecast widget. When one
-  renders, DON'T re-list every row in prose — add a one-line takeaway instead
-  (e.g. "Three are overdue; want me to draft nudges?"). For KPIs, call
-  analyze_portfolio; for showing weather (tour prep), call get_weather.
 - After generate_studio_image / edit_studio_image: render inline with
   markdown `![](url)`. Never paste the raw URL or the result dict.
 - After draft_message: quote or paraphrase the `nextStep` string. The
@@ -341,8 +333,6 @@ def make_chippi_agent(
         # Insights
         analyze_portfolio,
         generate_priority_list,
-        # Tour prep — keyless weather forecast for a showing
-        get_weather,
         # I/O
         process_inbound_message,
         read_attachment,
