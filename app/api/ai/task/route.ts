@@ -64,7 +64,8 @@ import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
  *  seconds of receiving the task; 30 minutes is plenty of headroom and short
  *  enough that a leaked task payload can't be replayed against the assets. */
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
-import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -382,17 +383,14 @@ function proxyModalStream({
               });
 
             } else if (type === 'tool_call_result') {
-              const toolName = String(evt.tool ?? 'tool');
-              const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
-              const ok = evt.ok !== false;
-              const summary = String(evt.summary ?? '');
-              // Rich-card payload Modal lifted off the tool output (weather /
-              // stats / option-list / question-flow / message-draft / …).
-              const display =
-                typeof evt.display === 'string'
-                  ? (evt.display as ToolCallBlock['display'])
-                  : undefined;
-              const data = 'data' in evt ? evt.data : undefined;
+              // Single source of truth for the browser frame — FORWARDS the
+              // rich-card display + data Modal lifted off the tool output
+              // (weather / stats / contacts / deals / properties / option-list
+              // / question-flow / message-draft / …). This is the Modal-path
+              // hop the previous attempt missed.
+              const frame = mapModalToolResultFrame(evt);
+              const { name: toolName, callId, ok, summary, display } = frame;
+              const data = frame.data;
               // Settle the result onto its tool-call block — by call_id when
               // present, else the most recent still-unresolved tool call. Carry
               // the rich data/display so the inline card re-renders on reload.
@@ -419,15 +417,9 @@ function proxyModalStream({
                 }
                 pendingPlanArgs = null;
               }
-              push(controller, {
-                type: 'tool_call_result',
-                name: toolName,
-                ok,
-                summary,
-                callId,
-                ...(display ? { display } : {}),
-                ...(data !== undefined ? { data } : {}),
-              });
+              // Spread into a plain object — `push` takes Record<string,unknown>;
+              // the typed frame interface has no index signature.
+              push(controller, { ...frame });
 
             } else if (type === 'done') {
               const finalText =

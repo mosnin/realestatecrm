@@ -106,11 +106,27 @@ async def add_property(
     if not result.data:
         return {"error": "insert returned no row"}
 
+    # Card row for the chat surface — display:"properties" renders a carousel.
+    # buildPropertiesCarousel reads address + listPrice + beds/baths (+ a photo
+    # url when present; a fresh property has none, which the mapper omits). The
+    # whole dict rides across as `data`; the renderer reads `data.properties`.
+    # Row values are PRIMITIVES only.
+    property_card = {
+        "id": property_id,
+        "address": address_clean,
+        "listPrice": list_price,
+        "beds": beds,
+        "baths": baths,
+    }
     return {
         "id": property_id,
         "address": address_clean,
         "list_price": list_price,
         "listing_status": status,
+        "ok": True,
+        "properties": [property_card],
+        "summary": f"Added property: {address_clean}.",
+        "display": "properties",
     }
 
 
