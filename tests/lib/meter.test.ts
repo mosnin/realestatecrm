@@ -63,6 +63,45 @@ describe('credit enforcement (meter)', () => {
     expect(balanceMock).not.toHaveBeenCalled();
   });
 
+  // ── Fix #4: delinquency gate ──────────────────────────────────────────
+  it('blocks a canceled subscription even with a leftover balance (delinquency gate)', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'canceled' });
+    balanceMock.mockResolvedValue(9999); // stale balance still sitting there
+    const { assertCanSpend, SubscriptionDelinquentError } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).rejects.toBeInstanceOf(SubscriptionDelinquentError);
+    // Refused before it even reads a balance.
+    expect(balanceMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks a past_due subscription (grace window does not permit metered spend)', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'past_due' });
+    balanceMock.mockResolvedValue(9999);
+    const { assertCanSpend, SubscriptionDelinquentError } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).rejects.toBeInstanceOf(SubscriptionDelinquentError);
+  });
+
+  it('allows a Free account (subscriptionStatus null) to spend its grant', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: null });
+    balanceMock.mockResolvedValue(1);
+    const { assertCanSpend } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+  });
+
+  it('delinquency gate does NOT fire when enforcement is OFF (plan downgrade is separate)', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'canceled' });
+    const { assertCanSpend } = await loadMeter(false);
+    await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+    expect(resolveMock).not.toHaveBeenCalled();
+  });
+
+  it('platform admins bypass the delinquency gate too (unlimited app-testing access)', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'canceled' });
+    isAdminMock.mockResolvedValue(true);
+    const { assertCanSpend } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+    expect(resolveMock).not.toHaveBeenCalled();
+  });
+
   it('chargeWorkflow debits via spendCredits when ON', async () => {
     spendMock.mockResolvedValue({ ok: true, balance: 0 });
     const { chargeWorkflow } = await loadMeter(true);

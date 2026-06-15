@@ -477,11 +477,17 @@ async function POSTHandler(req: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
 
-        // Brokerage path: mark canceled but preserve subscription id + seatLimit
-        // so the owner has audit context and can resubscribe without losing config.
-        // The ownership guard is critical here — without it, an attacker who
-        // can set metadata.brokerageId on their OWN subscription could cancel
-        // a victim brokerage simply by deleting their sub. (Audit-driven fix.)
+        // Brokerage path: mark canceled and DOWNGRADE the tier so a canceled
+        // brokerage stops being a paid (team/team_plus) account — otherwise it
+        // kept pooling credits + getting grants forever. We move it to
+        // 'starter' (the lowest brokerage tier; 'free' is space-only and would
+        // violate the Brokerage_plan_check constraint). resolveBillingAccount
+        // only pools at the brokerage for team/team_plus, so 'starter' makes
+        // member spaces fall back to their own balance. Subscription id +
+        // seatLimit are preserved so the owner has audit context and can
+        // resubscribe without losing config. The ownership guard is critical —
+        // without it, an attacker who can set metadata.brokerageId on their OWN
+        // subscription could cancel a victim brokerage by deleting their sub.
         const brokerageId = subscription.metadata?.brokerageId;
         if (brokerageId) {
           const guard = await verifyBrokerageOwnsSubscription(brokerageId, subscription);
@@ -489,6 +495,7 @@ async function POSTHandler(req: NextRequest) {
           const { error } = await supabase
             .from('Brokerage')
             .update({
+              plan: 'starter',
               stripeSubscriptionStatus: 'canceled',
               stripePeriodEnd: getPeriodEnd(subscription),
             })
@@ -503,10 +510,14 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ──────────────────────────────────────────
+        // Downgrade to 'free' on hard cancellation so the customer stops being
+        // a paid tier (correct feature gating + the delinquency guard below
+        // refuses metered spend on the now-canceled subscription).
         await supabase
           .from('Space')
           .update({
+            plan: 'free',
             stripeSubscriptionStatus: 'canceled',
             stripePeriodEnd: getPeriodEnd(subscription),
           })
@@ -651,6 +662,14 @@ async function POSTHandler(req: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
+        // Treatment decision (Fix #4): a failed payment is a GRACE state, not a
+        // hard cancellation. We flip status to 'past_due' and gate spend (the
+        // delinquency guard in lib/billing/meter.assertCanSpend refuses metered
+        // work for past_due) but DELIBERATELY do NOT wipe the plan label —
+        // Stripe retries the charge over its dunning window and a recovery
+        // (invoice.payment_succeeded → 'active') should restore access without a
+        // re-provision. The plan is only cleared on customer.subscription.deleted
+        // (the terminal cancellation), handled above.
         const invoice = event.data.object as Stripe.Invoice;
         const subId = extractInvoiceSubscriptionId(invoice);
         if (!subId) {

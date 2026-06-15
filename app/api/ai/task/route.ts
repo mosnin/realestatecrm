@@ -48,7 +48,7 @@ import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
-import { assertCanSpend, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
@@ -648,6 +648,12 @@ export async function POST(req: NextRequest) {
     try {
       await assertCanSpend(ctx.space.id, 'chat_turn');
     } catch (err) {
+      if (err instanceof SubscriptionDelinquentError) {
+        return NextResponse.json(
+          { error: 'Your subscription is inactive. Update your payment method or resubscribe to keep chatting with Chippi.' },
+          { status: 402 },
+        );
+      }
       if (err instanceof CreditsExhaustedError) {
         return NextResponse.json(
           { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },

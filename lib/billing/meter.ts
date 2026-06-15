@@ -18,6 +18,15 @@ import type { Workflow } from '@/lib/plans';
 
 export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
 
+/**
+ * Stripe subscription statuses that block metered spend. A delinquent account
+ * (hard-canceled, or in dunning / past the grace window) must not keep
+ * consuming credits even if a stale balance is sitting there. `null` (never
+ * subscribed → Free tier) and active/trialing are NOT here: Free users spend
+ * their one-time grant, and active/trialing are paid-up.
+ */
+const DELINQUENT_STATUSES = new Set(['canceled', 'past_due', 'unpaid']);
+
 export class CreditsExhaustedError extends Error {
   readonly workflow: Workflow;
   readonly balance: number;
@@ -26,6 +35,22 @@ export class CreditsExhaustedError extends Error {
     this.name = 'CreditsExhaustedError';
     this.workflow = workflow;
     this.balance = balance;
+  }
+}
+
+/**
+ * Thrown when a canceled / past_due / unpaid account attempts metered work.
+ * Distinct from CreditsExhaustedError (which means "buy more credits") — this
+ * means "fix your subscription". Callers translate it to a 402 / billing CTA.
+ */
+export class SubscriptionDelinquentError extends Error {
+  readonly workflow: Workflow;
+  readonly status: string;
+  constructor(workflow: Workflow, status: string) {
+    super(`Subscription is ${status}; metered work for ${workflow} is blocked`);
+    this.name = 'SubscriptionDelinquentError';
+    this.workflow = workflow;
+    this.status = status;
   }
 }
 
@@ -41,7 +66,15 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
   // only the up-front gate is skipped. Checked after the enforcement guard so it
   // adds zero overhead while CREDITS_ENFORCED is off.
   if (await isPlatformAdmin()) return;
-  const { account } = await resolveBillingAccount(spaceId);
+  const { account, subscriptionStatus } = await resolveBillingAccount(spaceId);
+  // Delinquency gate (Fix #4): a canceled / past_due / unpaid funding account
+  // can't keep spending even if it has a leftover balance. Runs only under
+  // CREDITS_ENFORCED and after the admin exemption, matching the existing gate
+  // semantics. The webhook downgrades canceled accounts' plan separately, so
+  // that change still happens regardless of whether enforcement is on.
+  if (subscriptionStatus && DELINQUENT_STATUSES.has(subscriptionStatus)) {
+    throw new SubscriptionDelinquentError(workflow, subscriptionStatus);
+  }
   const balance = await getCreditBalance(account);
   if (balance < workflowCost(workflow, units)) {
     throw new CreditsExhaustedError(workflow, balance);

@@ -261,3 +261,51 @@ describe('Fix #3 — checkout sets Space.plan + first-invoice race', () => {
     expect(backfill).toBeTruthy();
   });
 });
+
+// ── Fix #4 ─────────────────────────────────────────────────────────────
+describe('Fix #4 — cancellation downgrades; payment failure gates without wiping plan', () => {
+  it('customer.subscription.deleted downgrades the Space to free', async () => {
+    const subscription = sub({ status: 'canceled', metadata: {} });
+    const res = await fireEvent(
+      { id: 'evt_del', type: 'customer.subscription.deleted', data: { object: subscription } },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    const w = writesTo('Space')[0];
+    expect(w.payload.plan).toBe('free');
+    expect(w.payload.stripeSubscriptionStatus).toBe('canceled');
+  });
+
+  it('customer.subscription.deleted downgrades a brokerage to starter (free is space-only / would fail the CHECK)', async () => {
+    // Ownership guard reads the Brokerage row first; make customer match.
+    supabaseState.readHandler = (table) =>
+      table === 'Brokerage' ? { id: 'br1', stripeCustomerId: 'cus_1' } : null;
+    const subscription = sub({ status: 'canceled', metadata: { brokerageId: 'br1' } });
+    const res = await fireEvent(
+      { id: 'evt_del_b', type: 'customer.subscription.deleted', data: { object: subscription } },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    const w = writesTo('Brokerage')[0];
+    expect(w.payload.plan).toBe('starter');
+    expect(w.payload.stripeSubscriptionStatus).toBe('canceled');
+    // seatLimit intentionally preserved (no key in payload).
+    expect('seatLimit' in w.payload).toBe(false);
+  });
+
+  it('invoice.payment_failed sets past_due but does NOT change the plan (grace window)', async () => {
+    const subscription = sub({ status: 'past_due', metadata: {} });
+    const res = await fireEvent(
+      {
+        id: 'evt_fail',
+        type: 'invoice.payment_failed',
+        data: { object: { id: 'in_f', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    const w = writesTo('Space')[0];
+    expect(w.payload.stripeSubscriptionStatus).toBe('past_due');
+    expect('plan' in w.payload).toBe(false); // plan NOT wiped — recovery restores access
+  });
+});

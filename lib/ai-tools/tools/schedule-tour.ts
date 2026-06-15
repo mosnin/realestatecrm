@@ -26,7 +26,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
-import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import {
   findCalendarConnection,
   writeEventThrough,
@@ -99,6 +99,12 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     try {
       await assertCanSpend(ctx.space.id, 'tour_booking');
     } catch (err) {
+      if (err instanceof SubscriptionDelinquentError) {
+        return {
+          summary: 'Subscription inactive — update your payment method or resubscribe to keep booking tours.',
+          display: 'error',
+        };
+      }
       if (err instanceof CreditsExhaustedError) {
         return {
           summary: 'Out of credits — buy a top-up or upgrade to keep booking tours.',
