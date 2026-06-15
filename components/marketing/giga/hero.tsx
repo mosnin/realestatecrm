@@ -17,15 +17,10 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { BlurRise, EyebrowPill, Mono, PillPrimary } from './primitives';
 
-/* Placeholder logo cloud — reuses the brokerage logos already in /public.
- * TODO: replace placeholder logos with real partner / brokerage marks. */
-const LOGOS = [
-  { src: '/marketing/logos/compass.png', alt: 'Compass' },
-  { src: '/marketing/logos/remax.png', alt: 'RE/MAX' },
-  { src: '/marketing/logos/exit.svg', alt: 'EXIT Realty' },
-  { src: '/marketing/logos/lpt.png', alt: 'LPT Realty' },
-  { src: '/marketing/logos/source.png', alt: 'Source' },
-];
+/* Brokerage wordmarks for the social-proof marquee. Rendered as uniform styled
+ * text so every mark reads at the same size/weight (image logos had wildly
+ * different intrinsic ratios). Swap for real partner marks when available. */
+const LOGOS = ['Compass', 'RE/MAX', 'Coldwell Banker', 'Keller Williams', 'eXp Realty', 'Sotheby’s'];
 
 const DEMO = '/demo';
 
@@ -132,19 +127,12 @@ export function Hero() {
               animate={reduce ? undefined : { x: ['0%', '-50%'] }}
               transition={reduce ? undefined : { duration: 28, ease: 'linear', repeat: Infinity }}
             >
-              {[...LOGOS, ...LOGOS].map((logo, i) => (
-                // Fixed-size box + object-contain so every wordmark reads at a
-                // consistent visual weight regardless of its intrinsic ratio.
+              {[...LOGOS, ...LOGOS].map((name, i) => (
                 <span
-                  key={`${logo.alt}-${i}`}
-                  className="flex h-7 w-[130px] shrink-0 items-center justify-center"
+                  key={`${name}-${i}`}
+                  className="shrink-0 whitespace-nowrap text-[17px] font-semibold tracking-tight text-white/40"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={logo.src}
-                    alt={logo.alt}
-                    className="max-h-5 w-auto max-w-full object-contain opacity-50 grayscale invert"
-                  />
+                  {name}
                 </span>
               ))}
             </motion.div>

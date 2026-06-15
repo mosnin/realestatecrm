@@ -138,16 +138,16 @@ export function AgentCanvas() {
 
       {/* The big animated card */}
       <BlurRise delay={0.12}>
-        <div className="mt-12 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
+        <div className="mt-12 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02] p-2.5 sm:p-3">
           <div
-            className="grid lg:grid-cols-[0.66fr_1.34fr]"
+            className="grid gap-2.5 sm:gap-3 lg:grid-cols-[0.66fr_1.34fr]"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
             onFocusCapture={() => setPaused(true)}
             onBlurCapture={() => setPaused(false)}
           >
             {/* LEFT: product name + blurb + ghost pill + stepped list */}
-            <div className="flex flex-col p-8 sm:p-10">
+            <div className="flex flex-col p-6 sm:p-9">
               <span className="flex items-center gap-2.5">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#ff9a6e] to-[#c77dff] text-black">
                   <LayoutGrid className="h-[18px] w-[18px]" />
@@ -219,8 +219,9 @@ export function AgentCanvas() {
               </div>
             </div>
 
-            {/* RIGHT: scenic bg + composited product panel that changes per step */}
-            <div className="relative min-h-[460px] overflow-hidden border-t border-white/[0.08] lg:min-h-[600px] lg:border-l lg:border-t-0">
+            {/* RIGHT: scenic bg + composited product panel that changes per step.
+                Inset as its own rounded panel so the card border shows a gap. */}
+            <div className="relative min-h-[480px] overflow-hidden rounded-2xl lg:min-h-[700px]">
               {/* fixed scenic background — darkened + desaturated for the moody,
                   cinematic look of the reference (over a bright placeholder). */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
