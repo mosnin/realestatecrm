@@ -13,10 +13,18 @@ import {
   buildPropertiesCarousel,
   propertySubtitle,
   wmoToConditionCode,
+  buildOptionList,
+  optionLabelMap,
+  buildQuestionFlow,
+  formatQuestionFlowAnswers,
+  buildEmailDraft,
 } from '@/components/ai/blocks/tool-results/tool-ui-mappers';
 import { normalizeDealRows, normalizePropertyRows } from '@/components/ai/blocks/tool-results/normalize';
 import { safeParseSerializableDataTable } from '@/components/tool-ui/data-table/schema';
 import { safeParseSerializableItemCarousel } from '@/components/tool-ui/item-carousel/schema';
+import { safeParseSerializableOptionList } from '@/components/tool-ui/option-list/schema';
+import { safeParseSerializableQuestionFlow } from '@/components/tool-ui/question-flow/schema';
+import { safeParseSerializableMessageDraft } from '@/components/tool-ui/message-draft/schema';
 
 describe('buildContactsTable', () => {
   const contacts = [
@@ -159,5 +167,141 @@ describe('normalizers', () => {
     expect(normalizePropertyRows({ match: 'single', property: { id: 'p1', address: 'A' } })).toHaveLength(1);
     expect(normalizePropertyRows({ match: 'none' })).toEqual([]);
     expect(normalizePropertyRows(undefined)).toEqual([]);
+  });
+});
+
+describe('buildOptionList', () => {
+  const input = {
+    options: [
+      { id: 'a', label: 'Residential', description: 'Buyers and sellers' },
+      { id: 'b', label: 'Commercial' },
+    ],
+  };
+
+  it('passes the OptionList validator (strict schema)', () => {
+    expect(safeParseSerializableOptionList(buildOptionList(input))).not.toBeNull();
+  });
+
+  it('defaults selectionMode + a confirm action, drops absent descriptions', () => {
+    const ol = buildOptionList(input);
+    expect(ol.selectionMode).toBe('single');
+    expect(ol.actions).toEqual([{ id: 'confirm', label: 'Confirm', variant: 'default' }]);
+    expect(ol.options[0]).toEqual({ id: 'a', label: 'Residential', description: 'Buyers and sellers' });
+    // No description key when absent (strict schema rejects undefined values).
+    expect('description' in ol.options[1]).toBe(false);
+  });
+
+  it('clamps selection bounds and keeps custom actions', () => {
+    const ol = buildOptionList({
+      ...input,
+      selectionMode: 'multi',
+      minSelections: 0,
+      maxSelections: 2,
+      actions: [{ id: 'go', label: 'Go', variant: 'default' }],
+    });
+    expect(ol.minSelections).toBe(0);
+    expect(ol.maxSelections).toBe(2);
+    expect(ol.actions).toEqual([{ id: 'go', label: 'Go', variant: 'default' }]);
+    expect(safeParseSerializableOptionList(ol)).not.toBeNull();
+  });
+
+  it('optionLabelMap maps ids to labels for the round-trip', () => {
+    const m = optionLabelMap(input);
+    expect(m.get('a')).toBe('Residential');
+    expect(m.get('b')).toBe('Commercial');
+  });
+});
+
+describe('buildQuestionFlow', () => {
+  const steps = [
+    {
+      id: 'budget',
+      title: 'Budget',
+      options: [
+        { id: 'lo', label: 'Under $500k' },
+        { id: 'hi', label: '$500k+' },
+      ],
+    },
+    {
+      id: 'timeline',
+      title: 'Timeline',
+      description: 'When do they want to move?',
+      options: [{ id: 'soon', label: '0-3 months' }],
+      selectionMode: 'single' as const,
+    },
+  ];
+
+  it('builds upfront mode and passes the validator', () => {
+    const flow = buildQuestionFlow({ steps });
+    expect(flow).not.toBeNull();
+    expect(safeParseSerializableQuestionFlow(flow!)).not.toBeNull();
+    expect(flow && 'steps' in flow).toBe(true);
+  });
+
+  it('builds progressive mode from a single step', () => {
+    const flow = buildQuestionFlow({
+      step: 2,
+      title: 'Area',
+      options: [{ id: 'n', label: 'North' }, { id: 's', label: 'South' }],
+    });
+    expect(flow).not.toBeNull();
+    expect(flow && 'step' in flow && flow.step).toBe(2);
+    expect(safeParseSerializableQuestionFlow(flow!)).not.toBeNull();
+  });
+
+  it('returns null when neither steps nor a complete progressive step is given', () => {
+    expect(buildQuestionFlow({})).toBeNull();
+    expect(buildQuestionFlow({ title: 'No options' })).toBeNull();
+  });
+
+  it('formats answers back to a single labelled line', () => {
+    const line = formatQuestionFlowAnswers(steps, { budget: ['lo'], timeline: ['soon'] });
+    expect(line).toBe('Answers — Budget: Under $500k; Timeline: 0-3 months');
+  });
+
+  it('skips unanswered steps when formatting', () => {
+    expect(formatQuestionFlowAnswers(steps, { budget: ['hi'] })).toBe('Answers — Budget: $500k+');
+    expect(formatQuestionFlowAnswers(steps, {})).toBe('No answers selected.');
+  });
+});
+
+describe('buildEmailDraft', () => {
+  it('passes the MessageDraft validator (email channel)', () => {
+    const draft = buildEmailDraft({
+      subject: 'Quick check-in',
+      body: 'Hi Sam, just following up.',
+      to: ['sam@example.com'],
+      from: 'me@brokerage.com',
+    });
+    expect(draft.channel).toBe('email');
+    expect(safeParseSerializableMessageDraft(draft)).not.toBeNull();
+  });
+
+  it('substitutes a placeholder recipient when none is given (schema needs >=1)', () => {
+    const draft = buildEmailDraft({ subject: 'Hi', body: 'Body', to: [] });
+    expect(draft.to).toEqual(['(recipient)']);
+    expect(safeParseSerializableMessageDraft(draft)).not.toBeNull();
+  });
+
+  it('carries the outcome through for the receipt state', () => {
+    const draft = buildEmailDraft({
+      subject: 'Hi',
+      body: 'Body',
+      to: ['x@y.com'],
+      outcome: 'sent',
+    });
+    expect(draft.outcome).toBe('sent');
+    expect(safeParseSerializableMessageDraft(draft)).not.toBeNull();
+  });
+
+  it('omits empty cc/bcc and blank recipients', () => {
+    const draft = buildEmailDraft({
+      subject: 'Hi',
+      body: 'Body',
+      to: ['x@y.com', '  '],
+      cc: [],
+    });
+    expect(draft.to).toEqual(['x@y.com']);
+    expect('cc' in draft).toBe(false);
   });
 });
