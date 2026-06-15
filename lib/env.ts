@@ -59,6 +59,12 @@ const optionalSchema = z.object({
   STRIPE_PRICE_TEAM_ANNUAL: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS_ANNUAL: z.string().optional(),
+  // Per-unit brokerage seat add-on prices (above the plan's included seats).
+  // MUST be quantity-billed prices; the flat base prices above are NOT reused.
+  STRIPE_PRICE_TEAM_ADDON: z.string().optional(),
+  STRIPE_PRICE_TEAM_ADDON_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS_ADDON: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS_ADDON_ANNUAL: z.string().optional(),
   STRIPE_PRICE_TOPUP_STARTER: z.string().optional(),
   STRIPE_PRICE_TOPUP_GROWTH: z.string().optional(),
   STRIPE_PRICE_TOPUP_POWER: z.string().optional(),

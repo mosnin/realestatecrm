@@ -4,6 +4,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit, type AuditAction } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -149,6 +150,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     spaceId: undefined,
     req,
   });
+
+  // Release the offboarded seat from billing (Fix #1): the RPC deleted the
+  // membership row, so lower the per-unit add-on quantity. Best-effort, after
+  // the transfer committed — never block offboarding on a Stripe write.
+  void syncBrokerageSeatBilling(ctx.brokerage.id);
 
   return NextResponse.json({
     dryRun: false,

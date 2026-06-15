@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 
@@ -116,6 +117,11 @@ export async function POST(req: NextRequest) {
     console.error('[broker/join] membership insert failed', memberErr);
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
+
+  // Bill the new active seat (Fix #1): if the brokerage is over its plan's
+  // included seats, bump the per-unit add-on line quantity. Best-effort + after
+  // the membership committed — never block the join on a Stripe write.
+  void syncBrokerageSeatBilling(brokerage.id);
 
   // Adopt this brokerage's intake form-config ONLY if the Space isn't already
   // linked. Membership (above) is the source of truth for access; Space.brokerageId

@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -61,6 +62,11 @@ export async function DELETE(_req: Request, { params }: Params) {
     console.error('[broker/members/delete] delete failed', deleteErr);
     return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 });
   }
+
+  // Release the seat from billing (Fix #1): one fewer active member lowers the
+  // per-unit add-on quantity (and removes the add-on line once back at the
+  // included count), issuing a prorated credit. Best-effort, after the delete.
+  void syncBrokerageSeatBilling(ctx.brokerage.id);
 
   // Record the removal in the deny-list so the removed agent can't silently
   // rejoin via the still-circulating join code. ON CONFLICT DO NOTHING via

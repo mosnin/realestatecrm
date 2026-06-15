@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { PLANS } from '@/lib/plans';
+import { PLANS, addonSeatsForPlan } from '@/lib/plans';
 
 type BrokeragePlan = 'team' | 'team_plus';
 
@@ -311,6 +311,35 @@ async function handleBrokerageCheckout(
     }
   }
 
+  // Seed the per-seat add-on at checkout (Fix #1). The base price is a FLAT
+  // bundle billed quantity 1; seats beyond the plan's includedUsers bill on a
+  // SEPARATE per-unit add-on price as a second line item. We count current
+  // active members so a brokerage that already has agents over the included
+  // count is charged correctly on its FIRST invoice (not just after the next
+  // membership change). If the per-unit add-on price isn't configured yet (the
+  // flagged Stripe price-config dependency), we omit the line and the webhook's
+  // seat-sync logs the deferral — the seat count is still capped by
+  // checkSeatCapacity, only the incremental charge waits on the price object.
+  const line_items: Array<{ price: string; quantity: number }> = [
+    { price: priceId, quantity: 1 },
+  ];
+  const { count: memberCount } = await supabase
+    .from('BrokerageMembership')
+    .select('*', { count: 'exact', head: true })
+    .eq('brokerageId', ctx.brokerage.id);
+  const addonSeats = addonSeatsForPlan(plan, memberCount ?? 0);
+  const addonPriceId = PLANS[plan].addUser?.stripePriceMonthly ?? null;
+  if (addonSeats > 0) {
+    if (addonPriceId) {
+      line_items.push({ price: addonPriceId, quantity: addonSeats });
+    } else {
+      console.warn(
+        '[checkout:brokerage] per-seat add-on price not configured — seats past the included count will NOT be billed at checkout. Set STRIPE_PRICE_TEAM_ADDON / STRIPE_PRICE_TEAM_PLUS_ADDON (a per-unit Stripe price).',
+        { plan, addonSeats },
+      );
+    }
+  }
+
   try {
     console.log(
       '[checkout:brokerage] Creating checkout session, customer:',
@@ -319,11 +348,13 @@ async function handleBrokerageCheckout(
       priceId,
       'plan:',
       plan,
+      'addonSeats:',
+      addonSeats,
     );
     const session = await stripe.checkout.sessions.create({
       customer: customerId as string,
       mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items,
       subscription_data: {
         metadata: { brokerageId: ctx.brokerage.id, plan },
       },
