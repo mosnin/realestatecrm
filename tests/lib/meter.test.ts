@@ -80,8 +80,22 @@ describe('credit enforcement (meter)', () => {
     await expect(assertCanSpend('sp1', 'chat_turn')).rejects.toBeInstanceOf(SubscriptionDelinquentError);
   });
 
+  it('blocks an unpaid subscription (terminal dunning)', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'unpaid' });
+    balanceMock.mockResolvedValue(9999);
+    const { assertCanSpend, SubscriptionDelinquentError } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).rejects.toBeInstanceOf(SubscriptionDelinquentError);
+  });
+
   it('allows a Free account (subscriptionStatus null) to spend its grant', async () => {
     resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: null });
+    balanceMock.mockResolvedValue(1);
+    const { assertCanSpend } = await loadMeter(true);
+    await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();
+  });
+
+  it('does NOT block "inactive" (free / never-subscribed / incomplete) — parity with isSubscriptionDelinquent', async () => {
+    resolveMock.mockResolvedValue({ account: { type: 'space', id: 'sp1' }, subscriptionStatus: 'inactive' });
     balanceMock.mockResolvedValue(1);
     const { assertCanSpend } = await loadMeter(true);
     await expect(assertCanSpend('sp1', 'chat_turn')).resolves.toBeUndefined();

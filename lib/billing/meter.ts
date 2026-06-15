@@ -14,18 +14,10 @@
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import type { Workflow } from '@/lib/plans';
 
 export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
-
-/**
- * Stripe subscription statuses that block metered spend. A delinquent account
- * (hard-canceled, or in dunning / past the grace window) must not keep
- * consuming credits even if a stale balance is sitting there. `null` (never
- * subscribed → Free tier) and active/trialing are NOT here: Free users spend
- * their one-time grant, and active/trialing are paid-up.
- */
-const DELINQUENT_STATUSES = new Set(['canceled', 'past_due', 'unpaid']);
 
 export class CreditsExhaustedError extends Error {
   readonly workflow: Workflow;
@@ -68,12 +60,16 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
   if (await isPlatformAdmin()) return;
   const { account, subscriptionStatus } = await resolveBillingAccount(spaceId);
   // Delinquency gate (Fix #4): a canceled / past_due / unpaid funding account
-  // can't keep spending even if it has a leftover balance. Runs only under
+  // can't keep spending even if it has a leftover balance. Reuses the canonical
+  // isSubscriptionDelinquent (same set the chat/broker dunning gates use) so the
+  // "which statuses are delinquent" rule lives in ONE place. Runs only under
   // CREDITS_ENFORCED and after the admin exemption, matching the existing gate
   // semantics. The webhook downgrades canceled accounts' plan separately, so
-  // that change still happens regardless of whether enforcement is on.
-  if (subscriptionStatus && DELINQUENT_STATUSES.has(subscriptionStatus)) {
-    throw new SubscriptionDelinquentError(workflow, subscriptionStatus);
+  // that change still happens regardless of whether enforcement is on. (The chat
+  // route also has an UNCONDITIONAL dunning gate; this extends the same
+  // protection to the metered-workflow entry points, which lacked it.)
+  if (isSubscriptionDelinquent(subscriptionStatus)) {
+    throw new SubscriptionDelinquentError(workflow, subscriptionStatus ?? 'unknown');
   }
   const balance = await getCreditBalance(account);
   if (balance < workflowCost(workflow, units)) {
