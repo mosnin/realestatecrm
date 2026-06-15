@@ -559,12 +559,27 @@ async function POSTHandler(req: NextRequest) {
         // subscription price first (source of truth — a portal plan change
         // updates the price, but the checkout-time metadata.plan goes stale),
         // then metadata.plan, then SKIP (never default to a tier — Fix #5).
-        // Grant monthly credits ONLY on a genuine new-subscription or renewal
-        // invoice. Proration / mid-cycle / manual invoices also fire
-        // payment_succeeded and would each mint an extra full month of credits.
+        // Grant monthly credits on the invoices that represent a real new month
+        // of entitlement:
+        //   subscription_create     — first invoice of a brand-new sub
+        //   subscription_cycle      — a renewal (each billing period)
+        //   subscription_trial_end  — trial→paid conversion (Fix #6: without
+        //                             this, converts were CHARGED but got no
+        //                             credits for their first paid month)
+        //   subscription_update     — a plan change (Fix #6: grant the NEW
+        //                             tier's credits on an upgrade/downgrade)
+        // Every grant is keyed by sourceId = invoice.id against the DB's unique
+        // (reason, sourceId) index, so a retried/duplicate webhook re-runs the
+        // grant as a no-op — a plan change can't double-grant on redelivery.
+        // (Manual one-off invoices use other billing_reasons and are excluded.)
+        const GRANTABLE_BILLING_REASONS = new Set([
+          'subscription_create',
+          'subscription_cycle',
+          'subscription_trial_end',
+          'subscription_update',
+        ]);
         const grantableInvoice =
-          invoice.billing_reason === 'subscription_create' ||
-          invoice.billing_reason === 'subscription_cycle';
+          !!invoice.billing_reason && GRANTABLE_BILLING_REASONS.has(invoice.billing_reason);
 
         // Brokerage path
         const brokerageId = paidSub.metadata?.brokerageId;

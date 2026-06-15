@@ -24,12 +24,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// lib/plans.ts reads price ids from env at MODULE LOAD, so set them before any
-// import that transitively loads it (the route does). Real-ish ids so
-// planIdForStripePrice resolves a live subscription price back to its plan.
-process.env.STRIPE_PRICE_SOLO = 'price_solo_m';
-process.env.STRIPE_PRICE_PRO = 'price_pro_m';
-process.env.STRIPE_PRICE_TEAM = 'price_team_m';
+// lib/plans.ts reads price ids from env at MODULE LOAD. ES `import` statements
+// are hoisted above top-level code, so a plain `process.env.X = ...` here would
+// run AFTER the route (and its transitive lib/plans) is already imported and
+// cached — too late. vi.hoisted runs before any import, so set them there.
+// Real-ish ids so planIdForStripePrice maps a live price back to its plan.
+vi.hoisted(() => {
+  process.env.STRIPE_PRICE_SOLO = 'price_solo_m';
+  process.env.STRIPE_PRICE_PRO = 'price_pro_m';
+  process.env.STRIPE_PRICE_TEAM = 'price_team_m';
+});
 
 // ── Supabase double ───────────────────────────────────────────────────
 // reads: a handler keyed off (table, filters) -> row | null
@@ -118,7 +122,7 @@ vi.mock('@/lib/supabase', () => ({
 
 // ── Redis double (idempotency fast-path; correctness is DB-level) ──────
 const { redisGetMock, redisSetMock } = vi.hoisted(() => ({
-  redisGetMock: vi.fn(async () => null),
+  redisGetMock: vi.fn(async (): Promise<string | null> => null),
   redisSetMock: vi.fn(async () => 'OK'),
 }));
 vi.mock('@/lib/redis', () => ({
@@ -215,7 +219,13 @@ function writesTo(table: string): WriteCall[] {
 describe('Fix #3 — checkout sets Space.plan + first-invoice race', () => {
   it('checkout.session.completed sets Space.plan from the live price (not free)', async () => {
     supabaseState.readHandler = (table) => (table === 'Space' ? { stripeCustomerId: null } : null);
-    const subscription = sub({ status: 'trialing', metadata: { spaceId: 'sp1', plan: 'pro' } });
+    // Live price is Pro; metadata also says pro. The plan must be set NOW
+    // (during checkout), not left 'free' until the first invoice.
+    const subscription = sub({
+      status: 'trialing',
+      metadata: { spaceId: 'sp1', plan: 'pro' },
+      items: { data: [{ price: { id: 'price_pro_m' }, current_period_end: 1_800_000_000 }] },
+    });
     const res = await fireEvent(
       {
         id: 'evt_checkout',
@@ -361,5 +371,80 @@ describe('Fix #5 — unmapped price never silently defaults to solo', () => {
     );
     expect(res.status).toBe(200);
     expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_m');
+  });
+});
+
+// ── Fix #6 ─────────────────────────────────────────────────────────────
+describe('Fix #6 — trial-end + plan-change invoices are grantable', () => {
+  beforeEach(() => {
+    supabaseState.readHandler = (table, filters) => {
+      if (table !== 'Space') return null;
+      if (filters.stripeSubscriptionId === 'sub_1') return { id: 'sp1', plan: 'solo', stripeCustomerId: 'cus_1' };
+      return null;
+    };
+  });
+
+  it('grants on subscription_trial_end (trial → paid conversion)', async () => {
+    const subscription = sub({ items: { data: [{ price: { id: 'price_solo_m' }, current_period_end: 1_800_000_000 }] } });
+    const res = await fireEvent(
+      {
+        id: 'evt_trial_end',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_trial', billing_reason: 'subscription_trial_end', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'solo', 'in_trial');
+  });
+
+  it('grants the NEW tier on subscription_update (plan change), keyed by invoice id', async () => {
+    // Stored plan solo; live price now Pro → grant Pro, not the stale solo.
+    const subscription = sub({ items: { data: [{ price: { id: 'price_pro_m' }, current_period_end: 1_800_000_000 }] } });
+    const res = await fireEvent(
+      {
+        id: 'evt_update',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_upd', billing_reason: 'subscription_update', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_upd');
+  });
+
+  it('a duplicate plan-change delivery does not grant twice (idempotency)', async () => {
+    const event = {
+      id: 'evt_update_dupe',
+      type: 'invoice.payment_succeeded',
+      data: { object: { id: 'in_upd2', billing_reason: 'subscription_update', subscription: 'sub_1' } },
+    };
+    const subscription = sub({ items: { data: [{ price: { id: 'price_pro_m' }, current_period_end: 1_800_000_000 }] } });
+
+    // First delivery: Redis miss → processes + grants once.
+    redisGetMock.mockResolvedValueOnce(null);
+    await fireEvent(event, subscription);
+    // Second delivery of the SAME event: Redis hit → short-circuits, no grant.
+    redisGetMock.mockResolvedValueOnce('1');
+    await fireEvent(event, subscription);
+
+    expect(grantPlanMonthlyMock).toHaveBeenCalledTimes(1);
+    // And the single grant carried sourceId = invoice id, so even if Redis were
+    // unavailable the DB's unique (reason, sourceId) index would dedupe.
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_upd2');
+  });
+
+  it('does NOT grant on a non-grantable billing_reason (e.g. proration / manual)', async () => {
+    const subscription = sub();
+    const res = await fireEvent(
+      {
+        id: 'evt_proration',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_pro', billing_reason: 'subscription_threshold', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    expect(grantPlanMonthlyMock).not.toHaveBeenCalled();
   });
 });
