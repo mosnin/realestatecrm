@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
+import { syncBrokerageSeatBillingForSubscription } from '@/lib/billing/brokerage-seat-billing';
 import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
@@ -135,6 +136,30 @@ function resolveGrantPlan(sub: Stripe.Subscription): PlanId | null {
   const metaPlan = sub.metadata?.plan;
   if (metaPlan && metaPlan in PLANS) return metaPlan as PlanId;
   return null;
+}
+
+/**
+ * Converge a brokerage subscription's per-seat add-on line to its active member
+ * count (Fix #1). Best-effort: any failure is logged and swallowed so a Stripe
+ * seat write never 500s the webhook (→ infinite retry) or blocks the credit
+ * grant. The converge step is itself idempotent (same member count → no write).
+ */
+async function syncBrokerageSeatBillingFromWebhook(
+  stripe: Stripe,
+  brokerageId: string,
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  try {
+    const plan = resolveGrantPlan(subscription);
+    if (plan !== 'team' && plan !== 'team_plus') return; // no per-seat add-on
+    const { count } = await supabase
+      .from('BrokerageMembership')
+      .select('*', { count: 'exact', head: true })
+      .eq('brokerageId', brokerageId);
+    await syncBrokerageSeatBillingForSubscription(stripe, subscription, plan, count ?? 0);
+  } catch (e) {
+    logger.error('[stripe-webhook] brokerage seat-billing sync failed (non-fatal)', { brokerageId, subscriptionId: subscription.id }, e);
+  }
 }
 
 /**
@@ -383,6 +408,10 @@ async function POSTHandler(req: NextRequest) {
             customerId: session.customer as string,
             includePlanFromMetadata: true,
           });
+          // Converge the per-seat add-on to the active member count (Fix #1).
+          // Checkout already seeds it, but re-syncing here is idempotent and
+          // catches members added between session create and completion.
+          await syncBrokerageSeatBillingFromWebhook(stripe, brokerageId, subscription);
           break;
         }
 
@@ -600,6 +629,9 @@ async function POSTHandler(req: NextRequest) {
           await updateBrokerageFromSubscription(brokerageId, paidSub, {
             includePlanFromMetadata: true,
           });
+          // Keep the per-seat add-on quantity converged to the active member
+          // count each renewal (Fix #1) — best-effort, before the grant.
+          await syncBrokerageSeatBillingFromWebhook(stripe, brokerageId, paidSub);
           // Monthly credit grant (best-effort — must never break payment
           // processing). Idempotent-per-invoice via the event-ID dedupe above.
           if (grantableInvoice) {

@@ -28,8 +28,23 @@ export interface PlanDef {
   account: AccountType;
   stripePriceMonthly: string | null;
   stripePriceAnnual: string | null;
-  /** Per-user expansion above includedUsers (Team / Team Plus). */
-  addUser?: { priceMonthly: number; credits: number };
+  /**
+   * Per-user expansion above includedUsers (Team / Team Plus).
+   *
+   * `stripePrice*` is the Stripe price id for ONE add-on seat — it MUST be a
+   * per-unit ("licensed", quantity-billed) price so the subscription can carry
+   * a second line item whose quantity = active members − includedUsers (see
+   * lib/billing/brokerage-seat-billing.ts). It is intentionally separate from
+   * the plan's base `stripePriceMonthly` (a FLAT bundle price — $497/$897 — that
+   * always bills quantity 1). Null until the per-seat price object is created in
+   * Stripe and the env var is set; seat billing no-ops + warns while unset.
+   */
+  addUser?: {
+    priceMonthly: number;
+    credits: number;
+    stripePriceMonthly: string | null;
+    stripePriceAnnual: string | null;
+  };
 }
 
 const env = (k: string): string | null => process.env[k] ?? null;
@@ -75,7 +90,12 @@ export const PLANS: Record<PlanId, PlanDef> = {
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_ANNUAL'),
-    addUser: { priceMonthly: 79, credits: 3000 },
+    addUser: {
+      priceMonthly: 79,
+      credits: 3000,
+      stripePriceMonthly: env('STRIPE_PRICE_TEAM_ADDON'),
+      stripePriceAnnual: env('STRIPE_PRICE_TEAM_ADDON_ANNUAL'),
+    },
   },
   team_plus: {
     id: 'team_plus',
@@ -86,7 +106,12 @@ export const PLANS: Record<PlanId, PlanDef> = {
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM_PLUS'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_PLUS_ANNUAL'),
-    addUser: { priceMonthly: 69, credits: 4000 },
+    addUser: {
+      priceMonthly: 69,
+      credits: 4000,
+      stripePriceMonthly: env('STRIPE_PRICE_TEAM_PLUS_ADDON'),
+      stripePriceAnnual: env('STRIPE_PRICE_TEAM_PLUS_ADDON_ANNUAL'),
+    },
   },
 };
 
@@ -104,6 +129,22 @@ export type SelfServePlanId = 'solo' | 'pro';
  */
 export function resolveSelfServePlan(raw: unknown): SelfServePlanId {
   return raw === 'pro' ? 'pro' : 'solo';
+}
+
+/**
+ * Billable add-on seats for a brokerage plan: members beyond the plan's
+ * includedUsers. Pure + clamped to ≥ 0, so it's the single source of truth for
+ * BOTH the per-seat Stripe quantity (lib/billing/brokerage-seat-billing.ts) and
+ * the per-seat credit grant (lib/billing/grants.ts → grantMonthlyCredits's
+ * addonUsers). Plans without an add-on path (or unknown ids) yield 0 — they bill
+ * a flat bundle with no per-seat line. Non-finite/negative seat counts clamp to
+ * 0 (never invent a negative or NaN quantity to send to Stripe).
+ */
+export function addonSeatsForPlan(plan: PlanId | string | null | undefined, activeSeatCount: number): number {
+  const def = plan && plan in PLANS ? PLANS[plan as PlanId] : undefined;
+  if (!def?.addUser) return 0;
+  const seats = Number.isFinite(activeSeatCount) ? Math.floor(activeSeatCount) : 0;
+  return Math.max(0, seats - def.includedUsers);
 }
 
 /**

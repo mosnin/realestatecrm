@@ -6,6 +6,7 @@ import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 
 /**
  * GET /api/invitations/[token]
@@ -176,6 +177,11 @@ export async function POST(_req: Request, { params }: Params) {
     console.error('[invitations/accept] membership insert failed', memberErr);
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
+
+  // Bill the new active seat (Fix #1): a new member past the plan's included
+  // seats bumps the per-unit add-on line quantity. Best-effort, after the
+  // membership write — never block invite acceptance on a Stripe call.
+  void syncBrokerageSeatBilling(inv.brokerageId);
 
   // If this user had been offboarded previously (BP1 set User.status =
   // 'offboarded' and requireAuth gates on that), joining a new brokerage
