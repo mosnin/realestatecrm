@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
-import { PLANS, TOPUPS, type TopupId, planIdForStripePrice } from '@/lib/plans';
+import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -114,6 +114,26 @@ function customerIdOf(
  */
 function seatLimitForPlan(plan: string | undefined | null): number | null {
   if (plan === 'team' || plan === 'team_plus') return PLANS[plan].includedUsers;
+  return null;
+}
+
+/**
+ * Resolve the plan to grant/label for a paid invoice, from the live price first
+ * (source of truth) then the checkout-time metadata.plan. Returns null when
+ * NEITHER resolves a known tier.
+ *
+ * Fix #5: the old code defaulted a null resolution to 'solo', so a Pro/Team
+ * customer whose price id wasn't in PLANS (env not wired in this environment, a
+ * new price object, a typo) was granted Solo's smaller allotment AND relabeled
+ * Solo — silently underpaying a paying customer. Defaulting to a tier on
+ * ambiguity is never safe: returning null lets the caller log CRITICAL and skip
+ * the grant for manual review instead of guessing wrong.
+ */
+function resolveGrantPlan(sub: Stripe.Subscription): PlanId | null {
+  const livePlan = planIdForStripePrice(sub.items.data[0]?.price?.id);
+  if (livePlan) return livePlan;
+  const metaPlan = sub.metadata?.plan;
+  if (metaPlan && metaPlan in PLANS) return metaPlan as PlanId;
   return null;
 }
 
@@ -328,8 +348,21 @@ async function POSTHandler(req: NextRequest) {
               });
               break;
             }
-            await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
-            logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+            // Fix #7: the customer has ALREADY paid (this fires on a succeeded
+            // one-time payment). If the grant throws and we let it bubble to the
+            // outer catch → 500 → Stripe retries forever, all while the customer
+            // is charged-but-not-credited. Isolate it: log CRITICAL for manual
+            // crediting/alerting and still ack 200 so Stripe stops retrying.
+            // Idempotent via sourceId = session.id, so a retry that DID reach
+            // here wouldn't double-grant anyway.
+            try {
+              await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
+              logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+            } catch (e) {
+              logger.error('[stripe-webhook] CRITICAL: top-up paid but grant FAILED (charged-but-not-credited) — manual credit required', {
+                topupId, acctType, acctId, sessionId: session.id,
+              }, e);
+            }
           } else {
             logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
           }
@@ -353,9 +386,19 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ──────────────────────────────────────────
         const spaceId = session.metadata?.spaceId;
         if (!spaceId) break;
+
+        // Derive the plan from the LIVE subscription price (source of truth),
+        // falling back to the checkout-time metadata.plan. Without this the
+        // Space stayed on 'free' until the first invoice.payment_succeeded —
+        // a customer who completed checkout (and is being charged / trialing)
+        // saw a free tier and the wrong feature gating until the next webhook.
+        const checkoutPlan =
+          planIdForStripePrice(subscription.items.data[0]?.price?.id) ??
+          subscription.metadata?.plan ??
+          null;
 
         const updateData: Record<string, unknown> = {
           stripeCustomerId: session.customer as string,
@@ -363,6 +406,10 @@ async function POSTHandler(req: NextRequest) {
           stripeSubscriptionStatus: mapStatus(subscription.status),
           stripePeriodEnd: getPeriodEnd(subscription),
         };
+        if (checkoutPlan) {
+          updateData.plan = checkoutPlan;
+          updateData.planActivatedAt = new Date().toISOString();
+        }
 
         // Track trial usage — only set once, never reset
         if (subscription.status === 'trialing') {
@@ -463,11 +510,17 @@ async function POSTHandler(req: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
 
-        // Brokerage path: mark canceled but preserve subscription id + seatLimit
-        // so the owner has audit context and can resubscribe without losing config.
-        // The ownership guard is critical here — without it, an attacker who
-        // can set metadata.brokerageId on their OWN subscription could cancel
-        // a victim brokerage simply by deleting their sub. (Audit-driven fix.)
+        // Brokerage path: mark canceled and DOWNGRADE the tier so a canceled
+        // brokerage stops being a paid (team/team_plus) account — otherwise it
+        // kept pooling credits + getting grants forever. We move it to
+        // 'starter' (the lowest brokerage tier; 'free' is space-only and would
+        // violate the Brokerage_plan_check constraint). resolveBillingAccount
+        // only pools at the brokerage for team/team_plus, so 'starter' makes
+        // member spaces fall back to their own balance. Subscription id +
+        // seatLimit are preserved so the owner has audit context and can
+        // resubscribe without losing config. The ownership guard is critical —
+        // without it, an attacker who can set metadata.brokerageId on their OWN
+        // subscription could cancel a victim brokerage by deleting their sub.
         const brokerageId = subscription.metadata?.brokerageId;
         if (brokerageId) {
           const guard = await verifyBrokerageOwnsSubscription(brokerageId, subscription);
@@ -475,6 +528,7 @@ async function POSTHandler(req: NextRequest) {
           const { error } = await supabase
             .from('Brokerage')
             .update({
+              plan: 'starter',
               stripeSubscriptionStatus: 'canceled',
               stripePeriodEnd: getPeriodEnd(subscription),
             })
@@ -489,10 +543,14 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ──────────────────────────────────────────
+        // Downgrade to 'free' on hard cancellation so the customer stops being
+        // a paid tier (correct feature gating + the delinquency guard below
+        // refuses metered spend on the now-canceled subscription).
         await supabase
           .from('Space')
           .update({
+            plan: 'free',
             stripeSubscriptionStatus: 'canceled',
             stripePeriodEnd: getPeriodEnd(subscription),
           })
@@ -510,18 +568,31 @@ async function POSTHandler(req: NextRequest) {
         const paidSub = await stripe.subscriptions.retrieve(paidSubId);
         const paidStatus = mapStatus(paidSub.status);
 
-        // Derive the ACTIVE plan from the live subscription's price, not the
-        // checkout-time metadata.plan — that's stamped once and goes STALE on a
-        // portal plan change, so a Solo→Pro upgrade was granted Solo credits +
-        // relabeled Solo, and Pro→Solo kept granting Pro credits at the Solo
-        // price. Falls back to metadata when the price isn't a known plan price.
-        const livePlan = planIdForStripePrice(paidSub.items.data[0]?.price?.id);
-        // Grant monthly credits ONLY on a genuine new-subscription or renewal
-        // invoice. Proration / mid-cycle / manual invoices also fire
-        // payment_succeeded and would each mint an extra full month of credits.
+        // The ACTIVE plan is derived per-path below via resolveGrantPlan: live
+        // subscription price first (source of truth — a portal plan change
+        // updates the price, but the checkout-time metadata.plan goes stale),
+        // then metadata.plan, then SKIP (never default to a tier — Fix #5).
+        // Grant monthly credits on the invoices that represent a real new month
+        // of entitlement:
+        //   subscription_create     — first invoice of a brand-new sub
+        //   subscription_cycle      — a renewal (each billing period)
+        //   subscription_trial_end  — trial→paid conversion (Fix #6: without
+        //                             this, converts were CHARGED but got no
+        //                             credits for their first paid month)
+        //   subscription_update     — a plan change (Fix #6: grant the NEW
+        //                             tier's credits on an upgrade/downgrade)
+        // Every grant is keyed by sourceId = invoice.id against the DB's unique
+        // (reason, sourceId) index, so a retried/duplicate webhook re-runs the
+        // grant as a no-op — a plan change can't double-grant on redelivery.
+        // (Manual one-off invoices use other billing_reasons and are excluded.)
+        const GRANTABLE_BILLING_REASONS = new Set([
+          'subscription_create',
+          'subscription_cycle',
+          'subscription_trial_end',
+          'subscription_update',
+        ]);
         const grantableInvoice =
-          invoice.billing_reason === 'subscription_create' ||
-          invoice.billing_reason === 'subscription_cycle';
+          !!invoice.billing_reason && GRANTABLE_BILLING_REASONS.has(invoice.billing_reason);
 
         // Brokerage path
         const brokerageId = paidSub.metadata?.brokerageId;
@@ -532,10 +603,27 @@ async function POSTHandler(req: NextRequest) {
           // Monthly credit grant (best-effort — must never break payment
           // processing). Idempotent-per-invoice via the event-ID dedupe above.
           if (grantableInvoice) {
-            try {
-              await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, livePlan ?? paidSub.metadata?.plan ?? '', invoice.id);
-            } catch (e) {
-              logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+            const brokeragePlan = resolveGrantPlan(paidSub);
+            if (!brokeragePlan) {
+              // Fix #5: never guess a tier on an unmapped price — log CRITICAL
+              // (charged-but-not-credited) and skip so a human can reconcile,
+              // rather than granting the wrong (smaller) tier silently.
+              logger.error('[stripe-webhook] CRITICAL: brokerage invoice has unmapped price + no metadata.plan — grant SKIPPED, manual review required', {
+                brokerageId,
+                paidSubId,
+                priceId: paidSub.items.data[0]?.price?.id,
+                invoiceId: invoice.id,
+              });
+            } else {
+              try {
+                await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, brokeragePlan, invoice.id);
+              } catch (e) {
+                // Charged-but-not-credited: log CRITICAL for manual credit but
+                // never let it 500 the webhook (→ infinite Stripe retry). The
+                // grant is idempotent (sourceId = invoice id) so a manual replay
+                // is safe.
+                logger.error('[stripe-webhook] CRITICAL: brokerage monthly grant FAILED (paid, credits NOT granted) — manual credit required', { brokerageId, paidSubId, invoiceId: invoice.id }, e);
+              }
             }
           }
           break;
@@ -545,11 +633,30 @@ async function POSTHandler(req: NextRequest) {
         // Verify the subscription's customer owns the target Space before
         // crediting it active — mirrors the customer.subscription.updated guard
         // so a poisoned stripeSubscriptionId can't activate another's space.
-        const { data: paidSpace } = await supabase
+        let { data: paidSpace } = await supabase
           .from('Space')
           .select('id, plan, stripeCustomerId')
           .eq('stripeSubscriptionId', paidSubId)
           .maybeSingle();
+
+        // First-invoice race: the very first invoice.payment_succeeded can beat
+        // checkout.session.completed, so stripeSubscriptionId isn't written yet
+        // and the lookup above misses → the customer is CHARGED but granted 0
+        // credits. Fall back to the spaceId stamped on the subscription metadata
+        // (mirrors the brokerage path, which already keys off metadata). The
+        // customer-ownership guard below still applies, so this can't be abused
+        // to credit a space the payer doesn't own.
+        if (!paidSpace) {
+          const metaSpaceId = paidSub.metadata?.spaceId;
+          if (metaSpaceId) {
+            const { data: bySpaceId } = await supabase
+              .from('Space')
+              .select('id, plan, stripeCustomerId')
+              .eq('id', metaSpaceId)
+              .maybeSingle();
+            paidSpace = bySpaceId;
+          }
+        }
         if (paidSpace && paidSpace.stripeCustomerId && paidSpace.stripeCustomerId !== customerIdOf(paidSub.customer)) {
           logger.error('[stripe-webhook] invoice.payment_succeeded customer mismatch — subscription belongs to a different customer', {
             paidSubId,
@@ -558,40 +665,57 @@ async function POSTHandler(req: NextRequest) {
           });
           break;
         }
-        await supabase
-          .from('Space')
-          .update({
-            stripeSubscriptionStatus: paidStatus,
-            stripePeriodEnd: getPeriodEnd(paidSub),
-          })
-          .eq('stripeSubscriptionId', paidSubId);
+        // Update by the Space id we resolved (not just by stripeSubscriptionId)
+        // so the fallback path also backfills stripeSubscriptionId + customer,
+        // closing the race for every subsequent event.
+        if (paidSpace?.id) {
+          await supabase
+            .from('Space')
+            .update({
+              stripeCustomerId: customerIdOf(paidSub.customer) ?? undefined,
+              stripeSubscriptionId: paidSubId,
+              stripeSubscriptionStatus: paidStatus,
+              stripePeriodEnd: getPeriodEnd(paidSub),
+            })
+            .eq('id', paidSpace.id);
+        }
 
         // Monthly credit grant (best-effort — never break payment processing).
-        // Trust the tier stamped on the subscription metadata (set at checkout);
-        // fall back to the current Space.plan, else Solo. Using the metadata
-        // avoids mislabeling a downgrade (e.g. Pro→Solo) off a stale Space.plan.
+        // Plan comes from the live price first, then metadata.plan. Fix #5:
+        // if NEITHER resolves a known tier we do NOT default to 'solo' (which
+        // silently under-granted Pro/Team customers) — we log CRITICAL and skip
+        // the grant + the relabel so a human reconciles instead of guessing.
         try {
           if (paidSpace?.id) {
-            const planId =
-              livePlan ||
-              (paidSub.metadata?.plan as string) ||
-              (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
-            // Keep the plan label in sync even when this invoice isn't grantable
-            // (so a portal plan change is reflected immediately).
-            if (planId !== paidSpace.plan) {
-              await supabase
-                .from('Space')
-                .update({ plan: planId, planActivatedAt: new Date().toISOString() })
-                .eq('id', paidSpace.id);
-            }
-            if (grantableInvoice) {
-              await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+            const planId = resolveGrantPlan(paidSub);
+            if (!planId) {
+              logger.error('[stripe-webhook] CRITICAL: space invoice has unmapped price + no metadata.plan — grant & relabel SKIPPED, manual review required', {
+                paidSubId,
+                spaceId: paidSpace.id,
+                priceId: paidSub.items.data[0]?.price?.id,
+                invoiceId: invoice.id,
+              });
+            } else {
+              // Keep the plan label in sync even when this invoice isn't
+              // grantable (so a portal plan change is reflected immediately).
+              if (planId !== paidSpace.plan) {
+                await supabase
+                  .from('Space')
+                  .update({ plan: planId, planActivatedAt: new Date().toISOString() })
+                  .eq('id', paidSpace.id);
+              }
+              if (grantableInvoice) {
+                await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+              }
             }
           } else {
-            logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
+            logger.error('[stripe-webhook] CRITICAL: PAID invoice but no matching space — credits NOT granted, manual review required', { paidSubId });
           }
         } catch (e) {
-          logger.error('[stripe-webhook] space monthly grant failed (paid, credits NOT granted)', { paidSubId }, e);
+          // Charged-but-not-credited: CRITICAL for manual credit, but swallow so
+          // the webhook still returns 200 (a 500 here → infinite Stripe retry).
+          // Idempotent via sourceId = invoice id, so a manual replay is safe.
+          logger.error('[stripe-webhook] CRITICAL: space monthly grant FAILED (paid, credits NOT granted) — manual credit required', { paidSubId, invoiceId: invoice.id }, e);
         }
 
         // Notify only on active transition (payment recovered past_due subscription)
@@ -611,6 +735,14 @@ async function POSTHandler(req: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
+        // Treatment decision (Fix #4): a failed payment is a GRACE state, not a
+        // hard cancellation. We flip status to 'past_due' and gate spend (the
+        // delinquency guard in lib/billing/meter.assertCanSpend refuses metered
+        // work for past_due) but DELIBERATELY do NOT wipe the plan label —
+        // Stripe retries the charge over its dunning window and a recovery
+        // (invoice.payment_succeeded → 'active') should restore access without a
+        // re-provision. The plan is only cleared on customer.subscription.deleted
+        // (the terminal cancellation), handled above.
         const invoice = event.data.object as Stripe.Invoice;
         const subId = extractInvoiceSubscriptionId(invoice);
         if (!subId) {

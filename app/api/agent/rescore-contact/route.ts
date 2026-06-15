@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
-import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
@@ -65,6 +65,9 @@ export async function POST(req: NextRequest) {
   try {
     await assertCanSpend(spaceId, 'lead_score');
   } catch (err) {
+    if (err instanceof SubscriptionDelinquentError) {
+      return NextResponse.json({ skipped: true, reason: 'Subscription inactive' }, { status: 402 });
+    }
     if (err instanceof CreditsExhaustedError) {
       return NextResponse.json({ skipped: true, reason: 'Out of credits' }, { status: 402 });
     }

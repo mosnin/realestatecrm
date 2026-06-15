@@ -14,6 +14,7 @@
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import type { Workflow } from '@/lib/plans';
 
 export const CREDITS_ENFORCED = process.env.CREDITS_ENFORCED === 'true';
@@ -30,6 +31,22 @@ export class CreditsExhaustedError extends Error {
 }
 
 /**
+ * Thrown when a canceled / past_due / unpaid account attempts metered work.
+ * Distinct from CreditsExhaustedError (which means "buy more credits") — this
+ * means "fix your subscription". Callers translate it to a 402 / billing CTA.
+ */
+export class SubscriptionDelinquentError extends Error {
+  readonly workflow: Workflow;
+  readonly status: string;
+  constructor(workflow: Workflow, status: string) {
+    super(`Subscription is ${status}; metered work for ${workflow} is blocked`);
+    this.name = 'SubscriptionDelinquentError';
+    this.workflow = workflow;
+    this.status = status;
+  }
+}
+
+/**
  * Refuse a workflow up front when the funding account can't afford it.
  * No-op unless enforcement is on. Throws CreditsExhaustedError when short —
  * callers translate that to a 402 / an "out of credits" result.
@@ -41,7 +58,19 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
   // only the up-front gate is skipped. Checked after the enforcement guard so it
   // adds zero overhead while CREDITS_ENFORCED is off.
   if (await isPlatformAdmin()) return;
-  const { account } = await resolveBillingAccount(spaceId);
+  const { account, subscriptionStatus } = await resolveBillingAccount(spaceId);
+  // Delinquency gate (Fix #4): a canceled / past_due / unpaid funding account
+  // can't keep spending even if it has a leftover balance. Reuses the canonical
+  // isSubscriptionDelinquent (same set the chat/broker dunning gates use) so the
+  // "which statuses are delinquent" rule lives in ONE place. Runs only under
+  // CREDITS_ENFORCED and after the admin exemption, matching the existing gate
+  // semantics. The webhook downgrades canceled accounts' plan separately, so
+  // that change still happens regardless of whether enforcement is on. (The chat
+  // route also has an UNCONDITIONAL dunning gate; this extends the same
+  // protection to the metered-workflow entry points, which lacked it.)
+  if (isSubscriptionDelinquent(subscriptionStatus)) {
+    throw new SubscriptionDelinquentError(workflow, subscriptionStatus ?? 'unknown');
+  }
   const balance = await getCreditBalance(account);
   if (balance < workflowCost(workflow, units)) {
     throw new CreditsExhaustedError(workflow, balance);
