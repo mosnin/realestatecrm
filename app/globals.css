@@ -1013,6 +1013,48 @@
   letter-spacing: 0.01em;
 }
 
+/* ── Giga marketing shell — dark, cinematic redesign (ROOT-CAUSE FIX) ────────
+ *
+ * The marketing route-group layout (app/(marketing)/layout.tsx) marks its root
+ * with `data-marketing-shell`. Two things are scoped here so the redesign can't
+ * be undone by global rules elsewhere in this file:
+ *
+ *  1. HEADLINE FONT. The `@layer base` rule above forces every <h1>–<h6> to
+ *     --font-heading (a system SANS). That is exactly what made the previous
+ *     redesign render "stuck on the grotesque": inline styles fixed some
+ *     headings but anything that leaned on a class or forgot the inline style
+ *     fell back to the sans. We make the elegant SERIF display face
+ *     (--font-serif-display, Fraunces, injected by the layout via next/font)
+ *     the DEFAULT for every heading inside the shell, with a HIGH optical size
+ *     and light weight so the large headlines read thin + high-contrast (the
+ *     reference look) rather than the chunky low-opsz default. This selector
+ *     out-specifies the bare `h1..h6` element rule, so it always wins.
+ *
+ *  2. EYEBROWS stay monospace via the .eyebrow-mono helper / inline var; the
+ *     `--font-mono-display` (JetBrains Mono) is also injected by the layout.
+ *
+ * Scoped to the shell so the product (dashboard/app) is completely untouched. */
+[data-marketing-shell] {
+  /* High optical size + light weight = the thin, high-contrast serif voice. */
+  --serif-opsz: 144;
+}
+[data-marketing-shell] h1,
+[data-marketing-shell] h2,
+[data-marketing-shell] h3,
+[data-marketing-shell] h4,
+[data-marketing-shell] h5,
+[data-marketing-shell] h6,
+[data-marketing-shell] .font-serif-display {
+  font-family: var(--font-serif-display), Georgia, "Times New Roman", serif;
+  font-variation-settings: "opsz" var(--serif-opsz);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+/* Eyebrow labels: uppercase monospace, set apart from the serif headings. */
+[data-marketing-shell] .font-mono-display {
+  font-family: var(--font-mono-display), ui-monospace, SFMono-Regular, monospace;
+}
+
 /* ── Bold-canvas marketing type (logged-out site only) ──────────────────────
  * --font-display / --font-accent are injected by app/(marketing)/layout.tsx
  * via next/font (Inter Tight + Instrument Serif). Fallbacks keep the classes

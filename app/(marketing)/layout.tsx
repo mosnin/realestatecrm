@@ -1,41 +1,60 @@
 /**
- * Marketing route group layout, the "bold canvas" shell.
+ * Marketing route-group layout — the dark, cinematic shell ("Giga" redesign).
  *
- * Every page under `app/(marketing)/` renders inside this shell. The marketing
- * site is its own visual world, deliberately split from the product:
+ * Every page under `app/(marketing)/` renders inside this shell, which is a
+ * deliberately separate visual world from the product:
  *
- *  - Canvas, not paper: the page background is a tinted canvas (warm bone in
- *    light, near-black in dark) and content lives in big rounded color-blocked
- *    cards that sit ON it.
- *  - Display type: Inter Tight (via next/font, self-hosted) is the headline
- *    voice; Instrument Serif italic is the accent flourish. `--font-title` is
- *    overridden HERE so every legacy serif-Times headline in the marketing
- *    tree resolves to the display face, the product (outside this group)
- *    keeps its own type system untouched.
+ *  - ALWAYS DARK. A near-black (#0a0a0a) canvas with light text, regardless of
+ *    the app's light/dark theme toggle. The `dark` class is forced ON this
+ *    subtree so the legacy sub-pages (pricing / realtors / deals / …), which
+ *    were authored with `dark:` variants, also render their dark treatment on
+ *    this shell instead of flashing white cards. The product (outside this
+ *    group) keeps its own theme + type system untouched.
  *
- * The marketing site is public, we don't load Clerk for unauth visitors.
- * Auth-aware pages (the homepage redirects auth users to their workspace)
- * still call `auth()` from their own server component before rendering.
+ *  - SERIF DISPLAY HEADLINES. An elegant, high-contrast serif (Fraunces, with
+ *    a high optical-size axis + light weight) is the headline voice, exposed as
+ *    `--font-serif-display`. ROOT CAUSE FIXED: the previous shell forced
+ *    `--font-title → --font-display` (Bricolage Grotesque) and slapped
+ *    `font-display` on the wrapper, so every headline rendered as a heavy sans.
+ *    That override is GONE. The shell is tagged `data-marketing-shell`; a
+ *    scoped rule in globals.css makes the serif the DEFAULT for every heading
+ *    in the tree (out-specifying the global `h1..h6 { --font-heading }` base
+ *    rule), so headlines render large + thin even where a component leans on a
+ *    class. Body text stays on a clean system sans.
+ *
+ *  - EYEBROWS in monospace (JetBrains Mono), exposed as `--font-mono-display`.
+ *
+ * The marketing site is public; Clerk isn't loaded for unauth visitors (the
+ * middleware sets `x-public-page` and the root layout skips ClerkProvider).
+ * Auth-aware pages (the homepage redirects auth users to their workspace) still
+ * call `auth()` from their own server component before rendering.
  */
 
-import { Bricolage_Grotesque, Instrument_Serif } from 'next/font/google';
-import { SiteNav } from '@/components/marketing/site/nav';
-import { SiteFooter } from '@/components/marketing/site/footer';
+import { Fraunces, JetBrains_Mono } from 'next/font/google';
+import { SiteHeader } from '@/components/marketing/giga/header';
+import { SiteFooter } from '@/components/marketing/giga/footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
-const display = Bricolage_Grotesque({
+// Elegant high-contrast serif display face — the reference's headline voice.
+// Fraunces is a VARIABLE font: requesting the `opsz` axis means the weight axis
+// must stay variable (next/font forbids pinning discrete `weight`s alongside
+// `axes`). We get the full weight range too, so the scoped CSS in globals.css
+// can push optical sizing high AND keep the weight light — the thin, refined
+// large headlines of the reference, not the chunky low-opsz default.
+const serifDisplay = Fraunces({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  axes: ['opsz'],
   display: 'swap',
-  variable: '--font-display',
+  variable: '--font-serif-display',
 });
 
-const accent = Instrument_Serif({
+// Monospace face for the uppercase eyebrow labels.
+const monoDisplay = JetBrains_Mono({
   subsets: ['latin'],
-  weight: '400',
-  style: ['normal', 'italic'],
+  weight: ['400', '500'],
   display: 'swap',
-  variable: '--font-accent',
+  variable: '--font-mono-display',
 });
 
 export default function MarketingLayout({
@@ -45,12 +64,16 @@ export default function MarketingLayout({
 }) {
   return (
     <div
-      className={`${display.variable} ${accent.variable} font-display flex min-h-screen flex-col bg-white text-[#16161a] dark:bg-[#0a0a0b] dark:text-[#f5f5f4]`}
-      style={{ '--font-title': 'var(--font-display)' } as React.CSSProperties}
+      // `dark` is forced so this shell is dark regardless of the user's theme,
+      // and so legacy sub-pages' `dark:` variants resolve to their dark look.
+      // `data-marketing-shell` scopes the serif-headline + mono-eyebrow rules
+      // in globals.css to this subtree only.
+      data-marketing-shell
+      className={`dark ${serifDisplay.variable} ${monoDisplay.variable} flex min-h-screen flex-col bg-[#0a0a0a] text-white antialiased`}
     >
       {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      <SiteNav />
+      <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
     </div>
