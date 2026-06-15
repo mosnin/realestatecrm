@@ -123,6 +123,21 @@ export function planIdForStripePrice(priceId: string | null | undefined): PlanId
 }
 
 /**
+ * Which plans may purchase one-time credit top-ups. Only the FREE tier is
+ * blocked (it has no paid relationship — a top-up would be the first charge with
+ * no subscription, and the product intent is "top up your plan", not "pay-as-you
+ * -go without a plan"). Every paid tier (solo/pro/team/team_plus) is allowed;
+ * Team/Team Plus top-ups pool at the brokerage balance (resolveBillingAccount).
+ * The marketing FAQ ("buy a one-time top-up anytime") matches this.
+ *
+ * Single source of truth shared by the server gate (credits/checkout) and the
+ * client UI (buy-credits) so they can't disagree. Pure.
+ */
+export function canBuyTopups(plan: PlanId | string | null | undefined): boolean {
+  return plan === 'solo' || plan === 'pro' || plan === 'team' || plan === 'team_plus';
+}
+
+/**
  * Credit cost per premium workflow (docs/PRICING_V2_PLAN.md §4.4). The key is
  * the canonical `workflow` string written to CreditTxn.workflow.
  */

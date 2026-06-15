@@ -27,6 +27,22 @@ describe('planIdForStripePrice', () => {
   });
 });
 
+describe('canBuyTopups', () => {
+  it('allows every paid tier', async () => {
+    const { canBuyTopups } = await import('@/lib/plans');
+    for (const p of ['solo', 'pro', 'team', 'team_plus']) {
+      expect(canBuyTopups(p)).toBe(true);
+    }
+  });
+
+  it('blocks Free and any unknown/empty plan (no paid relationship)', async () => {
+    const { canBuyTopups } = await import('@/lib/plans');
+    for (const p of ['free', '', null, undefined, 'starter', 'enterprise', 'bogus']) {
+      expect(canBuyTopups(p)).toBe(false);
+    }
+  });
+});
+
 describe('resolveSelfServePlan', () => {
   it('keeps an explicit pro selection', async () => {
     const { resolveSelfServePlan } = await import('@/lib/plans');

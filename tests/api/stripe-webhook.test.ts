@@ -448,3 +448,47 @@ describe('Fix #6 — trial-end + plan-change invoices are grantable', () => {
     expect(grantPlanMonthlyMock).not.toHaveBeenCalled();
   });
 });
+
+// ── Fix #7 (webhook side) ──────────────────────────────────────────────
+describe('Fix #7 — a failed top-up grant does not 500 (no infinite retry)', () => {
+  it('logs CRITICAL and still returns 200 when grantTopup throws (charged-but-not-credited)', async () => {
+    supabaseState.readHandler = (table) =>
+      table === 'Space' ? { stripeCustomerId: 'cus_1' } : null;
+    grantTopupMock.mockRejectedValueOnce(new Error('db down'));
+    const res = await fireEvent({
+      id: 'evt_topup_fail',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          customer: 'cus_1',
+          metadata: { topup: 'starter', accountType: 'space', accountId: 'sp1' },
+        },
+      },
+    });
+    // 200 so Stripe stops retrying — NOT a 500 that loops forever.
+    expect(res.status).toBe(200);
+    const critical = loggerErrorMock.mock.calls.find(
+      (c) => String(c[0]).includes('CRITICAL') && String(c[0]).includes('top-up'),
+    );
+    expect(critical).toBeTruthy();
+  });
+
+  it('grants the top-up (sourceId = session id) on the happy path', async () => {
+    supabaseState.readHandler = (table) =>
+      table === 'Space' ? { stripeCustomerId: 'cus_1' } : null;
+    grantTopupMock.mockResolvedValueOnce(800);
+    const res = await fireEvent({
+      id: 'evt_topup_ok',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_top',
+          customer: 'cus_1',
+          metadata: { topup: 'starter', accountType: 'space', accountId: 'sp1' },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(grantTopupMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'starter', 'cs_top');
+  });
+});

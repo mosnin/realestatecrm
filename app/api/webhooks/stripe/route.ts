@@ -348,8 +348,21 @@ async function POSTHandler(req: NextRequest) {
               });
               break;
             }
-            await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
-            logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+            // Fix #7: the customer has ALREADY paid (this fires on a succeeded
+            // one-time payment). If the grant throws and we let it bubble to the
+            // outer catch → 500 → Stripe retries forever, all while the customer
+            // is charged-but-not-credited. Isolate it: log CRITICAL for manual
+            // crediting/alerting and still ack 200 so Stripe stops retrying.
+            // Idempotent via sourceId = session.id, so a retry that DID reach
+            // here wouldn't double-grant anyway.
+            try {
+              await grantTopup({ type: acctType, id: acctId }, topupId, session.id);
+              logger.info('[stripe-webhook] top-up credits granted', { topupId, acctType, acctId });
+            } catch (e) {
+              logger.error('[stripe-webhook] CRITICAL: top-up paid but grant FAILED (charged-but-not-credited) — manual credit required', {
+                topupId, acctType, acctId, sessionId: session.id,
+              }, e);
+            }
           } else {
             logger.warn('[stripe-webhook] top-up missing account metadata', { topupId });
           }
@@ -605,7 +618,11 @@ async function POSTHandler(req: NextRequest) {
               try {
                 await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, brokeragePlan, invoice.id);
               } catch (e) {
-                logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+                // Charged-but-not-credited: log CRITICAL for manual credit but
+                // never let it 500 the webhook (→ infinite Stripe retry). The
+                // grant is idempotent (sourceId = invoice id) so a manual replay
+                // is safe.
+                logger.error('[stripe-webhook] CRITICAL: brokerage monthly grant FAILED (paid, credits NOT granted) — manual credit required', { brokerageId, paidSubId, invoiceId: invoice.id }, e);
               }
             }
           }
@@ -692,10 +709,13 @@ async function POSTHandler(req: NextRequest) {
               }
             }
           } else {
-            logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
+            logger.error('[stripe-webhook] CRITICAL: PAID invoice but no matching space — credits NOT granted, manual review required', { paidSubId });
           }
         } catch (e) {
-          logger.error('[stripe-webhook] space monthly grant failed (paid, credits NOT granted)', { paidSubId }, e);
+          // Charged-but-not-credited: CRITICAL for manual credit, but swallow so
+          // the webhook still returns 200 (a 500 here → infinite Stripe retry).
+          // Idempotent via sourceId = invoice id, so a manual replay is safe.
+          logger.error('[stripe-webhook] CRITICAL: space monthly grant FAILED (paid, credits NOT granted) — manual credit required', { paidSubId, invoiceId: invoice.id }, e);
         }
 
         // Notify only on active transition (payment recovered past_due subscription)
