@@ -158,7 +158,7 @@ async def _fetch_curated_schemas(
     if not slugs:
         return []
     try:
-        async with httpx.AsyncClient(timeout=_SCHEMA_FETCH_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_SCHEMA_FETCH_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/integrations/search",
                 json={
@@ -283,7 +283,7 @@ def _build_curated_tool(
             arg_keys=list(arguments.keys()) if isinstance(arguments, dict) else [],
         )
         try:
-            async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT, follow_redirects=True) as client:
                 resp = await client.post(
                     f"{base_url}/api/internal/integrations/execute",
                     json={
