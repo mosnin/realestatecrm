@@ -76,6 +76,19 @@ async def find_integration_tool(
             "error": "no realtor identity on this run — integrations unavailable",
         })
 
+    # Hard loop-stop: two empty/errored discoveries this run is plenty — never
+    # grind reworded queries for minutes. Tell the agent to stop and be honest.
+    if ctx.context.integration_search_misses >= 2:
+        return json.dumps({
+            "tools": [],
+            "stop": True,
+            "error": (
+                "Already searched the connected integrations twice with no usable "
+                "result this turn. STOP — do not search again. Tell the realtor the "
+                "integration isn't connected (or the action isn't available) and move on."
+            ),
+        })
+
     try:
         async with httpx.AsyncClient(timeout=_SEARCH_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
@@ -89,16 +102,18 @@ async def find_integration_tool(
                 headers={"Authorization": f"Bearer {secret}"},
             )
     except Exception as err:
+        ctx.context.integration_search_misses += 1
         logger.warning(
             "find_integration_tool_request_failed",
             space_id=ctx.context.space_id,
             error=str(err)[:300],
         )
-        return json.dumps({"tools": [], "error": f"search request failed: {err}"})
+        return json.dumps({"tools": [], "error": f"search request failed: {err}. Tell the realtor integrations are temporarily unreachable; do not retry."})
 
     if resp.status_code >= 400:
+        ctx.context.integration_search_misses += 1
         return json.dumps(
-            {"tools": [], "error": f"search failed ({resp.status_code})"}
+            {"tools": [], "error": f"search failed ({resp.status_code}). Tell the realtor and do not retry."}
         )
 
     try:
@@ -106,10 +121,29 @@ async def find_integration_tool(
     except Exception:
         # Non-JSON body (an unfollowed redirect, a Vercel HTML page, a wrong
         # NEXT_PUBLIC_APP_URL) — surface status + snippet so it's diagnosable.
+        ctx.context.integration_search_misses += 1
         snippet = (resp.text or "")[:200].replace("\n", " ").strip()
         return json.dumps({"tools": [], "error": f"non-JSON response ({resp.status_code}): {snippet}"})
 
     tools = data.get("tools") or []
+    if not tools:
+        # Empty across the realtor's CONNECTED toolkits — almost always "not
+        # connected" or "no such action". Count it and tell the agent to stop
+        # and say so, instead of rewording the query and searching again.
+        ctx.context.integration_search_misses += 1
+        logger.info(
+            "find_integration_tool_empty",
+            space_id=ctx.context.space_id,
+            query=clean_query,
+        )
+        return json.dumps({
+            "tools": [],
+            "error": (
+                "No matching tools in the realtor's connected toolkits. The toolkit "
+                "may not be connected. Tell the realtor it isn't connected and stop — "
+                "do not reword and search again."
+            ),
+        })
     logger.info(
         "find_integration_tool_results",
         space_id=ctx.context.space_id,
