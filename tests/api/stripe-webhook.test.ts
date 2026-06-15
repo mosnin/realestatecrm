@@ -309,3 +309,57 @@ describe('Fix #4 — cancellation downgrades; payment failure gates without wipi
     expect('plan' in w.payload).toBe(false); // plan NOT wiped — recovery restores access
   });
 });
+
+// ── Fix #5 ─────────────────────────────────────────────────────────────
+describe('Fix #5 — unmapped price never silently defaults to solo', () => {
+  it('skips the grant + logs CRITICAL when the price is unmapped AND no metadata.plan', async () => {
+    supabaseState.readHandler = (table, filters) => {
+      if (table !== 'Space') return null;
+      if (filters.stripeSubscriptionId === 'sub_1') return { id: 'sp1', plan: 'pro', stripeCustomerId: 'cus_1' };
+      return null;
+    };
+    // Unknown price id, empty metadata — the exact Pro/Team-customer footgun.
+    const subscription = sub({
+      metadata: {},
+      items: { data: [{ price: { id: 'price_UNKNOWN' }, current_period_end: 1_800_000_000 }] },
+    });
+    const res = await fireEvent(
+      {
+        id: 'evt_inv_unmapped',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_u', billing_reason: 'subscription_create', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200); // still ack so Stripe stops retrying
+    // NOT granted (no guessed 'solo'), and NOT relabeled.
+    expect(grantPlanMonthlyMock).not.toHaveBeenCalled();
+    const relabel = writesTo('Space').find((w) => 'plan' in w.payload);
+    expect(relabel).toBeUndefined();
+    // CRITICAL logged for manual review.
+    const critical = loggerErrorMock.mock.calls.find((c) => String(c[0]).includes('CRITICAL'));
+    expect(critical).toBeTruthy();
+  });
+
+  it('still grants from metadata.plan when the price is unmapped but metadata carries the tier', async () => {
+    supabaseState.readHandler = (table, filters) => {
+      if (table !== 'Space') return null;
+      if (filters.stripeSubscriptionId === 'sub_1') return { id: 'sp1', plan: 'free', stripeCustomerId: 'cus_1' };
+      return null;
+    };
+    const subscription = sub({
+      metadata: { plan: 'pro' },
+      items: { data: [{ price: { id: 'price_UNKNOWN' }, current_period_end: 1_800_000_000 }] },
+    });
+    const res = await fireEvent(
+      {
+        id: 'evt_inv_meta',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_m', billing_reason: 'subscription_create', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_m');
+  });
+});

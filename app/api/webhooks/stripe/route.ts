@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
-import { PLANS, TOPUPS, type TopupId, planIdForStripePrice } from '@/lib/plans';
+import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -114,6 +114,26 @@ function customerIdOf(
  */
 function seatLimitForPlan(plan: string | undefined | null): number | null {
   if (plan === 'team' || plan === 'team_plus') return PLANS[plan].includedUsers;
+  return null;
+}
+
+/**
+ * Resolve the plan to grant/label for a paid invoice, from the live price first
+ * (source of truth) then the checkout-time metadata.plan. Returns null when
+ * NEITHER resolves a known tier.
+ *
+ * Fix #5: the old code defaulted a null resolution to 'solo', so a Pro/Team
+ * customer whose price id wasn't in PLANS (env not wired in this environment, a
+ * new price object, a typo) was granted Solo's smaller allotment AND relabeled
+ * Solo — silently underpaying a paying customer. Defaulting to a tier on
+ * ambiguity is never safe: returning null lets the caller log CRITICAL and skip
+ * the grant for manual review instead of guessing wrong.
+ */
+function resolveGrantPlan(sub: Stripe.Subscription): PlanId | null {
+  const livePlan = planIdForStripePrice(sub.items.data[0]?.price?.id);
+  if (livePlan) return livePlan;
+  const metaPlan = sub.metadata?.plan;
+  if (metaPlan && metaPlan in PLANS) return metaPlan as PlanId;
   return null;
 }
 
@@ -535,12 +555,10 @@ async function POSTHandler(req: NextRequest) {
         const paidSub = await stripe.subscriptions.retrieve(paidSubId);
         const paidStatus = mapStatus(paidSub.status);
 
-        // Derive the ACTIVE plan from the live subscription's price, not the
-        // checkout-time metadata.plan — that's stamped once and goes STALE on a
-        // portal plan change, so a Solo→Pro upgrade was granted Solo credits +
-        // relabeled Solo, and Pro→Solo kept granting Pro credits at the Solo
-        // price. Falls back to metadata when the price isn't a known plan price.
-        const livePlan = planIdForStripePrice(paidSub.items.data[0]?.price?.id);
+        // The ACTIVE plan is derived per-path below via resolveGrantPlan: live
+        // subscription price first (source of truth — a portal plan change
+        // updates the price, but the checkout-time metadata.plan goes stale),
+        // then metadata.plan, then SKIP (never default to a tier — Fix #5).
         // Grant monthly credits ONLY on a genuine new-subscription or renewal
         // invoice. Proration / mid-cycle / manual invoices also fire
         // payment_succeeded and would each mint an extra full month of credits.
@@ -557,10 +575,23 @@ async function POSTHandler(req: NextRequest) {
           // Monthly credit grant (best-effort — must never break payment
           // processing). Idempotent-per-invoice via the event-ID dedupe above.
           if (grantableInvoice) {
-            try {
-              await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, livePlan ?? paidSub.metadata?.plan ?? '', invoice.id);
-            } catch (e) {
-              logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+            const brokeragePlan = resolveGrantPlan(paidSub);
+            if (!brokeragePlan) {
+              // Fix #5: never guess a tier on an unmapped price — log CRITICAL
+              // (charged-but-not-credited) and skip so a human can reconcile,
+              // rather than granting the wrong (smaller) tier silently.
+              logger.error('[stripe-webhook] CRITICAL: brokerage invoice has unmapped price + no metadata.plan — grant SKIPPED, manual review required', {
+                brokerageId,
+                paidSubId,
+                priceId: paidSub.items.data[0]?.price?.id,
+                invoiceId: invoice.id,
+              });
+            } else {
+              try {
+                await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, brokeragePlan, invoice.id);
+              } catch (e) {
+                logger.error('[stripe-webhook] brokerage monthly grant failed', { brokerageId }, e);
+              }
             }
           }
           break;
@@ -618,25 +649,32 @@ async function POSTHandler(req: NextRequest) {
         }
 
         // Monthly credit grant (best-effort — never break payment processing).
-        // Trust the tier stamped on the subscription metadata (set at checkout);
-        // fall back to the current Space.plan, else Solo. Using the metadata
-        // avoids mislabeling a downgrade (e.g. Pro→Solo) off a stale Space.plan.
+        // Plan comes from the live price first, then metadata.plan. Fix #5:
+        // if NEITHER resolves a known tier we do NOT default to 'solo' (which
+        // silently under-granted Pro/Team customers) — we log CRITICAL and skip
+        // the grant + the relabel so a human reconciles instead of guessing.
         try {
           if (paidSpace?.id) {
-            const planId =
-              livePlan ||
-              (paidSub.metadata?.plan as string) ||
-              (paidSpace.plan && paidSpace.plan !== 'free' ? (paidSpace.plan as string) : 'solo');
-            // Keep the plan label in sync even when this invoice isn't grantable
-            // (so a portal plan change is reflected immediately).
-            if (planId !== paidSpace.plan) {
-              await supabase
-                .from('Space')
-                .update({ plan: planId, planActivatedAt: new Date().toISOString() })
-                .eq('id', paidSpace.id);
-            }
-            if (grantableInvoice) {
-              await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+            const planId = resolveGrantPlan(paidSub);
+            if (!planId) {
+              logger.error('[stripe-webhook] CRITICAL: space invoice has unmapped price + no metadata.plan — grant & relabel SKIPPED, manual review required', {
+                paidSubId,
+                spaceId: paidSpace.id,
+                priceId: paidSub.items.data[0]?.price?.id,
+                invoiceId: invoice.id,
+              });
+            } else {
+              // Keep the plan label in sync even when this invoice isn't
+              // grantable (so a portal plan change is reflected immediately).
+              if (planId !== paidSpace.plan) {
+                await supabase
+                  .from('Space')
+                  .update({ plan: planId, planActivatedAt: new Date().toISOString() })
+                  .eq('id', paidSpace.id);
+              }
+              if (grantableInvoice) {
+                await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+              }
             }
           } else {
             logger.error('[stripe-webhook] PAID invoice but no matching space — credits NOT granted', { paidSubId });
