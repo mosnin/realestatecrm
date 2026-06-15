@@ -406,7 +406,7 @@ async def chat_turn(item: dict):
         make_chat_model,
         resolve_chat_model,
     )
-    from tools.base import result_is_ok
+    from tools.base import result_is_ok, extract_display_payload as _extract_display_payload
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
@@ -543,13 +543,26 @@ async def chat_turn(item: dict):
                 summary = "" if output is None else str(output)
                 if len(summary) > 800:
                     summary = summary[:799] + "…"
-                return {
+                frame: dict[str, Any] = {
                     "type": "tool_call_result",
                     "tool": tool_name,
                     "ok": result_is_ok(output),
                     "summary": summary,
                     "call_id": _call_id(it),
                 }
+                # Lift the display hint + structured payload (weather / stats /
+                # option-list / question-flow / message-draft / …) onto the
+                # frame so the chat can render the rich inline card. The
+                # convention: tools return the widget payload at the top level
+                # alongside a "display" key (see tools/weather.py,
+                # tools/portfolio.py). We forward the whole dict as `data`; the
+                # client validates it before render.
+                display, data = _extract_display_payload(output)
+                if display:
+                    frame["display"] = display
+                    if data is not None:
+                        frame["data"] = data
+                return frame
 
             return None
 

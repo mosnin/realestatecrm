@@ -25,6 +25,10 @@ import { DealsTableResult } from './tool-results/deals-table-result';
 import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
 import { StatsResult } from './tool-results/stats-result';
 import { WeatherResult } from './tool-results/weather-result';
+import { OptionListResult } from './tool-results/option-list-result';
+import { QuestionFlowResult } from './tool-results/question-flow-result';
+import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
+import type { OptionListInput, QuestionFlowInput } from './tool-results/tool-ui-mappers';
 import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
 
 /** snake_case → "Search contacts". Repeated from tool-call-block-view to keep
@@ -138,6 +142,17 @@ function richResultFor(
         onSelectSlot={onUserIntent}
       />
     );
+  }
+  if (block.display === 'option-list' && Array.isArray((data as { options?: unknown[] }).options)) {
+    const d = data as unknown as OptionListInput & { prompt?: string };
+    return <OptionListResult input={d} prompt={d.prompt} onUserIntent={onUserIntent} />;
+  }
+  if (block.display === 'question-flow') {
+    const d = data as unknown as QuestionFlowInput;
+    return <QuestionFlowResult input={d} onUserIntent={onUserIntent} />;
+  }
+  if (block.display === 'message-draft' && typeof (data as { body?: unknown }).body === 'string') {
+    return <MessageDraftResult data={data as unknown as MessageDraftData} onUserIntent={onUserIntent} />;
   }
   return null;
 }
