@@ -27,7 +27,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com",
+      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com https://images.unsplash.com",
       "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
@@ -45,6 +45,13 @@ const nextConfig: NextConfig = {
   // makes Next.js require() it from node_modules instead, with intact
   // relative paths.
   serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  // Marketing redesign uses local placeholder imagery today. Unsplash is
+  // allowlisted so the founder can drop in royalty-free architecture/interior
+  // photos by URL later (the marketing <img> tags are plain <img>, but this
+  // also covers any next/image swap and matches the CSP img-src above).
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+  },
   // Lint + type-check run in CI (the `lint-typecheck-test` job, on every PR)
   // before anything reaches main. Re-running them inside `next build` on
   // Vercel's 8GB machine is redundant and was the cause of an Out-Of-Memory

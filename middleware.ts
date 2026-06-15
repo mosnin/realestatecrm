@@ -79,6 +79,8 @@ const isFullyPublicRoute = createRouteMatcher([
   // which keeps Clerk middleware so the homepage can detect auth users
   // and redirect them to their workspace (see `app/(marketing)/page.tsx`).
   '/realtors',
+  '/agents',                 // marketing: solo-agent story (redesign nav target)
+  '/brokerages',             // marketing: brokerage/floor story (redesign nav target)
   '/teams',
   '/teams/(.*)',
   '/features',
