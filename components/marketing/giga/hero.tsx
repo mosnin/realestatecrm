@@ -133,13 +133,19 @@ export function Hero() {
               transition={reduce ? undefined : { duration: 28, ease: 'linear', repeat: Infinity }}
             >
               {[...LOGOS, ...LOGOS].map((logo, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                // Fixed-size box + object-contain so every wordmark reads at a
+                // consistent visual weight regardless of its intrinsic ratio.
+                <span
                   key={`${logo.alt}-${i}`}
-                  src={logo.src}
-                  alt={logo.alt}
-                  className="h-5 w-auto shrink-0 opacity-50 grayscale invert sm:h-6"
-                />
+                  className="flex h-7 w-[130px] shrink-0 items-center justify-center"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logo.src}
+                    alt={logo.alt}
+                    className="max-h-5 w-auto max-w-full object-contain opacity-50 grayscale invert"
+                  />
+                </span>
               ))}
             </motion.div>
           </div>

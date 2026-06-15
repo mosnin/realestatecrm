@@ -31,8 +31,6 @@ import {
   ShieldCheck,
   GitBranch,
   CalendarCheck,
-  CheckCircle2,
-  Circle,
   Mail,
   Phone,
   Home,
@@ -40,7 +38,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
-import { ACCENT, BlurRise, Eyebrow, PillGhost, Serif, Band } from './primitives';
+import { BlurRise, Eyebrow, PillGhost, Serif, Band } from './primitives';
 
 /** Per-step dwell time before auto-advancing (ms). */
 const DURATION = 6500;
@@ -169,7 +167,8 @@ export function AgentCanvas() {
                 <PillGhost href="/agents">Explore Pipeline Canvas</PillGhost>
               </div>
 
-              {/* Stepped list */}
+              {/* Stepped list — plain text steps; the active step's top divider
+                  doubles as a filling white progress bar (the reference look). */}
               <div className="mt-9 flex flex-col">
                 {STEPS.map((s, i) => {
                   const isActive = i === active;
@@ -179,38 +178,27 @@ export function AgentCanvas() {
                       type="button"
                       onClick={() => goTo(i)}
                       aria-current={isActive}
-                      className="group relative w-full cursor-pointer border-t border-white/[0.08] py-4 text-left first:border-t-0"
+                      className="group relative w-full cursor-pointer py-4 text-left"
                     >
-                      {/* progress rail on the active row's top edge */}
-                      {isActive && (
-                        <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/10">
+                      {/* top hairline = divider for every step + progress fill on the active one */}
+                      <span aria-hidden className="absolute inset-x-0 top-0 h-px overflow-hidden bg-white/[0.1]">
+                        {isActive && (
                           <span
-                            className="block h-full"
+                            className="block h-full bg-white"
                             style={{
                               width: `${(reduce ? 1 : progress) * 100}%`,
-                              backgroundColor: ACCENT,
                               transition: reduce ? 'width 0.3s ease' : 'none',
                             }}
                           />
-                        </span>
-                      )}
-                      <span className="flex items-center gap-3">
-                        <span
-                          className={cn(
-                            'flex h-5 w-5 flex-shrink-0 items-center justify-center transition-colors',
-                            isActive ? 'text-[#ff9a6e]' : 'text-white/30 group-hover:text-white/55',
-                          )}
-                        >
-                          {isActive ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-3.5 w-3.5" />}
-                        </span>
-                        <span
-                          className={cn(
-                            'text-[15px] font-medium transition-colors',
-                            isActive ? 'text-white' : 'text-white/55 group-hover:text-white/80',
-                          )}
-                        >
-                          {s.title}
-                        </span>
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-[15px] transition-colors',
+                          isActive ? 'font-medium text-white' : 'text-white/55 group-hover:text-white/80',
+                        )}
+                      >
+                        {s.title}
                       </span>
                       <AnimatePresence initial={false}>
                         {isActive && (
@@ -219,7 +207,7 @@ export function AgentCanvas() {
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={reduce ? undefined : { height: 0, opacity: 0 }}
                             transition={{ duration: 0.3, ease: EASE_OUT }}
-                            className="overflow-hidden pl-8 text-[13px] leading-snug text-white/50"
+                            className="overflow-hidden text-[13px] leading-snug text-white/50"
                           >
                             <span className="block pt-2">{s.desc}</span>
                           </motion.p>
@@ -233,16 +221,18 @@ export function AgentCanvas() {
 
             {/* RIGHT: scenic bg + composited product panel that changes per step */}
             <div className="relative min-h-[460px] overflow-hidden border-t border-white/[0.08] lg:min-h-[600px] lg:border-l lg:border-t-0">
-              {/* fixed scenic background */}
+              {/* fixed scenic background — darkened + desaturated for the moody,
+                  cinematic look of the reference (over a bright placeholder). */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/marketing/home-hero.jpg"
                 alt=""
                 aria-hidden
                 className="absolute inset-0 h-full w-full object-cover"
+                style={{ filter: 'saturate(0.7) brightness(0.5) contrast(1.05)' }}
               />
-              <div aria-hidden className="absolute inset-0 bg-black/45" />
-              <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+              <div aria-hidden className="absolute inset-0 bg-black/55" />
+              <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
 
               {/* composited mockup, cross-fades per step */}
               <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-10">
@@ -253,7 +243,7 @@ export function AgentCanvas() {
                     animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     exit={reduce ? undefined : { opacity: 0, y: -8, filter: 'blur(8px)' }}
                     transition={{ duration: 0.5, ease: EASE_OUT }}
-                    className="w-full max-w-md"
+                    className="w-full max-w-lg"
                   >
                     <StepMockup step={active} />
                   </motion.div>

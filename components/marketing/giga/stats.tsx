@@ -1,45 +1,48 @@
 'use client';
 
 /**
- * Stats — the dark numbers band.
+ * Stats — the numbers band (reference-matched).
  *
- * Two-to-three big THIN serif numbers with small mono uppercase labels above
- * each, separated by thin vertical hairline dividers. Chippi-relevant, honest
- * placeholders the founder can refine.
+ * A short statement on the LEFT, then big SANS numbers on the RIGHT with small
+ * uppercase mono labels above each and thin vertical hairline dividers between
+ * them. No eyebrow, no centered headline — exactly the reference layout.
  */
 
-import { BlurRise, Eyebrow, Mono, Serif, Band } from './primitives';
+import { BlurRise, Mono, Band } from './primitives';
 
 const STATS = [
-  { value: '94%', label: 'OF FOLLOW-UPS DRAFTED FOR YOU' },
-  { value: '< 5 min', label: 'AVERAGE FIRST RESPONSE' },
-  { value: '24/7', label: 'WORKING YOUR PIPELINE' },
+  { value: '94%', label: 'Follow-ups drafted for you' },
+  { value: '< 5 min', label: 'Average first response' },
+  { value: '24/7', label: 'Working your pipeline' },
 ];
 
 export function Stats() {
   return (
     <Band className="py-20 sm:py-28">
-      <BlurRise>
-        <div className="flex flex-col items-center text-center">
-          <Eyebrow>By the numbers</Eyebrow>
-          <Serif className="mt-5 max-w-2xl text-[1.875rem] leading-[1.1] text-white/90 sm:text-[2.5rem]">
-            The busywork runs itself. The hours go to closing.
-          </Serif>
-        </div>
-      </BlurRise>
+      <div className="grid items-center gap-10 lg:grid-cols-[1fr_auto] lg:gap-20">
+        <BlurRise>
+          <p className="max-w-md text-xl leading-snug text-white/85 sm:text-[1.6rem] sm:leading-[1.3]">
+            The busywork runs itself, so your hours go to closing — Chippi up and
+            running on your book in a day.
+          </p>
+        </BlurRise>
 
-      <BlurRise delay={0.1}>
-        <div className="mt-14 grid grid-cols-1 divide-y divide-white/[0.08] border-y border-white/[0.08] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {STATS.map((s) => (
-            <div key={s.label} className="flex flex-col items-center px-6 py-10 text-center">
-              <Mono className="text-[10px] text-white/40">{s.label}</Mono>
-              <Serif className="mt-4 text-[3rem] leading-none text-white sm:text-[4rem]">
-                {s.value}
-              </Serif>
-            </div>
-          ))}
-        </div>
-      </BlurRise>
+        <BlurRise delay={0.1}>
+          <div className="grid grid-cols-3 divide-x divide-white/[0.1]">
+            {STATS.map((s) => (
+              <div key={s.label} className="px-5 first:pl-0 sm:px-8">
+                <Mono className="text-[10px] text-white/40">{s.label}</Mono>
+                <span
+                  className="mt-3 block text-[2.5rem] font-light leading-none tracking-tight tabular-nums text-white sm:text-[3.25rem]"
+                  style={{ fontFamily: 'var(--font-sans)' }}
+                >
+                  {s.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </BlurRise>
+      </div>
     </Band>
   );
 }
