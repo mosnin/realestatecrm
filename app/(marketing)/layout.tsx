@@ -1,41 +1,43 @@
 /**
- * Marketing route group layout, the "bold canvas" shell.
+ * Marketing route-group layout — the dark, cinematic shell (Giga redesign).
  *
- * Every page under `app/(marketing)/` renders inside this shell. The marketing
- * site is its own visual world, deliberately split from the product:
+ * Every page under `app/(marketing)/` renders inside this shell, deliberately
+ * split from the product:
  *
- *  - Canvas, not paper: the page background is a tinted canvas (warm bone in
- *    light, near-black in dark) and content lives in big rounded color-blocked
- *    cards that sit ON it.
- *  - Display type: Inter Tight (via next/font, self-hosted) is the headline
- *    voice; Instrument Serif italic is the accent flourish. `--font-title` is
- *    overridden HERE so every legacy serif-Times headline in the marketing
- *    tree resolves to the display face, the product (outside this group)
- *    keeps its own type system untouched.
+ *  - Always dark: a near-black (#0a0a0a) canvas with white text, regardless of
+ *    the app's light/dark theme toggle. The marketing site is its own visual
+ *    world; the product (outside this group) keeps its own type + theme system.
+ *  - Type: an elegant light-weight SERIF display face (Fraunces) is the
+ *    headline voice, exposed as `--font-serif-display`. Eyebrow labels use a
+ *    monospace face (JetBrains Mono) exposed as `--font-mono-display`. Body
+ *    stays on the app's system sans.
  *
- * The marketing site is public, we don't load Clerk for unauth visitors.
+ * The marketing site is public; Clerk isn't loaded for unauth visitors.
  * Auth-aware pages (the homepage redirects auth users to their workspace)
  * still call `auth()` from their own server component before rendering.
  */
 
-import { Bricolage_Grotesque, Instrument_Serif } from 'next/font/google';
-import { SiteNav } from '@/components/marketing/site/nav';
-import { SiteFooter } from '@/components/marketing/site/footer';
+import { Fraunces, JetBrains_Mono } from 'next/font/google';
+import { SiteHeader } from '@/components/marketing/giga/header';
+import { SiteFooter } from '@/components/marketing/giga/footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
-const display = Bricolage_Grotesque({
+// Elegant thin serif display face (the reference's headline voice). Optical
+// sizing + a light default weight keep the large headlines refined, not heavy.
+const serifDisplay = Fraunces({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-  variable: '--font-display',
-});
-
-const accent = Instrument_Serif({
-  subsets: ['latin'],
-  weight: '400',
+  weight: ['300', '400', '500'],
   style: ['normal', 'italic'],
   display: 'swap',
-  variable: '--font-accent',
+  variable: '--font-serif-display',
+});
+
+// Monospace face for the uppercase eyebrow labels.
+const monoDisplay = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  variable: '--font-mono-display',
 });
 
 export default function MarketingLayout({
@@ -45,12 +47,11 @@ export default function MarketingLayout({
 }) {
   return (
     <div
-      className={`${display.variable} ${accent.variable} font-display flex min-h-screen flex-col bg-white text-[#16161a] dark:bg-[#0a0a0b] dark:text-[#f5f5f4]`}
-      style={{ '--font-title': 'var(--font-display)' } as React.CSSProperties}
+      className={`${serifDisplay.variable} ${monoDisplay.variable} flex min-h-screen flex-col bg-[#0a0a0a] text-white antialiased`}
     >
       {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      <SiteNav />
+      <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
     </div>
