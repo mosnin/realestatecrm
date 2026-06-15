@@ -216,11 +216,20 @@ function formatTime(seconds: number) {
 // switching threads re-reads that thread's pick; a brand-new thread (no id
 // yet) defaults to Chat.
 const CHAT_MODE_STORAGE_PREFIX = 'chippi-chat-mode:';
+// A brand-new thread has no id yet, so its in-flight pick is keyed under a
+// stable draft slot — otherwise a re-render before the first send snaps Agent
+// back to Chat. The draft is cleared once the thread gets a real id (see the
+// carry-forward effect), so a fresh thread still defaults to Chat.
+const CHAT_MODE_DRAFT_KEY = `${CHAT_MODE_STORAGE_PREFIX}__draft__`;
+
+function chatModeKey(conversationId: string | null): string {
+  return conversationId ? CHAT_MODE_STORAGE_PREFIX + conversationId : CHAT_MODE_DRAFT_KEY;
+}
 
 function readStoredChatMode(conversationId: string | null): ChatMode {
-  if (!conversationId || typeof window === 'undefined') return 'chat';
+  if (typeof window === 'undefined') return 'chat';
   try {
-    const raw = window.sessionStorage.getItem(CHAT_MODE_STORAGE_PREFIX + conversationId);
+    const raw = window.sessionStorage.getItem(chatModeKey(conversationId));
     return raw === 'agent' ? 'agent' : 'chat';
   } catch {
     return 'chat';
@@ -228,11 +237,20 @@ function readStoredChatMode(conversationId: string | null): ChatMode {
 }
 
 function writeStoredChatMode(conversationId: string | null, mode: ChatMode): void {
-  if (!conversationId || typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return;
   try {
-    window.sessionStorage.setItem(CHAT_MODE_STORAGE_PREFIX + conversationId, mode);
+    window.sessionStorage.setItem(chatModeKey(conversationId), mode);
   } catch {
     /* quota / private mode — the in-memory state still drives this session */
+  }
+}
+
+function clearDraftChatMode(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(CHAT_MODE_DRAFT_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -293,6 +311,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       if (prev === conversationId) return;
       if (prev === null && conversationId) {
         writeStoredChatMode(conversationId, chatMode);
+        clearDraftChatMode();
         return;
       }
       setChatMode(readStoredChatMode(conversationId));
