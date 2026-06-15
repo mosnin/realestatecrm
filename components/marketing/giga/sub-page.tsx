@@ -8,9 +8,10 @@
  */
 
 import { BlurRise, EyebrowPill, Eyebrow, PillPrimary, PillGhost, Serif, Band } from './primitives';
+import { FEATURE_ICONS, type FeatureIconName } from './icons';
 
 export interface SubFeature {
-  icon: React.ElementType;
+  icon: FeatureIconName;
   title: string;
   desc: string;
 }
@@ -93,7 +94,7 @@ export function SubPageFeatures({
       <BlurRise delay={0.1}>
         <div className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.06] sm:grid-cols-3">
           {features.map((f) => {
-            const Icon = f.icon;
+            const Icon = FEATURE_ICONS[f.icon];
             return (
               <div key={f.title} className="bg-[#0a0a0a] p-8">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-[#ff9a6e]">

@@ -6,8 +6,7 @@
  * the AI cowork that works an agent's book while they close.
  */
 
-import { MessagesSquare, CalendarCheck, KanbanSquare } from 'lucide-react';
-import { SubPageHero, SubPageFeatures } from '@/components/marketing/giga/sub-page';
+import { SubPageHero, SubPageFeatures, type SubFeature } from '@/components/marketing/giga/sub-page';
 
 export const metadata = {
   title: 'For agents · Chippi',
@@ -15,19 +14,19 @@ export const metadata = {
     'Chippi works your book while you close — reading the inbox, drafting replies in your voice, and booking tours against your real calendar. Nothing sends without your tap.',
 };
 
-const FEATURES = [
+const FEATURES: SubFeature[] = [
   {
-    icon: MessagesSquare,
+    icon: 'MessagesSquare',
     title: 'Drafts in your voice',
     desc: 'Every reply written and waiting before you open the thread, the way you actually write. Edit it, send it, or skip it.',
   },
   {
-    icon: KanbanSquare,
+    icon: 'KanbanSquare',
     title: 'Know who to call first',
     desc: 'Leads scored against your live deals and ranked by intent, so the next best move is always at the top of the list.',
   },
   {
-    icon: CalendarCheck,
+    icon: 'CalendarCheck',
     title: 'Tours book themselves',
     desc: 'Approve a time and the calendar, the thread, and the deal all update — every action written down in plain language.',
   },

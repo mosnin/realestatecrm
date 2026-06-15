@@ -21,9 +21,10 @@
 
 import { cn } from '@/lib/utils';
 import { BlurRise, Eyebrow, PillGhost, Serif } from './primitives';
+import { FEATURE_ICONS, type FeatureIconName } from './icons';
 
 export interface FeatureBlurb {
-  icon: React.ElementType;
+  icon: FeatureIconName;
   title: string;
   desc: string;
 }
@@ -36,7 +37,7 @@ export interface FeatureSectionProps {
   blurbs: [FeatureBlurb, FeatureBlurb, FeatureBlurb];
   /** Large-card text column. */
   card: {
-    icon: React.ElementType;
+    icon: FeatureIconName;
     title: string;
     body: string;
     cta: { label: string; href: string };
@@ -58,7 +59,7 @@ export function FeatureSection({
   imageSide,
   id,
 }: FeatureSectionProps) {
-  const Icon = card.icon;
+  const Icon = FEATURE_ICONS[card.icon];
   const imageLeft = imageSide === 'left';
 
   return (
@@ -85,7 +86,7 @@ export function FeatureSection({
           <BlurRise delay={0.08}>
             <div className="grid grid-cols-1 gap-y-7 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-white/[0.08] lg:pt-2">
               {blurbs.map((b) => {
-                const BIcon = b.icon;
+                const BIcon = FEATURE_ICONS[b.icon];
                 return (
                   <div key={b.title} className="sm:px-5 sm:first:pl-0 sm:last:pr-0">
                     <BIcon className="h-[18px] w-[18px] text-white/55" />
