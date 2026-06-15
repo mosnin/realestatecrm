@@ -64,7 +64,7 @@ import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
  *  seconds of receiving the task; 30 minutes is plenty of headroom and short
  *  enough that a leaked task payload can't be replayed against the assets. */
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
-import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -386,14 +386,23 @@ function proxyModalStream({
               const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
               const ok = evt.ok !== false;
               const summary = String(evt.summary ?? '');
+              // Rich-card payload Modal lifted off the tool output (weather /
+              // stats / option-list / question-flow / message-draft / …).
+              const display =
+                typeof evt.display === 'string'
+                  ? (evt.display as ToolCallBlock['display'])
+                  : undefined;
+              const data = 'data' in evt ? evt.data : undefined;
               // Settle the result onto its tool-call block — by call_id when
-              // present, else the most recent still-unresolved tool call.
+              // present, else the most recent still-unresolved tool call. Carry
+              // the rich data/display so the inline card re-renders on reload.
               for (let i = blocks.length - 1; i >= 0; i--) {
                 const b = blocks[i];
                 if (b.type !== 'tool_call') continue;
                 if (callId ? b.callId === callId : !b.result) {
-                  b.result = { ok, summary };
+                  b.result = { ok, summary, data };
                   b.status = ok ? 'complete' : 'error';
+                  if (display) b.display = display;
                   break;
                 }
               }
@@ -416,6 +425,8 @@ function proxyModalStream({
                 ok,
                 summary,
                 callId,
+                ...(display ? { display } : {}),
+                ...(data !== undefined ? { data } : {}),
               });
 
             } else if (type === 'done') {
