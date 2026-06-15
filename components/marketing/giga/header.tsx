@@ -3,19 +3,21 @@
 /**
  * SiteHeader — the dark, cinematic sticky header (reference-matched).
  *
- * Layout: two FLOATING GLASS PILLS over the hero — the brand + nav on the left,
- * the actions on the right, with open space between them. Both pills carry a
- * backdrop-blur + translucent near-black fill + hairline border, and deepen
- * slightly on scroll (the "blur on scroll"), driven by framer-motion
- * `useScroll` + `useMotionValueEvent` (a threshold flips a `scrolled` flag).
+ * Layout: FULL-BLEED. The brand + nav hug the left edge, the actions hug the
+ * right edge (no max-width container) — the two clusters stretch to the screen.
+ *
+ * Background:
+ *  - At the very top the header is fully TRANSPARENT (no fill, no border, no
+ *    blur) — the logo/links/actions float directly over the hero.
+ *  - On scroll each cluster gains a translucent near-black blurred background
+ *    with a hairline border + soft shadow. Driven by framer-motion `useScroll`
+ *    + `useMotionValueEvent` (a threshold flips a `scrolled` flag).
  *
  * Nav:
- *  - Left pill: the Chippi logo, then Agents (opens a blurred mega-menu of
- *    Chippi capabilities), Brokerages, Pricing.
- *  - Right pill: "Sign in" (text) + "See a demo" (white rounded-full pill).
+ *  - Left cluster: the Chippi logo, then Agents (opens a blurred mega-menu),
+ *    Brokerages, Pricing.
+ *  - Right cluster: "Sign in" (text) + "See a demo" (white rounded-full pill).
  *  - Mobile: a full-screen blurred takeover.
- *
- * Copy is Chippi/real-estate; only the visual aesthetic matches the reference.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -123,27 +125,32 @@ export function SiteHeader() {
     show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } },
   };
 
-  // Shared glass-pill styling (animated bg/border deepen on scroll).
-  const pillAnimate = {
-    backgroundColor: scrolled ? 'rgba(12,12,12,0.82)' : 'rgba(12,12,12,0.5)',
-    borderColor: scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.07)',
+  // Each nav cluster is TRANSPARENT at the top and gains a blurred translucent
+  // background only once scrolled — animated, so it fades in/out.
+  const clusterAnimate = {
+    backgroundColor: scrolled ? 'rgba(12,12,12,0.72)' : 'rgba(12,12,12,0)',
+    borderColor: scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0)',
+    boxShadow: scrolled ? '0 10px 30px -12px rgba(0,0,0,0.55)' : '0 0px 0px 0px rgba(0,0,0,0)',
   };
-  const pillStyle = { backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as React.CSSProperties;
-  const pillTransition = { duration: reduce ? 0 : 0.35, ease: EASE_OUT };
+  const clusterStyle = {
+    backdropFilter: scrolled ? 'blur(16px)' : 'blur(0px)',
+    WebkitBackdropFilter: scrolled ? 'blur(16px)' : 'blur(0px)',
+  } as React.CSSProperties;
+  const clusterTransition = { duration: reduce ? 0 : 0.35, ease: EASE_OUT };
 
   return (
     <>
       <header ref={navRef} className="fixed inset-x-0 top-0 z-50">
-        <div className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-5 sm:pt-4">
-          {/* Two floating glass pills with open space between them. */}
-          <div className="relative flex items-center justify-between gap-3">
-            {/* LEFT pill — brand + desktop nav */}
+        {/* Full-bleed: brand hugs the left, actions hug the right. */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 sm:px-8 sm:py-4 lg:px-10">
+          {/* LEFT cluster — relative anchor for the mega-menu */}
+          <div className="relative">
             <motion.div
               initial={false}
-              animate={pillAnimate}
-              transition={pillTransition}
-              style={pillStyle}
-              className="flex items-center gap-0.5 rounded-full border px-1.5 shadow-lg shadow-black/20"
+              animate={clusterAnimate}
+              transition={clusterTransition}
+              style={clusterStyle}
+              className="flex items-center gap-0.5 rounded-full border px-1.5"
             >
               <Link href="/" aria-label="Chippi home" className="flex items-center px-3 py-2.5" onClick={closeAll}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -178,37 +185,7 @@ export function SiteHeader() {
               </nav>
             </motion.div>
 
-            {/* RIGHT pill — actions */}
-            <motion.div
-              initial={false}
-              animate={pillAnimate}
-              transition={pillTransition}
-              style={pillStyle}
-              className="flex items-center gap-1 rounded-full border p-1.5 shadow-lg shadow-black/20"
-            >
-              <Link
-                href={SIGNIN}
-                className="hidden rounded-full px-3.5 py-1.5 text-sm text-white/70 transition-colors hover:text-white lg:inline-flex"
-              >
-                Sign in
-              </Link>
-              <Link
-                href={DEMO}
-                className="hidden h-9 items-center rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
-              >
-                See a demo
-              </Link>
-              <button
-                type="button"
-                aria-label="Open menu"
-                onClick={() => setMobileOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/[0.08] lg:hidden"
-              >
-                <Menu size={20} />
-              </button>
-            </motion.div>
-
-            {/* Agents mega-menu — blurred panel, anchored under the left pill */}
+            {/* Agents mega-menu — anchored under the left cluster */}
             <AnimatePresence>
               {agentsOpen && (
                 <motion.div
@@ -217,7 +194,7 @@ export function SiteHeader() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.98 }}
                   transition={{ duration: reduce ? 0 : 0.2, ease: EASE_OUT }}
-                  className="absolute left-0 top-[calc(100%+10px)] hidden w-[760px] max-w-[calc(100vw-2rem)] lg:block"
+                  className="absolute left-0 top-[calc(100%+10px)] hidden w-[760px] max-w-[calc(100vw-2.5rem)] lg:block"
                   onMouseLeave={() => setAgentsOpen(false)}
                 >
                   <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0d0d0d]/90 shadow-2xl shadow-black/60 backdrop-blur-2xl">
@@ -283,6 +260,36 @@ export function SiteHeader() {
               )}
             </AnimatePresence>
           </div>
+
+          {/* RIGHT cluster — actions */}
+          <motion.div
+            initial={false}
+            animate={clusterAnimate}
+            transition={clusterTransition}
+            style={clusterStyle}
+            className="flex items-center gap-1 rounded-full border p-1.5"
+          >
+            <Link
+              href={SIGNIN}
+              className="hidden rounded-full px-3.5 py-1.5 text-sm text-white/70 transition-colors hover:text-white lg:inline-flex"
+            >
+              Sign in
+            </Link>
+            <Link
+              href={DEMO}
+              className="hidden h-9 items-center rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
+            >
+              See a demo
+            </Link>
+            <button
+              type="button"
+              aria-label="Open menu"
+              onClick={() => setMobileOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/[0.08] lg:hidden"
+            >
+              <Menu size={20} />
+            </button>
+          </motion.div>
         </div>
       </header>
 
