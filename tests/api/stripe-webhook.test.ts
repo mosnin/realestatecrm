@@ -52,10 +52,13 @@ const { supabaseState } = vi.hoisted(() => ({
     writes: [] as WriteCall[],
     // (table, filters) -> row. Default: null (not found).
     readHandler: (_table: string, _filters: Filters): unknown => null,
+    // (table, filters) -> count (for head:true count queries, e.g.
+    // BrokerageMembership seat counting). Default: 0.
+    countHandler: (_table: string, _filters: Filters): number => 0,
   },
 }));
 
-function makeSelectBuilder(table: string) {
+function makeSelectBuilder(table: string, head: boolean) {
   const filters: Filters = {};
   const builder: any = {
     eq(col: string, val: unknown) {
@@ -76,6 +79,12 @@ function makeSelectBuilder(table: string) {
     single() {
       supabaseState.reads.push({ table, filters: { ...filters } });
       return Promise.resolve({ data: supabaseState.readHandler(table, { ...filters }), error: null });
+    },
+    // head:true count query (.select('*', { count, head:true }).eq(...)) is
+    // awaited directly — resolve to a { count } shape.
+    then(resolve: (v: { count: number; error: null }) => unknown) {
+      supabaseState.reads.push({ table, filters: { ...filters } });
+      return Promise.resolve({ count: supabaseState.countHandler(table, { ...filters }), error: null }).then(resolve);
     },
   };
   return builder;
@@ -113,7 +122,8 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     from(table: string) {
       return {
-        select: () => makeSelectBuilder(table),
+        select: (_cols?: unknown, opts?: { head?: boolean }) =>
+          makeSelectBuilder(table, !!opts?.head),
         update: (payload: Record<string, unknown>) => makeUpdateBuilder(table, payload),
       };
     },
@@ -178,6 +188,7 @@ beforeEach(() => {
   supabaseState.reads = [];
   supabaseState.writes = [];
   supabaseState.readHandler = () => null;
+  supabaseState.countHandler = () => 0;
   stripeState.event = null;
   stripeState.subscription = null;
   redisGetMock.mockResolvedValue(null);
@@ -261,9 +272,11 @@ describe('Fix #3 — checkout sets Space.plan + first-invoice race', () => {
     );
     expect(res.status).toBe(200);
     // The grant ran for the space found via metadata fallback (not skipped).
+    // Space tiers carry no per-seat add-on, so addonUsers is 0 (Fix #2).
     expect(grantPlanMonthlyMock).toHaveBeenCalledWith(
       { type: 'space', id: 'sp1' },
       'solo',
+      0,
       'in_1',
     );
     // And stripeSubscriptionId was backfilled, closing the race for next time.
@@ -370,7 +383,7 @@ describe('Fix #5 — unmapped price never silently defaults to solo', () => {
       subscription,
     );
     expect(res.status).toBe(200);
-    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_m');
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 0, 'in_m');
   });
 });
 
@@ -395,7 +408,7 @@ describe('Fix #6 — trial-end + plan-change invoices are grantable', () => {
       subscription,
     );
     expect(res.status).toBe(200);
-    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'solo', 'in_trial');
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'solo', 0, 'in_trial');
   });
 
   it('grants the NEW tier on subscription_update (plan change), keyed by invoice id', async () => {
@@ -410,7 +423,7 @@ describe('Fix #6 — trial-end + plan-change invoices are grantable', () => {
       subscription,
     );
     expect(res.status).toBe(200);
-    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_upd');
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 0, 'in_upd');
   });
 
   it('a duplicate plan-change delivery does not grant twice (idempotency)', async () => {
@@ -431,7 +444,7 @@ describe('Fix #6 — trial-end + plan-change invoices are grantable', () => {
     expect(grantPlanMonthlyMock).toHaveBeenCalledTimes(1);
     // And the single grant carried sourceId = invoice id, so even if Redis were
     // unavailable the DB's unique (reason, sourceId) index would dedupe.
-    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 'in_upd2');
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'pro', 0, 'in_upd2');
   });
 
   it('does NOT grant on a non-grantable billing_reason (e.g. proration / manual)', async () => {
@@ -490,5 +503,64 @@ describe('Fix #7 — a failed top-up grant does not 500 (no infinite retry)', ()
     });
     expect(res.status).toBe(200);
     expect(grantTopupMock).toHaveBeenCalledWith({ type: 'space', id: 'sp1' }, 'starter', 'cs_top');
+  });
+});
+
+// ── Fix #2 ─────────────────────────────────────────────────────────────
+// Brokerage renewal grants base + PER-SEAT credits for seats over includedUsers.
+describe('Fix #2 — brokerage grant includes per-seat add-on credits', () => {
+  beforeEach(() => {
+    // Brokerage ownership guard reads the Brokerage row; customer must match.
+    supabaseState.readHandler = (table) =>
+      table === 'Brokerage' ? { id: 'br1', stripeCustomerId: 'cus_1' } : null;
+  });
+
+  it('passes addonUsers = activeMembers − includedUsers to grantPlanMonthly (team, 5 included)', async () => {
+    // 8 active members, team includes 5 → 3 add-on seats.
+    supabaseState.countHandler = (table, filters) =>
+      table === 'BrokerageMembership' && filters.brokerageId === 'br1' ? 8 : 0;
+    const subscription = sub({
+      metadata: { brokerageId: 'br1', plan: 'team' },
+      items: { data: [{ price: { id: 'price_team_m' }, current_period_end: 1_800_000_000 }] },
+    });
+    const res = await fireEvent(
+      {
+        id: 'evt_brk_renew',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_brk', billing_reason: 'subscription_cycle', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    // 4th arg is the add-on seat count; sourceId stays the invoice id (idempotency).
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith(
+      { type: 'brokerage', id: 'br1' },
+      'team',
+      3,
+      'in_brk',
+    );
+  });
+
+  it('passes addonUsers = 0 when the brokerage is within its included seats', async () => {
+    supabaseState.countHandler = (table) => (table === 'BrokerageMembership' ? 4 : 0); // ≤ 5
+    const subscription = sub({
+      metadata: { brokerageId: 'br1', plan: 'team' },
+      items: { data: [{ price: { id: 'price_team_m' }, current_period_end: 1_800_000_000 }] },
+    });
+    const res = await fireEvent(
+      {
+        id: 'evt_brk_renew_small',
+        type: 'invoice.payment_succeeded',
+        data: { object: { id: 'in_brk2', billing_reason: 'subscription_cycle', subscription: 'sub_1' } },
+      },
+      subscription,
+    );
+    expect(res.status).toBe(200);
+    expect(grantPlanMonthlyMock).toHaveBeenCalledWith(
+      { type: 'brokerage', id: 'br1' },
+      'team',
+      0,
+      'in_brk2',
+    );
   });
 });

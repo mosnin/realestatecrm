@@ -72,12 +72,20 @@ const GRANTABLE_PLANS = new Set<PlanId>(['solo', 'pro', 'team', 'team_plus']);
  * Grant a plan's monthly credits when an invoice is paid. Tolerant of the raw
  * plan string stored on Space/Brokerage (legacy `starter`/`enterprise` carry no
  * defined monthly grant → no-op). Returns the credits granted (0 if none).
+ *
+ * `addonUsers` (Fix #2) is the number of seats BEYOND the plan's includedUsers,
+ * so a brokerage's pool gets base + per-seat credits (PLANS.addUser.credits ×
+ * addonUsers). Space tiers have no add-on path, so callers pass 0 (the default)
+ * and monthlyGrantAmount ignores it. Idempotency is unchanged: the same
+ * sourceId (invoice id) keys the grant against the unique (reason, sourceId)
+ * index, so a retried webhook re-runs as a no-op regardless of addonUsers.
  */
 export async function grantPlanMonthly(
   account: BillingAccount,
   planRaw: string,
+  addonUsers = 0,
   sourceId?: string | null,
 ): Promise<number> {
   if (!GRANTABLE_PLANS.has(planRaw as PlanId)) return 0;
-  return grantMonthlyCredits(account, planRaw as PlanId, 0, sourceId);
+  return grantMonthlyCredits(account, planRaw as PlanId, addonUsers, sourceId);
 }

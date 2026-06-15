@@ -6,7 +6,7 @@ import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
 import { syncBrokerageSeatBillingForSubscription } from '@/lib/billing/brokerage-seat-billing';
-import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice } from '@/lib/plans';
+import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice, addonSeatsForPlan } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -648,7 +648,19 @@ async function POSTHandler(req: NextRequest) {
               });
             } else {
               try {
-                await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, brokeragePlan, invoice.id);
+                // Fix #2: grant base + PER-SEAT credits. Count active members
+                // and pass the seats over the plan's includedUsers as addonUsers
+                // so the pool reflects what the per-seat billing (Fix #1)
+                // charges. A count error → 0 add-on (grant at least the base —
+                // never under-grant to zero AND never over-grant on a flaky
+                // read). sourceId stays the invoice id, so idempotency is
+                // unchanged.
+                const { count: brokerageMembers } = await supabase
+                  .from('BrokerageMembership')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('brokerageId', brokerageId);
+                const addonUsers = addonSeatsForPlan(brokeragePlan, brokerageMembers ?? 0);
+                await grantPlanMonthly({ type: 'brokerage', id: brokerageId }, brokeragePlan, addonUsers, invoice.id);
               } catch (e) {
                 // Charged-but-not-credited: log CRITICAL for manual credit but
                 // never let it 500 the webhook (→ infinite Stripe retry). The
@@ -737,7 +749,8 @@ async function POSTHandler(req: NextRequest) {
                   .eq('id', paidSpace.id);
               }
               if (grantableInvoice) {
-                await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, invoice.id);
+                // Space tiers (solo/pro) have no per-seat add-on → addonUsers 0.
+                await grantPlanMonthly({ type: 'space', id: paidSpace.id as string }, planId, 0, invoice.id);
               }
             }
           } else {
