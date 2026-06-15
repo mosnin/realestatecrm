@@ -83,16 +83,14 @@ export function FeatureSection({
           </BlurRise>
 
           <BlurRise delay={0.08}>
-            <div className="grid grid-cols-1 gap-7 sm:grid-cols-3 lg:pt-2">
+            <div className="grid grid-cols-1 gap-y-7 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-white/[0.08] lg:pt-2">
               {blurbs.map((b) => {
                 const BIcon = b.icon;
                 return (
-                  <div key={b.title}>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/70">
-                      <BIcon className="h-[18px] w-[18px]" />
-                    </span>
-                    <h3 className="mt-4 text-[14px] font-semibold text-white">{b.title}</h3>
-                    <p className="mt-1.5 text-[13px] leading-snug text-white/50">{b.desc}</p>
+                  <div key={b.title} className="sm:px-5 sm:first:pl-0 sm:last:pr-0">
+                    <BIcon className="h-[18px] w-[18px] text-white/55" />
+                    <h3 className="mt-3.5 text-[13.5px] font-medium text-white">{b.title}</h3>
+                    <p className="mt-1.5 text-[12.5px] leading-snug text-white/45">{b.desc}</p>
                   </div>
                 );
               })}

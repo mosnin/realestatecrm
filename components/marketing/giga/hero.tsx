@@ -62,7 +62,7 @@ export function Hero() {
             className="mt-7 text-balance font-light leading-[1.04] tracking-[-0.025em] text-white"
           >
             The AI cowork that runs
-            <span className="block text-white/55">your entire pipeline.</span>
+            <span className="block">your entire pipeline.</span>
           </h1>
         </BlurRise>
 
