@@ -24,7 +24,7 @@ export default function BrokeragesPage() {
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Brokerage Dashboard"
+          label="Brokerage view"
           labelIcon="Building2"
           headline={
             <>

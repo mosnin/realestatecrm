@@ -2,23 +2,22 @@
 
 /**
  * Marketing page transition. A template remounts on every route change inside
- * the (marketing) group, so each page arrives with one subtle blur-in: the
- * content fades up from a soft blur to crisp. It wraps only the page content
- * (the fixed header/footer live outside it), so the chrome stays sharp while
- * the page resolves. Reduced-motion renders instantly, and animating `filter`
- * never shifts layout.
+ * the (marketing) group, so each page arrives with one smooth blur-in: a light
+ * blur that resolves to crisp on a silky ease-out-expo curve. It is kept light
+ * and transform-free on purpose, so it complements (rather than fights) the
+ * per-section blur-rise entrances and never shifts layout or reveals a strip on
+ * the light shell. Reduced-motion renders instantly.
  */
 
 import { motion, useReducedMotion } from 'framer-motion';
-import { EASE_OUT } from '@/lib/motion';
 
 export default function MarketingTemplate({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, filter: 'blur(12px)' }}
+      initial={reduce ? false : { opacity: 0, filter: 'blur(8px)' }}
       animate={{ opacity: 1, filter: 'blur(0px)' }}
-      transition={{ duration: 0.5, ease: EASE_OUT }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], opacity: { duration: 0.45, ease: 'easeOut' } }}
       style={{ willChange: 'filter, opacity' }}
     >
       {children}
