@@ -44,7 +44,7 @@ export function ResearchSection() {
             {/* Image + stat overlay */}
             <div className="relative min-h-[260px] lg:min-h-[420px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/marketing/product/realtors.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src="/marketing/research.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#ff7a45]/70 via-[#ff7a45]/10 to-transparent" />
               <div className="absolute bottom-6 left-6">
                 <span style={MONO} className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/80">

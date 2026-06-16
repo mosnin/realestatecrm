@@ -33,7 +33,7 @@ export function Hero() {
         {/* TODO: replace placeholder image — final cinematic hero shot. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/marketing/home-hero.jpg"
+          src="/marketing/hero-bg.jpg"
           alt=""
           className="h-full w-full object-cover object-center"
         />

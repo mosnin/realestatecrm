@@ -171,7 +171,7 @@ export function BrokerageShowcase() {
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}
-      image="/marketing/home-hero.jpg"
+      image="/marketing/feature-3.jpg"
       imageSide="right"
     />
   );

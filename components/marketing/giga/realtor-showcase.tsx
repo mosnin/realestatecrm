@@ -187,7 +187,7 @@ export function RealtorShowcase() {
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}
-      image="/marketing/home-hero.jpg"
+      image="/marketing/feature-2.jpg"
       imageSide="left"
     />
   );

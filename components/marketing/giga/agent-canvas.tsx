@@ -200,7 +200,7 @@ export function AgentCanvas() {
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}
-      image="/marketing/home-hero.jpg"
+      image="/marketing/feature-1.jpg"
       imageSide="right"
     />
   );
