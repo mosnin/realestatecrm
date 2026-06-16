@@ -223,8 +223,8 @@ export default function PricingPage() {
 
         {/* Individual plans */}
         <Band className="pb-8">
-          <BlurRise>
-            <Eyebrow>For individual agents</Eyebrow>
+          <BlurRise className="text-center">
+            <Eyebrow className="justify-center">For individual agents</Eyebrow>
           </BlurRise>
           <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
             {INDIVIDUAL.map((c, i) => (
@@ -237,8 +237,8 @@ export default function PricingPage() {
 
         {/* Team plans */}
         <Band className="py-16 sm:py-20">
-          <BlurRise>
-            <Eyebrow>For teams and brokerages</Eyebrow>
+          <BlurRise className="text-center">
+            <Eyebrow className="justify-center">For teams and brokerages</Eyebrow>
           </BlurRise>
           <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
             {TEAM.map((c, i) => (
@@ -252,10 +252,12 @@ export default function PricingPage() {
         {/* Brokerage expansion */}
         <Band className="py-16 sm:py-20">
           <BlurRise className="mx-auto max-w-3xl">
-            <Eyebrow>Brokerage expansion</Eyebrow>
-            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              Add an agent. Billing updates itself.
-            </Serif>
+            <div className="text-center">
+              <Eyebrow className="justify-center">Brokerage expansion</Eyebrow>
+              <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+                Add an agent. Billing updates itself.
+              </Serif>
+            </div>
             <div className="mt-8 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
               <table className="w-full text-[13.5px]">
                 <thead>
@@ -291,14 +293,16 @@ export default function PricingPage() {
         {/* Credits explainer + top-ups */}
         <Band className="py-16 sm:py-20">
           <BlurRise className="mx-auto max-w-3xl">
-            <Eyebrow>Premium AI workflows</Eyebrow>
-            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              Credits are spent when Chippi does real work.
-            </Serif>
-            <p className="mt-5 text-[14px] leading-relaxed text-white/55">
-              Every plan includes a monthly credit balance. High-value actions cost more, routine ones
-              cost little. Unused credits roll over for 30 days.
-            </p>
+            <div className="text-center">
+              <Eyebrow className="justify-center">Premium AI workflows</Eyebrow>
+              <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+                Credits are spent when Chippi does real work.
+              </Serif>
+              <p className="mt-5 text-[14px] leading-relaxed text-white/55">
+                Every plan includes a monthly credit balance. High-value actions cost more, routine ones
+                cost little. Unused credits roll over for 30 days.
+              </p>
+            </div>
             <ul className="mt-8 divide-y divide-white/[0.06] overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
               {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[])
                 .filter((k) => k in WORKFLOW_LABELS)
@@ -312,8 +316,8 @@ export default function PricingPage() {
                 ))}
             </ul>
 
-            <p className="mt-10">
-              <Eyebrow>Need more? One-time top-ups</Eyebrow>
+            <p className="mt-10 text-center">
+              <Eyebrow className="justify-center">Need more? One-time top-ups</Eyebrow>
             </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-3">
               {Object.values(TOPUPS).map((t) => (
