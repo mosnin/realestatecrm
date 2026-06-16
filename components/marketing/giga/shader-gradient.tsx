@@ -32,10 +32,10 @@ export function ShaderGradient({ className }: { className?: string }) {
         animate={reduce ? undefined : { rotate: 360 }}
         transition={reduce ? undefined : { duration: 70, repeat: Infinity, ease: 'linear' }}
       >
-        {blob('left-[5%] top-[10%] h-[55vh] w-[55vh] bg-[#ff7a45]/45 dark:bg-[#ff7a45]/25', { x: [0, 120, -40, 0], y: [0, 60, 30, 0], scale: [1, 1.15, 0.95, 1] }, 24)}
-        {blob('right-[8%] top-[20%] h-[50vh] w-[50vh] bg-[#ff5fa2]/45 dark:bg-[#ff5fa2]/25', { x: [0, -90, 40, 0], y: [0, 50, -30, 0], scale: [1, 0.9, 1.2, 1] }, 30, 1)}
-        {blob('left-[35%] bottom-[5%] h-[48vh] w-[48vh] bg-[#c77dff]/40 dark:bg-[#c77dff]/22', { x: [0, 70, -60, 0], y: [0, -40, 40, 0], scale: [1, 1.2, 1, 1] }, 27, 0.5)}
-        {blob('right-[30%] bottom-[10%] h-[40vh] w-[40vh] bg-[#ffb37a]/40 dark:bg-[#ffb37a]/20', { x: [0, -60, 50, 0], y: [0, 40, -20, 0], scale: [1, 1.1, 0.9, 1] }, 33, 1.5)}
+        {blob('left-[5%] top-[10%] h-[55vh] w-[55vh] bg-[#ff7a45]/28 dark:bg-[#ff7a45]/22', { x: [0, 120, -40, 0], y: [0, 60, 30, 0], scale: [1, 1.15, 0.95, 1] }, 24)}
+        {blob('right-[8%] top-[20%] h-[50vh] w-[50vh] bg-[#ff5fa2]/28 dark:bg-[#ff5fa2]/22', { x: [0, -90, 40, 0], y: [0, 50, -30, 0], scale: [1, 0.9, 1.2, 1] }, 30, 1)}
+        {blob('left-[35%] bottom-[5%] h-[48vh] w-[48vh] bg-[#c77dff]/26 dark:bg-[#c77dff]/20', { x: [0, 70, -60, 0], y: [0, -40, 40, 0], scale: [1, 1.2, 1, 1] }, 27, 0.5)}
+        {blob('right-[30%] bottom-[10%] h-[40vh] w-[40vh] bg-[#ffb37a]/26 dark:bg-[#ffb37a]/18', { x: [0, -60, 50, 0], y: [0, 40, -20, 0], scale: [1, 1.1, 0.9, 1] }, 33, 1.5)}
       </motion.div>
     </div>
   );
