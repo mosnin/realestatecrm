@@ -200,7 +200,7 @@ export function ChippiReadsShowcase() {
       }}
       topFeatures={READS_TOP}
       steps={READS_STEPS}
-      image="/marketing/feature-1.jpg"
+      image="/marketing/chippi-1.jpg"
       imageSide="right"
     />
   );
@@ -327,7 +327,7 @@ export function ChippiDecidesShowcase() {
       }}
       topFeatures={DECIDES_TOP}
       steps={DECIDES_STEPS}
-      image="/marketing/feature-2.jpg"
+      image="/marketing/chippi-2.jpg"
       imageSide="left"
     />
   );
@@ -461,7 +461,7 @@ export function ChippiActsShowcase() {
       }}
       topFeatures={ACTS_TOP}
       steps={ACTS_STEPS}
-      image="/marketing/feature-3.jpg"
+      image="/marketing/chippi-3.jpg"
       imageSide="right"
     />
   );

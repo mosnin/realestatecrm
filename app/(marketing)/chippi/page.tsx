@@ -40,7 +40,7 @@ export default function MeetChippiPage() {
             { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'A reply waiting before you open the thread.' },
             { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times proposed against your real availability.' },
           ]}
-          workflow="New buyer lead"
+          image="/marketing/chippi-hero.jpg"
         />
         <ChippiReadsShowcase />
         <ChippiDecidesShowcase />

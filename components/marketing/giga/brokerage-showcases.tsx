@@ -194,7 +194,7 @@ export function BrokerageRoutingShowcase() {
         { icon: ClipboardCheck, title: 'Logged with the reason', desc: 'Every assignment on the record.' },
       ]}
       steps={ROUTING_STEPS}
-      image="/marketing/feature-3.jpg"
+      image="/marketing/brokerages-1.jpg"
       imageSide="right"
     />
   );
@@ -328,7 +328,7 @@ export function BrokerageFloorShowcase() {
         { icon: TrendingUp, title: 'Spot the bottleneck', desc: 'See where deals are stuck.' },
       ]}
       steps={FLOOR_STEPS}
-      image="/marketing/hero-bg.jpg"
+      image="/marketing/brokerages-2.jpg"
       imageSide="left"
     />
   );
@@ -493,7 +493,7 @@ export function BrokerageApprovalsShowcase() {
         { icon: ScrollText, title: 'Full audit log', desc: 'Every action, timestamped.' },
       ]}
       steps={APPROVALS_STEPS}
-      image="/marketing/feature-1.jpg"
+      image="/marketing/brokerages-3.jpg"
       imageSide="right"
     />
   );

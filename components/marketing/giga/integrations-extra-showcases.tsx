@@ -206,7 +206,7 @@ export function IntegrationsSetupShowcase() {
       }}
       topFeatures={SETUP_TOP_FEATURES}
       steps={SETUP_STEPS}
-      image="/marketing/feature-3.jpg"
+      image="/marketing/integrations-2.jpg"
       imageSide="left"
     />
   );
@@ -385,7 +385,7 @@ export function IntegrationsAutomationShowcase() {
       }}
       topFeatures={AUTOMATION_TOP_FEATURES}
       steps={AUTOMATION_STEPS}
-      image="/marketing/research.jpg"
+      image="/marketing/integrations-3.jpg"
       imageSide="right"
     />
   );

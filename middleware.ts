@@ -86,6 +86,7 @@ const isFullyPublicRoute = createRouteMatcher([
   '/research',               // marketing: research story (stub)
   '/company',                // marketing: our-story page (Company menu)
   '/careers',                // marketing: careers page (Company menu)
+  '/demo',                   // marketing: book-a-demo scheduler (Calendly)
   '/teams',
   '/teams/(.*)',
   '/features',

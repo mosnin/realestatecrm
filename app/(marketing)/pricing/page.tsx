@@ -4,16 +4,16 @@
  * metadata).
  *
  * No free tier shown: every plan starts with a 7-day trial that requires a card.
- * Individuals (Solo / Pro), teams (Team / Team Plus), then brokerage expansion.
- * Premium AI workflows draw from a monthly credit balance.
+ * The plan cards + Monthly/Annual toggle live in the PricingPlans client
+ * component; the rest (expansion, credits, FAQ) is server-rendered here.
  *
  * Numbers come from `lib/plans` so the page can't drift from the product's
  * source of truth. Cinematic sections live in a forced-dark wrapper.
  */
 
 import Link from 'next/link';
-import { Check, ArrowRight } from 'lucide-react';
-import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
+import { WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
+import { PricingPlans } from '@/components/marketing/giga/pricing-plans';
 import {
   Band,
   BlurRise,
@@ -27,47 +27,6 @@ import {
 export const metadata = { title: 'Pricing · Chippi' };
 
 const SIGNUP = '/login/realtor?intent=signup';
-const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}&plan=${plan}`;
-
-type Card = {
-  id: keyof typeof PLANS;
-  blurb: string;
-  highlights: string[];
-  cta: { label: string; href: string };
-  featured?: boolean;
-};
-
-const INDIVIDUAL: Card[] = [
-  {
-    id: 'solo',
-    blurb: 'Organize your pipeline and put the core AI workflows to work.',
-    highlights: ['Reads and drafts every lead', 'Tour booking and follow-ups', 'Every integration included'],
-    cta: { label: 'Start free trial', href: signupHref('solo') },
-  },
-  {
-    id: 'pro',
-    blurb: 'The full daily AI workflow for serious lead volume.',
-    highlights: ['Everything in Solo', 'Higher monthly credit balance', 'Priority support'],
-    cta: { label: 'Start free trial', href: signupHref('pro') },
-    featured: true,
-  },
-];
-
-const TEAM: Card[] = [
-  {
-    id: 'team',
-    blurb: 'A shared command center for scoring, routing, and accountability.',
-    highlights: ['Lead routing across the floor', 'Live floor view and analytics', 'Roles, approvals, and audit log'],
-    cta: { label: 'Start a team', href: '/demo' },
-  },
-  {
-    id: 'team_plus',
-    blurb: 'Brokerage-level workflow without enterprise complexity.',
-    highlights: ['Everything in Team', 'More seats and credits', 'Better per-seat rate'],
-    cta: { label: 'Talk to sales', href: '/demo' },
-    featured: true,
-  },
-];
 
 const EXPANSION: { range: string; mo: number; yr: number }[] = [
   { range: '10 to 24 agents', mo: 69, yr: 56 },
@@ -105,79 +64,6 @@ const FAQ: { q: string; a: string }[] = [
   },
 ];
 
-function PlanCard({ card }: { card: Card }) {
-  const p = PLANS[card.id];
-  return (
-    <div
-      className={
-        'flex h-full flex-col rounded-3xl border p-8 ' +
-        (card.featured
-          ? 'border-[#ff7a45]/30 bg-gradient-to-b from-[#ff7a45]/[0.08] to-white/[0.02]'
-          : 'border-white/[0.08] bg-white/[0.02]')
-      }
-    >
-      <div className="flex items-center justify-between">
-        <h3 style={{ fontFamily: 'var(--font-sans)' }} className="text-[15px] font-semibold text-white">
-          {p.label}
-        </h3>
-        {card.featured ? (
-          <span className="rounded-full bg-[#ff7a45]/15 px-2.5 py-0.5 text-[10px] font-medium text-[#ff9a6e]">
-            Most popular
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-4">
-        <span
-          className="text-[2.5rem] font-light leading-none tracking-tight tabular-nums text-white"
-          style={{ fontFamily: 'var(--font-sans)' }}
-        >
-          ${p.priceMonthly}
-        </span>
-        <span className="text-sm text-white/45"> /mo</span>
-      </p>
-      <p className="mt-2 text-[12.5px] text-white/45">
-        {p.includedUsers > 1 ? `${p.includedUsers} seats included` : 'For one agent'}
-      </p>
-      <p className="mt-4 text-[13px] leading-relaxed text-white/55">{card.blurb}</p>
-
-      <div className="mt-6 border-t border-white/[0.08] pt-5">
-        <p>
-          <span className="text-xl font-semibold tabular-nums text-white">
-            {p.monthlyCredits.toLocaleString()}
-          </span>{' '}
-          <span className="text-[13px] text-white/45">credits / month</span>
-        </p>
-        {p.addUser ? (
-          <p className="mt-1.5 text-[12px] text-white/40">
-            +${p.addUser.priceMonthly}/seat, +{p.addUser.credits.toLocaleString()} credits
-          </p>
-        ) : null}
-      </div>
-
-      <ul className="mt-6 space-y-2.5">
-        {card.highlights.map((h) => (
-          <li key={h} className="flex items-start gap-2.5 text-[13px] text-white/70">
-            <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#ff9a6e]" />
-            {h}
-          </li>
-        ))}
-      </ul>
-
-      <Link
-        href={card.cta.href}
-        className={
-          'mt-7 flex h-11 w-full items-center justify-center rounded-full text-[14px] font-medium transition-all duration-200 active:scale-[0.98] ' +
-          (card.featured
-            ? 'bg-white text-black hover:bg-white/90'
-            : 'border border-white/20 text-white hover:bg-white/[0.05]')
-        }
-      >
-        {card.cta.label}
-      </Link>
-    </div>
-  );
-}
-
 export default function PricingPage() {
   return (
     <>
@@ -194,7 +80,7 @@ export default function PricingPage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/80 to-[#0a0a0a]" />
           </div>
-          <Band className="pt-40 pb-20 text-center sm:pt-48 sm:pb-24">
+          <Band className="pt-40 pb-16 text-center sm:pt-48 sm:pb-20">
             <BlurRise trigger="load">
               <EyebrowPill>Pricing</EyebrowPill>
             </BlurRise>
@@ -210,44 +96,11 @@ export default function PricingPage() {
                 add agents.
               </p>
             </BlurRise>
-            <BlurRise trigger="load" delay={0.24}>
-              <div className="mt-9 flex flex-wrap justify-center gap-3">
-                <PillPrimary href={SIGNUP} withArrow>
-                  Start free trial
-                </PillPrimary>
-                <PillGhost href="/demo">Talk to sales</PillGhost>
-              </div>
-            </BlurRise>
           </Band>
         </section>
 
-        {/* Individual plans */}
-        <Band className="pb-8">
-          <BlurRise className="text-center">
-            <Eyebrow className="justify-center">For individual agents</Eyebrow>
-          </BlurRise>
-          <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
-            {INDIVIDUAL.map((c, i) => (
-              <BlurRise key={c.id} delay={i * 0.06}>
-                <PlanCard card={c} />
-              </BlurRise>
-            ))}
-          </div>
-        </Band>
-
-        {/* Team plans */}
-        <Band className="py-16 sm:py-20">
-          <BlurRise className="text-center">
-            <Eyebrow className="justify-center">For teams and brokerages</Eyebrow>
-          </BlurRise>
-          <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
-            {TEAM.map((c, i) => (
-              <BlurRise key={c.id} delay={i * 0.06}>
-                <PlanCard card={c} />
-              </BlurRise>
-            ))}
-          </div>
-        </Band>
+        {/* Plan cards + Monthly/Annual toggle */}
+        <PricingPlans />
 
         {/* Brokerage expansion */}
         <Band className="py-16 sm:py-20">

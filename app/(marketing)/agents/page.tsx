@@ -35,7 +35,7 @@ export default function AgentsPage() {
             { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
             { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
           ]}
-          workflow="New buyer lead"
+          image="/marketing/agents-hero.jpg"
         />
         <AgentInboxShowcase />
         <ContentShowcase />

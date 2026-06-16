@@ -113,7 +113,7 @@ export function IntegrationsShowcase() {
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}
-      image="/marketing/feature-2.jpg"
+      image="/marketing/integrations-1.jpg"
       imageSide="right"
     />
   );

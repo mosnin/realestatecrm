@@ -41,7 +41,7 @@ export default function IntegrationsPage() {
             { icon: 'Users', title: 'Your CRM', desc: 'HubSpot, Salesforce, and Follow Up Boss, two-way.' },
             { icon: 'MessagesSquare', title: 'Messaging and e-sign', desc: 'WhatsApp, Twilio SMS, Slack, and DocuSign.' },
           ]}
-          workflow="New buyer lead"
+          image="/marketing/integrations-hero.jpg"
         />
         <IntegrationsShowcase />
         <IntegrationsSetupShowcase />

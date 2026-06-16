@@ -193,7 +193,7 @@ export function AgentInboxShowcase() {
       }}
       topFeatures={TOP_FEATURES_INBOX}
       steps={STEPS_INBOX}
-      image="/marketing/feature-3.jpg"
+      image="/marketing/agents-1.jpg"
       imageSide="right"
     />
   );
@@ -383,7 +383,7 @@ export function AgentPipelineShowcase() {
       }}
       topFeatures={TOP_FEATURES_PIPELINE}
       steps={STEPS_PIPELINE}
-      image="/marketing/feature-2.jpg"
+      image="/marketing/agents-3.jpg"
       imageSide="right"
     />
   );

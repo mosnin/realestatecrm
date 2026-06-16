@@ -38,7 +38,7 @@ export default function BrokeragesPage() {
             { icon: 'Users', title: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time.' },
             { icon: 'ShieldCheck', title: 'Approval-first', desc: 'Every send reviewed, every action on the audit log.' },
           ]}
-          workflow="Seller inquiry"
+          image="/marketing/brokerages-hero.jpg"
         />
         <BrokerageRoutingShowcase />
         <BrokerageFloorShowcase />

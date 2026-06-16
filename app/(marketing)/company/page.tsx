@@ -68,7 +68,7 @@ export default function CompanyPage() {
           <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-[80%]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/marketing/hero-bg.jpg"
+              src="/marketing/company-hero.jpg"
               alt=""
               className="h-full w-full object-cover opacity-20"
               style={{ filter: 'saturate(0.8) brightness(0.7)' }}
