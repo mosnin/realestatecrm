@@ -14,8 +14,8 @@ export default function MarketingTemplate({ children }: { children: React.ReactN
   const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={reduce ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.45, ease: EASE_OUT }}
     >
       {children}

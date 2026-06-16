@@ -81,6 +81,7 @@ const isFullyPublicRoute = createRouteMatcher([
   '/realtors',
   '/agents',                 // marketing: solo-agent story (redesign nav target)
   '/brokerages',             // marketing: brokerage/floor story (redesign nav target)
+  '/research',               // marketing: research story (stub)
   '/teams',
   '/teams/(.*)',
   '/features',

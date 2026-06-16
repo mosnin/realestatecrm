@@ -23,6 +23,8 @@ import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
 import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
 import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
 import { Complexity } from '@/components/marketing/giga/complexity';
+import { ResearchSection } from '@/components/marketing/giga/research';
+import { CtaSection } from '@/components/marketing/giga/cta';
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -32,12 +34,18 @@ export default async function MarketingHomePage() {
 
   return (
     <>
-      <Hero />
-      <Stats />
-      <AgentCanvas />
-      <RealtorShowcase />
-      <BrokerageShowcase />
-      <Complexity />
+      {/* Cinematic sections stay dark in both themes (reference-style). */}
+      <div className="dark bg-[#0a0a0a] text-white">
+        <Hero />
+        <Stats />
+        <AgentCanvas />
+        <RealtorShowcase />
+        <BrokerageShowcase />
+        <Complexity />
+      </div>
+      {/* Light/dark-adaptive closing sections */}
+      <ResearchSection />
+      <CtaSection />
     </>
   );
 }

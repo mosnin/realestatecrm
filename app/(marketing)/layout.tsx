@@ -36,12 +36,12 @@ export default function MarketingLayout({
 }) {
   return (
     <div
-      // `dark` is forced so this shell is dark regardless of the user's theme,
-      // and so legacy sub-pages' `dark:` variants resolve to their dark look.
-      // `data-marketing-shell` scopes the dashboard-font headline/eyebrow rules
-      // in globals.css to this subtree only.
+      // The shell follows the user's light/dark preference (the root <html>
+      // toggles `dark` from system / localStorage). `data-marketing-shell`
+      // scopes the dashboard-font headline/eyebrow rules in globals.css to this
+      // subtree. The cinematic homepage sections opt back into dark themselves.
       data-marketing-shell
-      className="dark flex min-h-screen flex-col bg-[#0a0a0a] text-white antialiased"
+      className="flex min-h-screen flex-col bg-white text-neutral-900 antialiased dark:bg-[#0a0a0a] dark:text-white"
     >
       {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
