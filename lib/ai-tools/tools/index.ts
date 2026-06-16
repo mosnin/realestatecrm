@@ -88,6 +88,9 @@ import { findOverdueFollowupsTool } from './find-overdue-followups';
 // Tour prep
 import { getWeatherTool } from './get-weather';
 
+// Connected-app activity (captured Composio trigger deliveries)
+import { getRecentEventsTool } from './get-recent-events';
+
 // Communication — drafting + sending + post-hoc logging
 import { draftEmailTool } from './draft-email';
 import { draftSmsTool } from './draft-sms';
@@ -185,6 +188,9 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Tour prep ──────────────────────────────────────────────────────────
   getWeatherTool as ToolDefinition,
+
+  // ── Connected-app activity ─────────────────────────────────────────────
+  getRecentEventsTool as ToolDefinition,
 
   // ── Communication ──────────────────────────────────────────────────────
   draftEmailTool as ToolDefinition,
