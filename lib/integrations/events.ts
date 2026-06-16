@@ -19,7 +19,7 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { normalizeTriggerEvent } from './triggers';
-import type { IntegrationEventStatus } from '@/lib/types';
+import type { IntegrationEvent, IntegrationEventStatus } from '@/lib/types';
 
 export interface CaptureEventArgs {
   spaceId: string;
@@ -93,6 +93,71 @@ export async function captureEvent(args: CaptureEventArgs): Promise<boolean> {
     });
     return false;
   }
+}
+
+/** The realtor-facing slice of an IntegrationEvent — the activity feed never
+ *  needs the raw `payload` (potentially large + may carry PII the feed doesn't
+ *  render) so the list helper projects it away at the DB boundary. */
+export type ActivityFeedEvent = Pick<
+  IntegrationEvent,
+  | 'id'
+  | 'connectionId'
+  | 'toolkit'
+  | 'eventType'
+  | 'title'
+  | 'actor'
+  | 'snippet'
+  | 'occurredAt'
+  | 'status'
+  | 'deliveryId'
+>;
+
+const FEED_COLUMNS =
+  'id, connectionId, toolkit, eventType, title, actor, snippet, occurredAt, status, deliveryId';
+
+export interface ListEventsArgs {
+  spaceId: string;
+  /** Page size. Clamped 1..100 by the caller before it reaches here. */
+  limit: number;
+  /** Keyset cursor: return events strictly older than this ISO occurredAt. */
+  before?: string;
+  /** Optional toolkit filter (e.g. 'gmail') — drives the feed's filter chips. */
+  toolkit?: string;
+  /** Optional single-connection filter. */
+  connectionId?: string;
+}
+
+/**
+ * List a space's persisted activity events, newest first by `occurredAt`.
+ *
+ * Space-scoped: the `.eq('spaceId', …)` is the privilege boundary — a realtor
+ * only ever sees their own space's events. Keyset-paginated on `occurredAt`
+ * (the `before` cursor) rather than offset, which stays correct as new events
+ * stream in at the head. Projects the feed columns only — never the raw
+ * `payload` blob. Best-effort: a DB error logs and returns [] so the page
+ * renders an empty feed instead of throwing.
+ */
+export async function listEvents(args: ListEventsArgs): Promise<ActivityFeedEvent[]> {
+  let query = supabase
+    .from('IntegrationEvent')
+    .select(FEED_COLUMNS)
+    .eq('spaceId', args.spaceId)
+    .order('occurredAt', { ascending: false })
+    .limit(args.limit);
+
+  if (args.before) query = query.lt('occurredAt', args.before);
+  if (args.toolkit) query = query.eq('toolkit', args.toolkit);
+  if (args.connectionId) query = query.eq('connectionId', args.connectionId);
+
+  const { data, error } = await query;
+  if (error) {
+    logger.warn('[integrations.events] list failed', {
+      spaceId: args.spaceId,
+      err: error.message,
+    });
+    return [];
+  }
+  return (data ?? []) as ActivityFeedEvent[];
 }
 
 /**
