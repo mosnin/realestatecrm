@@ -150,7 +150,7 @@ const STEPS: ShowcaseStep[] = [
   },
   {
     key: 'busywork',
-    title: 'Offload the busy work',
+    title: 'Offload the busywork',
     desc: 'Confirmations, follow-ups, data entry, scheduling, Chippi clears the grind in the background.',
     mockup: (
       <Frost title="Running for you" badge="Auto">
@@ -185,7 +185,7 @@ const STEPS: ShowcaseStep[] = [
 export function AgentCanvas() {
   return (
     <FeatureShowcase
-      eyebrow="Your AI cowork"
+      eyebrow="Meet your AI cowork"
       headline={
         <>
           Built to handle
@@ -195,7 +195,7 @@ export function AgentCanvas() {
       product={{
         name: 'Real Estate OS',
         icon: LayoutGrid,
-        desc: 'Chippi is the operating system for your real-estate business, it finds anything, works your pipeline, talks to clients, and clears the busy work, so your hours go to closing.',
+        desc: 'Chippi is the operating system for your real-estate business. It finds anything, works your pipeline, talks to your clients, and clears the busywork, so your hours go to closing.',
         cta: { label: 'Explore Real Estate OS', href: '/agents' },
       }}
       topFeatures={TOP_FEATURES}

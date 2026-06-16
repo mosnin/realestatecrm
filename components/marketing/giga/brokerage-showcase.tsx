@@ -167,7 +167,7 @@ export function BrokerageShowcase() {
       product={{
         name: 'Brokerage Dashboard',
         icon: Building2,
-        desc: 'Run the whole floor from one place, route leads, watch performance live, set roles and approvals, and manage seats, with every action on the audit log.',
+        desc: 'Run the whole floor from one place. Route leads, watch performance live, set roles and approvals, and manage seats, with every action on the audit log.',
         cta: { label: 'Explore brokerages', href: '/brokerages' },
       }}
       topFeatures={TOP_FEATURES}

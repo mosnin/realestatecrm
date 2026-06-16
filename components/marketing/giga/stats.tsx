@@ -22,8 +22,8 @@ export function Stats() {
       <div className="grid items-center gap-10 lg:grid-cols-[1fr_auto] lg:gap-20">
         <BlurRise>
           <p className="max-w-lg text-2xl leading-snug text-white/85 sm:text-[2rem] sm:leading-[1.25]">
-            The busywork runs itself, so your hours go to closing, Chippi up and
-            running on your book in a day.
+            The busywork runs itself, so your hours go to closing. Chippi goes
+            live on your book in a day.
           </p>
         </BlurRise>
 

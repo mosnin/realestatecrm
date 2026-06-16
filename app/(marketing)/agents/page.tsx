@@ -1,16 +1,15 @@
 /**
- * `/agents` , the solo-agent story. Server component (exports metadata); the
- * SubHero + showcases are client components, so SubHero's icons are passed by
- * registry name to stay on the right side of the server->client boundary.
- *
- * Under the hero, three feature sections (the realtor dashboard, the AI cowork,
- * and the content studio) drill into what an agent actually gets.
+ * `/agents`, the solo-agent story. Server component (exports metadata). The
+ * cinematic hero + showcases live in a forced-dark wrapper (they're built for a
+ * dark canvas); the closing CTA stays light/dark-adaptive like the home page.
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
 import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
 import { ContentShowcase } from '@/components/marketing/giga/content-showcase';
+import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
+import { CtaSection } from '@/components/marketing/giga/cta';
 
 export const metadata = {
   title: 'For agents · Chippi',
@@ -21,26 +20,52 @@ export const metadata = {
 export default function AgentsPage() {
   return (
     <>
-      <SubHero
-        label="Real Estate OS"
-        labelIcon="LayoutGrid"
-        headline={
-          <>
-            Your whole book, worked
-            <br className="hidden sm:block" /> while you close.
-          </>
-        }
-        description="Chippi reads every lead, drafts in your voice, books the tour, and keeps the deal current, so your hours go to closing, not admin."
-        features={[
-          { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Every reply written and waiting before you open the thread.' },
-          { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
-          { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
-        ]}
-        workflow="New buyer lead"
-      />
-      <RealtorShowcase />
-      <AgentCanvas />
-      <ContentShowcase />
+      <div className="dark bg-[#0a0a0a] text-white">
+        <SubHero
+          label="Real Estate OS"
+          labelIcon="LayoutGrid"
+          headline={
+            <>
+              Your whole book, worked
+              <br className="hidden sm:block" /> while you close.
+            </>
+          }
+          description="Chippi reads every lead, drafts in your voice, books the tour, and keeps the deal current, so your hours go to closing, not admin."
+          features={[
+            { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Every reply written and waiting before you open the thread.' },
+            { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
+            { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
+          ]}
+          workflow="New buyer lead"
+        />
+        <RealtorShowcase />
+        <AgentCanvas />
+        <ContentShowcase />
+        <PricingTeaser
+          headline={
+            <>
+              Simple pricing,
+              <br className="hidden sm:block" /> built for one agent.
+            </>
+          }
+          plans={[
+            {
+              name: 'Solo',
+              price: '$97',
+              blurb: 'For the agent getting started with Chippi.',
+              features: ['1 seat', '3,000 workflow credits / mo', 'Every Chippi feature'],
+            },
+            {
+              name: 'Pro Performer',
+              price: '$197',
+              blurb: 'For the producer running at full speed.',
+              features: ['1 seat', '8,000 workflow credits / mo', 'Priority support'],
+              featured: true,
+            },
+          ]}
+        />
+      </div>
+      <CtaSection />
     </>
   );
 }

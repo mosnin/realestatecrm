@@ -182,7 +182,7 @@ export function RealtorShowcase() {
       product={{
         name: 'Realtor Dashboard',
         icon: Home,
-        desc: 'The home base for your business, qualify leads, move deals, manage every contact, book tours, and show off a public profile that wins you listings.',
+        desc: 'The home base for your whole business. Qualify leads, move deals, manage every contact, book tours, and put a public profile out front that wins you listings.',
         cta: { label: 'Explore the dashboard', href: '/agents' },
       }}
       topFeatures={TOP_FEATURES}
