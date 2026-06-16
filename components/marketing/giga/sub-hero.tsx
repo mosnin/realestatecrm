@@ -82,11 +82,14 @@ export function SubHero({
 
   return (
     <section className="relative isolate overflow-hidden bg-[#0a0a0a] text-white">
-      {/* Page-geared photo, faded into the dark along the bottom */}
-      <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-[70%]">
+      {/* Page-geared photo, shown like the home hero: full-bleed at full opacity
+          under dark scrims (top for the heading, bottom into the next section)
+          plus a soft vignette so the copy always reads. */}
+      <div aria-hidden className="absolute inset-0 -z-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image} alt="" className="h-full w-full object-cover opacity-25" style={{ filter: 'saturate(0.8) brightness(0.7)' }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/40 via-[#0a0a0a]/70 to-[#0a0a0a]" />
+        <img src={image} alt="" className="h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/80 via-[#0a0a0a]/35 to-[#0a0a0a]" />
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_30%,transparent_30%,rgba(10,10,10,0.55)_100%)]" />
       </div>
 
       {/* Heading block */}

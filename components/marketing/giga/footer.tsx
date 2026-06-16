@@ -7,7 +7,7 @@
  */
 
 import Link from 'next/link';
-import { ShaderGradient } from './shader-gradient';
+import AnimatedGradientBackground from '@/components/ui/animated-gradient-background';
 
 const columns: Record<string, { label: string; href: string }[]> = {
   Product: [
@@ -35,10 +35,22 @@ const MONO = { fontFamily: 'var(--font-mono)' } as const;
 export function SiteFooter() {
   return (
     <footer className="relative bg-white dark:bg-[#0a0a0a]">
-      {/* Twirling gradient band: color anchored toward the footer, fading UP
-          into the CTA above (white at the top of the band). */}
-      <div className="relative h-56 w-full overflow-hidden sm:h-72">
-        <ShaderGradient />
+      {/* Warm gradient band (Chippi orange / pink / yellow), anchored toward the
+          footer and revealing as it scrolls into view. A wide, flat ellipse so
+          it reads as a soft wash rather than a tight radial. Fades UP into the
+          CTA above and out at the very bottom. */}
+      <div className="relative h-60 w-full overflow-hidden sm:h-72">
+        <AnimatedGradientBackground
+          revealOnScroll
+          Breathing
+          startingGap={185}
+          topOffset={-115}
+          breathingRange={6}
+          animationSpeed={0.02}
+          gradientOrigin="50% 92%"
+          gradientColors={['#ffd84d', '#ff8a3d', '#ff5fa2', 'rgba(255,95,162,0)']}
+          gradientStops={[0, 38, 72, 100]}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-white dark:to-[#0a0a0a]" />
       </div>
 

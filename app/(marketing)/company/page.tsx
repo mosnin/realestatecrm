@@ -65,15 +65,11 @@ export default function CompanyPage() {
       <div className="dark bg-[#0a0a0a] text-white">
         {/* Hero */}
         <section className="relative isolate overflow-hidden">
-          <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-[80%]">
+          <div aria-hidden className="absolute inset-0 -z-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/marketing/company-hero.jpg"
-              alt=""
-              className="h-full w-full object-cover opacity-20"
-              style={{ filter: 'saturate(0.8) brightness(0.7)' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/80 to-[#0a0a0a]" />
+            <img src="/marketing/company-hero.jpg" alt="" className="h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/82 via-[#0a0a0a]/48 to-[#0a0a0a]" />
+            <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
           </div>
           <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
             <BlurRise trigger="load">
