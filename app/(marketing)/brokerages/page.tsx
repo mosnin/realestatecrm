@@ -39,6 +39,7 @@ export default function BrokeragesPage() {
             { icon: 'ShieldCheck', title: 'Approval-first', desc: 'Every send reviewed, every action on the audit log.' },
           ]}
           image="/marketing/brokerages-hero.jpg"
+          variant="floor"
         />
         <BrokerageRoutingShowcase />
         <BrokerageFloorShowcase />

@@ -36,6 +36,7 @@ export default function AgentsPage() {
             { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
           ]}
           image="/marketing/agents-hero.jpg"
+          variant="inbox"
         />
         <AgentInboxShowcase />
         <ContentShowcase />

@@ -41,6 +41,7 @@ export default function MeetChippiPage() {
             { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times proposed against your real availability.' },
           ]}
           image="/marketing/chippi-hero.jpg"
+          variant="chippi"
         />
         <ChippiReadsShowcase />
         <ChippiDecidesShowcase />

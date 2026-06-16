@@ -42,6 +42,7 @@ export default function IntegrationsPage() {
             { icon: 'MessagesSquare', title: 'Messaging and e-sign', desc: 'WhatsApp, Twilio SMS, Slack, and DocuSign.' },
           ]}
           image="/marketing/integrations-hero.jpg"
+          variant="integrations"
         />
         <IntegrationsShowcase />
         <IntegrationsSetupShowcase />
