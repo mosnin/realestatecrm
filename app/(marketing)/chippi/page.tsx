@@ -7,9 +7,11 @@
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
-import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
+import {
+  ChippiReadsShowcase,
+  ChippiDecidesShowcase,
+  ChippiActsShowcase,
+} from '@/components/marketing/giga/chippi-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -40,9 +42,9 @@ export default function MeetChippiPage() {
           ]}
           workflow="New buyer lead"
         />
-        <AgentCanvas />
-        <RealtorShowcase />
-        <BrokerageShowcase />
+        <ChippiReadsShowcase />
+        <ChippiDecidesShowcase />
+        <ChippiActsShowcase />
         <PricingTeaser
           headline={
             <>

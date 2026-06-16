@@ -5,8 +5,7 @@
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import { AgentInboxShowcase, AgentPipelineShowcase } from '@/components/marketing/giga/agents-showcases';
 import { ContentShowcase } from '@/components/marketing/giga/content-showcase';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
@@ -38,9 +37,9 @@ export default function AgentsPage() {
           ]}
           workflow="New buyer lead"
         />
-        <RealtorShowcase />
-        <AgentCanvas />
+        <AgentInboxShowcase />
         <ContentShowcase />
+        <AgentPipelineShowcase />
         <PricingTeaser
           headline={
             <>

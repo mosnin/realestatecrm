@@ -5,9 +5,11 @@
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
-import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import {
+  BrokerageRoutingShowcase,
+  BrokerageFloorShowcase,
+  BrokerageApprovalsShowcase,
+} from '@/components/marketing/giga/brokerage-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -38,9 +40,9 @@ export default function BrokeragesPage() {
           ]}
           workflow="Seller inquiry"
         />
-        <BrokerageShowcase />
-        <RealtorShowcase />
-        <AgentCanvas />
+        <BrokerageRoutingShowcase />
+        <BrokerageFloorShowcase />
+        <BrokerageApprovalsShowcase />
         <PricingTeaser
           headline={
             <>

@@ -9,8 +9,10 @@
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { IntegrationsShowcase } from '@/components/marketing/giga/integrations-showcase';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
+import {
+  IntegrationsSetupShowcase,
+  IntegrationsAutomationShowcase,
+} from '@/components/marketing/giga/integrations-extra-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -42,8 +44,8 @@ export default function IntegrationsPage() {
           workflow="New buyer lead"
         />
         <IntegrationsShowcase />
-        <AgentCanvas />
-        <RealtorShowcase />
+        <IntegrationsSetupShowcase />
+        <IntegrationsAutomationShowcase />
         <PricingTeaser
           eyebrow="Pricing"
           headline={
