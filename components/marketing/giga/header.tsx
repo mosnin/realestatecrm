@@ -8,9 +8,10 @@
  * Background: fully TRANSPARENT at the top; on scroll each cluster animates in a
  * translucent near-black blurred background + hairline border + soft shadow.
  *
- * Nav: two dropdowns (Agents, Brokerages) that open a frosted blurred mega-menu,
- * plus a plain Pricing link. Right cluster: Sign in + white "See a demo" pill.
- * Mobile: a full-screen blurred takeover.
+ * Nav: two dropdowns, Product (Chippi, Agents, Brokerages, Integrations) and
+ * Company (Our story, Research, Careers), each opening a frosted blurred
+ * mega-menu, plus a plain Pricing link. Right cluster: Sign in + white
+ * "See a demo" pill. Mobile: a full-screen blurred takeover.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -27,18 +28,13 @@ import {
   X,
   ChevronDown,
   ArrowRight,
-  MessagesSquare,
-  Target,
-  Mic,
-  KanbanSquare,
-  Inbox,
-  PenLine,
-  ArrowRightLeft,
-  Users,
-  ShieldCheck,
-  BarChart3,
-  Gauge,
+  Aperture,
+  UserRound,
   Building2,
+  Blocks,
+  Compass,
+  Microscope,
+  Sprout,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
@@ -53,50 +49,50 @@ interface MegaItem {
   href: string;
 }
 
-type MenuKey = 'agents' | 'brokerages';
+type MenuKey = 'product' | 'company';
 
 interface MenuConfig {
+  label: string;
   featured: { eyebrow: string; title: string; body: string; cta: string; href: string };
   items: MegaItem[];
 }
 
 /** The two nav dropdowns, reference-styled frosted panels. */
 const MENUS: Record<MenuKey, MenuConfig> = {
-  agents: {
+  product: {
+    label: 'Product',
     featured: {
       eyebrow: 'MEET CHIPPI',
-      title: 'The AI cowork for your floor.',
-      body: 'It reads, scores, drafts, books, and follows up, so the busywork runs itself.',
-      cta: 'See a demo',
-      href: DEMO,
+      title: 'One teammate for the whole deal.',
+      body: 'It reads every lead, drafts in your voice, books the tour, and keeps the deal current.',
+      cta: 'Meet Chippi',
+      href: '/chippi',
     },
     items: [
-      { icon: MessagesSquare, label: 'Natural conversations', desc: 'Replies drafted in your voice, ready before you open the thread', href: '/agents' },
-      { icon: Target, label: 'Smart insights', desc: 'Every lead scored against your live pipeline', href: '/agents' },
-      { icon: Mic, label: 'Natural voice', desc: 'Talk to your CRM between showings, hands free', href: '/agents' },
-      { icon: KanbanSquare, label: 'Pipeline automation', desc: 'Tours booked, deals advanced, the log kept current', href: '/agents' },
-      { icon: Inbox, label: 'Omnichannel inbox', desc: 'Email, text, and calls in one worked queue', href: '/agents' },
-      { icon: PenLine, label: 'Content studio', desc: 'Listings and posts written on the go', href: '/agents' },
+      { icon: Aperture, label: 'Chippi', desc: 'The AI teammate that works your whole book', href: '/chippi' },
+      { icon: UserRound, label: 'For agents', desc: 'Your inbox, pipeline, and tours, handled', href: '/agents' },
+      { icon: Building2, label: 'For brokerages', desc: 'One agent behind every desk on the floor', href: '/brokerages' },
+      { icon: Blocks, label: 'Integrations', desc: 'Connect the tools you already pay for', href: '/integrations' },
     ],
   },
-  brokerages: {
+  company: {
+    label: 'Company',
     featured: {
-      eyebrow: 'FOR BROKERAGES',
-      title: 'One agent for the whole floor.',
-      body: 'Leads routed, performance visible, every send approval-first, a solo desk to hundreds of agents.',
-      cta: 'See a demo',
-      href: DEMO,
+      eyebrow: 'OUR STORY',
+      title: 'Real estate, caught up to the world.',
+      body: 'Why we are building the operating system the industry has been missing.',
+      cta: 'Read our story',
+      href: '/company',
     },
     items: [
-      { icon: ArrowRightLeft, label: 'Lead routing', desc: 'Auto-assign by territory and load, every assignment logged', href: '/brokerages' },
-      { icon: Users, label: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time', href: '/brokerages' },
-      { icon: ShieldCheck, label: 'Roles & control', desc: 'Approval-first sends with a full audit log', href: '/brokerages' },
-      { icon: BarChart3, label: 'Floor analytics', desc: 'Performance and bottlenecks across the team', href: '/brokerages' },
-      { icon: Gauge, label: 'Onboarding', desc: 'New agents productive from day one', href: '/brokerages' },
-      { icon: Building2, label: 'Seat billing', desc: 'Per-seat plans that scale with the floor', href: '/brokerages' },
+      { icon: Compass, label: 'Our story', desc: 'The gap we set out to close, and the people closing it', href: '/company' },
+      { icon: Microscope, label: 'Research', desc: 'The work that shaped every feature', href: '/research' },
+      { icon: Sprout, label: 'Careers', desc: 'Help build the future of real estate', href: '/careers' },
     ],
   },
 };
+
+const MENU_ORDER: MenuKey[] = ['product', 'company'];
 
 export function SiteHeader() {
   const reduce = useReducedMotion();
@@ -159,7 +155,7 @@ export function SiteHeader() {
   } as React.CSSProperties;
   const clusterTransition = { duration: reduce ? 0 : 0.35, ease: EASE_OUT };
 
-  const NavTrigger = ({ menu, label }: { menu: MenuKey; label: string }) => (
+  const NavTrigger = ({ menu }: { menu: MenuKey }) => (
     <button
       type="button"
       aria-expanded={openMenu === menu}
@@ -170,7 +166,7 @@ export function SiteHeader() {
         openMenu === menu ? 'text-white' : 'text-white/70 hover:text-white',
       )}
     >
-      {label}
+      {MENUS[menu].label}
       <ChevronDown
         className={cn('h-3.5 w-3.5 transition-transform duration-200', openMenu === menu && 'rotate-180')}
       />
@@ -198,8 +194,8 @@ export function SiteHeader() {
                 <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
               </Link>
               <nav className="hidden items-center gap-0.5 lg:flex">
-                <NavTrigger menu="agents" label="Agents" />
-                <NavTrigger menu="brokerages" label="Brokerages" />
+                <NavTrigger menu="product" />
+                <NavTrigger menu="company" />
                 <Link
                   href="/pricing"
                   onClick={closeAll}
@@ -210,7 +206,7 @@ export function SiteHeader() {
               </nav>
             </motion.div>
 
-            {/* Dropdown mega-menu (Agents / Brokerages), frosted blurred panel */}
+            {/* Dropdown mega-menu (Product / Company), frosted blurred panel */}
             <AnimatePresence>
               {active && (
                 <motion.div
@@ -219,7 +215,7 @@ export function SiteHeader() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.98 }}
                   transition={{ duration: reduce ? 0 : 0.2, ease: EASE_OUT }}
-                  className="absolute left-0 top-full hidden w-[760px] max-w-[calc(100vw-2.5rem)] pt-2.5 lg:block"
+                  className="absolute left-0 top-full hidden w-[720px] max-w-[calc(100vw-2.5rem)] pt-2.5 lg:block"
                   onMouseLeave={() => setOpenMenu(null)}
                 >
                   <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0d0d0d]/65 shadow-2xl shadow-black/60 backdrop-blur-2xl">
@@ -352,27 +348,51 @@ export function SiteHeader() {
               </div>
 
               <motion.nav
-                className="flex-1 space-y-2 overflow-y-auto px-5 py-8"
-                variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } } }}
+                className="flex-1 space-y-7 overflow-y-auto px-5 py-8"
+                variants={{ show: { transition: { staggerChildren: 0.04, delayChildren: 0.08 } } }}
                 initial="hidden"
                 animate="show"
               >
-                {[
-                  { label: 'Agents', href: '/agents' },
-                  { label: 'Brokerages', href: '/brokerages' },
-                  { label: 'Pricing', href: '/pricing' },
-                ].map((l) => (
-                  <motion.div key={l.label} variants={itemVariants}>
-                    <Link
-                      href={l.href}
-                      onClick={closeAll}
-                      style={{ fontFamily: 'var(--font-serif-display)' }}
-                      className="block py-2 text-3xl text-white"
+                {MENU_ORDER.map((key) => (
+                  <div key={key}>
+                    <motion.p
+                      variants={itemVariants}
+                      style={{ fontFamily: 'var(--font-mono-display)' }}
+                      className="px-1 text-[10px] font-medium uppercase tracking-[0.22em] text-white/35"
                     >
-                      {l.label}
-                    </Link>
-                  </motion.div>
+                      {MENUS[key].label}
+                    </motion.p>
+                    <div className="mt-2 space-y-0.5">
+                      {MENUS[key].items.map((it) => {
+                        const Icon = it.icon;
+                        return (
+                          <motion.div key={it.label} variants={itemVariants}>
+                            <Link
+                              href={it.href}
+                              onClick={closeAll}
+                              className="flex items-center gap-3 rounded-2xl px-1 py-2.5 text-white"
+                            >
+                              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/70">
+                                <Icon className="h-4 w-4" />
+                              </span>
+                              <span className="text-[19px]">{it.label}</span>
+                            </Link>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
+                <motion.div variants={itemVariants}>
+                  <Link
+                    href="/pricing"
+                    onClick={closeAll}
+                    style={{ fontFamily: 'var(--font-serif-display)' }}
+                    className="block px-1 py-2 text-2xl text-white"
+                  >
+                    Pricing
+                  </Link>
+                </motion.div>
               </motion.nav>
 
               <div className="space-y-3 border-t border-white/10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5">
