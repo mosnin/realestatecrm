@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
-import { resolveSelfServePlan } from '@/lib/plans';
+import { isAnnualAvailable, resolveSelfServePlan } from '@/lib/plans';
+
+// Per-self-serve-plan annual availability, derived SERVER-side (Stripe annual
+// price ids are non-NEXT_PUBLIC env vars, so the client bundle can't compute
+// this). /subscribe uses it to gate the in-app Monthly/Annual cadence choice so
+// it only shows annual when the checkout would actually accept it.
+const annualEnabled = { solo: isAnnualAvailable('solo'), pro: isAnnualAvailable('pro') };
 
 export async function GET() {
   const { userId } = await auth();
@@ -12,7 +18,7 @@ export async function GET() {
     .select('id')
     .eq('clerkId', userId)
     .maybeSingle();
-  if (!user) return NextResponse.json({ slug: null, plan: 'solo' });
+  if (!user) return NextResponse.json({ slug: null, plan: 'solo', annualEnabled });
 
   const { data: space } = await supabase
     .from('Space')
@@ -26,5 +32,6 @@ export async function GET() {
   return NextResponse.json({
     slug: space?.slug ?? null,
     plan: resolveSelfServePlan(space?.plan),
+    annualEnabled,
   });
 }

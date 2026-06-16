@@ -12,7 +12,7 @@
  */
 
 import Link from 'next/link';
-import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
+import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS, isAnnualAvailable } from '@/lib/plans';
 import { PricingPlans } from '@/components/marketing/giga/pricing-plans';
 import {
   Band,
@@ -56,11 +56,18 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'How does brokerage pricing work?',
-    a: 'Add an agent and billing updates automatically, the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
+    a: 'Add an agent and billing updates automatically. Each agent beyond your included seats is a flat monthly add-on ($79 on Team, $69 on Team Plus), added or removed as your floor changes. No tier jumping, no calls to sales until you want them.',
   },
 ];
 
 export default function PricingPage() {
+  // Show the Monthly/Annual preview toggle only when annual is actually
+  // purchasable for at least one displayed tier (computed server-side via the
+  // single-source-of-truth helper) — never advertise an annual price the in-app
+  // checkout would refuse.
+  const annualEnabled = (['solo', 'pro', 'team', 'team_plus'] as const).some((id) =>
+    isAnnualAvailable(id),
+  );
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
@@ -92,7 +99,7 @@ export default function PricingPage() {
         </section>
 
         {/* Plan cards + Monthly/Annual toggle */}
-        <PricingPlans />
+        <PricingPlans annualEnabled={annualEnabled} />
 
         {/* Adding agents, flat per-seat (matches lib/plans addUser, no invented tiers) */}
         <Band className="py-16 sm:py-20">

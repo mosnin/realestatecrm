@@ -3,8 +3,9 @@ import { auth } from '@clerk/nextjs/server';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { BillingPage } from '@/components/billing/billing-page';
+import { BrokerageSubscribe } from '@/components/billing/brokerage-subscribe';
 import { CreditsSummary } from '@/components/billing/credits-summary';
-import type { PlanId } from '@/lib/plans';
+import { isAnnualAvailable, type PlanId } from '@/lib/plans';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import type { Metadata } from 'next';
@@ -48,21 +49,16 @@ export default async function BrokerBillingPage() {
 
   const usingBrokerageEntity = Boolean(brokerageStripe?.stripeSubscriptionId);
 
-  if (!spaceRow && !usingBrokerageEntity) {
-    return (
-      <div className="space-y-6 max-w-3xl mx-auto pb-12">
-        <BillingHeader status="No workspace is set up for billing yet." />
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-          <p className="text-sm text-foreground">No workspace found.</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Set up a workspace before managing a subscription.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Annual availability (server-derived) for the self-serve Team/Team Plus
+  // picker — Stripe annual price ids are server-only env, so it's computed here.
+  const annualEnabled = {
+    team: isAnnualAvailable('team'),
+    team_plus: isAnnualAvailable('team_plus'),
+  };
 
-  // Only the broker_owner can manage billing. Others see a read-only message.
+  // Only the broker_owner can manage / start billing. Others see a read-only
+  // message (checked BEFORE the no-workspace branch so a non-owner never gets
+  // the setup prompt).
   const isBrokerOwner = ctx.membership.role === 'broker_owner';
   if (!isBrokerOwner) {
     return (
@@ -74,6 +70,20 @@ export default async function BrokerBillingPage() {
             Ask the brokerage owner to make changes to the subscription.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Owner with no billing entity set up yet (no Space, no brokerage sub) — e.g.
+  // a broker_only owner who just created the brokerage. The brokerage IS the
+  // billing entity, so we DON'T dead-end on "set up a workspace"; we show the
+  // self-serve Team / Team Plus checkout directly (a brokerage-scoped checkout
+  // needs no Space).
+  if (!spaceRow && !usingBrokerageEntity) {
+    return (
+      <div className="space-y-6 max-w-3xl mx-auto pb-12">
+        <BillingHeader status="Choose a plan to get your brokerage started." />
+        <BrokerageSubscribe annualEnabled={annualEnabled} />
       </div>
     );
   }
@@ -151,9 +161,18 @@ export default async function BrokerBillingPage() {
     );
   }
 
+  // Self-serve Team / Team Plus checkout — shown only when the brokerage has no
+  // active/trialing subscription on EITHER entity (brokerage or legacy Space),
+  // which is exactly what subscriptionStatus reflects here. We reach this point
+  // only as the broker_owner (non-owners returned early above). annualEnabled
+  // was computed above (shared with the no-billing-entity branch).
+  const brokerageSubscribed =
+    subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-12">
       <BillingHeader status="Manage your subscription and payment details." />
+      {!brokerageSubscribed && <BrokerageSubscribe annualEnabled={annualEnabled} />}
       <BillingPage
         slug={slug}
         plan={(((ctx.brokerage as { plan?: string }).plan) ?? 'free') as PlanId}

@@ -148,6 +148,31 @@ export function addonSeatsForPlan(plan: PlanId | string | null | undefined, acti
 }
 
 /**
+ * Is ANNUAL billing actually purchasable for a plan in this environment?
+ *
+ * True only when the plan's annual BASE price id is configured. For the
+ * brokerage tiers (team / team_plus) the per-seat add-on is billed on a
+ * SEPARATE annual price (addUser.stripePriceAnnual); if a plan has an add-on
+ * path but its annual add-on price is unset, a brokerage with seats past the
+ * included count couldn't be charged its annual per-seat line — so we treat
+ * annual as unavailable for that plan rather than offer a half-priced annual
+ * that silently under-bills seats.
+ *
+ * Pure (reads only the env-derived PLANS ids), so the SERVER gate (checkout)
+ * and the UI gate (marketing toggle / in-app cadence picker) use one source of
+ * truth and can never show an annual option that checkout would refuse.
+ */
+export function isAnnualAvailable(planId: PlanId | string | null | undefined): boolean {
+  const def = planId && planId in PLANS ? PLANS[planId as PlanId] : undefined;
+  if (!def) return false;
+  if (!def.stripePriceAnnual) return false;
+  // A plan with a per-seat add-on must also have its ANNUAL add-on price wired
+  // up, else annual seats can't be billed (see addUser doc above).
+  if (def.addUser && !def.addUser.stripePriceAnnual) return false;
+  return true;
+}
+
+/**
  * Reverse lookup: which plan does a Stripe price id belong to? The webhook uses
  * this to derive the ACTIVE plan from the live subscription's price, instead of
  * a `metadata.plan` that's stamped once at checkout and goes STALE on a

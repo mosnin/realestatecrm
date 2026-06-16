@@ -8,6 +8,12 @@
  * matches the product's existing annual seat-add-on discount; it is shown as the
  * discounted monthly-equivalent with a "billed annually" note. The toggle's
  * "Save 20%" badge communicates the saving.
+ *
+ * The Annual toggle option renders ONLY when annual is actually purchasable
+ * (annualEnabled, computed server-side via isAnnualAvailable) so the marketing
+ * preview can never advertise an annual price the in-app checkout would refuse.
+ * This toggle is a PREVIEW only — the real cadence choice happens at the in-app
+ * checkout (subscribe / broker billing).
  */
 
 import { useState } from 'react';
@@ -18,6 +24,9 @@ import { Band, BlurRise, Eyebrow } from './primitives';
 
 const SIGNUP = '/login/realtor?intent=signup';
 const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}&plan=${plan}`;
+/** Self-serve brokerage entry — Team / Team Plus check out in-app after broker
+ *  sign-in (the brokerage-scoped /api/billing/checkout), not via /demo. */
+const BROKER_SIGNIN = '/login/broker';
 
 /** Annual = 20% off the monthly rate (matches the seat-add-on annual discount). */
 const ANNUAL_FACTOR = 0.8;
@@ -54,13 +63,13 @@ const TEAM: Card[] = [
     id: 'team',
     blurb: 'A shared command center for scoring, routing, and accountability.',
     highlights: ['Lead routing across the floor', 'Live floor view and analytics', 'Roles, approvals, and audit log'],
-    cta: { label: 'Start a team', href: '/demo' },
+    cta: { label: 'Start a team', href: BROKER_SIGNIN },
   },
   {
     id: 'team_plus',
     blurb: 'Brokerage-level workflow without enterprise complexity.',
     highlights: ['Everything in Team', 'More seats and credits', 'Better per-seat rate'],
-    cta: { label: 'Talk to sales', href: '/demo' },
+    cta: { label: 'Start Team Plus', href: BROKER_SIGNIN },
     featured: true,
   },
 ];
@@ -181,15 +190,21 @@ function Toggle({ cycle, setCycle }: { cycle: Cycle; setCycle: (c: Cycle) => voi
   );
 }
 
-export function PricingPlans() {
+export function PricingPlans({ annualEnabled = false }: { annualEnabled?: boolean }) {
   const [cycle, setCycle] = useState<Cycle>('monthly');
+  // Annual is a preview that only makes sense when it's actually purchasable;
+  // when it isn't, hide the toggle and pin the cycle to monthly so no card ever
+  // shows a 20%-off price the in-app checkout would refuse.
+  const effectiveCycle: Cycle = annualEnabled ? cycle : 'monthly';
   return (
     <>
-      <Band className="pt-2">
-        <BlurRise className="flex justify-center">
-          <Toggle cycle={cycle} setCycle={setCycle} />
-        </BlurRise>
-      </Band>
+      {annualEnabled && (
+        <Band className="pt-2">
+          <BlurRise className="flex justify-center">
+            <Toggle cycle={cycle} setCycle={setCycle} />
+          </BlurRise>
+        </Band>
+      )}
 
       {/* Individual plans */}
       <Band className="pb-8 pt-10">
@@ -199,7 +214,7 @@ export function PricingPlans() {
         <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
           {INDIVIDUAL.map((c, i) => (
             <BlurRise key={c.id} delay={i * 0.06}>
-              <PlanCard card={c} cycle={cycle} />
+              <PlanCard card={c} cycle={effectiveCycle} />
             </BlurRise>
           ))}
         </div>
@@ -213,7 +228,7 @@ export function PricingPlans() {
         <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-2">
           {TEAM.map((c, i) => (
             <BlurRise key={c.id} delay={i * 0.06}>
-              <PlanCard card={c} cycle={cycle} />
+              <PlanCard card={c} cycle={effectiveCycle} />
             </BlurRise>
           ))}
         </div>
