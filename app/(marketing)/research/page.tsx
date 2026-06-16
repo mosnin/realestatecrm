@@ -1,5 +1,5 @@
 /**
- * `/research` — placeholder for the research story (how Chippi was built on
+ * `/research`, placeholder for the research story (how Chippi was built on
  * comprehensive real-estate research). Intentionally a stub for now; linked from
  * the homepage research section. Renders in the adaptive marketing shell.
  */
@@ -23,8 +23,8 @@ export default function ResearchPage() {
         How we built Chippi.
       </h1>
       <p className="mt-5 max-w-md text-base leading-relaxed text-neutral-600 dark:text-white/55">
-        The full story — hundreds of agent interviews, shadowed deals, and the workflows that shaped
-        every feature — is on the way.
+        The full story, hundreds of agent interviews, shadowed deals, and the workflows that shaped
+        every feature, is on the way.
       </p>
     </section>
   );

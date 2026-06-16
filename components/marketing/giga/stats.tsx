@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * Stats — the numbers band (reference-matched).
+ * Stats, the numbers band (reference-matched).
  *
  * A short statement on the LEFT, then big SANS numbers on the RIGHT with small
  * uppercase mono labels above each and thin vertical hairline dividers between
- * them. No eyebrow, no centered headline — exactly the reference layout.
+ * them. No eyebrow, no centered headline, exactly the reference layout.
  */
 
 import { BlurRise, Mono, Band } from './primitives';
@@ -22,7 +22,7 @@ export function Stats() {
       <div className="grid items-center gap-10 lg:grid-cols-[1fr_auto] lg:gap-20">
         <BlurRise>
           <p className="max-w-lg text-2xl leading-snug text-white/85 sm:text-[2rem] sm:leading-[1.25]">
-            The busywork runs itself, so your hours go to closing — Chippi up and
+            The busywork runs itself, so your hours go to closing, Chippi up and
             running on your book in a day.
           </p>
         </BlurRise>

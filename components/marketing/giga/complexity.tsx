@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Complexity — the "built to handle complexity" closer (reference-matched).
+ * Complexity, the "built to handle complexity" closer (reference-matched).
  *
  * A mono + dot eyebrow (colored dot) and a huge two-line thin serif heading on
  * the LEFT, with three feature columns on the RIGHT (icon + title + muted
@@ -16,12 +16,12 @@ const COLUMNS = [
   {
     icon: GitBranch,
     title: 'Routing that thinks',
-    desc: 'Leads land with the right agent by territory and load — or hand-pick and write the brief. Every assignment is logged with the reason.',
+    desc: 'Leads land with the right agent by territory and load, or hand-pick and write the brief. Every assignment is logged with the reason.',
   },
   {
     icon: BarChart3,
     title: 'The whole floor, live',
-    desc: 'Deals active, drafts pending, follow-ups due — per agent, read live from the work itself, not a Monday status meeting.',
+    desc: 'Deals active, drafts pending, follow-ups due, per agent, read live from the work itself, not a Monday status meeting.',
   },
   {
     icon: ShieldCheck,
@@ -45,7 +45,7 @@ export function Complexity() {
           </BlurRise>
           <BlurRise delay={0.08}>
             <p className="mt-6 max-w-md text-base leading-relaxed text-white/60">
-              One agent for the whole floor — leads routed, performance visible,
+              One agent for the whole floor, leads routed, performance visible,
               bottlenecks surfaced, every action reviewable. Scales from a solo
               desk to hundreds of agents without an enterprise maze.
             </p>

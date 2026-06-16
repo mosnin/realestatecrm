@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * FeatureShowcase — the reusable animated feature section (reference-matched).
+ * FeatureShowcase, the reusable animated feature section (reference-matched).
  *
  * One config-driven component used for multiple sections (e.g. "Real Estate OS"
  * and the realtor-dashboard tour). Layout:
@@ -24,6 +24,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
 import { BlurRise, Eyebrow, PillGhost, Serif, Band } from './primitives';
+import { AnimatedGradientText } from '@/components/ui/animated-gradient-text';
 
 /** Per-step dwell time before auto-advancing (ms). */
 const DURATION = 6500;
@@ -82,7 +83,7 @@ export function FeatureShowcase({
 
   // Auto-advance: this effect re-runs whenever the active step changes (or pause
   // toggles). It animates the progress bar 0→1 over DURATION, then steps to the
-  // next one — which re-runs the effect and continues the loop. Hover pauses it.
+  // next one, which re-runs the effect and continues the loop. Hover pauses it.
   useEffect(() => {
     if (reduce || paused) return;
     setProgress(0);
@@ -146,15 +147,16 @@ export function FeatureShowcase({
             {/* TEXT column */}
             <div className={cn('flex flex-col p-6 sm:p-9', imageLeft && 'lg:order-2')}>
               <span className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#ff7a45] to-[#ff5fa2] text-black">
-                  <ProductIcon className="h-[18px] w-[18px]" />
-                </span>
-                <span
-                  className="bg-gradient-to-r from-[#ff7a45] via-[#ff7e6b] to-[#ff5fa2] bg-clip-text text-[22px] font-semibold tracking-tight text-transparent"
+                <ProductIcon className="h-6 w-6" stroke="url(#chippi-grad)" strokeWidth={1.75} />
+                <AnimatedGradientText
+                  speed={2}
+                  colorFrom="#ff7a45"
+                  colorTo="#c77dff"
+                  className="text-[22px] font-semibold tracking-tight"
                   style={{ fontFamily: 'var(--font-heading)' }}
                 >
                   {product.name}
-                </span>
+                </AnimatedGradientText>
               </span>
               <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-white/60">{product.desc}</p>
               <div className="mt-6">

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Hero — the full-bleed, cinematic opener (reference-matched).
+ * Hero, the full-bleed, cinematic opener (reference-matched).
  *
  * A full-bleed photographic background (real-estate / architecture placeholder)
  * under dark gradient scrims. Centered: a glassy eyebrow pill, a HUGE two-line
@@ -30,7 +30,7 @@ export function Hero() {
     <section className="relative isolate min-h-[100svh] overflow-hidden bg-black">
       {/* Full-bleed background photo + scrims */}
       <div aria-hidden className="absolute inset-0 -z-10">
-        {/* TODO: replace placeholder image — final cinematic hero shot. */}
+        {/* TODO: replace placeholder image, final cinematic hero shot. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/marketing/hero-bg.jpg"
@@ -46,7 +46,7 @@ export function Hero() {
       {/* Centered headline stack */}
       <div className="mx-auto flex min-h-[100svh] max-w-4xl flex-col items-center justify-center px-5 pb-44 pt-28 text-center sm:px-8">
         <BlurRise trigger="load" delay={0.05}>
-          <EyebrowPill>Natural voice · Real-estate AI</EyebrowPill>
+          <EyebrowPill>Introducing Chippi</EyebrowPill>
         </BlurRise>
 
         <BlurRise trigger="load" delay={0.15}>
@@ -58,15 +58,15 @@ export function Hero() {
             }}
             className="mt-7 text-balance font-light leading-[1.04] tracking-[-0.025em] text-white"
           >
-            The AI cowork that runs
-            <span className="block">your entire pipeline.</span>
+            The operating system
+            <span className="block">for real estate.</span>
           </h1>
         </BlurRise>
 
         <BlurRise trigger="load" delay={0.28}>
           <p className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-white/65 sm:text-lg">
-            Chippi reads every lead, drafts in your voice, books the tour, and keeps the
-            deal current — the cowork built for real-estate agents and brokerages.
+            Chippi works your whole book. It reads every lead, drafts in your voice, books the
+            tour, and keeps every deal moving, so your hours go to the work only you can do.
           </p>
         </BlurRise>
 
@@ -90,7 +90,7 @@ export function Hero() {
           className="pointer-events-auto group flex w-[300px] items-center gap-3 rounded-2xl border border-white/10 bg-black/40 p-3 backdrop-blur-xl transition-colors hover:bg-black/55"
         >
           <span className="relative flex h-14 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-            {/* TODO: replace placeholder image — testimonial/clip thumbnail. */}
+            {/* TODO: replace placeholder image, testimonial/clip thumbnail. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/marketing/product/realtors.jpg"

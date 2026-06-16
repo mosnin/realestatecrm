@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Sub-page scaffolding for the dark marketing redesign — a styled hero + a
+ * Sub-page scaffolding for the dark marketing redesign, a styled hero + a
  * three-up feature section, shared by the Agents and Brokerages pages so the
  * nav targets work and read as one voice. Full content comes later; these are
  * high-fidelity placeholders in the reference aesthetic.

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * FeatureSection — the signature ALTERNATING feature block (reference-matched).
+ * FeatureSection, the signature ALTERNATING feature block (reference-matched).
  *
  * Layout (per the reference):
  *  - A mono + dot eyebrow label.

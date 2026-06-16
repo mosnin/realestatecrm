@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * BrokerageShowcase — the brokerage-dashboard feature section (image on the
+ * BrokerageShowcase, the brokerage-dashboard feature section (image on the
  * RIGHT, alternating after the realtor section). Same animated/frosted pattern,
  * focused on what a broker/team lead runs: lead routing, the live floor, team
  * performance, roles & approvals, and seats & billing.
@@ -10,7 +10,8 @@
 import {
   Building2,
   ArrowRightLeft,
-  Eye,
+  Waypoints,
+  Activity,
   ShieldCheck,
   CheckCircle2,
   Users,
@@ -28,8 +29,8 @@ import {
 } from './feature-showcase';
 
 const TOP_FEATURES = [
-  { icon: ArrowRightLeft, title: 'Routing on arrival', desc: 'Leads land with the right agent, every time.' },
-  { icon: Eye, title: 'The floor, live', desc: "See every agent's pipeline in real time." },
+  { icon: Waypoints, title: 'Routing on arrival', desc: 'Leads land with the right agent, every time.' },
+  { icon: Activity, title: 'The floor, live', desc: "See every agent's pipeline in real time." },
   { icon: ShieldCheck, title: 'Approval-first', desc: 'Every send reviewed, every action logged.' },
 ];
 
@@ -41,7 +42,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'routing',
     title: 'Lead routing',
-    desc: 'New leads are auto-assigned to the right agent by territory and load — or hand-pick and write the brief. Every assignment is logged with the reason.',
+    desc: 'New leads are auto-assigned to the right agent by territory and load, or hand-pick and write the brief. Every assignment is logged with the reason.',
     mockup: (
       <Frost title="Lead routing" badge="Auto">
         <motion.div variants={rowV} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
@@ -64,7 +65,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'floor',
     title: 'The floor, live',
-    desc: 'Deals active, drafts pending, follow-ups due — per agent, read live from the work itself, not a Monday status meeting.',
+    desc: 'Deals active, drafts pending, follow-ups due, per agent, read live from the work itself, not a Monday status meeting.',
     mockup: (
       <Frost title="The floor" badge="Live">
         <motion.div variants={rowV} className="grid grid-cols-3 gap-2 px-1 pb-2">
@@ -89,7 +90,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'performance',
     title: 'Team performance',
-    desc: 'Volume, closings, and response times across the whole team — surfaced automatically so you coach the right agents on the right things.',
+    desc: 'Volume, closings, and response times across the whole team, surfaced automatically so you coach the right agents on the right things.',
     mockup: (
       <Frost title="Performance" badge="This month">
         <motion.div variants={rowV} className="grid grid-cols-3 gap-2 px-1 pb-2">
@@ -133,7 +134,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'seats',
     title: 'Seats & billing',
-    desc: 'Per-seat plans that scale with the floor — add or reclaim seats in a click, with usage and billing always in view.',
+    desc: 'Per-seat plans that scale with the floor, add or reclaim seats in a click, with usage and billing always in view.',
     mockup: (
       <Frost title="Seats & billing" badge="Team plan">
         <motion.div variants={rowV} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -166,7 +167,7 @@ export function BrokerageShowcase() {
       product={{
         name: 'Brokerage Dashboard',
         icon: Building2,
-        desc: 'Run the whole floor from one place — route leads, watch performance live, set roles and approvals, and manage seats, with every action on the audit log.',
+        desc: 'Run the whole floor from one place, route leads, watch performance live, set roles and approvals, and manage seats, with every action on the audit log.',
         cta: { label: 'Explore brokerages', href: '/brokerages' },
       }}
       topFeatures={TOP_FEATURES}

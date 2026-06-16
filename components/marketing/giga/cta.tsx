@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * CtaSection — light/dark-adaptive closing CTA ("Ready to see Chippi in
+ * CtaSection, light/dark-adaptive closing CTA ("Ready to see Chippi in
  * action?"), reference-matched: contained width, serif headline on the left, a
  * muted paragraph on the right with the "Talk to us" pill directly below it.
  */
@@ -38,8 +38,8 @@ export function CtaSection() {
 
         <motion.div {...reveal} transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.1 }} className="lg:pt-3">
           <p className="max-w-sm text-[13.5px] leading-relaxed text-neutral-600 dark:text-white/55">
-            Chippi works your whole book — reading leads, drafting in your voice, booking tours, and
-            clearing the busywork — with every send approved by you.
+            Chippi works your whole book, reading leads, drafting in your voice, booking tours, and
+            clearing the busywork, with every send approved by you.
           </p>
           <Link
             href="/demo"

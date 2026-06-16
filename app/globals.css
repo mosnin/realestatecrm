@@ -1059,6 +1059,13 @@
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Flowing gradient for the AnimatedGradientText component (marketing labels). */
+@keyframes gradient-flow {
+  to {
+    background-position: var(--bg-size) 0;
+  }
+}
+
 /* ── Bold-canvas marketing type (logged-out site only) ──────────────────────
  * --font-display / --font-accent are injected by app/(marketing)/layout.tsx
  * via next/font (Inter Tight + Instrument Serif). Fallbacks keep the classes

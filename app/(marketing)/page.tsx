@@ -1,14 +1,14 @@
 /**
- * `/` (home) — the dark, cinematic marketing homepage ("Giga" redesign).
+ * `/` (home), the dark, cinematic marketing homepage ("Giga" redesign).
  *
  * Sections, in order:
- *   1. Hero — full-bleed real-estate photo, centered serif headline, white pill
+ *   1. Hero, full-bleed real-estate photo, centered serif headline, white pill
  *      CTA, a bottom-left video/testimonial card, and a marquee logo cloud.
- *   2. Stats — the big-numbers band right under the hero.
- *   3. AgentCanvas — THE feature section: one animated component (scenic photo
+ *   2. Stats, the big-numbers band right under the hero.
+ *   3. AgentCanvas, THE feature section: one animated component (scenic photo
  *      background with a product-UI card composited over it) whose stepped list
  *      auto-advances with progress bars and swaps the card per step.
- *   4. Complexity — the brokerage-floor closer.
+ *   4. Complexity, the brokerage-floor closer.
  *
  * Every child here is a self-contained client component that takes NO props, so
  * nothing crosses the server→client boundary (this page is a Server Component;

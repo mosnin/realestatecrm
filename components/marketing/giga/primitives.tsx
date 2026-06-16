@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Giga marketing primitives — the shared kit for the dark, cinematic redesign.
+ * Giga marketing primitives, the shared kit for the dark, cinematic redesign.
  *
  * Visual language (matches the reference; copy stays Chippi/real-estate):
  *  - Near-black sections, generous air, thin hairline dividers.
@@ -10,7 +10,7 @@
  *    scoped rule in globals.css already makes the serif the default for every
  *    heading in the shell; the <Serif> helper just pins the size/weight knobs.
  *  - Eyebrow labels: UPPERCASE MONOSPACE (--font-mono-display, JetBrains Mono)
- *    with a small colored dot. No emoji — the dot is a styled <span>.
+ *    with a small colored dot. No emoji, the dot is a styled <span>.
  *  - Rounded-full white "pill" CTAs.
  *
  * Motion is the installed framer-motion; everything respects
@@ -135,7 +135,7 @@ type PillProps = {
   withArrow?: boolean;
 };
 
-/** Solid white pill — the primary CTA ("See a demo"). */
+/** Solid white pill, the primary CTA ("See a demo"). */
 export function PillPrimary({ href, children, className, withArrow }: PillProps) {
   return (
     <Link
@@ -153,7 +153,7 @@ export function PillPrimary({ href, children, className, withArrow }: PillProps)
   );
 }
 
-/** Ghost pill — hairline border, transparent fill ("Explore X" / "Talk to us"). */
+/** Ghost pill, hairline border, transparent fill ("Explore X" / "Talk to us"). */
 export function PillGhost({ href, children, className, withArrow }: PillProps) {
   return (
     <Link

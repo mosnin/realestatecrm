@@ -4,8 +4,8 @@
  * WHY THIS EXISTS: the home / agents / brokerages pages are Server Components
  * (they `auth()` or export `metadata`), but the feature components that consume
  * their data (FeatureSection, SubPageFeatures) are Client Components. React
- * Server Components cannot pass functions — and a lucide icon is a forwardRef
- * function/object — as props across the server→client boundary. Doing so throws
+ * Server Components cannot pass functions, and a lucide icon is a forwardRef
+ * function/object, as props across the server→client boundary. Doing so throws
  * "Functions cannot be passed directly to Client Components" at render time.
  *
  * So the pages reference icons by NAME (a plain string, which serializes fine)

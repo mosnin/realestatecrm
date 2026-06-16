@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * SiteFooter — light/dark-adaptive footer (reference-matched): the twirling
+ * SiteFooter, light/dark-adaptive footer (reference-matched): the twirling
  * shader-gradient band on top, then the Chippi wordmark + COMPLIANT badges on
  * the left and three link columns on the right, with a © / social meta row.
  */

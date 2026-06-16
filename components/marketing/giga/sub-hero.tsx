@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * SubHero — the non-home page hero (reference-matched).
+ * SubHero, the non-home page hero (reference-matched).
  *
  * Centered gradient product label + big serif headline, then a description on
  * the left and three mini-features on the right. Below, a large, subtly animated
@@ -10,7 +10,7 @@
  * reference.
  *
  * Mobile: the mockup is intentionally oversized and the section clips it
- * (overflow-hidden) so it reads as a zoomed crop occupying the lower half — and
+ * (overflow-hidden) so it reads as a zoomed crop occupying the lower half, and
  * crucially never causes horizontal overflow, so the page scrolls cleanly.
  */
 
@@ -27,9 +27,9 @@ import {
 import { motion, useReducedMotion } from 'framer-motion';
 import { EASE_OUT } from '@/lib/motion';
 import { FEATURE_ICONS, type FeatureIconName } from './icons';
+import { AnimatedGradientText } from '@/components/ui/animated-gradient-text';
 
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
-const SERIF = { fontFamily: 'var(--font-serif-display), Georgia, serif' } as const;
 
 export interface SubHeroFeature {
   icon: FeatureIconName;
@@ -82,13 +82,16 @@ export function SubHero({
       <div className="mx-auto max-w-[1728px] px-5 pt-36 text-center sm:px-8 sm:pt-44 lg:px-10">
         <motion.div {...r(0)}>
           <span className="inline-flex items-center gap-2">
-            <LabelIcon className="h-5 w-5 text-[#ff9a6e]" />
-            <span
-              style={SERIF}
-              className="bg-gradient-to-r from-[#ff7a45] via-[#ff7e6b] to-[#ff5fa2] bg-clip-text text-[26px] font-medium text-transparent"
+            <LabelIcon className="h-6 w-6" stroke="url(#chippi-grad)" strokeWidth={1.75} />
+            <AnimatedGradientText
+              speed={2}
+              colorFrom="#ff7a45"
+              colorTo="#c77dff"
+              className="text-[26px] font-semibold tracking-tight"
+              style={{ fontFamily: 'var(--font-heading)' }}
             >
               {label}
-            </span>
+            </AnimatedGradientText>
           </span>
         </motion.div>
         <motion.h1
@@ -123,7 +126,7 @@ export function SubHero({
         </div>
       </div>
 
-      {/* Big animated app mockup — rises out of the dark, fades at the bottom.
+      {/* Big animated app mockup, rises out of the dark, fades at the bottom.
           On mobile it's oversized and clipped (no horizontal scroll). */}
       <div className="relative mt-16 sm:mt-20">
         <motion.div
@@ -161,7 +164,7 @@ const SCENARIOS = [
   {
     n: 1,
     title: 'Lead arrives',
-    say: '“Hi Sarah — thanks for reaching out about 142 Oak St. Want me to set up a time to see it?”',
+    say: '“Hi Sarah, thanks for reaching out about 142 Oak St. Want me to set up a time to see it?”',
     branches: [
       { label: 'Replies, interested', chip: '@interested', tone: 'text-sky-300 bg-sky-400/12', to: 'Qualify' },
       { label: 'No reply in 24h', chip: '@cold', tone: 'text-white/60 bg-white/[0.06]', to: 'Nurture' },
@@ -179,7 +182,7 @@ const SCENARIOS = [
   {
     n: 3,
     title: 'Book tour',
-    say: '“Perfect — I have Saturday at 2:00 or Sunday at 11:00. Which works?”',
+    say: '“Perfect, I have Saturday at 2:00 or Sunday at 11:00. Which works?”',
     branches: [
       { label: 'Time confirmed', chip: 'accepted', tone: 'text-emerald-300 bg-emerald-400/12', to: 'Confirm & log' },
     ],

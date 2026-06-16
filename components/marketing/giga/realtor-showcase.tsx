@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * RealtorShowcase — the realtor-dashboard feature section (image on the LEFT).
+ * RealtorShowcase, the realtor-dashboard feature section (image on the LEFT).
  * Same animated/frosted pattern as <AgentCanvas>, mirrored, focused on the real
  * features an agent uses day to day: lead qualification, deal pipelines,
  * contact management, tours, and a public profile.
@@ -10,7 +10,7 @@
 import {
   Home,
   LayoutDashboard,
-  Zap,
+  Gauge,
   Globe,
   CheckCircle2,
   Users,
@@ -30,7 +30,7 @@ import {
 
 const TOP_FEATURES = [
   { icon: LayoutDashboard, title: 'One workspace', desc: 'Lead to close in a single view, on any device.' },
-  { icon: Zap, title: 'Fast by default', desc: 'Everything a tap away — no training required.' },
+  { icon: Gauge, title: 'Fast by default', desc: 'Everything a tap away, no training required.' },
   { icon: Globe, title: 'Your brand, public', desc: 'A profile page that wins you the listing.' },
 ];
 
@@ -81,7 +81,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'pipeline',
     title: 'Deal pipelines',
-    desc: 'A drag-free board that moves with the work — every deal in the right stage, every next step in view.',
+    desc: 'A drag-free board that moves with the work, every deal in the right stage, every next step in view.',
     mockup: (
       <Frost title="Deal pipeline" badge="6 active">
         <motion.div variants={rowV} className="grid grid-cols-4 gap-1.5 px-1 pb-2">
@@ -106,13 +106,13 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'contacts',
     title: 'Contact management',
-    desc: 'Every client, lead, and past sale in one place — tagged, deduped, and always up to date.',
+    desc: 'Every client, lead, and past sale in one place, tagged, deduped, and always up to date.',
     mockup: (
       <Frost title="Contacts" badge="1,204">
         <Row icon={Users} title="Marcus Lee" meta="texted 2 days ago" right={<Chip label="Buyer" tone="bg-[#ff7a45]/15 text-[#ff9a6e]" />} />
         <Row icon={Users} title="Priya Patel" meta="emailed 1 week ago" right={<Chip label="Seller" tone="bg-sky-400/15 text-sky-300" />} />
         <Row icon={Users} title="The Romeros" meta="called today" right={<Chip label="Buyer" tone="bg-[#ff7a45]/15 text-[#ff9a6e]" />} />
-        <Row icon={Users} title="Devon Ray" meta="new — web form" right={<Chip label="Lead" tone="bg-white/10 text-white/60" />} />
+        <Row icon={Users} title="Devon Ray" meta="new, web form" right={<Chip label="Lead" tone="bg-white/10 text-white/60" />} />
         <Row icon={Users} title="Janet Cole" meta="past client · 2023" right={<Chip label="Sphere" tone="bg-emerald-400/15 text-emerald-300" />} />
       </Frost>
     ),
@@ -120,20 +120,20 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'tours',
     title: 'Tours',
-    desc: 'Approve a time and the tour books itself — calendar, client, and deal all updated, confirmation sent.',
+    desc: 'Approve a time and the tour books itself, calendar, client, and deal all updated, confirmation sent.',
     mockup: (
       <Frost title="Tours" badge="This week">
-        <Row icon={CalendarCheck} title="Sat 2:00 — 142 Oak St" meta="Sarah Chen" tone="text-[#ff9a6e]" right={<Chip label="Confirmed" tone="bg-emerald-400/15 text-emerald-300" />} active />
-        <Row icon={CalendarCheck} title="Sun 11:00 — 88 Pine Ave" meta="The Romeros" right={<Chip label="Confirmed" tone="bg-emerald-400/15 text-emerald-300" />} />
-        <Row icon={CalendarCheck} title="Mon 4:30 — 9 Birch Ln" meta="Marcus Lee" right={<Chip label="Pending" tone="bg-amber-400/15 text-amber-300" />} />
-        <Row icon={CalendarCheck} title="Wed 1:00 — 12 Cedar Ct" meta="Devon Ray" right={<Chip label="Requested" tone="bg-white/10 text-white/60" />} />
+        <Row icon={CalendarCheck} title="Sat 2:00, 142 Oak St" meta="Sarah Chen" tone="text-[#ff9a6e]" right={<Chip label="Confirmed" tone="bg-emerald-400/15 text-emerald-300" />} active />
+        <Row icon={CalendarCheck} title="Sun 11:00, 88 Pine Ave" meta="The Romeros" right={<Chip label="Confirmed" tone="bg-emerald-400/15 text-emerald-300" />} />
+        <Row icon={CalendarCheck} title="Mon 4:30, 9 Birch Ln" meta="Marcus Lee" right={<Chip label="Pending" tone="bg-amber-400/15 text-amber-300" />} />
+        <Row icon={CalendarCheck} title="Wed 1:00, 12 Cedar Ct" meta="Devon Ray" right={<Chip label="Requested" tone="bg-white/10 text-white/60" />} />
       </Frost>
     ),
   },
   {
     key: 'profile',
     title: 'Public profile',
-    desc: 'A polished, shareable profile that shows your listings, reviews, and track record — and wins you the next client.',
+    desc: 'A polished, shareable profile that shows your listings, reviews, and track record, and wins you the next client.',
     mockup: (
       <Frost title="Public profile" badge="Live">
         <motion.div variants={rowV} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
@@ -182,7 +182,7 @@ export function RealtorShowcase() {
       product={{
         name: 'Realtor Dashboard',
         icon: Home,
-        desc: 'The home base for your business — qualify leads, move deals, manage every contact, book tours, and show off a public profile that wins you listings.',
+        desc: 'The home base for your business, qualify leads, move deals, manage every contact, book tours, and show off a public profile that wins you listings.',
         cta: { label: 'Explore the dashboard', href: '/agents' },
       }}
       topFeatures={TOP_FEATURES}

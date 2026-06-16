@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ShaderGradient — a smooth, slowly twirling mesh gradient (the soft pink/orange
+ * ShaderGradient, a smooth, slowly twirling mesh gradient (the soft pink/orange
  * band above the footer). Built from large blurred color blobs inside a slowly
  * rotating field, so it reads as an organic, ever-shifting gradient without a
  * WebGL dependency. Adapts to light/dark and respects reduced motion.

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * FeatureCarousel — the auto-advancing feature showcase (the signature
+ * FeatureCarousel, the auto-advancing feature showcase (the signature
  * interaction, reference-matched). This is the FIRST feature block; the
  * additional feature sections use the static alternating large-card layout
  * (see FeatureSection).
@@ -37,7 +37,7 @@ interface FeatureTab {
   blurb: string;
   heading: React.ReactNode;
   description: string;
-  /** TODO: replace placeholder image — per-feature product shot. */
+  /** TODO: replace placeholder image, per-feature product shot. */
   image: string;
   imageAlt: string;
 }
@@ -54,7 +54,7 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Chippi reads each inbound against your live deals and drafts the reply in your voice. Edit it, send it, or skip it — nothing leaves without your tap.',
+      'Chippi reads each inbound against your live deals and drafts the reply in your voice. Edit it, send it, or skip it, nothing leaves without your tap.',
     image: '/marketing/product/realtors.jpg',
     imageAlt: 'Chippi drafting a reply in the agent inbox',
   },
@@ -69,14 +69,14 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Leads are scored against your real pipeline and ranked by intent, so the next best move is always at the top of the list — not buried in a spreadsheet.',
+      'Leads are scored against your real pipeline and ranked by intent, so the next best move is always at the top of the list, not buried in a spreadsheet.',
     image: '/marketing/product/brokerages.jpg',
     imageAlt: 'Chippi ranking leads by intent',
   },
   {
     icon: KanbanSquare,
     tab: 'Pipeline automation',
-    blurb: 'Tours booked, deals advanced, the log kept current — automatically.',
+    blurb: 'Tours booked, deals advanced, the log kept current, automatically.',
     heading: (
       <>
         A pipeline that
@@ -84,14 +84,14 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Approve a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal advances — every action written down in plain language.',
+      'Approve a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal advances, every action written down in plain language.',
     image: '/marketing/product/integrations.jpg',
     imageAlt: 'Chippi advancing a deal in the pipeline board',
   },
   {
     icon: Inbox,
     tab: 'Omnichannel inbox',
-    blurb: 'Email, text, and calls in one worked queue — nothing slips.',
+    blurb: 'Email, text, and calls in one worked queue, nothing slips.',
     heading: (
       <>
         Every channel, one
@@ -114,7 +114,7 @@ export function FeatureCarousel() {
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  // rAF loop refs — kept outside React state so the loop reads fresh values.
+  // rAF loop refs, kept outside React state so the loop reads fresh values.
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
   const progressRef = useRef(0);
@@ -129,7 +129,7 @@ export function FeatureCarousel() {
   }, []);
 
   useEffect(() => {
-    // No auto-advance under reduced motion — the showcase stays static and
+    // No auto-advance under reduced motion, the showcase stays static and
     // fully controllable by click.
     if (reduce) return;
 
@@ -277,7 +277,7 @@ export function FeatureCarousel() {
                   transition={{ duration: 0.6, ease: EASE_OUT }}
                   className="absolute inset-0"
                 >
-                  {/* TODO: replace placeholder image — per-feature product shot. */}
+                  {/* TODO: replace placeholder image, per-feature product shot. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={current.image}

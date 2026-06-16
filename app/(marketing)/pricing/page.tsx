@@ -22,7 +22,7 @@ const SIGNUP = '/login/realtor?intent=signup';
 // Self-serve CTA that carries the chosen tier so it survives into onboarding
 // and the subscribe step (Solo/Pro are the only self-serve plans; Team tiers
 // go to /demo). The plan is captured client-side at the auth hop because the
-// query param itself doesn't survive Clerk's redirects — see lib/signup-plan.ts.
+// query param itself doesn't survive Clerk's redirects, see lib/signup-plan.ts.
 const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}&plan=${plan}`;
 
 type Card = {

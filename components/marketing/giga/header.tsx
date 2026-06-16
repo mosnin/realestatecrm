@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * SiteHeader — the dark, cinematic sticky header (reference-matched).
+ * SiteHeader, the dark, cinematic sticky header (reference-matched).
  *
  * Layout: FULL-BLEED. Brand + nav hug the left edge, actions hug the right edge.
  *
@@ -60,13 +60,13 @@ interface MenuConfig {
   items: MegaItem[];
 }
 
-/** The two nav dropdowns — reference-styled frosted panels. */
+/** The two nav dropdowns, reference-styled frosted panels. */
 const MENUS: Record<MenuKey, MenuConfig> = {
   agents: {
     featured: {
       eyebrow: 'MEET CHIPPI',
       title: 'The AI cowork for your floor.',
-      body: 'It reads, scores, drafts, books, and follows up — so the busywork runs itself.',
+      body: 'It reads, scores, drafts, books, and follows up, so the busywork runs itself.',
       cta: 'See a demo',
       href: DEMO,
     },
@@ -83,7 +83,7 @@ const MENUS: Record<MenuKey, MenuConfig> = {
     featured: {
       eyebrow: 'FOR BROKERAGES',
       title: 'One agent for the whole floor.',
-      body: 'Leads routed, performance visible, every send approval-first — a solo desk to hundreds of agents.',
+      body: 'Leads routed, performance visible, every send approval-first, a solo desk to hundreds of agents.',
       cta: 'See a demo',
       href: DEMO,
     },
@@ -147,7 +147,7 @@ export function SiteHeader() {
   };
 
   // Each nav cluster is TRANSPARENT at the top and gains a blurred translucent
-  // background only once scrolled — animated, so it fades in/out.
+  // background only once scrolled, animated, so it fades in/out.
   const clusterAnimate = {
     backgroundColor: scrolled ? 'rgba(12,12,12,0.72)' : 'rgba(12,12,12,0)',
     borderColor: scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0)',
@@ -184,7 +184,7 @@ export function SiteHeader() {
       <header ref={navRef} className="fixed inset-x-0 top-0 z-50">
         {/* Full-bleed: brand hugs the left, actions hug the right. */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 sm:px-8 sm:py-4 lg:px-10">
-          {/* LEFT cluster — relative anchor for the mega-menu */}
+          {/* LEFT cluster, relative anchor for the mega-menu */}
           <div className="relative">
             <motion.div
               initial={false}
@@ -210,7 +210,7 @@ export function SiteHeader() {
               </nav>
             </motion.div>
 
-            {/* Dropdown mega-menu (Agents / Brokerages) — frosted blurred panel */}
+            {/* Dropdown mega-menu (Agents / Brokerages), frosted blurred panel */}
             <AnimatePresence>
               {active && (
                 <motion.div
@@ -286,7 +286,7 @@ export function SiteHeader() {
             </AnimatePresence>
           </div>
 
-          {/* RIGHT cluster — actions */}
+          {/* RIGHT cluster, actions */}
           <motion.div
             initial={false}
             animate={clusterAnimate}

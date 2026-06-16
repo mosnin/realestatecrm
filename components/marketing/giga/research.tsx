@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ResearchSection — light/dark-adaptive "case study" block (reference-matched),
+ * ResearchSection, light/dark-adaptive "case study" block (reference-matched),
  * reframed as the research story. Contained width, image-left card with a stat
  * overlay, content-right with label / title / Learn more / body / attribution.
  */
@@ -77,7 +77,7 @@ export function ResearchSection() {
               <p className="mt-6 max-w-md text-[13.5px] leading-relaxed text-neutral-600 dark:text-white/55">
                 We interviewed hundreds of agents and brokers, shadowed real deals from first lead to
                 close, and mapped the busywork that eats a realtor&apos;s day. Every feature in Chippi
-                traces back to a workflow we watched people struggle with — not a guess — so it works
+                traces back to a workflow we watched people struggle with, not a guess, so it works
                 the way top producers already do, only faster.
               </p>
               <div className="mt-7 flex items-center gap-3 border-t border-black/10 pt-5 dark:border-white/10">

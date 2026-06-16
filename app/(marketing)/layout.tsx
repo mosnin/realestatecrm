@@ -1,5 +1,5 @@
 /**
- * Marketing route-group layout — the dark, cinematic shell ("Giga" redesign).
+ * Marketing route-group layout, the dark, cinematic shell ("Giga" redesign).
  *
  * Every page under `app/(marketing)/` renders inside this shell, which is a
  * deliberately separate visual world from the product:
@@ -16,7 +16,7 @@
  *    so the logged-out site and the app read as one brand. The shell is tagged
  *    `data-marketing-shell`; a scoped rule in globals.css makes the serif the
  *    DEFAULT for every heading in the tree (out-specifying the global
- *    `h1..h6 { --font-heading }` base rule). No web fonts are loaded — these are
+ *    `h1..h6 { --font-heading }` base rule). No web fonts are loaded, these are
  *    the same system faces the dashboard uses.
  *
  * The marketing site is public; Clerk isn't loaded for unauth visitors (the
@@ -45,6 +45,15 @@ export default function MarketingLayout({
     >
       {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
+      {/* Shared gradient def so icons can be stroked with the brand gradient. */}
+      <svg aria-hidden width="0" height="0" className="absolute">
+        <defs>
+          <linearGradient id="chippi-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ff7a45" />
+            <stop offset="100%" stopColor="#c77dff" />
+          </linearGradient>
+        </defs>
+      </svg>
       <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
