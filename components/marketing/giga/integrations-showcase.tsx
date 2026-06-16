@@ -18,8 +18,7 @@ import {
   FileSignature,
   Check,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { FeatureShowcase, Frost, Row, rowV, type ShowcaseStep } from './feature-showcase';
+import { FeatureShowcase, Frost, Row, type ShowcaseStep } from './feature-showcase';
 
 const TOP_FEATURES = [
   { icon: Boxes, title: '50+ apps', desc: 'The tools you already pay for, connected through Composio.' },
