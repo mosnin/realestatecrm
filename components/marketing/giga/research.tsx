@@ -57,10 +57,13 @@ export function ResearchSection() {
             {/* Content */}
             <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-12">
               <span style={MONO} className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff7a45]">
-                Chippi research
+                Chippi is built on data
               </span>
-              <h3 className="mt-3 text-[20px] font-medium leading-snug text-neutral-900 dark:text-white sm:text-[24px]">
-                How we built Chippi from the ground up
+              <h3
+                style={{ fontFamily: 'var(--font-sans)' }}
+                className="mt-3 text-[20px] font-semibold leading-snug tracking-tight text-neutral-900 dark:text-white sm:text-[24px]"
+              >
+                Our Research
               </h3>
               <div className="mt-5">
                 <Link

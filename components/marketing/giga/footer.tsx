@@ -35,10 +35,11 @@ const MONO = { fontFamily: 'var(--font-mono)' } as const;
 export function SiteFooter() {
   return (
     <footer className="relative bg-white dark:bg-[#0a0a0a]">
-      {/* Twirling gradient band, fading into the footer surface */}
+      {/* Twirling gradient band: color anchored toward the footer, fading UP
+          into the CTA above (white at the top of the band). */}
       <div className="relative h-56 w-full overflow-hidden sm:h-72">
         <ShaderGradient />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white dark:to-[#0a0a0a]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-white dark:to-[#0a0a0a]" />
       </div>
 
       <div className="relative">

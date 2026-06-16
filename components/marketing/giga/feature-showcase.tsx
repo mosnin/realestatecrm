@@ -19,7 +19,7 @@
  * section can declare its own detailed panels.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
@@ -75,43 +75,29 @@ export function FeatureShowcase({
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const rafRef = useRef<number | null>(null);
-  const startRef = useRef<number | null>(null);
-  const progressRef = useRef(0);
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
-
   const goTo = useCallback((i: number) => {
     setActive(i);
     setProgress(0);
-    progressRef.current = 0;
-    startRef.current = null;
   }, []);
 
+  // Auto-advance: this effect re-runs whenever the active step changes (or pause
+  // toggles). It animates the progress bar 0→1 over DURATION, then steps to the
+  // next one — which re-runs the effect and continues the loop. Hover pauses it.
   useEffect(() => {
-    if (reduce) return;
-    function tick(now: number) {
-      if (pausedRef.current) {
-        startRef.current = now - progressRef.current * DURATION;
+    if (reduce || paused) return;
+    setProgress(0);
+    const start = performance.now();
+    let raf = requestAnimationFrame(function tick(now: number) {
+      const p = Math.min((now - start) / DURATION, 1);
+      setProgress(p);
+      if (p < 1) {
+        raf = requestAnimationFrame(tick);
       } else {
-        if (startRef.current === null) startRef.current = now;
-        const p = Math.min((now - startRef.current) / DURATION, 1);
-        progressRef.current = p;
-        setProgress(p);
-        if (p >= 1) {
-          startRef.current = null;
-          progressRef.current = 0;
-          setProgress(0);
-          setActive((cur) => (cur + 1) % steps.length);
-        }
+        setActive((cur) => (cur + 1) % steps.length);
       }
-      rafRef.current = requestAnimationFrame(tick);
-    }
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [reduce, active, steps.length]);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [active, paused, reduce, steps.length]);
 
   const ProductIcon = product.icon;
   const imageLeft = imageSide === 'left';
@@ -119,7 +105,7 @@ export function FeatureShowcase({
   return (
     <Band className={cn('py-24 sm:py-32', className)}>
       {/* Header: eyebrow + serif headline (left), three mini-features (right) */}
-      <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
+      <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
         <BlurRise>
           <div>
             <Eyebrow>{eyebrow}</Eyebrow>
@@ -135,7 +121,9 @@ export function FeatureShowcase({
               return (
                 <div key={f.title} className="sm:px-5 sm:first:pl-0 sm:last:pr-0">
                   <Icon className="h-[18px] w-[18px] text-white/55" />
-                  <h3 className="mt-3.5 text-[13.5px] font-medium text-white">{f.title}</h3>
+                  <h3 style={{ fontFamily: 'var(--font-sans)' }} className="mt-3.5 text-[13.5px] font-medium text-white">
+                    {f.title}
+                  </h3>
                   <p className="mt-1.5 text-[12.5px] leading-snug text-white/45">{f.desc}</p>
                 </div>
               );
@@ -154,8 +142,6 @@ export function FeatureShowcase({
             )}
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
-            onFocusCapture={() => setPaused(true)}
-            onBlurCapture={() => setPaused(false)}
           >
             {/* TEXT column */}
             <div className={cn('flex flex-col p-6 sm:p-9', imageLeft && 'lg:order-2')}>

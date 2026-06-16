@@ -112,7 +112,9 @@ export function SubHero({
               return (
                 <div key={f.title} className="sm:px-5 sm:first:pl-0 sm:last:pr-0">
                   <Icon className="h-[18px] w-[18px] text-white/55" />
-                  <h3 className="mt-3.5 text-[13.5px] font-medium text-white">{f.title}</h3>
+                  <h3 style={{ fontFamily: 'var(--font-sans)' }} className="mt-3.5 text-[13.5px] font-medium text-white">
+                    {f.title}
+                  </h3>
                   <p className="mt-1.5 text-[12.5px] leading-snug text-white/45">{f.desc}</p>
                 </div>
               );
