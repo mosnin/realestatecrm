@@ -18,6 +18,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// lib/inngest/functions.ts now imports lib/realtime/ably.ts, which is marked
+// `import 'server-only'` — a build-time guard that throws under vitest's Node
+// environment. Stub it so the handler under test can be imported. The Ably
+// publish path no-ops without ABLY_API_KEY, so this changes nothing we assert.
+vi.mock('server-only', () => ({}));
+
 // ── Mocks ──────────────────────────────────────────────────────────────
 
 const { findByComposioIdMock } = vi.hoisted(() => ({
