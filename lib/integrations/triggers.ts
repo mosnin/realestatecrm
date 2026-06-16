@@ -278,109 +278,174 @@ function build(args: {
 }
 
 /**
- * Per-slug templates. Each fn receives the flattened payload and
- * returns either a uniformly-shaped instruction (via `build()`) or
- * null when the payload is too thin to anchor on — in which case the
- * dispatcher skips the Modal run instead of burning compute on a
- * content-free prompt.
+ * The structured shape every per-slug extractor returns, OR null when the
+ * payload is too thin to anchor on (a required content field is missing).
  *
- * Field-name fallbacks: Composio webhook V1/V2/V3 payloads use
- * different keys for the same logical field; the flattenPayload step
- * upstream collapses common envelopes, and pickString() tries each
- * key in order.
+ * This is the ONE source of payload extraction. Two consumers derive from
+ * it without duplicating the per-slug `pickString` calls:
+ *   - `templateInstruction` → renders `build({ frame, fields, action })`,
+ *     the natural-language instruction the autonomous Modal run sees.
+ *   - `normalizeTriggerEvent` → maps `{ title, actor, snippet }` onto the
+ *     IntegrationEvent row for the activity feed.
  *
- * Voice rule: action sentences describe a JUDGMENT to make, not a
- * rulebook to follow. The model knows the realtor's CRM and history;
- * we trust it to judge noise vs signal rather than enumerate cases.
+ * `frame`/`fields`/`action` reproduce the instruction byte-for-byte (the
+ * Jobs-lens uniform shape); `title`/`actor`/`snippet` are the same values
+ * re-labelled for the feed. Keeping both in one place means the feed
+ * summary and the dispatch instruction can never drift.
  */
-const TEMPLATES: Record<string, (p: Record<string, unknown>) => string | null> = {
-  GMAIL_NEW_GMAIL_MESSAGE: (p) =>
-    build({
+interface ExtractedEvent {
+  frame: string;
+  fields: Array<[label: string, value: string | null]>;
+  action: string;
+  /** Feed: the headline (subject / event / deal / contact / task …). */
+  title: string | null;
+  /** Feed: who it's from (sender / attendee / author / customer …). */
+  actor: string | null;
+  /** Feed: short body/preview/message/comment text, when present. */
+  snippet: string | null;
+}
+
+/**
+ * Per-slug extractors. Each receives the flattened payload and returns an
+ * `ExtractedEvent`, or null when a required content field is absent (the
+ * old per-template `if (!text) return null` guards — instruction then no-ops
+ * and the feed row carries null title/actor/snippet).
+ *
+ * Field-name fallbacks: Composio webhook V1/V2/V3 payloads use different
+ * keys for the same logical field; `flattenPayload` collapses common
+ * envelopes upstream and `pickString()` tries each key in order.
+ *
+ * Voice rule (instruction `action`): describe a JUDGMENT to make, not a
+ * rulebook. The model knows the realtor's CRM and history.
+ */
+const EXTRACTORS: Record<string, (p: Record<string, unknown>) => ExtractedEvent | null> = {
+  GMAIL_NEW_GMAIL_MESSAGE: (p) => {
+    const subject = pickString(p, 'subject', 'messageSubject', 'message.subject');
+    const from = pickString(p, 'sender', 'from', 'fromEmail', 'message.from');
+    const snippet = pickString(p, 'snippet', 'preview', 'messageText', 'message.snippet');
+    return {
       frame: 'A new email just arrived in my Gmail.',
       fields: [
-        ['Subject', pickString(p, 'subject', 'messageSubject', 'message.subject')],
-        ['From', pickString(p, 'sender', 'from', 'fromEmail', 'message.from')],
-        ['Snippet', pickString(p, 'snippet', 'preview', 'messageText', 'message.snippet')],
+        ['Subject', subject],
+        ['From', from],
+        ['Snippet', snippet],
       ],
       action:
         'If this looks like it needs a response, read the thread and draft a reply for me to approve. Use your judgment on noise vs signal — I trust you.',
-    }),
+      title: subject,
+      actor: from,
+      snippet,
+    };
+  },
 
-  OUTLOOK_MESSAGE_TRIGGER: (p) =>
-    build({
+  OUTLOOK_MESSAGE_TRIGGER: (p) => {
+    const subject = pickString(p, 'subject', 'messageSubject');
+    const from = pickString(p, 'from', 'sender', 'fromEmail', 'senderEmail');
+    const snippet = pickString(p, 'bodyPreview', 'preview', 'snippet');
+    return {
       frame: 'A new email just arrived in my Outlook.',
       fields: [
-        ['Subject', pickString(p, 'subject', 'messageSubject')],
-        ['From', pickString(p, 'from', 'sender', 'fromEmail', 'senderEmail')],
-        ['Snippet', pickString(p, 'bodyPreview', 'preview', 'snippet')],
+        ['Subject', subject],
+        ['From', from],
+        ['Snippet', snippet],
       ],
       action:
         'Same as Gmail — draft a reply if it warrants one, otherwise let it pass.',
-    }),
+      title: subject,
+      actor: from,
+      snippet,
+    };
+  },
 
   SLACK_DIRECT_MESSAGE_RECEIVED: (p) => {
     const text = pickString(p, 'text', 'message', 'messageText');
     if (!text) return null;
-    return build({
+    const from = pickString(p, 'user', 'userId', 'userName', 'sender');
+    return {
       frame: 'A direct message just arrived on Slack.',
       fields: [
-        ['From', pickString(p, 'user', 'userId', 'userName', 'sender')],
+        ['From', from],
         ['Message', text],
       ],
       action: 'Draft a response if it warrants one — automated alerts can pass.',
-    });
+      title: null,
+      actor: from,
+      snippet: text,
+    };
   },
 
   SLACK_REACTION_ADDED: (p) => {
     const reaction = pickString(p, 'reaction', 'emoji');
     if (!reaction) return null;
-    return build({
+    const from = pickString(p, 'user', 'userName');
+    return {
       frame: `Someone reacted on Slack with :${reaction}:.`,
       fields: [
-        ['From', pickString(p, 'user', 'userName')],
+        ['From', from],
       ],
       action:
         'Usually a quiet ack. Only surface if it reads as confirmation or rejection of something I asked.',
-    });
+      title: `:${reaction}:`,
+      actor: from,
+      snippet: null,
+    };
   },
 
   DISCORD_NEW_MESSAGE_TRIGGER: (p) => {
     const text = pickString(p, 'content', 'text', 'message');
     if (!text) return null;
-    return build({
+    const from = pickString(p, 'author', 'userName', 'username');
+    return {
       frame: 'A new Discord message just arrived.',
       fields: [
-        ['From', pickString(p, 'author', 'userName', 'username')],
+        ['From', from],
         ['Message', text],
       ],
       action: 'Draft a reply if it warrants one.',
-    });
+      title: null,
+      actor: from,
+      snippet: text,
+    };
   },
 
-  GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER: (p) =>
-    build({
+  GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER: (p) => {
+    const event = pickString(p, 'summary', 'title');
+    const attendee = pickString(p, 'attendee', 'email', 'attendeeEmail');
+    const status = pickString(p, 'responseStatus', 'response', 'status');
+    return {
       frame: 'A calendar attendee changed their RSVP.',
       fields: [
-        ['Event', pickString(p, 'summary', 'title')],
-        ['Attendee', pickString(p, 'attendee', 'email', 'attendeeEmail')],
-        ['New status', pickString(p, 'responseStatus', 'response', 'status')],
+        ['Event', event],
+        ['Attendee', attendee],
+        ['New status', status],
       ],
       action:
         'If this is a tour or client meeting, draft a warm confirm (if accepted) or a reschedule offer (if declined). Internal events can pass.',
-    }),
+      title: event,
+      actor: attendee,
+      snippet: status,
+    };
+  },
 
-  GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER: (p) =>
-    build({
+  GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER: (p) => {
+    const event = pickString(p, 'summary', 'title');
+    const was = pickString(p, 'startTime', 'start', 'startDateTime');
+    return {
       frame: 'A calendar event was canceled.',
       fields: [
-        ['Event', pickString(p, 'summary', 'title')],
-        ['Was', pickString(p, 'startTime', 'start', 'startDateTime')],
+        ['Event', event],
+        ['Was', was],
       ],
       action:
         'If this was a tour or client meeting, draft a follow-up acknowledging and offering to reschedule.',
-    }),
+      title: event,
+      actor: null,
+      snippet: was,
+    };
+  },
 
   GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER: (p) => {
+    const event = pickString(p, 'summary', 'title');
     const attendees = (() => {
       const a = pickNested(p, ['attendees']);
       return Array.isArray(a)
@@ -389,18 +454,21 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => string | null> =
               typeof x === 'object' && x ? (x as Record<string, unknown>).email : null,
             )
             .filter(Boolean)
-            .join(', ')
+            .join(', ') || null
         : null;
     })();
-    return build({
+    return {
       frame: 'A calendar event is starting soon.',
       fields: [
-        ['Event', pickString(p, 'summary', 'title')],
+        ['Event', event],
         ['With', attendees],
       ],
       action:
         "Refresh me on who this is with, what we know about them, and anything pending. Tight — I'm walking in.",
-    });
+      title: event,
+      actor: attendees,
+      snippet: null,
+    };
   },
 
   HUBSPOT_CONTACT_CREATED_TRIGGER: (p) => {
@@ -408,169 +476,301 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => string | null> =
     const first = pickString(props, 'firstname', 'firstName', 'name');
     const last = pickString(props, 'lastname', 'lastName');
     const fullName = [first, last].filter(Boolean).join(' ') || null;
-    return build({
+    const email = pickString(props, 'email');
+    const phone = pickString(props, 'phone', 'mobilephone');
+    return {
       frame: 'A new contact was just created in HubSpot.',
       fields: [
         ['Name', fullName],
-        ['Email', pickString(props, 'email')],
-        ['Phone', pickString(props, 'phone', 'mobilephone')],
+        ['Email', email],
+        ['Phone', phone],
       ],
       action:
         'Tell me where this contact likely came from and draft an opener if I should reach out. System/import rows can pass.',
-    });
+      title: fullName,
+      actor: email,
+      snippet: phone,
+    };
   },
 
   HUBSPOT_DEAL_STAGE_UPDATED_TRIGGER: (p) => {
     const props = (pickNested(p, ['properties']) as Record<string, unknown>) ?? p;
-    return build({
+    const deal = pickString(props, 'dealname', 'name');
+    const fromStage = pickString(props, 'previousStage', 'priorStage');
+    const toStage = pickString(props, 'dealstage', 'stage');
+    return {
       frame: 'A HubSpot deal moved stages.',
       fields: [
-        ['Deal', pickString(props, 'dealname', 'name')],
-        ['From', pickString(props, 'previousStage', 'priorStage')],
-        ['To', pickString(props, 'dealstage', 'stage')],
+        ['Deal', deal],
+        ['From', fromStage],
+        ['To', toStage],
       ],
       action:
         'If the move warrants client communication — congratulating an accepted offer, nudging a stalled negotiation — draft it.',
-    });
+      title: deal,
+      actor: null,
+      // Feed: the human-meaningful change is the stage transition.
+      snippet:
+        fromStage && toStage ? `${fromStage} → ${toStage}` : toStage ?? fromStage,
+    };
   },
 
-  SALESFORCE_NEW_LEAD_TRIGGER: (p) =>
-    build({
+  SALESFORCE_NEW_LEAD_TRIGGER: (p) => {
+    const name = pickString(p, 'name', 'leadName', 'firstName');
+    const company = pickString(p, 'company', 'companyName');
+    const source = pickString(p, 'leadSource', 'source');
+    return {
       frame: 'A new lead just landed in Salesforce.',
       fields: [
-        ['Name', pickString(p, 'name', 'leadName', 'firstName')],
-        ['Company', pickString(p, 'company', 'companyName')],
-        ['Source', pickString(p, 'leadSource', 'source')],
+        ['Name', name],
+        ['Company', company],
+        ['Source', source],
       ],
       action:
         'Tell me what we know and draft an opener if a first touch is warranted.',
-    }),
+      title: name,
+      actor: company,
+      snippet: source,
+    };
+  },
 
-  SALESFORCE_NEW_OR_UPDATED_OPPORTUNITY_TRIGGER: (p) =>
-    build({
+  SALESFORCE_NEW_OR_UPDATED_OPPORTUNITY_TRIGGER: (p) => {
+    const opp = pickString(p, 'name', 'opportunityName');
+    const stage = pickString(p, 'stageName', 'stage');
+    const amount = pickString(p, 'amount');
+    return {
       frame: 'A Salesforce opportunity was created or updated.',
       fields: [
-        ['Opportunity', pickString(p, 'name', 'opportunityName')],
-        ['Stage', pickString(p, 'stageName', 'stage')],
-        ['Amount', pickString(p, 'amount')],
+        ['Opportunity', opp],
+        ['Stage', stage],
+        ['Amount', amount],
       ],
       action:
         'If the change is meaningful — stage advance, amount delta, close-date move — tell me what changed and whether I should reach out.',
-    }),
+      title: opp,
+      actor: null,
+      snippet: stage,
+    };
+  },
 
-  PIPEDRIVE_NEW_DEAL_TRIGGER: (p) =>
-    build({
+  PIPEDRIVE_NEW_DEAL_TRIGGER: (p) => {
+    const deal = pickString(p, 'title', 'dealTitle', 'name');
+    const contact = pickString(p, 'personName', 'contactName', 'person');
+    const value = pickString(p, 'value', 'amount');
+    return {
       frame: 'A new deal was just created in Pipedrive.',
       fields: [
-        ['Deal', pickString(p, 'title', 'dealTitle', 'name')],
-        ['Contact', pickString(p, 'personName', 'contactName', 'person')],
-        ['Value', pickString(p, 'value', 'amount')],
+        ['Deal', deal],
+        ['Contact', contact],
+        ['Value', value],
       ],
       action:
         'Draft an opener if the contact is fresh and a first touch is warranted.',
-    }),
+      title: deal,
+      actor: contact,
+      snippet: value,
+    };
+  },
 
-  STRIPE_CHECKOUT_SESSION_COMPLETED_TRIGGER: (p) =>
-    build({
+  STRIPE_CHECKOUT_SESSION_COMPLETED_TRIGGER: (p) => {
+    const amount = pickString(p, 'amount_total', 'amount', 'totalAmount');
+    const from = pickString(p, 'customer_email', 'email', 'customerEmail');
+    const forWhat = pickString(p, 'description', 'metadata.description');
+    return {
       frame: 'A Stripe payment just came through.',
       fields: [
-        ['Amount', pickString(p, 'amount_total', 'amount', 'totalAmount')],
-        ['From', pickString(p, 'customer_email', 'email', 'customerEmail')],
-        ['For', pickString(p, 'description', 'metadata.description')],
+        ['Amount', amount],
+        ['From', from],
+        ['For', forWhat],
       ],
       action:
         'Draft a short thank-you / confirmation matching the tone we already had with this person, and note in CRM whether this is an earnest deposit, retainer, or service fee.',
-    }),
+      title: amount,
+      actor: from,
+      snippet: forWhat,
+    };
+  },
 
-  STRIPE_PAYMENT_FAILED_TRIGGER: (p) =>
-    build({
+  STRIPE_PAYMENT_FAILED_TRIGGER: (p) => {
+    const customer = pickString(p, 'customer_email', 'email', 'customerEmail');
+    const reason = pickString(p, 'failure_message', 'reason', 'failureReason');
+    return {
       frame: 'A Stripe payment just failed.',
       fields: [
-        ['Customer', pickString(p, 'customer_email', 'email', 'customerEmail')],
-        ['Reason', pickString(p, 'failure_message', 'reason', 'failureReason')],
+        ['Customer', customer],
+        ['Reason', reason],
       ],
       action:
         "Draft a low-friction follow-up — we'll retry, they can update their method. Don't sound alarming; most failures are bank-side.",
-    }),
+      title: null,
+      actor: customer,
+      snippet: reason,
+    };
+  },
 
-  STRIPE_INVOICE_PAYMENT_SUCCEEDED_TRIGGER: (p) =>
-    build({
+  STRIPE_INVOICE_PAYMENT_SUCCEEDED_TRIGGER: (p) => {
+    const amount = pickString(p, 'amount_paid', 'amount', 'totalAmount');
+    const customer = pickString(p, 'customer_email', 'email', 'customerEmail');
+    return {
       frame: 'A Stripe invoice was paid.',
       fields: [
-        ['Amount', pickString(p, 'amount_paid', 'amount', 'totalAmount')],
-        ['Customer', pickString(p, 'customer_email', 'email', 'customerEmail')],
+        ['Amount', amount],
+        ['Customer', customer],
       ],
       action:
         'Recurring retainer → just stamp the CRM. One-off → send a brief confirmation.',
-    }),
+      title: amount,
+      actor: customer,
+      snippet: null,
+    };
+  },
 
-  ASANA_TASK_CREATED: (p) =>
-    build({
+  ASANA_TASK_CREATED: (p) => {
+    const task = pickString(p, 'name', 'taskName');
+    const assignee = pickString(p, 'assignee', 'assigneeName');
+    return {
       frame: 'A new task just landed in Asana.',
       fields: [
-        ['Task', pickString(p, 'name', 'taskName')],
-        ['Assigned to', pickString(p, 'assignee', 'assigneeName')],
+        ['Task', task],
+        ['Assigned to', assignee],
       ],
       action:
         'If this is work I owe a client (callback, follow-up, doc send), surface it as a today-item.',
-    }),
+      title: task,
+      actor: assignee,
+      snippet: null,
+    };
+  },
 
   ASANA_TASK_COMMENT_ADDED: (p) => {
     const comment = pickString(p, 'text', 'comment', 'commentText');
     if (!comment) return null;
-    return build({
+    const task = pickString(p, 'taskName', 'name');
+    const from = pickString(p, 'author', 'commenter');
+    return {
       frame: 'A new comment appeared on an Asana task.',
       fields: [
-        ['Task', pickString(p, 'taskName', 'name')],
-        ['From', pickString(p, 'author', 'commenter')],
+        ['Task', task],
+        ['From', from],
         ['Comment', comment],
       ],
       action: "If it's a question or blocker, tell me what's needed.",
-    });
+      title: task,
+      actor: from,
+      snippet: comment,
+    };
   },
 
-  TRELLO_NEW_CARD_TRIGGER: (p) =>
-    build({
+  TRELLO_NEW_CARD_TRIGGER: (p) => {
+    const card = pickString(p, 'name', 'cardName');
+    const list = pickString(p, 'listName', 'list');
+    return {
       frame: 'A new Trello card was created.',
       fields: [
-        ['Card', pickString(p, 'name', 'cardName')],
-        ['List', pickString(p, 'listName', 'list')],
+        ['Card', card],
+        ['List', list],
       ],
       action: 'If this is work I owe a client, surface it.',
-    }),
+      title: card,
+      actor: null,
+      snippet: list,
+    };
+  },
 
-  TRELLO_UPDATED_CARD_TRIGGER: (p) =>
-    build({
+  TRELLO_UPDATED_CARD_TRIGGER: (p) => {
+    const card = pickString(p, 'name', 'cardName');
+    const change = pickString(p, 'change', 'updateType');
+    return {
       frame: 'A Trello card was updated.',
       fields: [
-        ['Card', pickString(p, 'name', 'cardName')],
-        ['Change', pickString(p, 'change', 'updateType')],
+        ['Card', card],
+        ['Change', change],
       ],
       action:
         'If this is a status a client cares about — e.g., closing checklist item — tell me.',
-    }),
+      title: card,
+      actor: null,
+      snippet: change,
+    };
+  },
 
-  MAILCHIMP_SUBSCRIBE_TRIGGER: (p) =>
-    build({
+  MAILCHIMP_SUBSCRIBE_TRIGGER: (p) => {
+    const email = pickString(p, 'email', 'emailAddress');
+    const list = pickString(p, 'listName', 'list');
+    return {
       frame: 'Someone just subscribed to a Mailchimp list.',
       fields: [
-        ['Email', pickString(p, 'email', 'emailAddress')],
-        ['List', pickString(p, 'listName', 'list')],
+        ['Email', email],
+        ['List', list],
       ],
       action:
         "If we know them from CRM, surface what we know. If new, draft a low-key welcome and add them as a lead.",
-    }),
+      title: email,
+      actor: email,
+      snippet: list,
+    };
+  },
 
-  MAILCHIMP_UNSUBSCRIBE_TRIGGER: (p) =>
-    build({
+  MAILCHIMP_UNSUBSCRIBE_TRIGGER: (p) => {
+    const email = pickString(p, 'email', 'emailAddress');
+    return {
       frame: 'Someone unsubscribed from a Mailchimp list.',
       fields: [
-        ['Email', pickString(p, 'email', 'emailAddress')],
+        ['Email', email],
       ],
       action:
         'Known CRM contact → flag the signal quietly, no outreach. They may want less from us.',
-    }),
+      title: email,
+      actor: email,
+      snippet: null,
+    };
+  },
 };
+
+/** Timestamp keys Composio payloads use across toolkits. First valid one wins;
+ *  callers fall back to now() when none parse. */
+function pickOccurredAt(p: Record<string, unknown>): string | null {
+  const raw = pickString(
+    p,
+    'occurredAt',
+    'occurred_at',
+    'timestamp',
+    'createdAt',
+    'created_at',
+    'eventTime',
+    'event_time',
+    'date',
+  );
+  if (!raw) return null;
+  const t = new Date(raw);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+}
+
+/**
+ * Shared normalizer — the SINGLE source the activity feed derives from.
+ * Pure: same toolkit/slug/payload in → same summary out, no I/O.
+ *
+ * Pulls the feed-facing `{ title, actor, snippet }` out of the SAME per-slug
+ * extractor the dispatch instruction uses, so the two can't drift. Null-safe:
+ * an unknown slug or a thin/empty payload yields all-null fields (and
+ * occurredAt falls back to now()). `toolkit` is accepted for a stable
+ * signature and future per-toolkit tweaks; extraction keys off the slug today.
+ */
+export function normalizeTriggerEvent(
+  _toolkit: string,
+  slug: string,
+  payload: Record<string, unknown> | undefined,
+): { title: string | null; actor: string | null; snippet: string | null; occurredAt: string } {
+  const flat = flattenPayload(payload ?? {});
+  const extractor = EXTRACTORS[slug];
+  const extracted = extractor ? extractor(flat) : null;
+  return {
+    title: extracted?.title ?? null,
+    actor: extracted?.actor ?? null,
+    snippet: extracted?.snippet ?? null,
+    occurredAt: pickOccurredAt(flat) ?? new Date().toISOString(),
+  };
+}
 
 /**
  * Per-slug instruction templater. Given the trigger's payload, returns
@@ -578,22 +778,31 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => string | null> =
  * or null when the payload is too thin to act on (the dispatcher then
  * skips the run rather than burn Modal time on a content-free prompt).
  *
- * A slug missing from TEMPLATES returns null — dispatch then logs a gap
- * and no-ops. Adding a slug to CURATED_TRIGGERS without a template is
- * caught by the test suite.
+ * A slug missing from EXTRACTORS returns null — dispatch then logs a gap
+ * and no-ops. Adding a slug to CURATED_TRIGGERS without an extractor is
+ * caught by the test suite. Output is unchanged from the prior per-slug
+ * templates: the extractor's `frame`/`fields`/`action` feed `build()` as
+ * before; only the extraction now lives in one place (shared with the feed
+ * normalizer).
  */
 function templateInstruction(
   triggerSlug: string,
   payload: Record<string, unknown> | undefined,
 ): string | null {
-  const fn = TEMPLATES[triggerSlug];
-  if (!fn) return null;
-  // Flatten envelope wrappers so templates can use flat keys regardless
+  const extractor = EXTRACTORS[triggerSlug];
+  if (!extractor) return null;
+  // Flatten envelope wrappers so extractors can use flat keys regardless
   // of whether Composio V1/V2 sent flat fields or V3 wrapped them under
   // `payload`/`data`/`message`. Without this, the Gmail launch slug
   // silently no-ops on real V3 deliveries — V3 puts `snippet` and
   // `subject` inside `payload.*` while our flat-key picks miss them.
-  return fn(flattenPayload(payload ?? {}));
+  const extracted = extractor(flattenPayload(payload ?? {}));
+  if (!extracted) return null;
+  return build({
+    frame: extracted.frame,
+    fields: extracted.fields,
+    action: extracted.action,
+  });
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
