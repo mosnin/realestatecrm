@@ -18,9 +18,11 @@ import { findByComposioId } from '@/lib/integrations/connections';
 import {
   dispatchTrigger,
   findByComposioTriggerId,
+  normalizeTriggerEvent,
   stampFired,
 } from '@/lib/integrations/triggers';
 import { captureEvent, setEventStatus } from '@/lib/integrations/events';
+import { publishSpaceEvent } from '@/lib/realtime/ably';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
@@ -344,6 +346,38 @@ export const handleComposioTrigger = inngest.createFunction(
         status: 'captured',
       }),
     );
+
+    // 3b. Push the captured event to the space's live activity feed via Ably.
+    //     Best-effort overlay on top of the durable IntegrationEvent row above:
+    //     an already-open feed updates instantly instead of waiting for its
+    //     next load. publishSpaceEvent NEVER throws and no-ops when
+    //     ABLY_API_KEY is unset, so this can't fail/retry the handler or alter
+    //     capture/dispatch semantics — the extra try/catch keeps the step
+    //     itself defensive even if normalizeTriggerEvent (pure) ever changed.
+    //     The summary mirrors what the feed renders from the DB row.
+    await step.run('publish-ably', async () => {
+      try {
+        const { title, actor, snippet, occurredAt } = normalizeTriggerEvent(
+          connection.toolkit,
+          data.triggerSlug,
+          data.payload,
+        );
+        await publishSpaceEvent(connection.spaceId, {
+          toolkit: connection.toolkit,
+          eventType: data.triggerSlug,
+          title,
+          actor,
+          snippet,
+          occurredAt,
+          status: 'captured',
+          connectionId: connection.id,
+          deliveryId: data.deliveryId,
+        });
+      } catch {
+        // Defensive only — publishSpaceEvent already swallows its own errors.
+      }
+      return { published: true };
+    });
 
     // 4. Per-space daily cap. The receiver's per-(connection, slug)
     //    hourly cap is finer-grained but lets a realtor with five

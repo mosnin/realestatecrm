@@ -112,6 +112,11 @@ const optionalSchema = z.object({
   // Composio integrations
   COMPOSIO_API_KEY: z.string().optional(),
 
+  // Ably real-time pub/sub — powers the live activity feed. SERVER-ONLY (never
+  // NEXT_PUBLIC). Unset → the feed still works from the DB; only live updates
+  // are disabled (publish no-ops, /api/ably/token returns 503).
+  ABLY_API_KEY: z.string().optional(),
+
   // Direct Postgres (Modal side)
   DATABASE_URL: z.string().optional(),
 
