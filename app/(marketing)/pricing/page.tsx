@@ -12,7 +12,7 @@
  */
 
 import Link from 'next/link';
-import { WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
+import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
 import { PricingPlans } from '@/components/marketing/giga/pricing-plans';
 import {
   Band,
@@ -28,12 +28,8 @@ export const metadata = { title: 'Pricing · Chippi' };
 
 const SIGNUP = '/login/realtor?intent=signup';
 
-const EXPANSION: { range: string; mo: number; yr: number }[] = [
-  { range: '10 to 24 agents', mo: 69, yr: 56 },
-  { range: '25 to 49 agents', mo: 59, yr: 48 },
-  { range: '50 to 99 agents', mo: 49, yr: 40 },
-  { range: '100 to 199 agents', mo: 39, yr: 32 },
-];
+/* Brokerage seats are a flat per-seat add-on (see PLANS.*.addUser); there is no
+ * graduated/volume table, so we don't show one. */
 
 const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
   pipeline_audit: 'Full pipeline audit',
@@ -98,44 +94,45 @@ export default function PricingPage() {
         {/* Plan cards + Monthly/Annual toggle */}
         <PricingPlans />
 
-        {/* Brokerage expansion */}
+        {/* Adding agents, flat per-seat (matches lib/plans addUser, no invented tiers) */}
         <Band className="py-16 sm:py-20">
           <BlurRise className="mx-auto max-w-3xl">
             <div className="text-center">
-              <Eyebrow className="justify-center">Brokerage expansion</Eyebrow>
+              <Eyebrow className="justify-center">Adding agents</Eyebrow>
               <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-                Add an agent. Billing updates itself.
+                Add an agent, billing updates itself.
               </Serif>
+              <p className="mx-auto mt-5 max-w-xl text-[14px] leading-relaxed text-white/55">
+                Team and Team Plus include a block of seats. Past that, each additional agent is a flat
+                monthly add-on, added or removed automatically as your floor changes.
+              </p>
             </div>
-            <div className="mt-8 overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
-              <table className="w-full text-[13.5px]">
-                <thead>
-                  <tr className="border-b border-white/[0.08] text-left text-white/45">
-                    <th className="px-5 py-3.5 font-medium">Agents</th>
-                    <th className="px-5 py-3.5 font-medium tabular-nums">Monthly / agent</th>
-                    <th className="px-5 py-3.5 font-medium tabular-nums">Annual / agent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {EXPANSION.map((row) => (
-                    <tr key={row.range} className="border-b border-white/[0.06] last:border-0">
-                      <td className="px-5 py-3.5 text-white/80">{row.range}</td>
-                      <td className="px-5 py-3.5 tabular-nums text-white/80">${row.mo}</td>
-                      <td className="px-5 py-3.5 tabular-nums text-white/80">${row.yr}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td className="px-5 py-3.5 text-white/80">200+ agents</td>
-                    <td className="px-5 py-3.5 text-white/45" colSpan={2}>
-                      Custom, performance pricing available.{' '}
-                      <Link href="/demo" className="font-medium text-[#ff9a6e] hover:underline">
-                        Talk to sales
-                      </Link>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2">
+              {[PLANS.team, PLANS.team_plus].map((p) => (
+                <div key={p.id} className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6">
+                  <p style={{ fontFamily: 'var(--font-sans)' }} className="text-[15px] font-semibold text-white">
+                    {p.label}
+                  </p>
+                  <p className="mt-1 text-[12.5px] text-white/45">{p.includedUsers} seats included</p>
+                  <p className="mt-4">
+                    <span style={{ fontFamily: 'var(--font-sans)' }} className="text-2xl font-light tabular-nums text-white">
+                      ${p.addUser?.priceMonthly}
+                    </span>
+                    <span className="text-[13px] text-white/45"> / additional agent / mo</span>
+                  </p>
+                  <p className="mt-1 text-[12px] text-white/40">
+                    +{p.addUser?.credits.toLocaleString()} credits per added agent
+                  </p>
+                </div>
+              ))}
             </div>
+            <p className="mt-6 text-center text-[13px] text-white/45">
+              Running a large floor?{' '}
+              <Link href="/demo" className="font-medium text-[#ff9a6e] hover:underline">
+                Talk to sales
+              </Link>
+              .
+            </p>
           </BlurRise>
         </Band>
 
