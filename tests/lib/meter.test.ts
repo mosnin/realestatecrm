@@ -18,10 +18,12 @@ vi.mock('@/lib/billing/credits', async (importActual) => {
 });
 
 // CREDITS_ENFORCED is read at module load, so each case re-imports meter with
-// the flag stubbed to the value under test.
+// the flag stubbed to the value under test. Enforcement is now ON by default
+// (kill-switch semantics): only the exact string 'false' disables it, so the
+// "off" case stubs 'false' rather than '' (which now reads as ON).
 async function loadMeter(enforced: boolean) {
   vi.resetModules();
-  vi.stubEnv('CREDITS_ENFORCED', enforced ? 'true' : '');
+  vi.stubEnv('CREDITS_ENFORCED', enforced ? 'true' : 'false');
   return import('@/lib/billing/meter');
 }
 

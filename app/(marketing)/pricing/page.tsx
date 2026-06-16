@@ -31,13 +31,13 @@ const SIGNUP = '/login/realtor?intent=signup';
 /* Brokerage seats are a flat per-seat add-on (see PLANS.*.addUser); there is no
  * graduated/volume table, so we don't show one. */
 
+/* Only workflows that are actually built + metered today are advertised here.
+ * (pipeline_audit / followup_sequence / lead_qualification / call_prep exist in
+ * the cost catalog but are not yet shipped as discrete workflows, so we don't
+ * list prices for them.) */
 const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
-  pipeline_audit: 'Full pipeline audit',
-  followup_sequence: 'Follow-up sequence',
-  lead_qualification: 'Lead qualification run',
   tour_booking: 'Tour booking workflow',
   daily_briefing: 'Daily AI briefing',
-  call_prep: 'Call prep',
   lead_score: 'Lead score update',
 };
 
@@ -48,7 +48,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What are credits?',
-    a: 'High-value agentic actions draw from a monthly credit balance: a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
+    a: 'Premium AI workflows draw from a monthly credit balance, like booking a tour, running your daily AI briefing, or scoring a new lead. Routine actions cost little or nothing, and unused credits roll over for 30 days.',
   },
   {
     q: 'What happens when I run out of credits?',
