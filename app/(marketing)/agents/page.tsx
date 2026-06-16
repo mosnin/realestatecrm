@@ -1,12 +1,10 @@
 /**
- * `/agents` — the solo-agent story, dark redesign (styled placeholder).
- *
- * The nav's "Agents" target. Hero + a three-up feature section in the
- * reference aesthetic; full content lands later. Copy is Chippi/real-estate:
- * the AI cowork that works an agent's book while they close.
+ * `/agents` — the solo-agent story. Server component (exports metadata); the
+ * SubHero is a client component, so its icons are passed by registry name to
+ * stay on the right side of the server→client boundary.
  */
 
-import { SubPageHero, SubPageFeatures, type SubFeature } from '@/components/marketing/giga/sub-page';
+import { SubHero } from '@/components/marketing/giga/sub-hero';
 
 export const metadata = {
   title: 'For agents · Chippi',
@@ -14,44 +12,24 @@ export const metadata = {
     'Chippi works your book while you close — reading the inbox, drafting replies in your voice, and booking tours against your real calendar. Nothing sends without your tap.',
 };
 
-const FEATURES: SubFeature[] = [
-  {
-    icon: 'MessagesSquare',
-    title: 'Drafts in your voice',
-    desc: 'Every reply written and waiting before you open the thread, the way you actually write. Edit it, send it, or skip it.',
-  },
-  {
-    icon: 'KanbanSquare',
-    title: 'Know who to call first',
-    desc: 'Leads scored against your live deals and ranked by intent, so the next best move is always at the top of the list.',
-  },
-  {
-    icon: 'CalendarCheck',
-    title: 'Tours book themselves',
-    desc: 'Approve a time and the calendar, the thread, and the deal all update — every action written down in plain language.',
-  },
-];
-
 export default function AgentsPage() {
   return (
-    <>
-      <SubPageHero
-        eyebrow="For agents"
-        title="Your extra teammate in the field."
-        titleTail="Working your book while you close."
-        sub="Drafts in your voice, leads scored, tours booked — from your phone, between showings. Chippi handles the busywork so your hours go to closing."
-        image="/marketing/product/realtors.jpg"
-      />
-      <SubPageFeatures
-        eyebrow="The follow-up loop"
-        title={
-          <>
-            Read, draft, book — on
-            <br className="hidden sm:block" /> repeat, around the clock.
-          </>
-        }
-        features={FEATURES}
-      />
-    </>
+    <SubHero
+      label="Real Estate OS"
+      labelIcon="LayoutGrid"
+      headline={
+        <>
+          Your whole book, worked
+          <br className="hidden sm:block" /> while you close.
+        </>
+      }
+      description="Chippi reads every lead, drafts in your voice, books the tour, and keeps the deal current — so your hours go to closing, not admin."
+      features={[
+        { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Every reply written and waiting before you open the thread.' },
+        { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
+        { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
+      ]}
+      workflow="New buyer lead"
+    />
   );
 }

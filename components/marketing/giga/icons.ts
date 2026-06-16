@@ -31,6 +31,9 @@ import {
   ArrowRightLeft,
   Users,
   ShieldCheck,
+  Home,
+  LayoutGrid,
+  Building2,
 } from 'lucide-react';
 
 export const FEATURE_ICONS = {
@@ -51,6 +54,9 @@ export const FEATURE_ICONS = {
   ArrowRightLeft,
   Users,
   ShieldCheck,
+  Home,
+  LayoutGrid,
+  Building2,
 } as const;
 
 export type FeatureIconName = keyof typeof FEATURE_ICONS;
