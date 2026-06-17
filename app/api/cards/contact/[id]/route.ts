@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
-import { getSpaceForUser, getSpaceFromSlug } from '@/lib/space';
+import { getSpaceForUser } from '@/lib/space';
+import { normalizeSlug } from '@/lib/intake';
 
 /**
  * GET /api/cards/contact/[id]?slug=<workspace-slug>
@@ -9,8 +10,17 @@ import { getSpaceForUser, getSpaceFromSlug } from '@/lib/space';
  * Lightweight card payload for the inline expandable contact card in the
  * Chippi chat. Returns only what the card renders — no dead weight.
  *
- * Auth: Clerk session. Space resolved via slug query param (from URL) or
- * via the authenticated user's own space when slug is absent.
+ * Auth: Clerk session. The space is ALWAYS resolved from the authenticated
+ * caller (getSpaceForUser) — never from the `?slug=` query param. Slugs are
+ * public (they appear in /apply/, /book/, /p/ URLs), so trusting a
+ * caller-supplied slug to pick the space let any authenticated realtor read
+ * another tenant's contact PII by passing a victim's slug. The query is now
+ * scoped to the CALLER's own space, so a cross-tenant `id` simply 404s.
+ *
+ * The `slug` param is retained for backwards-compatible URLs but is only
+ * used as a defensive cross-check: if present and it does not resolve to the
+ * caller's own space, we 404 (same response as a missing row — no existence
+ * leak).
  */
 export async function GET(
   req: NextRequest,
@@ -23,11 +33,18 @@ export async function GET(
   const { id } = await params;
   const slug = req.nextUrl.searchParams.get('slug');
 
-  const space = slug
-    ? await getSpaceFromSlug(slug)
-    : await getSpaceForUser(userId);
-
+  // Authoritative space = the caller's own space. Resolved from the
+  // authenticated userId, NOT from the attacker-controllable slug.
+  const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Defensive cross-check: a slug, if supplied, must match the caller's own
+  // workspace. Compare normalized values against the caller's own (already
+  // normalized) slug — no extra space lookup, and a foreign slug never
+  // selects a foreign space.
+  if (slug && normalizeSlug(slug) !== space.slug) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   const { data: contact, error: contactError } = await supabase
     .from('Contact')
