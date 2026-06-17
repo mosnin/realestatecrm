@@ -148,19 +148,77 @@ export function addonSeatsForPlan(plan: PlanId | string | null | undefined, acti
 }
 
 /**
- * Reverse lookup: which plan does a Stripe price id belong to? The webhook uses
- * this to derive the ACTIVE plan from the live subscription's price, instead of
- * a `metadata.plan` that's stamped once at checkout and goes STALE on a
- * portal-driven plan change (Solo↔Pro / Team↔Team Plus). Returns null when the
- * id isn't a known plan price (e.g. price ids unset in this env) so callers can
- * fall back to metadata / the stored plan.
+ * Is ANNUAL billing actually purchasable for a plan in this environment?
+ *
+ * True only when the plan's annual BASE price id is configured. For the
+ * brokerage tiers (team / team_plus) the per-seat add-on is billed on a
+ * SEPARATE annual price (addUser.stripePriceAnnual); if a plan has an add-on
+ * path but its annual add-on price is unset, a brokerage with seats past the
+ * included count couldn't be charged its annual per-seat line — so we treat
+ * annual as unavailable for that plan rather than offer a half-priced annual
+ * that silently under-bills seats.
+ *
+ * Pure (reads only the env-derived PLANS ids), so the SERVER gate (checkout)
+ * and the UI gate (marketing toggle / in-app cadence picker) use one source of
+ * truth and can never show an annual option that checkout would refuse.
  */
-export function planIdForStripePrice(priceId: string | null | undefined): PlanId | null {
+export function isAnnualAvailable(planId: PlanId | string | null | undefined): boolean {
+  const def = planId && planId in PLANS ? PLANS[planId as PlanId] : undefined;
+  if (!def) return false;
+  if (!def.stripePriceAnnual) return false;
+  // A plan with a per-seat add-on must also have its ANNUAL add-on price wired
+  // up, else annual seats can't be billed (see addUser doc above).
+  if (def.addUser && !def.addUser.stripePriceAnnual) return false;
+  return true;
+}
+
+/**
+ * Reverse lookup: which BASE plan (and billing cadence) does a Stripe price id
+ * belong to? This is the single source of truth the webhook leans on to derive
+ * the ACTIVE plan + cadence from the live subscription's price, instead of a
+ * `metadata.plan` that's stamped once at checkout and goes STALE on a
+ * portal-/dashboard-driven plan OR cadence change (Solo↔Pro / Team↔Team Plus,
+ * monthly↔annual).
+ *
+ * Matches ONLY the configured BASE plan prices (`stripePriceMonthly` /
+ * `stripePriceAnnual` for solo/pro/team/team_plus). It deliberately does NOT
+ * match the per-seat add-on prices (`addUser.stripePrice*`): when the webhook
+ * iterates a brokerage subscription's items, the base line resolves a plan and
+ * the add-on line resolves null, so the caller naturally picks the base item and
+ * ignores the add-on without any special-casing.
+ *
+ * Returns null for:
+ *   - a null/undefined/empty id,
+ *   - an unconfigured env (the plan's price ids are null — comparing `=== null`
+ *     would falsely match a null priceId, so we guard the priceId truthiness
+ *     up front),
+ *   - any unknown id (a price not in PLANS, including the add-on prices),
+ * so callers can fall back to metadata / the stored plan. Pure.
+ */
+export function planFromPriceId(
+  priceId: string | null | undefined,
+): { plan: PlanId; cadence: 'monthly' | 'annual' } | null {
   if (!priceId) return null;
   for (const p of Object.values(PLANS)) {
-    if (p.stripePriceMonthly === priceId || p.stripePriceAnnual === priceId) return p.id;
+    // Only compare against CONFIGURED ids — a null env price must never match.
+    if (p.stripePriceMonthly && p.stripePriceMonthly === priceId) {
+      return { plan: p.id, cadence: 'monthly' };
+    }
+    if (p.stripePriceAnnual && p.stripePriceAnnual === priceId) {
+      return { plan: p.id, cadence: 'annual' };
+    }
   }
   return null;
+}
+
+/**
+ * Reverse lookup of just the plan id for a Stripe BASE price (no cadence).
+ * Thin wrapper over planFromPriceId (the single source of truth) so existing
+ * call sites that only need the tier don't drift from the cadence-aware map.
+ * Returns null for unknown ids and the per-seat add-on prices (see above).
+ */
+export function planIdForStripePrice(priceId: string | null | undefined): PlanId | null {
+  return planFromPriceId(priceId)?.plan ?? null;
 }
 
 /**

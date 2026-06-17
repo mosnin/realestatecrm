@@ -4,18 +4,20 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { PLANS, addonSeatsForPlan } from '@/lib/plans';
+import { PLANS, addonSeatsForPlan, isAnnualAvailable } from '@/lib/plans';
 
 type BrokeragePlan = 'team' | 'team_plus';
 
-/** Map plan → Stripe price env var. */
-function getBrokeragePriceEnv(plan: BrokeragePlan): string | undefined {
-  switch (plan) {
-    case 'team':
-      return process.env.STRIPE_PRICE_TEAM;
-    case 'team_plus':
-      return process.env.STRIPE_PRICE_TEAM_PLUS;
-  }
+/** Billing cadence the buyer chose. Defaults to monthly (the historical
+ *  behavior — existing clients post no cadence). 'annual' selects the
+ *  stripePriceAnnual ids; the route refuses checkout if the required annual
+ *  price isn't configured (no fake annual → silent monthly fallback). */
+type Cadence = 'monthly' | 'annual';
+
+/** Normalize an untrusted cadence hint from the POST body. Anything that isn't
+ *  the literal 'annual' resolves to 'monthly' (the safe default). */
+function resolveCadence(raw: unknown): Cadence {
+  return raw === 'annual' ? 'annual' : 'monthly';
 }
 
 export async function POST(req: NextRequest) {
@@ -38,12 +40,22 @@ export async function POST(req: NextRequest) {
     // STRIPE_PRICE_ID env and the label was reverse-derived from it.
     const spacePlan: 'solo' | 'pro' = body?.plan === 'pro' ? 'pro' : 'solo';
 
+    // Billing cadence (monthly default). Resolved here; the annual-availability
+    // refusal happens after auth (below) to keep auth-first ordering.
+    const cadence = resolveCadence(body?.cadence);
+
     const auth = await requireSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { userId, space } = auth;
 
     const { allowed } = await checkRateLimit(`billing:${userId}`, 5, 60);
     if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+
+    // When 'annual', the plan's annual price must be configured — refuse rather
+    // than silently charge monthly (no fake annual).
+    if (cadence === 'annual' && !isAnnualAvailable(spacePlan)) {
+      return NextResponse.json({ error: 'annual-not-available' }, { status: 409 });
+    }
 
     // Fetch Stripe columns separately (getSpaceFromSlug doesn't include them)
     const { data: stripeData, error: stripeQueryErr } = await supabase
@@ -80,14 +92,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve the Stripe price from the selected tier via lib/plans.ts (single
-    // source of truth). See pickSpacePriceId for the Solo legacy fallback.
-    const priceId = pickSpacePriceId(spacePlan, {
-      soloMonthly: PLANS.solo.stripePriceMonthly,
-      proMonthly: PLANS.pro.stripePriceMonthly,
-      legacy: process.env.STRIPE_PRICE_ID ?? null,
-    });
+    // source of truth). Annual uses the plan's stripePriceAnnual directly — the
+    // legacy STRIPE_PRICE_ID fallback is a MONTHLY Solo price and must never be
+    // charged as "annual" (isAnnualAvailable already verified the annual id is
+    // set). Monthly keeps pickSpacePriceId's Solo legacy fallback.
+    const priceId =
+      cadence === 'annual'
+        ? PLANS[spacePlan].stripePriceAnnual
+        : pickSpacePriceId(spacePlan, {
+            soloMonthly: PLANS.solo.stripePriceMonthly,
+            proMonthly: PLANS.pro.stripePriceMonthly,
+            legacy: process.env.STRIPE_PRICE_ID ?? null,
+          });
     if (!priceId) {
-      console.error('[checkout] No Stripe price configured for plan:', spacePlan);
+      console.error('[checkout] No Stripe price configured for plan:', spacePlan, 'cadence:', cadence);
       return NextResponse.json({ error: 'Billing not configured. Contact support.' }, { status: 503 });
     }
 
@@ -152,7 +170,7 @@ export async function POST(req: NextRequest) {
     // Only grant a 7-day trial if the user has never used one before
     const hasUsedTrial = !!stripeData?.trialUsedAt;
     const subscriptionData: Record<string, unknown> = {
-      metadata: { spaceId: space.id, plan: spacePlan },
+      metadata: { spaceId: space.id, plan: spacePlan, cadence },
     };
     if (!hasUsedTrial) {
       subscriptionData.trial_period_days = 7;
@@ -183,7 +201,7 @@ export async function POST(req: NextRequest) {
  */
 async function handleBrokerageCheckout(
   _req: NextRequest,
-  body: { plan?: string; scope?: string },
+  body: { plan?: string; scope?: string; cadence?: string },
 ): Promise<NextResponse> {
   // Auth: must be a broker (owner or admin), then enforce broker_owner only
   const ctx = await getBrokerContext();
@@ -210,9 +228,19 @@ async function handleBrokerageCheckout(
     );
   }
 
-  const priceId = getBrokeragePriceEnv(plan);
+  // Billing cadence (monthly default). When 'annual', the plan's annual base
+  // AND annual per-seat add-on price must both be configured (isAnnualAvailable
+  // checks both) — refuse rather than silently bill monthly / under-bill seats.
+  const cadence = resolveCadence(body?.cadence);
+  if (cadence === 'annual' && !isAnnualAvailable(plan)) {
+    return NextResponse.json({ error: 'annual-not-available' }, { status: 409 });
+  }
+
+  // Base price from lib/plans (single source of truth), keyed to the cadence.
+  const priceId =
+    cadence === 'annual' ? PLANS[plan].stripePriceAnnual : PLANS[plan].stripePriceMonthly;
   if (!priceId) {
-    console.error('[checkout:brokerage] Plan not configured:', plan);
+    console.error('[checkout:brokerage] Plan not configured:', plan, 'cadence:', cadence);
     return NextResponse.json({ error: 'Plan not configured' }, { status: 503 });
   }
 
@@ -328,7 +356,14 @@ async function handleBrokerageCheckout(
     .select('*', { count: 'exact', head: true })
     .eq('brokerageId', ctx.brokerage.id);
   const addonSeats = addonSeatsForPlan(plan, memberCount ?? 0);
-  const addonPriceId = PLANS[plan].addUser?.stripePriceMonthly ?? null;
+  // Add-on cadence MUST match the base cadence so the per-seat line bills on the
+  // same yearly/monthly schedule as the bundle (mirrors lib/billing/
+  // brokerage-seat-billing.ts → addonPriceIdForPlan). For annual we already
+  // verified this id is set via isAnnualAvailable.
+  const addonPriceId =
+    (cadence === 'annual'
+      ? PLANS[plan].addUser?.stripePriceAnnual
+      : PLANS[plan].addUser?.stripePriceMonthly) ?? null;
   if (addonSeats > 0) {
     if (addonPriceId) {
       line_items.push({ price: addonPriceId, quantity: addonSeats });
@@ -340,6 +375,19 @@ async function handleBrokerageCheckout(
     }
   }
 
+  // Trial parity with the Space flow: grant the same 7-day trial, but only the
+  // FIRST time this brokerage subscribes. The Brokerage row has no trialUsedAt
+  // column (unlike Space), so we use "never had a subscription" as the guard —
+  // a brokerage that previously subscribed (stripeSubscriptionId set) has
+  // already consumed its trial / paid, so it re-subscribes without a fresh one.
+  const brokerageHasSubscribedBefore = !!brokerageStripe.stripeSubscriptionId;
+  const subscriptionData: Record<string, unknown> = {
+    metadata: { brokerageId: ctx.brokerage.id, plan, cadence },
+  };
+  if (!brokerageHasSubscribedBefore) {
+    subscriptionData.trial_period_days = 7;
+  }
+
   try {
     console.log(
       '[checkout:brokerage] Creating checkout session, customer:',
@@ -348,19 +396,21 @@ async function handleBrokerageCheckout(
       priceId,
       'plan:',
       plan,
+      'cadence:',
+      cadence,
       'addonSeats:',
       addonSeats,
+      'trial:',
+      !brokerageHasSubscribedBefore,
     );
     const session = await stripe.checkout.sessions.create({
       customer: customerId as string,
       mode: 'subscription',
       line_items,
-      subscription_data: {
-        metadata: { brokerageId: ctx.brokerage.id, plan },
-      },
+      subscription_data: subscriptionData,
       success_url: `${appUrl}/broker/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/broker/billing?canceled=1`,
-      metadata: { brokerageId: ctx.brokerage.id, plan },
+      metadata: { brokerageId: ctx.brokerage.id, plan, cadence },
     });
 
     console.log(

@@ -5,8 +5,7 @@
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import { AgentInboxShowcase, AgentPipelineShowcase } from '@/components/marketing/giga/agents-showcases';
 import { ContentShowcase } from '@/components/marketing/giga/content-showcase';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
@@ -36,11 +35,12 @@ export default function AgentsPage() {
             { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
             { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
           ]}
-          workflow="New buyer lead"
+          image="/marketing/agents-hero.jpg"
+          variant="inbox"
         />
-        <RealtorShowcase />
-        <AgentCanvas />
+        <AgentInboxShowcase />
         <ContentShowcase />
+        <AgentPipelineShowcase />
         <PricingTeaser
           headline={
             <>

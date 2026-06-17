@@ -5,9 +5,11 @@
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
-import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
-import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
-import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import {
+  BrokerageRoutingShowcase,
+  BrokerageFloorShowcase,
+  BrokerageApprovalsShowcase,
+} from '@/components/marketing/giga/brokerage-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -22,7 +24,7 @@ export default function BrokeragesPage() {
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Brokerage Dashboard"
+          label="Brokerage view"
           labelIcon="Building2"
           headline={
             <>
@@ -36,11 +38,12 @@ export default function BrokeragesPage() {
             { icon: 'Users', title: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time.' },
             { icon: 'ShieldCheck', title: 'Approval-first', desc: 'Every send reviewed, every action on the audit log.' },
           ]}
-          workflow="Seller inquiry"
+          image="/marketing/brokerages-hero.jpg"
+          variant="floor"
         />
-        <BrokerageShowcase />
-        <RealtorShowcase />
-        <AgentCanvas />
+        <BrokerageRoutingShowcase />
+        <BrokerageFloorShowcase />
+        <BrokerageApprovalsShowcase />
         <PricingTeaser
           headline={
             <>

@@ -122,7 +122,7 @@ export function ContentShowcase() {
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}
-      image="/marketing/feature-1.jpg"
+      image="/marketing/agents-2.jpg"
       imageSide="left"
     />
   );

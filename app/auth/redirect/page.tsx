@@ -53,7 +53,11 @@ export default async function AuthRedirectPage({
     } catch {
       // Non-blocking — fall through to setup if invite check fails
     }
-    redirect('/setup');
+    // Preserve broker intent across the redirect: a brand-new user who signed in
+    // via the broker entry point goes to the broker onboarding flow
+    // (/setup?type=broker collects brokerage data) instead of the realtor quick
+    // path, so the broker intent survives Clerk's redirect to /auth/redirect.
+    redirect(intent === 'broker' ? '/setup?type=broker' : '/setup');
   }
 
   // If user already has broker-level membership, always route to /broker.

@@ -6,7 +6,7 @@ import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { grantTopup, grantPlanMonthly } from '@/lib/billing/grants';
 import { syncBrokerageSeatBillingForSubscription } from '@/lib/billing/brokerage-seat-billing';
-import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice, addonSeatsForPlan } from '@/lib/plans';
+import { PLANS, TOPUPS, type TopupId, type PlanId, planIdForStripePrice, planFromPriceId, addonSeatsForPlan } from '@/lib/plans';
 import { withObservability } from '@/lib/with-observability';
 
 /** Send a subscription status email to the space owner (non-blocking). */
@@ -119,6 +119,31 @@ function seatLimitForPlan(plan: string | undefined | null): number | null {
 }
 
 /**
+ * Derive the ACTIVE plan (+ cadence) from a subscription's LIVE price by scanning
+ * every line item through planFromPriceId and returning the FIRST base match.
+ *
+ * Scanning all items (not just items.data[0]) is what lets the per-seat add-on be
+ * ignored: planFromPriceId returns null for the add-on price, so on a brokerage
+ * sub the base bundle line resolves the plan regardless of item ORDER (Stripe can
+ * return the add-on first). Returns null when NO item maps to a configured base
+ * price — the env-not-wired / legacy-sub case — so callers fall back to metadata.
+ *
+ * This is the source of truth for the price-derived reconcile in the
+ * subscription.created|updated handlers; cadence is returned for completeness but
+ * NOT persisted today (Space/Brokerage have no cadence column — Stripe stays the
+ * source of truth for the billing interval).
+ */
+function planFromSubscriptionItems(
+  sub: Stripe.Subscription,
+): { plan: PlanId; cadence: 'monthly' | 'annual' } | null {
+  for (const item of sub.items?.data ?? []) {
+    const match = planFromPriceId(item.price?.id);
+    if (match) return match;
+  }
+  return null;
+}
+
+/**
  * Resolve the plan to grant/label for a paid invoice, from the live price first
  * (source of truth) then the checkout-time metadata.plan. Returns null when
  * NEITHER resolves a known tier.
@@ -131,7 +156,10 @@ function seatLimitForPlan(plan: string | undefined | null): number | null {
  * the grant for manual review instead of guessing wrong.
  */
 function resolveGrantPlan(sub: Stripe.Subscription): PlanId | null {
-  const livePlan = planIdForStripePrice(sub.items.data[0]?.price?.id);
+  // Scan ALL items so the per-seat add-on line (which maps to null) is skipped
+  // and the base bundle line resolves the tier regardless of item order — then
+  // fall back to the checkout-time metadata.plan, then null (never guess a tier).
+  const livePlan = planFromSubscriptionItems(sub)?.plan ?? null;
   if (livePlan) return livePlan;
   const metaPlan = sub.metadata?.plan;
   if (metaPlan && metaPlan in PLANS) return metaPlan as PlanId;
@@ -282,7 +310,23 @@ async function updateBrokerageFromSubscription(
     updateData.stripeCustomerId = webhookCustomer;
   }
 
-  if (opts.includePlanFromMetadata) {
+  // Reconcile plan + seatLimit from the subscription's ACTUAL price first, then
+  // fall back to the checkout-time metadata.plan. Deriving from the live price is
+  // what lets a Stripe-Portal / dashboard-initiated plan change (Team↔Team Plus)
+  // land in the app — the metadata.plan is stamped once and goes stale on such a
+  // change. The per-seat add-on line is ignored automatically (planFromPriceId
+  // returns null for it). We only act on brokerage tiers (team/team_plus) so a
+  // (mis)mapped Space price can never relabel a Brokerage.
+  //
+  // BACKWARD-COMPAT: price-derivation takes precedence ONLY when it returns a
+  // confident brokerage match. When NO item maps (prices unconfigured in this
+  // env, or a legacy sub) we fall through to the EXACT prior metadata-based
+  // behavior (gated on includePlanFromMetadata) — no regression.
+  const priceDerived = planFromSubscriptionItems(subscription);
+  if (priceDerived && (priceDerived.plan === 'team' || priceDerived.plan === 'team_plus')) {
+    updateData.plan = priceDerived.plan;
+    updateData.seatLimit = seatLimitForPlan(priceDerived.plan);
+  } else if (opts.includePlanFromMetadata) {
     const plan = subscription.metadata?.plan;
     if (plan === 'team' || plan === 'team_plus') {
       updateData.plan = plan;
@@ -493,12 +537,27 @@ async function POSTHandler(req: NextRequest) {
           break;
         }
 
-        // ── Existing Space path (unchanged) ──────────────────────────────
+        // ── Existing Space path ──────────────────────────────────────────
         const spaceId = subscription.metadata?.spaceId;
-        const updateData = {
+        const updateData: Record<string, unknown> = {
           stripeSubscriptionStatus: newStatus,
           stripePeriodEnd: getPeriodEnd(subscription),
         };
+
+        // Reconcile the plan label from the subscription's ACTUAL price so a
+        // Stripe-Portal / dashboard-initiated plan OR cadence change (Solo↔Pro,
+        // monthly↔annual) lands here too — not just on the next invoice. Only a
+        // confident SPACE-tier match (solo/pro) is applied; a brokerage price on
+        // a Space sub (shouldn't happen) is ignored rather than written to a
+        // free|solo|pro CHECK column. BACKWARD-COMPAT: when NO item maps (prices
+        // unconfigured in this env, or a legacy sub) we leave the plan untouched
+        // — exactly as before this handler set the plan — so the stored plan /
+        // the later invoice.payment_succeeded path stays authoritative.
+        const spacePriceDerived = planFromSubscriptionItems(subscription);
+        if (spacePriceDerived && (spacePriceDerived.plan === 'solo' || spacePriceDerived.plan === 'pro')) {
+          updateData.plan = spacePriceDerived.plan;
+          updateData.planActivatedAt = new Date().toISOString();
+        }
 
         if (spaceId) {
           // Validate spaceId ownership: only update if the space's existing customer matches

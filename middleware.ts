@@ -81,7 +81,12 @@ const isFullyPublicRoute = createRouteMatcher([
   '/realtors',
   '/agents',                 // marketing: solo-agent story (redesign nav target)
   '/brokerages',             // marketing: brokerage/floor story (redesign nav target)
+  '/integrations',           // marketing: connect-your-stack story (redesign nav target)
+  '/chippi',                 // marketing: "Meet Chippi" product page (Product menu)
   '/research',               // marketing: research story (stub)
+  '/company',                // marketing: our-story page (Company menu)
+  '/careers',                // marketing: careers page (Company menu)
+  '/demo',                   // marketing: book-a-demo scheduler (Calendly)
   '/teams',
   '/teams/(.*)',
   '/features',

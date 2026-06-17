@@ -4,6 +4,7 @@ import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,6 +52,17 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (error) {
     console.error('[admin/memberships] delete failed', error);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+  }
+
+  // Release the offboarded seat from billing (Fix #1): admin-removing a member
+  // lowers the active member count, so lower the per-unit add-on quantity (same
+  // path the broker_owner offboard/remove routes use). Best-effort + after the
+  // delete committed — a Stripe hiccup must never fail the admin delete. The
+  // sync itself safely no-ops when the brokerage has no active sub or isn't on a
+  // per-seat plan. Every BrokerageMembership row is, by definition, a brokerage
+  // membership; guard on brokerageId only to skip a malformed/legacy row.
+  if (membership.brokerageId) {
+    void syncBrokerageSeatBilling(membership.brokerageId);
   }
 
   await logAdminAction({ actor: admin.clerkUserId, action: 'delete_membership', target: id, details: {} });

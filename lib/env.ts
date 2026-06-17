@@ -119,6 +119,12 @@ const optionalSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
 
+  // Credit metering kill switch (lib/billing/meter.ts). Enforcement is ON by
+  // default; set CREDITS_ENFORCED=false to disable the credit gate entirely
+  // (emergency rollback — workflows run free, nobody blocked for a zero
+  // balance). Any other value (or unset) leaves enforcement ON.
+  CREDITS_ENFORCED: z.string().optional(),
+
   // Sentry
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   NEXT_PUBLIC_SENTRY_ENVIRONMENT: z.string().optional(),
