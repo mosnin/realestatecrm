@@ -267,4 +267,84 @@ describe('POST /api/agent/drafts/batch-approve', () => {
     expect(json.results).toHaveLength(1);
     expect(mockSendDraft).toHaveBeenCalledTimes(1);
   });
+
+  // ── Per-draft edited content (Fix 2) ──────────────────────────────────────
+
+  it('sends the realtor-edited content when an edit is provided', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'original body' }, error: null },
+      { data: null, error: null }, // update terminal
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    const res = await POST(
+      makeReq({ draftIds: ['d1'], edits: { d1: 'edited body the realtor rewrote' } }),
+    );
+    expect(res.status).toBe(200);
+
+    // sendDraft must receive the EDITED text, not the stored content.
+    expect(mockSendDraft).toHaveBeenCalledTimes(1);
+    const sentArg = mockSendDraft.mock.calls[0][0] as { content: string };
+    expect(sentArg.content).toBe('edited body the realtor rewrote');
+
+    // The update persists the edited content + labels it edited_and_approved.
+    const update = updateCalls.find((u) => u.table === 'AgentDraft');
+    expect(update).toBeDefined();
+    const v = update!.values as { content?: string; feedback_action: string; edit_distance: number };
+    expect(v.content).toBe('edited body the realtor rewrote');
+    expect(v.feedback_action).toBe('edited_and_approved');
+    expect(v.edit_distance).toBeGreaterThan(0);
+  });
+
+  it('falls back to stored content when no edit is provided for a draft', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'stored body' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    // edits map present but for a DIFFERENT draft id → d1 falls back to stored.
+    const res = await POST(makeReq({ draftIds: ['d1'], edits: { other: 'irrelevant' } }));
+    expect(res.status).toBe(200);
+
+    const sentArg = mockSendDraft.mock.calls[0][0] as { content: string };
+    expect(sentArg.content).toBe('stored body');
+    const update = updateCalls.find((u) => u.table === 'AgentDraft');
+    const v = update!.values as { content?: string; feedback_action: string; edit_distance: number };
+    // No content change → not flagged as edited, content not re-written.
+    expect(v.feedback_action).toBe('approved');
+    expect(v.edit_distance).toBe(0);
+    expect(v.content).toBeUndefined();
+  });
+
+  it('does not flag a whitespace-only edit as edited_and_approved', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'hello there' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    // Only trailing/collapsed whitespace differs — normalizedLevenshtein → 0.
+    const res = await POST(makeReq({ draftIds: ['d1'], edits: { d1: 'hello   there  ' } }));
+    expect(res.status).toBe(200);
+    const update = updateCalls.find((u) => u.table === 'AgentDraft');
+    const v = update!.values as { feedback_action: string; edit_distance: number };
+    expect(v.feedback_action).toBe('approved');
+    expect(v.edit_distance).toBe(0);
+  });
+
+  it('returns 400 when edits is not an object', async () => {
+    const res = await POST(makeReq({ draftIds: ['d1'], edits: 'nope' }));
+    expect(res.status).toBe(400);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when an edit value is empty', async () => {
+    const res = await POST(makeReq({ draftIds: ['d1'], edits: { d1: '   ' } }));
+    expect(res.status).toBe(400);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+  });
 });

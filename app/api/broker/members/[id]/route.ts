@@ -4,6 +4,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { logger } from '@/lib/logger';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -104,14 +105,35 @@ export async function DELETE(_req: Request, { params }: Params) {
     console.error('[broker/members/delete] removal deny-list insert failed', removalErr);
   }
 
-  // Best-effort: unlink their Space from this brokerage
-  await supabase
-    .from('Space')
-    .update({ brokerageId: null })
-    .eq('ownerId', membership.userId)
-    .eq('brokerageId', ctx.brokerage.id);
+  // Unlink their Space from this brokerage. This is part of revoking access:
+  // a silently-failed unlink can leave the removed member's workspace pointing
+  // at this brokerage (intake form-config, brokerage-scoped reads). Await it,
+  // retry once on transient failure, and surface a persistent failure loudly
+  // so ops can chase it — don't fire-and-forget.
+  let unlinkErr: { message?: string } | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await supabase
+      .from('Space')
+      .update({ brokerageId: null })
+      .eq('ownerId', membership.userId)
+      .eq('brokerageId', ctx.brokerage.id);
+    if (!error) {
+      unlinkErr = null;
+      break;
+    }
+    unlinkErr = error;
+  }
+  if (unlinkErr) {
+    // The membership row (the source of truth for access) is already deleted,
+    // so the member is out — but the Space link survived. Surface it: this is
+    // an access-revocation gap, not a cosmetic miss.
+    logger.error(
+      '[broker/members/delete] Space unlink failed after removal — workspace may still reference brokerage',
+      { brokerageId: ctx.brokerage.id, removedUserId: membership.userId, err: unlinkErr.message },
+    );
+  }
 
-  void audit({ actorClerkId: clerkId ?? null, action: 'DELETE', resource: 'BrokerageMembership', resourceId: membershipId, metadata: { brokerageId: ctx.brokerage.id, removedUserId: membership.userId, role: membership.role } });
+  void audit({ actorClerkId: clerkId ?? null, action: 'DELETE', resource: 'BrokerageMembership', resourceId: membershipId, metadata: { brokerageId: ctx.brokerage.id, removedUserId: membership.userId, role: membership.role, spaceUnlinked: !unlinkErr } });
 
   return NextResponse.json({ success: true });
 }
