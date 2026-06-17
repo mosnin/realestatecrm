@@ -78,6 +78,13 @@ const optionalSchema = z.object({
   // LLM routing
   OPENROUTER_API_KEY: z.string().optional(),
 
+  // Property "Analyze" web research. Both required for the feature to function;
+  // absent → the Analyze action returns a "research not configured" state (no
+  // crash). TAVILY_API_KEY drives web search for the subject property;
+  // FIRECRAWL_API_KEY drives scraping the listing/record pages found.
+  TAVILY_API_KEY: z.string().optional(),
+  FIRECRAWL_API_KEY: z.string().optional(),
+
   // Email / SMS
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
@@ -205,6 +212,10 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     ],
   },
   { label: 'Upstash rate limiting', keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'] },
+  {
+    label: 'Property Analyze web research — the "Analyze" action is inert without BOTH',
+    keys: ['TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
+  },
   // Cutover-critical secrets that boot GREEN when missing but then fail
   // silently: without CRON_SECRET every cron route 401s (sweeps / briefings /
   // SLA stop); without AGENT_INTERNAL_SECRET the Modal agent's callbacks 503
