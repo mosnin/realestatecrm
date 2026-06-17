@@ -167,9 +167,9 @@ export function UserActions({
       });
       const data = await res.json();
       if (res.ok) {
-        setResetResult('Password reset email sent.');
+        setResetResult(data.message || 'Use the Clerk Dashboard to complete the reset.');
       } else {
-        setResetResult(data.error || 'Failed to send reset email.');
+        setResetResult(data.error || 'Failed to start password reset.');
       }
     } catch {
       setResetResult('Network error. Try again.');
@@ -439,12 +439,14 @@ export function UserActions({
 
           <div className="border-t border-border" />
 
-          {/* Password reset */}
+          {/* Password reset — Clerk v7 has no send-reset API, so this opens the
+              Clerk Dashboard path rather than emailing the user directly. */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Password reset</p>
+              <p className="text-sm font-medium">Password reset (opens Clerk)</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Send a password reset email via Clerk
+                Records the request and points you to the Clerk Dashboard. The
+                user can also self-serve via &ldquo;Forgot password&rdquo;.
               </p>
             </div>
             <Button
@@ -455,7 +457,7 @@ export function UserActions({
               className="text-xs gap-1.5 flex-shrink-0"
             >
               <KeyRound size={13} />
-              {resetLoading ? 'Sending...' : 'Send reset email'}
+              {resetLoading ? 'Working...' : 'Reset via Clerk'}
             </Button>
           </div>
           {resetResult && (
