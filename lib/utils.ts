@@ -87,3 +87,23 @@ export function safeImageSrc(url: string | null | undefined): string | null {
     return null;
   }
 }
+
+/**
+ * Format a phone number as the user types. Strips non-digits and renders the
+ * (XXX) XXX-XXXX shape progressively for US-style numbers; an 11-digit number
+ * renders as +X (XXX) XXX-XXXX. Pure function so it's predictable and testable —
+ * this is presentation only, NOT validation.
+ *
+ * Single source of truth so every applicant-facing input (the intake chat and
+ * the tour-booking details form) auto-formats phone numbers identically.
+ */
+export function formatPhoneAsTyped(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 11);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return `+${digits.slice(0, 1)} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+}
