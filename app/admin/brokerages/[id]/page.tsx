@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { BrokerageActions } from './brokerage-actions';
+import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
 import { H1, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT } from '@/lib/typography';
 
 type Params = { params: Promise<{ id: string }> };
@@ -43,6 +44,12 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
   const brokerage = brokerageRow as {
     id: string; name: string; status: string; websiteUrl: string | null;
     logoUrl: string | null; joinCode: string | null; createdAt: string;
+    plan: string | null;
+    stripeSubscriptionStatus: string | null;
+    stripePeriodEnd: string | null;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    ownerId: string | null;
     User: { id: string; name: string | null; email: string } | null;
   };
 
@@ -314,6 +321,25 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
             </Card>
           </div>
         </div>
+      </div>
+
+      {/* Billing — plan change / cancel / credits (brokerage-scoped) */}
+      <div className="space-y-2">
+        <p className={SECTION_LABEL}>
+          Billing
+          <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+            {brokerage.plan ?? '—'}
+            {brokerage.stripeSubscriptionStatus ? ` · ${brokerage.stripeSubscriptionStatus}` : ''}
+          </span>
+        </p>
+        <AccountBillingPanel
+          accountType="brokerage"
+          accountId={brokerage.id}
+          currentPlan={brokerage.plan}
+          ownerUserId={brokerage.ownerId ?? owner?.id ?? null}
+          hasStripeCustomer={!!brokerage.stripeCustomerId}
+          hasSubscription={!!brokerage.stripeSubscriptionId}
+        />
       </div>
 
       {/* Invitations */}

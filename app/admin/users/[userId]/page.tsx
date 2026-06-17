@@ -240,6 +240,9 @@ export default async function AdminUserDetailPage({
 
   const subStatus = (fullUser.space as any)?.stripeSubscriptionStatus ?? null;
   const periodEnd = (fullUser.space as any)?.stripePeriodEnd ?? null;
+  const spaceId = (fullUser.space as any)?.id ?? null;
+  const spacePlan = (fullUser.space as any)?.plan ?? null;
+  const hasStripeCustomer = !!(fullUser.space as any)?.stripeCustomerId;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -506,6 +509,9 @@ export default async function AdminUserDetailPage({
         isSuspended={isSuspended}
         subscriptionStatus={subStatus ?? 'inactive'}
         stripePeriodEnd={periodEnd}
+        spaceId={spaceId}
+        spacePlan={spacePlan}
+        hasStripeCustomer={hasStripeCustomer}
         twoFactorEnabled={twoFactorEnabled}
         totpEnabled={totpEnabled}
         backupCodeEnabled={backupCodeEnabled}

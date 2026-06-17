@@ -4,11 +4,56 @@ import { supabase } from '@/lib/supabase';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
 import { checkRateLimit } from '@/lib/rate-limit';
-import type { User, Space } from '@/lib/types';
+import {
+  findBasePlanItem,
+  planChangePriceId,
+  planChangeItems,
+  spacePlanDbFields,
+  brokeragePlanDbFields,
+  isSpacePlanChangeId,
+  isBrokeragePlanChangeId,
+  trialEndUnixInDays,
+  type Cadence,
+} from '@/lib/billing/admin-subscription';
+import type { PlanId } from '@/lib/plans';
+import type Stripe from 'stripe';
+import type { User } from '@/lib/types';
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
 });
+
+/**
+ * Resolve the Stripe customer id for a refund/invoice operation. A brokerage
+ * subscription bills the BROKERAGE's own customer (NOT the owner's personal
+ * Space), so when accountType/accountId are supplied we read that table; for the
+ * legacy/space flow we fall back to the Space owned by `userId`. Returns null
+ * when no customer is on record.
+ */
+async function resolveStripeCustomerId(args: {
+  accountType?: string;
+  accountId?: string;
+  userId?: string;
+}): Promise<string | null> {
+  if ((args.accountType === 'space' || args.accountType === 'brokerage') && args.accountId) {
+    const table = args.accountType === 'space' ? 'Space' : 'Brokerage';
+    const { data } = await supabase
+      .from(table)
+      .select('stripeCustomerId')
+      .eq('id', args.accountId)
+      .maybeSingle();
+    return (data?.stripeCustomerId as string | null) ?? null;
+  }
+  if (args.userId) {
+    const { data } = await supabase
+      .from('Space')
+      .select('stripeCustomerId')
+      .eq('ownerId', args.userId)
+      .maybeSingle();
+    return (data?.stripeCustomerId as string | null) ?? null;
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   let admin: { userId: string };
@@ -31,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   const { action } = body;
 
-  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund', 'impersonate_user', 'force_password_reset', 'revoke_session', 'revoke_all_sessions', 'send_mfa_prompt'];
+  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'change_plan', 'cancel_subscription', 'list_invoices', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund', 'impersonate_user', 'force_password_reset', 'revoke_session', 'revoke_all_sessions', 'send_mfa_prompt'];
   if (!ALLOWED_ACTIONS.includes(action as string)) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
@@ -149,29 +194,48 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Update subscription status ───────────────────────────────────────
+    // HARDENED (Fix #4): the UI now only offers the states that map to a REAL
+    // Stripe operation (trialing → set trial_end; canceled → cancel). The old
+    // `active` branch did `trial_end:'now'` — which does NOT make a sub "active a
+    // year"; combined with handleCompAccount writing a 1-year stripePeriodEnd it
+    // produced a DB-vs-Stripe desync → surprise re-bill. That branch is gone.
+    // Any status WITHOUT a Stripe op is treated as an explicit DB-only OVERRIDE
+    // (requires override:true) and is clearly labeled as such — never silently
+    // written as if Stripe agreed.
     if (action === 'update_subscription') {
-      // Per-action daily cap — like issue_refund, this gives away value (can set
-      // a sub 'active' with no Stripe charge), so the shared 30/min admin limit
-      // isn't enough on its own.
+      // Per-action daily cap — like issue_refund, this can give away value, so
+      // the shared 30/min admin limit isn't enough on its own.
       const { allowed: subAllowed } = await checkRateLimit(`admin:subupdate:${admin.userId}`, 50, 86400);
       if (!subAllowed) {
         return NextResponse.json({ error: 'Daily subscription-update limit reached.' }, { status: 429 });
       }
-      const { userId, status, periodEnd } = body as {
+      const { userId, status, periodEnd, override } = body as {
         userId: string;
         status: string;
         periodEnd?: string;
+        override?: boolean;
       };
 
       if (!userId || typeof userId !== 'string') {
         return NextResponse.json({ error: 'userId is required' }, { status: 400 });
       }
 
-      const VALID_STATUSES = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'];
+      const VALID_STATUSES = ['trialing', 'past_due', 'canceled', 'unpaid', 'inactive'];
       if (!status || !VALID_STATUSES.includes(status)) {
         return NextResponse.json(
           { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` },
           { status: 400 }
+        );
+      }
+
+      // Statuses that correspond to a real Stripe op. Everything else is a
+      // DB-only override that must be opted into explicitly so an admin can't
+      // accidentally write a status Stripe will overwrite on its next webhook.
+      const STRIPE_BACKED_STATUSES = new Set(['trialing', 'canceled']);
+      if (!STRIPE_BACKED_STATUSES.has(status) && !override) {
+        return NextResponse.json(
+          { error: `Status '${status}' has no Stripe operation — it would be a DB-only override that the next Stripe webhook can overwrite. Re-submit with override:true to force it, or use Cancel / Comp / Change plan for real billing changes.` },
+          { status: 400 },
         );
       }
 
@@ -206,18 +270,11 @@ export async function POST(req: NextRequest) {
               proration_behavior: 'none',
             });
             stripeUpdated = true;
-          } else if (status === 'active') {
-            // End the trial immediately and activate the subscription
-            await stripe.subscriptions.update(subId, {
-              trial_end: 'now',
-              proration_behavior: 'none',
-            });
-            stripeUpdated = true;
           } else if (status === 'canceled') {
             await stripe.subscriptions.cancel(subId);
             stripeUpdated = true;
           } else {
-            stripeWarning = `Status '${status}' cannot be set via API — only database was updated.`;
+            stripeWarning = `Status '${status}' is a DB-only override — Stripe was not changed. The next Stripe webhook for this subscription can overwrite it.`;
           }
         } catch (stripeErr: any) {
           console.error('[admin/update_subscription] Stripe update failed', { stripeErr, subId, status });
@@ -242,7 +299,7 @@ export async function POST(req: NextRequest) {
         actor: admin.userId,
         action: 'update_subscription',
         target: userId,
-        details: { status, periodEnd: periodEnd ?? null, spaceId: spaceData.id, stripeUpdated, stripeWarning },
+        details: { status, periodEnd: periodEnd ?? null, spaceId: spaceData.id, stripeUpdated, override: !!override, stripeWarning },
       });
 
       const message = stripeWarning
@@ -250,6 +307,247 @@ export async function POST(req: NextRequest) {
         : `Subscription updated to '${status}'${stripeUpdated ? ' in Stripe and database' : ''}.`;
 
       return NextResponse.json({ success: true, message, stripeUpdated, stripeWarning: stripeWarning ?? undefined });
+    }
+
+    // ── Change plan (solo↔pro for spaces; team↔team_plus for brokerages) ──
+    // Fix #2: a REAL plan-change action. We move the Stripe subscription item's
+    // BASE price to the target plan's price (keeping the per-seat add-on line
+    // untouched), THEN mirror plan/planActivatedAt (+ seatLimit for brokerage)
+    // in the DB using the SAME mapping the webhook uses. Stripe is moved FIRST,
+    // so even if the DB write lagged the next webhook would reconcile to the same
+    // values — no desync, no silent under/over-billing.
+    if (action === 'change_plan') {
+      const { allowed: planAllowed } = await checkRateLimit(`admin:planchange:${admin.userId}`, 50, 86400);
+      if (!planAllowed) {
+        return NextResponse.json({ error: 'Daily plan-change limit reached.' }, { status: 429 });
+      }
+      const { accountType, accountId, plan, cadence: rawCadence, proration } = body as {
+        accountType?: string;
+        accountId?: string;
+        plan?: string;
+        cadence?: string;
+        proration?: string;
+      };
+
+      if ((accountType !== 'space' && accountType !== 'brokerage') || !accountId || typeof accountId !== 'string') {
+        return NextResponse.json({ error: 'accountType (space|brokerage) and accountId are required' }, { status: 400 });
+      }
+      // Validate + narrow the target plan for the account kind.
+      const isSpaceAcct = accountType === 'space';
+      if (isSpaceAcct ? !isSpacePlanChangeId(plan) : !isBrokeragePlanChangeId(plan)) {
+        return NextResponse.json(
+          { error: isSpaceAcct ? 'plan must be one of: solo, pro' : 'plan must be one of: team, team_plus' },
+          { status: 400 },
+        );
+      }
+      // After the guard, `plan` is a valid plan id for this account kind.
+      const targetPlan = plan as PlanId;
+      // Proration: default to a sensible 'create_prorations' (charge/credit the
+      // difference for the rest of the cycle) — the fair behavior for a tier
+      // change. Admin may pass 'none' to change tier without proration.
+      const prorationBehavior = proration === 'none' ? 'none' : 'create_prorations';
+
+      const table = accountType === 'space' ? 'Space' : 'Brokerage';
+      const { data: acct, error: acctErr } = await supabase
+        .from(table)
+        .select('id, plan, stripeSubscriptionId, stripeSubscriptionStatus')
+        .eq('id', accountId)
+        .maybeSingle();
+      if (acctErr) throw acctErr;
+      if (!acct) return NextResponse.json({ error: `${accountType} not found` }, { status: 404 });
+
+      const subId = (acct as any).stripeSubscriptionId as string | null;
+      if (!subId) {
+        return NextResponse.json(
+          { error: 'No Stripe subscription on record — a plan change must move a live subscription. Have the customer subscribe first.' },
+          { status: 400 },
+        );
+      }
+
+      const { getStripe } = await import('@/lib/stripe');
+      const stripe = getStripe();
+
+      // Read the live subscription to find the BASE item + its cadence (so the
+      // new price matches monthly/annual unless the admin overrides cadence).
+      let subscription;
+      try {
+        subscription = await stripe.subscriptions.retrieve(subId);
+      } catch (stripeErr: any) {
+        return NextResponse.json({ error: `Couldn't load the Stripe subscription: ${stripeErr.message}` }, { status: 502 });
+      }
+
+      const base = findBasePlanItem(subscription);
+      if (!base) {
+        return NextResponse.json(
+          { error: 'Could not identify the base plan line item on this subscription (price not mapped to a configured plan). Change it in the Stripe dashboard.' },
+          { status: 409 },
+        );
+      }
+      const cadence: Cadence = rawCadence === 'annual' ? 'annual' : rawCadence === 'monthly' ? 'monthly' : base.cadence;
+
+      if (base.plan === targetPlan && cadence === base.cadence) {
+        return NextResponse.json({ error: `Subscription is already on ${targetPlan} (${cadence}).` }, { status: 400 });
+      }
+
+      const newPriceId = planChangePriceId(targetPlan, cadence);
+      if (!newPriceId) {
+        return NextResponse.json(
+          { error: `No Stripe price configured for ${targetPlan} (${cadence}). Set the STRIPE_PRICE_* env var first.` },
+          { status: 503 },
+        );
+      }
+
+      // Move Stripe FIRST.
+      try {
+        await stripe.subscriptions.update(subId, {
+          items: planChangeItems(base.item.id, newPriceId),
+          proration_behavior: prorationBehavior,
+        });
+      } catch (stripeErr: any) {
+        console.error('[admin/change_plan] Stripe update failed', { stripeErr, subId, plan: targetPlan, cadence });
+        return NextResponse.json({ error: `Stripe plan change failed: ${stripeErr.message}. No change was applied.` }, { status: 502 });
+      }
+
+      // Then mirror the DB with the SAME mapping the webhook uses.
+      const dbFields = isSpaceAcct
+        ? spacePlanDbFields(targetPlan as 'solo' | 'pro')
+        : brokeragePlanDbFields(targetPlan as 'team' | 'team_plus');
+      const { error: dbErr } = await supabase.from(table).update(dbFields).eq('id', accountId);
+      if (dbErr) {
+        // Stripe already moved; the webhook will reconcile the DB to match.
+        console.error('[admin/change_plan] DB mirror failed (Stripe already moved — webhook will reconcile)', { dbErr, accountType, accountId });
+      }
+
+      await logAdminAction({
+        actor: admin.userId,
+        action: 'change_plan',
+        target: `${accountType}:${accountId}`,
+        details: { fromPlan: base.plan, toPlan: targetPlan, cadence, proration: prorationBehavior, subId, newPriceId },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Plan changed ${base.plan} → ${targetPlan} (${cadence}) in Stripe and database${dbErr ? ' (DB mirror will reconcile via webhook)' : ''}.`,
+        fromPlan: base.plan,
+        toPlan: targetPlan,
+        cadence,
+      });
+    }
+
+    // ── Cancel subscription (immediate vs end-of-period) ──────────────────
+    // Fix #3: an explicit, clearly-labeled cancel control.
+    //   immediate         → stripe.subscriptions.cancel (access ends now)
+    //   end_of_period     → update(cancel_at_period_end:true) (access until end)
+    // On IMMEDIATE cancel we set the DB plan consistently (free for space,
+    // starter for brokerage — matching the webhook's customer.subscription.deleted
+    // handler) instead of relying solely on the later webhook. End-of-period only
+    // flags the schedule; the plan stays until Stripe actually deletes the sub.
+    if (action === 'cancel_subscription') {
+      const { allowed: cancelAllowed } = await checkRateLimit(`admin:cancel:${admin.userId}`, 50, 86400);
+      if (!cancelAllowed) {
+        return NextResponse.json({ error: 'Daily cancel limit reached.' }, { status: 429 });
+      }
+      const { accountType, accountId, mode } = body as {
+        accountType?: string;
+        accountId?: string;
+        mode?: string;
+      };
+      if ((accountType !== 'space' && accountType !== 'brokerage') || !accountId || typeof accountId !== 'string') {
+        return NextResponse.json({ error: 'accountType (space|brokerage) and accountId are required' }, { status: 400 });
+      }
+      const cancelMode = mode === 'immediate' ? 'immediate' : 'end_of_period';
+
+      const table = accountType === 'space' ? 'Space' : 'Brokerage';
+      const { data: acct, error: acctErr } = await supabase
+        .from(table)
+        .select('id, stripeSubscriptionId')
+        .eq('id', accountId)
+        .maybeSingle();
+      if (acctErr) throw acctErr;
+      if (!acct) return NextResponse.json({ error: `${accountType} not found` }, { status: 404 });
+
+      const subId = (acct as any).stripeSubscriptionId as string | null;
+      if (!subId) {
+        return NextResponse.json({ error: 'No Stripe subscription on record to cancel.' }, { status: 400 });
+      }
+
+      const { getStripe } = await import('@/lib/stripe');
+      const stripe = getStripe();
+
+      try {
+        if (cancelMode === 'immediate') {
+          await stripe.subscriptions.cancel(subId);
+        } else {
+          await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
+        }
+      } catch (stripeErr: any) {
+        console.error('[admin/cancel_subscription] Stripe cancel failed', { stripeErr, subId, cancelMode });
+        return NextResponse.json({ error: `Stripe cancel failed: ${stripeErr.message}. No change was applied.` }, { status: 502 });
+      }
+
+      // Mirror the DB. Immediate → set status canceled + downgrade plan now
+      // (don't wait for the webhook). End-of-period → leave plan/status; Stripe
+      // keeps billing until the period ends and the deleted webhook downgrades.
+      const dbUpdate: Record<string, unknown> =
+        cancelMode === 'immediate'
+          ? {
+              stripeSubscriptionStatus: 'canceled',
+              plan: accountType === 'space' ? 'free' : 'starter',
+            }
+          : {}; // end-of-period: status flips when Stripe sends the update webhook
+      if (Object.keys(dbUpdate).length > 0) {
+        const { error: dbErr } = await supabase.from(table).update(dbUpdate).eq('id', accountId);
+        if (dbErr) console.error('[admin/cancel_subscription] DB mirror failed (webhook will reconcile)', { dbErr, accountType, accountId });
+      }
+
+      await logAdminAction({
+        actor: admin.userId,
+        action: 'cancel_subscription',
+        target: `${accountType}:${accountId}`,
+        details: { mode: cancelMode, subId },
+      });
+
+      return NextResponse.json({
+        success: true,
+        mode: cancelMode,
+        message:
+          cancelMode === 'immediate'
+            ? 'Subscription canceled immediately in Stripe. Access ends now.'
+            : 'Subscription will cancel at the end of the current billing period. Access continues until then.',
+      });
+    }
+
+    // ── List recent invoices (for the refund picker) ─────────────────────
+    // Read-only helper that powers the refund UI's invoice selector. Returns the
+    // customer's recent invoices with the data the admin needs to choose one and
+    // a partial amount (id, amount paid, currency, date, refundability).
+    if (action === 'list_invoices') {
+      const { userId: targetUserId, accountType, accountId } = body as {
+        userId?: string;
+        accountType?: string;
+        accountId?: string;
+      };
+      const customerId = await resolveStripeCustomerId({ accountType, accountId, userId: targetUserId });
+      if (!customerId) return NextResponse.json({ error: 'No Stripe customer' }, { status: 404 });
+
+      const { getStripe } = await import('@/lib/stripe');
+      const stripe = getStripe();
+      const invoices = await stripe.invoices.list({ customer: customerId, limit: 10 });
+      const list = invoices.data.map((inv) => {
+        const paymentIntentId =
+          (inv as unknown as { payment_intent?: string | null }).payment_intent ?? null;
+        return {
+          id: inv.id,
+          number: inv.number,
+          status: inv.status,
+          amountPaid: inv.amount_paid,
+          amountRefundable: inv.amount_paid, // gross paid; Stripe caps actual refund at remaining
+          currency: inv.currency,
+          created: inv.created,
+          refundable: inv.status === 'paid' && inv.amount_paid > 0 && !!paymentIntentId,
+        };
+      });
+      return NextResponse.json({ success: true, invoices: list });
     }
 
     // ── Suspend user ─────────────────────────────────────────────────────
@@ -347,16 +645,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Comp free month ─────────────────────────────────────────────────
+    // ── Comp (free period via a REAL Stripe trial_end) ───────────────────
+    // Fix #1: a comp MUST use a real Stripe mechanism so Stripe AND the DB
+    // agree the customer isn't billed until the comp date. The previous code
+    // (a) only pushed trial_end for past_due/unpaid and (b) wrote a far-future
+    // stripePeriodEnd to the DB for EVERY status — including canceled/inactive
+    // where Stripe has no live sub — so the DB said "active a year" while Stripe
+    // re-billed on its own schedule → surprise charges.
+    //
+    // Now: we push the subscription's trial_end to the comp date whenever a live
+    // Stripe subscription exists (past_due/unpaid/active/trialing all carry a
+    // live sub), and we ONLY write the far-future stripePeriodEnd to the DB when
+    // Stripe actually accepted that trial_end. If there's no live sub to move
+    // (canceled/inactive, or no subscription id), we DO NOT fabricate a future
+    // period in the DB — we report that a Stripe subscription must be created
+    // first. `days` lets the same handler back both "comp a month" (30) and
+    // "comp a year" (365); clamped 1..366.
     if (action === 'comp_free_month') {
-      // Per-action daily cap — comps grant 30 days free service; the shared
-      // 30/min admin limit isn't a meaningful guard for value give-aways.
       const { allowed: compAllowed } = await checkRateLimit(`admin:comp:${admin.userId}`, 20, 86400);
       if (!compAllowed) {
         return NextResponse.json({ error: 'Daily comp limit reached.' }, { status: 429 });
       }
-      const { userId: targetUserId } = body as { userId: string };
+      const { userId: targetUserId, days: rawDays } = body as { userId: string; days?: number };
       if (!targetUserId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+      const days = Math.max(1, Math.min(366, Number.isFinite(rawDays as number) ? Math.floor(rawDays as number) : 30));
 
       const { data: space } = await supabase
         .from('Space')
@@ -366,63 +678,96 @@ export async function POST(req: NextRequest) {
 
       if (!space) return NextResponse.json({ error: 'No workspace found' }, { status: 404 });
 
-      // Only allow comp on non-active/non-trialing subscriptions
-      const allowedStatuses = ['canceled', 'past_due', 'unpaid', 'inactive'];
-      if (!allowedStatuses.includes((space as any).stripeSubscriptionStatus ?? '')) {
+      const compSubId = (space as any).stripeSubscriptionId as string | null;
+      const compStatus = (space as any).stripeSubscriptionStatus as string;
+      // Statuses where Stripe still has a LIVE subscription we can push trial_end
+      // on. canceled/inactive (and a missing sub id) have no live sub.
+      const LIVE_SUB_STATUSES = new Set(['past_due', 'unpaid', 'active', 'trialing']);
+      const hasLiveSub = !!compSubId && LIVE_SUB_STATUSES.has(compStatus ?? '');
+
+      if (!hasLiveSub) {
+        // No live Stripe subscription to comp. Refuse rather than write a fake
+        // future period the DB can't back — that was the desync bug.
         return NextResponse.json(
-          { error: `Cannot comp a free month on a subscription with status '${(space as any).stripeSubscriptionStatus}'. Only allowed for: ${allowedStatuses.join(', ')}.` },
+          {
+            error: `Subscription is '${compStatus || 'inactive'}' with no live Stripe subscription, so there's nothing to push a trial on. Create or reactivate a subscription in the Stripe dashboard first, then comp it.`,
+          },
           { status: 400 },
         );
       }
 
-      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      const compSubId = (space as any).stripeSubscriptionId as string | null;
-      const compStatus = (space as any).stripeSubscriptionStatus as string;
+      const trialEndUnix = trialEndUnixInDays(days);
+      const periodEnd = new Date(trialEndUnix * 1000).toISOString();
 
       let stripeUpdated = false;
       let stripeWarning: string | null = null;
-
-      // For past_due and unpaid subscriptions the Stripe subscription still
-      // exists — push the trial_end forward so Stripe won't attempt to collect
-      // for 30 days.  For canceled/inactive the subscription is gone in Stripe;
-      // we can only update the database as a manual billing override.
-      if (compSubId && (compStatus === 'past_due' || compStatus === 'unpaid')) {
-        try {
-          const { getStripe } = await import('@/lib/stripe');
-          const stripe = getStripe();
-          await stripe.subscriptions.update(compSubId, {
-            trial_end: Math.floor(new Date(periodEnd).getTime() / 1000),
-            proration_behavior: 'none',
-          });
-          stripeUpdated = true;
-        } catch (stripeErr: any) {
-          console.error('[admin/comp_free_month] Stripe update failed', { stripeErr, compSubId });
-          stripeWarning = `Stripe update failed: ${stripeErr.message}. Database updated but Stripe may still attempt to collect payment.`;
-        }
-      } else {
-        stripeWarning = `Subscription is '${compStatus}' — Stripe has no active subscription to update. Database marked active for 30 days as a manual override. If you need to re-activate billing, create a new subscription in the Stripe dashboard.`;
+      let stripeStatus: string | null = null;
+      try {
+        const { getStripe } = await import('@/lib/stripe');
+        const stripe = getStripe();
+        const updated = await stripe.subscriptions.update(compSubId!, {
+          trial_end: trialEndUnix,
+          proration_behavior: 'none',
+        });
+        stripeUpdated = true;
+        // Mirror the status Stripe reports (trial_end in the future → 'trialing').
+        stripeStatus = (updated as { status?: string }).status ?? null;
+      } catch (stripeErr: any) {
+        console.error('[admin/comp_free_month] Stripe update failed', { stripeErr, compSubId });
+        stripeWarning = `Stripe update failed: ${stripeErr.message}. No change applied — Stripe may still attempt to collect.`;
       }
 
-      await supabase.from('Space').update({
-        stripeSubscriptionStatus: 'active',
-        stripePeriodEnd: periodEnd,
-      }).eq('id', space.id);
+      // Only mirror the comp into the DB when Stripe accepted it — otherwise the
+      // DB would claim a free period Stripe never granted.
+      if (stripeUpdated) {
+        // Map Stripe's status into our enum; a future trial_end yields 'trialing'.
+        const mappedStatus =
+          stripeStatus === 'active' ? 'active'
+          : stripeStatus === 'trialing' ? 'trialing'
+          : 'trialing';
+        await supabase.from('Space').update({
+          stripeSubscriptionStatus: mappedStatus,
+          stripePeriodEnd: periodEnd,
+        }).eq('id', space.id);
+      }
 
-      await logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd, stripeUpdated, stripeWarning } });
+      await logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { days, periodEnd, stripeUpdated, stripeStatus, stripeWarning } });
 
-      const message = stripeWarning
-        ? `Database updated. ⚠️ ${stripeWarning}`
-        : 'Free month applied in Stripe and database. User will not be charged for 30 days.';
+      if (!stripeUpdated) {
+        return NextResponse.json({ success: false, error: stripeWarning ?? 'Stripe update failed.' }, { status: 502 });
+      }
 
+      const message = `Comp applied in Stripe and database. The customer will not be charged until ${new Date(periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`;
       return NextResponse.json({ success: true, periodEnd, stripeUpdated, message });
     }
 
     // ── Issue refund ──────────────────────────────────────────────────────
+    // Fix #6: the admin can choose WHICH invoice to refund (invoiceId, listed by
+    // list_invoices) and a PARTIAL amount (in cents). Backward compatible: with
+    // neither, it falls back to a FULL refund of the most recent paid invoice
+    // (the prior behavior). Keeps the 3/day cap + audit log.
     if (action === 'issue_refund') {
-      const { userId: targetUserId } = body as { userId: string };
+      const { userId: targetUserId, invoiceId, amount: rawAmount, accountType, accountId } = body as {
+        userId?: string;
+        invoiceId?: string;
+        amount?: number;
+        accountType?: string;
+        accountId?: string;
+      };
 
-      if (!targetUserId || typeof targetUserId !== 'string') {
-        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      // Either a userId (space-by-owner) or an account (space|brokerage) is required.
+      if ((!targetUserId || typeof targetUserId !== 'string') && !accountId) {
+        return NextResponse.json({ error: 'userId or account is required' }, { status: 400 });
+      }
+
+      // Validate a partial amount up front (cents). Omitted/undefined → full refund.
+      let partialAmount: number | undefined;
+      if (rawAmount !== undefined && rawAmount !== null) {
+        const n = Number(rawAmount);
+        if (!Number.isInteger(n) || n <= 0) {
+          return NextResponse.json({ error: 'amount must be a positive integer number of cents.' }, { status: 400 });
+        }
+        partialAmount = n;
       }
 
       // Per-admin refund limit: 3 per day
@@ -431,40 +776,62 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Refund limit reached (max 3 per day). Try again tomorrow.' }, { status: 429 });
       }
 
-      const { data: space } = await supabase
-        .from('Space')
-        .select('id, stripeCustomerId')
-        .eq('ownerId', targetUserId)
-        .maybeSingle();
-
-      if (!space?.stripeCustomerId) return NextResponse.json({ error: 'No Stripe customer' }, { status: 404 });
+      const customerId = await resolveStripeCustomerId({ accountType, accountId, userId: targetUserId });
+      if (!customerId) return NextResponse.json({ error: 'No Stripe customer' }, { status: 404 });
 
       const stripe = (await import('@/lib/stripe')).getStripe();
 
-      // Auto-look up the most recent paid invoice for this customer and
-      // refund its payment_intent.  stripe.refunds.create() does not accept
-      // an `invoice` parameter — it requires `charge` or `payment_intent`.
-      const invoices = await stripe.invoices.list({
-        customer: space.stripeCustomerId,
-        status: 'paid',
-        limit: 1,
-      });
-      const lastInvoice = invoices.data[0];
-      if (!lastInvoice) {
-        return NextResponse.json({ error: 'No paid invoice found for this customer.' }, { status: 404 });
+      // Resolve the target invoice: the one the admin picked (verified to belong
+      // to this customer), else the most recent PAID invoice.
+      let invoice: Stripe.Invoice | undefined;
+      if (invoiceId && typeof invoiceId === 'string') {
+        try {
+          invoice = await stripe.invoices.retrieve(invoiceId);
+        } catch {
+          return NextResponse.json({ error: 'Invoice not found.' }, { status: 404 });
+        }
+        // Bind to this customer so an admin can't refund another customer's invoice.
+        const invCustomer = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id ?? null;
+        if (invCustomer !== customerId) {
+          return NextResponse.json({ error: 'Invoice does not belong to this customer.' }, { status: 400 });
+        }
+        if (invoice.status !== 'paid') {
+          return NextResponse.json({ error: `Invoice is '${invoice.status}', not paid — nothing to refund.` }, { status: 400 });
+        }
+      } else {
+        const invoices = await stripe.invoices.list({
+          customer: customerId,
+          status: 'paid',
+          limit: 1,
+        });
+        invoice = invoices.data[0];
+        if (!invoice) {
+          return NextResponse.json({ error: 'No paid invoice found for this customer.' }, { status: 404 });
+        }
       }
-      // Stripe 20.x dropped `payment_intent` from the top-level Invoice type,
-      // but the API still returns the string ID on paid invoices. Narrow
-      // through an interface rather than leaning on `any`.
-      const paymentIntentId = (lastInvoice as unknown as { payment_intent?: string | null }).payment_intent ?? null;
+
+      // stripe.refunds.create() does not accept an `invoice` parameter — it
+      // requires `charge` or `payment_intent`. Stripe 20.x dropped
+      // `payment_intent` from the top-level Invoice type, but the API still
+      // returns the string id on paid invoices.
+      const paymentIntentId = (invoice as unknown as { payment_intent?: string | null }).payment_intent ?? null;
       if (!paymentIntentId) {
-        return NextResponse.json({ error: 'Latest invoice has no associated payment intent.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invoice has no associated payment intent.' }, { status: 400 });
+      }
+      // A partial refund can't exceed what was paid on this invoice.
+      if (partialAmount !== undefined && partialAmount > invoice.amount_paid) {
+        return NextResponse.json(
+          { error: `Refund amount (${partialAmount}¢) exceeds the invoice's paid amount (${invoice.amount_paid}¢).` },
+          { status: 400 },
+        );
       }
 
       const refund = await stripe.refunds.create({
         payment_intent: paymentIntentId,
+        ...(partialAmount !== undefined ? { amount: partialAmount } : {}),
       });
-      await logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount } });
+      const refundTarget = accountId ? `${accountType}:${accountId}` : targetUserId;
+      await logAdminAction({ actor: admin.userId, action: 'issue_refund', target: refundTarget, details: { invoiceId: invoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount, partial: partialAmount !== undefined, customerId } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 

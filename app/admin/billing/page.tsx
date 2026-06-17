@@ -14,6 +14,7 @@ import { PLANS } from '@/lib/plans';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
 import { H3 } from '@/lib/typography';
+import { BillingCreditTool } from './credit-tool';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
@@ -298,6 +299,12 @@ export default async function AdminBillingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Credit management (grant / reverse) ──────────────────── */}
+      <div>
+        <p className={`${H3} mb-3`}>Credit management</p>
+        <BillingCreditTool />
+      </div>
 
       {/* ── Trial Expiring Soon ─────────────────────────────────── */}
       {trialExpiringSoon.length > 0 && (
