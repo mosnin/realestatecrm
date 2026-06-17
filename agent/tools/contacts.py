@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -23,6 +24,41 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     if isinstance(value, str) and len(value) > max_chars:
         return value[:max_chars - 1] + "…"
     return value
+
+
+def _normalize_tags(tags: Any) -> list[str]:
+    """Coerce a model-supplied `tags` value into a clean list[str].
+
+    The schema asks for a list, but the model intermittently passes a string
+    — most often a JSON-encoded list (`'["hot","pre-approved"]'`), sometimes a
+    single tag (`'hot'`) or a comma-separated run (`'hot, pre-approved'`).
+    Without this the insert/update either stored the raw string as one tag or
+    raised "tags needs an actual list format", which the model then retried —
+    burning the turn's step budget. Normalize all shapes here so both
+    create_contact and update_contact stay tolerant.
+    """
+    if tags is None:
+        return []
+    if isinstance(tags, str):
+        text = tags.strip()
+        if not text:
+            return []
+        # A JSON array string is the dominant failure mode.
+        try:
+            parsed = json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(t).strip() for t in parsed if str(t).strip()]
+        if isinstance(parsed, str) and parsed.strip():
+            return [parsed.strip()]
+        # Not JSON — treat as a single tag, or comma-split a plain run.
+        return [t.strip() for t in text.split(",") if t.strip()]
+    if isinstance(tags, (list, tuple)):
+        return [str(t).strip() for t in tags if str(t).strip()]
+    # Any other scalar (number, etc.) → its string form as a single tag.
+    text = str(tags).strip()
+    return [text] if text else []
 
 
 def _contacts_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -186,12 +222,13 @@ async def create_contact(
     budget: float | None = None,
     preferences: str | None = None,
     notes: str | None = None,
-    tags: list[str] | None = None,
+    tags: list[str] | str | None = None,
 ) -> dict[str, Any]:
     """Create a new contact (person) in the workspace."""
     # name required. lead_type: buyer|rental|seller (default buyer).
     # budget: dollars (monthly for rental, purchase price for buyer).
-    # tags: optional; use 'new-lead' for fresh leads.
+    # tags: optional list of strings; use 'new-lead' for fresh leads. A single
+    #   tag string or a JSON-array string is also accepted and normalized.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()
@@ -205,7 +242,9 @@ async def create_contact(
     if clean_lead_type not in valid_lead_types:
         clean_lead_type = "buyer"
 
-    clean_tags = [t.strip()[:60] for t in (tags or []) if t.strip()][:10]
+    # tags may arrive as a list (schema) or as a string the model fudged —
+    # _normalize_tags absorbs the JSON-string / single-tag / comma cases.
+    clean_tags = [t[:60] for t in _normalize_tags(tags)][:10]
 
     import uuid as _uuid
     contact_id = str(_uuid.uuid4())
@@ -300,7 +339,7 @@ async def update_contact(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
     reason: str,
-    add_tags: list[str] | None = None,
+    add_tags: list[str] | str | None = None,
     lead_type: str | None = None,
     new_pipeline_type: str | None = None,
     follow_up_date: str | None = None,
@@ -309,7 +348,8 @@ async def update_contact(
     re_engaged_signal: str | None = None,
 ) -> dict[str, Any]:
     """Update a contact; pass only the fields you want to change."""
-    # add_tags: up to 5 merged with existing.
+    # add_tags: up to 5 merged with existing. A list of strings is preferred; a
+    #   single tag string or a JSON-array string is also accepted.
     # lead_type: the lead CATEGORY — buyer | rental (a.k.a. renter) | seller.
     #   Use this to make someone a "renter/rental lead" (lead_type='rental') or
     #   a "buyer"/"seller" lead. This is NOT the pipeline stage.
@@ -342,8 +382,11 @@ async def update_contact(
     summary_parts: list[str] = []
 
     # ── Tags ──
+    # add_tags may arrive as a list (schema) or a string the model fudged
+    # (JSON array / single tag / comma run) — normalize before slicing so a
+    # bare string isn't sliced char-by-char.
     if add_tags:
-        clean_tags = [t.strip()[:60] for t in add_tags[:5] if t.strip()]
+        clean_tags = [t[:60] for t in _normalize_tags(add_tags)][:5]
         if clean_tags:
             existing = contact.get("tags") or []
             merged = list(dict.fromkeys(existing + clean_tags))
