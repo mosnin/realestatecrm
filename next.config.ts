@@ -60,6 +60,17 @@ const nextConfig: NextConfig = {
   // Skip them in the deploy build; CI stays the gate that blocks bad types.
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  // Build-memory headroom. The app outgrew a comfortable fit on Vercel's 8GB
+  // build container: static generation across 300+ routes (each parallel worker
+  // holds the compiled app) plus Sentry sourcemap bundling peaked into an OOM
+  // SIGKILL before routes-manifest.json was written. `webpackMemoryOptimizations`
+  // trims webpack's peak heap; `cpus` caps how many static-generation workers run
+  // in parallel. Lower peak RAM, slower build. If Vercel "Enhanced Builds" (a
+  // larger machine) is enabled, `cpus` can be raised again.
+  experimental: {
+    webpackMemoryOptimizations: true,
+    cpus: 2,
+  },
   async headers() {
     return [
       {
