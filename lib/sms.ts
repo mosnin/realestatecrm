@@ -151,6 +151,22 @@ export function tourReminderSMS(p: { guestName: string; guestPhone: string; busi
   };
 }
 
+export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    to: p.guestPhone,
+    body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} has been moved to ${p.date} at ${p.time}. Reply if that doesn't work.`,
+  };
+}
+
+export function tourCancelledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; property?: string | null }): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    to: p.guestPhone,
+    body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} on ${p.date} has been cancelled. Reply to rebook.`,
+  };
+}
+
 export function newDealSMS(p: { spaceName: string; dealTitle: string; value?: string | null; phone: string }): SendSMSParams {
   const val = p.value ? ` (${p.value})` : '';
   return {
