@@ -1,19 +1,23 @@
 "use client";
 
 /**
- * Opening moment. On every app/PWA open, Chippi greets the realtor by name
- * (a different line each time — picked SERVER-side and passed in, so the
- * server and client always render the same text; doing the random pick in the
- * client caused a hydration mismatch), reveals a snapshot of what changed while
- * they were away, signs off with the small Chippi mark, then the whole thing
- * swipes up to reveal the dashboard beneath it.
+ * Opening moment. On every app/PWA open, the original Chippi preloader plays:
+ * the Chippi wordmark DRAWS ITSELF ON (the Apple "hello" effect, restored from
+ * the first splash), then Chippi greets the realtor by name (a different line
+ * each time — picked SERVER-side and passed in, so server and client render the
+ * same text; doing the random pick in the client caused a hydration mismatch),
+ * reveals a snapshot of what changed while they were away, signs off with the
+ * small Chippi mark, then the whole thing swipes up to reveal the dashboard.
+ *
+ * Sequence: logo draw-on → greeting → what's-new snapshot → swipe up.
  *
  * Theme-driven (bg-background / text-foreground + the BrandLogo's own
- * light/dark swap). Honors prefers-reduced-motion. A safety timeout guarantees
- * it can never trap the app.
+ * light/dark swap; the draw-on renders in currentColor). Honors
+ * prefers-reduced-motion (skips the draw-on, plain fades). A safety timeout
+ * guarantees it can never trap the app.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -22,6 +26,7 @@ import {
 } from "motion/react";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { ChippiHelloEffect } from "@/components/ui/chippi-hello-effect";
 
 // One-shot, per-page-load gate. Module state lives for the lifetime of the JS
 // bundle: it survives client-side navigation (so switching between the realtor
@@ -36,13 +41,17 @@ export interface ChippiSnapshot {
   draftsReady: number;
 }
 
+type Stage = "logo" | "greeting" | "snapshot" | "gone";
+
 // Apple-ish ease-out (expo-like): fast start, long gentle settle.
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-// Timeline (ms). Greet → reveal what's new + mark → swipe up.
-const T_TO_SNAPSHOT = 1700;
-const T_TO_GONE = 4100;
-const T_SAFETY = 7000;
+// Timeline (ms).
+// Logo draws on (~1.2s) → hold a beat → greet → reveal what's new → swipe up.
+const T_LOGO_HOLD = 650; // hold the finished wordmark before the greeting
+const T_TO_SNAPSHOT = 1700; // greeting visible, then reveal the snapshot
+const T_TO_GONE = 4100; // from greeting start to swipe-up
+const T_SAFETY = 9000; // absolute backstop so the overlay can never trap the app
 
 function buildItems(s: ChippiSnapshot): { n: number; label: string }[] {
   const out: { n: number; label: string }[] = [];
@@ -77,11 +86,13 @@ export function ChippiSplash({
   // a stale flag from an earlier switch used to stick on and wrongly suppress
   // the splash on later opens — the regression this restore fixes.
   const [shouldPlay] = useState(() => !splashPlayed);
-  const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">(
-    shouldPlay ? "greeting" : "gone"
-  );
   const reduce = useReducedMotion();
+  // Reduced motion skips the draw-on and opens on the greeting directly.
+  const [stage, setStage] = useState<Stage>(
+    !shouldPlay ? "gone" : reduce ? "greeting" : "logo"
+  );
   const items = useMemo(() => buildItems(snapshot), [snapshot]);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     if (!shouldPlay) return;
@@ -89,15 +100,32 @@ export function ChippiSplash({
     // reload resets this module, which is exactly the first-load / hard-refresh
     // behavior we want.
     splashPlayed = true;
-    const a = setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT);
-    const b = setTimeout(() => setStage("gone"), T_TO_GONE);
-    const safety = setTimeout(() => setStage("gone"), T_SAFETY);
+    const list = timers.current;
+    // Absolute backstop, covering the full logo → overview sequence.
+    list.push(setTimeout(() => setStage("gone"), T_SAFETY));
+    // With reduced motion there's no draw-on to chain off, so run the overview
+    // timeline immediately (the greeting is already on screen).
+    if (reduce) {
+      list.push(setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT));
+      list.push(setTimeout(() => setStage("gone"), T_TO_GONE));
+    }
     return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-      clearTimeout(safety);
+      list.forEach(clearTimeout);
+      timers.current = [];
     };
-  }, [shouldPlay]);
+  }, [shouldPlay, reduce]);
+
+  // The logo finished drawing → hold a beat, then run the day overview:
+  // greeting → snapshot → swipe up. (All timers tracked for unmount cleanup.)
+  const handleLogoDone = () => {
+    timers.current.push(
+      setTimeout(() => {
+        setStage("greeting");
+        timers.current.push(setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT));
+        timers.current.push(setTimeout(() => setStage("gone"), T_TO_GONE));
+      }, T_LOGO_HOLD)
+    );
+  };
 
   // Lock body scroll while the overlay is up.
   useEffect(() => {
@@ -146,7 +174,22 @@ export function ChippiSplash({
           aria-hidden
         >
           <AnimatePresence mode="wait">
-            {stage === "greeting" ? (
+            {stage === "logo" ? (
+              <motion.div
+                key="logo"
+                className="flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, filter: "blur(8px)" }}
+                transition={{ duration: 0.5, ease: EASE }}
+              >
+                {/* The original draw-on: the Chippi wordmark traces itself in. */}
+                <ChippiHelloEffect
+                  className="h-16 w-auto px-8 sm:h-24"
+                  onAnimationComplete={handleLogoDone}
+                />
+              </motion.div>
+            ) : stage === "greeting" ? (
               <motion.h1
                 key="greeting"
                 className="text-center text-3xl tracking-tight sm:text-5xl"
