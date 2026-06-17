@@ -683,3 +683,42 @@ export type ApplicationStatus =
   | 'approved'
   | 'declined'
   | 'waitlisted';
+
+// ── Integration Types ──
+// The IntegrationConnection / IntegrationTrigger row shapes live next to
+// their DB helpers (lib/integrations/connections.ts, .../triggers.ts). The
+// event record is consumed more broadly (activity feed + agent context), so
+// its type lives here alongside the other model types.
+
+/** Lifecycle of a persisted connected-app event relative to dispatch. */
+export type IntegrationEventStatus = 'captured' | 'dispatched' | 'skipped' | 'failed';
+
+/**
+ * One persisted Composio trigger delivery — the durable record behind the
+ * activity feature. Written for every accepted delivery (even when dispatch
+ * is later skipped or fails). Mirrors the "IntegrationEvent" table
+ * (supabase/migrations/20260705000000_integration_event.sql).
+ */
+export type IntegrationEvent = {
+  id: string;
+  spaceId: string;
+  connectionId: string;
+  /** Null once the capturing trigger row is deleted (ON DELETE SET NULL). */
+  triggerId: string | null;
+  toolkit: string;
+  /** The trigger slug, e.g. 'GMAIL_NEW_GMAIL_MESSAGE'. */
+  eventType: string;
+  title: string | null;
+  /** from / sender / name, when the payload carries one. */
+  actor: string | null;
+  snippet: string | null;
+  occurredAt: string;
+  payload: Record<string, unknown> | null;
+  status: IntegrationEventStatus;
+  /** Modal draft correlation — populated by a follow-up, NULL on capture. */
+  draftId: string | null;
+  /** Composio's webhook delivery id; the idempotency anchor. */
+  deliveryId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

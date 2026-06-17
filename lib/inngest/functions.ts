@@ -18,8 +18,11 @@ import { findByComposioId } from '@/lib/integrations/connections';
 import {
   dispatchTrigger,
   findByComposioTriggerId,
+  normalizeTriggerEvent,
   stampFired,
 } from '@/lib/integrations/triggers';
+import { captureEvent, setEventStatus } from '@/lib/integrations/events';
+import { publishSpaceEvent } from '@/lib/realtime/ably';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
@@ -322,7 +325,61 @@ export const handleComposioTrigger = inngest.createFunction(
       return { dispatched: 'noop', reason: 'trigger_paused' };
     }
 
-    // 3. Per-space daily cap. The receiver's per-(connection, slug)
+    // 3. Capture the event FIRST — before any cap/paused gate decides
+    //    whether to dispatch. The raw delivery is now a durable record
+    //    (activity feed + agent context) regardless of whether we act on
+    //    it. Idempotent on deliveryId (partial unique index +
+    //    ignoreDuplicates), so an Inngest retry re-running this step is a
+    //    no-op, not a duplicate row. Best-effort: captureEvent never
+    //    throws, so a persist failure can't drop the dispatch below.
+    //    draftId stays NULL for now — the Modal draft is produced async;
+    //    correlating it back onto the event is a follow-up.
+    await step.run('capture-event', () =>
+      captureEvent({
+        spaceId: connection.spaceId,
+        connectionId: connection.id,
+        triggerId: triggerRow.id,
+        toolkit: connection.toolkit,
+        slug: data.triggerSlug,
+        payload: data.payload,
+        deliveryId: data.deliveryId,
+        status: 'captured',
+      }),
+    );
+
+    // 3b. Push the captured event to the space's live activity feed via Ably.
+    //     Best-effort overlay on top of the durable IntegrationEvent row above:
+    //     an already-open feed updates instantly instead of waiting for its
+    //     next load. publishSpaceEvent NEVER throws and no-ops when
+    //     ABLY_API_KEY is unset, so this can't fail/retry the handler or alter
+    //     capture/dispatch semantics — the extra try/catch keeps the step
+    //     itself defensive even if normalizeTriggerEvent (pure) ever changed.
+    //     The summary mirrors what the feed renders from the DB row.
+    await step.run('publish-ably', async () => {
+      try {
+        const { title, actor, snippet, occurredAt } = normalizeTriggerEvent(
+          connection.toolkit,
+          data.triggerSlug,
+          data.payload,
+        );
+        await publishSpaceEvent(connection.spaceId, {
+          toolkit: connection.toolkit,
+          eventType: data.triggerSlug,
+          title,
+          actor,
+          snippet,
+          occurredAt,
+          status: 'captured',
+          connectionId: connection.id,
+          deliveryId: data.deliveryId,
+        });
+      } catch {
+        // Defensive only — publishSpaceEvent already swallows its own errors.
+      }
+      return { published: true };
+    });
+
+    // 4. Per-space daily cap. The receiver's per-(connection, slug)
     //    hourly cap is finer-grained but lets a realtor with five
     //    connected apps each at 60/hr accumulate 300+ Modal runs in a
     //    day. This is the absolute ceiling per space.
@@ -342,24 +399,50 @@ export const handleComposioTrigger = inngest.createFunction(
         count: dailyCount,
         cap: SPACE_DAILY_CAP,
       });
+      // The event is already captured; mark it skipped (cap short-circuited
+      // the dispatch) so the feed shows we noticed but didn't act.
+      await step.run('mark-skipped-cap', () =>
+        setEventStatus(data.deliveryId, 'skipped'),
+      );
       return { dispatched: 'noop', reason: 'space_daily_cap' };
     }
 
-    // 4. Dispatch. The dispatcher is the single place that decides DRAFT
+    // 5. Dispatch. The dispatcher is the single place that decides DRAFT
     //    vs NOTICE vs DATA_SYNC vs no-op based on the slug. deliveryId
     //    threads through so the drafts tool can persist it on
     //    AgentDraft.triggerSource for the inbox "noticed because"
     //    breadcrumb.
-    const result = await step.run('dispatch', async () => {
-      return dispatchTrigger({
-        triggerSlug: data.triggerSlug,
-        connection,
-        payload: data.payload,
-        deliveryId: data.deliveryId,
+    //
+    //    On a thrown dispatch error we mark the captured event 'failed'
+    //    before rethrowing — Inngest still retries (existing behaviour
+    //    preserved); the event row reflects the last attempt's outcome.
+    let result;
+    try {
+      result = await step.run('dispatch', async () => {
+        return dispatchTrigger({
+          triggerSlug: data.triggerSlug,
+          connection,
+          payload: data.payload,
+          deliveryId: data.deliveryId,
+        });
       });
-    });
+    } catch (err) {
+      await step.run('mark-failed', () => setEventStatus(data.deliveryId, 'failed'));
+      throw err;
+    }
 
-    // 4. Stamp lastFiredAt only on a real dispatch — a no-op shouldn't
+    // Stamp the captured event with the dispatch outcome: a real dispatch
+    // (DRAFT/etc.) → 'dispatched'; a no-op (thin payload / unwired kind) →
+    // 'skipped'. fireRoutineRun is fire-and-forget, so a non-noop result
+    // means dispatch was invoked.
+    await step.run('mark-dispatch-outcome', () =>
+      setEventStatus(
+        data.deliveryId,
+        result.dispatched === 'noop' ? 'skipped' : 'dispatched',
+      ),
+    );
+
+    // 6. Stamp lastFiredAt only on a real dispatch — a no-op shouldn't
     //    look like a successful fire on the health endpoint.
     if (result.dispatched !== 'noop') {
       await step.run('stamp-fired', () => stampFired(triggerRow.id));
