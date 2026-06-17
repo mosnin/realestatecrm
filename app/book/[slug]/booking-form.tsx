@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhoneAsTyped } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Label } from '@/components/ui/label';
@@ -561,8 +561,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                     <input
                       id="guestPhone"
                       type="tel"
+                      inputMode="tel"
+                      autoComplete="tel-national"
                       value={guestPhone}
-                      onChange={(e) => setGuestPhone(e.target.value)}
+                      onChange={(e) => setGuestPhone(formatPhoneAsTyped(e.target.value))}
                       placeholder="(555) 123-4567"
                       className={INPUT_CLASS}
                     />

@@ -39,18 +39,16 @@ from pathlib import Path
 
 logger = structlog.get_logger(__name__)
 
-# Hard ceiling on agent-loop steps for an interactive chat turn. Each step
-# re-sends the system prompt + tool schemas + accumulated tool results, so
-# total prompt tokens scale with this number. 12 leaves headroom for a real
-# multi-step plan (lookup → plan → several writes → confirm) while capping a
-# pathological loop that would otherwise burn a whole day's token budget on
-# one message.
-# Inner agent-loop cap. The SDK re-sends the FULL transcript (system prompt +
-# every tool schema + accumulated tool results) on EVERY step, so token cost
-# grows quadratically with this number. 8 covers real multi-step workflows
-# (lookup → activity → deal → draft is 4-5 steps); deeper work belongs on the
-# swarm/delegate path which runs in its own bounded context.
-CHAT_MAX_TURNS = 8
+# Inner agent-loop cap for an interactive chat turn. The SDK re-sends the FULL
+# transcript (system prompt + every tool schema + accumulated tool results) on
+# EVERY step, so token cost grows with this number — it is the hard ceiling on
+# a runaway turn's token bill. But it also has to clear a genuinely multi-step
+# request: "create 5 contacts, score, tag, and set a follow-up for each" is
+# ~20 sequential tool calls, so the old value of 8 truncated legitimate work
+# with "Max turns (8) exceeded" even when no tool was failing. 14 covers the
+# realistic batch workflows the chat surface is asked to do; anything deeper
+# belongs on the swarm/delegate path, which runs in its own bounded context.
+CHAT_MAX_TURNS = 14
 
 # Server-side guard on replayed history. The client caps what it sends, but
 # this endpoint must not trust that — an unbounded transcript re-ships on

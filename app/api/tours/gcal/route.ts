@@ -117,7 +117,17 @@ export async function POST(req: NextRequest) {
 
     const accessToken = await getValidAccessToken(tokenRow, space.id);
 
-    const { data: tour } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
+    // Scope the Tour lookup to the caller's own space. requireSpaceOwner only
+    // proves the caller owns `slug`'s space — NOT that `tourId` belongs to it.
+    // Without this filter a caller could sync ANY tenant's tour (copying its
+    // guest PII into their own calendar) and overwrite the victim's
+    // googleEventId. A cross-tenant tourId now matches no row → 404.
+    const { data: tour } = await supabase
+      .from('Tour')
+      .select('*')
+      .eq('id', tourId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
     if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
     const event = {
@@ -147,8 +157,14 @@ export async function POST(req: NextRequest) {
         }
       );
       if (!res.ok) {
-        // Clear the stale event ID in the DB so it gets re-created on retry
-        await supabase.from('Tour').update({ googleEventId: null }).eq('id', tourId);
+        // Clear the stale event ID in the DB so it gets re-created on retry.
+        // Scope to the caller's space so the update can never touch another
+        // tenant's row.
+        await supabase
+          .from('Tour')
+          .update({ googleEventId: null })
+          .eq('id', tourId)
+          .eq('spaceId', space.id);
         googleEventId = null; // Re-create below
       }
     }
@@ -171,7 +187,11 @@ export async function POST(req: NextRequest) {
       googleEventId = created.id;
     }
 
-    await supabase.from('Tour').update({ googleEventId }).eq('id', tourId);
+    await supabase
+      .from('Tour')
+      .update({ googleEventId })
+      .eq('id', tourId)
+      .eq('spaceId', space.id);
 
     return NextResponse.json({ synced: true, googleEventId });
   }
