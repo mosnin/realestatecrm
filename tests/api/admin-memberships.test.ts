@@ -14,10 +14,10 @@ const { requireMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/permissions', () => ({ requirePlatformAdmin: requireMock }));
 vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn(async () => ({ userId: 'admin_clerk' })) }));
-const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async () => undefined) }));
+const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async (..._a: any[]) => undefined) }));
 vi.mock('@/lib/admin', () => ({ logAdminAction: logAdminActionMock }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
-const { sendInviteMock } = vi.hoisted(() => ({ sendInviteMock: vi.fn(async () => undefined) }));
+const { sendInviteMock } = vi.hoisted(() => ({ sendInviteMock: vi.fn(async (..._a: any[]) => undefined) }));
 vi.mock('@/lib/email', () => ({ sendBrokerageInvitation: sendInviteMock }));
 const { seatCheckMock } = vi.hoisted(() => ({
   seatCheckMock: vi.fn(async () => ({ ok: true, usage: { plan: 'team', seatLimit: 5, used: 1 } })),

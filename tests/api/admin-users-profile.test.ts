@@ -27,7 +27,7 @@ vi.mock('@clerk/nextjs/server', () => ({
     emailAddresses: { createEmailAddress: createEmailMock },
   }),
 }));
-const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async () => undefined) }));
+const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async (..._a: any[]) => undefined) }));
 vi.mock('@/lib/admin', () => ({ logAdminAction: logAdminActionMock }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
 

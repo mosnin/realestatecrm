@@ -25,12 +25,12 @@ vi.mock('@/lib/permissions', () => ({
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(async () => ({ userId: 'admin_clerk' })),
 }));
-const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async () => undefined) }));
+const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async (..._a: any[]) => undefined) }));
 vi.mock('@/lib/admin', () => ({ logAdminAction: logAdminActionMock }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
 
 const { performAccountDeletionMock, hardDeleteEnabledMock } = vi.hoisted(() => ({
-  performAccountDeletionMock: vi.fn(async () => ({ ok: true, hardDeleted: true, pendingDataDeletion: false })),
+  performAccountDeletionMock: vi.fn(async (..._a: any[]) => ({ ok: true, hardDeleted: true, pendingDataDeletion: false })),
   hardDeleteEnabledMock: vi.fn(() => true),
 }));
 vi.mock('@/lib/account-deletion', () => ({
