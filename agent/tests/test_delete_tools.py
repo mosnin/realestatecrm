@@ -147,7 +147,7 @@ _ALL_GATED = list(_DELETE_TOOLS.values())
 
 @pytest.fixture(autouse=True)
 def _disable_failure_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
-    for tool in [*_ALL_GATED, contacts_mod.update_contact]:
+    for tool in [*_ALL_GATED, contacts_mod.update_contact, contacts_mod.create_contact]:
         monkeypatch.setattr(tool, "_failure_error_function", None, raising=False)
         monkeypatch.setattr(tool, "_use_default_failure_error_function", False, raising=False)
 
@@ -358,3 +358,82 @@ async def test_invalid_lead_type_is_rejected_clearly(fake_db: _FakeSupabase) -> 
     )
     assert "error" in out
     assert "lead_type" in out["error"].lower()
+
+
+# ── 3. Tags tolerance (TASK 3) ────────────────────────────────────────────────
+# The model intermittently passes `tags`/`add_tags` as a STRING — most often a
+# JSON-encoded list ('["hot","pre-approved"]'), sometimes a single tag or a
+# comma run. Without coercion that surfaced as "tags needs an actual list
+# format", which the model retried until the turn's step budget was spent.
+
+
+def test_normalize_tags_json_array_string() -> None:
+    assert contacts_mod._normalize_tags('["hot","pre-approved"]') == ["hot", "pre-approved"]
+
+
+def test_normalize_tags_single_string() -> None:
+    assert contacts_mod._normalize_tags("hot") == ["hot"]
+
+
+def test_normalize_tags_comma_run() -> None:
+    assert contacts_mod._normalize_tags("hot, pre-approved") == ["hot", "pre-approved"]
+
+
+def test_normalize_tags_real_list_unchanged() -> None:
+    assert contacts_mod._normalize_tags(["hot", "warm"]) == ["hot", "warm"]
+
+
+def test_normalize_tags_empty_and_none() -> None:
+    assert contacts_mod._normalize_tags(None) == []
+    assert contacts_mod._normalize_tags("") == []
+    assert contacts_mod._normalize_tags("[]") == []
+
+
+@pytest.mark.asyncio
+async def test_create_contact_accepts_json_string_tags(fake_db: _FakeSupabase) -> None:
+    """create_contact stores a list even when tags arrive as a JSON string."""
+    out = await _invoke(
+        contacts_mod.create_contact,
+        _ctx(),
+        {"name": "Dana Lee", "tags": '["hot","pre-approved"]'},
+    )
+    assert out.get("ok") is True
+    insert_payloads = [
+        e["payload"] for e in fake_db.log if e["op"] == "insert" and e["table"] == "Contact"
+    ]
+    assert insert_payloads, "expected an INSERT on Contact"
+    assert insert_payloads[0]["tags"] == ["hot", "pre-approved"]
+
+
+@pytest.mark.asyncio
+async def test_create_contact_accepts_single_string_tag(fake_db: _FakeSupabase) -> None:
+    out = await _invoke(
+        contacts_mod.create_contact,
+        _ctx(),
+        {"name": "Sam Rivers", "tags": "new-lead"},
+    )
+    assert out.get("ok") is True
+    insert_payloads = [
+        e["payload"] for e in fake_db.log if e["op"] == "insert" and e["table"] == "Contact"
+    ]
+    assert insert_payloads[0]["tags"] == ["new-lead"]
+
+
+@pytest.mark.asyncio
+async def test_update_contact_accepts_json_string_add_tags(fake_db: _FakeSupabase) -> None:
+    """update_contact merges tags even when add_tags arrives as a JSON string
+    (and does not slice a bare string char-by-char)."""
+    fake_db.set_for(
+        "Contact",
+        "select",
+        _FakeResult(data={**_contact_row("buyer"), "tags": ["existing"]}),
+    )
+    out = await _invoke(
+        contacts_mod.update_contact,
+        _ctx(),
+        {"contact_id": "c1", "reason": "qualified", "add_tags": '["hot","pre-approved"]'},
+    )
+    assert out.get("ok") is True
+    update_payloads = [e["payload"] for e in fake_db.log if e["op"] == "update"]
+    assert update_payloads, "expected an UPDATE on Contact"
+    assert update_payloads[0]["tags"] == ["existing", "hot", "pre-approved"]
