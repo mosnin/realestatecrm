@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
     # Model for the swarm orchestrator's fan-out workers (the swarm sub-
-    # agents). The main Chippi agent's model is the per-workspace pick
-    # (see chippi.py / llm.py); this is swarm-only.
-    worker_model: str = Field(default="tencent/hy3-preview")
+    # agents). The main Chippi agent's model is the chat model (see
+    # chippi.py / llm.py); this is swarm-only.
+    worker_model: str = Field(default="z-ai/glm-5.2")
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection

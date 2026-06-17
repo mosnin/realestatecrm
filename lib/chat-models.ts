@@ -19,18 +19,18 @@ export interface ChatModelOption {
 // Chippi runs on one fixed model — the user-facing picker was removed. Kept as a
 // one-entry registry so isValidChatModel / resolveChatModel still validate the
 // persisted AgentSettings.chatModel and fall stale picks back to the default.
-// Image turns transparently switch to qwen3.6-flash (see VISION_FALLBACK_MODEL
+// Qwen3.7 Plus is multimodal, so image turns stay on it (see VISION_FALLBACK_MODEL
 // in lib/chat/multimodal.ts); the autonomous swarm uses its own worker model.
 export const CHAT_MODELS: ChatModelOption[] = [
   {
-    id: 'deepseek/deepseek-v4-pro',
-    label: 'DeepSeek V4 Pro',
-    tagline: 'Chippi runs on DeepSeek V4 Pro.',
+    id: 'qwen/qwen3.7-plus',
+    label: 'Qwen3.7 Plus',
+    tagline: 'Chippi runs on Qwen3.7 Plus.',
   },
 ];
 
 /** The model used for chat. */
-export const DEFAULT_CHAT_MODEL = 'deepseek/deepseek-v4-pro';
+export const DEFAULT_CHAT_MODEL = 'qwen/qwen3.7-plus';
 
 /** Allowlist check — gate user-supplied model slugs before persisting. */
 export function isValidChatModel(value: unknown): value is string {

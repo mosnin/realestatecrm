@@ -26,8 +26,8 @@ Prompt caching (Phase 2 + Phase 3):
   - openai / deepseek: automatic on stable prefixes >1024 tokens. Phase 1
     already keeps the system prompt + tool list stable, so the provider
     caches without explicit markers. ~50% discount on cached input.
-  - xai / moonshotai / qwen / unknown: no caching path on OpenRouter today.
-    Phase 1's prompt trim is the only saving.
+  - xai / moonshotai / qwen / zai / unknown: no caching path on OpenRouter
+    today. Phase 1's prompt trim is the only saving.
 
 Keep CHAT_MODELS / DEFAULT_CHAT_MODEL in sync with lib/llm.ts.
 """
@@ -116,15 +116,15 @@ _patch_openai_event_schemas()
 
 # The model Chippi runs on. OpenRouter slug. Mirrors DEFAULT_CHAT_MODEL in
 # lib/chat-models.ts.
-DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-pro"
+DEFAULT_CHAT_MODEL = "qwen/qwen3.7-plus"
 
 # Allowlist resolve_chat_model() accepts (anything else falls back to the
 # default): the chat model + the swarm worker model (settings.worker_model).
 # The per-workspace picker was removed, so this is an internal allowlist, not a
 # user-facing menu.
 CHAT_MODELS: tuple[str, ...] = (
-    "deepseek/deepseek-v4-pro",
-    "tencent/hy3-preview",
+    "qwen/qwen3.7-plus",
+    "z-ai/glm-5.2",
 )
 
 # Embedding model — OpenRouter and OpenAI resolve this to the same
@@ -287,7 +287,8 @@ def detect_provider(model: str | None) -> str:
         'deepseek/deepseek-chat'    -> 'deepseek'
         'google/gemini-2.5-pro'     -> 'google'
         'moonshotai/kimi-k2.6'      -> 'moonshotai'
-        'qwen/qwen3.6-flash'        -> 'qwen'
+        'qwen/qwen3.7-plus'         -> 'qwen'
+        'z-ai/glm-5.2'              -> 'zai'   (note: dash normalized out)
         bare 'gpt-5'                -> 'openai' (OpenAI-direct fallback path)
 
     Drives caching behavior and the ChatUsage.provider column.
@@ -303,8 +304,8 @@ def detect_provider(model: str | None) -> str:
 
 # Providers where OpenRouter accepts explicit `cache_control` breakpoints.
 # Anthropic shipped first; Google Gemini explicit caching on OpenRouter uses
-# the SAME breakpoint shape per OpenRouter's docs (Phase 3). xAI/Moonshot/Qwen
-# have no caching path today. OpenAI/DeepSeek auto-cache on stable prefixes
+# the SAME breakpoint shape per OpenRouter's docs (Phase 3). xAI/Moonshot/Qwen/
+# Z.AI have no caching path today. OpenAI/DeepSeek auto-cache on stable prefixes
 # and don't need markers.
 _CACHE_MARKER_PROVIDERS = frozenset({"anthropic", "google"})
 
@@ -327,7 +328,7 @@ def make_chat_model(name: str):
     `cache_control` markers to the system message and the last tool just
     before the request goes out. Every other provider gets the plain SDK
     model — OpenAI / DeepSeek auto-cache on stable prefixes; xAI / Moonshot
-    / Qwen have no OpenRouter caching path today.
+    / Qwen / Z.AI have no OpenRouter caching path today.
     """
     from agents import OpenAIChatCompletionsModel
 
