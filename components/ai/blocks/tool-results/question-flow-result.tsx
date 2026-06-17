@@ -64,8 +64,8 @@ export function QuestionFlowResult({
     const progressiveProps: QuestionFlowProps = {
       ...parsed,
       onSelect: interactive
-        ? (optionIds) => {
-            const labels = optionIds.map((id) => labelById.get(id) ?? id);
+        ? (optionIds: string[]) => {
+            const labels = optionIds.map((id: string) => labelById.get(id) ?? id);
             const title = input.title ?? 'Answer';
             onUserIntent?.(`Answers — ${title}: ${labels.join(', ')}`);
           }
