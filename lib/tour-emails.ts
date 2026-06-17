@@ -139,6 +139,43 @@ export async function sendTourReminder(data: TourEmailData) {
   await sendEmail(guestEmail, subject, html);
 }
 
+export async function sendTourRescheduled(data: TourEmailData) {
+  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
+  const subject = `Tour Rescheduled — ${formatDate(startsAt)}`;
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been moved to a new time:</p>
+    ${detailBox([
+      { label: 'New date', value: formatDate(startsAt) },
+      { label: 'New time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If this new time doesn't work, just reply to this email and we'll sort it out.</p>
+  `;
+
+  const html = wrapHtml(businessName, 'Tour rescheduled', body, `Sent by ${esc(businessName)}`);
+  await sendEmail(guestEmail, subject, html);
+}
+
+export async function sendTourCancelled(data: TourEmailData) {
+  const { guestName, guestEmail, businessName, startsAt, propertyAddress } = data;
+  const subject = `Tour Cancelled — ${formatDate(startsAt)}`;
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been cancelled:</p>
+    ${detailBox([
+      { label: 'Was scheduled for', value: `${formatDate(startsAt)} at ${formatTime(startsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">Would you like to rebook? Reply to this email and we'll find a new time that works for you.</p>
+  `;
+
+  const html = wrapHtml(businessName, 'Tour cancelled', body, `Sent by ${esc(businessName)}`);
+  await sendEmail(guestEmail, subject, html);
+}
+
 export async function sendTourFollowUp(data: TourEmailData) {
   const { guestName, guestEmail, businessName, propertyAddress } = data;
   const subject = `Thanks for touring with ${businessName}!`;

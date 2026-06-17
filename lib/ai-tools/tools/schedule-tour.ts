@@ -7,8 +7,11 @@
  * sees the full prompt (guest, property, start/end) before we commit.
  *
  * Write order after approval:
- *   1. Insert Tour row (idempotent booking primitive — manage tokens,
- *      conflict checks, source attribution).
+ *   1. Insert the Tour row via the atomic `book_tour_atomic` DB function
+ *      (the shared `bookTourAtomic` helper) — the SAME conflict-checked,
+ *      row-locked path the public /api/tours/book endpoint uses, so the
+ *      agent can't double-book a slot that a guest (or another agent run)
+ *      just took. A conflict surfaces as a friendly error, not a 2nd tour.
  *   2. Write through to the connected external calendar via Composio
  *      (`GOOGLECALENDAR_CREATE_EVENT`) AND log a CalendarEventMirror
  *      row. The mirror row is the backup; the external calendar is the
@@ -31,6 +34,7 @@ import {
   findCalendarConnection,
   writeEventThrough,
 } from '@/lib/calendar/mirror';
+import { bookTourAtomic } from '@/lib/tour-booking';
 
 const parameters = z
   .object({
@@ -150,35 +154,46 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
       }
     }
 
-    const tourId = crypto.randomUUID();
-    const { data: inserted, error: insertErr } = await supabase
-      .from('Tour')
-      .insert({
-        id: tourId,
-        spaceId: ctx.space.id,
-        contactId,
-        guestName: guestName.trim(),
-        guestEmail: guestEmail.trim().toLowerCase(),
-        guestPhone,
-        propertyAddress: args.propertyAddress?.trim() || null,
-        notes: args.notes?.trim() || null,
-        startsAt: new Date(args.startsAt).toISOString(),
-        endsAt: new Date(args.endsAt).toISOString(),
-        status: 'scheduled',
-      })
-      .select('id, startsAt, endsAt')
-      .single();
-    if (insertErr || !inserted) {
-      logger.error(
-        '[tools.schedule_tour] insert failed',
-        { spaceId: ctx.space.id },
-        insertErr,
-      );
+    const startsAtIso = new Date(args.startsAt).toISOString();
+    const endsAtIso = new Date(args.endsAt).toISOString();
+
+    // Insert through the SAME atomic, conflict-checked path the public
+    // /api/tours/book endpoint uses. Never inserts into Tour directly —
+    // that bypassed the row-lock and let the agent double-book a slot.
+    const booking = await bookTourAtomic({
+      spaceId: ctx.space.id,
+      contactId,
+      guestName: guestName.trim(),
+      guestEmail: guestEmail.trim().toLowerCase(),
+      guestPhone,
+      propertyAddress: args.propertyAddress?.trim() || null,
+      notes: args.notes?.trim() || null,
+      startsAt: startsAtIso,
+      endsAt: endsAtIso,
+    });
+    if (!booking.ok && booking.reason === 'conflict') {
+      // Slot overlaps an existing scheduled/confirmed tour — refuse rather
+      // than stack a second booking on the same time.
       return {
-        summary: `Failed to schedule tour: ${insertErr?.message ?? 'unknown error'}`,
+        summary: `That time overlaps an existing tour — pick a different slot.`,
         display: 'error',
       };
     }
+    if (!booking.ok) {
+      logger.error(
+        '[tools.schedule_tour] insert failed',
+        { spaceId: ctx.space.id },
+        booking.error,
+      );
+      const message =
+        booking.error instanceof Error ? booking.error.message : 'unknown error';
+      return {
+        summary: `Failed to schedule tour: ${message}`,
+        display: 'error',
+      };
+    }
+    const tourId = booking.tourId;
+    const inserted = { id: tourId, startsAt: startsAtIso, endsAt: endsAtIso };
 
     // Audit the tour on the Contact's activity feed when linked.
     if (contactId) {

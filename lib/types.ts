@@ -534,6 +534,8 @@ export type Tour = {
   endsAt: Date;
   status: TourStatus;
   googleEventId: string | null;
+  reminder24SentAt: Date | null;
+  reminder1hSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

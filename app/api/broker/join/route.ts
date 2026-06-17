@@ -78,12 +78,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Deny-list check. If this user was previously removed from this
-  // brokerage, the anonymous code path is closed — the only way back
-  // in is an explicit /api/invitations/[token] acceptance from a
-  // broker_owner or broker_admin. A removed agent re-clicking the
-  // join URL they kept in their email gets a clear 403; the broker
-  // doesn't get a silent member_joined notification for someone they
-  // already fired.
+  // brokerage, the anonymous code path is closed. Re-admission requires
+  // the broker to first clear the BrokerageRemoval record — the email
+  // invitation path (/api/invitations/[token]) enforces the same deny-list,
+  // so a stale invite can't silently revive a removed account either. A
+  // removed agent re-clicking the join URL they kept in their email gets a
+  // clear 403; the broker doesn't get a silent member_joined notification
+  // for someone they already fired.
   const { data: removalRow } = await supabase
     .from('BrokerageRemoval')
     .select('brokerageId')

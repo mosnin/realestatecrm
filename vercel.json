@@ -9,6 +9,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/tour-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/broker-weekly-report",
       "schedule": "0 9 * * 1"
     },

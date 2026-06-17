@@ -5,6 +5,7 @@ import { sendTourConfirmation, type TourEmailData } from '@/lib/tour-emails';
 import { notifyNewTour } from '@/lib/notify';
 import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -138,31 +139,31 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate a cryptographically secure manage token (256-bit entropy)
-  const tokenBytes = new Uint8Array(32);
-  crypto.getRandomValues(tokenBytes);
-  const manageToken = Array.from(tokenBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const manageToken = generateManageToken();
 
-  // Atomic booking via DB function — conflict check + insert in a single
-  // transaction with row-level locking to prevent double-booking.
+  // Atomic booking via the shared DB-function helper — conflict check +
+  // insert in a single transaction with row-level locking to prevent
+  // double-booking. The agent tool (schedule_tour) routes through the SAME
+  // helper so neither path can bypass the conflict check.
   const tourId = crypto.randomUUID();
-  const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_atomic', {
-    p_id: tourId,
-    p_space_id: space.id,
-    p_contact_id: contactId,
-    p_guest_name: guestName.trim(),
-    p_guest_email: guestEmail.trim().toLowerCase(),
-    p_guest_phone: guestPhone?.trim() || null,
-    p_property_address: propertyAddress?.trim() || null,
-    p_notes: notes?.trim() || null,
-    p_starts_at: start.toISOString(),
-    p_ends_at: end.toISOString(),
-    p_property_profile_id: validPropertyProfileId,
-    p_manage_token: manageToken,
+  const booking = await bookTourAtomic({
+    id: tourId,
+    spaceId: space.id,
+    contactId,
+    guestName: guestName.trim(),
+    guestEmail: guestEmail.trim().toLowerCase(),
+    guestPhone: guestPhone?.trim() || null,
+    propertyAddress: propertyAddress?.trim() || null,
+    notes: notes?.trim() || null,
+    startsAt: start.toISOString(),
+    endsAt: end.toISOString(),
+    propertyProfileId: validPropertyProfileId,
+    manageToken,
   });
-  if (rpcError) throw rpcError;
+  if (!booking.ok && booking.reason === 'error') throw booking.error;
 
-  // NULL return means a conflicting tour was found
-  if (!bookedId) {
+  // Conflict → the slot was taken between the availability check and now.
+  if (!booking.ok) {
     return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
 
