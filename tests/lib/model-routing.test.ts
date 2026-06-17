@@ -1,11 +1,12 @@
 /**
  * Guards the fixed model strategy:
- *   - Chippi chats on DeepSeek V4 Pro (text-only).
- *   - Image turns switch to qwen3.6-flash (the vision fallback).
+ *   - Chippi chats on Qwen3.7 Plus (multimodal — text + vision).
+ *   - Image turns stay on Qwen3.7 Plus; only a non-vision model would upgrade
+ *     to the vision fallback (also Qwen3.7 Plus).
  *   - The per-workspace picker is gone, so stale/removed model picks fall back
  *     to the default instead of being sent to the provider.
  *
- * The autonomous swarm worker model (tencent/hy3-preview) lives in
+ * The autonomous swarm worker model (z-ai/glm-5.2) lives in
  * agent/config.py and is covered on the Python side.
  */
 
@@ -20,28 +21,34 @@ import {
 const IMG = { id: 'i', filename: 's.png', mimeType: 'image/png', url: 'https://x/s.png' };
 
 describe('fixed model strategy', () => {
-  it('default chat model is DeepSeek V4 Pro', () => {
-    expect(DEFAULT_CHAT_MODEL).toBe('deepseek/deepseek-v4-pro');
+  it('default chat model is Qwen3.7 Plus', () => {
+    expect(DEFAULT_CHAT_MODEL).toBe('qwen/qwen3.7-plus');
   });
 
   it('only the supported chat model validates; removed ones do not', () => {
-    expect(isValidChatModel('deepseek/deepseek-v4-pro')).toBe(true);
+    expect(isValidChatModel('qwen/qwen3.7-plus')).toBe(true);
+    expect(isValidChatModel('deepseek/deepseek-v4-pro')).toBe(false);
     expect(isValidChatModel('x-ai/grok-4.3')).toBe(false);
     expect(isValidChatModel('anthropic/claude-opus-4.7')).toBe(false);
   });
 
-  it('image turns switch to qwen3.6-flash', () => {
-    expect(VISION_FALLBACK_MODEL).toBe('qwen/qwen3.6-flash');
+  it('the vision fallback is the multimodal default; image turns stay on it', () => {
+    expect(VISION_FALLBACK_MODEL).toBe('qwen/qwen3.7-plus');
     expect(providerSupportsImages('qwen')).toBe(true);
     expect(providerSupportsImages('deepseek')).toBe(false);
-    // A DeepSeek (text-only) turn carrying an image upgrades to qwen for that turn.
+    // The default chat model is itself multimodal — an image turn stays put.
+    expect(pickModelForAttachments('qwen/qwen3.7-plus', [IMG], true)).toEqual({
+      model: 'qwen/qwen3.7-plus',
+      upgraded: false,
+    });
+    // A text-only model carrying an image upgrades to qwen for that turn.
     expect(pickModelForAttachments('deepseek/deepseek-v4-pro', [IMG], true)).toEqual({
-      model: 'qwen/qwen3.6-flash',
+      model: 'qwen/qwen3.7-plus',
       upgraded: true,
     });
-    // A text-only turn is left on DeepSeek.
-    expect(pickModelForAttachments('deepseek/deepseek-v4-pro', [], true)).toEqual({
-      model: 'deepseek/deepseek-v4-pro',
+    // A text-only turn is left on the requested model.
+    expect(pickModelForAttachments('qwen/qwen3.7-plus', [], true)).toEqual({
+      model: 'qwen/qwen3.7-plus',
       upgraded: false,
     });
   });
@@ -53,8 +60,8 @@ describe('resolveChatModel falls back for stale/removed picks', () => {
   it('returns the default for a model no longer in the registry (OpenRouter on)', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     const { resolveChatModel } = await import('@/lib/llm');
-    expect(resolveChatModel('x-ai/grok-4.3')).toBe('deepseek/deepseek-v4-pro');
-    expect(resolveChatModel('deepseek/deepseek-v4-pro')).toBe('deepseek/deepseek-v4-pro');
-    expect(resolveChatModel(null)).toBe('deepseek/deepseek-v4-pro');
+    expect(resolveChatModel('x-ai/grok-4.3')).toBe('qwen/qwen3.7-plus');
+    expect(resolveChatModel('qwen/qwen3.7-plus')).toBe('qwen/qwen3.7-plus');
+    expect(resolveChatModel(null)).toBe('qwen/qwen3.7-plus');
   });
 });
