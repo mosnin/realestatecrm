@@ -38,10 +38,8 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.tool_context import ToolContext  # noqa: E402
-from agents.usage import Usage  # noqa: E402
-
 from security.context import AgentContext  # noqa: E402
+from tests._helpers import disable_tool_error_wrapper, make_tool_context  # noqa: E402
 from tools import contacts as contacts_mod  # noqa: E402
 from tools import deals as deals_mod  # noqa: E402
 from tools import deletion as deletion_mod  # noqa: E402
@@ -146,10 +144,14 @@ _ALL_GATED = list(_DELETE_TOOLS.values())
 
 
 @pytest.fixture(autouse=True)
-def _disable_failure_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
-    for tool in [*_ALL_GATED, contacts_mod.update_contact, contacts_mod.create_contact]:
-        monkeypatch.setattr(tool, "_failure_error_function", None, raising=False)
-        monkeypatch.setattr(tool, "_use_default_failure_error_function", False, raising=False)
+def _disable_failure_handlers() -> Any:
+    undos = [
+        disable_tool_error_wrapper(tool)
+        for tool in [*_ALL_GATED, contacts_mod.update_contact, contacts_mod.create_contact]
+    ]
+    yield
+    for undo in undos:
+        undo()
 
 
 @pytest.fixture
@@ -181,28 +183,9 @@ def _contact_row(lead_type: str = "buyer", name: str = "Orlando Miller") -> dict
     return {"id": "c1", "name": name, "type": "QUALIFICATION", "leadType": lead_type}
 
 
-def _tool_ctx(agent_ctx: AgentContext, tool_name: str, args_json: str) -> ToolContext:
-    # ToolContext's constructor has gained/lost fields across openai-agents
-    # 0.0.x point releases (older builds lack tool_name/tool_arguments). Pass
-    # only the kwargs the installed signature accepts so this test runs on both
-    # the CI-pinned SDK and a contributor's local one.
-    import inspect
-
-    candidate: dict[str, Any] = {
-        "context": agent_ctx,
-        "usage": Usage(),
-        "tool_name": tool_name,
-        "tool_call_id": f"call_{tool_name}",
-        "tool_arguments": args_json,
-    }
-    accepted = set(inspect.signature(ToolContext.__init__).parameters)
-    kwargs = {k: v for k, v in candidate.items() if k in accepted}
-    return ToolContext(**kwargs)
-
-
 async def _invoke(tool: Any, agent_ctx: AgentContext, args: dict[str, Any]) -> Any:
     args_json = json.dumps(args)
-    out = await tool.on_invoke_tool(_tool_ctx(agent_ctx, tool.name, args_json), args_json)
+    out = await tool.on_invoke_tool(make_tool_context(agent_ctx, tool.name, args_json), args_json)
     # Tools return dicts; the SDK may hand us back the dict directly.
     if isinstance(out, str):
         try:
