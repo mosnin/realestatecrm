@@ -43,10 +43,8 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.tool_context import ToolContext  # noqa: E402
-from agents.usage import Usage  # noqa: E402
-
 from security.context import AgentContext  # noqa: E402
+from tests._helpers import make_tool_context  # noqa: E402
 from tools import contacts as contacts_mod  # noqa: E402
 from tools import deals as deals_mod  # noqa: E402
 from tools import properties as properties_mod  # noqa: E402
@@ -154,24 +152,9 @@ def _ctx() -> AgentContext:
     )
 
 
-def _tool_ctx(agent_ctx: AgentContext, tool_name: str, args_json: str) -> ToolContext:
-    import inspect
-
-    candidate: dict[str, Any] = {
-        "context": agent_ctx,
-        "usage": Usage(),
-        "tool_name": tool_name,
-        "tool_call_id": f"call_{tool_name}",
-        "tool_arguments": args_json,
-    }
-    accepted = set(inspect.signature(ToolContext.__init__).parameters)
-    kwargs = {k: v for k, v in candidate.items() if k in accepted}
-    return ToolContext(**kwargs)
-
-
 async def _invoke(tool: Any, agent_ctx: AgentContext, args: dict[str, Any]) -> Any:
     args_json = json.dumps(args)
-    out = await tool.on_invoke_tool(_tool_ctx(agent_ctx, tool.name, args_json), args_json)
+    out = await tool.on_invoke_tool(make_tool_context(agent_ctx, tool.name, args_json), args_json)
     if isinstance(out, str):
         try:
             return json.loads(out)
