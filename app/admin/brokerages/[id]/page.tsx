@@ -177,12 +177,15 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: members */}
         <div className="lg:col-span-2 space-y-2">
-          <p className={SECTION_LABEL}>
-            Members
-            <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
-              {members.length}
-            </span>
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className={SECTION_LABEL}>
+              Members
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+                {members.length}
+              </span>
+            </p>
+            <BrokerageActions action="invite-member" brokerageId={brokerage.id} />
+          </div>
           {members.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
               <p className="text-sm text-foreground">Nobody here yet.</p>
@@ -232,7 +235,12 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                       </p>
                     </div>
                     {m.role !== 'broker_owner' && (
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <BrokerageActions
+                          action="change-member-role"
+                          membershipId={m.id}
+                          currentRole={m.role}
+                        />
                         <BrokerageActions
                           action="remove-member"
                           membershipId={m.id}
