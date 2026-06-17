@@ -112,6 +112,11 @@ const optionalSchema = z.object({
   // Composio integrations
   COMPOSIO_API_KEY: z.string().optional(),
 
+  // RentCast — real comparables + valuation for the CMA engine (lib/rentcast.ts).
+  // Unset → CMA falls back to the workspace's own Property rows and labels the
+  // report's data source as "your CRM data" instead of "RentCast market data".
+  RENTCAST_API_KEY: z.string().optional(),
+
   // Ably real-time pub/sub — powers the live activity feed. SERVER-ONLY (never
   // NEXT_PUBLIC). Unset → the feed still works from the DB; only live updates
   // are disabled (publish no-ops, /api/ably/token returns 503).

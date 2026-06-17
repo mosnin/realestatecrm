@@ -9,8 +9,10 @@
  *
  * Design (Jobs lens): paper-flat, serif h1 + status sentence, one builder card,
  * a calm preview of the auto-selected comps + the computed range, a hairline-
- * divided list of past reports. No MLS, no external lookups — comps come from
- * the realtor's own Property rows.
+ * divided list of past reports. Comps + valuation come from RentCast market
+ * data (merged with the realtor's own Property rows); the preview labels which
+ * source produced the numbers. A direct MLS feed is a future source, not wired
+ * up yet.
  *
  * Build pass (Musk lens): the heavy lifting (comp selection, stats) lives in
  * lib/cma.ts and runs server-side on save. The client just collects the subject,
@@ -41,7 +43,8 @@ import {
   CAPTION,
   META,
 } from '@/lib/typography';
-import type { CmaPayload, CmaComp } from '@/lib/cma';
+import type { CmaPayload, CmaComp } from '@/lib/cma-types';
+import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +85,7 @@ function compFacts(c: CmaComp): string {
   if (c.beds != null) parts.push(`${c.beds}bd`);
   if (c.baths != null) parts.push(`${c.baths}ba`);
   if (c.squareFeet != null) parts.push(`${c.squareFeet.toLocaleString()} sqft`);
+  if (c.distanceMiles != null) parts.push(`${c.distanceMiles.toFixed(1)} mi`);
   return parts.join(' · ');
 }
 
@@ -265,7 +269,7 @@ export function CmaView({ slug }: { slug: string }) {
           Price a home.
         </h1>
         <p className={cn(BODY_MUTED)}>
-          Pick a subject, and Chippi pulls comps from your CRM and computes a range.
+          Pick a subject, and Chippi pulls real market comps and computes a range.
         </p>
       </header>
 
@@ -357,6 +361,9 @@ export function CmaView({ slug }: { slug: string }) {
               {preview.payload.stats.compCount === 1 ? '' : 's'}
               {preview.payload.stats.avgPricePerSqft != null &&
                 ` · avg $${preview.payload.stats.avgPricePerSqft.toLocaleString()}/sqft`}
+            </p>
+            <p className={cn(META)}>
+              Source: {DATA_SOURCE_LABEL[preview.payload.dataSource]}
             </p>
           </div>
 
