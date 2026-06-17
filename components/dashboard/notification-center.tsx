@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
@@ -12,10 +11,12 @@ import {
   AlertCircle,
   Briefcase,
   X,
+  CheckCheck,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
-import { H3 } from '@/lib/typography';
+import { SECTION_LABEL } from '@/lib/typography';
 
 interface Notification {
   id: string;
@@ -44,11 +45,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => { setMounted(true); }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -94,97 +91,148 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
     return () => { supabase.removeChannel(channel); };
   }, [loadNotifications, spaceId]);
 
-  // Close on escape
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
-  function navigate(href: string) {
+  // Click a notification → mark it read (persisted) AND navigate to its target.
+  // Optimistically remove it so it leaves the unread list and the badge drops
+  // immediately; the persisted state keeps it gone on the next fetch.
+  function handleOpenNotification(n: Notification) {
     setOpen(false);
-    router.push(href);
+    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+    void fetch(`/api/notifications?slug=${encodeURIComponent(slug)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: n.id, sourceCreatedAt: n.createdAt }),
+    }).catch(() => {});
+    router.push(n.href);
+  }
+
+  // X on a row → dismiss it (persisted) without navigating.
+  function handleDismiss(n: Notification, e: React.MouseEvent) {
+    e.stopPropagation();
+    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+    const params = new URLSearchParams({
+      slug,
+      key: n.id,
+      sourceCreatedAt: n.createdAt,
+    });
+    void fetch(`/api/notifications?${params.toString()}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  }
+
+  function handleMarkAllRead() {
+    if (notifications.length === 0) return;
+    setNotifications([]);
+    void fetch(`/api/notifications?slug=${encodeURIComponent(slug)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => {});
   }
 
   const highCount = notifications.filter((n) => n.priority === 'high').length;
   const totalCount = notifications.length;
 
-  const dropdown = open && mounted ? createPortal(
-    <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)}>
-      <div
-        className="absolute right-4 md:right-8 top-12 w-80 sm:w-96 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={totalCount > 0 ? `${totalCount} notifications` : 'Notifications'}
+          title="Notifications"
+          className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors data-[state=open]:bg-foreground/[0.045] data-[state=open]:text-foreground"
+        >
+          <Bell size={14} strokeWidth={1.75} />
+          {totalCount > 0 && (
+            <span
+              className={cn(
+                'absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold leading-none inline-flex items-center justify-center tabular-nums ring-2 ring-background',
+                highCount > 0
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-foreground/15 text-foreground/70',
+              )}
+            >
+              {totalCount > 9 ? '9+' : totalCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-80 sm:w-96 p-1.5 rounded-xl border border-border/70"
       >
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <span className={H3}>Notifications</span>
-          <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground">
-            <X size={14} />
-          </button>
+        <div className="flex items-center justify-between px-2 pt-1.5 pb-1">
+          <p className={SECTION_LABEL}>Notifications</p>
+          {totalCount > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <CheckCheck size={12} strokeWidth={1.75} />
+              Mark all read
+            </button>
+          )}
         </div>
 
-        <div className="max-h-80 overflow-y-auto">
-          {notifications.length === 0 ? (
+        <div className="max-h-[22rem] overflow-y-auto">
+          {totalCount === 0 ? (
             <div className="py-10 text-center text-muted-foreground">
-              <Bell size={24} className="mx-auto mb-2 opacity-30" />
+              <Bell size={24} className="mx-auto mb-2 opacity-30" strokeWidth={1.75} />
               <p className="text-sm">Nothing pressing.</p>
               <p className="text-xs mt-0.5">I&apos;m watching the pipeline.</p>
             </div>
           ) : (
-            <div className="py-1">
+            <div className="space-y-0.5">
               {notifications.map((n) => {
                 const Icon = TYPE_ICONS[n.type] || AlertCircle;
                 return (
-                  <button
+                  <div
                     key={n.id}
-                    onClick={() => navigate(n.href)}
-                    className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-foreground/[0.04] transition-colors"
+                    className="group flex items-start gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-foreground/[0.05]"
                   >
-                    <div className={cn(
-                      'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
-                      n.priority === 'high' ? 'bg-red-100 dark:bg-red-500/15' :
-                      n.priority === 'medium' ? 'bg-amber-100 dark:bg-amber-500/15' :
-                      'bg-muted'
-                    )}>
-                      <Icon size={14} className={PRIORITY_COLORS[n.priority]} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{n.description}</p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenNotification(n)}
+                      className="flex flex-1 min-w-0 items-start gap-2.5 text-left active:scale-[0.99] transition-transform duration-150"
+                    >
+                      <span
+                        className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
+                          n.priority === 'high'
+                            ? 'bg-red-100 dark:bg-red-500/15'
+                            : n.priority === 'medium'
+                              ? 'bg-amber-100 dark:bg-amber-500/15'
+                              : 'bg-foreground/[0.06]',
+                        )}
+                      >
+                        <Icon size={14} strokeWidth={1.75} className={PRIORITY_COLORS[n.priority]} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13px] font-medium leading-tight text-foreground truncate">
+                          {n.title}
+                        </span>
+                        <span className="block text-[11px] leading-snug mt-0.5 text-muted-foreground/80 truncate">
+                          {n.description}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDismiss(n, e)}
+                      aria-label="Dismiss notification"
+                      className="flex-shrink-0 -mr-0.5 mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-all duration-150 hover:bg-foreground/[0.06] hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      <X size={13} strokeWidth={1.75} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={() => setOpen(!open)}
-        className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
-        title="Notifications"
-        aria-label={totalCount > 0 ? `${totalCount} notifications` : 'Notifications'}
-      >
-        <Bell size={14} strokeWidth={1.75} />
-        {totalCount > 0 && (
-          <span className={cn(
-            'absolute top-1 right-1 min-w-[14px] h-3.5 rounded-full text-[9px] font-semibold flex items-center justify-center px-1 leading-none ring-2 ring-background',
-            highCount > 0
-              ? 'bg-orange-500 text-white'
-              : 'bg-foreground/15 text-foreground/70'
-          )}>
-            {totalCount > 9 ? '9+' : totalCount}
-          </span>
-        )}
-      </button>
-      {dropdown}
-    </>
+      </PopoverContent>
+    </Popover>
   );
 }
