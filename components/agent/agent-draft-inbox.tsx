@@ -124,6 +124,39 @@ const AUTO_SEND_CONFIDENCE_THRESHOLD = 80;
 const AUTO_SEND_DELAY_MS = 30_000;
 const AUTO_SEND_TICK_MS = 250;
 
+// ─── Batch-approve payload ────────────────────────────────────────────────────
+
+export interface BatchApprovePayload {
+  draftIds: string[];
+  edits?: Record<string, string>;
+}
+
+/**
+ * Build the POST body for /api/agent/drafts/batch-approve.
+ *
+ * The bug this guards against: the inbox used to send only { draftIds }, so a
+ * realtor's inline edit was silently dropped and the stored draft shipped
+ * instead. We now carry an `edits` map (draftId → edited text) the endpoint
+ * already supports — but ONLY for ids that are actually in this batch and that
+ * actually have an edit. Pure so it can be unit-tested without rendering.
+ *
+ * The `edits` key is omitted entirely when there are no edits, keeping the
+ * common "approve as-is" payload byte-identical to before (backward-compat).
+ */
+export function buildBatchApprovePayload(
+  ids: string[],
+  edits: Map<string, string>,
+): BatchApprovePayload {
+  const scoped: Record<string, string> = {};
+  for (const id of ids) {
+    const edited = edits.get(id);
+    if (edited !== undefined) scoped[id] = edited;
+  }
+  return Object.keys(scoped).length > 0
+    ? { draftIds: ids, edits: scoped }
+    : { draftIds: ids };
+}
+
 // ─── DraftRow ────────────────────────────────────────────────────────────────
 
 function DraftRow({
@@ -132,6 +165,7 @@ function DraftRow({
   selected,
   onToggleSelect,
   onAction,
+  onEditChange,
   onCelebrationDone,
 }: {
   draft: AgentDraft;
@@ -139,6 +173,10 @@ function DraftRow({
   selected: boolean;
   onToggleSelect: () => void;
   onAction: (id: string, status: 'approved' | 'dismissed', content?: string) => Promise<DeliveryResult | null>;
+  /** Reports the row's edited content to the parent so bulk actions (Approve
+   *  all / Approve N selected) send the realtor's edits, not the stored draft.
+   *  Passes null when the content matches the original (no edit to carry). */
+  onEditChange: (id: string, content: string | null) => void;
   /** Called once the row's celebration dwell has finished — parent removes the row then. */
   onCelebrationDone: (id: string) => void;
 }) {
@@ -174,6 +212,14 @@ function DraftRow({
     draft.confidence !== null &&
     draft.confidence !== undefined &&
     draft.confidence >= AUTO_SEND_CONFIDENCE_THRESHOLD;
+
+  // Keep the parent's edits map in sync so bulk actions ship what the realtor
+  // actually wrote. Reports the trimmed edit when it differs from the stored
+  // draft, null otherwise. Runs whenever the effective edit changes (including
+  // back to the original via Cancel, which clears the parent entry).
+  useEffect(() => {
+    onEditChange(draft.id, isEdited ? editedContent.trim() : null);
+  }, [draft.id, isEdited, editedContent, onEditChange]);
 
   function startEdit() {
     setEditing(true);
@@ -497,7 +543,7 @@ function DraftRow({
               <AlertDialogHeader>
                 <AlertDialogTitle>Send this {draft.channel}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  I'll send this to {draft.Contact?.name ?? 'this contact'}. Once it's gone, it's gone.
+                  I&apos;ll send this to {draft.Contact?.name ?? 'this contact'}. Once it&apos;s gone, it&apos;s gone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -645,6 +691,16 @@ export function AgentDraftInbox({ slug }: Props) {
   // doesn't care about row order. Cleared on Esc and after a batch action.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchApproving, setBatchApproving] = useState(false);
+  // Per-row edited content, lifted from the rows so the bulk paths can ship
+  // the realtor's edits. draftId → trimmed edited text; absent when the row is
+  // unchanged. The single-row Approve already sends its own edit; this map
+  // only feeds "Approve all" and "Approve N selected".
+  const editsRef = useRef<Map<string, string>>(new Map());
+
+  const handleEditChange = useCallback((id: string, content: string | null) => {
+    if (content === null) editsRef.current.delete(id);
+    else editsRef.current.set(id, content);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -674,10 +730,15 @@ export function AgentDraftInbox({ slug }: Props) {
 
   // Drop selected ids that no longer correspond to a visible draft (e.g.
   // refresh removed them) so the sticky bar never claims phantom selections.
+  // Prune the edits map the same way so it can't grow unbounded or reapply a
+  // stale edit if a draft id is ever recycled.
   useEffect(() => {
+    const valid = new Set(drafts.map((d) => d.id));
+    for (const id of editsRef.current.keys()) {
+      if (!valid.has(id)) editsRef.current.delete(id);
+    }
     setSelectedIds((prev) => {
       if (prev.size === 0) return prev;
-      const valid = new Set(drafts.map((d) => d.id));
       let changed = false;
       const next = new Set<string>();
       for (const id of prev) {
@@ -777,13 +838,31 @@ export function AgentDraftInbox({ slug }: Props) {
         drafts.map((d) => fetch(`/api/agent/drafts/${d.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'approved', content: d.content }),
-        }).then((r) => { if (!r.ok) throw new Error(r.status.toString()); }))
+          // Ship the realtor's inline edit when present, else the stored draft.
+          body: JSON.stringify({ status: 'approved', content: editsRef.current.get(d.id) ?? d.content }),
+        }).then(async (r) => {
+          if (!r.ok) throw new Error(r.status.toString());
+          // Resolve to whether the message actually went out so we can warn
+          // about approved-but-undelivered rows instead of claiming a send.
+          const body = (await r.json().catch(() => null)) as { deliveryResult?: DeliveryResult } | null;
+          return body?.deliveryResult?.sent !== false;
+        }))
       );
       const failed = results.filter((r) => r.status === 'rejected').length;
       const succeeded = results.length - failed;
+      const notDelivered = results.filter(
+        (r) => r.status === 'fulfilled' && r.value === false,
+      ).length;
       if (failed > 0) {
         toast.error(`${succeeded} approved, ${failed} got stuck. Try those again.`);
+      } else if (notDelivered > 0) {
+        // Approved cleanly, but some couldn't be delivered (no channel
+        // configured / provider rejected). Say so rather than implying a send.
+        toast.warning(
+          notDelivered === succeeded
+            ? `Approved, but none could be sent — send those ${succeeded} manually.`
+            : `${succeeded} approved — ${notDelivered} couldn’t be sent. Send those manually.`,
+        );
       } else {
         toast.success(`All ${succeeded} drafts approved.`);
       }
@@ -804,11 +883,15 @@ export function AgentDraftInbox({ slug }: Props) {
     const snapshot = drafts.filter((d) => selectedIds.has(d.id));
     setDrafts((prev) => prev.filter((d) => !selectedIds.has(d.id)));
 
+    // Carry per-draft inline edits so the bulk path ships what the realtor
+    // wrote. The endpoint validates this map and labels edited rows
+    // 'edited_and_approved'; without it, batch-approve silently sent the
+    // un-edited stored draft.
     try {
       const res = await fetch('/api/agent/drafts/batch-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftIds: ids }),
+        body: JSON.stringify(buildBatchApprovePayload(ids, editsRef.current)),
       });
 
       if (!res.ok) {
@@ -827,11 +910,25 @@ export function AgentDraftInbox({ slug }: Props) {
       }
 
       const data = (await res.json()) as {
-        results: Array<{ draftId: string; ok: boolean; error?: string }>;
+        results: Array<{
+          draftId: string;
+          ok: boolean;
+          error?: string;
+          status?: 'sent' | 'approved';
+          deliveryResult?: DeliveryResult;
+        }>;
       };
 
       const failed = data.results.filter((r) => !r.ok);
       const succeeded = data.results.length - failed.length;
+      // Drafts that moved out of pending but whose message did NOT actually go
+      // out (delivery unconfigured or the provider rejected it). These are
+      // ok=true server-side but the realtor must know they still need to send
+      // manually — otherwise "approved" reads as "sent" and a client is left
+      // hanging. Mirrors the single-row DeliveryBanner's honesty.
+      const notDelivered = data.results.filter(
+        (r) => r.ok && r.deliveryResult && !r.deliveryResult.sent,
+      ).length;
 
       // Restore any drafts that failed so the realtor can retry them in
       // place. Successful ones stay removed.
@@ -845,9 +942,22 @@ export function AgentDraftInbox({ slug }: Props) {
       }
 
       if (failed.length === 0) {
-        toast.success(
-          succeeded === 1 ? '1 draft approved.' : `${succeeded} drafts approved.`,
-        );
+        if (notDelivered > 0) {
+          // All approved, but some couldn't be delivered. Don't dress it up as
+          // a clean send — tell the realtor exactly what still needs a manual
+          // send so they can follow up.
+          toast.warning(
+            notDelivered === succeeded
+              ? (succeeded === 1
+                  ? 'Approved, but it couldn’t be sent — send it manually.'
+                  : `Approved, but none could be sent — send those ${succeeded} manually.`)
+              : `${succeeded} approved — ${notDelivered} couldn’t be sent. Send those manually.`,
+          );
+        } else {
+          toast.success(
+            succeeded === 1 ? '1 draft approved.' : `${succeeded} drafts approved.`,
+          );
+        }
       } else if (succeeded === 0) {
         toast.error(
           failed.length === 1
@@ -955,6 +1065,7 @@ export function AgentDraftInbox({ slug }: Props) {
                 selected={selectedIds.has(draft.id)}
                 onToggleSelect={() => toggleSelect(draft.id)}
                 onAction={handleAction}
+                onEditChange={handleEditChange}
                 onCelebrationDone={handleCelebrationDone}
               />
             </StaggerItem>
