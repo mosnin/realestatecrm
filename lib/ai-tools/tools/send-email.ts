@@ -214,7 +214,24 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       }
     }
 
-    const idemKey = makeIdempotencyKey('send_email', ctx.space.id, resolvedEmail, args.subject);
+    // Idempotency key must distinguish genuinely-different messages while still
+    // collapsing true retries (identical recipient + subject + body) into one
+    // send. Keying on (spaceId, email, subject) alone wrongly treats two
+    // different same-subject emails to the same person (e.g. two "Following up"
+    // notes) as duplicates and silently drops all but the first. Fold a stable
+    // hash of the normalized body into the key so different bodies each send,
+    // while a byte-for-byte retry still dedupes.
+    const bodyHash = crypto
+      .createHash('sha256')
+      .update(args.body.trim())
+      .digest('hex');
+    const idemKey = makeIdempotencyKey(
+      'send_email',
+      ctx.space.id,
+      resolvedEmail,
+      args.subject,
+      bodyHash,
+    );
     try {
       await withIdempotency(idemKey, () =>
         sendEmailFromCRM({
