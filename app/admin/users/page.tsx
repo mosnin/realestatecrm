@@ -54,6 +54,29 @@ export default async function AdminUsersPage({
       const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
       return !sp;
     });
+  // Subscription-status filters — used by the Overview "at risk" deep-links
+  // (?filter=trialing | past-due | inactive). The Space row carries the live
+  // Stripe status, so we filter on it here rather than silently ignoring it.
+  if (filter === 'trialing')
+    results = results.filter((r: any) => {
+      const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+      return sp?.stripeSubscriptionStatus === 'trialing';
+    });
+  if (filter === 'past-due')
+    results = results.filter((r: any) => {
+      const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+      return sp?.stripeSubscriptionStatus === 'past_due';
+    });
+  // "inactive" = a workspace with no live paying subscription (no status, or a
+  // churned/dormant one). Mirrors the Overview "Inactive workspaces" intent at
+  // the granularity the user list has (subscription state).
+  if (filter === 'inactive')
+    results = results.filter((r: any) => {
+      const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+      if (!sp) return false;
+      const s = sp.stripeSubscriptionStatus;
+      return !s || s === 'inactive' || s === 'canceled' || s === 'unpaid';
+    });
 
   const users = results.map((row: any) => {
     const spaceData = Array.isArray(row.Space) ? row.Space[0] : row.Space;

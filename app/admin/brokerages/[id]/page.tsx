@@ -103,7 +103,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
 
   const [dealRows, pendingInviteCount] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'active').then((r) => r.data ?? [])
       : Promise.resolve([]),
     supabase.from('Invitation').select('*', { count: 'exact', head: true }).eq('brokerageId', id).eq('status', 'pending'),
   ]);

@@ -134,7 +134,16 @@ export function UserActions({
   const [repairLoading, setRepairLoading] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [repairOpen, setRepairOpen] = useState(false);
-  const [subStatus, setSubStatus] = useState(subscriptionStatus || 'inactive');
+  // Seed the "set status" target with the current status only when it's one the
+  // dropdown actually offers; otherwise (e.g. 'active', which is intentionally not
+  // a settable target — see SUBSCRIPTION_STATUSES) fall back to a valid option so
+  // the controlled <select> never renders with a value that has no matching
+  // <option> (which leaves it blank / shows the wrong selection).
+  const [subStatus, setSubStatus] = useState<string>(
+    (SUBSCRIPTION_STATUSES as readonly string[]).includes(subscriptionStatus ?? '')
+      ? (subscriptionStatus as string)
+      : 'trialing',
+  );
   const [subLoading, setSubLoading] = useState(false);
   const [subResult, setSubResult] = useState<string | null>(null);
   const [suspended, setSuspended] = useState(isSuspendedInitial);

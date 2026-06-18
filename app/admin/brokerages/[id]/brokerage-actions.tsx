@@ -103,10 +103,12 @@ function ToggleStatus({
 }: ToggleProps & { onDone: () => void }) {
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function toggle() {
     const next = status === 'active' ? 'suspended' : 'active';
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/brokerages/${brokerageId}`, {
         method: 'PATCH',
@@ -116,22 +118,30 @@ function ToggleStatus({
       if (res.ok) {
         setStatus(next);
         onDone();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Couldn’t update status. Try again.');
       }
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={toggle}
-      disabled={loading}
-      className="w-full text-xs justify-start"
-    >
-      {loading ? '…' : status === 'active' ? 'Suspend brokerage' : 'Reactivate brokerage'}
-    </Button>
+    <div className="w-full">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={toggle}
+        disabled={loading}
+        className="w-full text-xs justify-start"
+      >
+        {loading ? '…' : status === 'active' ? 'Suspend brokerage' : 'Reactivate brokerage'}
+      </Button>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
   );
 }
 
@@ -141,30 +151,40 @@ function RemoveMember({
   onDone,
 }: RemoveMemberProps & { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function remove() {
     if (!confirm(`Remove ${label} from this brokerage?`)) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/memberships/${membershipId}`, { method: 'DELETE' });
       if (res.ok) {
         onDone();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Couldn’t remove member.');
       }
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={remove}
-      disabled={loading}
-      className="text-xs text-destructive hover:text-destructive h-7 px-2"
-    >
-      {loading ? '…' : 'Remove'}
-    </Button>
+    <div className="flex flex-col items-end">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={remove}
+        disabled={loading}
+        className="text-xs text-destructive hover:text-destructive h-7 px-2"
+      >
+        {loading ? '…' : 'Remove'}
+      </Button>
+      {error && <p className="text-[11px] text-destructive mt-0.5">{error}</p>}
+    </div>
   );
 }
 
@@ -175,10 +195,12 @@ function ChangeMemberRole({
 }: ChangeMemberRoleProps & { onDone: () => void }) {
   const [role, setRole] = useState(currentRole);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function change(next: string) {
     if (next === role) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/memberships/${membershipId}`, {
         method: 'PATCH',
@@ -188,23 +210,32 @@ function ChangeMemberRole({
       if (res.ok) {
         setRole(next);
         onDone();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        // Keep the select reflecting the unchanged role on failure.
+        setError(data.error || 'Couldn’t change role.');
       }
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <select
-      value={role}
-      onChange={(e) => change(e.target.value)}
-      disabled={loading}
-      aria-label="Member role"
-      className="text-[11px] rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring"
-    >
-      <option value="broker_admin">Admin</option>
-      <option value="realtor_member">Realtor</option>
-    </select>
+    <div className="flex flex-col items-end">
+      <select
+        value={role}
+        onChange={(e) => change(e.target.value)}
+        disabled={loading}
+        aria-label="Member role"
+        className="text-[11px] rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <option value="broker_admin">Admin</option>
+        <option value="realtor_member">Realtor</option>
+      </select>
+      {error && <p className="text-[11px] text-destructive mt-0.5">{error}</p>}
+    </div>
   );
 }
 
@@ -304,10 +335,12 @@ function RevokeInvite({
   onDone,
 }: RevokeInviteProps & { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function revoke() {
     if (!confirm(`Revoke invitation to ${label}?`)) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/invitations/${invitationId}`, {
         method: 'PATCH',
@@ -316,28 +349,37 @@ function RevokeInvite({
       });
       if (res.ok) {
         onDone();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Couldn’t revoke invitation.');
       }
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={revoke}
-      disabled={loading}
-      className="text-xs text-destructive hover:text-destructive h-7 px-2"
-    >
-      {loading ? '…' : 'Revoke'}
-    </Button>
+    <div className="flex flex-col items-end">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={revoke}
+        disabled={loading}
+        className="text-xs text-destructive hover:text-destructive h-7 px-2"
+      >
+        {loading ? '…' : 'Revoke'}
+      </Button>
+      {error && <p className="text-[11px] text-destructive mt-0.5">{error}</p>}
+    </div>
   );
 }
 
 function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function deleteBrokerage() {
     if (
@@ -347,26 +389,35 @@ function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
     )
       return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/brokerages/${brokerageId}`, { method: 'DELETE' });
       if (res.ok) {
         router.push('/admin/brokerages');
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Couldn’t delete brokerage.');
       }
+    } catch {
+      setError('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={deleteBrokerage}
-      disabled={loading}
-      className="w-full text-xs justify-start border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-    >
-      {loading ? '…' : 'Delete brokerage'}
-    </Button>
+    <div className="w-full">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={deleteBrokerage}
+        disabled={loading}
+        className="w-full text-xs justify-start border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        {loading ? '…' : 'Delete brokerage'}
+      </Button>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
   );
 }
