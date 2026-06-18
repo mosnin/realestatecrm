@@ -18,8 +18,10 @@ export default async function SignUpPage({
   const isBroker = intent === 'broker';
   const redirectIntent = isBroker ? 'broker' : 'realtor';
   const signInBase = isBroker ? '/login/broker' : '/login/realtor';
-  // Validate redirect_url: allow safe internal paths, block path traversal
-  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  // Validate redirect_url: allow safe internal paths, block path traversal.
+  // '/join/' lets a brokerage join-code link survive the sign-up round-trip
+  // (reachable from the realtor sign-in page's "Sign up" link).
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/join/', '/subscribe', '/billing-required', '/authorize'];
   const isSafeRedirect = redirect_url
     && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
     && !redirect_url.includes('..');
