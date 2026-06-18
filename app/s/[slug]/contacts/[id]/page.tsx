@@ -12,7 +12,9 @@ import {
   MessageCircle,
   Calendar,
   ChevronDown,
+  Users,
 } from 'lucide-react';
+import { H3, BODY_MUTED } from '@/lib/typography';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { CopyApplicantPortalLink } from '@/components/contacts/copy-applicant-portal-link';
@@ -109,11 +111,23 @@ export default async function ClientDetailPage({
   } catch (err) {
     console.error('[contact-detail] DB query failed', { slug, id, error: err });
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load this person. This is usually temporary.</p>
-          <a href={`/s/${slug}/contacts`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Back to people</a>
+      <div className="flex min-h-[50vh] items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+            <Users size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
+          </div>
+          <h1 className={H3}>This person didn&apos;t load</h1>
+          <p className={cn(BODY_MUTED, 'mt-1.5')}>
+            The connection hiccupped on the way in. It&apos;s almost always a passing
+            thing.
+          </p>
+          <a
+            href={`/s/${slug}/contacts`}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 h-9 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+          >
+            <ArrowLeft size={14} />
+            Back to people
+          </a>
         </div>
       </div>
     );
@@ -514,7 +528,7 @@ export default async function ClientDetailPage({
           record, not the realtor's daily task. */}
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
-          <span>Follow-up &amp; lifecycle</span>
+          <span>Follow-up & lifecycle</span>
           <span className="inline-flex items-center gap-2">
             <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
             <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>

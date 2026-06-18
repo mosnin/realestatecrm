@@ -9,13 +9,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Mic, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Mic, MoreHorizontal, TrendingUp, RotateCcw } from 'lucide-react';
 import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, getInitials } from '@/lib/formatting';
 import { roleLabel } from '@/lib/deals/roles';
 import {
   H1,
+  H3,
   TITLE_FONT,
   BODY_MUTED,
   SECTION_LABEL,
@@ -181,14 +182,21 @@ export default async function DealDetailPage({
   } catch (err) {
     console.error('[deal-detail] DB queries failed', err);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
+      <div className="flex min-h-[50vh] items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+            <TrendingUp size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
+          </div>
+          <h1 className={H3}>This deal didn&apos;t load</h1>
+          <p className={cn(BODY_MUTED, 'mt-1.5')}>
+            The connection hiccupped on the way in. Nothing was lost — this is almost
+            always a passing thing.
+          </p>
           <a
             href={`/s/${slug}/deals/${id}`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
           >
+            <RotateCcw size={14} />
             Try again
           </a>
         </div>

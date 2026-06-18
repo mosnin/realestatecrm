@@ -60,7 +60,7 @@ import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { motion } from 'framer-motion';
-import { EASE_APPLE } from '@/lib/motion';
+import { EASE_APPLE, DURATION_FAST } from '@/lib/motion';
 
 type Client = {
   id: string;
@@ -1002,7 +1002,13 @@ export function ContactTable({ slug }: ContactTableProps) {
       {/* Card view — stage-grouped (existing pattern, kept for the grid
           toggle; cleaned only of the always-on checkbox). */}
       {!loading && !error && visibleContacts.length > 0 && view === 'card' && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <motion.div
+          key="card-view"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
+          className="grid grid-cols-1 gap-5 sm:grid-cols-3"
+        >
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
             if (stageContacts.length === 0 && !search && !tagFilter) {
@@ -1059,12 +1065,19 @@ export function ContactTable({ slug }: ContactTableProps) {
               </div>
             );
           })}
-        </div>
+        </motion.div>
       )}
 
-      {/* List view — divide-y row vocabulary. */}
+      {/* List view — divide-y row vocabulary. Keyed fade so toggling from the
+          card grid cross-dissolves rather than hard-cuts. The per-row stagger
+          is gated to the first mount, so it doesn't re-fire on every toggle. */}
       {!loading && !error && visibleContacts.length > 0 && view === 'list' && (
-        <div>
+        <motion.div
+          key="list-view"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
+        >
           {/* Tiny strip — only when select mode is on, so the select-all
               checkbox has a home. Otherwise the row list speaks for itself;
               column labels on a single-data-line list are chrome that pays
@@ -1103,7 +1116,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               />
             ))}
           </ul>
-        </div>
+        </motion.div>
       )}
 
       {/* Bulk-action bar — only when something is selected. */}

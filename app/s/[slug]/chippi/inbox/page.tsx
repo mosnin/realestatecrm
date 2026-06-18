@@ -16,9 +16,11 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
+import { CheckCircle2 } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { BODY_MUTED } from '@/lib/typography';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ApprovalActions } from '../approvals/approval-actions';
@@ -111,9 +113,13 @@ export default async function ChippiInboxPage({
       title={pendingCount === 0 ? 'Nothing waiting.' : 'Need your call.'}
     >
       {!hasDrafts && !hasApprovals ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
-          <p className="text-xs text-muted-foreground">
-            I&apos;ll bring drafts and decisions here when they need you.
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+            <CheckCircle2 size={22} strokeWidth={1.5} className="text-muted-foreground/60" />
+          </div>
+          <p className="text-base text-foreground">You&apos;re all caught up.</p>
+          <p className={cn(BODY_MUTED, 'mt-1.5 max-w-xs')}>
+            When Chippi has a draft to send or a decision for you, it&apos;ll land here.
           </p>
         </div>
       ) : (

@@ -19,7 +19,10 @@ import {
   List,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { useRealtime } from '@/hooks/use-realtime';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -168,9 +171,15 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
       } else {
         const data = await res.json().catch(() => ({}));
         console.error('[Tours] Status update failed:', data.error);
+        toast.error("Couldn't update that tour. Try again.", {
+          action: { label: 'Retry', onClick: () => void updateStatus(tourId, status) },
+        });
       }
     } catch (err) {
       console.error('[Tours] Status update error:', err);
+      toast.error("Couldn't update that tour. Try again.", {
+        action: { label: 'Retry', onClick: () => void updateStatus(tourId, status) },
+      });
     } finally {
       setUpdatingId(null);
     }
@@ -189,9 +198,19 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
         setTours((prev) =>
           prev.map((t) => (t.id === tourId ? { ...t, googleEventId: data.googleEventId } : t))
         );
+        toast.success('Added to your Google Calendar.');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        console.error('[Tours] Sync failed:', data.error);
+        toast.error(
+          data.error === 'not_connected'
+            ? 'Connect Google Calendar in Integrations first.'
+            : "Couldn't sync to Google Calendar. Try again.",
+        );
       }
     } catch (err) {
       console.error('[Tours] Sync failed:', err);
+      toast.error("Couldn't sync to Google Calendar. Try again.");
     } finally {
       setSyncingId(null);
     }
@@ -210,13 +229,26 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
         setTours((prev) =>
           prev.map((t) => (t.id === tourId ? { ...t, sourceDealId: data.deal.id } : t))
         );
+        toast.success('Tour turned into a deal.');
         router.push(`/s/${slug}/deals/${data.deal.id}`);
       } else if (res.status === 409) {
         const data = await res.json();
-        if (data.dealId) router.push(`/s/${slug}/deals/${data.dealId}`);
+        if (data.dealId) {
+          toast.info('This tour already has a deal — opening it.');
+          router.push(`/s/${slug}/deals/${data.dealId}`);
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        console.error('[Tours] Convert failed:', data.error);
+        toast.error("Couldn't turn this into a deal. Try again.", {
+          action: { label: 'Retry', onClick: () => void convertToDeal(tourId) },
+        });
       }
     } catch (err) {
       console.error('[Tours] Convert failed:', err);
+      toast.error("Couldn't turn this into a deal. Try again.", {
+        action: { label: 'Retry', onClick: () => void convertToDeal(tourId) },
+      });
     } finally {
       setConvertingId(null);
     }
@@ -301,22 +333,37 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
       {/* Stats */}
       <TourStatsStrip tours={tours.map((t) => ({ startsAt: t.startsAt, status: t.status, sourceDealId: t.sourceDealId, createdAt: t.createdAt }))} />
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border/70">
-        {(['upcoming', 'past', 'all', 'availability'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px',
-              tab === t
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {t === 'upcoming' ? 'Upcoming' : t === 'past' ? 'Past' : t === 'all' ? 'All' : 'Availability'}
-          </button>
-        ))}
+      {/* Tabs — animated active underline (shared layoutId) so switching slides
+          rather than cuts. role=tablist + role=tab so screen readers announce
+          the tab group and selected state. */}
+      <div role="tablist" aria-label="Tour views" className="flex items-center gap-1 border-b border-border/70">
+        {(['upcoming', 'past', 'all', 'availability'] as const).map((t) => {
+          const active = tab === t;
+          const label =
+            t === 'upcoming' ? 'Upcoming' : t === 'past' ? 'Past' : t === 'all' ? 'All' : 'Availability';
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t)}
+              className={cn(
+                'relative px-4 py-2 text-sm font-medium transition-colors duration-150 -mb-px',
+                active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+              {active && (
+                <motion.span
+                  layoutId="tours-tab-underline"
+                  className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-foreground"
+                  transition={{ duration: DURATION_FAST, ease: EASE_OUT }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Availability tab */}
@@ -362,15 +409,51 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
 
       {/* Tour list */}
       {tab !== 'availability' && filtered.length === 0 ? (
-        <div className="flex flex-col items-center text-center py-16 space-y-3">
-          <CalendarDays size={28} className="text-muted-foreground/40" />
-          <p className={H2} style={TITLE_FONT}>
-            No {tab === 'all' ? '' : tab + ' '}tours yet
-          </p>
-          <p className={`${BODY_MUTED} max-w-sm`}>
-            Share your booking link to start receiving tour requests.
-          </p>
-        </div>
+        (() => {
+          // Two empties: a truly fresh workspace (no tours at all, no search)
+          // earns the booking-link onboarding moment; a filtered/searched view
+          // that simply has no matches gets a quieter, accurate line.
+          const isFresh = tours.length === 0 && !searchLower;
+          const bookingUrl =
+            typeof window !== 'undefined' ? `${window.location.origin}/book/${slug}` : '';
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION_FAST, ease: EASE_OUT }}
+              className="flex flex-col items-center text-center py-16 space-y-3"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+                <CalendarDays size={22} strokeWidth={1.5} className="text-muted-foreground/60" />
+              </div>
+              <p className={H2} style={TITLE_FONT}>
+                {isFresh
+                  ? 'No tours booked yet'
+                  : `No ${tab === 'all' ? '' : tab + ' '}tours${searchLower ? ' match' : ''}`}
+              </p>
+              <p className={`${BODY_MUTED} max-w-sm`}>
+                {isFresh
+                  ? 'Share your booking link and tour requests will land right here.'
+                  : searchLower
+                    ? 'Try a shorter search, or switch tabs.'
+                    : 'Nothing here for this view yet.'}
+              </p>
+              {isFresh && bookingUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(bookingUrl);
+                    toast.success('Booking link copied.');
+                  }}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 h-9 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+                >
+                  <Copy size={14} />
+                  Copy booking link
+                </button>
+              )}
+            </motion.div>
+          );
+        })()
       ) : tab !== 'availability' ? (
         view === 'table' ? (
           /* ── Table view ── */

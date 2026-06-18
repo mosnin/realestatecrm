@@ -242,9 +242,29 @@ export function KanbanColumn({
               />
             ))}
           </AnimatePresence>
-          {deals.length === 0 && !isOver && (
-            <div className="flex items-center justify-center py-8 text-muted-foreground/40">
-              <p className="text-xs">No deals</p>
+          {deals.length === 0 && (
+            <div
+              className={cn(
+                'flex flex-col items-center justify-center gap-1.5 py-8 text-center transition-colors duration-150',
+                isCardDragging && isOver
+                  ? 'text-foreground'
+                  : 'text-muted-foreground/50',
+              )}
+            >
+              {isCardDragging ? (
+                <p className="text-xs font-medium">Drop here</p>
+              ) : (
+                <>
+                  <p className="text-xs">Nothing here yet</p>
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddOpen(true)}
+                    className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
+                  >
+                    Add a deal
+                  </button>
+                </>
+              )}
             </div>
           )}
         </SortableContext>

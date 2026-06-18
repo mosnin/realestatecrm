@@ -220,8 +220,15 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
         )}
 
         {!loading && timeline.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">No activity yet. Log a call, note, or email above.</p>
+          <div className="flex flex-col items-center text-center py-10">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.04]">
+              <Clock size={18} strokeWidth={1.5} className="text-muted-foreground/60" />
+            </div>
+            <p className="text-sm text-foreground">No history yet.</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+              Log a call, note, or email above — everything you do with this person
+              shows up here.
+            </p>
           </div>
         )}
 
