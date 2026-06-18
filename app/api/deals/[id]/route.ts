@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { dealHasOpenSignatureRequests } from '@/lib/esign';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -196,6 +197,73 @@ export async function PATCH(
 
     const stageChanged = body.stageId && body.stageId !== existing.stageId;
     const statusChanged = body.status && body.status !== existing.status;
+
+    // ── E-sign close gate (configurable, default OFF) ───────────────────────
+    //
+    // Only relevant on the transition INTO 'won'. We resolve the deal's
+    // brokerage via its Space.brokerageId and read the per-brokerage toggle
+    // `requireSignedDocsBeforeClose`. The toggle is OFF by default and most
+    // spaces have no brokerage at all, so the common path does ZERO extra work
+    // and behaves exactly as before.
+    //
+    // "Required documents signed" has no first-class definition (nothing marks a
+    // DealDocument as required-for-close), so the strongest available signal is
+    // reused: an in-progress SignatureRequest tied to the deal
+    // (status created|sent|delivered) means "not signed yet". See
+    // lib/esign.ts → dealHasOpenSignatureRequests.
+    //
+    //   * setting ON  + an open signature request → BLOCK with 409.
+    //   * setting ON  + all terminal / no requests → allow.
+    //   * setting OFF (or no brokerage)            → allow (unchanged).
+    //
+    // `closedWithUnsignedDocs` is computed for the SUCCESS-response advisory
+    // (below) regardless of the toggle — but only when actually closing, and
+    // only after we know the gate isn't going to block.
+    const closingWon = statusChanged && body.status === 'won';
+    let closedWithUnsignedDocs = false;
+    if (closingWon) {
+      // Read the deal's brokerage toggle (if the space belongs to a brokerage).
+      let gateOn = false;
+      if (space.brokerageId) {
+        const { data: brokerageRow, error: brokerageError } = await supabase
+          .from('Brokerage')
+          .select('requireSignedDocsBeforeClose')
+          .eq('id', space.brokerageId)
+          .maybeSingle();
+        if (brokerageError) {
+          // Fail OPEN: a brokerage-lookup blip must not block a close. This is a
+          // gating convenience, not a security control; the worst case is a deal
+          // closing with unsigned docs (the pre-feature behavior).
+          logger.warn('[deals/PATCH] brokerage gate lookup failed', {
+            dealId: id,
+            brokerageId: space.brokerageId,
+            err: brokerageError.message,
+          });
+        }
+        gateOn = Boolean(
+          (brokerageRow as { requireSignedDocsBeforeClose?: boolean } | null)
+            ?.requireSignedDocsBeforeClose,
+        );
+      }
+
+      // Only probe signatures when the gate is on, OR — cheaply — to populate
+      // the non-blocking advisory. We query once and reuse the result for both.
+      const { hasOpen } = await dealHasOpenSignatureRequests(id, space.id);
+      if (gateOn && hasOpen) {
+        return NextResponse.json(
+          {
+            error:
+              "Required documents aren't signed — complete e-sign or turn off 'require signed docs before close'.",
+            code: 'unsigned_documents',
+          },
+          { status: 409 },
+        );
+      }
+      // Advisory: deal is being closed while an open signature request exists
+      // (gate was off, so we let it through). Surfaced in the success response
+      // so the UI can flag "closed without signed docs".
+      closedWithUnsignedDocs = hasOpen;
+    }
 
     // Validate stageId belongs to this space BEFORE any mutations so an
     // invalid stageId cannot leave the row in a partially-updated state.
@@ -399,7 +467,12 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json(deal);
+    // Attach the non-blocking advisory ONLY when it's true, so the success
+    // response shape is unchanged for every normal close (and every non-close
+    // PATCH). The UI can read this to flag "closed without signed docs".
+    return NextResponse.json(
+      closedWithUnsignedDocs ? { ...deal, closedWithUnsignedDocs: true } : deal,
+    );
   } catch (err) {
     console.error('[deals/PATCH] unexpected error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

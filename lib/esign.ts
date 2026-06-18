@@ -130,6 +130,63 @@ export interface SignatureRequestRow {
 const REQUEST_COLUMNS =
   'id, spaceId, dealId, contactId, documentId, envelopeId, subject, signerEmail, signerName, status, signedDocumentUrl, completedAt, createdAt, updatedAt';
 
+// ── Open-signature detection (deal close gate) ───────────────────────────────
+//
+// There is no first-class "required document" concept on a deal — nothing marks
+// a DealDocument as required-for-close. So the strongest available signal for
+// "this deal still has unsigned paperwork" is a SignatureRequest tied to the
+// deal whose status is still in flight: created/sent/delivered. A
+// started-but-unfinished signature is the clearest "not signed yet". The
+// terminal statuses are deliberately NOT treated as open:
+//   - completed → signed, done.
+//   - declined / voided → dead envelopes, not pending work; a brokerage closing
+//     a deal after a signer declined/an envelope was voided is a legitimate
+//     human decision (re-send, or proceed without that document). Treating them
+//     as "open" would wedge the deal closed with no way forward but turning the
+//     toggle off, which is worse than letting the close through.
+const OPEN_SIGNATURE_STATUSES: readonly SignatureStatus[] = ['created', 'sent', 'delivered'];
+
+export interface OpenSignaturesResult {
+  /** True iff at least one in-flight (created|sent|delivered) request exists. */
+  hasOpen: boolean;
+  /** Count of in-flight requests (0 when none / on error). */
+  openCount: number;
+}
+
+/**
+ * Does this deal have any in-progress signature request?
+ *
+ * Scoped to the space so a caller can't probe another tenant's signatures. On a
+ * query error this returns `{ hasOpen: false, openCount: 0 }` — the helper is a
+ * gate input, and the caller decides what a "can't tell" result means; failing
+ * open here keeps a transient DB blip from wedging an otherwise-valid close. The
+ * caller (deal close gate) only consults this when the brokerage has explicitly
+ * opted in, so the default-off path never reaches it.
+ */
+export async function dealHasOpenSignatureRequests(
+  dealId: string,
+  spaceId: string,
+): Promise<OpenSignaturesResult> {
+  const { data, error } = await supabase
+    .from('SignatureRequest')
+    .select('id, status')
+    .eq('dealId', dealId)
+    .eq('spaceId', spaceId)
+    .in('status', OPEN_SIGNATURE_STATUSES as unknown as string[]);
+
+  if (error) {
+    logger.warn('[esign] open-signature lookup failed', {
+      dealId,
+      spaceId,
+      err: error.message,
+    });
+    return { hasOpen: false, openCount: 0 };
+  }
+
+  const openCount = (data ?? []).length;
+  return { hasOpen: openCount > 0, openCount };
+}
+
 /** Composio's execute response: { successful, data?, error? }. */
 interface ComposioExecuteResult {
   successful?: boolean;
