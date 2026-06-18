@@ -282,19 +282,23 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         });
         if (!profileRes.ok) throw await errorFrom(profileRes);
 
-        const brokerRes = await fetch('/api/broker/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(brokerCreateBody(values)),
-        });
-        if (!brokerRes.ok) throw await errorFrom(brokerRes);
-
+        // Mark onboarding complete FIRST. /api/broker/create gates on
+        // user.onboard (set by `complete`); calling create before complete
+        // returned 403 "Complete onboarding first" and dead-ended broker-only
+        // signups on the final step.
         const completeRes = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'complete', accountType: 'broker_only' }),
         });
         if (!completeRes.ok) throw await errorFrom(completeRes);
+
+        const brokerRes = await fetch('/api/broker/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(brokerCreateBody(values)),
+        });
+        if (!brokerRes.ok) throw await errorFrom(brokerRes);
 
         redirectRef.current = '/broker';
         setPhase('ready');
@@ -350,6 +354,18 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         throw new Error(spaceData?.error || 'Failed to create workspace.');
       }
 
+      // Mark onboarding complete FIRST. /api/broker/create gates on
+      // user.onboard AND accountType (both set by `complete`); calling create
+      // before complete returned 403 and stranded broker+workspace signups on
+      // the final step (the workspace existed but the brokerage was never made).
+      const accountType = role === 'broker' ? 'both' : 'realtor';
+      const completeRes = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete', accountType }),
+      });
+      if (!completeRes.ok) throw await errorFrom(completeRes);
+
       if (role === 'broker') {
         const brokerRes = await fetch('/api/broker/create', {
           method: 'POST',
@@ -368,14 +384,6 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
           }).catch(() => undefined);
         }
       }
-
-      const accountType = role === 'broker' ? 'both' : 'realtor';
-      const completeRes = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete', accountType }),
-      });
-      if (!completeRes.ok) throw await errorFrom(completeRes);
 
       redirectRef.current = role === 'broker'
         ? '/broker'
