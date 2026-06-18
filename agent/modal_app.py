@@ -826,6 +826,36 @@ async def chat_turn(item: dict):
                     continue
                 masked_error = mask_secrets(err_str)
                 logger.error("chat_turn_stream_failed", error=masked_error, space_id=space_id)
+
+                # Bill the tokens consumed before the stream died. The success
+                # path records usage (~line 718) and returns; a mid-stream
+                # failure used to return here having streamed real output —
+                # and real token cost — without ever writing a ChatUsage row,
+                # so the credit trigger never fired and the turn charged $0.
+                # `result` is bound once Runner.run_streamed() returned; a
+                # failure before that assignment leaves it unbound, so guard.
+                # This path is terminal (no retry), so it cannot double-record
+                # against the success branch.
+                try:
+                    from ledger import record_chat_usage
+
+                    partial = locals().get("result")
+                    if partial is not None:
+                        tokens_in, tokens_out, _, cached_in = extract_usage_with_cache(partial)
+                        if tokens_in or tokens_out:
+                            await record_chat_usage(
+                                space_id=space_id,
+                                model=model,
+                                prompt_tokens=tokens_in,
+                                completion_tokens=tokens_out,
+                                cached_tokens=cached_in,
+                                user_id=user_id or None,
+                                conversation_id=conversation_id or None,
+                                route="agent",
+                            )
+                except Exception:
+                    logger.warning("chat_turn_partial_usage_record_failed", space_id=space_id)
+
                 err = json.dumps({"type": "error", "message": masked_error})
                 yield f"data: {err}\n\n"
                 return

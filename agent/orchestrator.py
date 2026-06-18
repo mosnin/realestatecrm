@@ -670,7 +670,7 @@ async def _run_locked(
             max_turns=settings.coordinator_max_turns,
         )
 
-        _, _, total_tokens, cached_tokens = extract_usage_with_cache(result)
+        tokens_in, tokens_out, total_tokens, cached_tokens = extract_usage_with_cache(result)
         ctx.tokens_used = total_tokens
 
         final_output = getattr(result, "final_output", None)
@@ -778,6 +778,24 @@ async def _run_locked(
             importance=0.25,
         )
         await record_usage(space.id, total_tokens)
+
+        # Charge credits for this autonomous run. record_usage above only
+        # bumps the Redis daily-budget counter — it never bills. The credit
+        # ledger is a Postgres trigger on ChatUsage INSERT, so an autonomous
+        # run that never writes a ChatUsage row charges $0. Mirror the exact
+        # call the interactive chat path makes (modal_app.chat_turn) so the
+        # trigger fires. Best-effort: record_chat_usage never raises.
+        from ledger import record_chat_usage
+
+        await record_chat_usage(
+            space_id=space.id,
+            model=model_slug,
+            prompt_tokens=tokens_in,
+            completion_tokens=tokens_out,
+            cached_tokens=cached_tokens,
+            user_id=owner_clerk_id or None,
+            route="agent",
+        )
 
     await publish_event(
         ctx, "complete",

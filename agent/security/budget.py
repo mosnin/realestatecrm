@@ -127,3 +127,48 @@ async def release_run_lock(space_id: str, run_id: str) -> None:
             await r.delete(key)
     except Exception as exc:
         logger.warning("release_run_lock_failed space=%s error=%s", space_id, str(exc)[:200])
+
+
+# Swarm lock — one swarm per space at a time. Separate namespace from the
+# autonomous run lock so a background autonomous run and a user-initiated swarm
+# never block each other. TTL sits above the swarm Modal function's 600s
+# timeout, so a crashed swarm always frees the slot on its own.
+_SWARM_LOCK_TTL_S = 660
+
+
+def _swarm_lock_key(space_id: str) -> str:
+    return f"agent:swarmlock:{space_id}"
+
+
+async def acquire_swarm_lock(space_id: str, swarm_run_id: str) -> bool:
+    """Claim the single-swarm slot for a space. Returns False when another swarm
+    already holds it.
+
+    Without this, a double-submit to /api/swarm creates two SwarmRuns and bills
+    BOTH (the planner, every member, and the auditor each record ChatUsage).
+    SET NX EX is one atomic op, so two swarms starting together cannot both win
+    the slot. Fails OPEN on a Redis error — a rare outage must not halt swarms —
+    but logs it.
+    """
+    r = _get_redis()
+    if r is None:
+        return True  # No Redis (dev / test) — don't block runs.
+    try:
+        ok = await r.set(_swarm_lock_key(space_id), swarm_run_id, nx=True, ex=_SWARM_LOCK_TTL_S)
+        return bool(ok)
+    except Exception as exc:
+        logger.warning("acquire_swarm_lock_failed space=%s error=%s", space_id, str(exc)[:200])
+        return True
+
+
+async def release_swarm_lock(space_id: str, swarm_run_id: str) -> None:
+    """Release the swarm lock — but only if this swarm still owns it."""
+    r = _get_redis()
+    if r is None:
+        return
+    try:
+        key = _swarm_lock_key(space_id)
+        if await r.get(key) == swarm_run_id:
+            await r.delete(key)
+    except Exception as exc:
+        logger.warning("release_swarm_lock_failed space=%s error=%s", space_id, str(exc)[:200])

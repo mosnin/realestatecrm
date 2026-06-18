@@ -126,7 +126,8 @@ export async function chargeWorkflow(
       spaceId,
       userId: opts?.userId,
     });
-  } catch {
-    /* metering must never break the workflow */
+  } catch (err) {
+    /* metering must never break the workflow — log and swallow */
+    logger.error('[meter] chargeWorkflow failed silently', { spaceId, workflow }, err);
   }
 }
