@@ -37,21 +37,34 @@ from config import settings
 
 # Recognises ISO-8601 datetime strings the agent tools produce via
 # `datetime.isoformat()`. Tolerates trailing 'Z' and explicit offsets.
-# Date-only ('YYYY-MM-DD') is *not* coerced — asyncpg accepts those for
-# `date` columns directly via the str adapter.
 _ISO_DT_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$"
 )
 
+# Recognises date-only ('YYYY-MM-DD') strings. These MUST be coerced too:
+# every column the agent writes a bare date into — followUpAt,
+# lastContactedAt, scheduledAt, the Tour reminder columns — is `timestamptz`
+# (see supabase/schema.sql), and asyncpg will not bind a `str` to a
+# timestamp param. A previous version skipped these on the false premise that
+# asyncpg accepts bare-date strings via a str adapter; it does not, so the
+# model's `followUpAt='2026-06-18'` raised "expected a datetime.date or
+# datetime.datetime instance, got 'str'" and the tool retry-looped until the
+# turn's step budget was exhausted.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 
 def _coerce_param(value: Any) -> Any:
-    """Convert ISO-8601 datetime strings to real `datetime` objects.
+    """Convert ISO-8601 date/datetime strings to real `datetime` objects.
 
     asyncpg refuses to bind a `str` to a `timestamp`/`timestamptz` parameter
     — it raises "expected a datetime.date or datetime.datetime instance,
     got 'str'". The agent tools historically called `.isoformat()` before
     handing the value back to the query builder; coerce here so callers
     don't each have to remember the rule.
+
+    Both full datetimes ('2026-06-18T09:00:00Z') and bare dates
+    ('2026-06-18') are handled — the bare date becomes midnight UTC, which
+    asyncpg binds cleanly to the `timestamptz` columns the agent writes.
     """
     if isinstance(value, str) and _ISO_DT_RE.match(value):
         try:
@@ -61,6 +74,14 @@ def _coerce_param(value: Any) -> Any:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt
+        except ValueError:
+            return value
+    if isinstance(value, str) and _ISO_DATE_RE.match(value):
+        try:
+            d = date.fromisoformat(value)
+            # Midnight UTC — the target columns are timestamptz, and asyncpg
+            # binds a tz-aware datetime to them without complaint.
+            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         except ValueError:
             return value
     return value

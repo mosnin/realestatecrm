@@ -44,11 +44,93 @@ const cache = new Map<string, Model>();
  * @param modelSlug The workspace's configured chat model. When omitted, the
  *   default chat model is used. Always passed through `resolveChatModel()`.
  */
+type LlmClient = ReturnType<typeof getLLMClient>;
+
+/**
+ * Providers that honor explicit `cache_control` on OpenRouter. Anthropic and
+ * Google Gemini accept the Anthropic-shape ephemeral marker; OpenAI auto-caches
+ * stable prefixes with NO marker; xAI/Grok and the rest have no caching path.
+ * Mirrors `agent/llm.py:_CACHE_MARKER_PROVIDERS`.
+ */
+export function isCacheCapable(modelSlug: string): boolean {
+  const m = (modelSlug || '').toLowerCase();
+  return m.startsWith('anthropic/') || m.startsWith('google/') || m.includes('claude') || m.includes('gemini');
+}
+
+/**
+ * Mutate an outgoing chat-completions body so the static prefix (system prompt
+ * + tool list) is marked cacheable. One marker on the system message and one on
+ * the last tool cover the whole prefix; the provider then bills the repeated
+ * prefix at a deep discount on every turn after the first. Idempotent. Ported
+ * from `agent/llm.py:_apply_cache_markers`.
+ */
+export function applyCacheMarkers(body: { messages?: unknown; tools?: unknown } | undefined): void {
+  if (!body) return;
+  const marker = { type: 'ephemeral' as const };
+  const messages = body.messages;
+  if (Array.isArray(messages)) {
+    for (const msg of messages as Array<Record<string, unknown>>) {
+      if (msg && msg.role === 'system' && typeof msg.content === 'string') {
+        msg.content = [{ type: 'text', text: msg.content, cache_control: marker }];
+        break; // one system message; first hit wins
+      }
+    }
+  }
+  const tools = body.tools;
+  if (Array.isArray(tools) && tools.length > 0) {
+    const last = tools[tools.length - 1] as Record<string, unknown>;
+    if (last && typeof last === 'object' && !('cache_control' in last)) {
+      last.cache_control = marker;
+    }
+  }
+}
+
+/**
+ * Wrap the LLM client so `chat.completions.create` injects cache markers on the
+ * way out — the SDK builds the messages/tools inline, so we intercept the one
+ * call it makes rather than copy its converter. Only used for cache-capable
+ * providers; everyone else gets the plain client. Mirrors the Python
+ * `_CacheMarkerClient` proxy.
+ */
+function withCacheMarkers(client: LlmClient): LlmClient {
+  const chat = (client as unknown as { chat: { completions: { create: (...a: unknown[]) => unknown } } }).chat;
+  const completions = chat.completions;
+  const origCreate = completions.create.bind(completions);
+  const wrappedCompletions = new Proxy(completions, {
+    get(target, prop, recv) {
+      if (prop === 'create') {
+        return (...args: unknown[]) => {
+          applyCacheMarkers(args[0] as { messages?: unknown; tools?: unknown });
+          return origCreate(...args);
+        };
+      }
+      return Reflect.get(target, prop, recv);
+    },
+  });
+  const wrappedChat = new Proxy(chat, {
+    get(target, prop, recv) {
+      if (prop === 'completions') return wrappedCompletions;
+      return Reflect.get(target, prop, recv);
+    },
+  });
+  return new Proxy(client as object, {
+    get(target, prop, recv) {
+      if (prop === 'chat') return wrappedChat;
+      return Reflect.get(target, prop, recv);
+    },
+  }) as LlmClient;
+}
+
 export function getAgentModel(modelSlug?: string | null): Model {
   const resolved = resolveChatModel(modelSlug);
   const cached = cache.get(resolved);
   if (cached) return cached;
-  const model = new OpenAIChatCompletionsModel(getLLMClient(), resolved);
+  // Prompt caching (token redesign L4): wrap the client to mark the static
+  // prefix cacheable for providers that honor it (Anthropic / Gemini). For the
+  // Grok default and OpenAI (which auto-caches) this is a strict no-op — the
+  // plain client, unchanged — so it can't affect the current model.
+  const client = isCacheCapable(resolved) ? withCacheMarkers(getLLMClient()) : getLLMClient();
+  const model = new OpenAIChatCompletionsModel(client, resolved);
   cache.set(resolved, model);
   return model;
 }

@@ -386,22 +386,29 @@ describe('draftEmailTool', () => {
     expect(draftEmailTool.requiresApproval).toBe(false);
   });
 
-  it('returns the composed subject + body, no AgentDraft side effect', async () => {
+  it('renders a MessageDraft card with subject + body + recipient, no AgentDraft side effect', async () => {
     composeQuickDraftMock.mockResolvedValueOnce({
       subject: 'Quick check-in',
       body: 'Hey — circling back.',
       subjectLabel: 'Alex',
     });
+    // The tool now also looks up the contact's name + email for the card's
+    // "To" line. Supabase is mocked above; seed a Contact row for this case.
+    mockByTable['Contact'] = { single: { name: 'Alex Stone', email: 'alex@example.com' } };
     const result = await draftEmailTool.handler(
       { personId: 'c_1', intent: 'check-in' },
       makeCtx(),
     );
-    expect(result.display).toBe('plain');
-    const data = result.data as { subject: string; body: string };
+    // Email drafts render as a MessageDraft card (Send / Cancel inline).
+    expect(result.display).toBe('message-draft');
+    const data = result.data as { subject: string; body: string; to: string[]; contactName?: string };
     expect(data.subject).toMatch(/check-in/);
     expect(data.body).toMatch(/circling back/);
+    expect(data.to).toEqual(['alex@example.com']);
+    expect(data.contactName).toBe('Alex Stone');
     // composeQuickDraft does the work; no fake AgentDraft insert was needed.
     expect(composeQuickDraftMock).toHaveBeenCalledTimes(1);
+    delete mockByTable['Contact'];
   });
 });
 

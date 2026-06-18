@@ -1,8 +1,16 @@
 /**
  * `cancel_tour` — flip a Tour to status='cancelled'.
  *
- * Approval-gated: a cancelled tour drops off the calendar feed and
- * triggers (via cron) the cancel email — worth the realtor confirming.
+ * Approval-gated: a cancelled tour drops off the calendar feed — worth the
+ * realtor confirming.
+ *
+ * After the status flip we propagate the cancel, all best-effort (a failure
+ * never fails the cancel — same posture as schedule-tour's calendar write):
+ *   1. Drop the external calendar event. We cover BOTH calendar systems:
+ *      the legacy direct-GCal event (`Tour.googleEventId` → deleteGoogleEvent)
+ *      AND the Composio-mirror event schedule_tour writes
+ *      (`deleteEventThrough`), so neither leaves a ghost slot.
+ *   2. Tell the guest via email + SMS (`notifyTourCancelled`).
  */
 
 import crypto from 'crypto';
@@ -10,6 +18,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
+import { findCalendarConnection, deleteEventThrough } from '@/lib/calendar/mirror';
+import { notifyTourCancelled } from '@/lib/tour-notify';
 import { defineTool } from '../types';
 
 const parameters = z
@@ -39,7 +49,7 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
   async handler(args, ctx) {
     const { data: tour, error: tourErr } = await supabase
       .from('Tour')
-      .select('id, contactId, guestName, propertyAddress, status, googleEventId')
+      .select('id, contactId, guestName, guestEmail, guestPhone, propertyAddress, startsAt, endsAt, status, googleEventId')
       .eq('id', args.tourId)
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
@@ -84,6 +94,38 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
             .eq('spaceId', ctx.space.id);
         }
       });
+    }
+
+    // Also drop the Composio-mirror event schedule_tour writes (a separate
+    // calendar system from the legacy googleEventId above). Best-effort —
+    // the cancel already committed; a hiccup is logged and survivable.
+    try {
+      const connection = await findCalendarConnection(ctx.space.id);
+      if (connection) {
+        await deleteEventThrough({
+          spaceId: ctx.space.id,
+          connection,
+          sourceTourId: args.tourId,
+        });
+      }
+    } catch (err) {
+      logger.warn('[tools.cancel_tour] calendar delete failed', { tourId: args.tourId, spaceId: ctx.space.id }, err);
+    }
+
+    // Tell the guest their tour was cancelled — email + SMS, best-effort.
+    try {
+      await notifyTourCancelled({
+        spaceId: ctx.space.id,
+        guestName: (tour.guestName as string | null) || 'there',
+        guestEmail: (tour.guestEmail as string | null) ?? null,
+        guestPhone: (tour.guestPhone as string | null) ?? null,
+        propertyAddress: (tour.propertyAddress as string | null) ?? null,
+        startsAt: (tour.startsAt as string | null) ?? new Date().toISOString(),
+        endsAt: (tour.endsAt as string | null) ?? new Date().toISOString(),
+        tourId: args.tourId,
+      });
+    } catch (err) {
+      logger.warn('[tools.cancel_tour] guest notice failed', { tourId: args.tourId }, err);
     }
 
     if (tour.contactId) {

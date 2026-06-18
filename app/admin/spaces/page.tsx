@@ -5,9 +5,15 @@ import { SpaceListClient } from './space-list-client';
 
 export const metadata = { title: 'Spaces — Admin — Chippi' };
 
-export default async function AdminSpacesPage() {
+export default async function AdminSpacesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const isAdmin = await isPlatformAdmin();
   if (!isAdmin) redirect('/');
+
+  const initialQuery = (await searchParams).q?.trim() || '';
 
   const { data: spaces, error } = await supabase
     .from('Space')
@@ -41,7 +47,7 @@ export default async function AdminSpacesPage() {
   const totalCount = spaces?.length ?? 0;
 
   return (
-    <div className="space-y-8 pb-12 max-w-5xl">
+    <div className="space-y-8 pb-12 max-w-5xl mx-auto">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Management.</p>
         <h1
@@ -67,6 +73,7 @@ export default async function AdminSpacesPage() {
         }))}
         ownerMap={ownerMap}
         totalCount={totalCount}
+        initialQuery={initialQuery}
       />
     </div>
   );

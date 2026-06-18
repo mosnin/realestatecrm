@@ -5,7 +5,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
-import { ChippiPromptBox, type MentionItem, type SkillItem } from '@/components/ui/chippi-prompt-box';
+import {
+  ChippiPromptBox,
+  type MentionItem,
+  type SkillItem,
+  type SentAttachmentMeta,
+} from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
 import { History, X, AlertCircle, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -224,6 +229,7 @@ export function ChippiWorkspace({
     streamingReasoning,
     activePlan,
     send,
+    attachmentPreviewUrls,
     approve,
     deny,
     alwaysAllow,
@@ -678,6 +684,7 @@ export function ChippiWorkspace({
       mentions: MentionItem[],
       attachmentIds?: string[],
       mode: ChatMode = 'chat',
+      attachmentsMeta?: SentAttachmentMeta[],
     ) => {
       const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
       if (!text && !hasAttachments) return;
@@ -700,7 +707,7 @@ export function ChippiWorkspace({
       // or when reduced-motion is on.
       softTap();
 
-      await send(contextPrefix + text, attachmentIds, mode);
+      await send(contextPrefix + text, attachmentIds, mode, attachmentsMeta);
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;
@@ -938,19 +945,38 @@ export function ChippiWorkspace({
   }, [tailMessage, liveCallIds]);
 
   // ── Alive warmup status — Agent (Modal) spin-up ────────────────────────────
-  // An Agent turn pays a Modal warmup before the first token. Rather than a
-  // dead "Thinking…" sitting there, cycle a few honest status lines so the
-  // wait feels alive. Chat turns are a single fast call — they keep the plain
-  // "Thinking…" because inventing sandbox steps for them would be a lie.
+  // The FIRST Agent turn of a fresh conversation pays a cold Modal warmup
+  // before the first token. That one time we cycle a warm "getting ready" set
+  // so the longer wait reads as progress, not a hang — but NEVER infra jargon
+  // like "sandbox" (the realtor must not see our plumbing). Every later turn
+  // (and every Chat turn) reuses the warm path and cycles the calm "Thinking…"
+  // set below instead.
   const AGENT_WARMUP_PHRASES = useMemo(
     () => [
-      'Setting up the sandbox…',
-      'Loading your tools…',
-      'Getting context…',
+      'Getting things ready…',
+      'Warming up…',
       'Lining up the work…',
       'Almost there…',
     ],
     [],
+  );
+  // The alive "thinking" cycle for every in-progress turn after the cold
+  // start. Understated, honest, never mentions infrastructure.
+  const THINKING_PHRASES = useMemo(
+    () => ['Thinking…', 'Pondering…', 'Working it through…'],
+    [],
+  );
+
+  // First Agent turn of a fresh conversation? True when no assistant turn has
+  // landed any blocks yet — i.e. the streaming tail is the only assistant
+  // bubble. That's the one turn that pays the cold Modal warmup; later turns
+  // reuse the warm sandbox, so they skip the sandbox copy.
+  const isFirstAgentTurn = useMemo(
+    () =>
+      !messages.some(
+        (m) => m.role === 'assistant' && m !== tailMessage && m.blocks.length > 0,
+      ),
+    [messages, tailMessage],
   );
   // The runtime the in-flight turn is running on. Set on each send.
   const [activeTurnMode, setActiveTurnMode] = useState<ChatMode>('chat');
@@ -967,14 +993,21 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
 
+  // Cycle the status label while warming up — the cold-start sandbox steps
+  // move a touch faster (1.7s) so the longer wait reads as progress; the
+  // calm "Thinking…" cycle breathes slower (2.4s) so it never feels anxious.
   useEffect(() => {
-    if (!(isWarmingUp && activeTurnMode === 'agent')) {
+    if (!isWarmingUp) {
       setWarmupIndex(0);
       return;
     }
-    const id = setInterval(() => setWarmupIndex((i) => i + 1), 1700);
+    const isColdStart = activeTurnMode === 'agent' && isFirstAgentTurn;
+    const id = setInterval(
+      () => setWarmupIndex((i) => i + 1),
+      isColdStart ? 1700 : 2400,
+    );
     return () => clearInterval(id);
-  }, [isWarmingUp, activeTurnMode]);
+  }, [isWarmingUp, activeTurnMode, isFirstAgentTurn]);
 
   const currentAction = useMemo<string | null>(() => {
     if (!isStreaming || !tailMessage) return null;
@@ -1011,15 +1044,28 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
     if (!hasText) {
-      // Agent (Modal) warmup → cycle the alive status lines. Chat → plain.
-      if (activeTurnMode === 'agent') {
-        return AGENT_WARMUP_PHRASES[warmupIndex % AGENT_WARMUP_PHRASES.length];
-      }
-      return 'Thinking…';
+      // First Agent turn of a fresh conversation pays the cold Modal warmup —
+      // name the honest sandbox steps that one time. Every later turn (and
+      // every Chat turn) reuses the warm sandbox, so cycle the calm
+      // "Thinking…" set instead — the sandbox copy would be a lie there.
+      const phrases =
+        activeTurnMode === 'agent' && isFirstAgentTurn
+          ? AGENT_WARMUP_PHRASES
+          : THINKING_PHRASES;
+      return phrases[warmupIndex % phrases.length];
     }
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStreaming, tailMessage, liveCallIds, activeTurnMode, warmupIndex, AGENT_WARMUP_PHRASES]);
+  }, [
+    isStreaming,
+    tailMessage,
+    liveCallIds,
+    activeTurnMode,
+    isFirstAgentTurn,
+    warmupIndex,
+    AGENT_WARMUP_PHRASES,
+    THINKING_PHRASES,
+  ]);
 
   // Final visibility gate for the indicator block — we want the avatar +
   // shimmer line + plan card only when there's actually something to
@@ -1045,6 +1091,7 @@ export function ChippiWorkspace({
         prefill={prefill ?? undefined}
         skills={skills}
         showModeSwitch={!isBroker}
+        conversationId={activeConversationId}
       />
       {/* Rate-limit countdown — shown below the composer when the API is
           throttling. Counts down from 60 s and disappears automatically. */}
@@ -1445,6 +1492,7 @@ export function ChippiWorkspace({
                         role={msg.role}
                         streaming={msg.streaming && isStreaming}
                         liveCallIds={liveCallIds}
+                        localUrls={attachmentPreviewUrls}
                         onUserIntent={(text) => {
                           void handleSend(text, [], undefined);
                         }}

@@ -39,23 +39,26 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
 
   return (
     <main className="relative grid min-h-screen bg-background lg:grid-cols-2">
-      {/* ── Left ASCII brand panel (desktop) ── */}
+      {/* ── Left brand image panel (desktop) ── */}
       <div className="relative hidden flex-col justify-between overflow-hidden border-r border-border/70 p-12 lg:flex">
-        <AsciiField className="absolute inset-0 h-full w-full opacity-40" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_30%,rgba(255,150,79,0.18),transparent_60%)]" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/marketing/login-split.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/35" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_30%,rgba(255,150,79,0.20),transparent_60%)]" />
 
         <Link href="/" className="relative z-10 flex items-center gap-2" aria-label="Chippi home">
-          <BrandLogo className="h-7" alt="Chippi" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-white.png" alt="Chippi" className="h-7 w-auto" />
         </Link>
 
         <div className="relative z-10">
-          <p className="font-brand text-xs uppercase tracking-[0.25em] text-brand">
+          <p className="font-brand text-xs uppercase tracking-[0.25em] text-[#ff964f]">
             The agentic OS for real estate
           </p>
-          <h2 className="font-brand mt-4 text-4xl leading-tight tracking-tight text-foreground">
+          <h2 className="font-brand mt-4 text-4xl leading-tight tracking-tight text-white">
             I keep your day moving, so you don&apos;t have to.
           </h2>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-4 text-sm text-white/70">
             Drafts · Scoring · Tours · Pipeline
           </p>
         </div>

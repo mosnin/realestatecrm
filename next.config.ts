@@ -24,12 +24,12 @@ const securityHeaders = [
     key: 'Content-Security-Policy-Report-Only',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://assets.calendly.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com https://assets.calendly.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com",
-      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
-      "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
+      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com https://images.unsplash.com https://*.calendly.com",
+      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://calendly.com https://*.calendly.com",
+      "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://calendly.com https://*.calendly.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
@@ -45,6 +45,32 @@ const nextConfig: NextConfig = {
   // makes Next.js require() it from node_modules instead, with intact
   // relative paths.
   serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  // Marketing redesign ships local placeholder imagery today. Unsplash is
+  // allowlisted so the founder can drop in royalty-free architecture/interior
+  // photos by URL later (the marketing tags are plain <img>, but this also
+  // covers any next/image swap and matches the CSP img-src above).
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+  },
+  // Lint + type-check run in CI (the `lint-typecheck-test` job, on every PR)
+  // before anything reaches main. Re-running them inside `next build` on
+  // Vercel's 8GB machine is redundant and was the cause of an Out-Of-Memory
+  // kill during the post-compile "checking validity of types" phase (the build
+  // compiled fine, then got SIGKILL'd before writing routes-manifest.json).
+  // Skip them in the deploy build; CI stays the gate that blocks bad types.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+  // Build-memory headroom. The app outgrew a comfortable fit on Vercel's 8GB
+  // build container: static generation across 300+ routes (each parallel worker
+  // holds the compiled app) plus Sentry sourcemap bundling peaked into an OOM
+  // SIGKILL before routes-manifest.json was written. `webpackMemoryOptimizations`
+  // trims webpack's peak heap; `cpus` caps how many static-generation workers run
+  // in parallel. Lower peak RAM, slower build. If Vercel "Enhanced Builds" (a
+  // larger machine) is enabled, `cpus` can be raised again.
+  experimental: {
+    webpackMemoryOptimizations: true,
+    cpus: 2,
+  },
   async headers() {
     return [
       {
@@ -77,7 +103,10 @@ export default sentryBuildConfigured
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       silent: !process.env.CI,
-      widenClientFileUpload: true,
+      // Widening re-processes every client chunk for sourcemaps, which piled
+      // onto the build's peak memory on the way to the OOM. Off keeps the
+      // upload lean; stacktraces still resolve from the per-chunk maps we ship.
+      widenClientFileUpload: false,
       disableLogger: true,
       automaticVercelMonitors: true,
     })

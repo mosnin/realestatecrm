@@ -394,10 +394,14 @@ export function validateQuestion(
     value === undefined;
 
   // Required check
-  if (question.required && isEmpty) {
+  if (question.required) {
+    // A required checkbox (e.g. a consent gate) must be affirmatively
+    // checked. It's only satisfied by 'true' — an explicit 'false'
+    // (unchecked, or the chat's "No" option) is NOT empty, so it has to
+    // be rejected here rather than via the isEmpty branch below.
     if (question.type === 'checkbox') {
       if (strVal !== 'true') return `${question.label} is required`;
-    } else {
+    } else if (isEmpty) {
       return `${question.label} is required`;
     }
   }

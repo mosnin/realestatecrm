@@ -23,9 +23,11 @@ import structlog
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import from_supabase_error
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 log = structlog.get_logger(__name__)
@@ -277,7 +279,7 @@ async def _write_tour_through_to_external_calendar(
                     "attendees": attendees,
                 },
             }
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 resp = await client.post(
                     f"{base_url}/api/internal/integrations/execute",
                     json=payload,
@@ -330,3 +332,55 @@ async def _write_tour_through_to_external_calendar(
             "calendar_mirror_insert_failed",
             space_id=space_id, tour_id=tour_id, error=str(exc)[:300],
         )
+
+
+@function_tool(strict_mode=False)
+async def delete_tour(
+    ctx: RunContextWrapper[AgentContext],
+    tour_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a tour; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Removes the Tour row; the linked contact's timeline keeps an audit note.
+    # If the tour was mirrored to an external calendar, remove that event via
+    # the calendar integration separately — this tool only deletes the CRM row.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Tour")
+        .select("id,guestName,contactId")
+        .eq("id", tour_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Tour not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    guest = check.data.get("guestName") or "this tour"
+    contact_id = check.data.get("contactId")
+
+    if not confirmed:
+        return confirmation_required(
+            entity="tour", label=guest, entity_id=tour_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Tour",
+        entity="tour",
+        entity_id=tour_id,
+        label=guest,
+        contact_id=contact_id,
+        reason=reason,
+    )

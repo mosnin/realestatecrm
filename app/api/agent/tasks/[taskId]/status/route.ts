@@ -12,10 +12,16 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_STATUSES = Object.keys(VALID_TRANSITIONS) as TaskStatus[];
 
-// ── PATCH /api/agent/tasks/[taskId]/status ───────────────────────────────────
+// ── PATCH | POST /api/agent/tasks/[taskId]/status ────────────────────────────
 // Transition a task to the requested status.
+//
+// Exported under BOTH verbs: the task-card controls (Pause/Resume/Cancel/Retry
+// in components/agent/task-controls.tsx) POST here, while the semantic verb for
+// a partial-state update is PATCH. Accepting both keeps the established UI caller
+// working (a POST-only route returned 405 → the buttons silently failed) without
+// breaking any PATCH caller. The body/auth/transition contract is identical.
 
-export async function PATCH(
+async function handleStatusTransition(
   req: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ) {
@@ -57,7 +63,7 @@ export async function PATCH(
     .maybeSingle();
 
   if (fetchError) {
-    console.error('[agent/tasks/[taskId]/status/PATCH] fetch error:', fetchError);
+    console.error('[agent/tasks/[taskId]/status] fetch error:', fetchError);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
   }
   if (!task) {
@@ -112,3 +118,6 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, task: { id: taskId, status } });
 }
+
+export const PATCH = handleStatusTransition;
+export const POST = handleStatusTransition;

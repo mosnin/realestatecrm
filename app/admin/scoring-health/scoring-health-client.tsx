@@ -17,7 +17,6 @@ import {
 import Link from 'next/link';
 import type { SpaceFailureRow, FailedLeadRow } from './page';
 import { EmptyState } from '@/components/ui/empty-state';
-import { DateRangePresets } from '@/components/ui/date-range-presets';
 
 type Stats = {
   totalContacts: number;
@@ -42,7 +41,6 @@ export function ScoringHealthClient({
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
   const [rowMessage, setRowMessage] = useState<Record<string, string>>({});
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [days, setDays] = useState(7);
 
   const scoredRate =
     stats.totalContacts > 0
@@ -53,9 +51,10 @@ export function ScoringHealthClient({
       ? Math.round((stats.totalFailed / stats.totalContacts) * 100)
       : 0;
 
-  // Pick the matching failed count for the selected period
-  const failedInPeriod = days <= 1 ? stats.failed24h : stats.failed7d;
-  const periodLabel = days <= 1 ? '24h' : `${days}d`;
+  // Only 24h + 7d failure counts exist; the 7-day window is the useful one. (A
+  // date-range picker here previously drove the LABEL — 24h/30d/90d/365d — while
+  // the value stayed the 7-day count, which read as a different number per range.)
+  const failedInPeriod = stats.failed7d;
 
   async function retry(contactId: string) {
     setRowState((s) => ({ ...s, [contactId]: 'loading' }));
@@ -154,7 +153,6 @@ export function ScoringHealthClient({
             Monitor AI scoring failures and retry from a single place.
           </p>
         </header>
-        <DateRangePresets value={days} onChange={setDays} />
       </div>
 
       {/* Top metric cards */}
@@ -194,12 +192,12 @@ export function ScoringHealthClient({
         ))}
       </div>
 
-      {/* Trend row — responds to selected period */}
+      {/* Trend row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
             <p className="text-xs text-muted-foreground font-medium">
-              Failed (last {periodLabel})
+              Failed (last 7 days)
             </p>
             <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{failedInPeriod}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Rolling window</p>

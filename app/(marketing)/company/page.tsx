@@ -1,196 +1,188 @@
 /**
- * `/company` — Chippi's founding story. Replaces the old `/about`.
+ * `/company`, Chippi's founding story, on the dark cinematic redesign system
+ * (the "Our story" target in the Company nav menu).
  *
- * One idea: the world moved to AI; real estate didn't — so two people who'd
- * lived the gap built Chippi to close it. The page leads with the mission,
- * makes the problem feel inevitable, lets the founders stand as proof it's
- * built by people who know the work, folds the brand beliefs in as conviction,
- * and closes calmly.
- *
- * Matches the rebuilt homepage aesthetic: AsciiBlob hero atmosphere with a
- * center-protect radial, serif section headlines on the home clamp, the home
- * kit's Reveal / Stagger / Eyebrow motion, light canvas. Brand orange stays a
- * signature (the blob, the serif "Chippi") — never on a button or link.
- *
- * Auth users bounce to their workspace, mirroring the homepage.
+ * One idea: the world moved to AI; real estate didn't, so two people who'd
+ * lived the gap built Chippi to close it. Hero -> the gap -> the founders ->
+ * beliefs -> the adaptive closing CTA. Cinematic sections live in a forced-dark
+ * wrapper; the CTA stays light/dark-adaptive like the rest of the redesign.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { AsciiBlob } from '@/components/marketing/home/ascii-blob';
-import { Reveal, Eyebrow } from '@/components/marketing/home/home-kit';
-import { Founders } from '@/components/marketing/company/founders';
+import { CtaSection } from '@/components/marketing/giga/cta';
+import {
+  Band,
+  BlurRise,
+  Eyebrow,
+  EyebrowPill,
+  Serif,
+  PillPrimary,
+  PillGhost,
+} from '@/components/marketing/giga/primitives';
 
-export const metadata = { title: 'Company · Chippi' };
+export const metadata = {
+  title: 'Our story · Chippi',
+  description:
+    'Real estate deserves to work the way the rest of the world already does. We built Chippi to close the gap between what is now possible and what agents actually get.',
+};
 
-export default async function CompanyPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=realtor');
-  }
+/* The founders, real bios (no fabricated photos). */
+const FOUNDERS = [
+  {
+    name: 'Orlando',
+    role: 'Co-founder',
+    bio: 'Spent a decade in the short-term rental space, running into the same wall: real-estate software and the workflows around it were built for a pre-AI world. The productivity that is possible now is not the productivity agents actually get.',
+  },
+  {
+    name: 'Preston',
+    role: 'Co-founder',
+    bio: 'A decade building in e-commerce, software, and technology. Recently built groundbreaking AI agent-orchestration frameworks alongside several products of his own, the machinery that lets an agent do real work, not just answer questions.',
+  },
+];
 
-  return (
-    <div className="bg-muted text-foreground">
-      {/* 1. Hero — the mission in one line, over the orange ASCII field. */}
-      <section className="relative overflow-hidden bg-background">
-        <AsciiBlob />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(60% 50% at 50% 36%, var(--background) 32%, transparent 78%)',
-          }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-b from-transparent to-muted"
-        />
-
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pt-28 pb-20 text-center md:px-8 md:pt-40 md:pb-28">
-          <Reveal>
-            <Eyebrow>Our story</Eyebrow>
-          </Reveal>
-          <Reveal delay={0.06}>
-            <h1 className="font-brand mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,6vw,4.5rem)] leading-[1.05] tracking-tight text-foreground">
-              Real estate deserves to work the way the rest of the world already does.
-            </h1>
-          </Reveal>
-          <Reveal delay={0.12}>
-            <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-foreground/60 md:text-xl">
-              We built Chippi because the tools agents and brokerages live in
-              were drawn for a slower era. The work shouldn’t be the chrome.
-              The work should be the deals.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* 2. The problem they saw — one reading column. */}
-      <section
-        id="the-gap"
-        className="relative mx-auto max-w-3xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal>
-          <Eyebrow>The gap</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            The work moved on. The software didn’t.
-          </h2>
-          <div className="mt-6 space-y-5 text-lg leading-relaxed text-foreground/55">
-            <p>
-              An agent’s day is mostly attention management. Email, calendar,
-              replies, follow-ups, pipeline updates. The actual selling,
-              the listening and judging and knowing, happens in maybe ten
-              percent of it.
-            </p>
-            <p>
-              Everywhere else, that other ninety percent has started to run
-              itself. In real estate it still doesn’t. The tools are stuck a
-              generation behind what’s now possible. Agents and brokerages are
-              nowhere near the productivity the moment allows. That distance,
-              between what could happen and what actually does, is the whole
-              reason Chippi exists.
-            </p>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* 3. The founders — two people who lived the gap. */}
-      <section
-        id="the-founders"
-        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <Eyebrow>The founders</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            Built by people who know the work.
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-foreground/55">
-            Orlando and Preston teamed up to solve the problem from both ends:
-            the agent’s day and the brokerage’s floor.
-          </p>
-        </Reveal>
-        <div className="mt-16">
-          <Founders />
-        </div>
-      </section>
-
-      {/* 4. What Chippi believes — the conviction, carried from /about. */}
-      <section
-        id="what-we-believe"
-        className="relative mx-auto max-w-3xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal>
-          <Eyebrow>What we believe</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2rem,4.8vw,3.75rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            A few things we won’t move on.
-          </h2>
-        </Reveal>
-
-        <div className="mt-12 divide-y divide-border/60 border-t border-border/60">
-          {BELIEFS.map((b, i) => (
-            <Reveal key={b.title} delay={i * 0.04}>
-              <div className="py-8">
-                <h3 className="text-[19px] font-semibold tracking-tight text-foreground">
-                  {b.title}
-                </h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-foreground/55">
-                  {b.body}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* 5. Closing — calm, single ask plus a softer second door. */}
-      <section className="relative mx-auto max-w-7xl px-6 pb-28 pt-4 md:px-8">
-        <Reveal>
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-title text-[clamp(2rem,4.8vw,3.5rem)] font-normal leading-[1.04] tracking-[-0.02em] text-foreground">
-              Come see what your day looks like with Chippi.
-            </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-foreground/55">
-              Seven days free. No credit card. Bring your inbox and let Chippi
-              do the rest.
-            </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href="/login/realtor?intent=signup"
-                className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
-              >
-                Start free
-              </Link>
-              <Link
-                href="/demo"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-card/80 px-6 text-[15px] font-medium text-foreground ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-card"
-              >
-                Book a demo
-              </Link>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-    </div>
-  );
-}
-
+/* Beliefs, the things we will not move on. */
 const BELIEFS = [
   {
     title: 'Configuration is failure to decide.',
-    body: 'Settings, toggles, customization layers. They’re admissions the team couldn’t pick. Picking is the work. We won’t make your day harder so our spec was easier.',
+    body: 'Settings, toggles, customization layers, they are admissions the team could not pick. Picking is the work. We will not make your day harder so our spec was easier.',
   },
   {
     title: 'Nothing leaves without your name on it.',
-    body: 'Chippi drafts, books, and updates, but by default every move is yours to approve. You can grant per-task autonomy when you trust it. The default is you in the loop, and that’s where the trust lives.',
+    body: 'Chippi drafts, books, and updates, but by default every move is yours to approve. You can grant per-task autonomy when you trust it. The default is you in the loop, and that is where the trust lives.',
   },
   {
     title: 'Chippi has one voice.',
-    body: 'Wherever Chippi shows up, on a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It’s how you learn to trust the agent across every surface.',
+    body: 'Wherever Chippi shows up, a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It is how you learn to trust the agent across every surface.',
   },
   {
-    title: 'No numbers we can’t defend.',
-    body: 'No 10× headline. No minutes-saved-per-day claim. The day we can prove a number against your own data, we’ll quote it, and footnote it. Until then, the agent does the talking.',
+    title: 'No numbers we cannot defend.',
+    body: 'No 10x headline. No minutes-saved-per-day claim. The day we can prove a number against your own data, we will quote it, and footnote it. Until then, the agent does the talking.',
   },
 ];
+
+export default function CompanyPage() {
+  return (
+    <>
+      <div className="dark bg-[#0a0a0a] text-white">
+        {/* Hero */}
+        <section className="relative isolate overflow-hidden">
+          <div aria-hidden className="absolute inset-0 -z-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/marketing/company-hero.jpg" alt="" className="h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/82 via-[#0a0a0a]/48 to-[#0a0a0a]" />
+            <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
+          </div>
+          <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
+            <BlurRise trigger="load">
+              <EyebrowPill>Our story</EyebrowPill>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.08}>
+              <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
+                Real estate deserves to work the way the world already does.
+              </Serif>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.16}>
+              <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
+                We built Chippi because the tools agents and brokerages live in were drawn for a slower
+                era. The work should not be the chrome. The work should be the deals.
+              </p>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.24}>
+              <div className="mt-9 flex flex-wrap justify-center gap-3">
+                <PillPrimary href="/demo" withArrow>
+                  See a demo
+                </PillPrimary>
+                <PillGhost href="/chippi">Meet Chippi</PillGhost>
+              </div>
+            </BlurRise>
+          </Band>
+        </section>
+
+        {/* The gap */}
+        <Band className="py-24 sm:py-28">
+          <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
+            <BlurRise>
+              <Eyebrow>The gap</Eyebrow>
+              <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+                The work moved on.
+                <br className="hidden sm:block" /> The software did not.
+              </Serif>
+            </BlurRise>
+            <BlurRise delay={0.1}>
+              <div className="space-y-6 text-[15px] leading-relaxed text-white/60 lg:pt-2">
+                <p>
+                  An agent&apos;s day is mostly attention management: email, calendar, replies,
+                  follow-ups, pipeline updates. The actual selling, the listening and judging and
+                  knowing, happens in maybe ten percent of it.
+                </p>
+                <p>
+                  Everywhere else, that other ninety percent has started to run itself. In real estate
+                  it still does not. The tools are stuck a generation behind what is now possible. That
+                  distance, between what could happen and what actually does, is the whole reason Chippi
+                  exists.
+                </p>
+              </div>
+            </BlurRise>
+          </div>
+        </Band>
+
+        {/* Founders */}
+        <Band className="py-24 sm:py-28">
+          <BlurRise className="mx-auto max-w-2xl text-center">
+            <Eyebrow className="justify-center">The founders</Eyebrow>
+            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+              Built by people who know the work.
+            </Serif>
+            <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-white/55">
+              Orlando and Preston teamed up to solve the problem from both ends: the agent&apos;s day
+              and the brokerage&apos;s floor.
+            </p>
+          </BlurRise>
+          <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
+            {FOUNDERS.map((f, i) => (
+              <BlurRise key={f.name} delay={i * 0.08}>
+                <div className="h-full rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#ff7a45] to-[#ff5fa2] text-[17px] font-semibold text-black">
+                    {f.name[0]}
+                  </span>
+                  <h3 style={{ fontFamily: 'var(--font-sans)' }} className="mt-6 text-[18px] font-semibold text-white">
+                    {f.name}
+                  </h3>
+                  <p
+                    style={{ fontFamily: 'var(--font-mono-display)' }}
+                    className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#ff9a6e]"
+                  >
+                    {f.role}
+                  </p>
+                  <p className="mt-4 text-[14px] leading-relaxed text-white/55">{f.bio}</p>
+                </div>
+              </BlurRise>
+            ))}
+          </div>
+        </Band>
+
+        {/* Beliefs */}
+        <Band className="py-24 sm:py-28">
+          <BlurRise className="mx-auto max-w-2xl text-center">
+            <Eyebrow className="justify-center">What we believe</Eyebrow>
+            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+              A few things we will not move on.
+            </Serif>
+          </BlurRise>
+          <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
+            {BELIEFS.map((b, i) => (
+              <BlurRise key={b.title} delay={i * 0.06}>
+                <div className="h-full rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8">
+                  <h3 style={{ fontFamily: 'var(--font-sans)' }} className="text-[16px] font-semibold text-white">
+                    {b.title}
+                  </h3>
+                  <p className="mt-3 text-[14px] leading-relaxed text-white/55">{b.body}</p>
+                </div>
+              </BlurRise>
+            ))}
+          </div>
+        </Band>
+      </div>
+      <CtaSection />
+    </>
+  );
+}

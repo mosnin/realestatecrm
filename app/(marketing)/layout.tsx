@@ -1,18 +1,32 @@
 /**
- * Marketing route group layout.
+ * Marketing route-group layout, the dark, cinematic shell ("Giga" redesign).
  *
- * Every page under `app/(marketing)/` renders inside this shell — nav at
- * top, footer at bottom, content fills the middle. The dashboard chrome
- * (Sidebar, Header) is NOT mounted here.
+ * Every page under `app/(marketing)/` renders inside this shell, which is a
+ * deliberately separate visual world from the product:
  *
- * The marketing site is public — we don't load Clerk for unauth visitors.
- * Auth-aware pages (the homepage redirects auth users to their workspace)
- * still call `auth()` from their own server component before rendering.
+ *  - ALWAYS DARK. A near-black (#0a0a0a) canvas with light text, regardless of
+ *    the app's light/dark theme toggle. The `dark` class is forced ON this
+ *    subtree so the legacy sub-pages (pricing / realtors / deals / …), which
+ *    were authored with `dark:` variants, also render their dark treatment on
+ *    this shell instead of flashing white cards. The product (outside this
+ *    group) keeps its own theme untouched.
+ *
+ *  - SAME FONTS AS THE DASHBOARD. Headlines use the product's serif
+ *    (`--font-title`, Times) and eyebrows use the product mono (`--font-mono`),
+ *    so the logged-out site and the app read as one brand. The shell is tagged
+ *    `data-marketing-shell`; a scoped rule in globals.css makes the serif the
+ *    DEFAULT for every heading in the tree (out-specifying the global
+ *    `h1..h6 { --font-heading }` base rule). No web fonts are loaded, these are
+ *    the same system faces the dashboard uses.
+ *
+ * The marketing site is public; Clerk isn't loaded for unauth visitors (the
+ * middleware sets `x-public-page` and the root layout skips ClerkProvider).
+ * Auth-aware pages (the homepage redirects auth users to their workspace) still
+ * call `auth()` from their own server component before rendering.
  */
 
-import { FortitudoNav } from '@/components/marketing/fortitudo/nav';
-import { FortitudoFooter } from '@/components/marketing/fortitudo/footer';
-import { ScrollProgress } from '@/components/marketing/fortitudo/scroll-progress';
+import { SiteHeader } from '@/components/marketing/giga/header';
+import { SiteFooter } from '@/components/marketing/giga/footer';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
 export default function MarketingLayout({
@@ -21,15 +35,28 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* FirstPromoter click tracking — sets _fprom_tid cookie from ?fpr= links */}
+    <div
+      // The shell follows the user's light/dark preference (the root <html>
+      // toggles `dark` from system / localStorage). `data-marketing-shell`
+      // scopes the dashboard-font headline/eyebrow rules in globals.css to this
+      // subtree. The cinematic homepage sections opt back into dark themselves.
+      data-marketing-shell
+      className="flex min-h-screen flex-col bg-white text-neutral-900 antialiased dark:bg-[#0a0a0a] dark:text-white"
+    >
+      {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
-      {/* fortitudo "studio ASCII" chrome: thin scroll bar, floating pill nav,
-          inset charcoal footer. Every logged-out page inherits the look. */}
-      <ScrollProgress />
-      <FortitudoNav />
+      {/* Shared gradient def so icons can be stroked with the brand gradient. */}
+      <svg aria-hidden width="0" height="0" className="absolute">
+        <defs>
+          <linearGradient id="chippi-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ff7a45" />
+            <stop offset="100%" stopColor="#c77dff" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <SiteHeader />
       <main className="flex-1">{children}</main>
-      <FortitudoFooter />
+      <SiteFooter />
     </div>
   );
 }

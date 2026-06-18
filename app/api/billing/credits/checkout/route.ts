@@ -3,7 +3,7 @@ import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { TOPUPS, type TopupId } from '@/lib/plans';
+import { TOPUPS, type TopupId, canBuyTopups } from '@/lib/plans';
 import { resolveBillingAccount } from '@/lib/billing/account';
 
 /**
@@ -40,7 +40,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Which balance does this space fund? Team/Team Plus pool at the brokerage.
-    const { account } = await resolveBillingAccount(space.id);
+    const { account, plan } = await resolveBillingAccount(space.id);
+
+    // Plan gating (Fix #7): only paid tiers may buy top-ups. A Free account has
+    // no subscription, so a top-up would be its first-ever charge with no plan
+    // behind it — block it server-side (the UI also hides the buttons, but the
+    // server is the real boundary). `plan` is the FUNDING account's plan, so a
+    // Team space is correctly gated on the brokerage's tier, not Space.plan.
+    if (!canBuyTopups(plan)) {
+      return NextResponse.json(
+        { error: 'Top-ups are available on paid plans. Upgrade to buy more credits.' },
+        { status: 400 },
+      );
+    }
 
     // Use the FUNDING account's Stripe customer, not the space's. For a
     // Team/Team Plus space the balance pools at the brokerage, whose customer

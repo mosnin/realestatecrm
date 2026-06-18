@@ -4,7 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
@@ -34,6 +34,12 @@ export async function POST(
   try {
     await assertCanSpend(space.id, 'lead_score');
   } catch (err) {
+    if (err instanceof SubscriptionDelinquentError) {
+      return NextResponse.json(
+        { error: 'Your subscription is inactive. Update your payment method or resubscribe.' },
+        { status: 402 },
+      );
+    }
     if (err instanceof CreditsExhaustedError) {
       return NextResponse.json(
         { error: 'Out of credits. Buy a top-up or upgrade your plan.' },

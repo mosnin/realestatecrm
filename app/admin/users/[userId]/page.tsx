@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { UserActions } from './user-actions';
+import { AccountManagement, type MembershipSummary } from './account-management';
+import { getCurrentDbUser } from '@/lib/permissions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
@@ -238,11 +240,44 @@ export default async function AdminUserDetailPage({
     failedLeads = failedCount.count ?? 0;
   }
 
+  // Brokerage memberships for this user (drives the account-management role UI).
+  const { data: membershipRows } = await supabase
+    .from('BrokerageMembership')
+    .select('id, role, brokerageId')
+    .eq('userId', user.id);
+  const membershipList = (membershipRows ?? []) as Array<{
+    id: string;
+    role: string;
+    brokerageId: string;
+  }>;
+  let memberships: MembershipSummary[] = [];
+  if (membershipList.length > 0) {
+    const brokerageIds = membershipList.map((m) => m.brokerageId).filter(Boolean);
+    const { data: brokRows } = await supabase
+      .from('Brokerage')
+      .select('id, name')
+      .in('id', brokerageIds);
+    const nameMap = new Map((brokRows ?? []).map((b: any) => [b.id, b.name as string]));
+    memberships = membershipList.map((m) => ({
+      id: m.id,
+      role: m.role,
+      brokerageId: m.brokerageId,
+      brokerageName: nameMap.get(m.brokerageId) ?? 'Unknown brokerage',
+    }));
+  }
+
+  // Is this the signed-in admin's own row? Gates self-destructive actions.
+  const self = await getCurrentDbUser();
+  const isSelf = self?.id === user.id;
+
   const subStatus = (fullUser.space as any)?.stripeSubscriptionStatus ?? null;
   const periodEnd = (fullUser.space as any)?.stripePeriodEnd ?? null;
+  const spaceId = (fullUser.space as any)?.id ?? null;
+  const spacePlan = (fullUser.space as any)?.plan ?? null;
+  const hasStripeCustomer = !!(fullUser.space as any)?.stripeCustomerId;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       {/* Back nav */}
       <Link
         href="/admin/users"
@@ -506,10 +541,23 @@ export default async function AdminUserDetailPage({
         isSuspended={isSuspended}
         subscriptionStatus={subStatus ?? 'inactive'}
         stripePeriodEnd={periodEnd}
+        spaceId={spaceId}
+        spacePlan={spacePlan}
+        hasStripeCustomer={hasStripeCustomer}
         twoFactorEnabled={twoFactorEnabled}
         totpEnabled={totpEnabled}
         backupCodeEnabled={backupCodeEnabled}
         activeSessions={activeSessions}
+      />
+
+      {/* Account management — profile edit, role/account-type, delete */}
+      <AccountManagement
+        userId={fullUser.id}
+        email={fullUser.email}
+        name={fullUser.name}
+        platformRole={(fullUser.platformRole as string) ?? 'user'}
+        isSelf={isSelf}
+        memberships={memberships}
       />
     </div>
   );

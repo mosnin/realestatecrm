@@ -15,7 +15,6 @@ import { ConnectedAppsSection } from '@/components/settings/connected-apps-secti
 import { MemoryList } from '@/components/chippi/memory-list';
 import { RoutinesManager } from '@/components/routines/routines-manager';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
-import { ChatModelPicker } from '@/components/agent/chat-model-picker';
 import { UsageSection } from '@/components/settings/usage-section';
 import { cn } from '@/lib/utils';
 import type { SpaceSetting } from '@/lib/types';
@@ -175,7 +174,7 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       {/* Page header */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
@@ -280,18 +279,6 @@ export default async function SettingsPage({
               Tell Chippi about you so responses feel tailored, not generic.
             </p>
             <AIProfileForm slug={slug} spaceId={space.id} />
-          </section>
-          <section
-            id="chat-model"
-            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
-          >
-            <p className={SECTION_LABEL}>Chippi&apos;s model</p>
-            <p className={BODY_MUTED}>
-              The model Chippi thinks with — in chat and when it works on its
-              own. The default suits almost everyone; switch it only if you
-              have a reason to.
-            </p>
-            <ChatModelPicker />
           </section>
         </div>
       )}

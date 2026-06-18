@@ -66,6 +66,22 @@ interface BillingPageProps {
   canceledAccessEnd?: string;
   /** Support email or URL */
   supportUrl?: string;
+  /**
+   * Endpoint overrides so this same component can serve the broker surface,
+   * where portal/cancel must act on the BROKERAGE's Stripe identity instead of
+   * a Space the caller owns. Defaults are the realtor space routes.
+   */
+  endpoints?: { checkout?: string; portal?: string; cancel?: string };
+  /**
+   * Hide this component's own Subscribe / Resubscribe buttons. The brokerage
+   * billing page renders a dedicated <BrokerageSubscribe> card (plan picker +
+   * scope:'brokerage' checkout) above this component; this component's
+   * subscribe handler posts only { slug } to /api/billing/checkout (the Space
+   * flow), which is the WRONG Stripe entity for a brokerage subscription and
+   * 400s for a broker_only owner (no slug). Suppress the duplicate buttons so
+   * the only subscribe path on that page is the correct brokerage card.
+   */
+  hideSubscribe?: boolean;
   /** The account's plan tier — drives the displayed name + price. Without this
    *  the page hardcoded "Pro"/$97 and contradicted the real plan shown below. */
   plan?: PlanId;
@@ -162,15 +178,17 @@ export function BillingPage({
   usageStats,
   canceledAccessEnd,
   supportUrl = 'mailto:support@chippi.com',
-  plan = 'pro',
+  endpoints,
+  hideSubscribe = false,
+  plan = 'solo',
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
   // Plan name + price come from the single source of truth (lib/plans), not
-  // hardcoded — the page used to claim "Pro/$97" for every tier.
-  const planDef = PLANS[plan] ?? PLANS.pro;
+  // hardcoded — the page used to claim "Pro/$97" for every account.
+  const planDef = PLANS[plan] ?? PLANS.solo;
   const PLAN_NAME = planDef.label;
   const PLAN_PRICE = planDef.priceMonthly;
 
@@ -224,17 +242,17 @@ export function BillingPage({
   }
 
   function handleSubscribe() {
-    void startBillingFlow('/api/billing/checkout');
+    void startBillingFlow(endpoints?.checkout ?? '/api/billing/checkout');
   }
 
   function handleManage() {
-    void startBillingFlow('/api/billing/portal');
+    void startBillingFlow(endpoints?.portal ?? '/api/billing/portal');
   }
 
   async function handleCancel() {
     setCanceling(true);
     try {
-      const res = await fetch('/api/billing/cancel', {
+      const res = await fetch(endpoints?.cancel ?? '/api/billing/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug }),
@@ -278,7 +296,7 @@ export function BillingPage({
       )}
 
       {/* ── Canceled access banner ── */}
-      {subscriptionStatus === 'canceled' && (
+      {subscriptionStatus === 'canceled' && !hideSubscribe && (
         <div className="rounded-lg border border-border bg-muted/30 px-5 py-4 flex items-start gap-3">
           <AlertCircle size={18} className="text-muted-foreground flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -388,29 +406,31 @@ export function BillingPage({
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-2.5">
-          {isActive ? (
-            <>
-              <Button onClick={handleManage} variant="outline" size="sm" className="gap-1.5">
-                <CreditCard size={14} />
-                Manage subscription
+        {(isActive || !hideSubscribe) && (
+          <div className="mt-5 flex items-center gap-2.5">
+            {isActive ? (
+              <>
+                <Button onClick={handleManage} variant="outline" size="sm" className="gap-1.5">
+                  <CreditCard size={14} />
+                  Manage subscription
+                </Button>
+                <Button
+                  onClick={() => setCancelDialogOpen(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  Cancel plan
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleSubscribe} size="sm" className="gap-2">
+                Subscribe now
+                <ArrowRight size={14} />
               </Button>
-              <Button
-                onClick={() => setCancelDialogOpen(true)}
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                Cancel plan
-              </Button>
-            </>
-          ) : (
-            <Button onClick={handleSubscribe} size="sm" className="gap-2">
-              Subscribe now
-              <ArrowRight size={14} />
-            </Button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </SectionBlock>
 
       {/* ── Usage summary ── */}
@@ -468,7 +488,7 @@ export function BillingPage({
           ))}
         </ul>
 
-        {!isActive && (
+        {!isActive && !hideSubscribe && (
           <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Get started for ${PLAN_PRICE}/mo</p>

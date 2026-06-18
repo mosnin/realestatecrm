@@ -63,6 +63,12 @@ class AgentContext:
     # other run path (chat, routine, sweep, manual run-now).
     trigger_source: dict = field(default_factory=dict, compare=False)
 
+    # ── find_integration_tool loop guard ─────────────────────────────────
+    # Counts integration discoveries this run that came back empty or errored.
+    # The dispatcher hard-stops after two so a failing/empty search can't grind
+    # for minutes with reworded queries. A new run is a new context — resets.
+    integration_search_misses: int = field(default=0, compare=False)
+
     @classmethod
     def from_settings(
         cls,

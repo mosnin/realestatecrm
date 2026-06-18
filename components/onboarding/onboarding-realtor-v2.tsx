@@ -36,6 +36,7 @@ import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { CHIPPI_PILL } from '@/lib/typography';
 import { BrandLogo } from '@/components/brand-logo';
 import { composeOnboardingDraft } from '@/lib/onboarding-draft';
+import { readSignupPlan } from '@/lib/signup-plan';
 import { OnboardingIntro, OnboardingReady } from './onboarding-cinematics';
 import { ChippiSays, UserSays, AnswerAffordance, Thread } from './onboarding-chat';
 import { TypingText } from './typing-text';
@@ -215,6 +216,9 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
           businessName: businessName.trim(),
           intakePageTitle: 'Rental Application',
           intakePageIntro: 'Share a few details so I can review your rental fit faster.',
+          // Plan the buyer picked on the marketing site (sessionStorage-carried).
+          // Persisted on Space.plan so /subscribe shows + charges the right tier.
+          plan: readSignupPlan() ?? undefined,
         }),
       });
       if (!spaceRes.ok) {

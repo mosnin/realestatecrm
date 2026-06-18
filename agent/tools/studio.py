@@ -47,7 +47,7 @@ async def generate_studio_image(
         payload["model"] = model
 
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/studio/generate",
                 json=payload,
@@ -66,8 +66,11 @@ async def generate_studio_image(
 
     try:
         data = resp.json()
-    except Exception:  # noqa: BLE001
-        return {"error": "generation returned an unreadable response"}
+    except Exception:  # noqa: BLE001 — surface status + a snippet so a non-JSON
+        # body (an HTML auth/deploy-protection page, an unfollowed redirect, etc.)
+        # is diagnosable instead of an opaque "unreadable response".
+        snippet = (resp.text or "")[:200].replace("\n", " ").strip()
+        return {"error": f"generation returned a non-JSON response ({resp.status_code}): {snippet}"}
 
     return {
         "file_id": data.get("fileId"),
@@ -110,7 +113,7 @@ async def edit_studio_image(
         payload["prompt"] = prompt
 
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/studio/edit",
                 json=payload,
@@ -129,8 +132,9 @@ async def edit_studio_image(
 
     try:
         data = resp.json()
-    except Exception:  # noqa: BLE001
-        return {"error": "edit returned an unreadable response"}
+    except Exception:  # noqa: BLE001 — surface status + a snippet (see generate).
+        snippet = (resp.text or "")[:200].replace("\n", " ").strip()
+        return {"error": f"edit returned a non-JSON response ({resp.status_code}): {snippet}"}
 
     return {
         "file_id": data.get("fileId"),

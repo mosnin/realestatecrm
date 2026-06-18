@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { toastCopied } from '@/lib/toast-helpers';
 import { Card, CardContent } from '@/components/ui/card';
+import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,6 @@ import {
   CreditCard,
   Gift,
   Clock,
-  DollarSign,
   ShieldBan,
   ShieldCheck,
   LogIn,
@@ -59,6 +59,9 @@ interface UserActionsProps {
   intakeUrl: string | null;
   subscriptionStatus: string | null;
   stripePeriodEnd: string | null;
+  spaceId: string | null;
+  spacePlan: string | null;
+  hasStripeCustomer: boolean;
   isSuspended: boolean;
   twoFactorEnabled: boolean;
   totpEnabled: boolean;
@@ -99,7 +102,13 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-const SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'] as const;
+// Statuses an admin can set via the status dropdown. 'active' is intentionally
+// removed (Fix #4): the old `active` branch did `trial_end:'now'` which does NOT
+// make a subscription "active for a period" — use Change plan / Comp / Cancel for
+// real billing changes. 'trialing' maps to a real Stripe trial_end; 'canceled'
+// maps to a real cancel; the rest are DB-only overrides (require override:true).
+const SUBSCRIPTION_STATUSES = ['trialing', 'past_due', 'canceled', 'unpaid', 'inactive'] as const;
+const STRIPE_BACKED_STATUSES = new Set(['trialing', 'canceled']);
 
 export function UserActions({
   userId,
@@ -110,6 +119,9 @@ export function UserActions({
   intakeUrl,
   subscriptionStatus,
   stripePeriodEnd,
+  spaceId,
+  spacePlan,
+  hasStripeCustomer,
   isSuspended: isSuspendedInitial,
   twoFactorEnabled,
   totpEnabled,
@@ -122,7 +134,16 @@ export function UserActions({
   const [repairLoading, setRepairLoading] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [repairOpen, setRepairOpen] = useState(false);
-  const [subStatus, setSubStatus] = useState(subscriptionStatus || 'inactive');
+  // Seed the "set status" target with the current status only when it's one the
+  // dropdown actually offers; otherwise (e.g. 'active', which is intentionally not
+  // a settable target — see SUBSCRIPTION_STATUSES) fall back to a valid option so
+  // the controlled <select> never renders with a value that has no matching
+  // <option> (which leaves it blank / shows the wrong selection).
+  const [subStatus, setSubStatus] = useState<string>(
+    (SUBSCRIPTION_STATUSES as readonly string[]).includes(subscriptionStatus ?? '')
+      ? (subscriptionStatus as string)
+      : 'trialing',
+  );
   const [subLoading, setSubLoading] = useState(false);
   const [subResult, setSubResult] = useState<string | null>(null);
   const [suspended, setSuspended] = useState(isSuspendedInitial);
@@ -131,9 +152,6 @@ export function UserActions({
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [compLoading, setCompLoading] = useState(false);
   const [compResult, setCompResult] = useState<string | null>(null);
-  const [refundLoading, setRefundLoading] = useState(false);
-  const [refundResult, setRefundResult] = useState<string | null>(null);
-  const [refundOpen, setRefundOpen] = useState(false);
   const [sessions, setSessions] = useState<ActiveSession[]>(activeSessions);
   const [sessionBusy, setSessionBusy] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<string | null>(null);
@@ -158,9 +176,9 @@ export function UserActions({
       });
       const data = await res.json();
       if (res.ok) {
-        setResetResult('Password reset email sent.');
+        setResetResult(data.message || 'Use the Clerk Dashboard to complete the reset.');
       } else {
-        setResetResult(data.error || 'Failed to send reset email.');
+        setResetResult(data.error || 'Failed to start password reset.');
       }
     } catch {
       setResetResult('Network error. Try again.');
@@ -197,6 +215,9 @@ export function UserActions({
     setSubLoading(true);
     setSubResult(null);
     try {
+      // A status with no Stripe op is a DB-only override the backend rejects
+      // unless override:true is sent — make that explicit from the UI.
+      const isOverride = !STRIPE_BACKED_STATUSES.has(status);
       const res = await fetch('/api/admin/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,6 +226,7 @@ export function UserActions({
           userId,
           status,
           ...(periodEnd ? { periodEnd } : {}),
+          ...(isOverride ? { override: true } : {}),
         }),
       });
       const data = await res.json();
@@ -221,12 +243,6 @@ export function UserActions({
     }
   }
 
-  function handleCompAccount() {
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    handleUpdateSubscription('active', oneYearFromNow.toISOString());
-  }
-
   function handleExtendTrial() {
     const days = Math.max(1, Math.min(365, trialDays || 14));
     const end = new Date();
@@ -234,50 +250,30 @@ export function UserActions({
     handleUpdateSubscription('trialing', end.toISOString());
   }
 
-  async function handleCompFreeMonth() {
+  // Comp via the corrected comp_free_month handler (real Stripe trial_end). The
+  // `days` param backs both "comp a month" (30) and "comp a year" (365); the
+  // server only writes the far-future period to the DB when Stripe accepts the
+  // trial_end, so the old "DB says active a year / Stripe re-bills" desync is gone.
+  async function handleComp(days: number) {
     setCompLoading(true);
     setCompResult(null);
     try {
       const res = await fetch('/api/admin/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'comp_free_month', userId }),
+        body: JSON.stringify({ action: 'comp_free_month', userId, days }),
       });
       const data = await res.json();
       if (res.ok) {
-        setCompResult(`Free month granted. Active until ${new Date(data.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`);
+        setCompResult(`Comp applied. Not billed until ${new Date(data.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`);
         router.refresh();
       } else {
-        setCompResult(data.error || 'Failed to comp free month.');
+        setCompResult(data.error || 'Failed to comp.');
       }
     } catch {
       setCompResult('Network error. Try again.');
     } finally {
       setCompLoading(false);
-    }
-  }
-
-  async function handleRefund() {
-    setRefundLoading(true);
-    setRefundResult(null);
-    try {
-      const res = await fetch('/api/admin/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'issue_refund', userId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRefundResult(`Refund issued. Refund ID: ${data.refundId}, Amount: $${(data.amount / 100).toFixed(2)}.`);
-        setRefundOpen(false);
-        router.refresh();
-      } else {
-        setRefundResult(data.error || 'Refund failed.');
-      }
-    } catch {
-      setRefundResult('Network error. Try again.');
-    } finally {
-      setRefundLoading(false);
     }
   }
 
@@ -452,12 +448,14 @@ export function UserActions({
 
           <div className="border-t border-border" />
 
-          {/* Password reset */}
+          {/* Password reset — Clerk v7 has no send-reset API, so this opens the
+              Clerk Dashboard path rather than emailing the user directly. */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Password reset</p>
+              <p className="text-sm font-medium">Password reset (opens Clerk)</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Send a password reset email via Clerk
+                Records the request and points you to the Clerk Dashboard. The
+                user can also self-serve via &ldquo;Forgot password&rdquo;.
               </p>
             </div>
             <Button
@@ -468,7 +466,7 @@ export function UserActions({
               className="text-xs gap-1.5 flex-shrink-0"
             >
               <KeyRound size={13} />
-              {resetLoading ? 'Sending...' : 'Send reset email'}
+              {resetLoading ? 'Working...' : 'Reset via Clerk'}
             </Button>
           </div>
           {resetResult && (
@@ -552,18 +550,22 @@ export function UserActions({
             <>
               <div className="border-t border-border" />
 
-              {/* Subscription management */}
+              {/* Subscription status + trial (real-Stripe ops + comp) */}
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-medium flex items-center gap-1.5">
                     <CreditCard size={13} />
-                    Subscription
+                    Subscription status
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Current status: <span className="font-medium">{subscriptionStatus || 'inactive'}</span>
                     {stripePeriodEnd && (
                       <> &middot; Period end: {new Date(stripePeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
                     )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    &lsquo;trialing&rsquo; and &lsquo;canceled&rsquo; map to real Stripe operations. Other
+                    statuses are DB-only overrides (Stripe can overwrite them on its next webhook).
                   </p>
                 </div>
 
@@ -575,7 +577,9 @@ export function UserActions({
                     className="text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     {SUBSCRIPTION_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}{STRIPE_BACKED_STATUSES.has(s) ? '' : ' (override)'}
+                      </option>
                     ))}
                   </select>
                   <Button
@@ -591,16 +595,29 @@ export function UserActions({
 
                   <div className="w-px h-5 bg-border" />
 
+                  {/* Comp — both backed by the corrected comp_free_month (real
+                      Stripe trial_end; DB only mirrors when Stripe accepts it). */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleCompAccount}
-                    disabled={subLoading}
+                    onClick={() => handleComp(30)}
+                    disabled={compLoading}
                     className="text-xs gap-1.5"
                   >
                     <Gift size={13} />
-                    Comp account (1 yr)
+                    {compLoading ? 'Processing…' : 'Comp 1 month'}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleComp(365)}
+                    disabled={compLoading}
+                    className="text-xs gap-1.5"
+                  >
+                    <Gift size={13} />
+                    Comp 1 year
+                  </Button>
+
                   <div className="flex items-center gap-1">
                     <input
                       type="number"
@@ -625,82 +642,27 @@ export function UserActions({
                     </Button>
                   </div>
                 </div>
+                {subResult && <p className="text-xs text-muted-foreground">{subResult}</p>}
+                {compResult && <p className="text-xs text-muted-foreground">{compResult}</p>}
               </div>
-
-              {subResult && (
-                <p className="text-xs text-muted-foreground">{subResult}</p>
-              )}
 
               <div className="border-t border-border" />
 
-              {/* Billing actions */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <DollarSign size={13} />
-                    Billing
+              {/* Plan change / cancel / credits / money-refund */}
+              {spaceId && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Plan, cancellation, credits &amp; refunds
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Comp a free month or issue a refund for the last payment.
-                  </p>
+                  <AccountBillingPanel
+                    accountType="space"
+                    accountId={spaceId}
+                    currentPlan={spacePlan}
+                    ownerUserId={userId}
+                    hasStripeCustomer={hasStripeCustomer}
+                    hasSubscription={subscriptionStatus !== null && subscriptionStatus !== 'inactive'}
+                  />
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    onClick={handleCompFreeMonth}
-                    variant="outline"
-                    size="sm"
-                    disabled={compLoading}
-                    className="gap-1.5"
-                  >
-                    <Gift size={14} />
-                    {compLoading ? 'Processing...' : 'Comp free month'}
-                  </Button>
-
-                  <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-destructive hover:text-destructive"
-                      >
-                        <CreditCard size={14} />
-                        Issue refund
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Issue refund</DialogTitle>
-                        <DialogDescription>
-                          Refund the user&apos;s last payment? This will issue a full refund via Stripe.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => setRefundOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={handleRefund}
-                          disabled={refundLoading}
-                        >
-                          <CreditCard size={14} />
-                          {refundLoading ? 'Processing...' : 'Confirm refund'}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-
-              {compResult && (
-                <p className="text-xs text-muted-foreground">{compResult}</p>
-              )}
-              {refundResult && (
-                <p className="text-xs text-muted-foreground">{refundResult}</p>
               )}
             </>
           )}

@@ -5,15 +5,15 @@
  *
  * The subject is the page's serif h1 — the body of the page IS the body
  * of the email. Sender + time recede below the title; recipients tuck
- * into a single line. The body renders as plain text with whitespace
- * preserved.
+ * into a single line. HTML emails render in a sandboxed iframe (like Gmail);
+ * plain-text emails render as pre-wrapped text.
  *
  * Affordances live in one row above the body: Reply (primary), Star
  * (toggle), Open in Gmail (ghost link). Back to inbox is a quiet top-
  * left link, separate from the action row.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Reply } from 'lucide-react';
@@ -44,6 +44,7 @@ interface EmailMessage {
   cc: { name: string; address: string }[];
   subject: string | null;
   body: string;
+  bodyHtml: string | null;
   sentAt: string;
   starred: boolean;
   webLink: string | null;
@@ -117,6 +118,8 @@ export function EmailReadView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const [starBusy, setStarBusy] = useState(false);
+  const [bodyHeight, setBodyHeight] = useState(420);
+  const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (!connected) {
@@ -179,6 +182,31 @@ export function EmailReadView({
       body: buildQuotedReply(message),
     };
   }, [message]);
+
+  // Wrap the sanitized email HTML in a minimal document: links open out, the
+  // canvas is light (so a dark app theme can't invert the email), and images
+  // never overflow. Handles both full-document emails and bare fragments.
+  const emailSrcDoc = useMemo(() => {
+    const html = message?.bodyHtml;
+    if (!html) return '';
+    const inject =
+      '<base target="_blank"><meta name="color-scheme" content="light">' +
+      "<style>html,body{margin:0;padding:0;background:#fff;color:#111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;} img{max-width:100%;height:auto;} table{max-width:100%;} *{box-sizing:border-box;} a{color:#2563eb;}</style>";
+    if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${inject}`);
+    if (/<html[^>]*>/i.test(html)) return html.replace(/<html([^>]*)>/i, `<html$1><head>${inject}</head>`);
+    return `<!doctype html><html><head>${inject}</head><body>${html}</body></html>`;
+  }, [message?.bodyHtml]);
+
+  // The iframe doesn't auto-size; measure the rendered document and grow to fit.
+  const measureFrame = useCallback(() => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc) return;
+    const h = Math.max(
+      doc.documentElement?.scrollHeight ?? 0,
+      doc.body?.scrollHeight ?? 0,
+    );
+    if (h > 0) setBodyHeight(Math.min(h + 24, 20000));
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -301,9 +329,30 @@ export function EmailReadView({
             </div>
 
             <div className="border-t border-border/60 pt-6">
-              <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                {message.body || '(no body)'}
-              </div>
+              {/* HTML emails render in a sandboxed iframe (sanitized
+                  server-side, NO allow-scripts) so the email's own CSS/@import
+                  can't leak into the app and nothing in it can execute. Plain
+                  text falls back to pre-wrapped text. */}
+              {message.bodyHtml ? (
+                <iframe
+                  ref={frameRef}
+                  title="Email"
+                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                  srcDoc={emailSrcDoc}
+                  onLoad={() => {
+                    measureFrame();
+                    // Images and fonts settle after load — re-measure.
+                    setTimeout(measureFrame, 300);
+                    setTimeout(measureFrame, 1200);
+                  }}
+                  className="w-full rounded-md bg-white"
+                  style={{ height: bodyHeight, border: 'none', colorScheme: 'light' }}
+                />
+              ) : (
+                <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                  {message.body || '(no body)'}
+                </div>
+              )}
             </div>
           </motion.article>
         )}

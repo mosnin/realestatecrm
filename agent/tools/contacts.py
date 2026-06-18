@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -13,6 +14,7 @@ from errors import from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
 from tools.base import idempotent_tool, with_retry
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -24,6 +26,84 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     return value
 
 
+def _normalize_tags(tags: Any) -> list[str]:
+    """Coerce a model-supplied `tags` value into a clean list[str].
+
+    The schema asks for a list, but the model intermittently passes a string
+    — most often a JSON-encoded list (`'["hot","pre-approved"]'`), sometimes a
+    single tag (`'hot'`) or a comma-separated run (`'hot, pre-approved'`).
+    Without this the insert/update either stored the raw string as one tag or
+    raised "tags needs an actual list format", which the model then retried —
+    burning the turn's step budget. Normalize all shapes here so both
+    create_contact and update_contact stay tolerant.
+    """
+    if tags is None:
+        return []
+    if isinstance(tags, str):
+        text = tags.strip()
+        if not text:
+            return []
+        # A JSON array string is the dominant failure mode.
+        try:
+            parsed = json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(t).strip() for t in parsed if str(t).strip()]
+        if isinstance(parsed, str) and parsed.strip():
+            return [parsed.strip()]
+        # Not JSON — treat as a single tag, or comma-split a plain run.
+        return [t.strip() for t in text.split(",") if t.strip()]
+    if isinstance(tags, (list, tuple)):
+        return [str(t).strip() for t in tags if str(t).strip()]
+    # Any other scalar (number, etc.) → its string form as a single tag.
+    text = str(tags).strip()
+    return [text] if text else []
+
+
+def _contacts_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Wrap contact rows in the chat-card envelope.
+
+    Returns the `display: "contacts"` shape the chat surface renders as a
+    DataTable: `{contacts: [...], count, summary, display}`. The whole dict
+    rides across as `data` (modal_app.translate → extract_display_payload),
+    and the renderer dispatch reads `data.contacts`. Row fields stay
+    PRIMITIVES the buildContactsTable mapper expects (id, name, email, phone,
+    scoreLabel, leadType, lastContactedAt/followUpAt) — no nested objects.
+
+    Note: `tags` (a list) is dropped from the card rows so the DataTable's
+    primitives-only contract holds; the model still sees counts/names in the
+    summary and the full rows it needs to answer.
+    """
+    contacts = [
+        {
+            "id": r.get("id"),
+            "name": r.get("name"),
+            "email": r.get("email"),
+            "phone": r.get("phone"),
+            "leadType": r.get("leadType"),
+            "leadScore": r.get("leadScore"),
+            "scoreLabel": r.get("scoreLabel"),
+            "followUpAt": r.get("followUpAt"),
+            "lastContactedAt": r.get("lastContactedAt"),
+        }
+        for r in rows
+    ]
+    count = len(contacts)
+    if count == 0:
+        summary = "No matching contacts."
+    elif count == 1:
+        summary = f"Found 1 contact: {contacts[0].get('name') or 'unnamed'}."
+    else:
+        summary = f"Found {count} contacts."
+    return {
+        "contacts": contacts,
+        "count": count,
+        "summary": summary,
+        "display": "contacts",
+    }
+
+
 @function_tool(strict_mode=False)
 async def find_contacts(
     ctx: RunContextWrapper[AgentContext],
@@ -33,13 +113,15 @@ async def find_contacts(
     overdue_followup_only: bool = False,
     no_followup_quiet_days: int | None = None,
     limit: int = 20,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Find contacts in this space with optional filters."""
     # contact_id: single-contact lookup returns full record (notes, preferences).
     # name_contains: case-insensitive substring. lead_type: rental|buyer.
     # overdue_followup_only: only contacts with followUpAt in the past.
     # no_followup_quiet_days: QUALIFICATION contacts with no follow-up + quiet N+ days.
     # limit: 1-100.
+    # Returns {contacts:[...], count, display:"contacts"} so the chat renders a
+    # contacts table; the realtor sees the card, not a prose row dump.
     space_id = ctx.context.space_id
     db = await supabase()
     limit = max(1, min(100, limit))
@@ -58,12 +140,17 @@ async def find_contacts(
             .execute()
         )
         if not result.data:
-            return []
+            return _contacts_payload([])
         row = result.data
         for field in ("scoreSummary", "preferences", "notes"):
             if field in row:
                 row[field] = _trim(row[field])
-        return [row]
+        # Single-record lookup: surface the FULL record to the model (notes,
+        # preferences, budget) alongside the card envelope, so a "tell me about
+        # X" answer has the detail while still rendering the contact card.
+        payload = _contacts_payload([row])
+        payload["contact"] = row
+        return payload
 
     query = (
         db.table("Contact")
@@ -95,7 +182,7 @@ async def find_contacts(
         )
 
     result = await query.execute()
-    return result.data or []
+    return _contacts_payload(result.data or [])
 
 
 @function_tool(strict_mode=False)
@@ -135,12 +222,13 @@ async def create_contact(
     budget: float | None = None,
     preferences: str | None = None,
     notes: str | None = None,
-    tags: list[str] | None = None,
+    tags: list[str] | str | None = None,
 ) -> dict[str, Any]:
     """Create a new contact (person) in the workspace."""
     # name required. lead_type: buyer|rental|seller (default buyer).
     # budget: dollars (monthly for rental, purchase price for buyer).
-    # tags: optional; use 'new-lead' for fresh leads.
+    # tags: optional list of strings; use 'new-lead' for fresh leads. A single
+    #   tag string or a JSON-array string is also accepted and normalized.
     space_id = ctx.context.space_id
     db = await supabase()
     now = datetime.now(timezone.utc).isoformat()
@@ -154,7 +242,9 @@ async def create_contact(
     if clean_lead_type not in valid_lead_types:
         clean_lead_type = "buyer"
 
-    clean_tags = [t.strip()[:60] for t in (tags or []) if t.strip()][:10]
+    # tags may arrive as a list (schema) or as a string the model fudged —
+    # _normalize_tags absorbs the JSON-string / single-tag / comma cases.
+    clean_tags = [t[:60] for t in _normalize_tags(tags)][:10]
 
     import uuid as _uuid
     contact_id = str(_uuid.uuid4())
@@ -218,6 +308,30 @@ async def create_contact(
 
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
+# Lead category (Contact.leadType) — buyer vs renter vs seller. This is a
+# SEPARATE axis from the pipeline stage (Contact.type / new_pipeline_type
+# above). "Renter"/"rental" is a leadType, NOT a pipeline stage — see the
+# `lead_type` parameter on update_contact below. Mirrors the DB check
+# constraint on "Contact"."leadType" and create_contact's valid set.
+_VALID_LEAD_TYPES = {"buyer", "rental", "seller"}
+
+# Spoken/written synonyms the model may pass → canonical leadType. Lets
+# "renter" map to the stored "rental" without the realtor learning our enum.
+_LEAD_TYPE_ALIASES = {
+    "renter": "rental",
+    "rent": "rental",
+    "rental": "rental",
+    "tenant": "rental",
+    "lease": "rental",
+    "buyer": "buyer",
+    "buy": "buyer",
+    "purchaser": "buyer",
+    "seller": "seller",
+    "sell": "seller",
+    "listing": "seller",
+    "vendor": "seller",
+}
+
 
 @function_tool(strict_mode=False)
 @idempotent_tool
@@ -225,7 +339,8 @@ async def update_contact(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
     reason: str,
-    add_tags: list[str] | None = None,
+    add_tags: list[str] | str | None = None,
+    lead_type: str | None = None,
     new_pipeline_type: str | None = None,
     follow_up_date: str | None = None,
     brief: str | None = None,
@@ -233,7 +348,13 @@ async def update_contact(
     re_engaged_signal: str | None = None,
 ) -> dict[str, Any]:
     """Update a contact; pass only the fields you want to change."""
-    # add_tags: up to 5 merged with existing. new_pipeline_type: QUALIFICATION|TOUR|APPLICATION.
+    # add_tags: up to 5 merged with existing. A list of strings is preferred; a
+    #   single tag string or a JSON-array string is also accepted.
+    # lead_type: the lead CATEGORY — buyer | rental (a.k.a. renter) | seller.
+    #   Use this to make someone a "renter/rental lead" (lead_type='rental') or
+    #   a "buyer"/"seller" lead. This is NOT the pipeline stage.
+    # new_pipeline_type: the pipeline STAGE — QUALIFICATION|TOUR|APPLICATION.
+    #   Do NOT pass buyer/rental/seller here; those are lead_type values.
     # follow_up_date: ISO date. brief: 2-3 sentence agent summary (high-importance memory).
     # score_explanation: plain-English reason for lead score (stored as memory).
     # re_engaged_signal: short string; boosts lead score +12 and logs re-engagement.
@@ -244,7 +365,7 @@ async def update_contact(
 
     check = await (
         db.table("Contact")
-        .select("id,name,type,tags,leadScore")
+        .select("id,name,type,leadType,tags,leadScore")
         .eq("id", contact_id)
         .eq("spaceId", space_id)
         .maybe_single()
@@ -261,8 +382,11 @@ async def update_contact(
     summary_parts: list[str] = []
 
     # ── Tags ──
+    # add_tags may arrive as a list (schema) or a string the model fudged
+    # (JSON array / single tag / comma run) — normalize before slicing so a
+    # bare string isn't sliced char-by-char.
     if add_tags:
-        clean_tags = [t.strip()[:60] for t in add_tags[:5] if t.strip()]
+        clean_tags = [t[:60] for t in _normalize_tags(add_tags)][:5]
         if clean_tags:
             existing = contact.get("tags") or []
             merged = list(dict.fromkeys(existing + clean_tags))
@@ -274,11 +398,61 @@ async def update_contact(
             })
             summary_parts.append(f"tagged {clean_tags}")
 
+    # ── Lead type (buyer / rental / seller) ──
+    # The lead CATEGORY, distinct from the pipeline stage. "Make X a renter
+    # lead" lands here as lead_type='renter' → normalized to 'rental'. This is
+    # the correct home for buyer/rental/seller; the previous gap (only
+    # new_pipeline_type existed) is what made the agent mis-route 'rental' into
+    # the pipeline enum and hit the confusing QUALIFICATION/APPLICATION/TOUR error.
+    if lead_type:
+        normalized = _LEAD_TYPE_ALIASES.get(lead_type.strip().lower())
+        if normalized not in _VALID_LEAD_TYPES:
+            agent_err = from_supabase_error({
+                "message": (
+                    "lead_type must be one of buyer, rental (renter), or seller — "
+                    f"got '{lead_type}'."
+                ),
+                "code": None,
+            })
+            return {
+                "error": agent_err.message,
+                "code": agent_err.code,
+                "retryable": agent_err.retryable,
+            }
+        old_lead_type = contact.get("leadType") or "buyer"
+        if old_lead_type != normalized:
+            update["leadType"] = normalized
+            activities.append({
+                "type": "note",
+                "content": f"[Agent] Lead type changed: {old_lead_type} → {normalized}. {reason}",
+                "metadata": {
+                    "source": "agent",
+                    "oldLeadType": old_lead_type,
+                    "newLeadType": normalized,
+                },
+            })
+            summary_parts.append(f"lead type → {normalized}")
+
     # ── Pipeline type ──
     if new_pipeline_type:
         if new_pipeline_type not in _VALID_TYPES:
-            agent_err = from_supabase_error({"message": f"new_pipeline_type must be one of {_VALID_TYPES}", "code": None})
-            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+            # Catch the common confusion: buyer/rental/seller are lead_type
+            # values, not pipeline stages. Point the model at the right field
+            # instead of just rejecting with the bare stage enum.
+            if new_pipeline_type.strip().lower() in _LEAD_TYPE_ALIASES:
+                msg = (
+                    f"'{new_pipeline_type}' is a lead category, not a pipeline stage. "
+                    "Use the lead_type parameter (buyer | rental | seller) for that; "
+                    f"new_pipeline_type must be one of {_VALID_TYPES}."
+                )
+            else:
+                msg = f"new_pipeline_type must be one of {_VALID_TYPES}"
+            agent_err = from_supabase_error({"message": msg, "code": None})
+            return {
+                "error": agent_err.message,
+                "code": agent_err.code,
+                "retryable": agent_err.retryable,
+            }
         old_type = contact.get("type", "QUALIFICATION")
         if old_type != new_pipeline_type:
             update["type"] = new_pipeline_type
@@ -381,3 +555,52 @@ async def update_contact(
         )
 
     return {"ok": True, "contactId": contact_id, "changes": summary_parts or ["no-op"]}
+
+
+@function_tool(strict_mode=False)
+async def delete_contact(
+    ctx: RunContextWrapper[AgentContext],
+    contact_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a contact; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Deletes ContactActivity and related rows via DB cascade. Prefer archiving
+    # (update_contact tags / status) when the realtor only wants it hidden.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Contact")
+        .select("id,name")
+        .eq("id", contact_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    name = check.data.get("name") or "this contact"
+
+    if not confirmed:
+        return confirmation_required(
+            entity="contact", label=name, entity_id=contact_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Contact",
+        entity="contact",
+        entity_id=contact_id,
+        label=name,
+        reason=reason,
+    )

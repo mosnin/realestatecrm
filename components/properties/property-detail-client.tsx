@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { PropertyForm } from './property-form';
 import { PropertyShareDialog } from './property-share-dialog';
 import { PropertyStatusBadge } from './property-status-badge';
+import { PropertyAnalysisPanel } from './property-analysis-panel';
 
 /** Apple ease-out cubic — entrances. */
 const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -219,6 +220,17 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
           })}
         />
       </div>
+
+      {/* ── Web research / Analyze ──────────────────────────────────────
+          Pulls real data about this address from the web, structures it with
+          the LLM, and fills blank fields. Filled values flow back into the
+          local property state so the facts above refresh immediately. */}
+      <PropertyAnalysisPanel
+        propertyId={property.id}
+        initialAnalysis={property.analysis ?? null}
+        initialAnalyzedAt={property.analyzedAt ?? null}
+        onApplied={(updated) => setProperty((prev) => ({ ...prev, ...updated }))}
+      />
 
       {sharing && (
         <PropertyShareDialog

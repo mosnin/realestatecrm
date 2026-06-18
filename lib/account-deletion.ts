@@ -30,6 +30,7 @@
  * always-on. Flip it once owner has signed off on docs/DATA-DELETION.md.
  */
 
+import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 
 export function hardDeleteEnabled(): boolean {
@@ -86,4 +87,83 @@ export async function hardDeleteSpaceAndUser(params: {
   // 2. The User row — cascades to Space → all Space-scoped FK tables.
   const { error: userErr } = await supabase.from('User').delete().eq('id', userDbId);
   if (userErr) throw new Error(`User delete failed: ${userErr.message}`);
+}
+
+// ── Orchestrated deletion (shared by self-service + admin offboard) ──────────
+
+/**
+ * Outcome of performAccountDeletion. `ok:false` carries a `status` so the
+ * caller can map it onto an HTTP response without re-deriving the reason.
+ */
+export type AccountDeletionResult =
+  | { ok: true; hardDeleted: boolean; pendingDataDeletion: boolean }
+  | { ok: false; status: number; error: string; loginRemoved?: boolean };
+
+/**
+ * The full delete flow for ONE account, factored out of the self-service route
+ * so the platform-admin offboard route can reuse the exact same sequence
+ * (structural-blocker check → delete the Clerk identity → gated DB hard-delete).
+ *
+ * This deliberately does NOT do auth, rate-limiting, the type-to-confirm check,
+ * or audit logging — those are the caller's responsibility and differ between
+ * self-service (confirm = workspace name, audit as the user) and admin (confirm
+ * handled in the UI dialog, audit via logAdminAction as the admin). Keeping
+ * those out here lets both routes own their own policy while sharing the one
+ * destructive sequence that must never drift between the two surfaces.
+ *
+ * Honors ACCOUNT_DELETION_HARD_DELETE: with the flag off, the Clerk identity is
+ * removed (the part that actually locks the person out) and the workspace rows
+ * are left for the reviewed manual run — exactly as the self-service route does.
+ */
+export async function performAccountDeletion(params: {
+  userDbId: string;
+  clerkId: string;
+  spaceId: string | null;
+}): Promise<AccountDeletionResult> {
+  const { userDbId, clerkId, spaceId } = params;
+
+  // Structural blockers (e.g. owning a brokerage → User delete is RESTRICTed).
+  const blocker = await checkDeletionBlockers(userDbId);
+  if (blocker) {
+    return { ok: false, status: 409, error: blocker };
+  }
+
+  // Delete the Clerk identity first — always safe and is the part that actually
+  // locks the person out. If the DB sweep is gated off, the worst case is an
+  // orphaned set of rows with no login, cleaned up by the reviewed run.
+  const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+  try {
+    await clerkClient.users.deleteUser(clerkId);
+  } catch (err) {
+    console.error('[account-deletion] Clerk deleteUser failed', err);
+    return {
+      ok: false,
+      status: 500,
+      error: "couldn't delete the login. nothing was removed — try again.",
+    };
+  }
+
+  // The destructive DB sweep — gated. Off by default until owner signs off on
+  // docs/DATA-DELETION.md. When off (or when there's no workspace to sweep), we
+  // stop here: login is gone, rows await the reviewed run.
+  if (!hardDeleteEnabled() || !spaceId) {
+    return { ok: true, hardDeleted: false, pendingDataDeletion: !!spaceId };
+  }
+
+  try {
+    await hardDeleteSpaceAndUser({ userDbId, spaceId });
+  } catch (err) {
+    // Login is already gone; the DB sweep failed. Surface it loudly — this is
+    // the case to page on, because the row state is now partial.
+    console.error('[account-deletion] hard delete failed after Clerk delete', err);
+    return {
+      ok: false,
+      status: 500,
+      loginRemoved: true,
+      error:
+        'the login was removed but data deletion did not finish. contact help@usechippi.com.',
+    };
+  }
+
+  return { ok: true, hardDeleted: true, pendingDataDeletion: false };
 }

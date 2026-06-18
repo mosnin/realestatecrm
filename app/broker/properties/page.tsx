@@ -10,7 +10,7 @@ export default async function BrokerPropertiesPage() {
   if (!ctx) redirect('/');
 
   return (
-    <div className="space-y-6 max-w-4xl pb-12">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <BrokerPropertiesClient />
     </div>
   );

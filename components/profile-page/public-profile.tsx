@@ -20,12 +20,12 @@ import {
   BadgeCheck,
   CalendarCheck,
   Globe,
-  Home,
   Link2,
   Play,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { PublicSurfaceFrame } from '@/components/public-surface-frame';
+import { ListingsCarousel } from './listings-carousel';
 import { cn, safeHref } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { parseYouTubeId, youTubeThumbnail, faviconUrl } from '@/lib/profile-page';
@@ -73,13 +73,15 @@ interface PublicProfileProps {
   hidePoweredBy: boolean;
 }
 
-function formatPrice(value: number | null): string | null {
-  if (value == null || value <= 0) return null;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+/** First two initials from a name. Falls back to a single dot when empty.
+ *  Used for the avatar placeholder when the realtor has no photo. */
+function deriveInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '·';
+  return parts
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
 }
 
 /** Centred uppercase section heading — the divider between page sections. */
@@ -238,68 +240,6 @@ function VideoCard({ video }: { video: PublicVideo }) {
   );
 }
 
-/** A single property card inside the carousel. Image-led; fixed width so
- *  the carousel hints a peek of the next card at the right edge on mobile.
- *  When a property has no photo we render a tasteful muted placeholder
- *  (Home glyph) rather than a broken-image gap. The whole card is a link
- *  when `listingUrl` is set; otherwise it's a static surface. */
-function PropertyCard({ property }: { property: PublicProperty }) {
-  const cover = property.photos?.[0] ?? null;
-  const locality = [property.city, property.stateRegion].filter(Boolean).join(', ');
-  const price = formatPrice(property.listPrice);
-
-  const inner = (
-    <>
-      {cover ? (
-        <img
-          src={cover}
-          alt={property.address}
-          loading="lazy"
-          decoding="async"
-          className="aspect-[16/9] w-full object-cover"
-        />
-      ) : (
-        <div
-          aria-hidden
-          className="flex aspect-[16/9] w-full items-center justify-center bg-muted"
-        >
-          <Home size={28} className="text-muted-foreground/60" />
-        </div>
-      )}
-      <div className="px-4 py-3">
-        <p className="truncate text-sm font-medium text-foreground">{property.address}</p>
-        {locality && <p className="truncate text-xs text-muted-foreground">{locality}</p>}
-        {price && (
-          <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">{price}</p>
-        )}
-      </div>
-    </>
-  );
-
-  // The shared classes describe the carousel slide itself — fixed width so
-  // ~1.7 cards are visible on a 390px phone (hints horizontal swipe), the
-  // canonical card border/radius vocabulary, and `sm:hover:-translate-y-0.5`
-  // so it lifts on desktop only (mobile gets no hover state). `snap-start`
-  // pairs with the scroller's `snap-x mandatory` to lock each card into
-  // place as the realtor swipes.
-  const slideClass =
-    'block w-[260px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/70 bg-card sm:transition-transform sm:duration-150 sm:hover:-translate-y-0.5';
-
-  if (property.listingUrl) {
-    return (
-      <a
-        href={safeHref(property.listingUrl)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={slideClass}
-      >
-        {inner}
-      </a>
-    );
-  }
-  return <div className={slideClass}>{inner}</div>;
-}
-
 function LinkCard({
   link,
 }: {
@@ -398,42 +338,65 @@ export function PublicProfile({
                 className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-b from-transparent to-background"
               />
             </div>
-          ) : (
-            agentPhoto && (
-              <div className="relative">
-                <img
-                  src={agentPhoto}
-                  alt={agentName}
-                  loading="eager"
-                  decoding="async"
-                  className="aspect-[4/5] w-full object-cover object-top"
-                />
-                <div
-                  aria-hidden
-                  className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent to-background"
-                />
-              </div>
-            )
-          )}
-
-          <div
-            className={cn(
-              'relative px-6 text-center',
-              coverPhotoUrl ? '-mt-12' : agentPhoto ? '-mt-14' : 'pt-12',
-            )}
-          >
-            {/* When a cover is set, the face becomes a round avatar — the
-                "who" — sitting on top of the hero. The 4px background-coloured
-                ring carries the lift against any cover; no shadow needed. */}
-            {coverPhotoUrl && agentPhoto && (
+          ) : agentPhoto ? (
+            <div className="relative">
               <img
                 src={agentPhoto}
                 alt={agentName}
                 loading="eager"
                 decoding="async"
-                className="mx-auto mb-4 h-24 w-24 rounded-full border-4 border-background object-cover object-top"
+                className="aspect-[4/5] w-full object-cover object-top"
               />
+              <div
+                aria-hidden
+                className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent to-background"
+              />
+            </div>
+          ) : (
+            // No cover AND no face: render a styled placeholder band instead of
+            // blank white space at the top of the page. A soft accent-tinted
+            // gradient (the realtor's brand color) fading into the page — the
+            // round initials avatar below overlaps it the same way a real cover
+            // would. Never a white gap.
+            <div
+              aria-hidden
+              className="relative aspect-[16/9] w-full"
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${accentColor}26, ${accentColor}0d 55%, transparent)`,
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
+            </div>
+          )}
+
+          <div
+            className={cn(
+              'relative px-6 text-center',
+              coverPhotoUrl ? '-mt-12' : agentPhoto ? '-mt-14' : '-mt-12',
             )}
+          >
+            {/* The round avatar sits on top of the hero band — the "who". When
+                a cover is set OR there's no photo at all, the face (or its
+                initials fallback) renders here. The 4px background ring carries
+                the lift against any band; no shadow needed. */}
+            {(coverPhotoUrl || !agentPhoto) &&
+              (agentPhoto ? (
+                <img
+                  src={agentPhoto}
+                  alt={agentName}
+                  loading="eager"
+                  decoding="async"
+                  className="mx-auto mb-4 h-24 w-24 rounded-full border-4 border-background object-cover object-top"
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-4 border-background bg-orange-50 text-3xl leading-none text-orange-600 select-none dark:bg-orange-500/15 dark:text-orange-400"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {deriveInitials(businessName || agentName)}
+                </span>
+              ))}
 
             <h1>
               {logoUrl ? (
@@ -559,14 +522,7 @@ export function PublicProfile({
           {properties.length > 0 && (
             <section className="mt-10 space-y-4">
               <SectionHeader>Listings</SectionHeader>
-              <div
-                className="-mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2 no-scrollbar"
-                style={{ scrollPaddingLeft: '1.5rem', scrollPaddingRight: '1.5rem' }}
-              >
-                {properties.map((p) => (
-                  <PropertyCard key={p.id} property={p} />
-                ))}
-              </div>
+              <ListingsCarousel properties={properties} accentColor={accentColor} />
             </section>
           )}
 
@@ -583,13 +539,16 @@ export function PublicProfile({
           )}
 
           {/* Already applied? A quiet way back into the client portal — never
-              competes with the Apply / Book CTAs above. */}
+              competes with the Apply / Book CTAs above. Styled as a clear text
+              link (underline + hover) so it reads as tappable, not as caption
+              copy. */}
           <div className="mt-12 text-center">
+            <span className="text-xs text-muted-foreground">Already applied? </span>
             <a
               href="/clients/login"
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+              className="text-xs font-medium text-foreground underline decoration-foreground/30 underline-offset-2 transition-colors hover:decoration-foreground"
             >
-              Already applied? Check your status.
+              Check your status
             </a>
           </div>
 

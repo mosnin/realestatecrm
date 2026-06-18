@@ -43,7 +43,7 @@ async def publish_event(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as client:
             await client.post(
                 f"{settings.app_url}/api/agent/events",
                 json=payload,

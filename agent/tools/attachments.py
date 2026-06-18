@@ -57,7 +57,7 @@ def _truncate(text: str, limit: int = _MAX_TEXT_CHARS) -> str:
 
 async def _download(public_url: str) -> bytes:
     """Fetch the attachment bytes from its public URL. Caps at _MAX_DOWNLOAD_BYTES."""
-    async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
         resp = await client.get(public_url)
         resp.raise_for_status()
         # httpx already loads the full body — clip if oversized so we don't

@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toastSuccess, toastError } from '@/lib/toast-helpers';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { MorningActionSheet } from '@/components/chippi/morning-action-sheet';
 import type { MorningActionIntent } from '@/components/chippi/morning-actions';
@@ -63,8 +64,35 @@ export function ContactActionPills({
   const [activeIntent, setActiveIntent] = useState<MorningActionIntent | null>(
     null,
   );
+  const [clearing, setClearing] = useState(false);
+
+  // Clear an overdue follow-up: null out Contact.followUpAt, then refresh so the
+  // pills recompute. (This pill was previously mis-wired to the 'log-call'
+  // compose intent, so it opened a draft sheet and never cleared anything.)
+  async function clearFollowUp() {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpAt: null }),
+      });
+      if (!res.ok) throw new Error('clear failed');
+      toastSuccess('Follow-up cleared.');
+      router.refresh();
+    } catch {
+      toastError('Could not clear the follow-up. Try again.');
+    } finally {
+      setClearing(false);
+    }
+  }
 
   function handleTap(action: PeopleDetailAction) {
+    if (action.intent === 'clear-followup') {
+      void clearFollowUp();
+      return;
+    }
     if (isComposeIntent(action.intent)) {
       setActiveIntent(action.intent);
       return;

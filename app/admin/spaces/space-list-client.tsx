@@ -67,12 +67,14 @@ export function SpaceListClient({
   spaces,
   ownerMap,
   totalCount,
+  initialQuery = '',
 }: {
   spaces: SpaceRow[];
   ownerMap: Record<string, OwnerInfo>;
   totalCount: number;
+  initialQuery?: string;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialQuery);
   const [statusFilter, setStatusFilter] = useState('all');
 
   const filtered = useMemo(() => {
@@ -89,6 +91,7 @@ export function SpaceListClient({
       result = result.filter((s) => {
         const owner = ownerMap[s.ownerId];
         return (
+          s.id.toLowerCase().includes(q) ||
           s.name.toLowerCase().includes(q) ||
           s.slug.toLowerCase().includes(q) ||
           owner?.email?.toLowerCase().includes(q) ||
