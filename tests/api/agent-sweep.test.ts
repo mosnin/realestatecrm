@@ -15,8 +15,13 @@
  *   - Env vars: set in `beforeEach`, restored in `afterEach`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 
 // ── Supabase mock ───────────────────────────────────────────────────────────
+// `update` is included in the passthrough because the AgentRunLedger writes
+// (recordDispatch insert / markInFlight / markFailed) and the route's own
+// dispatch now touch this client. Unqueued `from()` calls fall back to an empty
+// result, so the ledger bookkeeping is transparent to the assertions below.
 type Terminal = { data?: unknown; error?: unknown; count?: number | null };
 let supabaseQueue: Terminal[] = [];
 const supabaseCalls: Array<{ table: string; chain: Array<[string, unknown[]]> }> = [];
@@ -28,7 +33,7 @@ vi.mock('@/lib/supabase', () => {
     supabaseCalls.push({ table, chain: calls });
 
     const chain: Record<string, unknown> = {};
-    const passthrough = ['select', 'eq', 'in', 'is', 'not', 'gte', 'lt', 'order', 'limit', 'range', 'contains'];
+    const passthrough = ['select', 'eq', 'in', 'is', 'not', 'gte', 'lt', 'order', 'limit', 'range', 'contains', 'insert', 'update'];
     for (const method of passthrough) {
       chain[method] = vi.fn((...args: unknown[]) => {
         calls.push([method, args]);
@@ -54,7 +59,19 @@ vi.mock('@/lib/supabase', () => {
   };
 });
 
-// Import AFTER mocks so the route picks up mocked supabase.
+// ── Billing meter mock ───────────────────────────────────────────────────────
+// The route now pre-checks credits via assertCanSpend before dispatching. Mock
+// it so the gate is deterministic (the real one would reach for Clerk auth +
+// the billing DB). Default: allow (no-op). Per-test: queue a throw to exercise
+// the skip paths. The two domain error classes are re-exported real so
+// `instanceof` in the route matches.
+const assertCanSpendMock = vi.fn<(spaceId: string, workflow: string, units?: number) => Promise<void>>();
+vi.mock('@/lib/billing/meter', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/billing/meter')>();
+  return { ...actual, assertCanSpend: (...args: Parameters<typeof actual.assertCanSpend>) => assertCanSpendMock(...args) };
+});
+
+// Import AFTER mocks so the route picks up mocked supabase + meter.
 import { GET } from '@/app/api/cron/agent-sweep/route';
 
 // ── Env helpers ─────────────────────────────────────────────────────────────
@@ -164,6 +181,8 @@ beforeEach(() => {
   modalCalls = [];
   kvStore = new Map();
   modalResponder = () => new Response(JSON.stringify({ ok: true }), { status: 200 });
+  assertCanSpendMock.mockReset();
+  assertCanSpendMock.mockResolvedValue(undefined); // default: account can afford the run
 
   snapshotEnv();
   process.env.CRON_SECRET = 'test-secret';
@@ -265,7 +284,11 @@ describe('GET /api/cron/agent-sweep', () => {
 
     expect(modalCalls).toHaveLength(1);
     expect(modalCalls[0].url).toBe('https://modal.example/webhook');
-    expect(modalCalls[0].body).toEqual({ space_id: 'space_one', secret: 'agent-secret' });
+    // run_id is forwarded to Modal (forward-compat for a Modal-side run_id +
+    // completion callback); it's a generated UUID, so match the stable fields
+    // and assert run_id is present + a string.
+    expect(modalCalls[0].body).toMatchObject({ space_id: 'space_one', secret: 'agent-secret' });
+    expect(typeof (modalCalls[0].body as { run_id?: unknown }).run_id).toBe('string');
     // Authorization header is case-insensitive on the wire; the route sets
     // 'Authorization' but Headers normalises to lowercase keys.
     const authValues = Object.entries(modalCalls[0].headers)
@@ -330,6 +353,45 @@ describe('GET /api/cron/agent-sweep', () => {
     expect(modalCalls.map((c) => (c.body as { space_id: string }).space_id)).toEqual(['space_fresh']);
     // And the route marked space_fresh swept (so the next tick would skip it).
     expect(kvStore.has('agent:sweep:last:space_fresh')).toBe(true);
+  });
+
+  it('skips a space whose account is out of credits (reason: insufficient_credits); no Modal call', async () => {
+    queueSweep({
+      spaces: [
+        { id: 'space_broke', slug: 'broke' },
+        { id: 'space_funded', slug: 'funded' },
+      ],
+      pending: [],
+    });
+    // Pre-check throws CreditsExhaustedError for the broke space only.
+    assertCanSpendMock.mockImplementation(async (spaceId: string) => {
+      if (spaceId === 'space_broke') throw new CreditsExhaustedError('chat_turn', 0);
+    });
+
+    const res = await invoke('Bearer test-secret');
+    const body = await res.json();
+    expect(body.totalSpaces).toBe(2);
+    expect(body.started).toBe(1);
+    expect(body.skipped).toBe(1);
+    expect(body.skipReasons).toEqual({ insufficient_credits: 1 });
+    expect(body.errored).toBe(0);
+    // Modal was NOT called for the broke space — the gate blocked dispatch.
+    expect(modalCalls.map((c) => (c.body as { space_id: string }).space_id)).toEqual(['space_funded']);
+  });
+
+  it('skips a delinquent-subscription space (reason: subscription_delinquent); no Modal call', async () => {
+    queueSweep({
+      spaces: [{ id: 'space_delinquent', slug: 'delinquent' }],
+      pending: [],
+    });
+    assertCanSpendMock.mockRejectedValue(new SubscriptionDelinquentError('chat_turn', 'past_due'));
+
+    const res = await invoke('Bearer test-secret');
+    const body = await res.json();
+    expect(body.started).toBe(0);
+    expect(body.skipped).toBe(1);
+    expect(body.skipReasons).toEqual({ subscription_delinquent: 1 });
+    expect(modalCalls).toHaveLength(0);
   });
 
   it('one Modal call rejecting marks that space errored; other spaces still process', async () => {

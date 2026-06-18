@@ -772,3 +772,32 @@ export type IntegrationEvent = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ── Agent Run Ledger ──
+// One row per autonomous-run DISPATCH (sweep / routine / run-now). The durable
+// lifecycle record behind dispatch reliability + reconcile. Mirrors the
+// "AgentRunLedger" table (supabase/migrations/20260709000000_agent_run_ledger.sql).
+// The dispatch helpers live in lib/agent/run-ledger.ts; the row type lives here
+// alongside the other model types (re-exported there for the helper's callers).
+
+/** Lifecycle of one autonomous-run dispatch. See the migration header. */
+export type AgentRunLedgerStatus = 'dispatched' | 'in_flight' | 'confirmed' | 'failed';
+
+export type AgentRunLedger = {
+  id: string;
+  /** Generated at dispatch (crypto.randomUUID()); forwarded to Modal in the POST body. */
+  runId: string;
+  spaceId: string;
+  /** Dispatch source: 'sweep' | 'routine' | 'run_now' | ... Free text in the DB. */
+  trigger: string | null;
+  status: AgentRunLedgerStatus;
+  dispatchedAt: string;
+  /** Set when reconcile confirms a run artifact appeared. */
+  confirmedAt: string | null;
+  /** Reason on status='failed' (Modal HTTP status, network error, or 'no_artifact'). */
+  failureReason: string | null;
+  /** Reserved for a future auto-retry path; always 0 today. */
+  retryCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
