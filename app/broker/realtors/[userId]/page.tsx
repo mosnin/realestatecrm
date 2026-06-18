@@ -7,12 +7,21 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Calendar,
   Mail as MailIcon,
   Phone,
+  BookOpen,
+  ArrowUpRight,
 } from 'lucide-react';
 import type { Metadata } from 'next';
-import { SECTION_LABEL, STAT_NUMBER_COMPACT, TITLE_FONT } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import {
+  SECTION_LABEL,
+  STAT_NUMBER_COMPACT,
+  TITLE_FONT,
+  CHIPPI_PILL,
+} from '@/lib/typography';
 
 export const metadata: Metadata = { title: 'Realtor Detail — Teams' };
 
@@ -50,7 +59,8 @@ export default async function RealtorDrilldownPage({ params }: Params) {
 
   // Fetch data in parallel — display rows are limited, but counts are separate
   const spaceId = space?.id;
-  const [contactsRes, dealsRes, stagesRes, contactCountRes, newLeadCountRes, hotLeadCountRes, dealCountRes] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [contactsRes, dealsRes, stagesRes, contactCountRes, newLeadCountRes, hotLeadCountRes, dealCountRes, overdueCountRes] = await Promise.all([
     spaceId
       ? supabase
           .from('Contact')
@@ -87,6 +97,15 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     spaceId
       ? supabase.from('Deal').select('id, value, status').eq('spaceId', spaceId).limit(10000)
       : Promise.resolve({ data: [] }),
+    // Overdue follow-ups — the one "needs attention" signal a broker scans for.
+    spaceId
+      ? supabase
+          .from('Contact')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', spaceId)
+          .not('followUpAt', 'is', null)
+          .lte('followUpAt', nowIso)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const contacts = (contactsRes.data ?? []) as Array<{
@@ -116,10 +135,32 @@ export default async function RealtorDrilldownPage({ params }: Params) {
   const pipelineValue = allDeals.filter((d) => d.status === 'active').reduce((sum, d) => sum + (d.value ?? 0), 0);
   const wonDeals = allDeals.filter((d) => d.status === 'won').length;
   const wonValue = allDeals.filter((d) => d.status === 'won').reduce((sum, d) => sum + (d.value ?? 0), 0);
+  const overdueFollowUps = overdueCountRes.count ?? 0;
+  // Lead-to-win conversion — the same metric the brokerage analytics ranks on,
+  // shown here so a realtor's page carries one quality number, not just volume.
+  const conversionPct = totalContacts > 0 ? Math.round((wonDeals / totalContacts) * 100) : null;
 
+  const displayName = user.name ?? user.email ?? 'this realtor';
   const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_admin' ? 'Admin' : 'Realtor';
   const joinedAt = new Date(membership.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = (user.name ?? user.email ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
+  // Coach prefill — drops the broker into Chippi with this realtor's snapshot,
+  // mirroring the Realtors-list "Coach" affordance so the two surfaces agree.
+  const coachSummary = (() => {
+    const bits: string[] = [];
+    if (overdueFollowUps > 0) bits.push(`${overdueFollowUps} overdue follow-up${overdueFollowUps === 1 ? '' : 's'}`);
+    if (newLeads > 0) bits.push(`${newLeads} new lead${newLeads === 1 ? '' : 's'}`);
+    if (activeDeals > 0) bits.push(`${activeDeals} active deal${activeDeals === 1 ? '' : 's'} worth ${formatCompact(pipelineValue)}`);
+    if (wonDeals > 0) bits.push(`${wonDeals} won`);
+    return bits.length > 0 ? bits.join(', ') : 'quiet, nothing notable yet';
+  })();
+  const coachHref = `/broker?prompt=${encodeURIComponent(
+    `Help me coach ${displayName}. Here's what I'm seeing: ${coachSummary}. Draft a 1:1 agenda and a nudge I can send.`,
+  )}`;
+  const auditHref = `/broker?prompt=${encodeURIComponent(
+    `Audit ${displayName}'s pipeline. ${activeDeals} active ${activeDeals === 1 ? 'deal' : 'deals'} worth ${formatCompact(pipelineValue)}. Which deals are stuck or need attention, and what should they do next?`,
+  )}`;
 
   const scoreBadge = (label: string | null) => {
     if (label === 'hot') return 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15';
@@ -127,13 +168,16 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     return 'text-muted-foreground bg-muted';
   };
 
+  // Secondary stats — the volume context. Pipeline + Won are pulled out above
+  // as the two focal numbers (money is the loudest signal), so this strip
+  // carries the funnel counts and the quality read.
   const stats: Array<{ label: string; value: string | number }> = [
     { label: 'People', value: totalContacts },
     { label: 'New people', value: newLeads },
     { label: 'Hot people', value: hotLeads },
     { label: 'Active deals', value: activeDeals },
-    { label: 'Pipeline', value: formatCompact(pipelineValue) },
-    { label: 'Won', value: `${wonDeals} (${formatCompact(wonValue)})` },
+    { label: 'Deals won', value: wonDeals },
+    { label: 'Lead to win', value: conversionPct != null ? `${conversionPct}%` : '—' },
   ];
 
   return (
@@ -146,7 +190,9 @@ export default async function RealtorDrilldownPage({ params }: Params) {
         <ArrowLeft size={14} /> Back to realtors
       </Link>
 
-      {/* Profile header */}
+      {/* Profile header — identity on the left, the two real actions on the
+          right. A broker lands here to DO something (coach, or look at the
+          live workspace), so the page can't dead-end at a back link. */}
       <div className="flex items-start gap-4">
         <div className="w-14 h-14 rounded-full bg-foreground/[0.06] text-foreground/70 flex items-center justify-center text-lg font-semibold flex-shrink-0">
           {initials}
@@ -168,6 +214,12 @@ export default async function RealtorDrilldownPage({ params }: Params) {
             <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
               {roleLabel}
             </span>
+            {overdueFollowUps > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                <AlertTriangle size={11} />
+                {overdueFollowUps} overdue
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -175,9 +227,67 @@ export default async function RealtorDrilldownPage({ params }: Params) {
             {space?.slug && <> · Workspace <span className="font-mono text-muted-foreground">/{space.slug}</span></>}
           </p>
         </div>
+
+        {/* Actions */}
+        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+          {activeDeals > 0 && (
+            <Link
+              href={auditHref}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-border/70 text-sm font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+            >
+              Audit pipeline
+              <ArrowUpRight size={14} />
+            </Link>
+          )}
+          <Link href={coachHref} className={CHIPPI_PILL}>
+            <BookOpen size={14} />
+            Coach with Chippi
+          </Link>
+        </div>
       </div>
 
-      {/* Stats — hairline-divider snapshot grid */}
+      {/* Focal money — pipeline + won are the loudest signal a broker reads on
+          a realtor, so they get the serif STAT scale and full width before the
+          quieter count strip. */}
+      <section className="grid grid-cols-2 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+        <div className="bg-background px-4 py-4">
+          <p className={SECTION_LABEL}>Active pipeline</p>
+          <p className="text-[25px] leading-tight tracking-tight tabular-nums text-foreground mt-1" style={TITLE_FONT}>
+            {formatCompact(pipelineValue)}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+            {activeDeals} active deal{activeDeals === 1 ? '' : 's'}
+          </p>
+        </div>
+        <div className="bg-background px-4 py-4">
+          <p className={SECTION_LABEL}>Closed (won)</p>
+          <p className="text-[25px] leading-tight tracking-tight tabular-nums text-foreground mt-1" style={TITLE_FONT}>
+            {formatCompact(wonValue)}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+            {wonDeals} deal{wonDeals === 1 ? '' : 's'} won
+          </p>
+        </div>
+      </section>
+
+      {/* Mobile actions — stacked below the money on small screens. */}
+      <div className="flex sm:hidden items-center gap-2">
+        {activeDeals > 0 && (
+          <Link
+            href={auditHref}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 h-9 px-3.5 rounded-full border border-border/70 text-sm font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+          >
+            Audit pipeline
+            <ArrowUpRight size={14} />
+          </Link>
+        )}
+        <Link href={coachHref} className={cn(CHIPPI_PILL, 'flex-1 justify-center')}>
+          <BookOpen size={14} />
+          Coach
+        </Link>
+      </div>
+
+      {/* Stats — hairline-divider snapshot grid (the funnel counts + quality) */}
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
         {stats.map(({ label, value }) => (
           <div key={label} className="bg-background px-4 py-4">

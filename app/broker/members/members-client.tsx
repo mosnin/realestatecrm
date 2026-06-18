@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import Link from 'next/link';
+import { Search, X, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getInitials } from '@/lib/formatting';
 import { BODY_MUTED } from '@/lib/typography';
@@ -130,11 +131,12 @@ export function MembersClient({
                   (currentUserRole === 'broker_owner' ||
                     (currentUserRole === 'broker_admin' && m.role === 'realtor_member'));
                 const display = m.userName ?? m.userEmail ?? 'Unnamed';
-                return (
-                  <li
-                    key={m.id}
-                    className="group/row flex items-center gap-3 py-3"
-                  >
+                // A member row is a doorway to that realtor's detail page (the
+                // same target the Brief and Realtors list use), so the roster
+                // isn't a dead end. Pending invitees have no detail to open.
+                const detailHref = m.userOnboard && m.userId ? `/broker/realtors/${m.userId}` : null;
+                const RowIdentity = (
+                  <>
                     <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
                       {getInitials(display)}
                     </div>
@@ -156,6 +158,31 @@ export function MembersClient({
                         </p>
                       )}
                     </div>
+                  </>
+                );
+
+                return (
+                  <li
+                    key={m.id}
+                    className="group/row flex items-center gap-3 py-3"
+                  >
+                    {detailHref ? (
+                      <Link
+                        href={detailHref}
+                        className="group/identity flex items-center gap-3 min-w-0 flex-1 -mx-2 px-2 py-0.5 rounded-md hover:bg-foreground/[0.04] transition-colors"
+                      >
+                        {RowIdentity}
+                        <ArrowUpRight
+                          size={13}
+                          className="flex-shrink-0 text-muted-foreground/0 group-hover/identity:text-muted-foreground/60 transition-colors"
+                          aria-hidden
+                        />
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {RowIdentity}
+                      </div>
+                    )}
                     {canManage ? (
                       <div className="flex items-center gap-0.5 flex-shrink-0 lg:opacity-0 lg:group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
                         <ChangeRoleButton

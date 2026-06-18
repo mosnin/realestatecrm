@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatCompact } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { DURATION_BASE, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 
@@ -282,6 +283,13 @@ export function ReviewsClient({ initialReviews, initialOpenCount, role, brokerag
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Deal size — the triage signal. Which flag is the big
+                            one? Quiet tabular money, never louder than status. */}
+                        {r.deal.value != null && r.deal.value > 0 && (
+                          <span className="hidden sm:inline text-xs tabular-nums text-muted-foreground">
+                            {formatCompact(r.deal.value)}
+                          </span>
+                        )}
                         {r.commentCount > 0 && (
                           <span
                             className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground"
