@@ -191,6 +191,10 @@ export async function POST(req: NextRequest) {
     businessName: settingsFull?.businessName || space.name,
     tourId: tour.id,
     slug,
+    // Lets the confirmation email link the guest to /tour/[token] so they
+    // can self-serve cancel/reschedule/feedback (the page existed but was
+    // never linked from any guest email).
+    manageToken: tour.manageToken,
   };
   try { await sendTourConfirmation(emailData); } catch (e) { console.error('[tours] confirmation email failed:', e); }
 

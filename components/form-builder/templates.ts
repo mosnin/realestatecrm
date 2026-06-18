@@ -27,22 +27,16 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       description: 'We just need a few details to get going.',
       position: 0,
       questions: [
+        // System field id MUST be 'name' to satisfy formConfigSchema's
+        // required-system-fields check (name/email/phone). A first/last
+        // split here used ids the save schema rejects, 400-ing every save.
         {
-          id: 'firstName',
+          id: 'name',
           type: 'text',
-          label: 'First name',
-          placeholder: 'Alex',
+          label: 'Full name',
+          placeholder: 'Alex Johnson',
           required: true,
           position: 0,
-          system: true,
-        },
-        {
-          id: 'lastName',
-          type: 'text',
-          label: 'Last name',
-          placeholder: 'Johnson',
-          required: true,
-          position: 1,
           system: true,
         },
         {
@@ -51,7 +45,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           label: 'Email',
           placeholder: 'alex@email.com',
           required: true,
-          position: 2,
+          position: 1,
           system: true,
         },
         {
@@ -60,7 +54,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           label: 'Phone',
           placeholder: '(555) 123-4567',
           required: true,
-          position: 3,
+          position: 2,
           system: true,
         },
       ],
@@ -279,22 +273,16 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       description: 'We just need a few details to get going.',
       position: 0,
       questions: [
+        // System field id MUST be 'name' to satisfy formConfigSchema's
+        // required-system-fields check (name/email/phone). A first/last
+        // split here used ids the save schema rejects, 400-ing every save.
         {
-          id: 'firstName',
+          id: 'name',
           type: 'text',
-          label: 'First name',
-          placeholder: 'Alex',
+          label: 'Full name',
+          placeholder: 'Alex Johnson',
           required: true,
           position: 0,
-          system: true,
-        },
-        {
-          id: 'lastName',
-          type: 'text',
-          label: 'Last name',
-          placeholder: 'Johnson',
-          required: true,
-          position: 1,
           system: true,
         },
         {
@@ -303,7 +291,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           label: 'Email',
           placeholder: 'alex@email.com',
           required: true,
-          position: 2,
+          position: 1,
           system: true,
         },
         {
@@ -312,7 +300,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           label: 'Phone',
           placeholder: '(555) 123-4567',
           required: true,
-          position: 3,
+          position: 2,
           system: true,
         },
       ],

@@ -107,6 +107,7 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
       businessName,
       tourId: tour.id,
       slug,
+      manageToken: tour.manageToken,
     };
 
     const delivered = { email: false, sms: false };

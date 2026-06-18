@@ -13,7 +13,9 @@ export default async function BrokerSignInPage({
   searchParams: Promise<{ redirect_url?: string }>;
 }) {
   const { redirect_url } = await searchParams;
-  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  // '/join/' kept in parity with the realtor sign-in / sign-up allowlists so
+  // a brokerage join-code redirect survives this entry point too.
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/join/', '/subscribe', '/billing-required', '/authorize'];
   const safeInviteRedirect = redirect_url
     && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
     && !redirect_url.includes('..')
