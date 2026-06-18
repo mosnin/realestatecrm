@@ -9,6 +9,7 @@ import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { BrokerMain } from '@/components/broker/broker-main';
 import { supabase } from '@/lib/supabase';
+import { isAccountComped } from '@/lib/billing/comp';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { pickGreeting } from '@/lib/greetings';
@@ -71,7 +72,11 @@ export default async function BrokerLayout({ children }: { children: React.React
 
   const isOwnerOfBrokerage = ctx.brokerage.ownerId === ctx.dbUserId;
 
-  if (!isPlatformAdmin && isOwnerOfBrokerage && !isBillingOrSettings) {
+  // Complimentary (admin-granted) access skips the brokerage subscription gate —
+  // internal/demo brokerages get in without a Stripe subscription. Resilient.
+  const brokerageComped = await isAccountComped('Brokerage', ctx.brokerage.id);
+
+  if (!isPlatformAdmin && isOwnerOfBrokerage && !isBillingOrSettings && !brokerageComped) {
     // Only the brokerage OWNER is gated by subscription. Invited admins and
     // members access the broker dashboard for free — billing is the owner's
     // responsibility (handled by the !isOwnerOfBrokerage skip).

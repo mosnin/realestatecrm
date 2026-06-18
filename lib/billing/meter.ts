@@ -73,7 +73,11 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
     // only the up-front gate is skipped. Checked after the enforcement guard so it
     // adds zero overhead while CREDITS_ENFORCED is off.
     if (await isPlatformAdmin()) return;
-    const { account, subscriptionStatus } = await resolveBillingAccount(spaceId);
+    const { account, subscriptionStatus, isComped } = await resolveBillingAccount(spaceId);
+    // Complimentary (admin-granted) accounts get unlimited usage — never blocked
+    // by the delinquency or credit gate, same posture as the platform-admin
+    // exemption above. Demos must never hit a wall.
+    if (isComped) return;
     // Delinquency gate (Fix #4): a canceled / past_due / unpaid funding account
     // can't keep spending even if it has a leftover balance. Reuses the canonical
     // isSubscriptionDelinquent (same set the chat/broker dunning gates use) so the
@@ -114,7 +118,9 @@ export async function chargeWorkflow(
 ): Promise<void> {
   if (!CREDITS_ENFORCED) return;
   try {
-    const { account } = await resolveBillingAccount(spaceId);
+    const { account, isComped } = await resolveBillingAccount(spaceId);
+    // Comp accounts are free — never debited.
+    if (isComped) return;
     await spendCredits(account, workflow, {
       units: opts?.units,
       spaceId,

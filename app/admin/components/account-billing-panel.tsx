@@ -19,7 +19,7 @@
  * (brokerage accounts) so the two never drift.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,7 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowRightLeft, Ban, Coins, DollarSign, RefreshCw, Plus, Undo2 } from 'lucide-react';
+import { ArrowRightLeft, Ban, Coins, DollarSign, RefreshCw, Plus, Undo2, Gift } from 'lucide-react';
 
 type AccountType = 'space' | 'brokerage';
 
@@ -90,6 +90,90 @@ export function AccountBillingPanel({
 }: AccountBillingPanelProps) {
   const router = useRouter();
   const planOptions = accountType === 'space' ? SPACE_PLAN_OPTIONS : BROKERAGE_PLAN_OPTIONS;
+
+  // ── Complimentary (free) access ────────────────────────────────────────────
+  // Stripe-independent: grant full access with no payment, for internal team
+  // members and demo accounts. Status loads on mount (lightweight compOnly read).
+  const [comp, setComp] = useState<{
+    compAccess: boolean;
+    compExpiresAt: string | null;
+    compNote: string | null;
+  } | null>(null);
+  const [compDays, setCompDays] = useState('');
+  const [compNoteInput, setCompNoteInput] = useState('');
+  const [compLoading, setCompLoading] = useState(false);
+  const [compResult, setCompResult] = useState<string | null>(null);
+
+  const loadComp = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/admin/billing?accountType=${accountType}&accountId=${accountId}&compOnly=1`,
+      );
+      const data = await res.json();
+      if (res.ok && data.comp) setComp(data.comp);
+    } catch {
+      /* non-fatal: the control still allows granting */
+    }
+  }, [accountType, accountId]);
+
+  useEffect(() => {
+    loadComp();
+  }, [loadComp]);
+
+  async function handleGrantComp() {
+    setCompLoading(true);
+    setCompResult(null);
+    try {
+      const res = await fetch('/api/admin/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'grant_comp',
+          accountType,
+          accountId,
+          ...(compDays.trim() !== '' ? { days: Number(compDays) } : {}),
+          ...(compNoteInput.trim() !== '' ? { note: compNoteInput.trim() } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setComp(data.comp);
+        setCompResult('Free access granted.');
+        router.refresh();
+      } else {
+        setCompResult(data.error || 'Could not grant free access.');
+      }
+    } catch {
+      setCompResult('Network error. Try again.');
+    } finally {
+      setCompLoading(false);
+    }
+  }
+
+  async function handleRevokeComp() {
+    if (!confirm('Revoke free access for this account? They will need a paid subscription to keep using the app.')) return;
+    setCompLoading(true);
+    setCompResult(null);
+    try {
+      const res = await fetch('/api/admin/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke_comp', accountType, accountId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setComp(data.comp);
+        setCompResult('Free access revoked.');
+        router.refresh();
+      } else {
+        setCompResult(data.error || 'Could not revoke free access.');
+      }
+    } catch {
+      setCompResult('Network error. Try again.');
+    } finally {
+      setCompLoading(false);
+    }
+  }
 
   // ── Plan change ──────────────────────────────────────────────────────────
   const [targetPlan, setTargetPlan] = useState(
@@ -330,6 +414,77 @@ export function AccountBillingPanel({
   return (
     <Card>
       <CardContent className="px-5 py-4 space-y-5">
+        {/* ── Complimentary (free) access ──────────────────────────────── */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium flex items-center gap-1.5">
+            <Gift size={13} />
+            Free access (comp)
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Grant this {accountType} full access with no payment — for internal team members and
+            demos. Independent of Stripe: it never touches their subscription, and a real
+            subscription later still works normally.
+          </p>
+          {comp?.compAccess ? (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs space-y-1.5">
+              <p className="font-medium text-emerald-700 dark:text-emerald-400">
+                Free access is ON
+                {comp.compExpiresAt
+                  ? ` · expires ${new Date(comp.compExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : ' · no expiry'}
+              </p>
+              {comp.compNote && <p className="text-muted-foreground">Note: {comp.compNote}</p>}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRevokeComp}
+                disabled={compLoading}
+                className="text-xs gap-1.5 text-destructive hover:text-destructive"
+              >
+                <Ban size={13} />
+                {compLoading ? 'Revoking…' : 'Revoke free access'}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground">Expiry (days, blank = none)</label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="No expiry"
+                  value={compDays}
+                  onChange={(e) => setCompDays(e.target.value)}
+                  className="w-32 text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground">Note (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sales — Jane"
+                  value={compNoteInput}
+                  onChange={(e) => setCompNoteInput(e.target.value)}
+                  className="w-44 text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGrantComp}
+                disabled={compLoading}
+                className="text-xs gap-1.5"
+              >
+                <Gift size={13} />
+                {compLoading ? 'Granting…' : 'Grant free access'}
+              </Button>
+            </div>
+          )}
+          {compResult && <p className="text-xs text-muted-foreground">{compResult}</p>}
+        </div>
+
+        <div className="border-t border-border" />
+
         {/* ── Change plan ──────────────────────────────────────────────── */}
         <div className="space-y-2">
           <p className="text-sm font-medium flex items-center gap-1.5">

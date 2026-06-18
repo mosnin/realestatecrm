@@ -13,6 +13,7 @@
 import { supabase } from '@/lib/supabase';
 import type { PlanId } from '@/lib/plans';
 import type { BillingAccount } from '@/lib/billing/credits';
+import { isAccountComped, COMP_SPACE_PLAN, COMP_BROKERAGE_PLAN } from '@/lib/billing/comp';
 
 export interface BillingContext {
   account: BillingAccount;
@@ -22,6 +23,9 @@ export interface BillingContext {
    *  brokerage). Used by the spend gate to refuse delinquent (canceled /
    *  past_due / unpaid) accounts. null when the account never subscribed. */
   subscriptionStatus: string | null;
+  /** True when the account has admin-granted complimentary (free) access —
+   *  unlimited usage, no Stripe required. Independent of subscriptionStatus. */
+  isComped: boolean;
 }
 
 const BROKERAGE_PLANS = new Set<string>(['team', 'team_plus']);
@@ -41,6 +45,19 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
   if (error) throw error;
   if (!space) throw new Error(`resolveBillingAccount: space ${spaceId} not found`);
 
+  // Complimentary access overrides Stripe entirely: the space funds itself, at
+  // the top tier, with no spend gate. Checked FIRST so a comped demo account
+  // never routes into (or drains) a brokerage pool. Resilient — false if the
+  // comp columns aren't present yet.
+  if (await isAccountComped('Space', space.id as string)) {
+    return {
+      account: { type: 'space', id: space.id as string },
+      plan: COMP_SPACE_PLAN,
+      subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
+      isComped: true,
+    };
+  }
+
   if (space.brokerageId) {
     const { data: brokerage } = await supabase
       .from('Brokerage')
@@ -59,10 +76,12 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
         .eq('userId', space.ownerId)
         .maybeSingle();
       if (membership) {
+        const brokerageComped = await isAccountComped('Brokerage', brokerage.id as string);
         return {
           account: { type: 'brokerage', id: brokerage.id as string },
-          plan: brokerage.plan as PlanId,
+          plan: brokerageComped ? COMP_BROKERAGE_PLAN : (brokerage.plan as PlanId),
           subscriptionStatus: (brokerage.stripeSubscriptionStatus as string) ?? null,
+          isComped: brokerageComped,
         };
       }
     }
@@ -72,5 +91,6 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
     account: { type: 'space', id: space.id as string },
     plan: ((space.plan as string) ?? 'free') as PlanId,
     subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
+    isComped: false,
   };
 }

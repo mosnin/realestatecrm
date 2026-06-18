@@ -7,6 +7,7 @@ import { SidebarCollapseProvider } from '@/components/dashboard/sidebar-collapse
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { supabase } from '@/lib/supabase';
+import { isAccountComped } from '@/lib/billing/comp';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
@@ -144,7 +145,12 @@ export default async function DashboardLayout({
     currentPath.includes('/billing') ||
     currentPath.includes('/settings');
 
-  if (!dbUser.isPlatformAdmin) {
+  // Complimentary (admin-granted) access skips the subscription gate entirely —
+  // internal team / demo accounts get in without a Stripe subscription. Resilient:
+  // if the comp columns aren't present this is false and the normal gate runs.
+  const hasCompAccess = await isAccountComped('Space', space.id);
+
+  if (!dbUser.isPlatformAdmin && !hasCompAccess) {
     try {
       const { data: subData, error: subError } = await supabase
         .from('Space')
