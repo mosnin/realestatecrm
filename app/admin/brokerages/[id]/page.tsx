@@ -273,12 +273,16 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                   <Users size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Owner</p>
-                    <Link
-                      href={`/admin/users/${owner?.id}`}
-                      className="text-xs text-foreground hover:underline underline-offset-2"
-                    >
-                      {owner?.name ?? owner?.email ?? '—'}
-                    </Link>
+                    {owner?.id ? (
+                      <Link
+                        href={`/admin/users/${owner.id}`}
+                        className="text-xs text-foreground hover:underline underline-offset-2"
+                      >
+                        {owner.name ?? owner.email ?? '—'}
+                      </Link>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Unknown owner</p>
+                    )}
                   </div>
                 </div>
                 {brokerage.joinCode && (
