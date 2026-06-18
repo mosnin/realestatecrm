@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
+import { RevokeInvitation } from './revoke-invitation';
 
 const statusStyle = (status: string) => {
   switch (status) {
@@ -77,9 +78,14 @@ export default async function AdminInvitationsPage() {
                       {inv.status === 'pending' && ` · Expires ${expiresAt}`}
                     </p>
                   </div>
-                  <span className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 capitalize flex-shrink-0 ${statusStyle(inv.status)}`}>
-                    {inv.status}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 capitalize ${statusStyle(inv.status)}`}>
+                      {inv.status}
+                    </span>
+                    {inv.status === 'pending' && (
+                      <RevokeInvitation invitationId={inv.id} email={inv.email} />
+                    )}
+                  </div>
                 </div>
               </div>
             );
