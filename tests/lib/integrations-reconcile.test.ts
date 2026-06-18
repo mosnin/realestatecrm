@@ -21,6 +21,18 @@ vi.mock('@/lib/integrations/composio', () => ({
   deleteConnection: vi.fn(),
 }));
 
+// ── triggers mock — reconcile self-heals missing trigger registrations ──
+// `ensureTriggersRegistered` lazy-imports this module; mocking it lets us
+// assert reconcile registers curated triggers for active rows that have none.
+const { listTriggersMock, registerTriggersMock } = vi.hoisted(() => ({
+  listTriggersMock: vi.fn(),
+  registerTriggersMock: vi.fn(),
+}));
+vi.mock('@/lib/integrations/triggers', () => ({
+  listTriggersForConnection: listTriggersMock,
+  registerForConnection: registerTriggersMock,
+}));
+
 // ── catalog mock — control which toolkit slugs are "known" ───────────
 
 vi.mock('@/lib/integrations/catalog', () => ({
@@ -81,6 +93,9 @@ beforeEach(() => {
     maybeSingle: { data: null, error: null },
     single: { data: { id: 'new-row-id' }, error: null },
   };
+  // Default trigger mocks: nothing registered yet, registration succeeds.
+  listTriggersMock.mockResolvedValue([]);
+  registerTriggersMock.mockResolvedValue({ registered: 1, failed: 0 });
 });
 
 describe('reconcileFromComposio', () => {
@@ -199,5 +214,114 @@ describe('reconcileFromComposio', () => {
       ([msg]) => typeof msg === 'string' && msg.includes('reconciled composio connection'),
     );
     expect(reconcileLogs).toHaveLength(0);
+  });
+
+  // ── trigger self-heal: the root-cause fix for the empty activity feed ──────
+  // An active connection that never went through the OAuth callback (callback
+  // dropped, or predates the triggers feature) has zero IntegrationTrigger
+  // rows → Composio never fires webhooks → activity feed stays empty. Reconcile
+  // (runs on every /settings load) must register the curated triggers.
+
+  it('registers curated triggers for an already-tracked ACTIVE row that has none', async () => {
+    listMock.mockResolvedValueOnce({
+      items: [{ id: 'ca_active', status: 'ACTIVE', alias: 'a', toolkit: { slug: 'gmail' } }],
+    });
+    // Already tracked + already active (the common 9-connections case).
+    tableBehavior.IntegrationConnection = {
+      maybeSingle: {
+        data: { id: 'conn-active', composioConnectionId: 'ca_active', toolkit: 'gmail', status: 'active' },
+        error: null,
+      },
+    };
+    listTriggersMock.mockResolvedValue([]); // no triggers yet
+
+    await reconcileFromComposio({ spaceId: 'space-1', entityId: 'user-1' });
+
+    expect(registerTriggersMock).toHaveBeenCalledTimes(1);
+    expect(registerTriggersMock).toHaveBeenCalledWith({
+      connection: expect.objectContaining({ id: 'conn-active', toolkit: 'gmail', status: 'active' }),
+    });
+  });
+
+  it('does NOT re-register triggers when the connection already has rows (no duplicate Composio subscriptions)', async () => {
+    listMock.mockResolvedValueOnce({
+      items: [{ id: 'ca_active', status: 'ACTIVE', alias: 'a', toolkit: { slug: 'gmail' } }],
+    });
+    tableBehavior.IntegrationConnection = {
+      maybeSingle: {
+        data: { id: 'conn-active', composioConnectionId: 'ca_active', toolkit: 'gmail', status: 'active' },
+        error: null,
+      },
+    };
+    listTriggersMock.mockResolvedValue([{ id: 'existing-trigger' }]); // already registered
+
+    await reconcileFromComposio({ spaceId: 'space-1', entityId: 'user-1' });
+
+    expect(registerTriggersMock).not.toHaveBeenCalled();
+  });
+
+  it('promotes a pending row AND registers its triggers in one pass', async () => {
+    listMock.mockResolvedValueOnce({
+      items: [{ id: 'ca_pending', status: 'ACTIVE', alias: 'a', toolkit: { slug: 'gmail' } }],
+    });
+    // Tracked but still pending (callback dropped before promotion).
+    tableBehavior.IntegrationConnection = {
+      maybeSingle: {
+        data: { id: 'conn-pending', composioConnectionId: 'ca_pending', toolkit: 'gmail', status: 'pending' },
+        error: null,
+      },
+    };
+    listTriggersMock.mockResolvedValue([]);
+
+    await reconcileFromComposio({ spaceId: 'space-1', entityId: 'user-1' });
+
+    // Promotion log fired …
+    const promoteLogs = infoMock.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('promoted pending row'),
+    );
+    expect(promoteLogs).toHaveLength(1);
+    // … and triggers were registered with status forced to 'active'.
+    expect(registerTriggersMock).toHaveBeenCalledWith({
+      connection: expect.objectContaining({ id: 'conn-pending', status: 'active' }),
+    });
+  });
+
+  it('registers triggers for a freshly reconciled-in connection', async () => {
+    listMock.mockResolvedValueOnce({
+      items: [{ id: 'ca_new', status: 'ACTIVE', alias: 'jane@gmail.com', toolkit: { slug: 'gmail' } }],
+    });
+    // Not tracked → insert path returns the new row.
+    tableBehavior.IntegrationConnection = {
+      maybeSingle: { data: null, error: null },
+      single: { data: { id: 'fresh-row', composioConnectionId: 'ca_new', toolkit: 'gmail', status: 'active' }, error: null },
+    };
+    listTriggersMock.mockResolvedValue([]);
+
+    await reconcileFromComposio({ spaceId: 'space-1', entityId: 'user-1' });
+
+    expect(registerTriggersMock).toHaveBeenCalledTimes(1);
+    expect(registerTriggersMock).toHaveBeenCalledWith({
+      connection: expect.objectContaining({ id: 'fresh-row', toolkit: 'gmail' }),
+    });
+  });
+
+  it('swallows a trigger-registration failure (panel must still load)', async () => {
+    listMock.mockResolvedValueOnce({
+      items: [{ id: 'ca_active', status: 'ACTIVE', alias: 'a', toolkit: { slug: 'gmail' } }],
+    });
+    tableBehavior.IntegrationConnection = {
+      maybeSingle: {
+        data: { id: 'conn-active', composioConnectionId: 'ca_active', toolkit: 'gmail', status: 'active' },
+        error: null,
+      },
+    };
+    listTriggersMock.mockResolvedValue([]);
+    registerTriggersMock.mockRejectedValueOnce(new Error('composio down'));
+
+    // Must not throw.
+    await expect(
+      reconcileFromComposio({ spaceId: 'space-1', entityId: 'user-1' }),
+    ).resolves.toBeUndefined();
+    expect(warnMock).toHaveBeenCalled();
   });
 });

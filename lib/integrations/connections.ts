@@ -80,6 +80,19 @@ export async function reconcileFromComposio(args: {
           toolkit: item.toolkit.slug,
         });
       }
+      // Trigger self-heal — runs for EVERY already-tracked active row, not
+      // just freshly-promoted ones. The OAuth callback is the only path that
+      // registered curated triggers, and it's a cross-site redirect that
+      // frequently drops; rows that reached 'active' via this reconcile (or
+      // that predate the triggers feature) have zero IntegrationTrigger rows
+      // and so Composio never fires webhooks for them — the "Activity feed is
+      // empty even though apps are connected" failure. Registering here makes
+      // every /settings load converge the connection onto its curated
+      // triggers. Idempotent (see ensureTriggersRegistered) and best-effort
+      // (never throws), so it can't break the panel from loading.
+      if (existing.status === 'pending' || existing.status === 'active') {
+        await ensureTriggersRegistered({ ...existing, status: 'active' });
+      }
       continue; // already tracked
     }
 
@@ -97,7 +110,47 @@ export async function reconcileFromComposio(args: {
         toolkit: item.toolkit.slug,
         spaceId: args.spaceId,
       });
+      // A reconciled-in connection never went through the OAuth callback in
+      // this codebase, so it has no curated triggers. Register them now.
+      await ensureTriggersRegistered(inserted);
     }
+  }
+}
+
+/**
+ * Idempotently register a connection's curated Composio triggers if it has
+ * none yet. The trigger-registration path lives in `./triggers`, which
+ * imports the `IntegrationConnectionRow` type from this module — a static
+ * import would close the cycle, so we lazy-import (same pattern as `revoke`).
+ *
+ * Idempotent + best-effort by contract: it first checks for any existing
+ * IntegrationTrigger row and no-ops if present (so re-running on every
+ * /settings load never re-creates Composio subscriptions, which cost money),
+ * and it swallows every error (a Composio outage here must not break the
+ * integrations panel). Only call with an ACTIVE connection — registering
+ * against a non-active one would stack failed rows.
+ */
+async function ensureTriggersRegistered(connection: IntegrationConnectionRow): Promise<void> {
+  try {
+    // Lazy import breaks the connections ↔ triggers cycle.
+    const { listTriggersForConnection, registerForConnection } = await import('./triggers');
+    const existingTriggers = await listTriggersForConnection(connection.id);
+    if (existingTriggers.length > 0) return; // already registered — no-op
+    const result = await registerForConnection({ connection });
+    if (result.registered > 0 || result.failed > 0) {
+      logger.info('[integrations.connections] registered triggers via reconcile', {
+        connectionId: connection.id,
+        toolkit: connection.toolkit,
+        registered: result.registered,
+        failed: result.failed,
+      });
+    }
+  } catch (err) {
+    logger.warn('[integrations.connections] ensureTriggersRegistered failed', {
+      connectionId: connection.id,
+      toolkit: connection.toolkit,
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
