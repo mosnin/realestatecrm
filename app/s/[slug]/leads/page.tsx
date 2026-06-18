@@ -95,7 +95,7 @@ export default async function LeadsPage({
   };
 
   return (
-    <div className="space-y-6 max-w-[1320px]">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">People.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -155,7 +155,7 @@ export default async function LeadsPage({
             Share your intake link — new applications will appear here.
           </p>
           <Link
-            href={`/s/${slug}/intake/share`}
+            href={`/s/${slug}/intake`}
             className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Get your intake link <ArrowRight size={12} />

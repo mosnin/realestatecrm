@@ -293,6 +293,22 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ error: 'Space not found' }, { status: 404, headers: CORS_HEADERS });
   }
 
+  // ── Per-tenant LLM cost cap ─────────────────────────────────────────────────
+  // The IP limit above stops one client from hammering the endpoint, but a
+  // distributed flood (many IPs targeting one space's public form) can still
+  // run up unbounded OpenAI cost on a single tenant. Cap total LLM calls per
+  // space per hour. 500/hr is generous for a legitimate public intake form —
+  // each genuine conversation is a handful of turns, so even dozens of
+  // concurrent prospects stay well under it — while bounding worst-case spend.
+  // Evaluated AFTER the space is resolved and BEFORE any LLM call below.
+  const { allowed: spaceAllowed } = await checkRateLimit(`intake-chat:space:${space.id}`, 500, 3600);
+  if (!spaceAllowed) {
+    return NextResponse.json(
+      { error: 'This form is handling a lot of activity right now. Please try again shortly.' },
+      { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': '3600' } },
+    );
+  }
+
   // ── Load SpaceSetting (business name + form configs) ──────────────────────
   let businessName: string = space.name;
   let rentalFormConfig: IntakeFormConfig | null = null;

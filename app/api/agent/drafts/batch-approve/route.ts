@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { normalizedLevenshtein } from '@/lib/draft-feedback';
 
 /**
  * Batch-approve pending agent drafts in one tap.
@@ -15,8 +16,15 @@ import { logger } from '@/lib/logger';
  * the realtor batch-approves 5, four succeed, one returns its error, and the
  * UI surfaces per-item status from the `results[]` payload.
  *
- * Body: { draftIds: string[] }
+ * Body: { draftIds: string[], edits?: { [draftId: string]: string } }
  * Returns: { results: [{ draftId, ok, error?, status?, deliveryResult? }] }
+ *
+ * Edited content: the realtor can tweak a draft in the inbox before batch-
+ * approving. The optional `edits` map carries per-draft edited text; when an
+ * entry is present we send the edited text and label the row
+ * 'edited_and_approved' (mirrors the single-draft PATCH route). Drafts without
+ * an edit fall back to the stored content and label 'approved'. Without this,
+ * batch-approve silently shipped the un-edited stored draft.
  *
  * Server-side scoping: every draftId is verified to belong to the realtor's
  * space AND status='pending'. A compromised client passing ids from another
@@ -81,6 +89,29 @@ export async function POST(req: NextRequest) {
   // De-dupe to avoid double-sending if the client passes the same id twice.
   const uniqueIds = Array.from(new Set(draftIds as string[]));
 
+  // Optional per-draft edited content. Validate the map shape up-front so a
+  // malformed `edits` fails the whole request (cheap, before any send) rather
+  // than per-item. Values must be non-empty strings; anything else is rejected.
+  const editsRaw = (body as { edits?: unknown })?.edits;
+  const edits = new Map<string, string>();
+  if (editsRaw !== undefined && editsRaw !== null) {
+    if (typeof editsRaw !== 'object' || Array.isArray(editsRaw)) {
+      return NextResponse.json(
+        { error: 'edits must be an object mapping draftId to content' },
+        { status: 400 },
+      );
+    }
+    for (const [key, value] of Object.entries(editsRaw as Record<string, unknown>)) {
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        return NextResponse.json(
+          { error: `edits["${key}"] must be a non-empty string` },
+          { status: 400 },
+        );
+      }
+      edits.set(key, value.trim());
+    }
+  }
+
   const results: BatchResult[] = [];
 
   for (const draftId of uniqueIds) {
@@ -119,8 +150,12 @@ export async function POST(req: NextRequest) {
         if (contactRow) contact = contactRow;
       }
 
+      // Use the realtor's edited text when supplied, falling back to the
+      // stored draft. The edit was validated (non-empty string) up-front.
+      const finalContent: string = edits.get(draftId) ?? existing.content;
+
       const deliveryResult: DeliveryResult = await sendDraft(
-        { channel: existing.channel, subject: existing.subject, content: existing.content },
+        { channel: existing.channel, subject: existing.subject, content: finalContent },
         contact,
         space.name,
         { spaceId: space.id, userId },
@@ -130,14 +165,23 @@ export async function POST(req: NextRequest) {
       // delivery unconfigured/failed). Matches the single PATCH semantics.
       const finalStatus: 'sent' | 'approved' = deliveryResult.sent ? 'sent' : 'approved';
 
+      // Server-side edit labelling — same whitespace-normalized comparison the
+      // single PATCH route uses. A no-op edit (whitespace only) is NOT recorded
+      // as 'edited_and_approved'.
+      const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
+      const contentChanged = serverEditDistance > 0;
+
+      const updatePatch: Record<string, unknown> = {
+        status: finalStatus,
+        updatedAt: new Date().toISOString(),
+        feedback_action: contentChanged ? 'edited_and_approved' : 'approved',
+        edit_distance: contentChanged ? serverEditDistance : 0,
+      };
+      if (contentChanged) updatePatch.content = finalContent;
+
       const { error: updateError } = await supabase
         .from('AgentDraft')
-        .update({
-          status: finalStatus,
-          updatedAt: new Date().toISOString(),
-          feedback_action: 'approved',
-          edit_distance: 0,
-        })
+        .update(updatePatch)
         .eq('id', draftId)
         .eq('spaceId', space.id);
 
@@ -163,6 +207,7 @@ export async function POST(req: NextRequest) {
           newStatus: finalStatus,
           contactId: existing.contactId,
           channel: existing.channel,
+          contentEdited: contentChanged,
           deliverySent: deliveryResult.sent,
           deliveryError: deliveryResult.error,
           batch: true,

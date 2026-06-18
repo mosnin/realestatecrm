@@ -37,10 +37,14 @@ import {
   actionNeedsApproval,
   buildComposioAgentTools,
   buildToolkitAgentTools,
+  __resetComposioCatalogCacheForTests,
 } from '@/lib/integrations/agent-tools';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The per-toolkit catalog cache is module-level state — without a reset,
+  // one test's cached fetch result leaks into the next test's expectations.
+  __resetComposioCatalogCacheForTests();
   getComposioMock.mockReturnValue({
     tools: { getRawComposioTools: getRawComposioToolsMock },
   });

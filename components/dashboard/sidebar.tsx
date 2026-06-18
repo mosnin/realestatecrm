@@ -428,7 +428,7 @@ export function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
 function QuickCreateMenu({ slug }: { slug: string }) {
   const base = `/s/${slug}`;
   const items: { href: string; label: string }[] = [
-    { href: `${base}/contacts/new`, label: 'New contact' },
+    { href: `${base}/contacts`, label: 'New contact' },
     { href: `${base}/deals`, label: 'New deal' },
     { href: `${base}/properties/new`, label: 'New property' },
   ];

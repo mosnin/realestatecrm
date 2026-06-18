@@ -179,7 +179,7 @@ export function ActivityFeed({ slug }: { slug: string }) {
             const targetHref = entry.Contact
               ? `/s/${slug}/contacts/${entry.Contact.id}`
               : entry.Deal
-                ? `/s/${slug}/deals`
+                ? `/s/${slug}/deals/${entry.Deal.id}`
                 : null;
 
             const canUndo =

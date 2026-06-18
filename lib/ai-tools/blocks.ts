@@ -16,11 +16,33 @@ export type MessageBlock =
   | ToolCallBlock
   | PermissionBlock
   | ReasoningBlock
-  | SubagentTaskBlock;
+  | SubagentTaskBlock
+  | AttachmentBlock;
 
 export interface TextBlock {
   type: 'text';
   content: string;
+}
+
+/**
+ * A file the realtor attached to a user message (image / PDF / doc). The agent
+ * already reads these (hydrated per-turn into the model context); this block is
+ * what makes them visible as a chip/thumbnail in the transcript history.
+ *
+ * We persist only stable metadata — never a signed URL, which expires. The
+ * `id` references an `Attachment` row; the renderer mints a fresh short-lived
+ * URL on demand (GET /api/ai/attachments/[id]) for image thumbnails.
+ */
+export interface AttachmentBlock {
+  type: 'attachment';
+  /** Attachment row id — the renderer signs a URL from this when needed. */
+  id: string;
+  filename: string;
+  mimeType: string;
+  /** Convenience flag so the renderer doesn't re-parse the mime each time. */
+  isImage: boolean;
+  /** File size in bytes, when known — shown on the non-image chip. */
+  sizeBytes?: number;
 }
 
 export interface ToolCallBlock {

@@ -9,8 +9,10 @@
  *
  * Design (Jobs lens): paper-flat, serif h1 + status sentence, one builder card,
  * a calm preview of the auto-selected comps + the computed range, a hairline-
- * divided list of past reports. No MLS, no external lookups — comps come from
- * the realtor's own Property rows.
+ * divided list of past reports. Comps + valuation come from RentCast market
+ * data (merged with the realtor's own Property rows); the preview labels which
+ * source produced the numbers. A direct MLS feed is a future source, not wired
+ * up yet.
  *
  * Build pass (Musk lens): the heavy lifting (comp selection, stats) lives in
  * lib/cma.ts and runs server-side on save. The client just collects the subject,
@@ -41,7 +43,8 @@ import {
   CAPTION,
   META,
 } from '@/lib/typography';
-import type { CmaPayload, CmaComp } from '@/lib/cma';
+import type { CmaPayload, CmaComp } from '@/lib/cma-types';
+import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +85,7 @@ function compFacts(c: CmaComp): string {
   if (c.beds != null) parts.push(`${c.beds}bd`);
   if (c.baths != null) parts.push(`${c.baths}ba`);
   if (c.squareFeet != null) parts.push(`${c.squareFeet.toLocaleString()} sqft`);
+  if (c.distanceMiles != null) parts.push(`${c.distanceMiles.toFixed(1)} mi`);
   return parts.join(' · ');
 }
 
@@ -265,7 +269,7 @@ export function CmaView({ slug }: { slug: string }) {
           Price a home.
         </h1>
         <p className={cn(BODY_MUTED)}>
-          Pick a subject, and Chippi pulls comps from your CRM and computes a range.
+          Pick a subject, and Chippi pulls real market comps and computes a range.
         </p>
       </header>
 
@@ -338,6 +342,16 @@ export function CmaView({ slug }: { slug: string }) {
         <section className="space-y-3">
           <p className={cn(SECTION_LABEL)}>Preview</p>
 
+          {(preview.payload.dataSource === 'crm' || preview.payload.stats.insufficientData) && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+              {preview.payload.dataSourceReason === 'rentcast_unconfigured'
+                ? 'Market data isn’t connected, so this is based only on your own CRM listings — not real comparable sales. Set RENTCAST_API_KEY (and redeploy) to get accurate market values.'
+                : preview.payload.dataSource === 'crm'
+                  ? 'No market data was found for this address, so this is based only on your own CRM listings. Treat it as a rough internal reference, not a market valuation.'
+                  : 'Not enough comparable data to stand behind this estimate yet — add more priced comparables or connect market data.'}
+            </div>
+          )}
+
           <div className="rounded-xl border border-border/70 bg-card px-6 py-6 text-center space-y-1.5">
             <p className={cn(SECTION_LABEL)}>Suggested list-price range</p>
             {preview.payload.stats.suggestedLow != null &&
@@ -357,6 +371,9 @@ export function CmaView({ slug }: { slug: string }) {
               {preview.payload.stats.compCount === 1 ? '' : 's'}
               {preview.payload.stats.avgPricePerSqft != null &&
                 ` · avg $${preview.payload.stats.avgPricePerSqft.toLocaleString()}/sqft`}
+            </p>
+            <p className={cn(META)}>
+              Source: {DATA_SOURCE_LABEL[preview.payload.dataSource]}
             </p>
           </div>
 

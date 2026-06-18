@@ -26,7 +26,7 @@ import { composeBrief } from '@/lib/briefing/compose';
 import { shouldGenerateFor } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import { monitorCron } from '@/lib/cron-monitor';
-import { assertCanSpend, chargeWorkflow, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 
 export const runtime = 'nodejs';
 
@@ -49,7 +49,7 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
     try {
       await assertCanSpend(spaceId, 'daily_briefing');
     } catch (err) {
-      if (err instanceof CreditsExhaustedError) return 'failed';
+      if (err instanceof CreditsExhaustedError || err instanceof SubscriptionDelinquentError) return 'failed';
       throw err;
     }
     // Has this (space, date) brief already been generated? A retry of the same

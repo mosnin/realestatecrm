@@ -45,7 +45,17 @@ vi.mock('@/lib/supabase', () => {
     chain.then = (r: (v: unknown) => unknown, e?: (e: unknown) => unknown) => termThen.then(r, e);
     return chain;
   }
-  return { supabase: { from: vi.fn((table: string) => makeChain(table)) } };
+  // schedule_tour now books through the atomic `book_tour_atomic` RPC
+  // (lib/tour-booking.ts) instead of a raw Tour insert. The function returns
+  // the booked id (non-null = success; null = slot conflict). Echo back the
+  // passed p_id so the booking resolves to { ok: true }.
+  const rpc = vi.fn((fn: string, params?: Record<string, unknown>) => {
+    if (fn === 'book_tour_atomic') {
+      return Promise.resolve({ data: (params?.p_id as string) ?? 'tour_rpc', error: null });
+    }
+    return Promise.resolve({ data: null, error: null });
+  });
+  return { supabase: { from: vi.fn((table: string) => makeChain(table)), rpc } };
 });
 
 const { syncContactMock, syncDealMock } = vi.hoisted(() => ({

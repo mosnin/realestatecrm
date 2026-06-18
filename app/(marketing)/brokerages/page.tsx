@@ -1,38 +1,74 @@
 /**
- * `/brokerages` — how Chippi empowers a real estate brokerage and its floor.
- *
- * Replaces the old `/teams/*` tree and absorbs its content into one rich,
- * scrolling page that belongs to the rebuilt homepage family (home-kit:
- * Reveal / Stagger / Parallax / Eyebrow, AsciiBlob hero, serif section
- * headlines, light canvas, dark accent bands).
- *
- * The one idea: give every agent on your floor an extra teammate, and give
- * yourself a view of the whole room — leads routed, deals tracked,
- * bottlenecks surfaced, everything in one place instead of six tools.
- *
- * Every capability shown is grounded in real code:
- *   - lead routing / reassignment  → lib/ai-tools/tools/assign-lead-to-realtor.ts
- *   - performance rollups          → lib/ai-tools/tools/summarize-realtor.ts
- *   - bottlenecks / stalled deals  → find-stuck-deals.ts, pipeline-summary.ts,
- *                                     find-overdue-followups.ts
- *   - deal review / sign-off       → lib/ai-tools/tools/request-deal-review.ts
- *   - roles (Owner/Admin/Member)   → lib/permissions.ts (canManageLeads, etc.)
- *
- * Auth users bounce to their workspace before render (mirrors the homepage).
- * Primary CTA stays the locked home pill → /login/realtor?intent=signup.
- * Brokerages want a walkthrough, so "Book a demo" → /demo is prominent.
+ * `/brokerages`, the floor story. Server component (exports metadata). The
+ * cinematic hero + showcases live in a forced-dark wrapper; the closing CTA
+ * stays light/dark-adaptive like the home page.
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import { BrokeragesContent } from '@/components/marketing/brokerages/brokerages-content';
+import { SubHero } from '@/components/marketing/giga/sub-hero';
+import {
+  BrokerageRoutingShowcase,
+  BrokerageFloorShowcase,
+  BrokerageApprovalsShowcase,
+} from '@/components/marketing/giga/brokerage-showcases';
+import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
+import { CtaSection } from '@/components/marketing/giga/cta';
 
-export const metadata = { title: 'For brokerages · Chippi' };
+export const metadata = {
+  title: 'For brokerages · Chippi',
+  description:
+    'Give every agent on the floor a Chippi: leads routed to the right agent, approval-first drafts, and a live floor view with role-based controls and an audit log.',
+};
 
-export default async function BrokeragesPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect('/auth/redirect?intent=broker');
-  }
-  return <BrokeragesContent />;
+export default function BrokeragesPage() {
+  return (
+    <>
+      <div className="dark bg-[#0a0a0a] text-white">
+        <SubHero
+          label="Brokerage view"
+          labelIcon="Building2"
+          headline={
+            <>
+              One agent behind
+              <br className="hidden sm:block" /> every desk on the floor.
+            </>
+          }
+          description="Give every agent a Chippi: leads routed, performance visible, and every send approval-first, from a solo desk to hundreds of agents."
+          features={[
+            { icon: 'ArrowRightLeft', title: 'Routing on arrival', desc: 'Leads auto-assigned by territory and load, logged with the reason.' },
+            { icon: 'Users', title: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time.' },
+            { icon: 'ShieldCheck', title: 'Approval-first', desc: 'Every send reviewed, every action on the audit log.' },
+          ]}
+          image="/marketing/brokerages-hero.jpg"
+          variant="floor"
+        />
+        <BrokerageRoutingShowcase />
+        <BrokerageFloorShowcase />
+        <BrokerageApprovalsShowcase />
+        <PricingTeaser
+          headline={
+            <>
+              Pricing that scales
+              <br className="hidden sm:block" /> with your floor.
+            </>
+          }
+          plans={[
+            {
+              name: 'Team',
+              price: '$497',
+              blurb: 'For the growing floor.',
+              features: ['5 seats included', '24,000 workflow credits / mo', '+$79 per extra seat'],
+            },
+            {
+              name: 'Team Plus',
+              price: '$897',
+              blurb: 'For the established brokerage.',
+              features: ['10 seats included', '50,000 workflow credits / mo', '+$69 per extra seat'],
+              featured: true,
+            },
+          ]}
+        />
+      </div>
+      <CtaSection />
+    </>
+  );
 }

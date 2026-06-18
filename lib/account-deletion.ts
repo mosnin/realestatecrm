@@ -17,6 +17,9 @@
  * delete, while we still hold the spaceId):
  *   - `Attachment`     — has spaceId but no FK to Space
  *   - `TelemetryEvent` — has nullable spaceId, no FK to Space
+ *   - Wasabi storage objects — Postgres can't cascade into object storage, so
+ *     we enumerate the keys and best-effort delete the blobs before the row
+ *     cascade fires (see deleteSpaceStorageObjects).
  *
  * What is intentionally retained (see docs/DATA-DELETION.md §retention):
  *   - Stripe customer/invoice records (held by Stripe; legal/financial retention)
@@ -30,10 +33,71 @@
  * always-on. Flip it once owner has signed off on docs/DATA-DELETION.md.
  */
 
+import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { deleteObjectsBestEffort } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 
 export function hardDeleteEnabled(): boolean {
   return process.env.ACCOUNT_DELETION_HARD_DELETE === 'true';
+}
+
+/**
+ * Collect every Wasabi object key owned by a space, across the four tables that
+ * carry a storage reference, and best-effort delete the underlying blobs.
+ *
+ * GDPR erasure means the bytes, not just the DB rows. The cascade deletes the
+ * rows (File/DealDocument/ContactDocument via Space FK; Attachment is swept
+ * explicitly), but Postgres knows nothing about Wasabi — without this the
+ * objects survive forever. So we enumerate the keys WHILE the rows still exist
+ * (before the cascade fires) and drop the blobs.
+ *
+ * Best-effort by design: a Wasabi failure here must never abort the DB
+ * deletion (the user's right to erasure of their data outranks orphan-cleanup),
+ * and the nightly storage-gc cron sweeps anything we miss. We log failures.
+ *
+ * Storage columns per table (verified against the migrations):
+ *   - Attachment.storagePath        (chat-attachments/…)
+ *   - File.storageKey               (files/… and studio/… — studio media is File rows)
+ *   - DealDocument.storagePath      (deal-documents/…)
+ *   - ContactDocument.storageKey    (contact-documents/…)
+ */
+async function deleteSpaceStorageObjects(spaceId: string): Promise<void> {
+  const keys: string[] = [];
+
+  const collect = (
+    rows: Array<Record<string, unknown>> | null,
+    col: string,
+  ): void => {
+    for (const row of rows ?? []) {
+      const v = row[col];
+      if (typeof v === 'string' && v.length > 0) keys.push(v);
+    }
+  };
+
+  // Attachment + File are space-scoped directly. DealDocument + ContactDocument
+  // also carry spaceId, so a single spaceId filter reaches every blob.
+  const [att, file, deal, contact] = await Promise.all([
+    supabase.from('Attachment').select('storagePath').eq('spaceId', spaceId),
+    supabase.from('File').select('storageKey').eq('spaceId', spaceId),
+    supabase.from('DealDocument').select('storagePath').eq('spaceId', spaceId),
+    supabase.from('ContactDocument').select('storageKey').eq('spaceId', spaceId),
+  ]);
+
+  collect(att.data as Array<Record<string, unknown>> | null, 'storagePath');
+  collect(file.data as Array<Record<string, unknown>> | null, 'storageKey');
+  collect(deal.data as Array<Record<string, unknown>> | null, 'storagePath');
+  collect(contact.data as Array<Record<string, unknown>> | null, 'storageKey');
+
+  if (keys.length === 0) return;
+
+  const { ok, failed } = await deleteObjectsBestEffort(keys);
+  if (failed.length > 0) {
+    logger.error(
+      '[account-deletion] storage blob delete had failures — orphans left for storage-gc',
+      { spaceId, attempted: keys.length, ok, failed: failed.length },
+    );
+  }
 }
 
 /**
@@ -76,6 +140,12 @@ export async function hardDeleteSpaceAndUser(params: {
 
   const { userDbId, spaceId } = params;
 
+  // 0. Storage blobs FIRST — enumerate object keys while the rows that
+  //    reference them still exist, then best-effort delete the Wasabi
+  //    objects. Must precede the row deletes below (and the User cascade),
+  //    or the keys are gone before we can read them. Never throws.
+  await deleteSpaceStorageObjects(spaceId);
+
   // 1. Non-cascading tables — must go first, while the spaceId still resolves.
   const { error: attErr } = await supabase.from('Attachment').delete().eq('spaceId', spaceId);
   if (attErr) throw new Error(`Attachment delete failed: ${attErr.message}`);
@@ -86,4 +156,83 @@ export async function hardDeleteSpaceAndUser(params: {
   // 2. The User row — cascades to Space → all Space-scoped FK tables.
   const { error: userErr } = await supabase.from('User').delete().eq('id', userDbId);
   if (userErr) throw new Error(`User delete failed: ${userErr.message}`);
+}
+
+// ── Orchestrated deletion (shared by self-service + admin offboard) ──────────
+
+/**
+ * Outcome of performAccountDeletion. `ok:false` carries a `status` so the
+ * caller can map it onto an HTTP response without re-deriving the reason.
+ */
+export type AccountDeletionResult =
+  | { ok: true; hardDeleted: boolean; pendingDataDeletion: boolean }
+  | { ok: false; status: number; error: string; loginRemoved?: boolean };
+
+/**
+ * The full delete flow for ONE account, factored out of the self-service route
+ * so the platform-admin offboard route can reuse the exact same sequence
+ * (structural-blocker check → delete the Clerk identity → gated DB hard-delete).
+ *
+ * This deliberately does NOT do auth, rate-limiting, the type-to-confirm check,
+ * or audit logging — those are the caller's responsibility and differ between
+ * self-service (confirm = workspace name, audit as the user) and admin (confirm
+ * handled in the UI dialog, audit via logAdminAction as the admin). Keeping
+ * those out here lets both routes own their own policy while sharing the one
+ * destructive sequence that must never drift between the two surfaces.
+ *
+ * Honors ACCOUNT_DELETION_HARD_DELETE: with the flag off, the Clerk identity is
+ * removed (the part that actually locks the person out) and the workspace rows
+ * are left for the reviewed manual run — exactly as the self-service route does.
+ */
+export async function performAccountDeletion(params: {
+  userDbId: string;
+  clerkId: string;
+  spaceId: string | null;
+}): Promise<AccountDeletionResult> {
+  const { userDbId, clerkId, spaceId } = params;
+
+  // Structural blockers (e.g. owning a brokerage → User delete is RESTRICTed).
+  const blocker = await checkDeletionBlockers(userDbId);
+  if (blocker) {
+    return { ok: false, status: 409, error: blocker };
+  }
+
+  // Delete the Clerk identity first — always safe and is the part that actually
+  // locks the person out. If the DB sweep is gated off, the worst case is an
+  // orphaned set of rows with no login, cleaned up by the reviewed run.
+  const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+  try {
+    await clerkClient.users.deleteUser(clerkId);
+  } catch (err) {
+    console.error('[account-deletion] Clerk deleteUser failed', err);
+    return {
+      ok: false,
+      status: 500,
+      error: "couldn't delete the login. nothing was removed — try again.",
+    };
+  }
+
+  // The destructive DB sweep — gated. Off by default until owner signs off on
+  // docs/DATA-DELETION.md. When off (or when there's no workspace to sweep), we
+  // stop here: login is gone, rows await the reviewed run.
+  if (!hardDeleteEnabled() || !spaceId) {
+    return { ok: true, hardDeleted: false, pendingDataDeletion: !!spaceId };
+  }
+
+  try {
+    await hardDeleteSpaceAndUser({ userDbId, spaceId });
+  } catch (err) {
+    // Login is already gone; the DB sweep failed. Surface it loudly — this is
+    // the case to page on, because the row state is now partial.
+    console.error('[account-deletion] hard delete failed after Clerk delete', err);
+    return {
+      ok: false,
+      status: 500,
+      loginRemoved: true,
+      error:
+        'the login was removed but data deletion did not finish. contact help@usechippi.com.',
+    };
+  }
+
+  return { ok: true, hardDeleted: true, pendingDataDeletion: false };
 }

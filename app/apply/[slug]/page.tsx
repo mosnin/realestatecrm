@@ -288,7 +288,7 @@ export default async function PublicApplyPage({
         profileHref={`/p/${slug}`}
         accentColor={customization.accentColor}
         privacyPolicyUrl={customization.privacyPolicyUrl}
-        termsUrl={`/apply/${slug}/terms`}
+        termsUrl="/legal/terms"
         hidePoweredBy={hidePoweredBy}
         footerLinks={customization.footerLinks}
         licenseNumber={settings?.intakeLicenseNumber ?? null}

@@ -28,8 +28,23 @@ export interface PlanDef {
   account: AccountType;
   stripePriceMonthly: string | null;
   stripePriceAnnual: string | null;
-  /** Per-user expansion above includedUsers (Team / Team Plus). */
-  addUser?: { priceMonthly: number; credits: number };
+  /**
+   * Per-user expansion above includedUsers (Team / Team Plus).
+   *
+   * `stripePrice*` is the Stripe price id for ONE add-on seat — it MUST be a
+   * per-unit ("licensed", quantity-billed) price so the subscription can carry
+   * a second line item whose quantity = active members − includedUsers (see
+   * lib/billing/brokerage-seat-billing.ts). It is intentionally separate from
+   * the plan's base `stripePriceMonthly` (a FLAT bundle price — $497/$897 — that
+   * always bills quantity 1). Null until the per-seat price object is created in
+   * Stripe and the env var is set; seat billing no-ops + warns while unset.
+   */
+  addUser?: {
+    priceMonthly: number;
+    credits: number;
+    stripePriceMonthly: string | null;
+    stripePriceAnnual: string | null;
+  };
 }
 
 const env = (k: string): string | null => process.env[k] ?? null;
@@ -51,7 +66,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Solo',
     priceMonthly: 97,
     includedUsers: 1,
-    monthlyCredits: 1500,
+    monthlyCredits: 3000,
     account: 'space',
     stripePriceMonthly: env('STRIPE_PRICE_SOLO'),
     stripePriceAnnual: env('STRIPE_PRICE_SOLO_ANNUAL'),
@@ -61,7 +76,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Pro Performer',
     priceMonthly: 197,
     includedUsers: 1,
-    monthlyCredits: 4000,
+    monthlyCredits: 8000,
     account: 'space',
     stripePriceMonthly: env('STRIPE_PRICE_PRO'),
     stripePriceAnnual: env('STRIPE_PRICE_PRO_ANNUAL'),
@@ -71,39 +86,154 @@ export const PLANS: Record<PlanId, PlanDef> = {
     label: 'Team',
     priceMonthly: 497,
     includedUsers: 5,
-    monthlyCredits: 12000,
+    monthlyCredits: 24000,
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_ANNUAL'),
-    addUser: { priceMonthly: 79, credits: 1500 },
+    addUser: {
+      priceMonthly: 79,
+      credits: 3000,
+      stripePriceMonthly: env('STRIPE_PRICE_TEAM_ADDON'),
+      stripePriceAnnual: env('STRIPE_PRICE_TEAM_ADDON_ANNUAL'),
+    },
   },
   team_plus: {
     id: 'team_plus',
     label: 'Team Plus',
     priceMonthly: 897,
     includedUsers: 10,
-    monthlyCredits: 25000,
+    monthlyCredits: 50000,
     account: 'brokerage',
     stripePriceMonthly: env('STRIPE_PRICE_TEAM_PLUS'),
     stripePriceAnnual: env('STRIPE_PRICE_TEAM_PLUS_ANNUAL'),
-    addUser: { priceMonthly: 69, credits: 2000 },
+    addUser: {
+      priceMonthly: 69,
+      credits: 4000,
+      stripePriceMonthly: env('STRIPE_PRICE_TEAM_PLUS_ADDON'),
+      stripePriceAnnual: env('STRIPE_PRICE_TEAM_PLUS_ADDON_ANNUAL'),
+    },
   },
 };
 
+/** The self-serve tiers a buyer can pick and check out on their own (no sales).
+ *  Solo/Pro live on the Space; Team/Team Plus are brokerage-scoped and go
+ *  through /demo, so they are intentionally NOT self-serve here. */
+export type SelfServePlanId = 'solo' | 'pro';
+
 /**
- * Reverse lookup: which plan does a Stripe price id belong to? The webhook uses
- * this to derive the ACTIVE plan from the live subscription's price, instead of
- * a `metadata.plan` that's stamped once at checkout and goes STALE on a
- * portal-driven plan change (Solo↔Pro / Team↔Team Plus). Returns null when the
- * id isn't a known plan price (e.g. price ids unset in this env) so callers can
- * fall back to metadata / the stored plan.
+ * Normalize an untrusted plan hint (URL param, sessionStorage, request body)
+ * to a self-serve Space tier. Anything that isn't 'pro' resolves to 'solo' —
+ * the historical default for direct visitors and the safe fallback when the
+ * chosen plan is lost across a redirect. Pure, so the resolution is identical
+ * on the marketing CTA, the onboarding write, and the subscribe display.
  */
-export function planIdForStripePrice(priceId: string | null | undefined): PlanId | null {
+export function resolveSelfServePlan(raw: unknown): SelfServePlanId {
+  return raw === 'pro' ? 'pro' : 'solo';
+}
+
+/**
+ * Billable add-on seats for a brokerage plan: members beyond the plan's
+ * includedUsers. Pure + clamped to ≥ 0, so it's the single source of truth for
+ * BOTH the per-seat Stripe quantity (lib/billing/brokerage-seat-billing.ts) and
+ * the per-seat credit grant (lib/billing/grants.ts → grantMonthlyCredits's
+ * addonUsers). Plans without an add-on path (or unknown ids) yield 0 — they bill
+ * a flat bundle with no per-seat line. Non-finite/negative seat counts clamp to
+ * 0 (never invent a negative or NaN quantity to send to Stripe).
+ */
+export function addonSeatsForPlan(plan: PlanId | string | null | undefined, activeSeatCount: number): number {
+  const def = plan && plan in PLANS ? PLANS[plan as PlanId] : undefined;
+  if (!def?.addUser) return 0;
+  const seats = Number.isFinite(activeSeatCount) ? Math.floor(activeSeatCount) : 0;
+  return Math.max(0, seats - def.includedUsers);
+}
+
+/**
+ * Is ANNUAL billing actually purchasable for a plan in this environment?
+ *
+ * True only when the plan's annual BASE price id is configured. For the
+ * brokerage tiers (team / team_plus) the per-seat add-on is billed on a
+ * SEPARATE annual price (addUser.stripePriceAnnual); if a plan has an add-on
+ * path but its annual add-on price is unset, a brokerage with seats past the
+ * included count couldn't be charged its annual per-seat line — so we treat
+ * annual as unavailable for that plan rather than offer a half-priced annual
+ * that silently under-bills seats.
+ *
+ * Pure (reads only the env-derived PLANS ids), so the SERVER gate (checkout)
+ * and the UI gate (marketing toggle / in-app cadence picker) use one source of
+ * truth and can never show an annual option that checkout would refuse.
+ */
+export function isAnnualAvailable(planId: PlanId | string | null | undefined): boolean {
+  const def = planId && planId in PLANS ? PLANS[planId as PlanId] : undefined;
+  if (!def) return false;
+  if (!def.stripePriceAnnual) return false;
+  // A plan with a per-seat add-on must also have its ANNUAL add-on price wired
+  // up, else annual seats can't be billed (see addUser doc above).
+  if (def.addUser && !def.addUser.stripePriceAnnual) return false;
+  return true;
+}
+
+/**
+ * Reverse lookup: which BASE plan (and billing cadence) does a Stripe price id
+ * belong to? This is the single source of truth the webhook leans on to derive
+ * the ACTIVE plan + cadence from the live subscription's price, instead of a
+ * `metadata.plan` that's stamped once at checkout and goes STALE on a
+ * portal-/dashboard-driven plan OR cadence change (Solo↔Pro / Team↔Team Plus,
+ * monthly↔annual).
+ *
+ * Matches ONLY the configured BASE plan prices (`stripePriceMonthly` /
+ * `stripePriceAnnual` for solo/pro/team/team_plus). It deliberately does NOT
+ * match the per-seat add-on prices (`addUser.stripePrice*`): when the webhook
+ * iterates a brokerage subscription's items, the base line resolves a plan and
+ * the add-on line resolves null, so the caller naturally picks the base item and
+ * ignores the add-on without any special-casing.
+ *
+ * Returns null for:
+ *   - a null/undefined/empty id,
+ *   - an unconfigured env (the plan's price ids are null — comparing `=== null`
+ *     would falsely match a null priceId, so we guard the priceId truthiness
+ *     up front),
+ *   - any unknown id (a price not in PLANS, including the add-on prices),
+ * so callers can fall back to metadata / the stored plan. Pure.
+ */
+export function planFromPriceId(
+  priceId: string | null | undefined,
+): { plan: PlanId; cadence: 'monthly' | 'annual' } | null {
   if (!priceId) return null;
   for (const p of Object.values(PLANS)) {
-    if (p.stripePriceMonthly === priceId || p.stripePriceAnnual === priceId) return p.id;
+    // Only compare against CONFIGURED ids — a null env price must never match.
+    if (p.stripePriceMonthly && p.stripePriceMonthly === priceId) {
+      return { plan: p.id, cadence: 'monthly' };
+    }
+    if (p.stripePriceAnnual && p.stripePriceAnnual === priceId) {
+      return { plan: p.id, cadence: 'annual' };
+    }
   }
   return null;
+}
+
+/**
+ * Reverse lookup of just the plan id for a Stripe BASE price (no cadence).
+ * Thin wrapper over planFromPriceId (the single source of truth) so existing
+ * call sites that only need the tier don't drift from the cadence-aware map.
+ * Returns null for unknown ids and the per-seat add-on prices (see above).
+ */
+export function planIdForStripePrice(priceId: string | null | undefined): PlanId | null {
+  return planFromPriceId(priceId)?.plan ?? null;
+}
+
+/**
+ * Which plans may purchase one-time credit top-ups. Only the FREE tier is
+ * blocked (it has no paid relationship — a top-up would be the first charge with
+ * no subscription, and the product intent is "top up your plan", not "pay-as-you
+ * -go without a plan"). Every paid tier (solo/pro/team/team_plus) is allowed;
+ * Team/Team Plus top-ups pool at the brokerage balance (resolveBillingAccount).
+ * The marketing FAQ ("buy a one-time top-up anytime") matches this.
+ *
+ * Single source of truth shared by the server gate (credits/checkout) and the
+ * client UI (buy-credits) so they can't disagree. Pure.
+ */
+export function canBuyTopups(plan: PlanId | string | null | undefined): boolean {
+  return plan === 'solo' || plan === 'pro' || plan === 'team' || plan === 'team_plus';
 }
 
 /**
@@ -170,16 +300,22 @@ export const CREDIT_ROLLOVER_DAYS = 30;
  *
  *   margin@full = 1 - (monthlyCredits * CREDIT_COGS_BUDGET_USD) / planPrice
  *
- * The binding tier is the Team Plus add-on seat ($69 / 2000 credits → max
- * $0.0138/credit for exactly 60%). $0.013 holds >= 62% on every tier, leaving a
- * buffer for model-price-estimate / provider-markup error.
+ * The binding tier is the Team Plus add-on seat ($69 / 4,000 credits → max
+ * $0.01725/credit for exactly 60%). $0.0065 holds >= 62% on every tier, leaving
+ * a buffer for model-price-estimate / provider-markup error.
  *
- * The DB trigger 20260627000000_meter_chat_usage_credits.sql is the enforcement
- * point (charges credits/turn = max(1, ceil(costUsd / this)) off each ChatUsage
- * row, model-aware); this constant + helper are the TS-side source of truth for
- * estimation/display. Keep the two in sync.
+ * Halved from the original $0.013 the moment the monthly allotments doubled and
+ * the model lineup moved to the far cheaper DeepSeek / Tencent / qwen set: with
+ * credits 2x and the budget 1/2x, worst-case margins are UNCHANGED while real
+ * usage roughly doubles (actual model COGS sits well under the budget).
+ *
+ * The DB trigger (supabase/migrations/..._meter_chat_usage_credits.sql, then
+ * ..._recalibrate_credit_budget.sql) is the enforcement point (charges
+ * credits/turn = max(1, ceil(costUsd / this)) off each ChatUsage row); this
+ * constant + helper are the TS-side source of truth for estimation/display.
+ * Keep the two in sync.
  */
-export const CREDIT_COGS_BUDGET_USD = 0.013;
+export const CREDIT_COGS_BUDGET_USD = 0.0065;
 
 /** Credits a turn costs given its actual token COGS (model-aware). Floor of 1
  *  so even a near-free turn costs a credit. Mirrors the SQL trigger. */

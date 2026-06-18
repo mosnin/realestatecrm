@@ -19,7 +19,8 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/formatting';
-import type { CmaPayload, CmaComp } from '@/lib/cma';
+import type { CmaPayload, CmaComp } from '@/lib/cma-types';
+import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +91,9 @@ export default async function CmaPublicPage({ params }: Props) {
   const brand = (spaceRow as { name: string; emoji: string | null } | null) ?? null;
 
   const { subject, comps, stats, generatedAt } = report.payload;
+  // Older reports (persisted before the RentCast engine) have no dataSource —
+  // they were CRM-only, so default to 'crm' for an honest, stable label.
+  const dataSource = report.payload.dataSource ?? 'crm';
 
   const subjectLocation = [subject.city, subject.stateRegion].filter(Boolean).join(', ');
   const hasRange = stats.suggestedLow != null && stats.suggestedHigh != null;
@@ -143,7 +147,16 @@ export default async function CmaPublicPage({ params }: Props) {
               Add priced comparables to compute a range.
             </p>
           )}
+          {stats.estimatedValue != null && (
+            <p className="text-xs text-muted-foreground">
+              Automated value estimate{' '}
+              <span className="text-foreground tabular-nums">{money(stats.estimatedValue)}</span>
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">{BASIS_NOTE[stats.basis]}</p>
+          <p className="text-[11px] text-muted-foreground">
+            Source: {DATA_SOURCE_LABEL[dataSource]}
+          </p>
         </section>
 
         {/* ── The comp-derived stat strip ────────────────────────────────── */}
@@ -190,9 +203,9 @@ export default async function CmaPublicPage({ params }: Props) {
 
           {comps.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-              <p className="text-sm text-foreground">No comparable homes on file yet.</p>
+              <p className="text-sm text-foreground">No comparable homes found.</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Comparables drawn from this office&apos;s records will appear here.
+                We couldn&apos;t find recent comparable sales for this property.
               </p>
             </div>
           ) : (
@@ -203,6 +216,7 @@ export default async function CmaPublicPage({ params }: Props) {
                     <Th>Address</Th>
                     <Th className="text-right">Beds / baths</Th>
                     <Th className="text-right">Sqft</Th>
+                    <Th className="text-right">Distance</Th>
                     <Th className="text-right">Price</Th>
                     <Th className="text-right">$/sqft</Th>
                   </tr>
@@ -220,8 +234,9 @@ export default async function CmaPublicPage({ params }: Props) {
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <footer className="border-t border-border/60 pt-6 space-y-2">
           <p className="text-xs text-muted-foreground">
-            Prepared {brand?.name ? `by ${brand.name} ` : ''}on {generated}. This analysis is an
-            estimate based on comparable properties, not an appraisal.
+            Prepared {brand?.name ? `by ${brand.name} ` : ''}on {generated} using{' '}
+            {DATA_SOURCE_LABEL[dataSource]}. This analysis is an estimate based on comparable
+            properties, not an appraisal.
           </p>
           <p className="text-[11px] text-muted-foreground print:hidden">
             Tip: use your browser&apos;s print to save this report as a PDF.
@@ -265,18 +280,24 @@ function CompRow({ c }: { c: CmaComp }) {
     c.beds != null || c.baths != null
       ? `${c.beds ?? '—'} / ${c.baths ?? '—'}`
       : '—';
+  // CRM comps use our listingStatus enum; RentCast comps carry a listing-type
+  // string (e.g. "Standard") that has no enum entry — show it verbatim.
+  const statusLabel = STATUS_LABEL[c.listingStatus] ?? c.listingStatus;
   return (
     <tr className="border-b border-border/60 last:border-0">
       <td className="px-3 py-2.5 align-top">
         <span className="text-foreground">{c.address}</span>
         {c.city && <span className="text-muted-foreground"> · {c.city}</span>}
-        <span className="ml-2 text-[11px] text-muted-foreground">
-          {STATUS_LABEL[c.listingStatus] ?? c.listingStatus}
-        </span>
+        {statusLabel && (
+          <span className="ml-2 text-[11px] text-muted-foreground">{statusLabel}</span>
+        )}
       </td>
       <td className="px-3 py-2.5 text-right tabular-nums align-top">{bedBath}</td>
       <td className="px-3 py-2.5 text-right tabular-nums align-top">
         {c.squareFeet != null ? c.squareFeet.toLocaleString('en-US') : '—'}
+      </td>
+      <td className="px-3 py-2.5 text-right tabular-nums align-top">
+        {c.distanceMiles != null ? `${c.distanceMiles.toFixed(1)} mi` : '—'}
       </td>
       <td className="px-3 py-2.5 text-right tabular-nums align-top">{money(c.price)}</td>
       <td className="px-3 py-2.5 text-right tabular-nums align-top">{ppsf(c.pricePerSqft)}</td>

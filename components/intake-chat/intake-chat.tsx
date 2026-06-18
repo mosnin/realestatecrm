@@ -35,7 +35,7 @@ import {
 import { motion } from 'motion/react';
 import { validateQuestion } from '@/components/form-renderer/question-renderer';
 import { IntakeChatSuccess } from './intake-chat-success';
-import { cn } from '@/lib/utils';
+import { cn, formatPhoneAsTyped } from '@/lib/utils';
 import {
   DURATION_BASE,
   EASE_OUT,
@@ -267,6 +267,7 @@ export function IntakeChat({
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('asking');
   const [applicationRef, setApplicationRef] = useState<string | null>(null);
+  const [statusPortalToken, setStatusPortalToken] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const activeConfig = useMemo<IntakeFormConfig | null>(() => {
@@ -421,8 +422,12 @@ export function IntakeChat({
         submitFiredRef.current = false;
         return;
       }
-      const data = (await res.json()) as { applicationRef?: string };
+      const data = (await res.json()) as {
+        applicationRef?: string;
+        statusPortalToken?: string;
+      };
       setApplicationRef(data.applicationRef ?? null);
+      setStatusPortalToken(data.statusPortalToken ?? null);
       setPhase('done');
     } catch {
       setSubmitError('Network error. Check your connection and try again.');
@@ -477,15 +482,35 @@ export function IntakeChat({
   // below the last question — which reads as "you submitted, here's a
   // receipt below your conversation" instead of "you're done, well done."
   if (phase === 'done') {
+    // Pull the applicant's first name from the name answer they just gave so
+    // the confirmation can address them directly. `answers.name` holds the full
+    // name captured by the system name field (id 'name').
+    const nameAnswer = answers['name'];
+    const fullName = typeof nameAnswer === 'string' ? nameAnswer.trim() : '';
+    const firstName = fullName.split(/\s+/)[0] || '';
+
+    // Build a working status-portal link when the API handed back a token; fall
+    // back to a ref-only link (read-only status view) otherwise. Omit entirely
+    // if we somehow have neither.
+    const statusHref = applicationRef
+      ? statusPortalToken
+        ? `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}&token=${encodeURIComponent(statusPortalToken)}`
+        : `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}`
+      : null;
+
     return (
       <div className="space-y-8">
         <IntakeChatSuccess
           businessName={businessName}
+          firstName={firstName}
+          realtorName={agentName}
           agentPhoto={agentPhoto}
           applicationRef={applicationRef}
           thankYouTitle={customization.thankYouTitle}
           thankYouMessage={customization.thankYouMessage}
           accentColor={customization.accentColor}
+          bookHref={`/book/${slug}`}
+          statusHref={statusHref}
           profileHref={`/p/${slug}`}
         />
       </div>
@@ -986,23 +1011,6 @@ function DateField({ value, onChange, onCommit, accentColor, error }: InputProps
       </PrimaryActionButton>
     </div>
   );
-}
-
-/**
- * Format a phone number as the user types. Strips non-digits and renders
- * the (XXX) XXX-XXXX shape progressively for US-style numbers. Pure
- * function so it's testable and predictable; not validation —
- * `validateQuestion` still gates submission.
- */
-function formatPhoneAsTyped(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 11);
-  if (digits.length === 0) return '';
-  if (digits.length <= 3) return `(${digits}`;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  return `+${digits.slice(0, 1)} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
 }
 
 const EMAIL_INLINE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -268,30 +268,35 @@ export function ReviewDetailClient({
           </ul>
         )}
 
-        {/* Composer */}
-        <div className="space-y-2 pt-2">
-          <Textarea
-            value={commentBody}
-            onChange={(e) => setCommentBody(e.target.value.slice(0, MAX_COMMENT_LEN))}
-            placeholder="Add a comment…"
-            maxLength={MAX_COMMENT_LEN}
-            aria-label="New comment"
-          />
-          <div className="flex items-center justify-between">
-            <span className={cn(CAPTION, 'tabular-nums')}>
-              {commentBody.length}/{MAX_COMMENT_LEN}
-            </span>
-            <button
-              type="button"
-              onClick={submitComment}
-              disabled={postingComment || commentBody.trim().length === 0}
-              className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
-            >
-              {postingComment && <Loader2 size={13} className="animate-spin" />}
-              Add comment
-            </button>
+        {/* Composer — hidden once resolved. The API rejects comments on a
+            resolved review (409), so don't show an enabled box that always fails. */}
+        {!isResolved ? (
+          <div className="space-y-2 pt-2">
+            <Textarea
+              value={commentBody}
+              onChange={(e) => setCommentBody(e.target.value.slice(0, MAX_COMMENT_LEN))}
+              placeholder="Add a comment…"
+              maxLength={MAX_COMMENT_LEN}
+              aria-label="New comment"
+            />
+            <div className="flex items-center justify-between">
+              <span className={cn(CAPTION, 'tabular-nums')}>
+                {commentBody.length}/{MAX_COMMENT_LEN}
+              </span>
+              <button
+                type="button"
+                onClick={submitComment}
+                disabled={postingComment || commentBody.trim().length === 0}
+                className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
+              >
+                {postingComment && <Loader2 size={13} className="animate-spin" />}
+                Add comment
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className={cn(CAPTION, 'pt-2')}>This review is resolved — comments are closed.</p>
+        )}
       </section>
 
       {/* Resolution actions — only broker_owner / broker_admin, only while open */}

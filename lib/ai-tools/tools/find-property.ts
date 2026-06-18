@@ -36,6 +36,8 @@ interface PropertyHit {
   beds: number | null;
   baths: number | null;
   squareFeet: number | null;
+  /** First photo URL, when the property has one — feeds the carousel card. */
+  image: string | null;
 }
 
 interface FindPropertyResult {
@@ -44,7 +46,15 @@ interface FindPropertyResult {
   properties?: PropertyHit[];
 }
 
-const SELECT = 'id, address, city, listingStatus, mlsNumber, listPrice, beds, baths, squareFeet';
+const SELECT =
+  'id, address, city, listingStatus, mlsNumber, listPrice, beds, baths, squareFeet, photos';
+
+/** Pull the first usable photo URL out of the JSONB `photos` array. */
+function firstPhoto(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const first = value.find((p) => typeof p === 'string' && p.trim().length > 0);
+  return typeof first === 'string' ? first : null;
+}
 
 function toHit(row: Record<string, unknown>): PropertyHit {
   return {
@@ -57,6 +67,7 @@ function toHit(row: Record<string, unknown>): PropertyHit {
     beds: (row.beds as number | null) ?? null,
     baths: (row.baths as number | null) ?? null,
     squareFeet: (row.squareFeet as number | null) ?? null,
+    image: firstPhoto(row.photos),
   };
 }
 
@@ -94,7 +105,7 @@ export const findPropertyTool = defineTool<typeof parameters, FindPropertyResult
         return {
           summary: summariseOne(hit),
           data: { match: 'single' as const, property: hit },
-          display: 'plain',
+          display: 'properties',
         };
       }
     }
@@ -140,7 +151,7 @@ export const findPropertyTool = defineTool<typeof parameters, FindPropertyResult
       return {
         summary: summariseOne(hit),
         data: { match: 'single' as const, property: hit },
-        display: 'plain',
+        display: 'properties',
       };
     }
 
@@ -149,7 +160,7 @@ export const findPropertyTool = defineTool<typeof parameters, FindPropertyResult
     return {
       summary: `Found ${properties.length} properties:\n${lines}`,
       data: { match: 'shortlist' as const, properties },
-      display: 'plain',
+      display: 'properties',
     };
   },
 });

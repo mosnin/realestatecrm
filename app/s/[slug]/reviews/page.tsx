@@ -42,7 +42,7 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
   // rather than 404 — the user might visit this link from stale nav.
   if (!space.brokerageId) {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-4xl mx-auto pb-12">
         <header className="space-y-1.5">
           <p className="text-sm text-muted-foreground">Reviews.</p>
           <h1 className={H1} style={TITLE_FONT}>
@@ -144,7 +144,7 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
     : 'All caught up.';
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Reviews.</p>
         <h1 className={H1} style={TITLE_FONT}>

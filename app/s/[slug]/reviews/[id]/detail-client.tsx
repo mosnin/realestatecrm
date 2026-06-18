@@ -125,7 +125,7 @@ export function DetailClient({ slug, review, comments: initialComments }: Props)
   };
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-4xl mx-auto pb-12">
       {/* Breadcrumb */}
       <div>
         <Link

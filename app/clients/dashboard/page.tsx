@@ -108,8 +108,10 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      {/* Book another tour — quiet entry point for engaged clients */}
-      {applications.length > 0 && (
+      {/* Book another tour — quiet entry point for engaged clients.
+          /clients/book offers agents from applications AND tours, so a
+          tours-only client (no applications) should reach it too. */}
+      {(applications.length > 0 || tours.length > 0) && (
         <div>
           <Link
             href="/clients/book"

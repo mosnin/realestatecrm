@@ -34,11 +34,15 @@ async function countSegment(segment: SegmentKey): Promise<number> {
     return count ?? 0;
   }
   if (segment === 'no_workspace') {
-    const [{ count: totalUsers }, { count: totalSpaces }] = await Promise.all([
+    // Mirror the route's recipient resolver: count users who own ZERO spaces.
+    // A naive (totalUsers − totalSpaces) under-reports whenever a user owns more
+    // than one Space, so the card would disagree with the actual send count.
+    const [{ count: totalUsers }, { data: spaces }] = await Promise.all([
       supabase.from('User').select('*', { count: 'exact', head: true }),
-      supabase.from('Space').select('*', { count: 'exact', head: true }),
+      supabase.from('Space').select('ownerId'),
     ]);
-    return Math.max(0, (totalUsers ?? 0) - (totalSpaces ?? 0));
+    const owners = new Set((spaces ?? []).map((s: { ownerId: string }) => s.ownerId));
+    return Math.max(0, (totalUsers ?? 0) - owners.size);
   }
   return 0;
 }

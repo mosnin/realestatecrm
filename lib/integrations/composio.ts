@@ -183,7 +183,7 @@ export async function executeToolForEntity(args: {
   arguments: Record<string, unknown>;
 }) {
   const composio = getComposio();
-  return composio.tools.execute(args.slug, {
+  const exec = composio.tools.execute(args.slug, {
     userId: args.entityId,
     arguments: args.arguments,
     // Composio's tool-version handshake: without this flag the SDK throws
@@ -198,6 +198,29 @@ export async function executeToolForEntity(args: {
     // adjacency guarantee rather than into permanent skew.
     dangerouslySkipVersionCheck: true,
   });
+
+  // Default 20s timeout for every caller (calendar/comms/esign/whatsapp).
+  // The @composio/core SDK's execute(slug, body, modifiers) surface exposes
+  // no timeout/AbortSignal option — `body` is a Zod-validated schema that
+  // would silently strip an extra field — so we bound the call ourselves by
+  // racing it against a rejecting timer. A hung upstream (Composio or the
+  // realtor's connected app) must not pin a serverless invocation open;
+  // every call site already treats a thrown error as a degraded/best-effort
+  // path, so the timeout surfaces as a clean failure rather than a crash.
+  return withTimeout(exec, 20_000, `composio.tools.execute(${args.slug})`);
+}
+
+/**
+ * Reject `promise` if it doesn't settle within `ms`. The underlying SDK call
+ * keeps running but its result is abandoned — acceptable here because callers
+ * treat integration failures as best-effort.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer)) as Promise<T>;
 }
 
 // ─── Triggers ────────────────────────────────────────────────────────────────

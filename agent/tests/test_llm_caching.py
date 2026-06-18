@@ -58,7 +58,8 @@ _apply_anthropic_cache_markers = _apply_cache_markers
         ("deepseek/deepseek-chat", "deepseek"),
         ("google/gemini-2.5-pro", "google"),
         ("moonshotai/kimi-k2.6", "moonshotai"),
-        ("qwen/qwen3.6-flash", "qwen"),
+        ("qwen/qwen3.7-plus", "qwen"),
+        ("z-ai/glm-5.2", "zai"),  # dash normalized out
         # OpenAI-direct fallback path (no slash)
         ("gpt-5-mini", "openai"),
         ("gpt-4o", "openai"),
@@ -166,8 +167,8 @@ def test_cache_markers_no_system_no_crash():
 def test_cache_marker_providers_include_anthropic_and_google():
     """OpenRouter's docs confirm Gemini explicit caching uses the same
     cache_control shape as Anthropic — Phase 3 extended the marker proxy
-    accordingly. xAI / OpenAI / DeepSeek / Moonshot / Qwen are not in the
-    set: OpenAI/DeepSeek auto-cache without markers; the rest have no
+    accordingly. xAI / OpenAI / DeepSeek / Moonshot / Qwen / Z.AI are not in
+    the set: OpenAI/DeepSeek auto-cache without markers; the rest have no
     OpenRouter caching path today.
     """
     assert "anthropic" in _CACHE_MARKER_PROVIDERS
@@ -177,6 +178,7 @@ def test_cache_marker_providers_include_anthropic_and_google():
     assert "xai" not in _CACHE_MARKER_PROVIDERS
     assert "moonshotai" not in _CACHE_MARKER_PROVIDERS
     assert "qwen" not in _CACHE_MARKER_PROVIDERS
+    assert "zai" not in _CACHE_MARKER_PROVIDERS
 
 
 def test_make_chat_model_wraps_google_slug_in_caching_proxy():
@@ -199,14 +201,14 @@ def test_make_chat_model_wraps_anthropic_slug_in_caching_proxy():
 
 
 def test_make_chat_model_does_not_wrap_non_cache_providers():
-    """xAI / Moonshot / Qwen / bare OpenAI slugs get the plain SDK model.
-    The wrapper costs nothing at runtime but the test pins the gating so
-    we don't accidentally bypass OpenAI's auto-cache by wrapping it.
+    """xAI / Moonshot / Qwen / Z.AI / bare OpenAI slugs get the plain SDK
+    model. The wrapper costs nothing at runtime but the test pins the gating
+    so we don't accidentally bypass OpenAI's auto-cache by wrapping it.
     """
     from agents import OpenAIChatCompletionsModel
     from llm import _CachingChatModel
 
-    for slug in ("x-ai/grok-4.3", "moonshotai/kimi-k2.6", "qwen/qwen3.6-flash"):
+    for slug in ("x-ai/grok-4.3", "moonshotai/kimi-k2.6", "qwen/qwen3.7-plus", "z-ai/glm-5.2"):
         m = make_chat_model(slug)
         assert isinstance(m, OpenAIChatCompletionsModel)
         assert not isinstance(m, _CachingChatModel)

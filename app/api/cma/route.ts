@@ -5,9 +5,12 @@
  *   POST { slug, subjectPropertyId? | subject:{address,...}, title? }
  *        → { report }   builds the CMA, inserts a CmaReport with a shareToken
  *
- * Auth: requireSpaceOwner(slug). Comps come from the space's own Property rows
- * (in-house, no MLS). The analysis is frozen into `payload` at insert time so
- * the public page stays stable even if the underlying rows later change.
+ * Auth: requireSpaceOwner(slug). Comps + valuation come from RentCast market
+ * data (when RENTCAST_API_KEY is set), merged with the space's own Property
+ * rows; without RentCast it falls back to the in-house Property-only logic. The
+ * report records which source it used. The analysis is frozen into `payload` at
+ * insert time so the public page stays stable even if the underlying rows or
+ * the upstream market data later change.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -123,7 +126,12 @@ export async function POST(req: NextRequest) {
 
   let payload;
   try {
-    payload = await buildCma({ spaceId: space.id, subjectPropertyId, subjectFields });
+    payload = await buildCma({
+      spaceId: space.id,
+      subjectPropertyId,
+      subjectFields,
+      signal: req.signal,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Could not build the analysis.';
     // A missing subject is the caller's fault (404-ish); everything else is 500.

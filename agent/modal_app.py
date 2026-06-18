@@ -39,13 +39,22 @@ from pathlib import Path
 
 logger = structlog.get_logger(__name__)
 
-# Hard ceiling on agent-loop steps for an interactive chat turn. Each step
-# re-sends the system prompt + tool schemas + accumulated tool results, so
-# total prompt tokens scale with this number. 12 leaves headroom for a real
-# multi-step plan (lookup → plan → several writes → confirm) while capping a
-# pathological loop that would otherwise burn a whole day's token budget on
-# one message.
-CHAT_MAX_TURNS = 12
+# Inner agent-loop cap for an interactive chat turn. The SDK re-sends the FULL
+# transcript (system prompt + every tool schema + accumulated tool results) on
+# EVERY step, so token cost grows with this number — it is the hard ceiling on
+# a runaway turn's token bill. But it also has to clear a genuinely multi-step
+# request: "create 5 contacts, score, tag, and set a follow-up for each" is
+# ~20 sequential tool calls, so the old value of 8 truncated legitimate work
+# with "Max turns (8) exceeded" even when no tool was failing. 14 covers the
+# realistic batch workflows the chat surface is asked to do; anything deeper
+# belongs on the swarm/delegate path, which runs in its own bounded context.
+CHAT_MAX_TURNS = 14
+
+# Server-side guard on replayed history. The client caps what it sends, but
+# this endpoint must not trust that — an unbounded transcript re-ships on
+# every loop step (multiplying every other token cost) regardless of where
+# it came from.
+CHAT_HISTORY_MAX_ITEMS = 16
 
 # Resolve the agent source directory from this file's location, NOT from the
 # deploy cwd. Without this, `modal deploy agent/modal_app.py` (from repo root)
@@ -395,7 +404,7 @@ async def chat_turn(item: dict):
         make_chat_model,
         resolve_chat_model,
     )
-    from tools.base import result_is_ok
+    from tools.base import result_is_ok, extract_display_payload as _extract_display_payload
 
     agent_settings = AgentSettings.model_validate(sr.data)
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
@@ -532,13 +541,26 @@ async def chat_turn(item: dict):
                 summary = "" if output is None else str(output)
                 if len(summary) > 800:
                     summary = summary[:799] + "…"
-                return {
+                frame: dict[str, Any] = {
                     "type": "tool_call_result",
                     "tool": tool_name,
                     "ok": result_is_ok(output),
                     "summary": summary,
                     "call_id": _call_id(it),
                 }
+                # Lift the display hint + structured payload (weather / stats /
+                # option-list / question-flow / message-draft / …) onto the
+                # frame so the chat can render the rich inline card. The
+                # convention: tools return the widget payload at the top level
+                # alongside a "display" key (see tools/weather.py,
+                # tools/portfolio.py). We forward the whole dict as `data`; the
+                # client validates it before render.
+                display, data = _extract_display_payload(output)
+                if display:
+                    frame["display"] = display
+                    if data is not None:
+                        frame["data"] = data
+                return frame
 
             return None
 
@@ -550,7 +572,8 @@ async def chat_turn(item: dict):
     user_content = build_user_input(text_with_attachments, attachments)
 
     input_items: list[dict[str, Any]] = []
-    for turn in history:
+    # Most-recent CHAT_HISTORY_MAX_ITEMS only — see the constant's comment.
+    for turn in history[-CHAT_HISTORY_MAX_ITEMS:]:
         if not isinstance(turn, dict):
             continue
         role = turn.get("role")
@@ -586,11 +609,13 @@ async def chat_turn(item: dict):
         try:
             from integrations import active_toolkits, load_integration_tools
 
-            # Pull the toolkit list up so we can both surface it to the
-            # model (workspace_info below) and use it to gate the
-            # dispatcher tools.
+            # Pull the toolkit list ONCE — surfaced to the model via
+            # workspace_info below AND passed into the tool loader (which
+            # used to re-query the same table on every turn).
             connected_toolkits = await active_toolkits(space_id, user_id)
-            integration_tools = await load_integration_tools(space_id, user_id)
+            integration_tools = await load_integration_tools(
+                space_id, user_id, toolkits=connected_toolkits
+            )
         except Exception as ie:  # noqa: BLE001
             logger.warning(
                 "load_integration_tools_failed",
@@ -629,6 +654,21 @@ async def chat_turn(item: dict):
         " applying. Use the full URL verbatim; no shortening."
     ) if intake_url else None
 
+    # Broker mode gets brokerage context, NOT the realtor block above — the
+    # broker agent was previously handed the OWNER's personal workspace info
+    # (their intake link + "include it in contact-facing drafts"), which is
+    # realtor-persona instruction injected into the brokerage chief-of-staff.
+    if mode == "broker":
+        workspace_info = (
+            "# Brokerage context\n"
+            f"- Brokerage id: {brokerage_id}\n"
+            f"- Operator role: {broker_role}\n"
+            "- You are the brokerage chief-of-staff. Answer about the TEAM —"
+            " realtors, routing, performance, revenue — through the broker"
+            " tools. You do not have a personal intake link or personal"
+            " integrations in this mode."
+        )
+
     async def event_stream():
         try:
             # ── Tool registry selection — Phase 2/3 plug into BROKER_TOOLS ──
@@ -647,6 +687,9 @@ async def chat_turn(item: dict):
                     extra_tools=integration_tools,
                     workspace_info=workspace_info,
                     model=resolved_model,
+                    email_inbox_connected=any(
+                        tk in ("gmail", "outlook") for tk in connected_toolkits
+                    ),
                 )
         except Exception as e:
             err = json.dumps({"type": "error", "message": f"agent build failed: {e}"})
@@ -783,6 +826,36 @@ async def chat_turn(item: dict):
                     continue
                 masked_error = mask_secrets(err_str)
                 logger.error("chat_turn_stream_failed", error=masked_error, space_id=space_id)
+
+                # Bill the tokens consumed before the stream died. The success
+                # path records usage (~line 718) and returns; a mid-stream
+                # failure used to return here having streamed real output —
+                # and real token cost — without ever writing a ChatUsage row,
+                # so the credit trigger never fired and the turn charged $0.
+                # `result` is bound once Runner.run_streamed() returned; a
+                # failure before that assignment leaves it unbound, so guard.
+                # This path is terminal (no retry), so it cannot double-record
+                # against the success branch.
+                try:
+                    from ledger import record_chat_usage
+
+                    partial = locals().get("result")
+                    if partial is not None:
+                        tokens_in, tokens_out, _, cached_in = extract_usage_with_cache(partial)
+                        if tokens_in or tokens_out:
+                            await record_chat_usage(
+                                space_id=space_id,
+                                model=model,
+                                prompt_tokens=tokens_in,
+                                completion_tokens=tokens_out,
+                                cached_tokens=cached_in,
+                                user_id=user_id or None,
+                                conversation_id=conversation_id or None,
+                                route="agent",
+                            )
+                except Exception:
+                    logger.warning("chat_turn_partial_usage_record_failed", space_id=space_id)
+
                 err = json.dumps({"type": "error", "message": masked_error})
                 yield f"data: {err}\n\n"
                 return

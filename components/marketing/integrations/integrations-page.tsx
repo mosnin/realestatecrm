@@ -1,32 +1,25 @@
-'use client';
-
 /**
- * IntegrationsPage — the client body for /integrations.
+ * IntegrationsPage, the /integrations body on the bold-canvas system.
  *
- * Tells one idea: connect your tools once, and Chippi works inside them.
- * Hero replicates the home-hero atmosphere (AsciiBlob + center-protect
- * radial); a three-step "how it works" explains the Composio connect-then-act
- * model; the catalog renders straight from `lib/integrations/catalog.ts`
- * (the source of truth — no invented entries or blurbs), grouped by category
- * with a monogram per app and a "soon" pill for coming-soon entries.
- *
- * Same family as the homepage: serif section headlines, light canvas,
- * hairline structure, Reveal/Stagger motion. Brand orange stays on the
- * AsciiBlob signature only.
+ * One idea: connect your tools once, and Chippi works inside them. The
+ * owner-provided IntegrationHero above carries the opener (50+ apps, two
+ * minutes to connect), so no second hero here, just a three-step "how it
+ * works" in white soft-shadow cards → the catalog rendered straight from
+ * `lib/integrations/catalog.ts` (the source of truth, no invented entries)
+ * → a closing CTA. Each app reads as a letter monogram (no fabricated brand
+ * logos).
  */
 
 import Link from 'next/link';
-import { Reveal, Stagger, StaggerItem, Eyebrow } from '@/components/marketing/home/home-kit';
-import { AsciiBlob } from '@/components/marketing/home/ascii-blob';
+import { ArrowRight } from 'lucide-react';
+import { Reveal } from '@/components/marketing/site/reveal';
+import { EyebrowChip } from '@/components/marketing/site/section';
 import {
   INTEGRATIONS,
   type IntegrationApp,
   type IntegrationCategory,
 } from '@/lib/integrations/catalog';
 
-// Category display labels + the order they read on the page. We control the
-// sequence here (catalog order is per-app within a category); this is the
-// scan order a realtor would expect — comms first, then where work lands.
 const CATEGORY_ORDER: { key: IntegrationCategory; label: string }[] = [
   { key: 'email', label: 'Email' },
   { key: 'calendar', label: 'Calendar' },
@@ -54,112 +47,11 @@ function grouped(): { key: IntegrationCategory; label: string; apps: Integration
 
 const TOTAL = INTEGRATIONS.length;
 
-export function IntegrationsPage() {
-  const groups = grouped();
-
-  return (
-    <div className="bg-muted text-foreground">
-      <Hero />
-      <HowItWorks />
-
-      {/* The catalog — grouped, scannable. */}
-      <section
-        id="the-catalog"
-        className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-      >
-        <Reveal className="max-w-3xl">
-          <Eyebrow>The catalog</Eyebrow>
-          <h2 className="mt-5 font-title text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-            {TOTAL} apps Chippi can work inside.
-          </h2>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Connected through Composio. Each one becomes a tool Chippi can call
-            mid-task, reading what it needs, writing back where the work lives.
-          </p>
-        </Reveal>
-
-        <div className="mt-16 space-y-16">
-          {groups.map((group) => (
-            <CategoryBlock key={group.key} label={group.label} apps={group.apps} />
-          ))}
-        </div>
-      </section>
-
-      <ClosingCTA />
-    </div>
-  );
-}
-
-/* ── Hero ──────────────────────────────────────────────────────────────── */
-
-function Hero() {
-  return (
-    <section className="relative overflow-hidden bg-background">
-      <AsciiBlob />
-      {/* Center-protect radial — keep the headline zone calm behind the field. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(60% 50% at 50% 38%, var(--background) 32%, transparent 78%)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-b from-transparent to-muted"
-      />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-6 pt-28 pb-20 text-center md:px-8 md:pt-40 md:pb-28">
-        <Reveal>
-          <span className="inline-flex items-center gap-2 rounded-full bg-card/80 px-3.5 py-1.5 text-[12px] font-medium text-foreground/70 ring-1 ring-border/70 backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-            {TOTAL} integrations, one agent
-          </span>
-        </Reveal>
-
-        <Reveal delay={0.06}>
-          <h1 className="font-brand mx-auto mt-7 max-w-4xl text-[clamp(2.5rem,6.4vw,5rem)] leading-[1.02] tracking-tight text-foreground">
-            Your whole stack, wired into one agent.
-          </h1>
-        </Reveal>
-
-        <Reveal delay={0.12}>
-          <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-foreground/60 md:text-xl">
-            Connect the tools you already pay for. Chippi connects through
-            Composio, then calls each one as a tool while it works, pulling
-            data out of your workflows and writing it back where it belongs.
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.18}>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login/realtor?intent=signup"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
-            >
-              Start free
-            </Link>
-            <Link
-              href="/demo"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-card/80 px-6 text-[15px] font-medium text-foreground ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-card"
-            >
-              Book a demo
-            </Link>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ── How it works ──────────────────────────────────────────────────────── */
-
 const STEPS: { n: string; title: string; body: string }[] = [
   {
     n: '01',
-    title: 'connect your tools',
-    body: 'Pick the apps you already work in and authorize them once. Chippi connects through Composio over OAuth. no keys to copy, no scripts to wire.',
+    title: 'Connect your tools',
+    body: 'Pick the apps you already work in and authorize each one in about two minutes. Chippi connects through Composio over OAuth, no keys to copy, no scripts to wire.',
   },
   {
     n: '02',
@@ -168,69 +60,110 @@ const STEPS: { n: string; title: string; body: string }[] = [
   },
   {
     n: '03',
-    title: 'data flows both ways',
+    title: 'Data flows both ways',
     body: 'Chippi pulls what it needs out of your tools and writes results back in. Anything that posts or sends waits for your approval first.',
   },
 ];
 
-function HowItWorks() {
-  return (
-    <section
-      id="how-it-works"
-      className="relative mx-auto max-w-7xl px-6 py-24 scroll-mt-28 md:px-8 md:py-32"
-    >
-      <Reveal className="max-w-3xl">
-        <Eyebrow>How it works</Eyebrow>
-        <h2 className="mt-5 font-title text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
-          Connect once. Chippi does the reaching.
-        </h2>
-        <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
-          You don&apos;t move data between tabs anymore. You connect a tool, and
-          from then on Chippi works inside it the way you would.
-        </p>
-      </Reveal>
+export function IntegrationsPage() {
+  const groups = grouped();
 
-      <Stagger className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-3xl border border-border/60 bg-border/60 md:grid-cols-3">
-        {STEPS.map((step) => (
-          <StaggerItem key={step.n} className="flex flex-col bg-background px-8 py-10">
-            <span className="font-title text-[2rem] leading-none tracking-[-0.02em] text-muted-foreground/50">
-              {step.n}
-            </span>
-            <h3 className="mt-8 text-lg font-semibold text-foreground">{step.title}</h3>
-            <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              {step.body}
+  return (
+    <>
+      {/* How it works, three white soft-shadow cards */}
+      <section className="mt-4 px-4 sm:mt-8 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <Reveal className="max-w-2xl">
+            <EyebrowChip>How it works</EyebrowChip>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              Connect once. Chippi does the reaching.
+            </h2>
+          </Reveal>
+          <div className="mt-12 grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <Reveal key={step.n} delay={i * 0.05}>
+                <div className="flex h-full flex-col rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-8">
+                  <span className="text-sm font-semibold tracking-[0.14em] text-[#ff4b29]">
+                    {step.n}
+                  </span>
+                  <h3 className="mt-5 text-xl font-semibold tracking-tight text-zinc-950">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2.5 text-sm leading-relaxed text-neutral-600">{step.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Catalog, open white */}
+      <section className="mt-24 px-4 sm:mt-32 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <Reveal className="max-w-2xl">
+            <EyebrowChip>The catalog</EyebrowChip>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              {TOTAL} apps Chippi can work inside.
+            </h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600">
+              Connected through Composio. Each one becomes a tool Chippi can call mid-task,
+              reading what it needs and writing back where the work lives.
             </p>
-          </StaggerItem>
-        ))}
-      </Stagger>
-    </section>
+          </Reveal>
+
+          <div className="mt-14 space-y-14">
+            {groups.map((group) => (
+              <CategoryBlock key={group.key} label={group.label} apps={group.apps} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Closing CTA */}
+      <section className="mt-24 px-4 pb-24 sm:mt-32 sm:px-6 sm:pb-32">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <h2 className="mx-auto max-w-xl text-3xl font-semibold leading-tight tracking-tight text-zinc-950 sm:text-4xl">
+            Connect your stack. Let Chippi work inside it.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-neutral-600">
+            Bring the tools you already use.
+          </p>
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/login/realtor?intent=signup"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/demo"
+              className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white px-7 text-[15px] font-semibold text-zinc-950 transition-colors duration-150 hover:bg-black/[0.04]"
+            >
+              Book a demo
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-neutral-500">7 days free, then $97/mo. Cancel anytime.</p>
+        </Reveal>
+      </section>
+    </>
   );
 }
-
-/* ── Catalog ───────────────────────────────────────────────────────────── */
 
 function CategoryBlock({ label, apps }: { label: string; apps: IntegrationApp[] }) {
   return (
     <Reveal>
-      <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="flex items-baseline justify-between border-b border-black/5 pb-3">
+        <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
           {label}
         </h3>
-        <span className="text-[11px] tabular-nums text-muted-foreground/70">
-          {apps.length}
-        </span>
+        <span className="text-[11px] tabular-nums text-neutral-400">{apps.length}</span>
       </div>
-
-      <Stagger
-        amount={0.05}
-        className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3"
-      >
+      <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
         {apps.map((app) => (
-          <StaggerItem key={app.toolkit}>
-            <IntegrationRow app={app} />
-          </StaggerItem>
+          <IntegrationRow key={app.toolkit} app={app} />
         ))}
-      </Stagger>
+      </div>
     </Reveal>
   );
 }
@@ -241,75 +174,28 @@ function IntegrationRow({ app }: { app: IntegrationApp }) {
       <Monogram name={app.name} />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h4 className="truncate text-[15px] font-semibold text-foreground">{app.name}</h4>
-          {app.comingSoon && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-border/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <h4 className="truncate text-[15px] font-semibold tracking-tight text-zinc-950">
+            {app.name}
+          </h4>
+          {app.comingSoon ? (
+            <span className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-500 ring-1 ring-black/10">
               soon
             </span>
-          )}
+          ) : null}
         </div>
-        <p className="mt-1 text-sm leading-snug text-muted-foreground">{app.blurb}</p>
+        <p className="mt-1 text-sm leading-snug text-neutral-600">{app.blurb}</p>
       </div>
     </div>
   );
 }
 
-/**
- * Monogram — a paper-flat letter chip. We ship no logo image assets, so each
- * app reads as its first initial in a hairline-ringed square. Consistent,
- * neutral, no fabricated brand marks.
- */
+/** Letter chip, we ship no logo image assets, so each app reads as its
+ *  initial in a soft white square. No fabricated brand marks. */
 function Monogram({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase();
   return (
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background text-[15px] font-semibold text-foreground/65">
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[15px] font-semibold text-neutral-500 shadow-sm ring-1 ring-black/5">
       {initial}
     </div>
-  );
-}
-
-/* ── Closing CTA ───────────────────────────────────────────────────────── */
-
-function ClosingCTA() {
-  return (
-    <section
-      id="get-connected"
-      className="mx-auto max-w-7xl px-6 py-12 scroll-mt-28 md:px-8 md:py-24"
-    >
-      <Reveal>
-        <div className="relative overflow-hidden rounded-[2rem] bg-[#171310] px-8 py-16 text-center md:px-16 md:py-24">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(60% 80% at 50% 120%, rgba(255,150,79,0.30), transparent 70%)',
-            }}
-          />
-          <div className="relative">
-            <h2 className="mx-auto max-w-3xl font-title text-[clamp(2rem,5vw,3.75rem)] font-normal leading-[1.04] tracking-[-0.018em] text-white">
-              Connect your stack. Let Chippi work inside it.
-            </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg text-white/55">
-              Seven days free. No credit card. Bring the tools you already use.
-            </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href="/login/realtor?intent=signup"
-                className="inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground shadow-lg shadow-brand/25 transition-all duration-150 hover:brightness-105 active:scale-[0.98]"
-              >
-                Start free
-              </Link>
-              <Link
-                href="/demo"
-                className="inline-flex h-12 items-center justify-center rounded-full bg-white/10 px-6 text-[15px] font-medium text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/15"
-              >
-                Book a demo
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Reveal>
-    </section>
   );
 }

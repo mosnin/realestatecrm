@@ -418,8 +418,58 @@ export interface Property {
   /** Brokerage pool: the member realtor's Space this pool property is assigned
    *  to. Null = unassigned (sitting in the pool). */
   assignedSpaceId?: string | null;
+  /** "Analyze" feature: the full structured web-research result (or null until
+   *  the first run). See lib/property-analysis.ts for the pipeline. */
+  analysis?: PropertyAnalysis | null;
+  /** "Analyze" feature: when the most recent Analyze run completed. */
+  analyzedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Property "Analyze" result shapes (plain data; client-safe) ──────────────
+// The canonical pipeline lives in lib/property-analysis.ts (server-only). These
+// shapes are defined here so both the server pipeline and client UI can share
+// them without the UI importing a server-only module.
+
+/** The Property fields the analysis may populate (grounded in web evidence). */
+export interface AnalyzedFields {
+  beds: number | null;
+  baths: number | null;
+  squareFeet: number | null;
+  lotSizeSqft: number | null;
+  yearBuilt: number | null;
+  propertyType: string | null;
+  listPrice: number | null;
+  listingStatus: string | null;
+  listingUrl: string | null;
+  estimatedValue: number | null;
+  lastSoldPrice: number | null;
+  lastSoldDate: string | null;
+  description: string | null;
+  features: string[];
+  hoaFee: string | null;
+  propertyTaxes: string | null;
+  photoUrls: string[];
+}
+
+/** Per-field provenance: which source URL each populated value came from. */
+export type FieldSources = Partial<Record<keyof AnalyzedFields, string>>;
+
+/** A source page consulted during an analysis run. */
+export interface AnalysisSource {
+  url: string;
+  title: string;
+}
+
+/** The structured result persisted into Property.analysis. */
+export interface PropertyAnalysis {
+  fields: AnalyzedFields;
+  fieldSources: FieldSources;
+  summary: string;
+  sources: AnalysisSource[];
+  stats: { searchResults: number; scraped: number };
+  analyzedAt: string;
 }
 
 export type DealActivity = {
@@ -534,6 +584,8 @@ export type Tour = {
   endsAt: Date;
   status: TourStatus;
   googleEventId: string | null;
+  reminder24SentAt: Date | null;
+  reminder1hSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -681,3 +733,42 @@ export type ApplicationStatus =
   | 'approved'
   | 'declined'
   | 'waitlisted';
+
+// ── Integration Types ──
+// The IntegrationConnection / IntegrationTrigger row shapes live next to
+// their DB helpers (lib/integrations/connections.ts, .../triggers.ts). The
+// event record is consumed more broadly (activity feed + agent context), so
+// its type lives here alongside the other model types.
+
+/** Lifecycle of a persisted connected-app event relative to dispatch. */
+export type IntegrationEventStatus = 'captured' | 'dispatched' | 'skipped' | 'failed';
+
+/**
+ * One persisted Composio trigger delivery — the durable record behind the
+ * activity feature. Written for every accepted delivery (even when dispatch
+ * is later skipped or fails). Mirrors the "IntegrationEvent" table
+ * (supabase/migrations/20260705000000_integration_event.sql).
+ */
+export type IntegrationEvent = {
+  id: string;
+  spaceId: string;
+  connectionId: string;
+  /** Null once the capturing trigger row is deleted (ON DELETE SET NULL). */
+  triggerId: string | null;
+  toolkit: string;
+  /** The trigger slug, e.g. 'GMAIL_NEW_GMAIL_MESSAGE'. */
+  eventType: string;
+  title: string | null;
+  /** from / sender / name, when the payload carries one. */
+  actor: string | null;
+  snippet: string | null;
+  occurredAt: string;
+  payload: Record<string, unknown> | null;
+  status: IntegrationEventStatus;
+  /** Modal draft correlation — populated by a follow-up, NULL on capture. */
+  draftId: string | null;
+  /** Composio's webhook delivery id; the idempotency anchor. */
+  deliveryId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

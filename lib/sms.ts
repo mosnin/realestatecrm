@@ -90,15 +90,24 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
 
   try {
     const hasMedia = Array.isArray(params.mediaUrls) && params.mediaUrls.length > 0;
-    const response = await client.messages.send({
-      from: fromNumber,
-      to: toNumber,
-      text: params.body,
-      // Including media_urls promotes the send from SMS to MMS server-side.
-      // Telnyx expects an array of publicly fetchable URLs — caller is
-      // responsible for making sure the URLs resolve without auth.
-      ...(hasMedia ? { media_urls: params.mediaUrls } : {}),
-    });
+    const response = await client.messages.send(
+      {
+        from: fromNumber,
+        to: toNumber,
+        text: params.body,
+        // Including media_urls promotes the send from SMS to MMS server-side.
+        // Telnyx expects an array of publicly fetchable URLs — caller is
+        // responsible for making sure the URLs resolve without auth.
+        ...(hasMedia ? { media_urls: params.mediaUrls } : {}),
+      },
+      // 10s per-attempt timeout, no retries. SMS here is best-effort — this
+      // function never throws and the caller treats a `false` return as
+      // "notification skipped". A hung Telnyx call must not pin a serverless
+      // invocation open. The SDK retries timeouts by default (which would make
+      // the real wall-clock bound ~3x), so maxRetries:0 keeps it a hard 10s;
+      // on timeout the SDK rejects and we fall into the catch below.
+      { timeout: 10_000, maxRetries: 0 },
+    );
     logger.info('[sms] sent', {
       to: toNumber,
       messageId: response?.data?.id ?? 'unknown',
@@ -148,6 +157,22 @@ export function tourReminderSMS(p: { guestName: string; guestPhone: string; busi
   return {
     to: p.guestPhone,
     body: `Hi ${p.guestName}, reminder: your tour with ${p.businessName}${prop} is tomorrow at ${p.time}. See you there!`,
+  };
+}
+
+export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    to: p.guestPhone,
+    body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} has been moved to ${p.date} at ${p.time}. Reply if that doesn't work.`,
+  };
+}
+
+export function tourCancelledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; property?: string | null }): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    to: p.guestPhone,
+    body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} on ${p.date} has been cancelled. Reply to rebook.`,
   };
 }
 

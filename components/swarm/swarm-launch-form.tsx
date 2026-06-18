@@ -8,6 +8,8 @@ import type { CustomAgent } from '@/lib/swarm-types';
 
 interface SwarmLaunchFormProps {
   slug: string;
+  /** The space UUID — what /api/swarm authorizes against (NOT the slug). */
+  spaceId: string;
   availableAgents: CustomAgent[];
 }
 
@@ -17,7 +19,7 @@ const EXAMPLE_PROMPTS = [
   'Analyze my pipeline and suggest next actions',
 ] as const;
 
-export function SwarmLaunchForm({ slug, availableAgents }: SwarmLaunchFormProps) {
+export function SwarmLaunchForm({ slug, spaceId, availableAgents }: SwarmLaunchFormProps) {
   const router = useRouter();
   const [goal, setGoal] = useState('');
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
@@ -52,7 +54,7 @@ export function SwarmLaunchForm({ slug, availableAgents }: SwarmLaunchFormProps)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          spaceId: slug,
+          spaceId,
           goal: trimmed,
           customAgentIds: Array.from(selectedAgentIds),
         }),

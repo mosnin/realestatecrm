@@ -46,6 +46,10 @@ export async function getValidAccessToken(
     return decryptOrPassthrough(tokenRow.accessToken);
   }
 
+  // 8s timeout: callers catch a thrown refresh failure and degrade (GCal sync
+  // is best-effort). A hung Google token endpoint must not pin the serverless
+  // function open — on timeout fetch rejects with an AbortError that the
+  // caller's try/catch treats like any other refresh failure.
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -55,6 +59,7 @@ export async function getValidAccessToken(
       refresh_token: decrypt(tokenRow.refreshToken),
       grant_type: 'refresh_token',
     }),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!res.ok) {
@@ -112,13 +117,29 @@ export async function deleteGoogleEvent(args: {
 
   const calendarId =
     (tokenRow as { calendarId?: string | null }).calendarId || 'primary';
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(args.googleEventId)}`,
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
-  );
+
+  // 8s timeout. This function's contract is "return true/false, never throw"
+  // — callers fire it as `void deleteGoogleEvent(...).then(...)` with no catch.
+  // A bare fetch that hangs (or whose AbortSignal fires) would otherwise
+  // throw an unhandled rejection, so we catch the network/timeout error here
+  // and degrade to `false` (orphaned event, logged for ops) — never crash.
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(args.googleEventId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+  } catch (err) {
+    logger.warn('[gcal-helpers] delete event request failed (network/timeout)', {
+      spaceId: args.spaceId,
+      googleEventId: args.googleEventId,
+    }, err);
+    return false;
+  }
 
   // 204 No Content = deleted. 410 Gone = already deleted (idempotent
   // success). 404 Not Found = same — the event was never on this
