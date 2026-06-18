@@ -26,7 +26,7 @@ from llm import (
     openai_model,
     resolve_chat_model,
 )
-from security.budget import check_budget
+from security.budget import acquire_swarm_lock, check_budget, release_swarm_lock
 
 logger = structlog.get_logger(__name__)
 
@@ -274,6 +274,24 @@ async def run_swarm(payload: dict) -> None:
     db = await get_supabase()
     client = get_llm_client()
 
+    # One swarm per space at a time. A double-submit to /api/swarm creates two
+    # SwarmRuns and would bill BOTH (the planner, every member, and the auditor
+    # each record ChatUsage). Mirrors the autonomous acquire_run_lock; a
+    # separate Redis namespace keeps autonomous runs and swarms from blocking
+    # each other. Fails open if Redis is unavailable.
+    if not await acquire_swarm_lock(space_id, swarm_run_id):
+        logger.warning("swarm_skipped_concurrent", swarm_run_id=swarm_run_id, space_id=space_id)
+        await db.table("SwarmRun").update({
+            "status": "failed",
+            "errorMessage": "Another swarm is already running for this workspace.",
+            "completedAt": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", swarm_run_id).execute()
+        await emit_event(
+            db, swarm_run_id, "swarm_failed",
+            {"error": "Another swarm is already running for this workspace."},
+        )
+        return
+
     try:
         # Budget gate — the swarm runs the planner, every member, and the
         # auditor against real models. Before this gate it ran completely
@@ -382,3 +400,6 @@ async def run_swarm(payload: dict) -> None:
             "completedAt": datetime.now(timezone.utc).isoformat(),
         }).eq("id", swarm_run_id).execute()
         await emit_event(db, swarm_run_id, "swarm_failed", {"error": str(exc)})
+
+    finally:
+        await release_swarm_lock(space_id, swarm_run_id)
