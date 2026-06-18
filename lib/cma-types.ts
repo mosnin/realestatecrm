@@ -21,6 +21,15 @@ export const DATA_SOURCE_LABEL: Record<CmaDataSource, string> = {
   crm: 'your CRM data',
 };
 
+/**
+ * Why the report ended up on its `dataSource` — drives an honest banner so a
+ * CRM-only fallback is never mistaken for a real market valuation.
+ */
+export type CmaDataSourceReason =
+  | 'rentcast' // RentCast returned market data
+  | 'rentcast_unconfigured' // RENTCAST_API_KEY not present at runtime → never called
+  | 'rentcast_no_match'; // RentCast configured but returned no usable data
+
 // ── Public payload shapes ────────────────────────────────────────────────────
 
 /** Snapshot of the subject property frozen into the report. */
@@ -78,6 +87,12 @@ export interface CmaStats {
   estimatedValue: number | null;
   /** Whether the priced comps were mostly sold (vs list) prices. */
   basis: 'sold' | 'list' | 'mixed' | 'none';
+  /**
+   * True when there isn't enough real data to stand behind the numbers — no
+   * market estimate AND fewer than a handful of priced comps. The UI must NOT
+   * present these as a market valuation.
+   */
+  insufficientData: boolean;
 }
 
 export interface CmaPayload {
@@ -86,6 +101,8 @@ export interface CmaPayload {
   stats: CmaStats;
   /** Which engine produced the headline numbers — drives the honest label. */
   dataSource: CmaDataSource;
+  /** Why it came from `dataSource` (e.g. RentCast off vs no match). */
+  dataSourceReason?: CmaDataSourceReason;
   /** ISO timestamp the analysis was computed. */
   generatedAt: string;
 }

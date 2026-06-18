@@ -342,6 +342,16 @@ export function CmaView({ slug }: { slug: string }) {
         <section className="space-y-3">
           <p className={cn(SECTION_LABEL)}>Preview</p>
 
+          {(preview.payload.dataSource === 'crm' || preview.payload.stats.insufficientData) && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+              {preview.payload.dataSourceReason === 'rentcast_unconfigured'
+                ? 'Market data isn’t connected, so this is based only on your own CRM listings — not real comparable sales. Set RENTCAST_API_KEY (and redeploy) to get accurate market values.'
+                : preview.payload.dataSource === 'crm'
+                  ? 'No market data was found for this address, so this is based only on your own CRM listings. Treat it as a rough internal reference, not a market valuation.'
+                  : 'Not enough comparable data to stand behind this estimate yet — add more priced comparables or connect market data.'}
+            </div>
+          )}
+
           <div className="rounded-xl border border-border/70 bg-card px-6 py-6 text-center space-y-1.5">
             <p className={cn(SECTION_LABEL)}>Suggested list-price range</p>
             {preview.payload.stats.suggestedLow != null &&
