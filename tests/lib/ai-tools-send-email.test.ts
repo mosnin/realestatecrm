@@ -163,6 +163,55 @@ describe('sendEmailTool handler — toEmail path', () => {
   });
 });
 
+describe('sendEmailTool handler — idempotency key', () => {
+  // The in-memory dedup store (no Redis configured under test) persists across
+  // calls within the process, which is exactly the surface these tests exercise.
+  // Each test uses a unique subject so it can't collide with sibling tests.
+
+  it('sends BOTH of two same-subject emails with DIFFERENT bodies to the same recipient', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+    };
+    const recipient = 'samesubject@example.com';
+    const subject = 'Following up [diff-body]';
+
+    const first = await sendEmailTool.handler(
+      { toEmail: recipient, subject, body: 'Just checking in after the tour.' },
+      makeCtx(),
+    );
+    const second = await sendEmailTool.handler(
+      { toEmail: recipient, subject, body: 'Wanted to add the financing details too.' },
+      makeCtx(),
+    );
+
+    // Different bodies must NOT be deduped — both go out.
+    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(2);
+    expect(first.display).toBe('success');
+    expect(second.display).toBe('success');
+  });
+
+  it('dedupes an identical retry (same recipient + subject + body) to a single send', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+    };
+    const args = {
+      toEmail: 'retry@example.com',
+      subject: 'Following up [retry]',
+      body: 'Same exact message body.',
+    };
+
+    const first = await sendEmailTool.handler(args, makeCtx());
+    const second = await sendEmailTool.handler(args, makeCtx());
+
+    // True retry of an identical message must collapse to one delivery.
+    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
+    expect(first.display).toBe('success');
+    expect(second.display).toBe('success');
+  });
+});
+
 describe('sendEmailTool handler — errors', () => {
   it('surfaces a delivery failure without throwing', async () => {
     mockByTable = {
