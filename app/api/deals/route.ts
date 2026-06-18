@@ -3,9 +3,11 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
 import { notifyNewDeal } from '@/lib/notify';
+import { logger } from '@/lib/logger';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
+  try {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
@@ -81,6 +83,10 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json(deals);
+  } catch (err) {
+    logger.error('[deals/GET] failed', {}, err);
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

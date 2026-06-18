@@ -37,7 +37,11 @@
 -- ============================================================================
 
 -- 1. ── pin search_path on the money RPCs ────────────────────────────────────
-ALTER FUNCTION grant_credits(text, text, integer, text, timestamptz)
+-- 6-arg signature: the 5-arg grant_credits was DROPped in
+-- 20260623000000_credit_grant_idempotency.sql and replaced by a 6-arg version
+-- (added p_source_id). Targeting the old 5-arg signature here errors
+-- "function does not exist" on a fresh replay and halts the chain.
+ALTER FUNCTION grant_credits(text, text, integer, text, timestamptz, text)
   SET search_path = public;
 ALTER FUNCTION spend_credits(text, text, integer, text, text, text, jsonb)
   SET search_path = public;

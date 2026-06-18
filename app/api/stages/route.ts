@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { logger } from '@/lib/logger';
 import type { DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
+  try {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
@@ -108,6 +110,10 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json(stages);
+  } catch (err) {
+    logger.error('[stages/GET] failed', {}, err);
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
 }
 
 const VALID_STAGE_KINDS = ['lead', 'qualified', 'active', 'under_contract', 'closing', 'closed'] as const;

@@ -2,8 +2,10 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
+import { logger } from '@/lib/logger';
 
 export async function PATCH(req: NextRequest) {
+  try {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -81,4 +83,8 @@ export async function PATCH(req: NextRequest) {
   if (fetchError) throw fetchError;
 
   return NextResponse.json(updated);
+  } catch (err) {
+    logger.error('[deals/reorder/PATCH] failed', {}, err);
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
 }

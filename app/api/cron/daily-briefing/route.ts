@@ -52,6 +52,25 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
       if (err instanceof CreditsExhaustedError || err instanceof SubscriptionDelinquentError) return 'failed';
       throw err;
     }
+    // Has this (space, date) brief already been generated? A retry of the same
+    // UTC hour (Vercel retry, manual re-trigger) re-enters here and would charge
+    // a second time — the credit is for *producing* the brief, and we only
+    // produce it once per (space, date). The pre-existing row is the truth
+    // source for "already charged"; we re-compose to refresh the payload but
+    // skip the charge when the row was already there. The DB unique key
+    // (spaceId,forDate) makes this authoritative even without Redis.
+    const { data: priorRow, error: priorError } = await supabase
+      .from('Brief')
+      .select('id')
+      .eq('spaceId', spaceId)
+      .eq('forDate', forDate)
+      .maybeSingle();
+    if (priorError) {
+      console.error(`[cron/daily-briefing] prior-row lookup failed for ${spaceId}:`, priorError.message);
+      return 'failed';
+    }
+    const alreadyCharged = priorRow != null;
+
     const { brief, cardMeta } = await composeBrief(spaceId);
     const { data: row, error } = await supabase
       .from('Brief')
@@ -72,7 +91,11 @@ async function generateOne(spaceId: string, forDate: string): Promise<'ok' | 'fa
       return 'failed';
     }
 
-    await chargeWorkflow(spaceId, 'daily_briefing');
+    // Charge only on first production for this (space, date). Re-runs refresh
+    // the brief but never re-charge.
+    if (!alreadyCharged) {
+      await chargeWorkflow(spaceId, 'daily_briefing');
+    }
 
     // Inline delivery fan-out. Wrapped in its own try/catch so a Resend
     // / Telnyx hiccup never bubbles up and fails the brief generation —

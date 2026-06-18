@@ -12,6 +12,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
@@ -74,6 +75,10 @@ export async function GET(
   }));
 
   return NextResponse.json(contact);
+  } catch (err) {
+    logger.error('[contacts/GET] failed', {}, err);
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
 }
 
 export async function PATCH(

@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { inngest } from '@/lib/inngest/client';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RETRY_THRESHOLD = 3;
@@ -95,7 +96,27 @@ export async function PATCH(req: Request, { params }: Params) {
       resolvedAt: new Date().toISOString(),
     };
   } else {
-    // retry: increment retryCount; use 'retrying' if still under threshold, else back to 'pending'
+    // retry: actually re-enqueue the original event to Inngest. Without this
+    // the row's status flips but the job stays lost — the whole point of the
+    // DLQ is to replay it. Re-send BEFORE touching the DB so a send failure
+    // doesn't leave the row claiming a retry that never happened.
+    const eventName = existing.eventType;
+    const eventPayload = existing.eventPayload;
+    if (!eventName || typeof eventName !== 'string') {
+      return NextResponse.json({ error: 'Event has no eventType to replay' }, { status: 422 });
+    }
+    if (eventPayload == null || typeof eventPayload !== 'object') {
+      return NextResponse.json({ error: 'Event has no payload to replay' }, { status: 422 });
+    }
+
+    try {
+      await inngest.send({ name: eventName, data: eventPayload as Record<string, unknown> });
+    } catch (sendErr) {
+      console.error('[admin/dlq] re-enqueue to Inngest failed', sendErr);
+      return NextResponse.json({ error: 'Re-enqueue failed' }, { status: 502 });
+    }
+
+    // increment retryCount; use 'retrying' if still under threshold, else back to 'pending'
     const newRetryCount = (existing.retryCount ?? 0) + 1;
     const newStatus: string = newRetryCount < RETRY_THRESHOLD ? 'retrying' : 'pending';
     updatePayload = {
