@@ -17,6 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { monitorCron } from '@/lib/cron-monitor';
+import { assertCanSpend, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
+import { recordDispatch, markInFlight, markFailed } from '@/lib/agent/run-ledger';
 
 // Env vars read at request time, not module load. Otherwise tests (and
 // serverless cold-start ordering) lock these to whatever was set when the
@@ -54,6 +56,19 @@ const SWEEP_BUDGET_MS = 270_000; // headroom under maxDuration (300s)
 
 // Give the long sweep the full serverless ceiling rather than the 10s default.
 export const maxDuration = 300;
+
+// Credit gate workflow key for a swept autonomous run. We REUSE 'chat_turn' (the
+// canonical agent-turn key — its doc in lib/plans.ts is literally "one Chippi
+// chat/AGENT turn") rather than minting an 'agent_sweep' key, because the Modal
+// run the sweep dispatches is metered per-turn as chat_turn by the ChatUsage DB
+// trigger (20260627000000_meter_chat_usage_credits.sql — "realtor+broker via
+// Modal"). So this pre-check gates the SAME currency the run will actually burn:
+// "can this space afford at least one agent turn?" (cost 1).
+//
+// CRITICAL: assertCanSpend only CHECKS the balance (reads getCreditBalance /
+// throws when short) — it never debits. The real charge stays in the post-run
+// ChatUsage trigger, so this does NOT double-gate or double-charge.
+const SWEEP_WORKFLOW = 'chat_turn' as const;
 
 type SweepOutcome =
   | { spaceId: string; status: 'started' }
@@ -200,6 +215,27 @@ async function sweepOne(spaceId: string, pendingCount: number): Promise<SweepOut
     return { spaceId, status: 'skipped', reason: 'recent' };
   }
 
+  // Credit pre-check (Fix #6). Refuse to dispatch a run the account can't
+  // afford. assertCanSpend only CHECKS the balance — it never debits (the real
+  // charge stays in the post-run ChatUsage trigger), so this can't double-gate.
+  // It fails OPEN on infra trouble (only the two domain refusals propagate), so
+  // a transient billing-lookup blip never blocks the sweep.
+  try {
+    await assertCanSpend(spaceId, SWEEP_WORKFLOW);
+  } catch (err) {
+    if (err instanceof CreditsExhaustedError) {
+      return { spaceId, status: 'skipped', reason: 'insufficient_credits' };
+    }
+    if (err instanceof SubscriptionDelinquentError) {
+      return { spaceId, status: 'skipped', reason: 'subscription_delinquent' };
+    }
+    throw err; // unexpected — let the worker's catch mark this space errored
+  }
+
+  // Record the dispatch in the AgentRunLedger and forward the runId to Modal in
+  // the POST body (Modal ignores unknown fields today — forward-compatible).
+  const runId = await recordDispatch(spaceId, 'sweep');
+
   // Fire the Modal webhook. Fire-and-forget semantics: we await the HTTP
   // response so we know whether Modal accepted the job, but we don't wait
   // for the agent run to finish.
@@ -213,11 +249,15 @@ async function sweepOne(spaceId: string, pendingCount: number): Promise<SweepOut
         'Content-Type': 'application/json',
         Authorization: `Bearer ${internalSecret}`,
       },
-      body: JSON.stringify({ space_id: spaceId, secret: internalSecret }),
+      body: JSON.stringify({ space_id: spaceId, secret: internalSecret, run_id: runId }),
       signal: controller.signal,
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+      // Non-2xx: the run did not start. Record a genuine dispatch failure.
+      // (The sweep does NOT retry per-space — leftover spaces are picked up on
+      // the next tick; the recently-swept guard rotates coverage.)
+      await markFailed(runId, `Modal returned ${res.status}`);
       return {
         spaceId,
         status: 'errored',
@@ -225,6 +265,17 @@ async function sweepOne(spaceId: string, pendingCount: number): Promise<SweepOut
       };
     }
   } catch (err) {
+    // A MODAL_TIMEOUT_MS abort here means the POST landed and the run is in
+    // flight (Modal holds the connection for the whole run) — record it as
+    // in_flight, not failed, and treat the space as started. A non-timeout
+    // network error means the run never started → failed.
+    const isTimeout = err instanceof Error && err.name === 'AbortError';
+    if (isTimeout) {
+      await markInFlight(runId);
+      await markSwept(spaceId);
+      return { spaceId, status: 'started' };
+    }
+    await markFailed(runId, err instanceof Error ? err.message : String(err));
     return {
       spaceId,
       status: 'errored',
@@ -234,6 +285,8 @@ async function sweepOne(spaceId: string, pendingCount: number): Promise<SweepOut
     clearTimeout(timer);
   }
 
+  // Accepted (2xx) — the run is in flight (awaiting end-of-run artifact).
+  await markInFlight(runId);
   // Mark swept so the next cron tick within MIN_INTERVAL_MS skips this space.
   await markSwept(spaceId);
   return { spaceId, status: 'started' };

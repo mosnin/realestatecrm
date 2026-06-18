@@ -27,7 +27,9 @@ vi.mock('@/lib/supabase', () => {
     supabaseCalls.push({ table, chain: calls });
 
     const chain: Record<string, unknown> = {};
-    const passthrough = ['select', 'eq', 'in', 'lte', 'order', 'limit', 'update'];
+    // `insert` covers the AgentRunLedger.recordDispatch write that fireRoutineRun
+    // now performs; unqueued ledger calls fall back to the empty terminal.
+    const passthrough = ['select', 'eq', 'in', 'lte', 'order', 'limit', 'update', 'insert'];
     for (const method of passthrough) {
       chain[method] = vi.fn((...args: unknown[]) => {
         calls.push([method, args]);
@@ -60,6 +62,7 @@ const ENV_KEYS = [
   'CRON_ROUTINES_DISABLED',
   'MODAL_WEBHOOK_URL',
   'AGENT_INTERNAL_SECRET',
+  'ROUTINE_DISPATCH_BACKOFF_MS',
 ] as const;
 const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
@@ -166,6 +169,8 @@ beforeEach(() => {
   delete process.env.CRON_ROUTINES_DISABLED;
   process.env.MODAL_WEBHOOK_URL = 'https://modal.example/webhook';
   process.env.AGENT_INTERNAL_SECRET = 'agent-secret';
+  // Instant retry backoff so the retry-then-fail path doesn't add real seconds.
+  process.env.ROUTINE_DISPATCH_BACKOFF_MS = '0';
 
   fetchSpy = buildFetchMock();
   vi.stubGlobal('fetch', fetchSpy);
@@ -245,12 +250,15 @@ describe('GET /api/cron/routines', () => {
 
     expect(modalCalls).toHaveLength(1);
     // user_id is only added when the owner's clerkId resolved — left absent
-    // here so the cron body matches the original contract.
-    expect(modalCalls[0].body).toEqual({
+    // here. run_id is forwarded for ledger correlation (a generated UUID), so
+    // match the stable fields and assert run_id is present.
+    expect(modalCalls[0].body).toMatchObject({
       space_id: 's1',
       secret: 'agent-secret',
       instruction: 'draft a check-in for quiet deals',
     });
+    expect((modalCalls[0].body as { user_id?: unknown }).user_id).toBeUndefined();
+    expect(typeof (modalCalls[0].body as { run_id?: unknown }).run_id).toBe('string');
 
     // The cron stamped the routine — table name + an update with both fields.
     const stamp = supabaseCalls.find(
