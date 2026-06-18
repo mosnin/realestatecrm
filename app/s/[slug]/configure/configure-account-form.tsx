@@ -940,7 +940,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
             description="Choose how you want to be notified when a new lead comes in."
           />
           <div>
-            <div className="flex items-center justify-between py-3 border-b border-border">
+            <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium">Email notifications</p>
                 <p className="text-xs text-muted-foreground">
@@ -948,13 +948,6 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
                 </p>
               </div>
               <Switch checked={notifications} onCheckedChange={setNotifications} />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-medium">Dashboard badge</p>
-                <p className="text-xs text-muted-foreground">Unread count in the sidebar</p>
-              </div>
-              <Switch checked disabled />
             </div>
           </div>
         </section>
