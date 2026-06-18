@@ -32,6 +32,7 @@ import {
   ArrowLeft,
   Gauge,
   LifeBuoy,
+  Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ const navSections = [
       { href: '/admin/agent-stats', label: 'Agent health', icon: Bot, exact: false },
       { href: '/admin/audit-log', label: 'Audit log', icon: ScrollText, exact: false },
       { href: '/admin/observability', label: 'Observability', icon: Gauge, exact: false },
+      { href: '/admin/env', label: 'Environment', icon: Settings2, exact: false },
       { href: '/admin/support', label: 'Support', icon: LifeBuoy, exact: false },
     ],
   },
