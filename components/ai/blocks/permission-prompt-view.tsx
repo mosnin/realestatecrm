@@ -306,13 +306,13 @@ export function PermissionPromptView({
   const disabled = busy || submitting !== null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/5 px-4 py-3">
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0 text-amber-700 dark:text-amber-400">
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground">
           <ShieldCheck size={15} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
             {isSendEmail ? 'Email draft — review and send' : isSendSms ? 'SMS draft — review and send' : 'Approve before running'}
           </p>
           <p className="text-sm font-semibold text-foreground">{prompt.summary}</p>

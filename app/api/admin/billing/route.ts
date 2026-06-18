@@ -32,6 +32,27 @@ async function lookupPlan(acc: BillingAccount): Promise<string | null> {
   return (data?.plan as string) ?? null;
 }
 
+/** Current complimentary-access state for an account (resilient to missing columns). */
+async function lookupComp(
+  acc: BillingAccount,
+): Promise<{ compAccess: boolean; compExpiresAt: string | null; compNote: string | null }> {
+  const table = acc.type === 'space' ? 'Space' : 'Brokerage';
+  try {
+    const { data } = await supabase
+      .from(table)
+      .select('compAccess, compExpiresAt, compNote')
+      .eq('id', acc.id)
+      .maybeSingle();
+    return {
+      compAccess: (data?.compAccess as boolean) ?? false,
+      compExpiresAt: (data?.compExpiresAt as string) ?? null,
+      compNote: (data?.compNote as string) ?? null,
+    };
+  } catch {
+    return { compAccess: false, compExpiresAt: null, compNote: null };
+  }
+}
+
 export async function GET(req: Request) {
   try {
     await requirePlatformAdmin();
@@ -43,13 +64,18 @@ export async function GET(req: Request) {
   if (!account) {
     return NextResponse.json({ error: 'accountType (space|brokerage) and accountId are required' }, { status: 400 });
   }
+  // Lightweight path for the comp control: just the comp status, no balance/ledger.
+  if (url.searchParams.get('compOnly') === '1') {
+    return NextResponse.json({ account, comp: await lookupComp(account) });
+  }
   try {
-    const [plan, balance, txns] = await Promise.all([
+    const [plan, balance, txns, comp] = await Promise.all([
       lookupPlan(account),
       getCreditBalance(account),
       getRecentTxns(account, 30),
+      lookupComp(account),
     ]);
-    return NextResponse.json({ account, plan, balance, txns });
+    return NextResponse.json({ account, plan, balance, txns, comp });
   } catch {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
   }
@@ -133,5 +159,58 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ error: 'Unknown action (expected grant | refund)' }, { status: 400 });
+  // ── Complimentary access — Stripe-INDEPENDENT free access for internal team /
+  //    demo accounts. Writes only the comp columns; never touches Stripe. ──────
+  if (action === 'grant_comp') {
+    const account = parseAccount(body.accountType, body.accountId);
+    if (!account) return NextResponse.json({ error: 'account required' }, { status: 400 });
+    // Optional time-box (days from now). Omit/blank/null = no expiry (free until revoked).
+    let expiresAt: string | null = null;
+    if (body.days != null && body.days !== '') {
+      const days = Number(body.days);
+      if (!Number.isFinite(days) || days <= 0 || days > 3650) {
+        return NextResponse.json(
+          { error: 'days must be a positive number ≤ 3650, or omitted for no expiry' },
+          { status: 400 },
+        );
+      }
+      expiresAt = new Date(Date.now() + days * 86400_000).toISOString();
+    }
+    const note = typeof body.note === 'string' ? body.note.slice(0, 500) : null;
+    const table = account.type === 'space' ? 'Space' : 'Brokerage';
+    const { error } = await supabase
+      .from(table)
+      .update({ compAccess: true, compExpiresAt: expiresAt, compNote: note })
+      .eq('id', account.id);
+    if (error) return NextResponse.json({ error: 'Could not grant comp access' }, { status: 500 });
+    await logAdminAction({
+      actor: clerkUserId,
+      action: 'billing_grant_comp',
+      target: `${account.type}:${account.id}`,
+      details: { expiresAt: expiresAt ?? 'never', note },
+    });
+    return NextResponse.json({ ok: true, comp: { compAccess: true, compExpiresAt: expiresAt, compNote: note } });
+  }
+
+  if (action === 'revoke_comp') {
+    const account = parseAccount(body.accountType, body.accountId);
+    if (!account) return NextResponse.json({ error: 'account required' }, { status: 400 });
+    const table = account.type === 'space' ? 'Space' : 'Brokerage';
+    const { error } = await supabase
+      .from(table)
+      .update({ compAccess: false, compExpiresAt: null, compNote: null })
+      .eq('id', account.id);
+    if (error) return NextResponse.json({ error: 'Could not revoke comp access' }, { status: 500 });
+    await logAdminAction({
+      actor: clerkUserId,
+      action: 'billing_revoke_comp',
+      target: `${account.type}:${account.id}`,
+    });
+    return NextResponse.json({ ok: true, comp: { compAccess: false, compExpiresAt: null, compNote: null } });
+  }
+
+  return NextResponse.json(
+    { error: 'Unknown action (expected grant | refund | grant_comp | revoke_comp)' },
+    { status: 400 },
+  );
 }

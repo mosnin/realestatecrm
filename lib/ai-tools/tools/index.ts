@@ -31,6 +31,7 @@ import type { ToolDefinition } from '../types';
 
 // People — find + state changes + activity capture
 import { findPersonTool } from './find-person';
+import { listContactsTool } from './list-contacts';
 import { addPersonTool } from './add-person';
 import { logCallTool } from './log-call';
 import { logMeetingTool } from './log-meeting';
@@ -39,6 +40,7 @@ import { clearFollowupTool } from './clear-followup';
 import { markPersonHotTool } from './mark-person-hot';
 import { markPersonColdTool } from './mark-person-cold';
 import { archivePersonTool } from './archive-person';
+import { deleteContactTool } from './delete-contact';
 import { mergePersonsTool } from './merge-persons';
 import { noteOnPersonTool } from './note-on-person';
 
@@ -52,6 +54,7 @@ import { updateDealProbabilityTool } from './update-deal-probability';
 import { attachPropertyToDealTool } from './attach-property-to-deal';
 import { markDealWonTool } from './mark-deal-won';
 import { markDealLostTool } from './mark-deal-lost';
+import { deleteDealTool } from './delete-deal';
 import { noteOnDealTool } from './note-on-deal';
 import { addChecklistItemTool } from './add-checklist-item';
 
@@ -59,6 +62,7 @@ import { addChecklistItemTool } from './add-checklist-item';
 import { scheduleTourTool } from './schedule-tour';
 import { rescheduleTourTool } from './reschedule-tour';
 import { cancelTourTool } from './cancel-tour';
+import { deleteTourTool } from './delete-tour';
 import { findToursTool } from './find-tours';
 
 // Properties
@@ -66,6 +70,7 @@ import { findPropertyTool } from './find-property';
 import { findComparablePropertiesTool } from './find-comparable-properties';
 import { addPropertyTool } from './add-property';
 import { updatePropertyStatusTool } from './update-property-status';
+import { deletePropertyTool } from './delete-property';
 import { noteOnPropertyTool } from './note-on-property';
 
 // Calendar
@@ -75,9 +80,16 @@ import { proposeTourTimesTool } from './propose-tour-times';
 
 // Pipeline aggregates
 import { pipelineSummaryTool } from './pipeline-summary';
+import { workspaceStatsTool } from './workspace-stats';
 import { findStuckDealsTool } from './find-stuck-deals';
 import { findQuietHotPersonsTool } from './find-quiet-hot-persons';
 import { findOverdueFollowupsTool } from './find-overdue-followups';
+
+// Tour prep
+import { getWeatherTool } from './get-weather';
+
+// Connected-app activity (captured Composio trigger deliveries)
+import { getRecentEventsTool } from './get-recent-events';
 
 // Communication — drafting + sending + post-hoc logging
 import { draftEmailTool } from './draft-email';
@@ -106,6 +118,9 @@ import { attachFileToPropertyTool } from './attach-file-to-property';
 // Planning
 import { createPlanTool } from './plan';
 
+// Clarification — structured ask (OptionList / QuestionFlow)
+import { askRealtorTool } from './ask-realtor';
+
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
  * intentionally NOT in this list — it gets added at the `registry` layer.
@@ -117,6 +132,7 @@ import { createPlanTool } from './plan';
 export const ALL_TOOLS: ToolDefinition[] = [
   // ── People ─────────────────────────────────────────────────────────────
   findPersonTool as ToolDefinition,
+  listContactsTool as ToolDefinition,
   addPersonTool as ToolDefinition,
   logCallTool as ToolDefinition,
   logMeetingTool as ToolDefinition,
@@ -125,6 +141,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   markPersonHotTool as ToolDefinition,
   markPersonColdTool as ToolDefinition,
   archivePersonTool as ToolDefinition,
+  deleteContactTool as ToolDefinition,
   mergePersonsTool as ToolDefinition,
   noteOnPersonTool as ToolDefinition,
 
@@ -138,6 +155,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   attachPropertyToDealTool as ToolDefinition,
   markDealWonTool as ToolDefinition,
   markDealLostTool as ToolDefinition,
+  deleteDealTool as ToolDefinition,
   noteOnDealTool as ToolDefinition,
   addChecklistItemTool as ToolDefinition,
 
@@ -145,6 +163,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   scheduleTourTool as ToolDefinition,
   rescheduleTourTool as ToolDefinition,
   cancelTourTool as ToolDefinition,
+  deleteTourTool as ToolDefinition,
   findToursTool as ToolDefinition,
 
   // ── Properties ─────────────────────────────────────────────────────────
@@ -152,6 +171,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   findComparablePropertiesTool as ToolDefinition,
   addPropertyTool as ToolDefinition,
   updatePropertyStatusTool as ToolDefinition,
+  deletePropertyTool as ToolDefinition,
   noteOnPropertyTool as ToolDefinition,
 
   // ── Calendar ───────────────────────────────────────────────────────────
@@ -161,9 +181,16 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Pipeline aggregates ────────────────────────────────────────────────
   pipelineSummaryTool as ToolDefinition,
+  workspaceStatsTool as ToolDefinition,
   findStuckDealsTool as ToolDefinition,
   findQuietHotPersonsTool as ToolDefinition,
   findOverdueFollowupsTool as ToolDefinition,
+
+  // ── Tour prep ──────────────────────────────────────────────────────────
+  getWeatherTool as ToolDefinition,
+
+  // ── Connected-app activity ─────────────────────────────────────────────
+  getRecentEventsTool as ToolDefinition,
 
   // ── Communication ──────────────────────────────────────────────────────
   draftEmailTool as ToolDefinition,
@@ -189,4 +216,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,
+
+  // ── Clarification ──────────────────────────────────────────────────────
+  askRealtorTool as ToolDefinition,
 ];

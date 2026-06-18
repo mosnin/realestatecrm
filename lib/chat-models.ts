@@ -16,36 +16,21 @@ export interface ChatModelOption {
   tagline: string;
 }
 
+// Chippi runs on one fixed model — the user-facing picker was removed. Kept as a
+// one-entry registry so isValidChatModel / resolveChatModel still validate the
+// persisted AgentSettings.chatModel and fall stale picks back to the default.
+// Qwen3.7 Plus is multimodal, so image turns stay on it (see VISION_FALLBACK_MODEL
+// in lib/chat/multimodal.ts); the autonomous swarm uses its own worker model.
 export const CHAT_MODELS: ChatModelOption[] = [
   {
-    id: 'x-ai/grok-4.3',
-    label: 'Grok 4.3',
-    tagline: 'Quick, direct, strong with fresh real-world context.',
-  },
-  {
-    id: 'openai/gpt-5.5',
-    label: 'GPT-5.5',
-    tagline: 'Fast and balanced — a strong all-rounder.',
-  },
-  {
-    id: 'anthropic/claude-opus-4.7',
-    label: 'Claude Opus 4.7',
-    tagline: 'Deepest reasoning — reach for it on long, intricate work.',
-  },
-  {
-    id: 'moonshotai/kimi-k2.6',
-    label: 'Kimi K2.6',
-    tagline: 'Long-context specialist — large documents and histories.',
-  },
-  {
-    id: 'qwen/qwen3.6-flash',
-    label: 'Qwen3.6 Flash',
-    tagline: 'Fastest and lowest cost — high-volume, simple turns.',
+    id: 'qwen/qwen3.7-plus',
+    label: 'Qwen3.7 Plus',
+    tagline: 'Chippi runs on Qwen3.7 Plus.',
   },
 ];
 
-/** The model used when a workspace hasn't picked one. */
-export const DEFAULT_CHAT_MODEL = 'x-ai/grok-4.3';
+/** The model used for chat. */
+export const DEFAULT_CHAT_MODEL = 'qwen/qwen3.7-plus';
 
 /** Allowlist check — gate user-supplied model slugs before persisting. */
 export function isValidChatModel(value: unknown): value is string {

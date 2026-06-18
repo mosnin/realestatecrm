@@ -37,6 +37,15 @@ const MODEL_PRICES: Record<string, { in: number; out: number }> = {
   'anthropic/claude-opus-4.7': { in: 5.0, out: 25.0 },
   'moonshotai/kimi-k2.6': { in: 0.73, out: 3.49 },
   'qwen/qwen3.6-flash': { in: 0.19, out: 1.13 },
+  // Active stack. Prices reuse the models these replaced (deepseek-v4-pro for
+  // the qwen chat/multimodal model, hy3-preview for the glm swarm worker) so
+  // metering keeps charging a sane non-zero rate.
+  // TODO: confirm real pricing
+  'qwen/qwen3.7-plus': { in: 0.44, out: 0.88 },
+  'z-ai/glm-5.2': { in: 0.07, out: 0.26 },
+  // Retired but retained so historical ChatUsage rows still price correctly.
+  'deepseek/deepseek-v4-pro': { in: 0.44, out: 0.88 },
+  'tencent/hy3-preview': { in: 0.07, out: 0.26 },
 };
 const DEFAULT_PRICE = { in: 2.5, out: 10.0 };
 

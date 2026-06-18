@@ -9,7 +9,9 @@
  *
  * Auth: requires Authorization: Bearer <CRON_SECRET> header. Vercel Cron
  * injects this automatically when CRON_SECRET is set in project env vars.
- * Returns 401 immediately if the header is absent or wrong.
+ * When CRON_SECRET is UNSET we return 500 (a misconfiguration the monitorCron
+ * wrapper surfaces to Sentry) rather than a silent 401 that would let the
+ * autonomous layer die unnoticed. A present-but-wrong token still gets 401.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,8 +21,13 @@ import { monitorCron } from '@/lib/cron-monitor';
 
 async function handler(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    logger.error('[cron.cleanup] CRON_SECRET env var is not set — rejecting request');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+  }
   const authHeader = req.headers.get('authorization');
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

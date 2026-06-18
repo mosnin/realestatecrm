@@ -9,6 +9,7 @@ import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { BrokerMain } from '@/components/broker/broker-main';
 import { supabase } from '@/lib/supabase';
+import { isAccountComped } from '@/lib/billing/comp';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { pickGreeting } from '@/lib/greetings';
@@ -52,89 +53,72 @@ export default async function BrokerLayout({ children }: { children: React.React
   const slug = spaceRow?.slug as string ?? '';
   const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
 
-  // Subscription gate — redirect to standalone pages
-  // Only exempt billing/settings paths for users with subscription history;
-  // users with NO subscription history should always be redirected to /subscribe.
+  // Subscription gate — the BROKERAGE is the billing entity (a brokerage-scoped
+  // Stripe subscription on the Brokerage row), so the owner subscribes/manages
+  // at /broker/billing — NOT /subscribe (which checks out the owner's personal
+  // Space, the wrong entity for a team plan).
   const brokerHeaders = await headers();
   const brokerPath = brokerHeaders.get('x-pathname')
     || brokerHeaders.get('x-invoke-path')
     || brokerHeaders.get('x-matched-path')
     || brokerHeaders.get('next-url')
     || '';
+  // Always let the owner reach billing/settings so they can subscribe or fix a
+  // payment problem — otherwise the gate would bounce them away from the very
+  // page that resolves it.
   const isBillingOrSettings =
     brokerPath.includes('/billing') ||
     brokerPath.includes('/settings');
 
   const isOwnerOfBrokerage = ctx.brokerage.ownerId === ctx.dbUserId;
 
-  if (!isPlatformAdmin && isOwnerOfBrokerage) {
-    // Only the brokerage OWNER is gated by subscription.
-    // Invited admins and members access the broker dashboard for free —
-    // billing is the owner's responsibility.
-    if (spaceRow) {
-      try {
-        const { data: subData, error: subError } = await supabase
+  // Complimentary (admin-granted) access skips the brokerage subscription gate —
+  // internal/demo brokerages get in without a Stripe subscription. Resilient.
+  const brokerageComped = await isAccountComped('Brokerage', ctx.brokerage.id);
+
+  if (!isPlatformAdmin && isOwnerOfBrokerage && !isBillingOrSettings && !brokerageComped) {
+    // Only the brokerage OWNER is gated by subscription. Invited admins and
+    // members access the broker dashboard for free — billing is the owner's
+    // responsibility (handled by the !isOwnerOfBrokerage skip).
+    try {
+      // 1) The brokerage's OWN subscription — the current, correct billing entity.
+      const { data: brokerageSub, error: brokerageSubError } = await supabase
+        .from('Brokerage')
+        .select('stripeSubscriptionStatus')
+        .eq('id', ctx.brokerage.id)
+        .maybeSingle();
+      if (brokerageSubError) throw brokerageSubError;
+      const brokerageStatus = brokerageSub?.stripeSubscriptionStatus ?? 'inactive';
+      const brokerageSubscribed = brokerageStatus === 'active' || brokerageStatus === 'trialing';
+
+      // 2) Legacy fallback: brokerages that subscribed through the OLD Space flow
+      //    (on the owner's personal Space) before brokerage billing existed. An
+      //    active/trialing Space sub keeps those owners working — we must NOT
+      //    lock them out just because the Brokerage row has no sub yet.
+      let legacySpaceSubscribed = false;
+      if (!brokerageSubscribed) {
+        const { data: legacySpace } = await supabase
           .from('Space')
-          .select('stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
-          .eq('id', spaceRow.id)
-          .maybeSingle();
-
-        if (subError) {
-          console.error('[broker-layout] Subscription check query failed:', subError);
-          redirect(`/subscribe?slug=${slug}`);
-        }
-
-        const hasSubscriptionHistory = !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
-        // Only exempt billing/settings for users with subscription history
-        const isBrokerExempt = isBillingOrSettings && hasSubscriptionHistory;
-
-        const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-        if (status !== 'active' && status !== 'trialing' && !isBrokerExempt) {
-          if (hasSubscriptionHistory) {
-            redirect(`/billing-required?slug=${slug}&reason=${status}`);
-          }
-          redirect(`/subscribe?slug=${slug}`);
-        }
-      } catch (err: any) {
-        // Next.js redirect() throws a special error — re-throw it
-        if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
-        console.error('[broker-layout] Subscription gate error:', err);
-        redirect(`/subscribe?slug=${slug}`);
-      }
-    } else if (isBrokerOnly) {
-      // Broker-only owner without a personal space — check via owner's space
-      try {
-        const { data: ownerSpace } = await supabase
-          .from('Space')
-          .select('slug, stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
+          .select('stripeSubscriptionStatus')
           .eq('ownerId', ctx.brokerage.ownerId)
           .maybeSingle();
-
-        if (ownerSpace) {
-          const ownerStatus = ownerSpace.stripeSubscriptionStatus ?? 'inactive';
-          const ownerSlug = ownerSpace.slug ?? '';
-          const ownerHasHistory = !!(ownerSpace.stripeSubscriptionId || ownerSpace.trialUsedAt);
-          const isBrokerOnlyExempt = isBillingOrSettings && ownerHasHistory;
-
-          if (ownerStatus !== 'active' && ownerStatus !== 'trialing' && !isBrokerOnlyExempt) {
-            if (ownerHasHistory) {
-              redirect(`/billing-required?slug=${ownerSlug}&reason=${ownerStatus}`);
-            }
-            redirect(`/subscribe?slug=${ownerSlug}`);
-          }
-        }
-        // broker_only without personal space — skip subscription gate entirely.
-        // These users have no Space to check against; they manage the brokerage
-        // without needing a personal subscription.
-      } catch (err: any) {
-        if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
-        console.error('[broker-layout] Broker-only owner subscription check error:', err);
-        // Don't redirect broker_only users without a space to /subscribe —
-        // they have no slug and the subscription wall doesn't apply to them.
+        const legacyStatus = legacySpace?.stripeSubscriptionStatus ?? 'inactive';
+        legacySpaceSubscribed = legacyStatus === 'active' || legacyStatus === 'trialing';
       }
-    } else {
-      // No space and not broker-only — shouldn't be here
-      redirect('/setup');
+
+      // Not subscribed on EITHER entity → send to the brokerage billing surface
+      // (self-serve Team / Team Plus checkout + payment management live there).
+      if (!brokerageSubscribed && !legacySpaceSubscribed) {
+        redirect('/broker/billing');
+      }
+    } catch (err: any) {
+      // Next.js redirect() throws a special error — re-throw it.
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+      // On a real query error, fail closed to the (exempt) billing page rather
+      // than leave an unsubscribed owner inside the dashboard. /broker/billing
+      // re-checks ownership and is always reachable (exempt above).
+      console.error('[broker-layout] Subscription gate error:', err);
+      redirect('/broker/billing');
     }
   }
 

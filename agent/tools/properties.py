@@ -14,9 +14,11 @@ from agents import RunContextWrapper, function_tool
 
 from config import settings
 from db import supabase
+from errors import from_supabase_error
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 _ALLOWED_PROPERTY_TYPES = {
@@ -104,11 +106,27 @@ async def add_property(
     if not result.data:
         return {"error": "insert returned no row"}
 
+    # Card row for the chat surface — display:"properties" renders a carousel.
+    # buildPropertiesCarousel reads address + listPrice + beds/baths (+ a photo
+    # url when present; a fresh property has none, which the mapper omits). The
+    # whole dict rides across as `data`; the renderer reads `data.properties`.
+    # Row values are PRIMITIVES only.
+    property_card = {
+        "id": property_id,
+        "address": address_clean,
+        "listPrice": list_price,
+        "beds": beds,
+        "baths": baths,
+    }
     return {
         "id": property_id,
         "address": address_clean,
         "list_price": list_price,
         "listing_status": status,
+        "ok": True,
+        "properties": [property_card],
+        "summary": f"Added property: {address_clean}.",
+        "display": "properties",
     }
 
 
@@ -293,3 +311,52 @@ async def send_property_packet(
         "contactId": contact_id,
         "channel": channel,
     }
+
+
+@function_tool(strict_mode=False)
+async def delete_property(
+    ctx: RunContextWrapper[AgentContext],
+    property_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a property; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Property packets cascade; deal/contact propertyId links are nulled.
+    # Prefer setting listing_status to off_market when keeping the record.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Property")
+        .select("id,address")
+        .eq("id", property_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Property not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    address = check.data.get("address") or "this property"
+
+    if not confirmed:
+        return confirmation_required(
+            entity="property", label=address, entity_id=property_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Property",
+        entity="property",
+        entity_id=property_id,
+        label=address,
+        reason=reason,
+    )

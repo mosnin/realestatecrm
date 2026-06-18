@@ -59,6 +59,12 @@ const optionalSchema = z.object({
   STRIPE_PRICE_TEAM_ANNUAL: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS: z.string().optional(),
   STRIPE_PRICE_TEAM_PLUS_ANNUAL: z.string().optional(),
+  // Per-unit brokerage seat add-on prices (above the plan's included seats).
+  // MUST be quantity-billed prices; the flat base prices above are NOT reused.
+  STRIPE_PRICE_TEAM_ADDON: z.string().optional(),
+  STRIPE_PRICE_TEAM_ADDON_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS_ADDON: z.string().optional(),
+  STRIPE_PRICE_TEAM_PLUS_ADDON_ANNUAL: z.string().optional(),
   STRIPE_PRICE_TOPUP_STARTER: z.string().optional(),
   STRIPE_PRICE_TOPUP_GROWTH: z.string().optional(),
   STRIPE_PRICE_TOPUP_POWER: z.string().optional(),
@@ -71,6 +77,13 @@ const optionalSchema = z.object({
 
   // LLM routing
   OPENROUTER_API_KEY: z.string().optional(),
+
+  // Property "Analyze" web research. Both required for the feature to function;
+  // absent → the Analyze action returns a "research not configured" state (no
+  // crash). TAVILY_API_KEY drives web search for the subject property;
+  // FIRECRAWL_API_KEY drives scraping the listing/record pages found.
+  TAVILY_API_KEY: z.string().optional(),
+  FIRECRAWL_API_KEY: z.string().optional(),
 
   // Email / SMS
   RESEND_API_KEY: z.string().optional(),
@@ -106,12 +119,28 @@ const optionalSchema = z.object({
   // Composio integrations
   COMPOSIO_API_KEY: z.string().optional(),
 
+  // RentCast — real comparables + valuation for the CMA engine (lib/rentcast.ts).
+  // Unset → CMA falls back to the workspace's own Property rows and labels the
+  // report's data source as "your CRM data" instead of "RentCast market data".
+  RENTCAST_API_KEY: z.string().optional(),
+
+  // Ably real-time pub/sub — powers the live activity feed. SERVER-ONLY (never
+  // NEXT_PUBLIC). Unset → the feed still works from the DB; only live updates
+  // are disabled (publish no-ops, /api/ably/token returns 503).
+  ABLY_API_KEY: z.string().optional(),
+
   // Direct Postgres (Modal side)
   DATABASE_URL: z.string().optional(),
 
   // App URLs / flags
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
+
+  // Credit metering kill switch (lib/billing/meter.ts). Enforcement is ON by
+  // default; set CREDITS_ENFORCED=false to disable the credit gate entirely
+  // (emergency rollback — workflows run free, nobody blocked for a zero
+  // balance). Any other value (or unset) leaves enforcement ON.
+  CREDITS_ENFORCED: z.string().optional(),
 
   // Sentry
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
@@ -129,6 +158,44 @@ const optionalSchema = z.object({
   // Client portal
   CLIENT_AUTH_SECRET: z.string().optional(),
   NEXT_PUBLIC_CLIENTS_URL: z.string().optional(),
+
+  // ── Read from process.env in code but previously absent from this schema ──
+  // All consumed somewhere in app/ or lib/ yet undocumented, so nobody setting
+  // up a new deployment would know to set them. Typed here so the environment is
+  // fully described in one place.
+
+  // App domain / canonical URLs
+  NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),    // lib/utils.ts, MCP OAuth discovery, Stripe redirect
+  NEXT_PUBLIC_SITE_URL: z.string().optional(),       // app/robots.ts, app/sitemap.ts
+  NEXT_PUBLIC_APP_ORIGIN: z.string().optional(),     // lib/briefing/delivery.ts (email links)
+
+  // Webhook signing secrets
+  CLERK_WEBHOOK_SECRET: z.string().optional(),       // app/api/webhooks/clerk
+  COMPOSIO_WEBHOOK_SECRET: z.string().optional(),    // app/api/webhooks/composio
+  TELNYX_WEBHOOK_SECRET: z.string().optional(),      // app/api/webhooks/telnyx-voice
+
+  // Telnyx voice
+  TELNYX_AGENT_NUMBER: z.string().optional(),        // app/api/calls
+  TELNYX_VOICE_CONNECTION_ID: z.string().optional(), // lib/voice.ts
+
+  // Crypto / token signing (each falls back to CLERK_SECRET_KEY if unset)
+  ENCRYPTION_KEY: z.string().optional(),             // lib/crypto.ts
+  MCP_JWT_SECRET: z.string().optional(),             // app/api/mcp + oauth/token
+
+  // Inngest (Studio scheduled posts + Composio trigger dispatch); SDK reads env
+  INNGEST_EVENT_KEY: z.string().optional(),
+  INNGEST_SIGNING_KEY: z.string().optional(),
+
+  // Briefing email sender domain
+  BRIEF_EMAIL_DOMAIN: z.string().optional(),         // lib/briefing/delivery.ts
+
+  // Web push (VAPID) — push notifications go inert without these
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
+
+  // Sentry client-side trace sampling (server variant: SENTRY_TRACES_SAMPLE_RATE)
+  NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: z.string().optional(), // instrumentation-client.ts
 });
 
 const envSchema = requiredSchema.merge(optionalSchema);
@@ -150,6 +217,20 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     ],
   },
   { label: 'Upstash rate limiting', keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'] },
+  {
+    label: 'Property Analyze web research — the "Analyze" action is inert without BOTH',
+    keys: ['TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
+  },
+  // Cutover-critical secrets that boot GREEN when missing but then fail
+  // silently: without CRON_SECRET every cron route 401s (sweeps / briefings /
+  // SLA stop); without AGENT_INTERNAL_SECRET the Modal agent's callbacks 503
+  // (Chippi goes dark). Kept optional so CI/preview boot without them, but
+  // warned individually so a real deploy notices.
+  { label: 'Cron auth — cron routes 401 without CRON_SECRET', keys: ['CRON_SECRET'] },
+  {
+    label: 'Agent↔Modal auth — agent callbacks 503 without AGENT_INTERNAL_SECRET',
+    keys: ['AGENT_INTERNAL_SECRET'],
+  },
 ];
 
 function validateEnv(): Env {

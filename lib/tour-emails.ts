@@ -21,6 +21,10 @@ export interface TourEmailData {
   businessName: string;
   tourId: string;
   slug: string;
+  /** Opaque token for the guest self-service page at /tour/[token]
+   *  (cancel / rebook / post-tour feedback). When present, the guest
+   *  emails link there instead of only saying "reply to this email". */
+  manageToken?: string | null;
 }
 
 /** Escape HTML special characters to prevent XSS in email templates. */
@@ -77,6 +81,23 @@ function detailBox(items: { label: string; value: string }[]): string {
   return `<div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #f1f5f9">${rows}</div>`;
 }
 
+/** Absolute URL to the guest self-service tour page, or null when no token. */
+function manageUrl(manageToken: string | null | undefined): string | null {
+  if (!manageToken) return null;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  return `${appUrl}/tour/${encodeURIComponent(manageToken)}`;
+}
+
+/** "Manage tour" CTA button + line, rendered only when we have a manage URL. */
+function manageBlock(url: string | null): string {
+  if (!url) return '';
+  return `
+    <table cellpadding="0" cellspacing="0" style="margin:4px 0 12px"><tr><td style="border-radius:8px;background:#0f172a">
+      <a href="${url}" style="display:inline-block;padding:11px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">Manage your tour</a>
+    </td></tr></table>
+    <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5">Reschedule or cancel any time from that page.</p>`;
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   if (!process.env.RESEND_API_KEY) {
     console.log(`[tour-email] (dev) To: ${to} | Subject: ${subject}`);
@@ -105,6 +126,11 @@ export async function sendTourConfirmation(data: TourEmailData) {
   const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
   const subject = `Tour Confirmed — ${formatDate(startsAt)}`;
 
+  const url = manageUrl(data.manageToken);
+  const manageOrReply = url
+    ? manageBlock(url)
+    : `<p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If you need to reschedule or cancel, please reply to this email.</p>`;
+
   const body = `
     <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
     <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been confirmed:</p>
@@ -113,7 +139,7 @@ export async function sendTourConfirmation(data: TourEmailData) {
       { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
-    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If you need to reschedule or cancel, please reply to this email.</p>
+    ${manageOrReply}
   `;
 
   const html = wrapHtml(businessName, 'Tour confirmed', body, `Sent by ${esc(businessName)}`);
@@ -132,10 +158,48 @@ export async function sendTourReminder(data: TourEmailData) {
       { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
-    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">We look forward to seeing you!</p>
+    <p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5">We look forward to seeing you!</p>
+    ${manageBlock(manageUrl(data.manageToken))}
   `;
 
   const html = wrapHtml(businessName, 'Tour reminder', body, `Sent by ${esc(businessName)}`);
+  await sendEmail(guestEmail, subject, html);
+}
+
+export async function sendTourRescheduled(data: TourEmailData) {
+  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
+  const subject = `Tour Rescheduled — ${formatDate(startsAt)}`;
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been moved to a new time:</p>
+    ${detailBox([
+      { label: 'New date', value: formatDate(startsAt) },
+      { label: 'New time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If this new time doesn't work, just reply to this email and we'll sort it out.</p>
+  `;
+
+  const html = wrapHtml(businessName, 'Tour rescheduled', body, `Sent by ${esc(businessName)}`);
+  await sendEmail(guestEmail, subject, html);
+}
+
+export async function sendTourCancelled(data: TourEmailData) {
+  const { guestName, guestEmail, businessName, startsAt, propertyAddress } = data;
+  const subject = `Tour Cancelled — ${formatDate(startsAt)}`;
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been cancelled:</p>
+    ${detailBox([
+      { label: 'Was scheduled for', value: `${formatDate(startsAt)} at ${formatTime(startsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">Would you like to rebook? Reply to this email and we'll find a new time that works for you.</p>
+  `;
+
+  const html = wrapHtml(businessName, 'Tour cancelled', body, `Sent by ${esc(businessName)}`);
   await sendEmail(guestEmail, subject, html);
 }
 

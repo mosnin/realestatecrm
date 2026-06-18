@@ -188,6 +188,8 @@ CREATE TABLE IF NOT EXISTS "Tour" (
                     CHECK (status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
   "googleEventId" text,
   "manageToken"   text,
+  "reminder24SentAt" timestamptz,
+  "reminder1hSentAt"  timestamptz,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );

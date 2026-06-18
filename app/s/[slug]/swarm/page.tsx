@@ -171,7 +171,7 @@ export default async function SwarmPage({
 
       {/* Launch form */}
       <div className="max-w-2xl">
-        <SwarmLaunchForm availableAgents={agents} slug={slug} />
+        <SwarmLaunchForm availableAgents={agents} slug={slug} spaceId={space.id} />
       </div>
 
       {/* Recent runs — only rendered when runs exist */}

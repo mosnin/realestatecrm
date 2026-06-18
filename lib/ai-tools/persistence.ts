@@ -24,17 +24,81 @@ export interface SaveUserMessageInput {
   spaceId: string;
   conversationId: string | null;
   content: string;
+  /**
+   * Attachment row ids the realtor sent with this message. When present we
+   * resolve their metadata and persist an `attachment` block per file so the
+   * transcript renders them as chips/thumbnails on reload — the agent already
+   * reads the files, but they were previously invisible in history.
+   */
+  attachmentIds?: string[];
+}
+
+/**
+ * Resolve attachment ids → persisted `attachment` blocks. Reads only stable
+ * metadata (id / filename / mime / size); the renderer signs a URL on demand,
+ * so nothing here expires. Scoped to the space so a foreign id can't be
+ * smuggled onto a message. Failures degrade to no blocks — a missing chip is
+ * never worth failing the whole send.
+ */
+async function attachmentBlocks(
+  spaceId: string,
+  ids: string[] | undefined,
+): Promise<MessageBlock[]> {
+  if (!ids || ids.length === 0) return [];
+  try {
+    const { data, error } = await supabase
+      .from('Attachment')
+      .select('id, filename, "mimeType", "sizeBytes"')
+      .in('id', ids)
+      .eq('spaceId', spaceId);
+    if (error) {
+      logger.warn('[tools.persistence] attachment block resolve failed', { spaceId }, error);
+      return [];
+    }
+    const rows = (data ?? []) as Array<{
+      id: string;
+      filename: string;
+      mimeType: string;
+      sizeBytes: number | null;
+    }>;
+    // Preserve the order the realtor sent them in, not PostgREST's row order.
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const blocks: MessageBlock[] = [];
+    for (const aid of ids) {
+      const r = byId.get(aid);
+      if (!r) continue;
+      const mimeType = r.mimeType ?? '';
+      blocks.push({
+        type: 'attachment',
+        id: r.id,
+        filename: r.filename,
+        mimeType,
+        isImage: mimeType.startsWith('image/'),
+        ...(typeof r.sizeBytes === 'number' ? { sizeBytes: r.sizeBytes } : {}),
+      });
+    }
+    return blocks;
+  } catch (err) {
+    logger.warn('[tools.persistence] attachment block resolve threw', { spaceId }, err);
+    return [];
+  }
 }
 
 export async function saveUserMessage(input: SaveUserMessageInput): Promise<{ messageId: string }> {
   const id = crypto.randomUUID();
+  const blocks = await attachmentBlocks(input.spaceId, input.attachmentIds);
   const { error } = await supabase.from('Message').insert({
     id,
     spaceId: input.spaceId,
     conversationId: input.conversationId,
     role: 'user',
     content: input.content,
-    // User messages don't need blocks — they're always plain text.
+    // User messages are plain text EXCEPT for attachment chips — when the
+    // realtor sent files we persist an `attachment` block per file so the
+    // bubble can re-render them on reload.
+    ...(blocks.length > 0
+      ? { blocks: blocks as unknown as Record<string, unknown>[] }
+      : {}),
   });
   if (error) {
     logger.error('[tools.persistence] saveUserMessage failed', { spaceId: input.spaceId }, error);

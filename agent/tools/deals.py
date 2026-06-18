@@ -13,6 +13,7 @@ from errors import from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import idempotent_tool, with_retry
+from tools.deletion import confirmation_required, delete_row
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -24,6 +25,105 @@ def _trim(value: Any, max_chars: int = _CLIP) -> Any:
     return value
 
 
+async def _enrich_deal_rows(db: Any, space_id: str, rows: list[dict[str, Any]]) -> None:
+    """Resolve stageId → stageName and link the primary contact name, in place.
+
+    The deals DataTable shows the stage as a badge and the contact name as a
+    column (buildDealsTable reads `stageName` + `contactName`), but the Deal row
+    only carries `stageId`. Two batch queries (one for stages, one for the
+    DealContact → Contact join) keep this O(1) round-trips regardless of row
+    count. Best-effort: a lookup failure leaves the field null rather than
+    failing the whole find.
+    """
+    if not rows:
+        return
+
+    # Stage names — one query for every stage in the space.
+    try:
+        stages_res = await (
+            db.table("DealStage").select("id,name").eq("spaceId", space_id).execute()
+        )
+        stage_name_by_id = {s["id"]: s["name"] for s in (stages_res.data or [])}
+    except Exception:
+        stage_name_by_id = {}
+
+    # Primary contact per deal — DealContact join, then a batch Contact name
+    # lookup. We surface the first linked contact (the card shows one).
+    deal_ids = [r["id"] for r in rows if r.get("id")]
+    contact_name_by_deal: dict[str, str] = {}
+    try:
+        if deal_ids:
+            links_res = await (
+                db.table("DealContact")
+                .select("dealId,contactId")
+                .in_("dealId", deal_ids)
+                .execute()
+            )
+            links = links_res.data or []
+            first_contact_by_deal: dict[str, str] = {}
+            for link in links:
+                did = link.get("dealId")
+                cid = link.get("contactId")
+                if did and cid and did not in first_contact_by_deal:
+                    first_contact_by_deal[did] = cid
+            contact_ids = list(dict.fromkeys(first_contact_by_deal.values()))
+            if contact_ids:
+                contacts_res = await (
+                    db.table("Contact")
+                    .select("id,name")
+                    .in_("id", contact_ids)
+                    .eq("spaceId", space_id)
+                    .execute()
+                )
+                name_by_contact = {
+                    c["id"]: c.get("name") for c in (contacts_res.data or [])
+                }
+                for did, cid in first_contact_by_deal.items():
+                    if name_by_contact.get(cid):
+                        contact_name_by_deal[did] = name_by_contact[cid]
+    except Exception:
+        contact_name_by_deal = {}
+
+    for r in rows:
+        r["stageName"] = stage_name_by_id.get(r.get("stageId"))
+        r["contactName"] = contact_name_by_deal.get(r.get("id"))
+
+
+def _deals_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Wrap deal rows in the chat-card envelope (display: "deals").
+
+    The whole dict rides across as `data`; the renderer reads `data.deals`.
+    Row fields are the PRIMITIVES buildDealsTable needs (id, title, stage via
+    stageName, status, value, contact via contactName, closeDate). `_enrich_deal_rows`
+    must have run first to populate stageName/contactName.
+    """
+    deals = [
+        {
+            "id": r.get("id"),
+            "title": r.get("title"),
+            "stageName": r.get("stageName"),
+            "status": r.get("status"),
+            "value": r.get("value"),
+            "contactName": r.get("contactName"),
+            "closeDate": r.get("closeDate"),
+        }
+        for r in rows
+    ]
+    count = len(deals)
+    if count == 0:
+        summary = "No matching deals."
+    elif count == 1:
+        summary = f"Found 1 deal: {deals[0].get('title') or 'untitled'}."
+    else:
+        summary = f"Found {count} deals."
+    return {
+        "deals": deals,
+        "count": count,
+        "summary": summary,
+        "display": "deals",
+    }
+
+
 @function_tool(strict_mode=False)
 async def find_deals(
     ctx: RunContextWrapper[AgentContext],
@@ -32,13 +132,15 @@ async def find_deals(
     stalled_days: int | None = None,
     closing_within_days: int | None = None,
     limit: int = 30,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Find deals in this space with optional filters."""
-    # deal_id: single-deal lookup (returns [] if missing).
+    # deal_id: single-deal lookup (returns {deals:[]} if missing).
     # status: active|won|lost|on_hold (default active).
     # stalled_days: filter to deals untouched in N+ days.
     # closing_within_days: filter to deals with closeDate in next N days.
     # limit: 1-50.
+    # Returns {deals:[...], count, display:"deals"} so the chat renders a deals
+    # table; the realtor sees the card, not a prose row dump.
     space_id = ctx.context.space_id
     db = await supabase()
     limit = max(1, min(50, limit))
@@ -56,11 +158,16 @@ async def find_deals(
             .execute()
         )
         if not result.data:
-            return []
+            return _deals_payload([])
         row = result.data
         row["description"] = _trim(row.get("description"))
         row["address"] = _trim(row.get("address"))
-        return [row]
+        await _enrich_deal_rows(db, space_id, [row])
+        payload = _deals_payload([row])
+        # Single-record lookup: keep the FULL record available to the model
+        # (address, description, probability) alongside the card envelope.
+        payload["deal"] = row
+        return payload
 
     query = (
         db.table("Deal")
@@ -91,7 +198,9 @@ async def find_deals(
         query = query.order("createdAt", desc=True)
 
     result = await query.execute()
-    return result.data or []
+    rows = result.data or []
+    await _enrich_deal_rows(db, space_id, rows)
+    return _deals_payload(rows)
 
 
 @function_tool(strict_mode=False)
@@ -609,3 +718,53 @@ async def request_deal_review(
         "dealId": deal_id,
         "status": "open",
     }
+
+
+@function_tool(strict_mode=False)
+async def delete_deal(
+    ctx: RunContextWrapper[AgentContext],
+    deal_id: str,
+    reason: str,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """Permanently delete a deal; two-step confirmed gate (irreversible)."""
+    # confirmed: false on the first call returns requires_confirmation and does
+    #   NOT delete; true on a follow-up call actually deletes. ALWAYS confirm
+    #   with the realtor before re-calling with confirmed=True.
+    # Deletes checklist items, documents, and review requests via DB cascade
+    # (the commission ledger is retained). Prefer marking the deal lost
+    # (update_deal status) when the realtor wants to keep history.
+    # reason: why it's being deleted, logged for audit.
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    check = await (
+        db.table("Deal")
+        .select("id,title")
+        .eq("id", deal_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not check.data:
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {
+            "error": agent_err.message,
+            "code": agent_err.code,
+            "retryable": agent_err.retryable,
+        }
+    title = check.data.get("title") or "this deal"
+
+    if not confirmed:
+        return confirmation_required(
+            entity="deal", label=title, entity_id=deal_id,
+        )
+
+    return await delete_row(
+        ctx,
+        table="Deal",
+        entity="deal",
+        entity_id=deal_id,
+        label=title,
+        reason=reason,
+    )

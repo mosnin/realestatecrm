@@ -7,6 +7,7 @@ import { SidebarCollapseProvider } from '@/components/dashboard/sidebar-collapse
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { supabase } from '@/lib/supabase';
+import { isAccountComped } from '@/lib/billing/comp';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
@@ -16,6 +17,7 @@ import { ChippiBar } from '@/components/chippi/chippi-bar';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
@@ -143,7 +145,12 @@ export default async function DashboardLayout({
     currentPath.includes('/billing') ||
     currentPath.includes('/settings');
 
-  if (!dbUser.isPlatformAdmin) {
+  // Complimentary (admin-granted) access skips the subscription gate entirely —
+  // internal team / demo accounts get in without a Stripe subscription. Resilient:
+  // if the comp columns aren't present this is false and the normal gate runs.
+  const hasCompAccess = await isAccountComped('Space', space.id);
+
+  if (!dbUser.isPlatformAdmin && !hasCompAccess) {
     try {
       const { data: subData, error: subError } = await supabase
         .from('Space')
@@ -263,6 +270,11 @@ export default async function DashboardLayout({
           draftsReady: pendingDraftCount,
         }}
       />
+      {/* Account-switch swipe (broker to realtor and back). Mounted here too so
+          the flag set on switch is CLEARED on arrival. Without it the flag stuck
+          on and ChippiSplash (gated on !peekSwitchFlag) stayed suppressed on the
+          realtor side after the first account switch. */}
+      <AccountSwitchSwipe />
       {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips
           sidebar/header/chat-bar via CSS. Mount near the root so the
           flag is set before any layout reads it. */}

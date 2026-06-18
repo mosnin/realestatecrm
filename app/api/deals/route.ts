@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds, propertyId } = body;
+  const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds, propertyId, status } = body;
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -95,6 +95,15 @@ export async function POST(req: NextRequest) {
   if (!title || typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 255) {
     return NextResponse.json({ error: 'Title required (max 255 chars)' }, { status: 400 });
   }
+
+  // Validate status. A deal may be created directly in a terminal status
+  // (e.g. logging an already-won deal), so accept the same enum the PATCH
+  // route does and default to 'active'.
+  const VALID_STATUSES = ['active', 'won', 'lost', 'on_hold'];
+  if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+  }
+  const statusVal: string = status ?? 'active';
 
   // Verify the target stage belongs to this space (prevents cross-space stage injection)
   const { data: stageCheck, error: stageCheckErr } = await supabase
@@ -258,9 +267,15 @@ export async function POST(req: NextRequest) {
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,
     stageId: finalStageId,
+    status: statusVal,
     // The deal enters its initial stage right now. Without this, dealHealth
     // can't compute "days in stage" until the first stage move sets it.
     stageChangedAt: nowIso,
+    // When a deal is CREATED directly in a closed status (won|lost), stamp
+    // closedAt immediately — mirrors the PATCH transition logic. Without this,
+    // a deal born 'won' never gets a close timestamp, so avgTimeToCloseDays
+    // (lib/deal-metrics.ts) silently drops it from the average.
+    ...((statusVal === 'won' || statusVal === 'lost') && { closedAt: nowIso }),
     position: lastPosition + 1,
   }).select().single();
   if (dealError) throw dealError;

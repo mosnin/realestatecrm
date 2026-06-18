@@ -6,6 +6,7 @@ import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 
 /**
  * GET /api/invitations/[token]
@@ -149,6 +150,27 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Already a member', roleToAssign: inv.roleToAssign }, { status: 200 });
   }
 
+  // Deny-list check (SECURITY). If this user was previously REMOVED from this
+  // brokerage, the BrokerageRemoval row records that removal intent. Accepting
+  // an invite for a removed user used to silently flip User.status back to
+  // 'active' (further down), reviving an offboarded account and bypassing the
+  // removal the broker asked for — the same denial that broker/join enforces.
+  // Block it here too: re-admission requires the broker to first clear the
+  // removal record (a deliberate "actually, let them back in" action), not a
+  // stale invite link. Mirrors the broker/join deny-list query.
+  const { data: removalRow } = await supabase
+    .from('BrokerageRemoval')
+    .select('brokerageId')
+    .eq('brokerageId', inv.brokerageId)
+    .eq('userId', user.id)
+    .maybeSingle();
+  if (removalRow) {
+    return NextResponse.json(
+      { error: 'Your access to this brokerage was removed. Ask the broker to restore your access before accepting a new invitation.' },
+      { status: 403 },
+    );
+  }
+
   // Enforce the brokerage's seat cap at accept time, not just at invite time.
   // The invite-time check (broker/invite) can be outrun: invites issued under
   // the cap, concurrent accepts, or memberships added by other paths can push a
@@ -176,6 +198,11 @@ export async function POST(_req: Request, { params }: Params) {
     console.error('[invitations/accept] membership insert failed', memberErr);
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
+
+  // Bill the new active seat (Fix #1): a new member past the plan's included
+  // seats bumps the per-unit add-on line quantity. Best-effort, after the
+  // membership write — never block invite acceptance on a Stripe call.
+  void syncBrokerageSeatBilling(inv.brokerageId);
 
   // If this user had been offboarded previously (BP1 set User.status =
   // 'offboarded' and requireAuth gates on that), joining a new brokerage

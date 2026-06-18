@@ -18,6 +18,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// lib/inngest/functions.ts now imports lib/realtime/ably.ts, which is marked
+// `import 'server-only'` — a build-time guard that throws under vitest's Node
+// environment. Stub it so the handler under test can be imported. The Ably
+// publish path no-ops without ABLY_API_KEY, so this changes nothing we assert.
+vi.mock('server-only', () => ({}));
+
 // ── Mocks ──────────────────────────────────────────────────────────────
 
 const { findByComposioIdMock } = vi.hoisted(() => ({
@@ -36,6 +42,20 @@ vi.mock('@/lib/integrations/triggers', () => ({
   dispatchTrigger: dispatchMock,
   findByComposioTriggerId: findTriggerMock,
   stampFired: stampFiredMock,
+}));
+
+// IntegrationEvent capture layer. captureEvent persists the delivery
+// (idempotent on deliveryId in the real impl — tested directly in
+// integrations-triggers.test.ts); setEventStatus stamps the dispatch
+// outcome. Here we spy on the calls to assert capture happens once, before
+// the cap gate, and carries the right status.
+const { captureEventMock, setEventStatusMock } = vi.hoisted(() => ({
+  captureEventMock: vi.fn(async () => true),
+  setEventStatusMock: vi.fn(async () => undefined),
+}));
+vi.mock('@/lib/integrations/events', () => ({
+  captureEvent: captureEventMock,
+  setEventStatus: setEventStatusMock,
 }));
 
 const { redisSetMock, redisIncrMock, redisExpireMock } = vi.hoisted(() => ({
@@ -128,12 +148,14 @@ function event(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   // Defaults: claim succeeds, connection found + active, trigger found + active,
-  // daily count = 1, dispatch returns DRAFT.
+  // daily count = 1, dispatch returns DRAFT, capture succeeds.
   redisSetMock.mockResolvedValue('OK');
   redisIncrMock.mockResolvedValue(1);
   findByComposioIdMock.mockResolvedValue(activeConnection());
   findTriggerMock.mockResolvedValue(activeTrigger());
   dispatchMock.mockResolvedValue({ dispatched: 'DRAFT' });
+  captureEventMock.mockResolvedValue(true);
+  setEventStatusMock.mockResolvedValue(undefined);
 });
 
 describe('handleComposioTrigger', () => {
@@ -217,5 +239,84 @@ describe('handleComposioTrigger', () => {
     dispatchMock.mockResolvedValueOnce({ dispatched: 'noop', reason: 'thin_payload' });
     await invoke(event());
     expect(stampFiredMock).not.toHaveBeenCalled();
+  });
+
+  // ── IntegrationEvent capture ─────────────────────────────────────────
+
+  it('captures exactly one IntegrationEvent and still dispatches on the happy path', async () => {
+    await invoke(event());
+
+    // Exactly one capture, with the resolved connection/trigger context and
+    // status 'captured'.
+    expect(captureEventMock).toHaveBeenCalledTimes(1);
+    expect(captureEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        connectionId: 'conn-1',
+        triggerId: 'trg-row-1',
+        toolkit: 'gmail',
+        slug: 'GMAIL_NEW_GMAIL_MESSAGE',
+        deliveryId: 'msg_abc',
+        payload: { subject: 'Hi' },
+        status: 'captured',
+      }),
+    );
+    // Capture does NOT replace dispatch — both happen.
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    // Outcome stamped 'dispatched' on a real dispatch.
+    expect(setEventStatusMock).toHaveBeenCalledWith('msg_abc', 'dispatched');
+  });
+
+  it('is idempotent on a repeated deliveryId — second invocation captures nothing', async () => {
+    // Real dedupe behaviour: the first claim succeeds, a redelivery of the
+    // SAME deliveryId finds the claim already set (Redis NX → null) and the
+    // handler short-circuits before capture. Net: exactly one row written
+    // across both deliveries, first still dispatched. (The DB unique index +
+    // ignoreDuplicates is the second line of defense, tested directly against
+    // captureEvent in integrations-triggers.test.ts.)
+    redisSetMock.mockResolvedValueOnce('OK'); // 1st delivery claims
+    const first = await invoke(event());
+    redisSetMock.mockResolvedValueOnce(null); // 2nd delivery: already claimed
+    const second = await invoke(event());
+
+    expect(first).toMatchObject({ dispatched: 'DRAFT' });
+    expect(second).toMatchObject({ dispatched: 'noop', reason: 'duplicate_handler' });
+    // Exactly one capture total across the repeated deliveryId.
+    expect(captureEventMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures BEFORE the daily cap gate — capped events are persisted then marked skipped', async () => {
+    redisIncrMock.mockResolvedValueOnce(101); // over the cap of 100
+    const result = await invoke(event());
+
+    expect(result).toMatchObject({ dispatched: 'noop', reason: 'space_daily_cap' });
+    // Capture still happened even though dispatch was skipped by the cap.
+    expect(captureEventMock).toHaveBeenCalledTimes(1);
+    // And the event was moved to 'skipped'.
+    expect(setEventStatusMock).toHaveBeenCalledWith('msg_abc', 'skipped');
+    // Dispatch was NOT invoked.
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('marks the event skipped when dispatch returns a noop (thin payload)', async () => {
+    dispatchMock.mockResolvedValueOnce({ dispatched: 'noop', reason: 'thin_payload' });
+    await invoke(event());
+    expect(captureEventMock).toHaveBeenCalledTimes(1);
+    expect(setEventStatusMock).toHaveBeenCalledWith('msg_abc', 'skipped');
+  });
+
+  it('marks the event failed and rethrows when dispatch throws', async () => {
+    dispatchMock.mockRejectedValueOnce(new Error('modal down'));
+    await expect(invoke(event())).rejects.toThrow('modal down');
+    // Event was captured first, then flipped to 'failed' before the rethrow.
+    expect(captureEventMock).toHaveBeenCalledTimes(1);
+    expect(setEventStatusMock).toHaveBeenCalledWith('msg_abc', 'failed');
+  });
+
+  it('does NOT capture when the trigger is paused (capture follows trigger resolution)', async () => {
+    findTriggerMock.mockResolvedValueOnce(activeTrigger({ status: 'paused' }));
+    await invoke(event());
+    expect(captureEventMock).not.toHaveBeenCalled();
   });
 });

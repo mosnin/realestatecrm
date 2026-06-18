@@ -152,6 +152,11 @@ export function FormAnalyticsClient({
     return trend.slice(trend.length - days);
   }, [trend, days]);
 
+  // The trend dataset only spans `trend.length` days (currently 30). When a
+  // longer preset (90d / All) is picked we can't show more days than we have,
+  // so report the ACTUAL span rather than claiming "Last 90/365 days".
+  const trendDaysShown = Math.min(days, filteredTrend.length);
+
   const trendFormatted = filteredTrend.map((d) => ({
     ...d,
     label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -293,7 +298,7 @@ export function FormAnalyticsClient({
             <div>
               <p className="text-sm font-semibold">Submission trend</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Last {days} days · {trendTotal} total
+                Last {trendDaysShown} days · {trendTotal} total
               </p>
             </div>
           </div>

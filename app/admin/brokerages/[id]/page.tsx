@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { BrokerageActions } from './brokerage-actions';
+import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
 import { H1, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT } from '@/lib/typography';
 
 type Params = { params: Promise<{ id: string }> };
@@ -43,6 +44,12 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
   const brokerage = brokerageRow as {
     id: string; name: string; status: string; websiteUrl: string | null;
     logoUrl: string | null; joinCode: string | null; createdAt: string;
+    plan: string | null;
+    stripeSubscriptionStatus: string | null;
+    stripePeriodEnd: string | null;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    ownerId: string | null;
     User: { id: string; name: string | null; email: string } | null;
   };
 
@@ -96,7 +103,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
 
   const [dealRows, pendingInviteCount] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'active').then((r) => r.data ?? [])
       : Promise.resolve([]),
     supabase.from('Invitation').select('*', { count: 'exact', head: true }).eq('brokerageId', id).eq('status', 'pending'),
   ]);
@@ -170,12 +177,15 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: members */}
         <div className="lg:col-span-2 space-y-2">
-          <p className={SECTION_LABEL}>
-            Members
-            <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
-              {members.length}
-            </span>
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className={SECTION_LABEL}>
+              Members
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+                {members.length}
+              </span>
+            </p>
+            <BrokerageActions action="invite-member" brokerageId={brokerage.id} />
+          </div>
           {members.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
               <p className="text-sm text-foreground">Nobody here yet.</p>
@@ -225,7 +235,12 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                       </p>
                     </div>
                     {m.role !== 'broker_owner' && (
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <BrokerageActions
+                          action="change-member-role"
+                          membershipId={m.id}
+                          currentRole={m.role}
+                        />
                         <BrokerageActions
                           action="remove-member"
                           membershipId={m.id}
@@ -258,12 +273,16 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                   <Users size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Owner</p>
-                    <Link
-                      href={`/admin/users/${owner?.id}`}
-                      className="text-xs text-foreground hover:underline underline-offset-2"
-                    >
-                      {owner?.name ?? owner?.email ?? '—'}
-                    </Link>
+                    {owner?.id ? (
+                      <Link
+                        href={`/admin/users/${owner.id}`}
+                        className="text-xs text-foreground hover:underline underline-offset-2"
+                      >
+                        {owner.name ?? owner.email ?? '—'}
+                      </Link>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Unknown owner</p>
+                    )}
                   </div>
                 </div>
                 {brokerage.joinCode && (
@@ -314,6 +333,25 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
             </Card>
           </div>
         </div>
+      </div>
+
+      {/* Billing — plan change / cancel / credits (brokerage-scoped) */}
+      <div className="space-y-2">
+        <p className={SECTION_LABEL}>
+          Billing
+          <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+            {brokerage.plan ?? '—'}
+            {brokerage.stripeSubscriptionStatus ? ` · ${brokerage.stripeSubscriptionStatus}` : ''}
+          </span>
+        </p>
+        <AccountBillingPanel
+          accountType="brokerage"
+          accountId={brokerage.id}
+          currentPlan={brokerage.plan}
+          ownerUserId={brokerage.ownerId ?? owner?.id ?? null}
+          hasStripeCustomer={!!brokerage.stripeCustomerId}
+          hasSubscription={!!brokerage.stripeSubscriptionId}
+        />
       </div>
 
       {/* Invitations */}

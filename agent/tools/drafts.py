@@ -237,14 +237,47 @@ async def draft_message(
         )
     else:
         next_step = "Drafted — review and approve in your inbox to send. I never send for you without approval."
-    return {
+
+    draft_id = created.get("id", "")
+    out: dict[str, Any] = {
         "action": "drafted",
-        "draftId": created.get("id", ""),
+        "draftId": draft_id,
         "contactId": contact_id,
         "channel": channel,
         "autoCreatedContact": auto_created,
         "nextStep": next_step,
     }
+
+    # Email drafts render as a MessageDraft card with Send / Cancel inline. The
+    # card's Send hits the real approve-and-send endpoint
+    # (PATCH /api/agent/drafts/{draftId} {status:'approved'}); Cancel discards
+    # ({status:'dismissed'}). Only the email channel maps to the card — SMS /
+    # note keep the plain prose path. We surface a "To" line from the contact's
+    # email so the card is faithful; a missing email still renders (the realtor
+    # can fix it in their inbox).
+    if channel == "email":
+        to_email = recipient_email
+        if not to_email and contact_id:
+            try:
+                contact_lookup = await (
+                    db.table("Contact")
+                    .select("email")
+                    .eq("id", contact_id)
+                    .eq("spaceId", space_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if contact_lookup and contact_lookup.data:
+                    to_email = contact_lookup.data.get("email")
+            except Exception:
+                to_email = None
+        out["display"] = "message-draft"
+        out["to"] = [to_email] if to_email else []
+        out["subject"] = subject or ""
+        out["body"] = content
+        out["contactName"] = contact_name
+
+    return out
 
 
 # ── Send-now escape hatches ─────────────────────────────────────────────
@@ -391,7 +424,7 @@ async def _dispatch_send_now(
         payload["subject"] = subject
 
     try:
-        async with httpx.AsyncClient(timeout=_SEND_NOW_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_SEND_NOW_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/agent/send",
                 json=payload,

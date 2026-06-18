@@ -35,6 +35,9 @@ const FILTERS = [
   { value: 'not-onboarded', label: 'Not onboarded' },
   { value: 'has-space', label: 'Has workspace' },
   { value: 'no-space', label: 'No workspace' },
+  { value: 'trialing', label: 'Trialing' },
+  { value: 'past-due', label: 'Past due' },
+  { value: 'inactive', label: 'Inactive' },
   { value: 'suspended', label: 'Suspended' },
 ] as const;
 

@@ -25,7 +25,6 @@ import json
 import os
 import sys
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -37,18 +36,15 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
 # when running pytest from the agent/ directory.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.tool_context import ToolContext  # noqa: E402
-from agents.usage import Usage  # noqa: E402
-
 from security.context import AgentContext  # noqa: E402
+from tests._helpers import disable_tool_error_wrapper, make_tool_context  # noqa: E402
 from tools.broker import BROKER_TOOLS  # noqa: E402
-from tools.broker._guards import BrokerPermissionError  # noqa: E402
 from tools.broker import actions as actions_mod  # noqa: E402
 from tools.broker import performance as performance_mod  # noqa: E402
 from tools.broker import pipeline as pipeline_mod  # noqa: E402
 from tools.broker import revenue as revenue_mod  # noqa: E402
 from tools.broker import team as team_mod  # noqa: E402
-
+from tools.broker._guards import BrokerPermissionError  # noqa: E402
 
 # ── Fake supabase client ────────────────────────────────────────────────────
 
@@ -193,13 +189,15 @@ class _FakeSupabase:
 
 
 @pytest.fixture(autouse=True)
-def _disable_failure_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
+def _disable_failure_handlers() -> Any:
     """Tools wrap their handler in a failure-error function that turns raised
     exceptions into a model-visible string. For testing we want the original
-    exception to surface so we can assert the type/message directly."""
-    for tool in BROKER_TOOLS:
-        monkeypatch.setattr(tool, "_failure_error_function", None, raising=False)
-        monkeypatch.setattr(tool, "_use_default_failure_error_function", False, raising=False)
+    exception to surface so we can assert the type/message directly. Restore
+    the wrappers on teardown so the mutation doesn't leak into other tests."""
+    undos = [disable_tool_error_wrapper(tool) for tool in BROKER_TOOLS]
+    yield
+    for undo in undos:
+        undo()
 
 
 @pytest.fixture
@@ -235,19 +233,9 @@ def _ctx(
     )
 
 
-def _tool_ctx(agent_ctx: AgentContext, tool_name: str, args_json: str = "{}") -> ToolContext:
-    return ToolContext(
-        context=agent_ctx,
-        usage=Usage(),
-        tool_name=tool_name,
-        tool_call_id=f"call_{tool_name}",
-        tool_arguments=args_json,
-    )
-
-
 async def _invoke(tool: Any, agent_ctx: AgentContext, args: dict[str, Any] | None = None) -> Any:
     args_json = json.dumps(args or {})
-    return await tool.on_invoke_tool(_tool_ctx(agent_ctx, tool.name, args_json), args_json)
+    return await tool.on_invoke_tool(make_tool_context(agent_ctx, tool.name, args_json), args_json)
 
 
 def _tool_by_name(name: str) -> Any:

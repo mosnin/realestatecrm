@@ -7,9 +7,17 @@
  * prompt + voice-sample logic.
  *
  * Approval: NO. The realtor isn't sending anything; they're seeing a draft.
+ *
+ * Rendering: returns `display: 'message-draft'` so the chat shows the draft
+ * as a MessageDraft card with Send / Cancel. Because this tool writes NO
+ * AgentDraft row (compose-only), there's no draftId — the card's Send/Cancel
+ * round-trip through the chat as an explicit instruction (the agent then
+ * fires the real send via send_email, which is approval-gated). The data also
+ * keeps `subject` + `body` so non-card consumers still work.
  */
 
 import { z } from 'zod';
+import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
 import { composeQuickDraft } from '@/lib/agent/quick-draft';
 
@@ -31,6 +39,10 @@ const parameters = z
 interface DraftEmailResult {
   subject: string;
   body: string;
+  /** Recipient address(es) for the MessageDraft card. */
+  to: string[];
+  /** Contact display name, for the round-trip instruction. */
+  contactName?: string;
 }
 
 export const draftEmailTool = defineTool<typeof parameters, DraftEmailResult>({
@@ -55,11 +67,30 @@ export const draftEmailTool = defineTool<typeof parameters, DraftEmailResult>({
         display: 'error',
       };
     }
-    const subject = composed.subject ?? `Quick check-in${composed.subjectLabel ? ` — ${composed.subjectLabel}` : ''}`;
+    const subject = composed.subject ?? 'Quick check-in';
+
+    // Pull the recipient's name + email so the MessageDraft card has a real
+    // "To" line. Best-effort: a missing email still renders (the card shows a
+    // placeholder and the round-trip names the contact).
+    const { data: contact } = await supabase
+      .from('Contact')
+      .select('name, email')
+      .eq('id', args.personId)
+      .eq('spaceId', ctx.space.id)
+      .maybeSingle();
+    const contactName = contact?.name ?? undefined;
+    const to = contact?.email ? [contact.email] : [];
+
     return {
-      summary: `Draft email — "${subject}"`,
-      data: { subject, body: composed.body },
-      display: 'plain',
+      summary: `Draft email to ${contactName ?? 'the contact'} — "${subject}"`,
+      data: {
+        id: `draft-${args.personId}`,
+        subject,
+        body: composed.body,
+        to,
+        contactName,
+      },
+      display: 'message-draft',
     };
   },
 });

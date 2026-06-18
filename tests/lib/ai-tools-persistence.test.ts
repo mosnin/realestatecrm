@@ -4,6 +4,9 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 // ── Mock supabase: record every insert so tests can assert on the row ────
 let inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
 let nextError: { message: string } | null = null;
+// Rows the mocked Attachment SELECT returns (used by saveUserMessage to
+// resolve attachment blocks). Keyed nowhere — the helper filters/ids itself.
+let attachmentRows: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -12,6 +15,13 @@ vi.mock('@/lib/supabase', () => ({
         inserts.push({ table, row });
         return Promise.resolve({ data: null, error: nextError });
       },
+      // Chainable read used by the attachment-block resolver:
+      // .select(...).in(...).eq(...) → { data, error }.
+      select: () => ({
+        in: () => ({
+          eq: () => Promise.resolve({ data: attachmentRows, error: null }),
+        }),
+      }),
     }),
   },
 }));
@@ -21,6 +31,7 @@ import { saveAssistantMessage, saveUserMessage } from '@/lib/ai-tools/persistenc
 beforeEach(() => {
   inserts = [];
   nextError = null;
+  attachmentRows = [];
 });
 
 describe('saveUserMessage', () => {
@@ -42,6 +53,40 @@ describe('saveUserMessage', () => {
     await expect(
       saveUserMessage({ spaceId: 's', conversationId: null, content: 'Hi' }),
     ).rejects.toThrow(/network down/);
+  });
+
+  it('persists attachment blocks when attachmentIds are sent', async () => {
+    attachmentRows = [
+      { id: 'att_2', filename: 'lease.pdf', mimeType: 'application/pdf', sizeBytes: 2048 },
+      { id: 'att_1', filename: 'kitchen.png', mimeType: 'image/png', sizeBytes: 1024 },
+    ];
+    await saveUserMessage({
+      spaceId: 'space_1',
+      conversationId: 'conv_1',
+      content: 'Here are the docs',
+      attachmentIds: ['att_1', 'att_2'],
+    });
+    const blocks = inserts[0].row.blocks as MessageBlock[];
+    expect(blocks).toHaveLength(2);
+    // Order follows attachmentIds, not the row order from the DB.
+    expect(blocks[0]).toMatchObject({
+      type: 'attachment',
+      id: 'att_1',
+      filename: 'kitchen.png',
+      mimeType: 'image/png',
+      isImage: true,
+      sizeBytes: 1024,
+    });
+    expect(blocks[1]).toMatchObject({
+      type: 'attachment',
+      id: 'att_2',
+      isImage: false,
+    });
+  });
+
+  it('omits blocks entirely when no attachmentIds are sent', async () => {
+    await saveUserMessage({ spaceId: 's', conversationId: 'c', content: 'plain' });
+    expect(inserts[0].row.blocks).toBeUndefined();
   });
 });
 

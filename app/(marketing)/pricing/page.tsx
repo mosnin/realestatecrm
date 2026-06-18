@@ -1,267 +1,232 @@
 /**
- * `/pricing` — Chippi V2 three-layer pricing.
+ * `/pricing`, Chippi V2 tiers on the dark cinematic redesign system (matches
+ * /company and the rest of the marketing site). Server component (exports
+ * metadata).
  *
- * Layer 1: platform tiers for individuals (Free / Solo / Pro Performer) and
- * teams (Team / Team Plus). Layer 2: brokerage expansion (auto-expanding
- * per-agent pricing). Premium AI workflows draw from a monthly credit balance.
+ * No free tier shown: every plan starts with a 7-day trial that requires a card.
+ * The plan cards + Monthly/Annual toggle live in the PricingPlans client
+ * component; the rest (expansion, credits, FAQ) is server-rendered here.
  *
- * Numbers come from `lib/plans` so the marketing page can't drift from the
- * product's source of truth. Marketing visual system (studio): serif Times for
- * prices, orange accents allowed.
+ * Numbers come from `lib/plans` so the page can't drift from the product's
+ * source of truth. Cinematic sections live in a forced-dark wrapper.
  */
 
 import Link from 'next/link';
-import { MarketingHero } from '@/components/marketing/marketing-hero';
-import { MarketingCTA } from '@/components/marketing/marketing-cta';
-import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
-import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS } from '@/lib/plans';
+import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS, isAnnualAvailable } from '@/lib/plans';
+import { PricingPlans } from '@/components/marketing/giga/pricing-plans';
+import {
+  Band,
+  BlurRise,
+  Eyebrow,
+  EyebrowPill,
+  Serif,
+  PillPrimary,
+  PillGhost,
+} from '@/components/marketing/giga/primitives';
 
 export const metadata = { title: 'Pricing · Chippi' };
 
 const SIGNUP = '/login/realtor?intent=signup';
 
-type Card = {
-  id: keyof typeof PLANS;
-  blurb: string;
-  cta: { label: string; href: string };
-  featured?: boolean;
-};
+/* Brokerage seats are a flat per-seat add-on (see PLANS.*.addUser); there is no
+ * graduated/volume table, so we don't show one. */
 
-const INDIVIDUAL: Card[] = [
-  { id: 'free', blurb: 'Experience the workspace. No card required.', cta: { label: 'Start free', href: SIGNUP } },
-  { id: 'solo', blurb: 'Organize your pipeline and start using AI workflows.', cta: { label: 'Start Solo', href: SIGNUP } },
-  { id: 'pro', blurb: 'Full daily AI workflow for serious lead volume.', cta: { label: 'Start Pro', href: SIGNUP }, featured: true },
-];
-
-const TEAM: Card[] = [
-  { id: 'team', blurb: 'Shared command center for scoring, routing, accountability.', cta: { label: 'Start a team', href: '/demo' } },
-  { id: 'team_plus', blurb: 'Brokerage-level workflow without enterprise complexity.', cta: { label: 'Talk to sales', href: '/demo' } },
-];
-
-const EXPANSION: { range: string; mo: number; yr: number }[] = [
-  { range: '10–24 agents', mo: 69, yr: 56 },
-  { range: '25–49 agents', mo: 59, yr: 48 },
-  { range: '50–99 agents', mo: 49, yr: 40 },
-  { range: '100–199 agents', mo: 39, yr: 32 },
-];
-
-// Premium workflows shown on the pricing table. `chat_turn` is intentionally
-// omitted — the per-turn chat meter is an internal cost ceiling, not one of the
-// advertised "premium workflows" (the copy positions routine chat as ~free).
+/* Only workflows that are actually built + metered today are advertised here.
+ * (pipeline_audit / followup_sequence / lead_qualification / call_prep exist in
+ * the cost catalog but are not yet shipped as discrete workflows, so we don't
+ * list prices for them.) */
 const WORKFLOW_LABELS: Partial<Record<keyof typeof WORKFLOW_CREDIT_COST, string>> = {
-  pipeline_audit: 'Full pipeline audit',
-  followup_sequence: 'Follow-up sequence',
-  lead_qualification: 'Lead qualification run',
   tour_booking: 'Tour booking workflow',
   daily_briefing: 'Daily AI briefing',
-  call_prep: 'Call prep',
   lead_score: 'Lead score update',
 };
 
 const FAQ: { q: string; a: string }[] = [
   {
+    q: 'Is there a free plan?',
+    a: 'No. Every plan starts with a 7-day free trial. A card is required to begin, you are not charged until the trial ends, and you can cancel anytime before then at no cost.',
+  },
+  {
     q: 'What are credits?',
-    a: 'High-value agentic actions draw from a monthly credit balance — a full pipeline audit, a follow-up sequence, a lead qualification run. Routine actions cost little or nothing. Unused credits roll over for 30 days.',
+    a: 'Premium AI workflows draw from a monthly credit balance, like booking a tour, running your daily AI briefing, or scoring a new lead. Routine actions cost little or nothing, and unused credits roll over for 30 days.',
   },
   {
     q: 'What happens when I run out of credits?',
-    a: 'Buy a one-time top-up anytime, or upgrade your plan for a larger monthly allocation and a better rate. Your workspace never locks — only the premium AI workflows pause.',
+    a: 'Buy a one-time top-up anytime, or move up a plan for a larger monthly allocation and a better rate. Your workspace never locks, only the premium AI workflows pause.',
   },
   {
     q: 'How does brokerage pricing work?',
-    a: 'Add an agent and billing updates automatically — the per-agent price drops as the team grows. No tier jumping, no calls to sales until you want them.',
+    a: 'Add an agent and billing updates automatically. Each agent beyond your included seats is a flat monthly add-on ($79 on Team, $69 on Team Plus), added or removed as your floor changes. No tier jumping, no calls to sales until you want them.',
   },
 ];
 
-function PlanCard({ card }: { card: Card }) {
-  const p = PLANS[card.id];
-  return (
-    <div
-      className={`flex flex-col rounded-2xl border p-8 ${
-        card.featured ? 'border-brand/60' : 'border-border/70'
-      }`}
-    >
-      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        {p.label}
-      </p>
-      <p style={TITLE_FONT} className="mt-4 text-[44px] leading-none tracking-[-0.02em] text-foreground">
-        {p.priceMonthly === 0 ? '$0' : `$${p.priceMonthly}`}
-      </p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {p.priceMonthly === 0 ? 'free forever' : 'per month'}
-        {p.includedUsers > 1 ? ` · ${p.includedUsers} users` : ''}
-      </p>
-      <p className="mt-5 text-sm text-foreground/85">{card.blurb}</p>
-      <p className="mt-5 text-sm text-foreground">
-        <span style={TITLE_FONT} className="text-xl">
-          {(p.monthlyCredits || p.oneTimeCredits || 0).toLocaleString()}
-        </span>{' '}
-        <span className="text-muted-foreground">
-          credits{p.monthlyCredits ? ' / month' : ' to start'}
-        </span>
-      </p>
-      {p.addUser && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          +${p.addUser.priceMonthly}/user · +{p.addUser.credits.toLocaleString()} credits
-        </p>
-      )}
-      <Link href={card.cta.href} className={`${PRIMARY_PILL} mt-8 w-full justify-center`}>
-        {card.cta.label}
-      </Link>
-    </div>
-  );
-}
-
 export default function PricingPage() {
+  // Show the Monthly/Annual preview toggle only when annual is actually
+  // purchasable for at least one displayed tier (computed server-side via the
+  // single-source-of-truth helper) — never advertise an annual price the in-app
+  // checkout would refuse.
+  const annualEnabled = (['solo', 'pro', 'team', 'team_plus'] as const).some((id) =>
+    isAnnualAvailable(id),
+  );
   return (
     <>
-      <MarketingHero
-        eyebrow="PRICING"
-        title="Pricing that scales with your team."
-        sub="Start free. Move up as you grow. Premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents."
-        primaryCta={{ label: 'Start free', href: SIGNUP }}
-        secondaryCta={{ label: 'Talk to sales for teams', href: '/demo' }}
-      />
-
-      {/* Individual plans */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-6xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            For individual agents
-          </p>
-          <div className="mt-6 grid gap-5 md:grid-cols-3">
-            {INDIVIDUAL.map((c) => (
-              <PlanCard key={c.id} card={c} />
-            ))}
+      <div className="dark bg-[#0a0a0a] text-white">
+        {/* Hero */}
+        <section className="relative isolate overflow-hidden">
+          <div aria-hidden className="absolute inset-0 -z-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/marketing/hero-bg.jpg" alt="" className="h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/82 via-[#0a0a0a]/48 to-[#0a0a0a]" />
+            <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
           </div>
-        </div>
-      </section>
+          <Band className="pt-40 pb-16 text-center sm:pt-48 sm:pb-20">
+            <BlurRise trigger="load">
+              <EyebrowPill>Pricing</EyebrowPill>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.08}>
+              <Serif as="h1" className="mx-auto mt-7 max-w-3xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
+                Pricing that scales with you.
+              </Serif>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.16}>
+              <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
+                Every plan starts with a 7-day free trial. Move up as you grow, premium AI workflows
+                draw from a monthly credit balance, and brokerage pricing expands automatically as you
+                add agents.
+              </p>
+            </BlurRise>
+          </Band>
+        </section>
 
-      {/* Team plans */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-4xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            For teams
-          </p>
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
-            {TEAM.map((c) => (
-              <PlanCard key={c.id} card={c} />
-            ))}
-          </div>
-        </div>
-      </section>
+        {/* Plan cards + Monthly/Annual toggle */}
+        <PricingPlans annualEnabled={annualEnabled} />
 
-      {/* Brokerage expansion */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-3xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Brokerage expansion
-          </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
-            Add an agent. Billing updates automatically.
-          </h2>
-          <div className="mt-8 overflow-hidden rounded-2xl border border-border/70">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/60 text-left text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Agents</th>
-                  <th className="px-5 py-3 font-medium tabular-nums">Monthly / agent</th>
-                  <th className="px-5 py-3 font-medium tabular-nums">Annual / agent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {EXPANSION.map((row) => (
-                  <tr key={row.range} className="border-b border-border/60 last:border-0">
-                    <td className="px-5 py-3 text-foreground">{row.range}</td>
-                    <td className="px-5 py-3 tabular-nums text-foreground">${row.mo}</td>
-                    <td className="px-5 py-3 tabular-nums text-foreground">${row.yr}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="px-5 py-3 text-foreground">200+ agents</td>
-                  <td className="px-5 py-3 text-muted-foreground" colSpan={2}>
-                    Custom — performance pricing available.{' '}
-                    <Link href="/demo" className="text-brand hover:underline">Talk to sales</Link>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Credits explainer */}
-      <section className="relative pb-16 md:pb-24">
-        <div className="mx-auto max-w-3xl px-6 md:px-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Premium AI workflows
-          </p>
-          <h2 style={TITLE_FONT} className="mt-3 text-[28px] md:text-[36px] tracking-[-0.02em] text-foreground">
-            Credits are spent when Chippi does real work.
-          </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Every paid plan includes a monthly credit balance. High-value actions cost more; routine ones cost little. Unused credits roll over for 30 days.
-          </p>
-          <ul className="mt-8 divide-y divide-border/60 border-t border-b border-border/60">
-            {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[])
-              .filter((k) => k in WORKFLOW_LABELS)
-              .map((k) => (
-              <li key={k} className="flex items-center justify-between py-3">
-                <span className="text-sm text-foreground">{WORKFLOW_LABELS[k]}</span>
-                <span className="text-sm tabular-nums text-muted-foreground">
-                  {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Need more? One-time top-ups
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {Object.values(TOPUPS).map((t) => (
-              <div key={t.id} className="rounded-2xl border border-border/70 p-5">
-                <p className="text-sm font-medium text-foreground">{t.label}</p>
-                <p style={TITLE_FONT} className="mt-2 text-2xl tabular-nums text-foreground">
-                  {t.credits.toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">credits · ${t.price} one-time</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="relative py-16 md:py-24">
-        <div className="max-w-3xl mx-auto px-6 md:px-8">
-          <div className="text-center">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Questions
+        {/* Adding agents, flat per-seat (matches lib/plans addUser, no invented tiers) */}
+        <Band className="py-16 sm:py-20">
+          <BlurRise className="mx-auto max-w-3xl">
+            <div className="text-center">
+              <Eyebrow className="justify-center">Adding agents</Eyebrow>
+              <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+                Add an agent, billing updates itself.
+              </Serif>
+              <p className="mx-auto mt-5 max-w-xl text-[14px] leading-relaxed text-white/55">
+                Team and Team Plus include a block of seats. Past that, each additional agent is a flat
+                monthly add-on, added or removed automatically as your floor changes.
+              </p>
+            </div>
+            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2">
+              {[PLANS.team, PLANS.team_plus].map((p) => (
+                <div key={p.id} className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6">
+                  <p style={{ fontFamily: 'var(--font-sans)' }} className="text-[15px] font-semibold text-white">
+                    {p.label}
+                  </p>
+                  <p className="mt-1 text-[12.5px] text-white/45">{p.includedUsers} seats included</p>
+                  <p className="mt-4">
+                    <span style={{ fontFamily: 'var(--font-sans)' }} className="text-2xl font-light tabular-nums text-white">
+                      ${p.addUser?.priceMonthly}
+                    </span>
+                    <span className="text-[13px] text-white/45"> / additional agent / mo</span>
+                  </p>
+                  <p className="mt-1 text-[12px] text-white/40">
+                    +{p.addUser?.credits.toLocaleString()} credits per added agent
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-6 text-center text-[13px] text-white/45">
+              Running a large floor?{' '}
+              <Link href="/demo" className="font-medium text-[#ff9a6e] hover:underline">
+                Talk to sales
+              </Link>
+              .
             </p>
-            <h2
-              style={TITLE_FONT}
-              className="mt-4 text-[34px] sm:text-[44px] tracking-[-0.02em] text-foreground"
-            >
+          </BlurRise>
+        </Band>
+
+        {/* Credits explainer + top-ups */}
+        <Band className="py-16 sm:py-20">
+          <BlurRise className="mx-auto max-w-3xl">
+            <div className="text-center">
+              <Eyebrow className="justify-center">Premium AI workflows</Eyebrow>
+              <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
+                Credits are spent when Chippi does real work.
+              </Serif>
+              <p className="mt-5 text-[14px] leading-relaxed text-white/55">
+                Every plan includes a monthly credit balance. High-value actions cost more, routine ones
+                cost little. Unused credits roll over for 30 days.
+              </p>
+            </div>
+            <ul className="mt-8 divide-y divide-white/[0.06] overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
+              {(Object.keys(WORKFLOW_CREDIT_COST) as (keyof typeof WORKFLOW_CREDIT_COST)[])
+                .filter((k) => k in WORKFLOW_LABELS)
+                .map((k) => (
+                  <li key={k} className="flex items-center justify-between px-5 py-3.5">
+                    <span className="text-[13.5px] text-white/80">{WORKFLOW_LABELS[k]}</span>
+                    <span className="text-[13px] tabular-nums text-white/45">
+                      {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+
+            <p className="mt-10 text-center">
+              <Eyebrow className="justify-center">Need more? One-time top-ups</Eyebrow>
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              {Object.values(TOPUPS).map((t) => (
+                <div key={t.id} className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-5">
+                  <p className="text-[13.5px] font-medium text-white">{t.label}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-white">
+                    {t.credits.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-[12px] text-white/45">credits, ${t.price} one-time</p>
+                </div>
+              ))}
+            </div>
+          </BlurRise>
+        </Band>
+
+        {/* FAQ */}
+        <Band className="py-16 sm:py-20">
+          <BlurRise className="mx-auto max-w-3xl text-center">
+            <Eyebrow className="justify-center">Questions</Eyebrow>
+            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
               What people ask first.
-            </h2>
-          </div>
-          <ul className="mt-14 divide-y divide-border/60 border-t border-b border-border/60">
-            {FAQ.map((item) => (
-              <li key={item.q} className="py-8">
-                <p className="text-base md:text-lg font-medium text-foreground">{item.q}</p>
-                <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">{item.a}</p>
-              </li>
+            </Serif>
+          </BlurRise>
+          <ul className="mx-auto mt-12 max-w-3xl divide-y divide-white/[0.08]">
+            {FAQ.map((item, i) => (
+              <BlurRise key={item.q} delay={i * 0.04}>
+                <li className="py-7">
+                  <p style={{ fontFamily: 'var(--font-sans)' }} className="text-[15px] font-semibold text-white">
+                    {item.q}
+                  </p>
+                  <p className="mt-2.5 text-[14px] leading-relaxed text-white/55">{item.a}</p>
+                </li>
+              </BlurRise>
             ))}
           </ul>
-        </div>
-      </section>
+        </Band>
 
-      <MarketingCTA
-        title="Start free. Grow when you’re ready."
-        sub="No card required to begin. Bring your inbox and let Chippi do the work."
-        primaryCta={{ label: 'Start free', href: SIGNUP }}
-        secondaryCta={{ label: 'Talk to sales', href: '/demo' }}
-      />
+        {/* Closing CTA */}
+        <Band className="pb-28 pt-4 sm:pb-36">
+          <BlurRise className="mx-auto max-w-2xl text-center">
+            <Serif className="text-[clamp(1.9rem,3.8vw,3rem)] leading-[1.06] text-white">
+              Try Chippi free for 7 days.
+            </Serif>
+            <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-white/55">
+              Bring your inbox and let Chippi start working the leads today. Card required, cancel
+              anytime before day 7 at no charge.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <PillPrimary href={SIGNUP} withArrow>
+                Start free trial
+              </PillPrimary>
+              <PillGhost href="/demo">Book a demo</PillGhost>
+            </div>
+          </BlurRise>
+        </Band>
+      </div>
     </>
   );
 }

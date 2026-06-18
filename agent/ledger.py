@@ -11,8 +11,8 @@ Phase 2 caching telemetry:
                  path (xAI Grok, Google Gemini on OpenRouter today).
                  Powers the cache-hit-rate stat on the Usage page.
   provider     — OpenRouter prefix ('anthropic' | 'openai' | 'xai' |
-                 'deepseek' | 'google' | 'moonshotai' | 'qwen' | 'unknown').
-                 Powers the per-provider breakdown on the Usage page.
+                 'deepseek' | 'google' | 'moonshotai' | 'qwen' | 'zai' |
+                 'unknown'). Powers the per-provider breakdown on the Usage page.
 """
 
 from __future__ import annotations
@@ -46,6 +46,15 @@ MODEL_PRICES: dict[str, dict[str, float]] = {
     "anthropic/claude-opus-4.7": {"in": 5.00, "out": 25.00},
     "moonshotai/kimi-k2.6":      {"in": 0.73, "out": 3.49},
     "qwen/qwen3.6-flash":        {"in": 0.19, "out": 1.13},
+    # Active stack. Prices reuse the models these replaced (deepseek-v4-pro for
+    # the qwen chat/multimodal model, hy3-preview for the glm swarm worker) so
+    # metering keeps charging a sane non-zero rate.
+    # TODO: confirm real pricing
+    "qwen/qwen3.7-plus":         {"in": 0.44, "out": 0.88},
+    "z-ai/glm-5.2":              {"in": 0.07, "out": 0.26},
+    # Retired but retained so historical ChatUsage rows still price correctly.
+    "deepseek/deepseek-v4-pro":  {"in": 0.44, "out": 0.88},
+    "tencent/hy3-preview":       {"in": 0.07, "out": 0.26},
 }
 _DEFAULT_PRICE = {"in": 2.50, "out": 10.00}
 

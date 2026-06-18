@@ -1,19 +1,32 @@
 "use client";
 
 /**
- * Opening moment. On every app/PWA open, Chippi greets the realtor by name
+ * Opening moment. When the realtor OPENS the app, Chippi greets them by name
  * (a different line each time — picked SERVER-side and passed in, so the
  * server and client always render the same text; doing the random pick in the
  * client caused a hydration mismatch), reveals a snapshot of what changed while
  * they were away, signs off with the small Chippi mark, then the whole thing
  * swipes up to reveal the dashboard beneath it.
  *
+ * It plays on every real "open", not just the very first mount — which is the
+ * bug that made it feel gone on an installed PWA. An installed PWA usually
+ * RESUMES (the page stays alive in memory) instead of reloading, so a
+ * mount-only splash only ever played on the very first cold launch. This
+ * version triggers on the browser's open/resume lifecycle:
+ *   - initial load / hard refresh / cold PWA launch  → the server paints the
+ *     greeting and the client runs the timeline;
+ *   - bfcache restore (back/forward, some PWA resumes) → `pageshow.persisted`;
+ *   - the app is brought back to the foreground after being away a while
+ *     (re-opening the PWA for the day) → `visibilitychange`.
+ * In-app navigation does NOT replay it (the dashboard layout persists, so the
+ * component never remounts and nothing re-fires).
+ *
  * Theme-driven (bg-background / text-foreground + the BrandLogo's own
  * light/dark swap). Honors prefers-reduced-motion. A safety timeout guarantees
  * it can never trap the app.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -22,14 +35,6 @@ import {
 } from "motion/react";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { peekSwitchFlag } from "@/components/dashboard/account-switch";
-
-// One-shot, per-page-load gate. Module state lives for the lifetime of the JS
-// bundle: it survives client-side navigation (so switching between the realtor
-// and broker dashboards does NOT replay the heavy splash) but resets on a full
-// page reload (so a first open or hard refresh plays it again). The lighter
-// Chippi-logo account-switch swipe is a separate component and is unaffected.
-let splashPlayed = false;
 
 export interface ChippiSnapshot {
   newLeads: number;
@@ -44,6 +49,12 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const T_TO_SNAPSHOT = 1700;
 const T_TO_GONE = 4100;
 const T_SAFETY = 7000;
+
+// Coming back to the app after this long away counts as a fresh "open" and
+// replays the splash (the "open the PWA for the day → here's your brief"
+// moment). Short tab-switches stay under it, so it never nags mid-task.
+const REOPEN_AFTER_MS = 30 * 60 * 1000;
+const LAST_PLAYED_KEY = "chippi:splash:lastPlayed";
 
 function buildItems(s: ChippiSnapshot): { n: number; label: string }[] {
   const out: { n: number; label: string }[] = [];
@@ -70,32 +81,65 @@ export function ChippiSplash({
   greeting: string;
   snapshot: ChippiSnapshot;
 }) {
-  // Decide ONCE, on first render, whether this mount should play the splash.
-  // Skip it if it has already played this page load (client-side navigation,
-  // e.g. switching dashboards) or if an account switch is in progress — that
-  // hands the moment to the lighter Chippi-logo swipe instead.
-  const [shouldPlay] = useState(() => !splashPlayed && !peekSwitchFlag());
-  const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">(
-    shouldPlay ? "greeting" : "gone"
-  );
+  // Start on the greeting so the server paints it immediately on every full
+  // load (no blank flash before hydration). The client then runs the timeline.
+  const [stage, setStage] = useState<"greeting" | "snapshot" | "gone">("greeting");
   const reduce = useReducedMotion();
   const items = useMemo(() => buildItems(snapshot), [snapshot]);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  }, []);
+
+  // Run greeting → snapshot → swipe up, and stamp when it last played.
+  const runTimeline = useCallback(() => {
+    clearTimers();
+    timers.current.push(setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT));
+    timers.current.push(setTimeout(() => setStage("gone"), T_TO_GONE));
+    timers.current.push(setTimeout(() => setStage("gone"), T_SAFETY));
+    try {
+      sessionStorage.setItem(LAST_PLAYED_KEY, String(Date.now()));
+    } catch {
+      /* sessionStorage can be unavailable; the splash still plays. */
+    }
+  }, [clearTimers]);
+
+  // Restart the whole splash (used when the app is re-opened / resumed).
+  const replay = useCallback(() => {
+    setStage("greeting");
+    runTimeline();
+  }, [runTimeline]);
 
   useEffect(() => {
-    if (!shouldPlay) return;
-    // Mark played so later client-side navigations skip the splash. A full page
-    // reload resets this module, which is exactly the first-load / hard-refresh
-    // behavior we want.
-    splashPlayed = true;
-    const a = setTimeout(() => setStage("snapshot"), T_TO_SNAPSHOT);
-    const b = setTimeout(() => setStage("gone"), T_TO_GONE);
-    const safety = setTimeout(() => setStage("gone"), T_SAFETY);
-    return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-      clearTimeout(safety);
+    // Initial open: the greeting is already on screen (SSR) — run the timeline.
+    runTimeline();
+
+    // Restored from bfcache (back/forward, some PWA resumes) → a real re-open.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) replay();
     };
-  }, [shouldPlay]);
+    // App brought back to the foreground after being away → re-open for the day.
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      let last = 0;
+      try {
+        last = Number(sessionStorage.getItem(LAST_PLAYED_KEY)) || 0;
+      } catch {
+        /* ignore */
+      }
+      if (Date.now() - last >= REOPEN_AFTER_MS) replay();
+    };
+
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearTimers();
+    };
+  }, [runTimeline, replay, clearTimers]);
 
   // Lock body scroll while the overlay is up.
   useEffect(() => {
