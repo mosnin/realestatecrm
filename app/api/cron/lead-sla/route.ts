@@ -34,8 +34,9 @@ async function handler(req: NextRequest) {
         breached: acc.breached + r.breached,
         nudged: acc.nudged + r.nudged,
         escalated: acc.escalated + r.escalated,
+        followUpsCreated: acc.followUpsCreated + r.followUpsCreated,
       }),
-      { breached: 0, nudged: 0, escalated: 0 },
+      { breached: 0, nudged: 0, escalated: 0, followUpsCreated: 0 },
     );
     logger.info('[cron/lead-sla] sweep complete', { brokerages: results.length, ...totals });
     return NextResponse.json({ ok: true, brokerages: results.length, ...totals });
