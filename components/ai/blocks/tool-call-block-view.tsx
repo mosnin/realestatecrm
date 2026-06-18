@@ -21,11 +21,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
-import { ContactsResult } from './tool-results/contacts-result';
-import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
-import { PropertiesResult } from './tool-results/properties-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
+import { ContactsTableResult } from './tool-results/contacts-table-result';
+import { DealsTableResult } from './tool-results/deals-table-result';
+import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
+import { StatsResult } from './tool-results/stats-result';
+import { WeatherResult } from './tool-results/weather-result';
+import { OptionListResult } from './tool-results/option-list-result';
+import { QuestionFlowResult } from './tool-results/question-flow-result';
+import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
+import type { OptionListInput, QuestionFlowInput } from './tool-results/tool-ui-mappers';
+import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
 
 /**
  * Row-level shimmer styles for the running state. A gentle gradient sweep
@@ -60,8 +67,16 @@ function ensureRowShimmerStyles() {
 .dark .an-tool-call-row-shimmer {
   background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%);
 }
+@keyframes an-tool-call-icon-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.an-tool-call-icon-pulse {
+  animation: an-tool-call-icon-pulse 1.6s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .an-tool-call-row-shimmer { animation: none; }
+  .an-tool-call-icon-pulse { animation: none; opacity: 1; }
 }
 `;
   document.head.appendChild(style);
@@ -187,12 +202,6 @@ interface ToolCallBlockViewProps {
   block: ToolCallBlock;
   /** Is this call currently running? Overrides persisted status for live turns. */
   live?: boolean;
-  /**
-   * When true a subtle left accent timeline bar is rendered, signalling this
-   * tool call is part of a multi-step sequence. Wire from the parent once
-   * sequence detection is implemented; default false today.
-   */
-  isPartOfSequence?: boolean;
   /** Interactive cards (availability picker) bubble user intents back up
    *  through this prop. The workspace forwards them as the next user
    *  message. Omitted on read-only history surfaces. */
@@ -203,7 +212,6 @@ interface ToolCallBlockViewProps {
 export function ToolCallBlockView({
   block,
   live,
-  isPartOfSequence = false,
   onUserIntent,
   className,
 }: ToolCallBlockViewProps) {
@@ -241,10 +249,13 @@ export function ToolCallBlockView({
           tint: 'text-emerald-600 dark:text-emerald-400',
         };
       case 'error':
+        // Neutral, not red — a failed tool mid-task shouldn't alarm the realtor
+        // (the agent routinely tries a few tools). Same muted tone as the other
+        // terminal states; the XCircle glyph still marks it as failed.
         return {
           label: 'Failed',
           iconEl: <XCircle size={12} />,
-          tint: 'text-rose-600 dark:text-rose-400',
+          tint: 'text-muted-foreground',
         };
       case 'denied':
         return {
@@ -271,17 +282,29 @@ export function ToolCallBlockView({
     if (status !== 'complete' || !block.result?.ok) return null;
     const data = block.result.data as Record<string, unknown> | undefined;
     if (!data) return null;
+    // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
+    // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-      return <ContactsResult data={data as { contacts: never[] }} />;
+      return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
     }
-    if (block.display === 'deals' && Array.isArray((data as { deals?: unknown[] }).deals)) {
-      return <DealsResult data={data as { deals: never[] }} />;
+    if (block.display === 'deals') {
+      const deals = normalizeDealRows(data);
+      return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
     }
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;
     }
-    if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
-      return <PropertiesResult data={data as { properties: never[] }} />;
+    if (block.display === 'properties') {
+      const properties = normalizePropertyRows(data);
+      return properties.length > 0 ? (
+        <PropertiesCarouselResult properties={properties} onUserIntent={onUserIntent} />
+      ) : null;
+    }
+    if (block.display === 'stats') {
+      return <StatsResult data={data} />;
+    }
+    if (block.display === 'weather') {
+      return <WeatherResult data={data} />;
     }
     if (
       block.display === 'availability-picker' &&
@@ -302,6 +325,25 @@ export function ToolCallBlockView({
           onSelectSlot={onUserIntent}
         />
       );
+    }
+    // ── Interactive clarification (ask_realtor) ──────────────────────────
+    // A small set of choices → OptionList; the realtor's pick rounds back
+    // through onUserIntent as the next turn.
+    if (block.display === 'option-list' && Array.isArray((data as { options?: unknown[] }).options)) {
+      const d = data as unknown as OptionListInput & { prompt?: string };
+      return <OptionListResult input={d} prompt={d.prompt} onUserIntent={onUserIntent} />;
+    }
+    // A branching / multi-step clarification → QuestionFlow; answers round
+    // back through onUserIntent once complete.
+    if (block.display === 'question-flow') {
+      const d = data as unknown as QuestionFlowInput;
+      return <QuestionFlowResult input={d} onUserIntent={onUserIntent} />;
+    }
+    // ── Email draft awaiting approval (draft_message / draft_email) ───────
+    // MessageDraft with Send / Cancel. Send hits the real approve-and-send
+    // endpoint when a draftId is present, else falls back to onUserIntent.
+    if (block.display === 'message-draft' && typeof (data as { body?: unknown }).body === 'string') {
+      return <MessageDraftResult data={data as unknown as MessageDraftData} onUserIntent={onUserIntent} />;
     }
     return null;
   })();
@@ -324,20 +366,9 @@ export function ToolCallBlockView({
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
-  // Colored left-edge bar carries the status semantic so the row stays
-  // scannable without a card border. The body of the row is borderless
-  // and transparent — see STYLESHEET.md "paper-flat" principle.
-  const accentBar =
-    status === 'running'
-      ? 'bg-muted-foreground/30'
-      : block.display === 'error' || status === 'error'
-        ? 'bg-rose-500/60'
-        : block.display === 'warning'
-          ? 'bg-amber-500/60'
-          : block.display === 'success' && status === 'complete'
-            ? 'bg-emerald-500/60'
-            : 'bg-muted-foreground/20';
-
+  // Rows are borderless and transparent — no left accent bar or card edge —
+  // per STYLESHEET.md "paper-flat" principle. Status reads from the icon tint,
+  // the running-row shimmer, and the error breadcrumb instead.
   // Expand is only useful when there are args or a result summary to show in
   // the collapsible detail pane (not the same as the inline summary).
   const argsEntries = Object.entries(block.args ?? {});
@@ -345,14 +376,10 @@ export function ToolCallBlockView({
 
   return (
     <motion.div
-      className={cn(
-        'group relative flex flex-col',
-        isPartOfSequence && 'border-l border-border/40 ml-1 pl-2',
-        className,
-      )}
-      initial={{ opacity: 0, y: 4 }}
+      className={cn('group relative flex flex-col', className)}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* Compact step row. Collapsed by default — args, summary, and full
           result detail live behind the expand chevron. Three pieces stay
@@ -373,14 +400,9 @@ export function ToolCallBlockView({
           status === 'running' && 'an-tool-call-row-shimmer',
         )}
       >
-        {/* Left accent bar */}
-        <span
-          aria-hidden
-          className={cn('absolute left-0 inset-y-0 w-[3px] rounded-l-lg flex-shrink-0', accentBar)}
-        />
-
-        {/* Tool icon */}
-        <span className={cn('flex-shrink-0', tint)}>
+        {/* Tool icon — gets a gentle pulse while the call is in flight so the
+            running row reads "alive" now that the left accent bar is gone. */}
+        <span className={cn('flex-shrink-0', tint, status === 'running' && 'an-tool-call-icon-pulse')}>
           <Icon size={13} />
         </span>
 
@@ -426,7 +448,7 @@ export function ToolCallBlockView({
       {inlineError && (
         <p
           role="status"
-          className="text-[12px] text-rose-700 dark:text-rose-400 mt-1 px-1 leading-snug"
+          className="text-[12px] text-muted-foreground mt-1 px-1 leading-snug"
         >
           {inlineError}
         </p>
@@ -475,10 +497,10 @@ export function ToolCallBlockView({
               )}
               {block.result?.error && block.result.ok === false && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                     Error
                   </p>
-                  <p className="text-xs text-rose-700 dark:text-rose-300">{block.result.error}</p>
+                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{block.result.error}</p>
                 </div>
               )}
             </div>

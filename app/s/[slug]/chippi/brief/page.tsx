@@ -1,12 +1,17 @@
 /**
- * /chippi/brief — the dedicated daily brief page.
+ * /chippi/brief — the realtor's daily dashboard.
  *
- * The brief's serif morning sentence IS the page's identity, so we omit
- * the shell's static title to avoid two serif h1s stacking. The greeting
- * line ("Today.") still orients; everything below it is the brief.
+ * A calm, premium bento grid that gives the realtor an at-a-glance picture
+ * of their day and their business. Every number on it is REAL: composed
+ * server-side by composeBriefDashboard (one parallel fan-out against the
+ * realtor's own tables) and handed to the client bento as props, so the
+ * grid paints with truthful numbers on first byte — no client fetch
+ * waterfall, no zeros that count up after a round-trip.
  *
- * Renders the live brief — bypasses the lifecycle collapse so the realtor
- * always sees the full brief when they navigate here intentionally.
+ * The shell's "Today." greeting orients; the bento owns everything below.
+ * Each cell renders its own empty state and is omitted when it has no data
+ * — calm silence over filler. See components/chippi/brief-dashboard.tsx for
+ * the cell map and lib/briefing/dashboard.ts for the per-cell data source.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -14,7 +19,8 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
-import { DailyBrief } from '@/components/chippi/daily-brief';
+import { BriefDashboard } from '@/components/chippi/brief-dashboard';
+import { composeBriefDashboard } from '@/lib/briefing/dashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +44,12 @@ export default async function ChippiBriefPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  // One server-side fan-out gathers every real number the bento renders.
+  const dashboard = await composeBriefDashboard(space.id, space.ownerId);
+
   return (
     <ChippiPageShell greeting="Today.">
-      <DailyBrief slug={slug} alwaysLive />
+      <BriefDashboard slug={slug} data={dashboard} />
     </ChippiPageShell>
   );
 }

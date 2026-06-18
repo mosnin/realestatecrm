@@ -1,17 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { TOPUPS, type TopupId } from '@/lib/plans';
+import { TOPUPS, type TopupId, type PlanId, canBuyTopups } from '@/lib/plans';
 
 /**
  * Buy-more-credits — the three top-up packs. Clicking one opens Stripe Checkout
  * (one-time payment); on success the webhook grants the credits. Paper-flat per
  * STYLESHEET: hairline-divider grid, rounded-xl, serif stat number, foreground
  * pill CTA, no shadow.
+ *
+ * `plan` is the FUNDING account's plan. Top-ups are paid-tier only (Fix #7):
+ * when the plan can't buy them (Free) we render an upgrade hint instead of the
+ * packs. The server route enforces the same rule — this is just the UI guard.
  */
-export function BuyCredits({ slug }: { slug: string }) {
+export function BuyCredits({ slug, plan }: { slug: string; plan: PlanId | string | null | undefined }) {
   const [loading, setLoading] = useState<TopupId | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  if (!canBuyTopups(plan)) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Top-ups are available on paid plans. Upgrade to buy more credits.
+      </p>
+    );
+  }
 
   async function buy(topup: TopupId) {
     setLoading(topup);

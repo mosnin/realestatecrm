@@ -1,6 +1,6 @@
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, getRecentTxns, type CreditTxnRow } from '@/lib/billing/credits';
-import { PLANS } from '@/lib/plans';
+import { PLANS, type PlanId } from '@/lib/plans';
 import { BuyCredits } from '@/components/billing/buy-credits';
 import { cn } from '@/lib/utils';
 
@@ -38,11 +38,13 @@ export async function CreditsSummary({ spaceId, slug }: { spaceId: string; slug:
   let monthlyCredits = 0;
   let balance = 0;
   let txns: CreditTxnRow[] = [];
+  let plan: PlanId = 'free';
   try {
-    const { account, plan } = await resolveBillingAccount(spaceId);
+    const resolved = await resolveBillingAccount(spaceId);
+    plan = resolved.plan;
     planLabel = PLANS[plan].label;
     monthlyCredits = PLANS[plan].monthlyCredits;
-    [balance, txns] = await Promise.all([getCreditBalance(account), getRecentTxns(account, 8)]);
+    [balance, txns] = await Promise.all([getCreditBalance(resolved.account), getRecentTxns(resolved.account, 8)]);
   } catch {
     return null; // credits not provisioned in this environment yet
   }
@@ -65,7 +67,7 @@ export async function CreditsSummary({ spaceId, slug }: { spaceId: string; slug:
         </p>
       </header>
 
-      <BuyCredits slug={slug} />
+      <BuyCredits slug={slug} plan={plan} />
 
       {txns.length > 0 && (
         <div className="space-y-1.5">

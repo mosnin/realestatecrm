@@ -1,5 +1,7 @@
 import { AuthPageLayout } from '@/components/auth/auth-page-layout';
 import { ThemedSignIn } from '@/components/auth/clerk-sign-in';
+import { PlanIntentCapture } from '@/components/auth/plan-intent-capture';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { BODY_MUTED, QUIET_LINK } from '@/lib/typography';
@@ -13,8 +15,12 @@ export default async function RealtorSignInPage({
   searchParams: Promise<{ redirect_url?: string }>;
 }) {
   const { redirect_url } = await searchParams;
-  // Validate redirect_url: allow safe internal paths, block path traversal
-  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  // Validate redirect_url: allow safe internal paths, block path traversal.
+  // '/join/' is required so a logged-out user who opens a brokerage
+  // join-code link round-trips back to /join/[code] after sign-in. Without
+  // it the code is dropped and /auth/redirect lands them on their own
+  // workspace, silently failing the join.
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/join/', '/subscribe', '/billing-required', '/authorize'];
   const isSafeRedirect = redirect_url
     && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
     && !redirect_url.includes('..');
@@ -30,6 +36,10 @@ export default async function RealtorSignInPage({
       variant="realtor"
       heading="Welcome back, realtor."
     >
+      {/* Stash any ?plan= from the marketing CTA before Clerk's redirects drop it. */}
+      <Suspense fallback={null}>
+        <PlanIntentCapture />
+      </Suspense>
       <div className="w-full space-y-4">
         <ThemedSignIn
           routing="path"

@@ -158,7 +158,7 @@ async def _fetch_curated_schemas(
     if not slugs:
         return []
     try:
-        async with httpx.AsyncClient(timeout=_SCHEMA_FETCH_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_SCHEMA_FETCH_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url}/api/internal/integrations/search",
                 json={
@@ -283,7 +283,7 @@ def _build_curated_tool(
             arg_keys=list(arguments.keys()) if isinstance(arguments, dict) else [],
         )
         try:
-            async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT, follow_redirects=True) as client:
                 resp = await client.post(
                     f"{base_url}/api/internal/integrations/execute",
                     json={
@@ -311,7 +311,13 @@ def _build_curated_tool(
             )
         # 4xx body carries the Composio envelope (possibleFixes, requestId)
         # the model uses to self-correct. 2xx already carries {ok,data,error}.
-        return body_text or json.dumps({"ok": True, "data": None})
+        if not body_text.strip():
+            # Empty 2xx/3xx body is NOT success (this caused false "done").
+            return json.dumps({
+                "ok": False,
+                "error": f"{slug} returned an empty {resp.status_code} response — treat as failed, not done.",
+            })
+        return body_text
 
     # `additionalProperties: True` matches the TS side (lib/integrations/
     # agent-tools.ts) — Composio re-validates server-side anyway, so loose
@@ -340,74 +346,85 @@ def _build_curated_tool(
     )
 
 
-async def load_integration_tools(space_id: str, user_id: str) -> list[Any]:
+def _dispatcher_pair() -> list[Any]:
+    from tools.integrations_dispatcher import (
+        call_integration_tool,
+        find_integration_tool,
+    )
+
+    return [find_integration_tool, call_integration_tool]
+
+
+async def load_integration_tools(
+    space_id: str,
+    user_id: str,
+    toolkits: list[str] | None = None,
+) -> list[Any]:
     """Return curated FunctionTools (one per top-N action on each connected
     toolkit) PLUS the dispatcher fallback (find_integration_tool +
-    call_integration_tool). Empty list when no toolkits are connected or
-    the proxy is unconfigured — chat must keep working on the native
-    catalog regardless.
+    call_integration_tool). Empty list ONLY when no toolkits are connected
+    — chat must keep working on the native catalog regardless.
 
-    The curated tools are the fast path: one LLM hop, one HTTP round trip,
-    no dispatcher search step. The dispatcher remains for everything not
-    in the curated allowlist (uncommon actions, toolkits without a
-    curated set yet).
+    Pass `toolkits` when the caller already fetched the connected list
+    (chat_turn does, for workspace_info) — saves a duplicate DB query on
+    the hot path.
+
+    Degradation policy: when the proxy env is missing or the connected
+    lookup fails, return the DISPATCHER PAIR rather than nothing. The
+    dispatcher fails loudly and instructively at call time ("integration
+    proxy not configured — tell the realtor…"), which the model can relay
+    as "temporarily unavailable". Returning [] here made every config
+    failure indistinguishable from "the realtor connected nothing", and
+    the model told realtors their integrations were gone.
     """
     proxy = _proxy_base()
     if proxy is None:
-        logger.warning(
+        logger.error(
             "integration_proxy_not_configured",
             space_id=space_id,
             user_id=user_id,
             hint="set NEXT_PUBLIC_APP_URL and AGENT_INTERNAL_SECRET in the Modal secret",
         )
-        return []
+        return _dispatcher_pair()
     base_url, secret = proxy
 
-    try:
-        toolkits = await active_toolkits(space_id, user_id)
-    except Exception as err:  # noqa: BLE001
-        logger.warning(
-            "integration_active_check_failed",
-            space_id=space_id,
-            user_id=user_id,
-            error=str(err)[:200],
-        )
-        return []
+    if toolkits is None:
+        try:
+            toolkits = await active_toolkits(space_id, user_id)
+        except Exception as err:  # noqa: BLE001
+            logger.warning(
+                "integration_active_check_failed",
+                space_id=space_id,
+                user_id=user_id,
+                error=str(err)[:200],
+            )
+            # Unknown whether connections exist — hand the model the
+            # dispatcher so a transient DB blip can't zero out tools.
+            return _dispatcher_pair()
     if not toolkits:
         return []
 
-    # ── Token-cost guard: dispatcher-only by default ────────────────────────
-    # The curated fast-path pre-loads dozens of Composio FunctionTools, and
-    # each carries a full JSON Schema — HubSpot/Gmail CRM actions run 1-3k
-    # tokens EACH. The OpenAI Agents SDK re-sends the ENTIRE tool-schema block
-    # on every step of the agent loop, so ~23 curated schemas × up to 10 loop
-    # steps was the dominant term in the 500k-tokens-per-turn blowup.
-    #
-    # The dispatcher (find_integration_tool → call_integration_tool) is two
-    # small tools that reach the SAME full Composio catalog with one extra
-    # hop of latency. Default to it. A deploy that would rather pay the tokens
-    # for that one less hop can opt back into curated with
-    # CHIPPI_CURATED_INTEGRATIONS=1 — no code change, no redeploy.
-    curated_enabled = (os.environ.get("CHIPPI_CURATED_INTEGRATIONS", "") or "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+    # ── Curated per-toolkit tools: ON by default ────────────────────────────
+    # History: curated was DISABLED by default as a token guard (each curated
+    # schema is 1-3k tokens, re-sent every agent-loop step). But the
+    # dispatcher-only default meant a realtor's connected Gmail surfaced as
+    # two generic search tools while the prompt told the model gmail_* tools
+    # were pre-loaded — the model concluded it had no Gmail and SAID SO. The
+    # most-reported integration bug was this default. Tokens are managed by
+    # the curated-slug budget below (MAX_TOTAL_TOOLS cap), not by hiding the
+    # tools. Opt OUT with CHIPPI_CURATED_INTEGRATIONS=0 if a deploy must.
+    curated_enabled = (
+        os.environ.get("CHIPPI_CURATED_INTEGRATIONS", "1") or "1"
+    ).strip().lower() not in ("0", "false", "no", "off")
     if not curated_enabled:
-        from tools.integrations_dispatcher import (
-            call_integration_tool,
-            find_integration_tool,
-        )
-
         logger.info(
             "integration_tools_dispatcher_only",
             space_id=space_id,
             user_id=user_id,
             connected_toolkits=toolkits,
-            reason="curated_disabled_token_guard",
+            reason="curated_disabled_by_env",
         )
-        return [find_integration_tool, call_integration_tool]
+        return _dispatcher_pair()
 
     # Collect curated slugs across the realtor's connected toolkits. A
     # toolkit with no curated entry contributes nothing here and falls

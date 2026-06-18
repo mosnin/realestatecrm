@@ -1,40 +1,40 @@
 /**
- * `/status` — system status. Honest, calm, no theatre.
+ * `/status`, system status. Honest, calm, no theatre.
  *
- * Apple-discipline: a silent serif hero, then a hairline-divided list of the
- * surfaces a realtor depends on, each carrying a single dot.
+ * Bold-canvas shell: PageHero opener, then the checks as white soft-shadow
+ * rows, each carrying a single dot.
  *
  * This page tells the TRUTH at request time. It probes the subsystems we can
- * actually verify from the server — the database, the agent's LLM + Modal
- * runtime, and the integrations layer — and renders what it finds:
+ * actually verify from the server, the database, the agent's LLM + Modal
+ * runtime, and the integrations layer, and renders what it finds:
  *
  *   - emerald  → operational (the check ran and passed)
- *   - rose     → degraded    (the check ran and failed)
- *   - muted    → unknown     (the check could not be performed — e.g. a
+ *   - amber    → degraded    (the check ran and failed)
+ *   - neutral  → unknown     (the check could not be performed, e.g. a
  *                             dependency isn't configured in this env)
  *
  * We do NOT paint a green dot we can't stand behind. A status page that lies
  * is worse than no status page. We also do NOT invent uptime percentages or
- * an incident history — those would be unverifiable claims. When there is a
+ * an incident history, those would be unverifiable claims. When there is a
  * real incident feed to wire, it earns its place here; until then the page
  * stays a calm, honest fact about right now.
  *
  * Only the three subsystems we can verify without a logged-in user are listed.
  * The per-user, per-workspace health (a realtor's own Gmail/Calendar
- * connection) lives behind auth on the integrations page — it can't be shown
+ * connection) lives behind auth on the integrations page, it can't be shown
  * truthfully on a public marketing page, so it isn't faked here.
  *
- * No charts, no graphs, no numbers. Hairline borders only. No brand orange.
+ * No charts, no graphs, no numbers.
  */
 
-import { MarketingHero } from '@/components/marketing/marketing-hero';
+import { PageHero } from '@/components/marketing/site/page-hero';
 import { supabase } from '@/lib/supabase';
 import { hasLLMKey } from '@/lib/llm';
 import { composioConfigured } from '@/lib/integrations/composio';
 
 export const metadata = { title: 'Status · Chippi' };
 
-// Always evaluate at request time — a status page must never be cached into a
+// Always evaluate at request time, a status page must never be cached into a
 // stale "operational" snapshot.
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +48,7 @@ interface Subsystem {
 /**
  * Probe the primary database. Mirrors the `/api/health` DB probe: a single
  * bounded read. A thrown error or a query error is degraded; success is
- * operational. There is no "unknown" path here — the DB is always reachable
+ * operational. There is no "unknown" path here, the DB is always reachable
  * to attempt, so the check always produces a real verdict.
  */
 async function checkDatabase(): Promise<Health> {
@@ -64,7 +64,7 @@ async function checkDatabase(): Promise<Health> {
  * The agent (Chippi) needs two things to do real work: an LLM provider key
  * and a Modal runtime URL. We can only verify CONFIGURATION from here, not a
  * live round-trip (that path is authenticated and rate-shaped). Missing config
- * is reported as "unknown" rather than "operational" — we won't claim the
+ * is reported as "unknown" rather than "operational", we won't claim the
  * agent is up when we can't see the keys it needs.
  */
 function checkAgent(): Health {
@@ -93,8 +93,8 @@ function checkIntegrations(): Health {
 
 const DOT: Record<Health, string> = {
   operational: 'bg-emerald-500',
-  degraded: 'bg-rose-500',
-  unknown: 'bg-muted-foreground/40',
+  degraded: 'bg-amber-500',
+  unknown: 'bg-neutral-300',
 };
 
 const LABEL: Record<Health, string> = {
@@ -105,9 +105,9 @@ const LABEL: Record<Health, string> = {
 
 function StatusRow({ label, health }: Subsystem) {
   return (
-    <li className="flex items-center justify-between gap-4 py-4">
-      <span className="text-sm text-foreground">{label}</span>
-      <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+    <li className="flex items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5">
+      <span className="text-sm font-medium text-zinc-950">{label}</span>
+      <span className="inline-flex items-center gap-2 text-sm text-neutral-500">
         <span
           aria-hidden
           className={`inline-block size-2 rounded-full ${DOT[health]}`}
@@ -120,7 +120,7 @@ function StatusRow({ label, health }: Subsystem) {
 
 export default async function StatusPage() {
   // Each probe is independently guarded so one failing check can never throw
-  // the page — the worst case for any single subsystem is "unknown".
+  // the page, the worst case for any single subsystem is "unknown".
   const [database, agent, integrations] = await Promise.all([
     checkDatabase(),
     Promise.resolve(checkAgent()),
@@ -136,7 +136,7 @@ export default async function StatusPage() {
   const anyDegraded = subsystems.some((s) => s.health === 'degraded');
   const allOperational = subsystems.every((s) => s.health === 'operational');
 
-  // The headline is the one focal sentence — it must match the dots below it.
+  // The headline is the one focal sentence, it must match the dots below it.
   const title = anyDegraded
     ? 'We’re looking into an issue.'
     : allOperational
@@ -145,24 +145,24 @@ export default async function StatusPage() {
 
   return (
     <>
-      <MarketingHero
-        eyebrow="STATUS"
+      <PageHero
+        eyebrow="Status"
         title={title}
         sub="Live status of Chippi’s agent, integrations, and dashboard."
       />
 
-      <section className="relative pb-24 md:pb-32">
-        <div className="mx-auto max-w-2xl px-6 md:px-8">
-          <ul className="divide-y divide-border/60 border-t border-b border-border/60">
+      <section className="px-4 pb-24 pt-2 sm:px-6 sm:pb-32">
+        <div className="mx-auto max-w-2xl">
+          <ul className="space-y-3">
             {subsystems.map((s) => (
               <StatusRow key={s.label} label={s.label} health={s.health} />
             ))}
           </ul>
-          <p className="mt-6 text-sm text-muted-foreground">
+          <p className="mt-8 text-sm text-neutral-500">
             Subscribe to status updates at{' '}
             <a
               href="mailto:status@chippi.app"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
+              className="underline underline-offset-2 transition-colors hover:text-zinc-950"
             >
               status@chippi.app
             </a>

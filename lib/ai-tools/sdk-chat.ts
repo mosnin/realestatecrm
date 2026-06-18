@@ -31,18 +31,21 @@ import {
   restoreRunState,
   applyApprovalDecision,
   type ApprovalDecision,
+  type ToolResultSink,
 } from './sdk-bridge';
 import { getAgentModel } from './agent-model';
 import { resolveChatModel } from '@/lib/llm';
 import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multimodal';
 import { buildDelegateTaskTool } from './tools/delegate-task';
-import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
+import { getChatTools } from './toolsets';
+import { withLoopGuard } from './loop-guard';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
 import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
+import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -66,13 +69,26 @@ const DEFAULT_MAX_TOKENS = 4_096;
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
- * to spelunk the catalog can't run our token bill into the ground. 15
- * gives the agent enough headroom to chain multi-step workflows
- * autonomously (look up a person → read their activity → find their
- * deal → draft a follow-up) without stopping mid-task to ask the
- * realtor a clarifying question.
+ * to spelunk the catalog can't run our token bill into the ground.
+ *
+ * Why 8, not 15: the SDK re-sends the FULL transcript (system prompt +
+ * every tool schema + all accumulated tool outputs) on EVERY inner step
+ * — token cost grows quadratically with the cap. 8 still covers the real
+ * multi-step workflows (look up a person → read activity → find deal →
+ * draft a follow-up is 4-5 steps); anything deeper belongs on
+ * delegate_task, which runs in its own bounded Modal context instead of
+ * re-billing this conversation's transcript.
  */
-const MAX_TURNS_PER_TURN = 15;
+const MAX_TURNS_PER_TURN = 6;
+
+/**
+ * Cap on prior turns re-sent to the model per reply (token redesign L3). The
+ * full transcript is re-shipped on every inner step, so unbounded history
+ * compounds the per-turn cost. The route already caps at 20; we window to the
+ * most recent turns here — enough for "who was that?" continuity without
+ * re-billing a long thread on every step.
+ */
+const HISTORY_WINDOW = 10;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -93,9 +109,27 @@ export function buildChatAgent(
     modelSlug?: string | null;
     integrationTools?: SdkTool[];
     instructions?: string;
+    /**
+     * The user's message for THIS turn. When present, the agent ships only
+     * CORE + the toolsets the message implies (`toolsets.ts`) instead of the
+     * whole catalog — the token-furnace fix. Omitted on the resume path,
+     * which falls back to the full catalog (a safe superset of whatever the
+     * paused run referenced).
+     */
+    userMessage?: string;
+    /**
+     * Optional sink for tool `data`/`display` keyed by SDK call id. The stream
+     * pump passes this so rich-card payloads reach the UI without entering the
+     * model's context. See `ToolResultSink` in sdk-bridge.ts.
+     */
+    resultSink?: ToolResultSink;
   } = {},
 ): Agent {
-  const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+  const selectedDomain =
+    opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
+  const domainTools = selectedDomain.map((t: ToolDefinition) =>
+    toSdkTool(t, ctx, opts.resultSink),
+  );
 
   // The model every agent in this turn runs on. Either an explicit override
   // (tests / A-B), or the realtor's workspace model resolved to the active
@@ -108,43 +142,14 @@ export function buildChatAgent(
   // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
   // its progress back inline. See tools/delegate-task.ts + the system prompt's
   // "when to delegate" guidance.
-  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx);
+  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx, opts.resultSink);
 
-  // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  // They share the parent's Model instance so they hit the same provider/key.
-  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: agentModel });
-  const contactResearcher = buildContactResearcherAgent(ctx, { model: agentModel });
-  const planner = buildPlannerAgent(ctx, { model: agentModel });
-
-  // Each sub-agent gets an explicit, small per-run turn cap. Without this, the
-  // SDK runs every `asTool` sub-agent with its DEFAULT_MAX_TURNS (10), and the
-  // parent's own cap does NOT bound the children — so a single request that
-  // fans out (e.g. "deep dive on my leads" -> research_person per lead) could
-  // chain dozens of uncapped sub-runs, each re-sending its growing transcript,
-  // into millions of tokens before failing. A tight cap collapses that blast
-  // radius while still leaving room for each skill's legitimate tool sequence
-  // (find_person -> find_deal -> recall_history -> answer).
-  const SUBAGENT_MAX_TURNS = 5;
-  const skillTools = [
-    pipelineAnalyst.asTool({
-      toolName: 'analyze_pipeline',
-      toolDescription:
-        'Analyze the pipeline for stuck deals, quiet hot persons, and overdue follow-ups.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-    contactResearcher.asTool({
-      toolName: 'research_person',
-      toolDescription:
-        'Research everything we know about a person and recommend the next action.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-    planner.asTool({
-      toolName: 'planner',
-      toolDescription:
-        'Break a complex multi-step task into a concrete execution plan before starting work. Call this first when the user asks for something that requires several distinct actions.',
-      runOptions: { maxTurns: SUBAGENT_MAX_TURNS },
-    }),
-  ];
+  // Per-turn sub-agents removed (token redesign L2). `analyze_pipeline`,
+  // `research_person`, and `planner` used to be attached as tools on EVERY
+  // turn, and each ran its own multi-turn sub-loop that re-shipped a growing
+  // transcript — a large, mostly-wasted token cost. The model now chains the
+  // core read tools inline; `delegate_task` remains for genuinely deep,
+  // explicitly-requested jobs (its own bounded Modal run).
 
   // Personalized prompt is async — it loads a snapshot of the realtor's
   // pipeline + connected apps. Callers that already awaited it pass it
@@ -153,7 +158,10 @@ export function buildChatAgent(
   return new Agent({
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
-    tools: [delegateTool, ...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
+    // Loop guard: stop the model from re-calling the same tool with the same
+    // args and burning the turn (code-level smart-stop + retry nudge, no extra
+    // model calls). Fresh per turn — these tool instances aren't shared.
+    tools: withLoopGuard([delegateTool, ...domainTools, ...(opts.integrationTools ?? [])]),
     model: agentModel,
     // Chat completions across every OpenRouter provider. maxTokens caps the
     // pre-charge (see DEFAULT_MAX_TOKENS). No `reasoning` setting: that's a
@@ -189,29 +197,71 @@ export function buildChatAgent(
  * — no toast, no surprise, just truth on the page.
  */
 export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]> {
-  if (!composioConfigured()) return [];
+  return (await loadIntegrationToolsDetailed(ctx)).tools;
+}
+
+/** What a turn's integration load actually produced — the prompt builder
+ *  uses this so the model is told the LIVE truth instead of a cached or
+ *  silently-degraded picture. */
+export interface IntegrationLoadResult {
+  tools: SdkTool[];
+  /** Toolkits whose tools are attached THIS turn. */
+  liveToolkits: string[];
+  /** Toolkits the realtor has connected but whose tools could not be
+   *  loaded this turn for a TRANSIENT reason (Composio down, server key
+   *  missing). Auth-dead connections are excluded — those flip to
+   *  'expired' and stop being "connected". The prompt tells the model to
+   *  describe these as temporarily unavailable, NOT as disconnected —
+   *  "I don't have your Gmail" to a realtor who connected Gmail is the
+   *  single most-reported integration bug. */
+  unavailableToolkits: string[];
+}
+
+export async function loadIntegrationToolsDetailed(
+  ctx: ToolContext,
+): Promise<IntegrationLoadResult> {
   let toolkits: string[];
   try {
-    toolkits = await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId });
+    toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
   } catch (err) {
     logger.warn('[sdk-chat] activeToolkits lookup failed — proceeding without integration tools', {
       spaceId: ctx.space.id,
       userId: ctx.userId,
       err: err instanceof Error ? err.message : String(err),
     });
-    return [];
+    return { tools: [], liveToolkits: [], unavailableToolkits: [] };
   }
-  if (toolkits.length === 0) return [];
+  if (toolkits.length === 0) return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+
+  // The realtor HAS connections but the server can't reach Composio at
+  // all (key unset). Silent-empty here is what made a misconfigured
+  // deploy read as "Chippi lost my integrations" — degrade loudly instead.
+  if (!composioConfigured()) {
+    logger.error(
+      '[sdk-chat] COMPOSIO_API_KEY is not configured but this workspace has connected toolkits — integration tools are unavailable for every turn until it is set',
+      { spaceId: ctx.space.id, toolkits },
+    );
+    return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
+  }
 
   // Per-toolkit build lets us attribute auth failures to the right row.
-  // The cost is N round-trips instead of 1, but N is bounded by how
-  // many apps the realtor has connected (typically 2-5).
+  // Builds run in PARALLEL — they're independent Composio fetches (cached
+  // after the first turn), and running them sequentially put N round-trips
+  // on the critical path before the first token.
   const collected: SdkTool[] = [];
-  for (const toolkit of toolkits) {
-    try {
-      const tools = await buildToolkitAgentTools({ toolkit, userId: ctx.userId });
-      collected.push(...tools);
-    } catch (err) {
+  const liveToolkits: string[] = [];
+  const unavailableToolkits: string[] = [];
+  const settled = await Promise.allSettled(
+    toolkits.map((toolkit) => buildToolkitAgentTools({ toolkit, userId: ctx.userId })),
+  );
+  for (let i = 0; i < toolkits.length; i++) {
+    const toolkit = toolkits[i];
+    const outcome = settled[i];
+    if (outcome.status === 'fulfilled') {
+      collected.push(...outcome.value);
+      liveToolkits.push(toolkit);
+    } else {
+      const err = outcome.reason;
       if (isAuthLikeError(err)) {
         // Don't await — keep the chat hot. The DB write is fire-and-
         // forget; worst case is the row stays 'active' for one more
@@ -235,6 +285,7 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
           err: err instanceof Error ? err.message : String(err),
         });
       } else {
+        unavailableToolkits.push(toolkit);
         logger.warn('[sdk-chat] integration tools load failed for toolkit — skipping', {
           spaceId: ctx.space.id,
           userId: ctx.userId,
@@ -245,7 +296,7 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
       // In all error cases, drop this toolkit's tools and keep going.
     }
   }
-  return collected;
+  return { tools: collected, liveToolkits, unavailableToolkits };
 }
 
 /**
@@ -282,8 +333,38 @@ export function isAuthLikeError(err: unknown): boolean {
   return false;
 }
 
-// ── Fresh-turn entry point ─────────────────────────────────────────────────
+/**
+ * Integration tools for a chat turn — the SCALABLE path (token redesign).
+ * Instead of pre-loading every connected toolkit's actions (~30 schemas × N
+ * toolkits, re-shipped every step), attach two meta-tools — find_integration_tool
+ * + call_integration_tool — that search and execute on demand. Build-time cost
+ * is ~0 (no Composio fetch here); the action schema is fetched only when the
+ * model actually calls find_integration_tool. Still reports the connected
+ * toolkits so the prompt can tell the model which apps are reachable.
+ */
+export async function loadIntegrationMetaTools(ctx: ToolContext): Promise<IntegrationLoadResult> {
+  let toolkits: string[];
+  try {
+    toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
+  } catch (err) {
+    logger.warn('[sdk-chat] activeToolkits lookup failed — no integration tools', {
+      spaceId: ctx.space.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+  }
+  if (toolkits.length === 0) return { tools: [], liveToolkits: [], unavailableToolkits: [] };
+  if (!composioConfigured()) {
+    logger.error(
+      '[sdk-chat] COMPOSIO_API_KEY not configured but this workspace has connected toolkits — integration tools unavailable until it is set',
+      { spaceId: ctx.space.id, toolkits },
+    );
+    return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
+  }
+  return { tools: buildIntegrationSearchTools(ctx, toolkits), liveToolkits: toolkits, unavailableToolkits: [] };
+}
 
+// ── Fresh-turn entry point ─────────────────────────────────────────────────
 export interface ChatHistoryRow {
   role: 'user' | 'assistant';
   content: string;
@@ -320,6 +401,12 @@ export interface RunChatTurnInput {
    * the card") no longer has to detour through Modal.
    */
   attachments?: MultimodalAttachment[];
+  /**
+   * Sink for tool `data`/`display` keyed by SDK call id. The stream pump
+   * creates this and reads it back to attach rich-card payloads to the SSE
+   * `tool_call_result` frame. See `ToolResultSink` in sdk-bridge.ts.
+   */
+  resultSink?: ToolResultSink;
 }
 
 /**
@@ -328,17 +415,24 @@ export interface RunChatTurnInput {
  * `result.completed` to know when persistence is safe.
  */
 export async function runChatTurn(input: RunChatTurnInput) {
-  // Load integration tools and personalized instructions in parallel —
-  // both are I/O-bound (Composio fetch + DB snapshot). The SDK's Agent
-  // construction is synchronous so we await both before building.
-  const [integrationTools, instructions] = await Promise.all([
-    loadIntegrationTools(input.ctx),
-    buildPersonalizedSystemPrompt(input.ctx),
-  ]);
+  // Integration tools load first (live truth: which toolkits actually have
+  // tools attached this turn), then the personalized prompt embeds that
+  // truth — previously the prompt's "Connected: …" line came from a 5-minute
+  // cache, so right after connecting Gmail the model HELD the Gmail tools
+  // while its own prompt said Gmail wasn't connected.
+  const integrations = await loadIntegrationMetaTools(input.ctx);
+  const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
+    integrations: {
+      liveToolkits: integrations.liveToolkits,
+      unavailableToolkits: integrations.unavailableToolkits,
+    },
+  });
   const agent = buildChatAgent(input.ctx, {
     modelSlug: input.model,
-    integrationTools,
+    integrationTools: integrations.tools,
     instructions,
+    userMessage: input.userMessage,
+    resultSink: input.resultSink,
   });
 
   // The trailing user turn. With attachments, encode SDK-native multimodal
@@ -356,7 +450,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // either a string OR an `AgentInputItem[]`; we use the array form so
   // the agent sees the conversation, not just the trailing turn.
   const items: AgentInputItem[] = [
-    ...(input.history ?? []).map((row) => ({
+    ...(input.history ?? []).slice(-HISTORY_WINDOW).map((row) => ({
       role: row.role,
       content: row.content,
     })),
@@ -386,6 +480,9 @@ export interface ResumeChatTurnInput {
    */
   callId: string;
   model?: string | Model;
+  /** Sink for tool `data`/`display` on resumed turns (post-approval tool runs
+   *  can also produce rich cards). See `ToolResultSink` in sdk-bridge.ts. */
+  resultSink?: ToolResultSink;
 }
 
 /**
@@ -394,14 +491,18 @@ export interface ResumeChatTurnInput {
  * same way regardless of which path produced them.
  */
 export async function resumeChatTurn(input: ResumeChatTurnInput) {
-  const [integrationTools, instructions] = await Promise.all([
-    loadIntegrationTools(input.ctx),
-    buildPersonalizedSystemPrompt(input.ctx),
-  ]);
+  const integrations = await loadIntegrationMetaTools(input.ctx);
+  const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
+    integrations: {
+      liveToolkits: integrations.liveToolkits,
+      unavailableToolkits: integrations.unavailableToolkits,
+    },
+  });
   const agent = buildChatAgent(input.ctx, {
     model: input.model,
-    integrationTools,
+    integrationTools: integrations.tools,
     instructions,
+    resultSink: input.resultSink,
   });
   const state = await restoreRunState(agent, input.serializedState);
 

@@ -113,25 +113,22 @@ CURATED_ACTIONS: dict[str, list[str]] = {
     # actions — the user must have an IG Business connected, not a
     # personal account. Composio surfaces both paths under the same slug;
     # the personal-account caller just gets an empty result.
+    # Social toolkits are low-ROI for real estate vs gmail/hubspot/calendar —
+    # keep the 3 highest-value actions each (post + DM + identity/inbox) curated
+    # for token budget; the long tail stays reachable via find_integration_tool.
     "instagram": [
         "INSTAGRAM_GET_USER_INFO",
-        "INSTAGRAM_GET_IG_USER_MEDIA",
         "INSTAGRAM_LIST_ALL_CONVERSATIONS",
         "INSTAGRAM_SEND_TEXT_MESSAGE",
-        "INSTAGRAM_GET_IG_MEDIA_COMMENTS",
     ],
     "facebook": [
-        "FACEBOOK_GET_CURRENT_USER",
         "FACEBOOK_CREATE_POST",
-        "FACEBOOK_GET_PAGE_POSTS",
         "FACEBOOK_GET_PAGE_CONVERSATIONS",
         "FACEBOOK_SEND_MESSAGE",
     ],
     "twitter": [
         "TWITTER_CREATION_OF_A_POST",
         "TWITTER_USER_LOOKUP_ME",
-        "TWITTER_USER_HOME_TIMELINE_BY_USER_ID",
-        "TWITTER_RECENT_SEARCH",
         "TWITTER_SEND_A_NEW_MESSAGE_TO_A_USER",
     ],
     # ── Productivity ─────────────────────────────────────────────────────

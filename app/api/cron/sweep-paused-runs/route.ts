@@ -10,7 +10,10 @@
  *   - Marks `status='expired'` on any pending row past its expiresAt.
  *   - Hard-deletes any row older than 30 days regardless of status.
  *
- * Auth: same Bearer CRON_SECRET pattern as the other cron routes.
+ * Auth: same Bearer CRON_SECRET pattern as the other cron routes. An UNSET
+ * CRON_SECRET returns 500 (a misconfiguration the monitorCron wrapper surfaces
+ * to Sentry) instead of a silent 401 — otherwise the sweep would quietly die
+ * and abandoned rows would pile up unnoticed. A present-but-wrong token → 401.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,9 +24,13 @@ import { monitorCron } from '@/lib/cron-monitor';
 const HARD_DELETE_DAYS = 30;
 
 async function handler(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    logger.error('[cron.sweep-paused-runs] CRON_SECRET env var is not set — rejecting request');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+  }
   const auth = req.headers.get('authorization');
-  // Guard the unset-secret case: without it, `Bearer undefined` authenticates.
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

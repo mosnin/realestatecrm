@@ -23,6 +23,8 @@ import { Check, Loader2 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { brandOrange } from '@/lib/colors';
 import { TITLE_FONT } from '@/lib/typography';
+import { PLANS, resolveSelfServePlan, type SelfServePlanId } from '@/lib/plans';
+import { readSignupPlan } from '@/lib/signup-plan';
 
 const FEATURES = [
   'I draft every follow-up. You approve.',
@@ -42,14 +44,55 @@ function SubscribeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If no slug in URL, fetch it from the user's space.
+  // Did the URL explicitly pin the tier? If so it wins and we never override it.
+  const urlPlan = searchParams.get('plan');
+  const urlPinnedPlan = urlPlan === 'solo' || urlPlan === 'pro';
+
+  // The tier to show + charge. Resolution order, most-trusted first:
+  //   1. ?plan= on the URL (explicit, e.g. a re-entry from the cancel link).
+  //   2. The plan persisted on the user's Space at onboarding (the carrier
+  //      that survives Clerk's redirects), fetched from /api/auth/me below.
+  //   3. The sessionStorage hint captured at the marketing CTA (transport).
+  //   4. Solo — the historical default for direct visitors.
+  const [plan, setPlan] = useState<SelfServePlanId>(() =>
+    urlPinnedPlan ? (urlPlan as SelfServePlanId) : readSignupPlan() ?? 'solo',
+  );
+  const planDef = PLANS[plan];
+
+  // Billing cadence + whether annual is purchasable for each self-serve plan.
+  // annualEnabled is server-derived (Stripe annual price ids are server-only
+  // env), delivered by /api/auth/me below; until it loads we assume no annual so
+  // the toggle never flashes an option the checkout would refuse.
+  const [cadence, setCadence] = useState<'monthly' | 'annual'>('monthly');
+  const [annualEnabled, setAnnualEnabled] = useState<Record<SelfServePlanId, boolean>>({
+    solo: false,
+    pro: false,
+  });
+  const annualOk = annualEnabled[plan];
+  // The cadence actually used (pinned to monthly when annual isn't available for
+  // the shown plan, e.g. after switching plans or before the signal loads).
+  const effectiveCadence: 'monthly' | 'annual' = annualOk && cadence === 'annual' ? 'annual' : 'monthly';
+  const isAnnual = effectiveCadence === 'annual';
+  const monthlyPrice = planDef.priceMonthly;
+  const annualPerMonth = Math.round(monthlyPrice * 0.8);
+  const displayPrice = isAnnual ? annualPerMonth : monthlyPrice;
+
+  // Resolve slug, the persisted Space.plan, and annual availability from the
+  // user's account. We hit /api/auth/me on load — the common gate path arrives
+  // as /subscribe?slug=… (slug set, no plan), so the persisted plan (the durable
+  // carrier) still needs adopting, and annualEnabled is ALWAYS server-derived,
+  // so we fetch it even when slug + plan are already pinned.
   useEffect(() => {
-    if (slug || !isLoaded || !isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
     fetch('/api/auth/me')
       .then((r) => r.json())
-      .then((d) => { if (d.slug) setSlug(d.slug); })
+      .then((d) => {
+        if (!slug && d.slug) setSlug(d.slug);
+        if (!urlPinnedPlan && d.plan) setPlan(resolveSelfServePlan(d.plan));
+        if (d.annualEnabled) setAnnualEnabled(d.annualEnabled);
+      })
       .catch(() => {});
-  }, [slug, isLoaded, isSignedIn]);
+  }, [slug, isLoaded, isSignedIn, urlPinnedPlan, urlPlan]);
 
   // Redirect unauthenticated users.
   if (isLoaded && !isSignedIn) {
@@ -64,7 +107,7 @@ function SubscribeContent() {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, plan, cadence: effectiveCadence }),
       });
       const data = await res.json();
       if (data.url) {
@@ -113,7 +156,7 @@ function SubscribeContent() {
 
         {/* Chippi speaks — the focal element. */}
         <header className="space-y-2 text-center">
-          <p className="text-sm text-muted-foreground">Chippi Pro.</p>
+          <p className="text-sm text-muted-foreground">Chippi {planDef.label}.</p>
           <h1 className="text-3xl leading-tight tracking-tight sm:text-[2.5rem]" style={TITLE_FONT}>
             Let&apos;s keep working together.
           </h1>
@@ -124,15 +167,52 @@ function SubscribeContent() {
 
         {/* Paper-flat panel — hairline border, no shadow. */}
         <div className="mt-8 rounded-xl border border-border/70 bg-card p-6 sm:p-7">
-          {/* Price */}
+          {/* Monthly/Annual choice — only when annual is purchasable for this
+              tier (server-derived). The chosen cadence is sent to checkout. */}
+          {annualOk && (
+            <div className="mb-5 flex justify-center">
+              <div className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setCadence('monthly')}
+                  className={
+                    'rounded-full px-3.5 py-1 text-xs transition-colors ' +
+                    (!isAnnual ? 'bg-background font-medium text-foreground shadow-sm' : 'text-muted-foreground')
+                  }
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCadence('annual')}
+                  className={
+                    'flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs transition-colors ' +
+                    (isAnnual ? 'bg-background font-medium text-foreground shadow-sm' : 'text-muted-foreground')
+                  }
+                >
+                  Annual
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    Save 20%
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Price — from lib/plans.ts (single source of truth), keyed to the
+              tier the buyer chose so it can't drift from what's charged. Annual
+              shows the discounted monthly-equivalent; the real charge is the
+              annual Stripe price. */}
           <div className="flex items-end justify-center gap-1.5">
             <span className="text-[2.75rem] leading-none tabular-nums tracking-tight" style={TITLE_FONT}>
-              $97
+              ${displayPrice}
             </span>
             <span className="mb-1 text-base text-muted-foreground">/mo</span>
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">
-            7 days free, then $97 a month. Cancel anytime.
+            {isAnnual
+              ? `7 days free, then $${displayPrice * 12} a year. Cancel anytime.`
+              : `7 days free, then $${monthlyPrice} a month. Cancel anytime.`}
           </p>
 
           {/* Features */}
@@ -163,11 +243,18 @@ function SubscribeContent() {
             {loading && <Loader2 size={15} className="animate-spin" />}
             {loading ? 'Taking you to checkout.' : 'Start your 7 days free'}
           </button>
-          <p className="mt-3 text-center text-xs text-muted-foreground">No card needed to start.</p>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Card required to start — you won&apos;t be charged until your trial ends. Cancel anytime.
+          </p>
         </div>
 
-        {/* Already subscribed */}
+        {/* Plans + already subscribed */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
+          Need more?{' '}
+          <a href="/pricing" className="text-foreground underline-offset-2 hover:underline">
+            See all plans
+          </a>
+          {' · '}
           Already subscribed?{' '}
           <a
             href={slug ? `/s/${slug}/billing` : '#'}

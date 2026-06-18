@@ -75,8 +75,12 @@ import {
   dispatchTrigger,
   setPausedForConnection,
   summariesForConnections,
+  normalizeTriggerEvent,
   CURATED_TRIGGERS,
 } from '@/lib/integrations/triggers';
+// captureEvent uses the real normalizeTriggerEvent + the mocked supabase
+// above, so we can assert the IntegrationEvent write shape directly.
+import { captureEvent } from '@/lib/integrations/events';
 import type { IntegrationConnectionRow } from '@/lib/integrations/connections';
 
 function freshConnection(overrides: Partial<IntegrationConnectionRow> = {}): IntegrationConnectionRow {
@@ -463,5 +467,138 @@ describe('dispatchTrigger', () => {
     expect(result.dispatched).toBe('noop');
     expect(result.reason).toBe('no_dispatch');
     expect(fireRoutineRunMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── normalizeTriggerEvent (shared feed/dispatch extractor) ───────────────────
+
+describe('normalizeTriggerEvent', () => {
+  it('derives title/actor/snippet from the same extractor the instruction uses', () => {
+    const out = normalizeTriggerEvent('gmail', 'GMAIL_NEW_GMAIL_MESSAGE', {
+      subject: 'Offer accepted on 1421 Maple',
+      from: 'sarah@example.com',
+      snippet: 'Hi — we accept.',
+    });
+    expect(out.title).toBe('Offer accepted on 1421 Maple');
+    expect(out.actor).toBe('sarah@example.com');
+    expect(out.snippet).toBe('Hi — we accept.');
+    expect(typeof out.occurredAt).toBe('string');
+    expect(Number.isNaN(new Date(out.occurredAt).getTime())).toBe(false);
+  });
+
+  it('reads V3-style nested payloads via the same flatten step', () => {
+    const out = normalizeTriggerEvent('gmail', 'GMAIL_NEW_GMAIL_MESSAGE', {
+      payload: { subject: 'Nested', from: 'a@b.com', snippet: 'hi' },
+    });
+    expect(out.title).toBe('Nested');
+    expect(out.actor).toBe('a@b.com');
+  });
+
+  it('prefers a payload timestamp for occurredAt when present', () => {
+    const out = normalizeTriggerEvent('gmail', 'GMAIL_NEW_GMAIL_MESSAGE', {
+      subject: 'X',
+      timestamp: '2026-05-01T12:00:00Z',
+    });
+    expect(out.occurredAt).toBe('2026-05-01T12:00:00.000Z');
+  });
+
+  it('is null-safe: a thin/empty payload yields all-null fields + a fallback occurredAt', () => {
+    const out = normalizeTriggerEvent('gmail', 'GMAIL_NEW_GMAIL_MESSAGE', {});
+    expect(out.title).toBeNull();
+    expect(out.actor).toBeNull();
+    expect(out.snippet).toBeNull();
+    expect(Number.isNaN(new Date(out.occurredAt).getTime())).toBe(false);
+  });
+
+  it('is null-safe for an unknown slug', () => {
+    const out = normalizeTriggerEvent('gmail', 'NOT_A_REAL_TRIGGER', { subject: 'X' });
+    expect(out).toMatchObject({ title: null, actor: null, snippet: null });
+  });
+});
+
+// ─── captureEvent — IntegrationEvent persistence (idempotent on deliveryId) ───
+
+describe('captureEvent', () => {
+  it('upserts an IntegrationEvent insert-or-ignore on deliveryId (the idempotency contract)', async () => {
+    let chainCalls: Array<[string, unknown[]]> = [];
+    let table = '';
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((t: string) => {
+      table = t;
+      chainCalls = [];
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) {
+        chain[m] = vi.fn((...args: unknown[]) => {
+          chainCalls.push([m, args]);
+          return chain;
+        });
+      }
+      const term = () => Promise.resolve({ data: null, error: null });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: null }).then(r, e);
+      return chain;
+    });
+
+    const ok = await captureEvent({
+      spaceId: 'space-1',
+      connectionId: 'conn-1',
+      triggerId: 'trg-row-1',
+      toolkit: 'gmail',
+      slug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      payload: { subject: 'Hi', from: 'a@b.com', snippet: 'hey' },
+      deliveryId: 'msg_abc',
+    });
+
+    expect(ok).toBe(true);
+    expect(table).toBe('IntegrationEvent');
+    const upsert = chainCalls.find(([m]) => m === 'upsert');
+    expect(upsert, 'captureEvent must upsert').toBeTruthy();
+    // The row carries the normalized summary + the delivery id.
+    const row = upsert![1][0] as Record<string, unknown>;
+    expect(row).toMatchObject({
+      spaceId: 'space-1',
+      connectionId: 'conn-1',
+      triggerId: 'trg-row-1',
+      toolkit: 'gmail',
+      eventType: 'GMAIL_NEW_GMAIL_MESSAGE',
+      title: 'Hi',
+      actor: 'a@b.com',
+      snippet: 'hey',
+      status: 'captured',
+      deliveryId: 'msg_abc',
+    });
+    // Idempotency: insert-or-IGNORE on the deliveryId unique index. A retry
+    // re-running this is a silent no-op instead of a duplicate row.
+    const opts = upsert![1][1] as { onConflict: string; ignoreDuplicates: boolean };
+    expect(opts).toEqual({ onConflict: 'deliveryId', ignoreDuplicates: true });
+  });
+
+  it('never throws on a DB error — logs and returns false', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+      for (const m of passthrough) chain[m] = vi.fn(() => chain);
+      const term = () => Promise.resolve({ data: null, error: { message: 'boom' } });
+      chain.maybeSingle = vi.fn(term);
+      chain.single = vi.fn(term);
+      chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: { message: 'boom' } }).then(r, e);
+      return chain;
+    });
+
+    const ok = await captureEvent({
+      spaceId: 'space-1',
+      connectionId: 'conn-1',
+      triggerId: null,
+      toolkit: 'gmail',
+      slug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      payload: { subject: 'Hi' },
+      deliveryId: 'msg_err',
+    });
+    expect(ok).toBe(false);
   });
 });

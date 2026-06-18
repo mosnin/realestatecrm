@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single:wght@100..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -18,10 +17,11 @@
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
-  /* Marketing/auth-only brand display font (fortitudo "studio ASCII" look).
-     Bitcount Grid Single, used via the `.font-brand` utility on the logged-out
-     site and auth pages. The product (dashboard) never reaches for it. */
-  --font-brand: "Bitcount Grid Single", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  /* Marketing/auth-only brand display face, used via the `.font-brand` utility
+     on the logged-out site and auth pages. Now the clean system display stack
+     (SF Pro Display) — the previous Bitcount Grid Single techno face was pulled.
+     Swap this one line to wire a different display font; nothing else changes. */
+  --font-brand: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
 
   /* Rainbow-button color stops (marketing CTA flourish). */
   --color-color-1: hsl(var(--color-1));
@@ -1013,6 +1013,70 @@
   letter-spacing: 0.01em;
 }
 
+/* ── Giga marketing shell — dark, cinematic redesign (ROOT-CAUSE FIX) ────────
+ *
+ * The marketing route-group layout (app/(marketing)/layout.tsx) marks its root
+ * with `data-marketing-shell`. Two things are scoped here so the redesign can't
+ * be undone by global rules elsewhere in this file:
+ *
+ *  1. HEADLINE FONT. The `@layer base` rule above forces every <h1>–<h6> to
+ *     --font-heading (a system SANS). That is exactly what made the previous
+ *     redesign render "stuck on the grotesque": inline styles fixed some
+ *     headings but anything that leaned on a class or forgot the inline style
+ *     fell back to the sans. We make the elegant SERIF display face
+ *     (--font-serif-display, Fraunces, injected by the layout via next/font)
+ *     the DEFAULT for every heading inside the shell, with a HIGH optical size
+ *     and light weight so the large headlines read thin + high-contrast (the
+ *     reference look) rather than the chunky low-opsz default. This selector
+ *     out-specifies the bare `h1..h6` element rule, so it always wins.
+ *
+ *  2. EYEBROWS stay monospace via the .eyebrow-mono helper / inline var; the
+ *     `--font-mono-display` (JetBrains Mono) is also injected by the layout.
+ *
+ * Scoped to the shell so the product (dashboard/app) is completely untouched. */
+[data-marketing-shell] {
+  /* Marketing headlines use the SAME fonts as the product dashboard so the
+     logged-out site and the app read as one brand: the serif --font-title
+     (Times) for headlines and --font-mono for eyebrows. The component-level
+     --font-serif-display / --font-mono-display vars are re-pointed at the
+     dashboard fonts here, so every inline reference resolves to them without
+     editing each component. */
+  --font-serif-display: var(--font-title);
+  --font-mono-display: var(--font-mono);
+}
+[data-marketing-shell] h1,
+[data-marketing-shell] h2,
+[data-marketing-shell] h3,
+[data-marketing-shell] h4,
+[data-marketing-shell] h5,
+[data-marketing-shell] h6,
+[data-marketing-shell] .font-serif-display {
+  font-family: var(--font-title), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.02em;
+}
+/* Eyebrow labels: uppercase monospace, set apart from the serif headings. */
+[data-marketing-shell] .font-mono-display {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Flowing gradient for the AnimatedGradientText component (marketing labels). */
+@keyframes gradient-flow {
+  to {
+    background-position: var(--bg-size) 0;
+  }
+}
+
+/* ── Bold-canvas marketing type (logged-out site only) ──────────────────────
+ * --font-display / --font-accent are injected by app/(marketing)/layout.tsx
+ * via next/font (Inter Tight + Instrument Serif). Fallbacks keep the classes
+ * harmless anywhere the variables aren't mounted. */
+.font-display {
+  font-family: var(--font-display, var(--font-brand));
+}
+.font-accent {
+  font-family: var(--font-accent, Georgia, 'Times New Roman', serif);
+}
+
 /* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */
 .text-gradient-brand {
   background: linear-gradient(135deg, #ff964f, #ffb27a, #ffc994);
@@ -1027,6 +1091,35 @@
 .rounded-marketing-2xl { border-radius: 1.75rem; }
 .rounded-marketing-3xl { border-radius: 2rem; }
 
+/* Liquid glass — the video-hero surface treatment (marketing-only). A dark
+   luminosity wash + blur with a vertical light-edge ring drawn by a masked
+   gradient border, so the glass reads as lit from above and below. */
+.liquid-glass {
+  background: rgba(0, 0, 0, 0.4);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 20%,
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
+    rgba(255,255,255,0.1) 80%, rgba(255,255,255,0.3) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1036,15 +1129,146 @@
   0% { background-position: 0%; }
   100% { background-position: 200%; }
 }
+.animate-rainbow { animation: rainbow 4s linear infinite; }
+
+/* Rainbow glow stops (marketing ruixen section). Warm, brand-adjacent. */
+:root {
+  --color-1: 25 95% 62%;
+  --color-2: 35 95% 60%;
+  --color-3: 15 90% 60%;
+  --color-4: 45 95% 58%;
+  --color-5: 5 90% 62%;
+}
 
 @keyframes pulse-brand {
   0%, 100% { box-shadow: 0 0 20px rgba(255, 150, 79, 0.3); }
   50% { box-shadow: 0 0 36px rgba(255, 150, 79, 0.55); }
 }
 
+/* Vertical text marquee (CTA) + horizontal icon marquee (integrations hero). */
+@keyframes marquee-vertical {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+.animate-marquee-vertical { animation: marquee-vertical var(--duration, 30s) linear infinite; }
+
+@keyframes scroll-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes scroll-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+.animate-scroll-left { animation: scroll-left 30s linear infinite; }
+.animate-scroll-right { animation: scroll-right 30s linear infinite; }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.7s ease-out both; }
+
+/* Radix accordion height transitions (shadcn accordion primitive). */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+.animate-accordion-down { animation: accordion-down 0.2s ease-out; }
+.animate-accordion-up { animation: accordion-up 0.2s ease-out; }
+
 .animate-fade-up { animation: fade-up 0.5s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
+  .animate-fade-in-up,
+  .animate-marquee-vertical,
+  .animate-scroll-left,
+  .animate-scroll-right,
+  .animate-accordion-down,
+  .animate-accordion-up,
   .animate-rainbow { animation: none !important; }
+}
+
+/* ── Marketing particle CTA (owner-provided hero button, recolored brand) ── */
+.pp-btn {
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  background:
+    radial-gradient(65.28% 65.28% at 50% 100%, rgba(255, 176, 84, 0.85) 0%, rgba(255, 176, 84, 0) 100%),
+    linear-gradient(0deg, #ff4b29, #ff4b29);
+  border-radius: 9999px;
+  border: none;
+  outline: none;
+  padding: 12px 18px;
+  min-height: 48px;
+  min-width: 102px;
+}
+.pp-btn::before,
+.pp-btn::after {
+  content: "";
+  position: absolute;
+  transition: all 0.5s ease-in-out;
+  z-index: 0;
+}
+.pp-btn::before {
+  inset: 1px;
+  background: linear-gradient(177.95deg, rgba(255, 255, 255, 0.19) 0%, rgba(255, 255, 255, 0) 100%);
+  border-radius: 9999px;
+}
+.pp-btn::after {
+  inset: 2px;
+  background:
+    radial-gradient(65.28% 65.28% at 50% 100%, rgba(255, 176, 84, 0.85) 0%, rgba(255, 176, 84, 0) 100%),
+    linear-gradient(0deg, #ff4b29, #ff4b29);
+  border-radius: 9999px;
+}
+.pp-btn:active { transform: scale(0.95); }
+.pp-points {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+.pp-point {
+  bottom: -10px;
+  position: absolute;
+  animation: pp-float infinite ease-in-out;
+  pointer-events: none;
+  width: 2px;
+  height: 2px;
+  background-color: #fff;
+  border-radius: 9999px;
+}
+@keyframes pp-float {
+  0% { transform: translateY(0); }
+  85% { opacity: 0; }
+  100% { transform: translateY(-55px); opacity: 0; }
+}
+.pp-inner {
+  z-index: 2;
+  gap: 6px;
+  position: relative;
+  width: 100%;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-point { animation: none; display: none; }
 }

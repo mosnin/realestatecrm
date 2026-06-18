@@ -45,7 +45,7 @@ interface RawComposioTool {
   };
 }
 
-const DEFAULT_LIMIT = 10;
+const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 30;
 const PER_TOOLKIT_FETCH = 200;
 

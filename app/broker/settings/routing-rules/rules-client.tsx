@@ -69,7 +69,6 @@ type EditorForm = {
   destinationKind: DestinationKind;
   destinationUserId: string;
   destinationPoolMethod: PoolMethod;
-  destinationPoolTag: string;
 };
 
 type FieldError = Partial<Record<keyof EditorForm, string>>;
@@ -364,7 +363,6 @@ function RuleEditorDialog({
         destinationKind: 'agent',
         destinationUserId: '',
         destinationPoolMethod: 'round_robin',
-        destinationPoolTag: '',
       };
     }
     const r = mode.rule;
@@ -380,7 +378,6 @@ function RuleEditorDialog({
       destinationKind: r.destinationUserId ? 'agent' : 'pool',
       destinationUserId: r.destinationUserId ?? '',
       destinationPoolMethod: r.destinationPoolMethod ?? 'round_robin',
-      destinationPoolTag: r.destinationPoolTag ?? '',
     };
   }, [mode]);
 
@@ -427,10 +424,6 @@ function RuleEditorDialog({
 
     if (form.destinationKind === 'agent') {
       if (!form.destinationUserId) errs.destinationUserId = 'Choose an agent.';
-    } else {
-      if (form.destinationPoolTag.trim().length > 60) {
-        errs.destinationPoolTag = 'Tags are at most 60 characters.';
-      }
     }
 
     return { ok: Object.keys(errs).length === 0, errs };
@@ -456,10 +449,11 @@ function RuleEditorDialog({
           form.destinationKind === 'agent' ? form.destinationUserId : null,
         destinationPoolMethod:
           form.destinationKind === 'pool' ? form.destinationPoolMethod : null,
-        destinationPoolTag:
-          form.destinationKind === 'pool' && form.destinationPoolTag.trim() !== ''
-            ? form.destinationPoolTag.trim()
-            : null,
+        // Pool-tag narrowing isn't implemented in the assignment engine yet
+        // (it ignores destinationPoolTag until BrokerageMembership grows a tags
+        // column), so we don't surface an input for it — always send null
+        // rather than store a value that silently has no effect.
+        destinationPoolTag: null,
       };
 
       const isEdit = mode.kind === 'edit';
@@ -657,7 +651,7 @@ function RuleEditorDialog({
                     Mini round-robin / score pick
                   </p>
                   <p className={CAPTION}>
-                    Uses the realtor pool. Tag narrowing is ignored until the membership tags column ships.
+                    Distributes matching leads across the realtor pool.
                   </p>
                 </div>
               </label>
@@ -691,35 +685,20 @@ function RuleEditorDialog({
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="rule-pool-method">Pick method</Label>
-                  <Select
-                    value={form.destinationPoolMethod}
-                    onValueChange={(v) => update('destinationPoolMethod', v as PoolMethod)}
-                  >
-                    <SelectTrigger id="rule-pool-method">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="round_robin">Round-robin</SelectItem>
-                      <SelectItem value="score_based">Score-based</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="rule-pool-tag">Pool tag (optional)</Label>
-                  <Input
-                    id="rule-pool-tag"
-                    value={form.destinationPoolTag}
-                    maxLength={60}
-                    placeholder="ignored for now"
-                    onChange={(e) => update('destinationPoolTag', e.target.value)}
-                  />
-                  {errors.destinationPoolTag && (
-                    <p className="text-xs text-destructive">{errors.destinationPoolTag}</p>
-                  )}
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rule-pool-method">Pick method</Label>
+                <Select
+                  value={form.destinationPoolMethod}
+                  onValueChange={(v) => update('destinationPoolMethod', v as PoolMethod)}
+                >
+                  <SelectTrigger id="rule-pool-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="round_robin">Round-robin</SelectItem>
+                    <SelectItem value="score_based">Score-based</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </fieldset>

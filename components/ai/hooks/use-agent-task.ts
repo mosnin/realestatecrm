@@ -47,6 +47,22 @@ export interface UiMessage {
  */
 export type ChatMode = 'chat' | 'agent';
 
+/**
+ * Lightweight attachment descriptor the composer passes to `send` so the
+ * optimistic user bubble can show the file chips/thumbnails immediately —
+ * before the server persists them. `previewUrl` is an object URL for instant
+ * image display; it's surfaced via `attachmentPreviewUrls` so the renderer can
+ * use it instead of waiting on a signed-URL round-trip.
+ */
+export interface AttachmentMeta {
+  id: string;
+  filename: string;
+  mimeType: string;
+  isImage: boolean;
+  sizeBytes?: number;
+  previewUrl?: string;
+}
+
 export interface UseAgentTaskOptions {
   spaceSlug: string;
   /** Current conversation, or null to have the hook create one on first send. */
@@ -96,7 +112,18 @@ export interface UseAgentTaskResult {
    * created yet. Cleared automatically on `turn_complete`.
    */
   activePlan: { task: string; steps: Array<{ title: string; description: string }> } | null;
-  send: (text: string, attachmentIds?: string[], mode?: ChatMode) => Promise<void>;
+  send: (
+    text: string,
+    attachmentIds?: string[],
+    mode?: ChatMode,
+    attachmentsMeta?: AttachmentMeta[],
+  ) => Promise<void>;
+  /**
+   * Object URLs for just-sent attachments, keyed by attachment id. Lets the
+   * user-message renderer show an image thumbnail instantly while the signed
+   * URL is still being minted. Cleared as conversations change.
+   */
+  attachmentPreviewUrls: Record<string, string>;
   approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   deny: (requestId: string) => Promise<void>;
   /**
@@ -149,6 +176,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [streamingReasoning, setStreamingReasoning] = useState('');
+  // Object URLs for just-sent attachments → instant image thumbnails in the
+  // optimistic user bubble. Keyed by attachment id.
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [activePlan, setActivePlan] = useState<{
     task: string;
     steps: Array<{ title: string; description: string }>;
@@ -188,6 +218,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   useEffect(() => {
     setPendingApproval(null);
     autoApprovedRef.current = null;
+    // Drop stale optimistic preview URLs — the new conversation's history
+    // signs its own URLs per image.
+    setAttachmentPreviewUrls({});
     if (typeof window === 'undefined') return;
     if (!initialConversationId) {
       setAllowedTools(new Set());
@@ -386,6 +419,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
               return {
                 ...b,
                 status: event.ok ? 'complete' : 'error',
+                // The in-process runtime only knows a tool's `display` once the
+                // handler ran, so it rides the result event (not just start).
+                // Prefer it; fall back to whatever start carried.
+                display: event.display ?? b.display,
                 result: {
                   ok: event.ok,
                   summary: event.summary,
@@ -632,7 +669,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [spaceSlug, onConversationCreated, conversationsEndpoint, conversationCreatePayload]);
 
   const send = useCallback(
-    async (text: string, attachmentIds?: string[], mode: ChatMode = 'chat') => {
+    async (
+      text: string,
+      attachmentIds?: string[],
+      mode: ChatMode = 'chat',
+      attachmentsMeta?: AttachmentMeta[],
+    ) => {
       const trimmed = text.trim();
       const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
       // Allow attachment-only sends — the user might just want to drop in a
@@ -641,6 +683,26 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       // Fix 2: record immediately so retryLastMessage always has current data.
       lastUserInputRef.current = { text: trimmed, ...(hasAttachments ? { attachmentIds } : {}) };
+
+      // Build attachment blocks for the optimistic user bubble so the chips
+      // show immediately, and stash any object URLs for instant thumbnails.
+      const attachmentBlocks: MessageBlock[] = (attachmentsMeta ?? []).map((a) => ({
+        type: 'attachment',
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        isImage: a.isImage,
+        ...(typeof a.sizeBytes === 'number' ? { sizeBytes: a.sizeBytes } : {}),
+      }));
+      if (attachmentsMeta && attachmentsMeta.length > 0) {
+        setAttachmentPreviewUrls((prev) => {
+          const next = { ...prev };
+          for (const a of attachmentsMeta) {
+            if (a.previewUrl) next[a.id] = a.previewUrl;
+          }
+          return next;
+        });
+      }
 
       // Optimistic UI: push the user message + a streaming assistant
       // placeholder BEFORE we await conversation creation. This is what
@@ -651,7 +713,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       const userMsg: UiMessage = {
         id: newId(),
         role: 'user',
-        blocks: [{ type: 'text', content: trimmed }],
+        // Attachment chips render above the text, matching the composer.
+        blocks: [
+          ...attachmentBlocks,
+          ...(trimmed ? [{ type: 'text', content: trimmed } as MessageBlock] : []),
+        ],
       };
       const assistantMsgId = newId();
       const assistantMsg: UiMessage = {
@@ -826,6 +892,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     streamingReasoning,
     activePlan,
     send,
+    attachmentPreviewUrls,
     approve,
     deny,
     alwaysAllow,

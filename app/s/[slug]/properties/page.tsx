@@ -62,7 +62,7 @@ export default async function PropertiesPage({
   }
 
   return (
-    <div className={cn('space-y-6', PAGE_MAX)}>
+    <div className={cn('space-y-6 mx-auto pb-12', PAGE_MAX)}>
       {/* Page header — status-sentence pattern: muted greeting → serif h1
           → one-sentence status. Add-listing CTA sits inline; primary
           action lives where the realtor's eye lands after the title. */}

@@ -51,7 +51,7 @@ export default async function TourManagePage({
       .maybeSingle(),
     supabase
       .from('Space')
-      .select('name, slug, ownerId')
+      .select('name, slug, ownerId, stripeSubscriptionStatus')
       .eq('id', tour.spaceId)
       .maybeSingle(),
     supabase
@@ -62,6 +62,9 @@ export default async function TourManagePage({
   ]);
 
   const businessName = settings?.businessName || space?.name || 'the property';
+  // Hide the Chippi mark on paid tiers (white-label), matching /book/[slug].
+  const subStatus = (space as { stripeSubscriptionStatus?: string | null } | null)?.stripeSubscriptionStatus;
+  const hidePoweredBy = subStatus === 'active' || subStatus === 'trialing';
   const [coverPhotoUrl, agentPhoto] = await Promise.all([
     resolveStoredPhoto(
       (profileRow as { coverPhotoUrl?: string | null } | null)?.coverPhotoUrl ?? null,
@@ -79,6 +82,7 @@ export default async function TourManagePage({
       businessName={businessName}
       coverPhotoUrl={coverPhotoUrl}
       agentPhoto={agentPhoto}
+      hidePoweredBy={hidePoweredBy}
     >
       <TourManageClient
         tour={{

@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
 
@@ -77,12 +78,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Deny-list check. If this user was previously removed from this
-  // brokerage, the anonymous code path is closed — the only way back
-  // in is an explicit /api/invitations/[token] acceptance from a
-  // broker_owner or broker_admin. A removed agent re-clicking the
-  // join URL they kept in their email gets a clear 403; the broker
-  // doesn't get a silent member_joined notification for someone they
-  // already fired.
+  // brokerage, the anonymous code path is closed. Re-admission requires
+  // the broker to first clear the BrokerageRemoval record — the email
+  // invitation path (/api/invitations/[token]) enforces the same deny-list,
+  // so a stale invite can't silently revive a removed account either. A
+  // removed agent re-clicking the join URL they kept in their email gets a
+  // clear 403; the broker doesn't get a silent member_joined notification
+  // for someone they already fired.
   const { data: removalRow } = await supabase
     .from('BrokerageRemoval')
     .select('brokerageId')
@@ -116,6 +118,11 @@ export async function POST(req: NextRequest) {
     console.error('[broker/join] membership insert failed', memberErr);
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
+
+  // Bill the new active seat (Fix #1): if the brokerage is over its plan's
+  // included seats, bump the per-unit add-on line quantity. Best-effort + after
+  // the membership committed — never block the join on a Stripe write.
+  void syncBrokerageSeatBilling(brokerage.id);
 
   // Adopt this brokerage's intake form-config ONLY if the Space isn't already
   // linked. Membership (above) is the source of truth for access; Space.brokerageId

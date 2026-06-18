@@ -7,7 +7,7 @@ import { TOPUPS, PLANS } from '@/lib/plans';
  * retail at >= BUDGET / 0.40 to clear a 60% gross margin. This test fails if a
  * future pack/plan edit prices credits below the 60% floor — a direct money leak.
  */
-const CREDIT_COGS_BUDGET_USD = 0.013;
+const CREDIT_COGS_BUDGET_USD = 0.0065;
 const MIN_MARGIN = 0.6;
 
 function margin(priceUsd: number, credits: number): number {

@@ -2,9 +2,16 @@
  * `reschedule_tour` — move a Tour to a new start (and optional end) time.
  *
  * Approval-gated: tours are on calendars and inboxes; the realtor sees
- * the new time before we commit. Google Calendar sync runs server-side
- * on a separate cron job (see schedule-tour.ts), so we don't duplicate
- * it here — same stance as the create path.
+ * the new time before we commit.
+ *
+ * After the DB update we propagate the move, both best-effort (a failure
+ * never fails the reschedule — same posture as schedule-tour's calendar
+ * write):
+ *   1. Move the external calendar event via the Composio mirror
+ *      (`updateEventThrough`) — the same calendar seam schedule-tour
+ *      writes through.
+ *   2. Tell the guest via email + SMS (`notifyTourRescheduled`) so they
+ *      don't show up at the old time.
  */
 
 import crypto from 'crypto';
@@ -12,6 +19,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { findCalendarConnection, updateEventThrough } from '@/lib/calendar/mirror';
+import { notifyTourRescheduled } from '@/lib/tour-notify';
 
 const parameters = z
   .object({
@@ -58,7 +67,7 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
   async handler(args, ctx) {
     const { data: tour, error: tourErr } = await supabase
       .from('Tour')
-      .select('id, startsAt, endsAt, contactId, propertyAddress, guestName, status')
+      .select('id, startsAt, endsAt, contactId, propertyAddress, guestName, guestEmail, guestPhone, status')
       .eq('id', args.tourId)
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
@@ -113,6 +122,41 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
       if (activityErr) {
         logger.warn('[tools.reschedule_tour] activity insert failed', { tourId: args.tourId }, activityErr);
       }
+    }
+
+    // Propagate the move to the realtor's external calendar — same Composio
+    // mirror seam schedule_tour writes through. Best-effort: the Tour row
+    // already moved; a calendar hiccup is logged and survivable.
+    try {
+      const connection = await findCalendarConnection(ctx.space.id);
+      if (connection) {
+        await updateEventThrough({
+          spaceId: ctx.space.id,
+          connection,
+          sourceTourId: args.tourId,
+          startsAt: newStarts.toISOString(),
+          endsAt: newEnds.toISOString(),
+        });
+      }
+    } catch (err) {
+      logger.warn('[tools.reschedule_tour] calendar update failed', { tourId: args.tourId, spaceId: ctx.space.id }, err);
+    }
+
+    // Tell the guest their tour moved — email + SMS, best-effort. A guest
+    // whose tour silently slid would show up at the old time.
+    try {
+      await notifyTourRescheduled({
+        spaceId: ctx.space.id,
+        guestName: (tour.guestName as string | null) || 'there',
+        guestEmail: (tour.guestEmail as string | null) ?? null,
+        guestPhone: (tour.guestPhone as string | null) ?? null,
+        propertyAddress: (tour.propertyAddress as string | null) ?? null,
+        startsAt: newStarts.toISOString(),
+        endsAt: newEnds.toISOString(),
+        tourId: args.tourId,
+      });
+    } catch (err) {
+      logger.warn('[tools.reschedule_tour] guest notice failed', { tourId: args.tourId }, err);
     }
 
     const guest = (tour.guestName as string | null) || 'guest';

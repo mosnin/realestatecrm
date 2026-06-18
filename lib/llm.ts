@@ -33,7 +33,7 @@
 import OpenAI from 'openai';
 
 // Local binding for use in this module (the block below only RE-exports it).
-import { DEFAULT_CHAT_MODEL } from './chat-models';
+import { DEFAULT_CHAT_MODEL, isValidChatModel } from './chat-models';
 
 export {
   CHAT_MODELS,
@@ -128,7 +128,11 @@ export const OPENAI_FALLBACK_CHAT_MODEL = 'gpt-4o-mini';
  * which key the deployment has.
  */
 export function resolveChatModel(requested?: string | null): string {
-  const wanted = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  const candidate = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
+  // A model that isn't in the registry (e.g. an old per-workspace pick left over
+  // from the since-removed model picker) falls back to the default, so only a
+  // supported model is ever sent to the provider.
+  const wanted = isValidChatModel(candidate) ? candidate : DEFAULT_CHAT_MODEL;
   if (isOpenRouterConfigured()) return wanted;
   // OpenAI-only path: only bare gpt-* models are servable.
   if (wanted.includes('/') || !wanted.toLowerCase().startsWith('gpt')) {
@@ -155,6 +159,8 @@ export const EMBEDDING_MODEL = isOpenRouterConfigured()
  *   'x-ai/grok-4.3'             -> 'xai'   (dash normalized out)
  *   'deepseek/deepseek-chat'    -> 'deepseek'
  *   'google/gemini-2.5-pro'     -> 'google'
+ *   'qwen/qwen3.7-plus'         -> 'qwen'
+ *   'z-ai/glm-5.2'              -> 'zai'   (dash normalized out)
  *   bare 'gpt-5'                -> 'openai' (OpenAI-direct fallback)
  *
  * Drives the ChatUsage.provider column and Usage page breakdown. Per-
@@ -165,8 +171,8 @@ export const EMBEDDING_MODEL = isOpenRouterConfigured()
  *     OpenRouter, ~75% discount. Min cache write ~4096 tokens.
  *   - openai / deepseek: automatic on stable prefixes >1024 tokens,
  *     ~50% discount.
- *   - xai / moonshotai / qwen: no caching path today; Phase 1 trim is
- *     the only saving.
+ *   - xai / moonshotai / qwen / zai: no caching path today; Phase 1 trim
+ *     is the only saving.
  */
 export function detectProvider(model: string | null | undefined): string {
   if (!model) return 'unknown';
@@ -187,13 +193,15 @@ export const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google Gemini',
   moonshotai: 'Moonshot Kimi',
   qwen: 'Qwen',
+  // 'z-ai/...' slugs normalize to 'zai' in detectProvider (dash stripped).
+  zai: 'Z.AI GLM',
   unknown: 'Other',
 };
 
 /**
  * Providers where OpenRouter caches input tokens. The realtor should see
- * a meaningful hit rate over time on these. xAI / Moonshot / Qwen fall
- * back to Phase 1's prompt trim only, so a 0% rate there is correct —
+ * a meaningful hit rate over time on these. xAI / Moonshot / Qwen / Z.AI
+ * fall back to Phase 1's prompt trim only, so a 0% rate there is correct —
  * not a bug worth surfacing. Google Gemini was added in Phase 3 once the
  * cache_control proxy was extended to forward Anthropic-shape markers
  * to Gemini on OpenRouter.

@@ -46,6 +46,8 @@ export const PROVIDER_TOOL_SLUGS = {
   googlecalendar: {
     list: 'GOOGLECALENDAR_EVENTS_LIST',
     create: 'GOOGLECALENDAR_CREATE_EVENT',
+    update: 'GOOGLECALENDAR_UPDATE_EVENT',
+    delete: 'GOOGLECALENDAR_DELETE_EVENT',
   },
   outlook_calendar: {
     // Composio's Outlook slugs. We don't write to Outlook yet — tour
@@ -53,6 +55,8 @@ export const PROVIDER_TOOL_SLUGS = {
     // for future use; the create() path checks the provider first.
     list: 'OUTLOOK_CALENDAR_LIST_EVENTS',
     create: 'OUTLOOK_CALENDAR_CREATE_EVENT',
+    update: 'OUTLOOK_CALENDAR_UPDATE_EVENT',
+    delete: 'OUTLOOK_CALENDAR_DELETE_EVENT',
   },
 } as const;
 
@@ -236,4 +240,161 @@ export async function writeEventThrough(
     externalEventId,
     externalOk,
   };
+}
+
+/**
+ * Find the mirror row Chippi wrote for a given tour, so reschedule/cancel
+ * can locate the external event id to update or delete. Returns the most
+ * recent row with a non-null externalEventId (a tour can have a failed
+ * mirror row with no id and a later successful one). Null when nothing
+ * mirrored — the caller skips the external mutation cleanly.
+ */
+async function findTourMirror(
+  spaceId: string,
+  sourceTourId: string,
+): Promise<{ id: string; externalEventId: string; externalProvider: CalendarProvider } | null> {
+  const { data, error } = await supabase
+    .from('CalendarEventMirror')
+    .select('id, externalEventId, externalProvider')
+    .eq('spaceId', spaceId)
+    .eq('sourceTourId', sourceTourId)
+    .not('externalEventId', 'is', null)
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('[calendar.mirror] findTourMirror failed', { spaceId, sourceTourId, err: error.message });
+    return null;
+  }
+  if (!data) return null;
+  const provider = (data as { externalProvider: string }).externalProvider;
+  if (provider !== 'googlecalendar' && provider !== 'outlook_calendar') return null;
+  const externalEventId = (data as { externalEventId: string | null }).externalEventId;
+  if (!externalEventId) return null;
+  return { id: (data as { id: string }).id, externalEventId, externalProvider: provider };
+}
+
+export interface UpdateThroughInput {
+  spaceId: string;
+  connection: CalendarConnection;
+  /** The Tour this mirror event belongs to — used to locate the external id. */
+  sourceTourId: string;
+  /** New ISO start. */
+  startsAt: string;
+  /** New ISO end. Must be > startsAt. */
+  endsAt: string;
+}
+
+/**
+ * Move the external calendar event for a tour to a new time AND sync the
+ * mirror row's start/end. Mirrors `writeEventThrough`'s posture: the
+ * external calendar is the source of truth, the mirror row is the backup.
+ *
+ * Never throws — a Composio/DB hiccup degrades to "the external event kept
+ * its old time", logged for ops, so the caller's primary action (the Tour
+ * row already moved) is never blocked. No mirrored event → no-op (returns
+ * `externalOk: false`); the realtor still sees the new time in their CRM.
+ */
+export async function updateEventThrough(
+  input: UpdateThroughInput,
+): Promise<{ externalOk: boolean }> {
+  const mirror = await findTourMirror(input.spaceId, input.sourceTourId);
+  if (!mirror) return { externalOk: false };
+
+  let externalOk = false;
+  const slugs = PROVIDER_TOOL_SLUGS[input.connection.toolkit];
+  if (slugs?.update && composioConfigured()) {
+    try {
+      const resp = await executeToolForEntity({
+        entityId: input.connection.userId,
+        slug: slugs.update,
+        arguments: {
+          event_id: mirror.externalEventId,
+          start_datetime: input.startsAt,
+          end_datetime: input.endsAt,
+        },
+      });
+      externalOk = Boolean(resp.successful);
+      if (!resp.successful) {
+        logger.warn(
+          '[calendar.mirror] external update failed',
+          { spaceId: input.spaceId, provider: input.connection.toolkit, err: resp.error ?? null },
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        '[calendar.mirror] external update threw',
+        { spaceId: input.spaceId, provider: input.connection.toolkit },
+        err,
+      );
+    }
+  }
+
+  // Keep the mirror row's window in sync regardless of the external result —
+  // it's our forensic record of where the event should be.
+  const { error: updErr } = await supabase
+    .from('CalendarEventMirror')
+    .update({ start: input.startsAt, end: input.endsAt })
+    .eq('id', mirror.id);
+  if (updErr) {
+    logger.warn('[calendar.mirror] mirror row update failed', { spaceId: input.spaceId, mirrorId: mirror.id, err: updErr.message });
+  }
+
+  return { externalOk };
+}
+
+/**
+ * Delete the external calendar event for a tour AND drop its mirror row.
+ * Mirrors `writeEventThrough`'s posture and `deleteGoogleEvent`'s
+ * idempotency: a cancelled tour must not leave a ghost slot.
+ *
+ * Never throws — a Composio/DB hiccup degrades to "the external event
+ * lingered", logged for ops. No mirrored event → no-op (returns
+ * `externalOk: false`).
+ */
+export async function deleteEventThrough(input: {
+  spaceId: string;
+  connection: CalendarConnection;
+  sourceTourId: string;
+}): Promise<{ externalOk: boolean }> {
+  const mirror = await findTourMirror(input.spaceId, input.sourceTourId);
+  if (!mirror) return { externalOk: false };
+
+  let externalOk = false;
+  const slugs = PROVIDER_TOOL_SLUGS[input.connection.toolkit];
+  if (slugs?.delete && composioConfigured()) {
+    try {
+      const resp = await executeToolForEntity({
+        entityId: input.connection.userId,
+        slug: slugs.delete,
+        arguments: { event_id: mirror.externalEventId },
+      });
+      externalOk = Boolean(resp.successful);
+      if (!resp.successful) {
+        logger.warn(
+          '[calendar.mirror] external delete failed',
+          { spaceId: input.spaceId, provider: input.connection.toolkit, err: resp.error ?? null },
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        '[calendar.mirror] external delete threw',
+        { spaceId: input.spaceId, provider: input.connection.toolkit },
+        err,
+      );
+    }
+  }
+
+  // Drop the mirror row — the event is gone (or we tried). Leaving a stale
+  // row would resurface a deleted slot in the on-demand calendar surface.
+  const { error: delErr } = await supabase
+    .from('CalendarEventMirror')
+    .delete()
+    .eq('id', mirror.id);
+  if (delErr) {
+    logger.warn('[calendar.mirror] mirror row delete failed', { spaceId: input.spaceId, mirrorId: mirror.id, err: delErr.message });
+  }
+
+  return { externalOk };
 }

@@ -187,7 +187,7 @@ function formFromTemplate(t: BrokerageTemplate): EditorForm {
 // Main client
 // ---------------------------------------------------------------------------
 
-export default function TemplatesClient() {
+export default function TemplatesClient({ canManage }: { canManage: boolean }) {
   const [templates, setTemplates] = useState<BrokerageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -433,23 +433,25 @@ export default function TemplatesClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={openCreate}
-          className={cn(PRIMARY_PILL)}
-        >
-          <Plus size={14} />
-          New template
-        </button>
-      </div>
+      {canManage && (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={openCreate}
+            className={cn(PRIMARY_PILL)}
+          >
+            <Plus size={14} />
+            New template
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <LoadingSkeleton />
       ) : loadError ? (
         <LoadErrorState message={loadError} onRetry={() => { setLoading(true); void loadTemplates(); }} />
       ) : templates.length === 0 ? (
-        <EmptyState onCreate={openCreate} />
+        <EmptyState canManage={canManage} onCreate={openCreate} />
       ) : (
         <div className="space-y-8">
           {CATEGORY_ORDER.map((cat) => {
@@ -468,6 +470,7 @@ export default function TemplatesClient() {
                     <TemplateRow
                       key={t.id}
                       template={t}
+                      canManage={canManage}
                       onEdit={() => openEdit(t)}
                       onPublish={() => setPublishTarget(t)}
                       onDuplicate={() => handleDuplicate(t)}
@@ -515,25 +518,22 @@ export default function TemplatesClient() {
 
 type TemplateRowProps = {
   template: BrokerageTemplate;
+  canManage: boolean;
   onEdit: () => void;
   onPublish: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 };
 
-function TemplateRow({ template: t, onEdit, onPublish, onDuplicate, onDelete }: TemplateRowProps) {
+function TemplateRow({ template: t, canManage, onEdit, onPublish, onDuplicate, onDelete }: TemplateRowProps) {
   const status = publishStatus(t);
   const meta = statusMeta(status);
 
-  return (
-    <li className="group py-3 hover:bg-foreground/[0.04] transition-colors -mx-2 px-2">
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex-1 min-w-0 text-left"
-          aria-label={`Edit ${t.name}`}
-        >
+  // The body content is identical for both roles; only the wrapper differs —
+  // managers get a clickable <button> that opens the editor, read-only members
+  // get a static <div> so there's no dead "Edit" affordance that would 403.
+  const bodyContent = (
+    <>
           <div className="flex items-center gap-2 flex-wrap">
             <span
               aria-label={meta.label}
@@ -577,39 +577,58 @@ function TemplateRow({ template: t, onEdit, onPublish, onDuplicate, onDelete }: 
                 : 'Never published'}
             </span>
           </p>
-        </button>
+    </>
+  );
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Actions for ${t.name}`}
-              className="shrink-0"
-            >
-              <MoreHorizontal size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onSelect={onEdit}>
-              <Pencil size={14} />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onPublish}>
-              <Send size={14} />
-              Publish to agents
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onDuplicate}>
-              <Copy size={14} />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onDelete} variant="destructive">
-              <Trash2 size={14} />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+  return (
+    <li className="group py-3 hover:bg-foreground/[0.04] transition-colors -mx-2 px-2">
+      <div className="flex items-start gap-3">
+        {canManage ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex-1 min-w-0 text-left"
+            aria-label={`Edit ${t.name}`}
+          >
+            {bodyContent}
+          </button>
+        ) : (
+          <div className="flex-1 min-w-0 text-left">{bodyContent}</div>
+        )}
+
+        {canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Actions for ${t.name}`}
+                className="shrink-0"
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={onEdit}>
+                <Pencil size={14} />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onPublish}>
+                <Send size={14} />
+                Publish to agents
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onDuplicate}>
+                <Copy size={14} />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onDelete} variant="destructive">
+                <Trash2 size={14} />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </li>
   );
@@ -897,19 +916,23 @@ function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => 
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({ canManage, onCreate }: { canManage: boolean; onCreate: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
       <p className={cn(BODY)}>No templates yet.</p>
       <p className={cn(BODY_MUTED, 'mt-1')}>
-        Write a message once. Push it to every agent.
+        {canManage
+          ? 'Write a message once. Push it to every agent.'
+          : 'Your team’s owner or admins will add shared templates here.'}
       </p>
-      <div className="mt-4 inline-flex">
-        <button type="button" onClick={onCreate} className={cn(PRIMARY_PILL)}>
-          <Plus size={14} />
-          New template
-        </button>
-      </div>
+      {canManage && (
+        <div className="mt-4 inline-flex">
+          <button type="button" onClick={onCreate} className={cn(PRIMARY_PILL)}>
+            <Plus size={14} />
+            New template
+          </button>
+        </div>
+      )}
     </div>
   );
 }

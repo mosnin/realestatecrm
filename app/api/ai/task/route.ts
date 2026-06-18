@@ -30,6 +30,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { isPlatformAdmin } from '@/lib/permissions';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import {
   chippiErrorMessage,
@@ -47,7 +48,8 @@ import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isSubscriptionDelinquent } from '@/lib/api-auth';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
-import { assertCanSpend, CreditsExhaustedError } from '@/lib/billing/meter';
+import { assertCanSpend, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
+import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
@@ -63,6 +65,7 @@ import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
  *  enough that a leaked task payload can't be replayed against the assets. */
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -380,18 +383,24 @@ function proxyModalStream({
               });
 
             } else if (type === 'tool_call_result') {
-              const toolName = String(evt.tool ?? 'tool');
-              const callId = typeof evt.call_id === 'string' ? evt.call_id : '';
-              const ok = evt.ok !== false;
-              const summary = String(evt.summary ?? '');
+              // Single source of truth for the browser frame — FORWARDS the
+              // rich-card display + data Modal lifted off the tool output
+              // (weather / stats / contacts / deals / properties / option-list
+              // / question-flow / message-draft / …). This is the Modal-path
+              // hop the previous attempt missed.
+              const frame = mapModalToolResultFrame(evt);
+              const { name: toolName, callId, ok, summary, display } = frame;
+              const data = frame.data;
               // Settle the result onto its tool-call block — by call_id when
-              // present, else the most recent still-unresolved tool call.
+              // present, else the most recent still-unresolved tool call. Carry
+              // the rich data/display so the inline card re-renders on reload.
               for (let i = blocks.length - 1; i >= 0; i--) {
                 const b = blocks[i];
                 if (b.type !== 'tool_call') continue;
                 if (callId ? b.callId === callId : !b.result) {
-                  b.result = { ok, summary };
+                  b.result = { ok, summary, data };
                   b.status = ok ? 'complete' : 'error';
+                  if (display) b.display = display;
                   break;
                 }
               }
@@ -408,13 +417,9 @@ function proxyModalStream({
                 }
                 pendingPlanArgs = null;
               }
-              push(controller, {
-                type: 'tool_call_result',
-                name: toolName,
-                ok,
-                summary,
-                callId,
-              });
+              // Spread into a plain object — `push` takes Record<string,unknown>;
+              // the typed frame interface has no index signature.
+              push(controller, { ...frame });
 
             } else if (type === 'done') {
               const finalText =
@@ -526,21 +531,19 @@ export async function POST(req: NextRequest) {
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
 
-  const { allowed } = await checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600);
-  if (!allowed) {
+  // The three rate-limit counters are independent — fire them together
+  // instead of paying three sequential Redis round-trips on the critical
+  // path before the first token.
+  const ip = getClientIp(req);
+  const [userLimit, ipLimit, spaceLimit] = await Promise.all([
+    checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600),
+    checkRateLimit(`chat:ip:${ip}`, 30, 600),
+    checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600),
+  ]);
+  if (!userLimit.allowed) {
     return NextResponse.json({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
   }
-
-  const ip = getClientIp(req);
-  const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
-  if (!ipLimit.allowed) {
-    return NextResponse.json(
-      { error: chippiErrorMessage('rate_limited') },
-      { status: 429, headers: { 'Retry-After': '600' } },
-    );
-  }
-  const spaceLimit = await checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600);
-  if (!spaceLimit.allowed) {
+  if (!ipLimit.allowed || !spaceLimit.allowed) {
     return NextResponse.json(
       { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
@@ -550,15 +553,27 @@ export async function POST(req: NextRequest) {
   // Dunning gate — pause premium AI for a LAPSED paid subscription (the card
   // failed, or the plan was canceled), while leaving the CRM fully usable.
   // Only past_due / canceled / unpaid are gated; free & never-subscribed
-  // ('inactive'), trialing, active, and brokerage-member spaces (whose own
-  // status is 'inactive' — the brokerage funds them) all pass. Admins bypass.
-  // Fails OPEN so a DB hiccup can't lock out a paying customer.
+  // ('inactive'), trialing, and active all pass. Admins bypass. Fails OPEN so a
+  // DB hiccup can't lock out a paying customer.
+  //
+  // Gate on the account that actually FUNDS the space, not the Space row: Solo/
+  // Pro pay from the Space, but Team / Team Plus members are funded by their
+  // Brokerage pool and their own Space status stays 'inactive' by design — so
+  // reading only the Space let a lapsed brokerage keep premium AI on every seat.
   try {
-    const { data: subRow } = await supabase
-      .from('Space')
-      .select('stripeSubscriptionStatus')
-      .eq('id', ctx.space.id)
-      .maybeSingle();
+    const { account } = await resolveBillingAccount(ctx.space.id);
+    const { data: subRow } =
+      account.type === 'brokerage'
+        ? await supabase
+            .from('Brokerage')
+            .select('stripeSubscriptionStatus')
+            .eq('id', account.id)
+            .maybeSingle()
+        : await supabase
+            .from('Space')
+            .select('stripeSubscriptionStatus')
+            .eq('id', account.id)
+            .maybeSingle();
     const subStatus = subRow?.stripeSubscriptionStatus ?? 'inactive';
     if (isSubscriptionDelinquent(subStatus)) {
       const { data: userRow } = await supabase
@@ -580,27 +595,42 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/task] subscription status check failed — allowing turn', { spaceSlug }, err);
   }
 
+  // Platform admins get unlimited usage: exempt from the budget + credit gates
+  // below. Token usage is still RECORDED downstream (ChatUsage), so an admin's
+  // consumption is tracked — it's just never blocked.
+  let isAdmin = false;
   try {
-    const { data: agentSettingsRow } = await supabase
-      .from('AgentSettings')
-      .select('dailyTokenBudget')
-      .eq('spaceId', ctx.space.id)
-      .maybeSingle();
+    isAdmin = await isPlatformAdmin();
+  } catch (err) {
+    logger.warn('[ai/task] admin check failed, treating as non-admin', { spaceSlug }, err);
+  }
+
+  try {
+    // Budget settings + today's usage are independent reads — fetch together.
+    const [settingsResult, usageResult] = await Promise.all([
+      supabase
+        .from('AgentSettings')
+        .select('dailyTokenBudget')
+        .eq('spaceId', ctx.space.id)
+        .maybeSingle(),
+      // Sums ChatUsage rows + the autonomous Redis counter, matching the
+      // Settings display. (The old version read AgentTask token columns no
+      // code writes, so enforcement silently passed every time.)
+      getTodayTokenUsage(ctx.space.id),
+    ]);
 
     // Default must match the AgentSettings.dailyTokenBudget DB column default
     // (and schemas.py / the settings + usage APIs), which are all 50_000. This
     // fallback was 500_000, so a space with no AgentSettings row was gated at
     // 10x the budget every other surface shows and enforces.
     const dailyTokenBudget: number =
-      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
+      ((settingsResult.data as { dailyTokenBudget?: number | null } | null)?.dailyTokenBudget as
+        | number
+        | null
+        | undefined) ?? 50_000;
+    const { total: todayTokens } = usageResult;
 
-    // Previously this read AgentTask.inputTokens/outputTokens — columns no
-    // code writes — so the enforcement silently passed every time. Route
-    // through the shared helper that sums ChatUsage rows + the autonomous
-    // Redis counter, matching the Settings display.
-    const { total: todayTokens } = await getTodayTokenUsage(ctx.space.id);
-
-    if (todayTokens >= dailyTokenBudget) {
+    if (!isAdmin && todayTokens >= dailyTokenBudget) {
       logger.warn('[ai/task] daily token budget exceeded', {
         spaceId: ctx.space.id,
         todayTokens,
@@ -616,16 +646,25 @@ export async function POST(req: NextRequest) {
   // credits. No-op unless CREDITS_ENFORCED, so this is dormant until credits go
   // live. Joins the daily-token-budget gate above as a pre-stream refusal the
   // chat client already surfaces (same non-OK JSON error shape as 429/400).
-  try {
-    await assertCanSpend(ctx.space.id, 'chat_turn');
-  } catch (err) {
-    if (err instanceof CreditsExhaustedError) {
-      return NextResponse.json(
-        { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
-        { status: 402 },
-      );
+  // Admins skip the credit gate too (unlimited usage).
+  if (!isAdmin) {
+    try {
+      await assertCanSpend(ctx.space.id, 'chat_turn');
+    } catch (err) {
+      if (err instanceof SubscriptionDelinquentError) {
+        return NextResponse.json(
+          { error: 'Your subscription is inactive. Update your payment method or resubscribe to keep chatting with Chippi.' },
+          { status: 402 },
+        );
+      }
+      if (err instanceof CreditsExhaustedError) {
+        return NextResponse.json(
+          { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
+          { status: 402 },
+        );
+      }
+      throw err;
     }
-    throw err;
   }
 
   let conversationId: string;
@@ -637,7 +676,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: message });
+    await saveUserMessage({
+      spaceId: ctx.space.id,
+      conversationId,
+      content: message,
+      attachmentIds: body.attachmentIds,
+    });
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
@@ -747,10 +791,24 @@ export async function POST(req: NextRequest) {
       history: history.map((h) => ({ role: h.role, content: h.content })),
       attachments: turnAttachments,
       abortController,
-      // Escalation hook — when the direct model's reply triggers
-      // shouldEscalate(), hand off to the agent path. Returning false means
-      // "commit the direct answer" (the v1 behaviour).
-      onEscalate: async () => false,
+      // Escalation hook — when the direct model's reply trips
+      // shouldEscalate() ("I can't send that from here…"), re-run the SAME
+      // message on the in-process TS agent (full tool surface) and pipe its
+      // stream through. This was previously hardwired to `false`, so a
+      // misrouted action committed the toolless deflection — the realtor
+      // read that as "Chippi has no tools".
+      onEscalate: async () => {
+        logger.info('[ai/task] direct → agent escalation', { spaceSlug, model: turnModel });
+        return streamTsChatTurn({
+          ctx,
+          conversationId,
+          userMessage: message,
+          history,
+          model: turnModel,
+          attachments: turnAttachments,
+          abortController,
+        });
+      },
     });
   }
 

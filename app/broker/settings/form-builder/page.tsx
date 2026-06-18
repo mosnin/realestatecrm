@@ -239,7 +239,7 @@ export default function BrokerFormBuilderPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
+      <div className="space-y-4 animate-pulse max-w-3xl mx-auto">
         <div className="h-8 bg-muted rounded-lg w-40" />
         <div className="h-64 bg-muted rounded-lg" />
       </div>
@@ -249,7 +249,7 @@ export default function BrokerFormBuilderPage() {
   const activeFormName = activeLeadType === 'rental' ? 'Rental application' : 'Buyer inquiry';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl mx-auto pb-56 md:pb-24">
       {/* ── Header ── */}
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">

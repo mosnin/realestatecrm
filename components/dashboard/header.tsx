@@ -32,12 +32,10 @@ import {
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
-import { Building2, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, CreditCard, Settings, Check, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield, PanelLeft, PanelLeftClose } from 'lucide-react';
-import { useSidebarCollapsed } from '@/components/dashboard/sidebar-collapse';
+import { Building2, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, CreditCard, Settings, Check, Calendar, BarChart2, ClipboardList, Wallet, FolderOpen, Shield } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { ShareLinksMenu } from './share-links-menu';
-import { ChippiPowerToggle } from '@/components/chippi/chippi-power-toggle';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 // Broker mobile nav is sourced from the SINGLE source of truth shared with the
@@ -85,29 +83,6 @@ function isMobileChildActive(child: NavChild, pathname: string, base: string): b
   const fullHref = `${base}${child.href.split('?')[0]}`;
   if (child.exact) return pathname === fullHref;
   return pathname === fullHref || pathname.startsWith(`${fullHref}/`);
-}
-
-/**
- * Desktop sidebar collapse toggle — the panel icon at the top-left of the
- * header (Claude-style). Reads the shared collapse context provided by the
- * layout, so it stays in sync with the sidebar's own edge handle. Hidden on
- * mobile (the drawer handles nav there).
- */
-function SidebarCollapseToggle() {
-  const { collapsed, toggle } = useSidebarCollapsed();
-  const Icon = collapsed ? PanelLeft : PanelLeftClose;
-  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={label}
-      title={label}
-      className="hidden md:inline-flex items-center justify-center w-8 h-8 rounded-full border border-border/70 bg-background text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.96]"
-    >
-      <Icon size={17} strokeWidth={1.75} />
-    </button>
-  );
 }
 
 export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null, isPlatformAdmin = false }: HeaderProps) {
@@ -181,8 +156,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   return (
     <header data-dashboard-header className="h-14 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
       <div className="flex items-center gap-3">
-        {/* Desktop sidebar collapse toggle (Claude-style panel icon). */}
-        <SidebarCollapseToggle />
         {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
             state, not a bare SVG. Radix's Trigger wraps whatever child you
             give it; without dimensions the click area is just the icon. */}
@@ -515,7 +488,6 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
       <div className="flex items-center gap-1.5">
-        {slug && <ChippiPowerToggle />}
         {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} spaceId={spaceId} />}
         {isBrokerOnly && !slug && <NotificationBell />}

@@ -23,6 +23,7 @@ private memory, not contact with the human.
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -96,13 +97,13 @@ async def audit_response_times(
     ) if owner_ids else None
     users_by_id = {u["id"]: u for u in ((users_res.data if users_res else []) or [])}
 
-    per_realtor: list[dict[str, Any]] = []
-    all_hours: list[float] = []
-    for space in spaces:
+    # Per-realtor audit as a coroutine — the roster runs in PARALLEL via
+    # asyncio.gather instead of 2 sequential DB round-trips per realtor.
+    async def _audit(space: dict[str, Any]) -> tuple[dict[str, Any], list[float]] | None:
         space_id = space["id"]
         owner_id = space.get("ownerId")
         if not owner_id:
-            continue
+            return None
         user = users_by_id.get(owner_id) or {}
         name = user.get("name") or user.get("email") or "Realtor"
 
@@ -117,23 +118,21 @@ async def audit_response_times(
         )
         contacts = contacts_res.data or []
         if not contacts:
-            per_realtor.append({
+            return ({
                 "id": owner_id,
                 "name": name,
                 "median_hours": None,
                 "sample_size": 0,
-            })
-            continue
+            }, [])
 
         contact_ids = [c["id"] for c in contacts if c.get("id")]
         if not contact_ids:
-            per_realtor.append({
+            return ({
                 "id": owner_id,
                 "name": name,
                 "median_hours": None,
                 "sample_size": 0,
-            })
-            continue
+            }, [])
 
         # First outbound activity per contact — same shape as
         # team._response_hours_for_space, duplicated here so neither module
@@ -188,20 +187,22 @@ async def audit_response_times(
 
         if hours:
             med = round(statistics.median(hours), 2)
-            per_realtor.append({
+            return ({
                 "id": owner_id,
                 "name": name,
                 "median_hours": med,
                 "sample_size": len(hours),
-            })
-            all_hours.extend(hours)
-        else:
-            per_realtor.append({
-                "id": owner_id,
-                "name": name,
-                "median_hours": None,
-                "sample_size": 0,
-            })
+            }, hours)
+        return ({
+            "id": owner_id,
+            "name": name,
+            "median_hours": None,
+            "sample_size": 0,
+        }, [])
+
+    audited = await asyncio.gather(*(_audit(s) for s in spaces))
+    per_realtor: list[dict[str, Any]] = [r[0] for r in audited if r is not None]
+    all_hours: list[float] = [h for r in audited if r is not None for h in r[1]]
 
     # Team median across ALL response samples (not the median of medians —
     # the broker wants the team's "typical" response, which is best measured
@@ -311,13 +312,15 @@ async def find_at_risk_agents(
         )
         users_by_id = {u["id"]: u for u in (users_res.data or [])}
 
-    at_risk: list[dict[str, Any]] = []
-
-    for space in spaces:
+    # Per-realtor assessment as a coroutine so the whole roster runs in
+    # PARALLEL via asyncio.gather. The sequential version paid ~6 DB
+    # round-trips per realtor in series — 120 sequential queries for a
+    # 20-agent brokerage, the dominant term in "broker chat is slow".
+    async def _assess(space: dict[str, Any]) -> dict[str, Any] | None:
         space_id = space["id"]
         owner_id = space.get("ownerId")
         if not owner_id:
-            continue
+            return None
         user = users_by_id.get(owner_id) or {}
         name = user.get("name") or user.get("email") or "Realtor"
 
@@ -461,7 +464,7 @@ async def find_at_risk_agents(
             reasons.append(f"{sla_nudge_count} SLA nudge{'s' if sla_nudge_count != 1 else ''}")
 
         if not reasons:
-            continue  # no signals — realtor is fine
+            return None  # no signals — realtor is fine
 
         # Risk score: escalated leads are heaviest, then silence, then won decline.
         risk_score = (
@@ -471,7 +474,7 @@ async def find_at_risk_agents(
             + (abs(won_pct_change) if won_pct_change is not None else 0)
         )
 
-        at_risk.append({
+        return {
             "id": owner_id,
             "name": name,
             "risk_score": round(risk_score, 1),
@@ -485,7 +488,10 @@ async def find_at_risk_agents(
                 "sla_nudge_count": sla_nudge_count,
                 "sla_escalate_count": sla_escalate_count,
             },
-        })
+        }
+
+    results = await asyncio.gather(*(_assess(s) for s in spaces))
+    at_risk: list[dict[str, Any]] = [r for r in results if r is not None]
 
     # Sort descending by risk_score so the most urgent surfaces first.
     at_risk.sort(key=lambda r: r["risk_score"], reverse=True)

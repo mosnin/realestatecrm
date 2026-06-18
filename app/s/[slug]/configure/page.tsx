@@ -103,7 +103,7 @@ export default async function ConfigurePage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl mx-auto pb-12">
       <ConfigureAccountForm initialData={initialData} slug={slug} />
 
       {/* Brokerage section — links to dedicated page */}
