@@ -97,55 +97,96 @@ interface RawContact {
   snoozedUntil: string | null;
 }
 
-async function enrichOne(c: RawContact, spaceId: string, now: Date): Promise<PersonContext> {
-  // Most-recent activity (one-liner) and active-deal count run in parallel.
+interface LatestActivity {
+  type: string;
+  content: string | null;
+  createdAt: string;
+}
+
+/**
+ * Enrich a batch of contacts with most-recent activity + active-deal count.
+ *
+ * Replaces the old per-row enrichOne (2 queries/contact → 16 for a full
+ * shortlist of 8). Now exactly TWO queries total regardless of N: one
+ * `contactId IN (ids)` against ContactActivity and one against DealContact,
+ * hydrated in JS. Output is identical to the per-row path — same recency
+ * anchor, same most-recent-activity string, same active-deal count.
+ */
+async function enrichMany(
+  contacts: RawContact[],
+  spaceId: string,
+  now: Date,
+): Promise<PersonContext[]> {
+  if (contacts.length === 0) return [];
+  const ids = contacts.map((c) => c.id);
+
   const [activityRes, dealRes] = await Promise.all([
+    // Ordered DESC so the FIRST row we see per contactId is its most recent —
+    // mirrors the old per-contact `.order(createdAt desc).limit(1)`.
     supabase
       .from('ContactActivity')
-      .select('type, content, createdAt')
-      .eq('contactId', c.id)
+      .select('contactId, type, content, createdAt')
+      .in('contactId', ids)
       .eq('spaceId', spaceId)
-      .order('createdAt', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order('createdAt', { ascending: false }),
     supabase
       .from('DealContact')
-      .select('Deal!inner(id, status)')
-      .eq('contactId', c.id),
+      .select('contactId, Deal!inner(id, status)')
+      .in('contactId', ids),
   ]);
 
-  let mostRecent: string | null = null;
-  if (activityRes.data) {
-    const row = activityRes.data as { type: string; content: string | null; createdAt: string };
-    const date = row.createdAt.slice(0, 10);
-    const content = trimContent(row.content);
-    mostRecent = content ? `${date} — ${row.type}: ${content}` : `${date} — ${row.type}`;
+  // Most-recent activity per contact (first wins thanks to DESC order).
+  const latestByContact = new Map<string, LatestActivity>();
+  for (const row of (activityRes.data ?? []) as Array<LatestActivity & { contactId: string }>) {
+    if (!latestByContact.has(row.contactId)) {
+      latestByContact.set(row.contactId, { type: row.type, content: row.content, createdAt: row.createdAt });
+    }
   }
 
+  // Active-deal count per contact.
+  const activeDealCountByContact = new Map<string, number>();
   const dealRows =
-    (dealRes.data ?? []) as unknown as Array<{ Deal: { id: string; status: string } | null }>;
-  const activeDealCount = dealRows.filter((r) => r.Deal && r.Deal.status === 'active').length;
+    (dealRes.data ?? []) as unknown as Array<{ contactId: string; Deal: { id: string; status: string } | null }>;
+  for (const r of dealRows) {
+    if (r.Deal && r.Deal.status === 'active') {
+      activeDealCountByContact.set(r.contactId, (activeDealCountByContact.get(r.contactId) ?? 0) + 1);
+    }
+  }
 
-  // Recency: prefer lastContactedAt; fall back to most-recent activity date.
-  const recencyAnchor =
-    c.lastContactedAt ?? (activityRes.data ? (activityRes.data as { createdAt: string }).createdAt : null);
+  return contacts.map((c) => {
+    const activity = latestByContact.get(c.id) ?? null;
 
-  const snoozed = c.snoozedUntil ? new Date(c.snoozedUntil) > now : false;
+    let mostRecent: string | null = null;
+    if (activity) {
+      const date = activity.createdAt.slice(0, 10);
+      const content = trimContent(activity.content);
+      mostRecent = content ? `${date} — ${activity.type}: ${content}` : `${date} — ${activity.type}`;
+    }
 
-  return {
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    phone: c.phone,
-    leadScore: c.leadScore,
-    scoreLabel: c.scoreLabel,
-    type: c.type,
-    status: snoozed ? 'snoozed' : 'active',
-    followUpAt: c.followUpAt,
-    days_since_last_touch: daysSince(recencyAnchor, now),
-    most_recent_activity: mostRecent,
-    active_deal_count: activeDealCount,
-  };
+    // Recency: prefer lastContactedAt; fall back to most-recent activity date.
+    const recencyAnchor = c.lastContactedAt ?? (activity ? activity.createdAt : null);
+    const snoozed = c.snoozedUntil ? new Date(c.snoozedUntil) > now : false;
+
+    return {
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      leadScore: c.leadScore,
+      scoreLabel: c.scoreLabel,
+      type: c.type,
+      status: snoozed ? 'snoozed' : 'active',
+      followUpAt: c.followUpAt,
+      days_since_last_touch: daysSince(recencyAnchor, now),
+      most_recent_activity: mostRecent,
+      active_deal_count: activeDealCountByContact.get(c.id) ?? 0,
+    };
+  });
+}
+
+async function enrichOne(c: RawContact, spaceId: string, now: Date): Promise<PersonContext> {
+  const [person] = await enrichMany([c], spaceId, now);
+  return person;
 }
 
 function summariseOne(p: PersonContext): string {
@@ -245,8 +286,8 @@ export const findPersonTool = defineTool<typeof parameters, FindPersonResult>({
       };
     }
 
-    // Ambiguous → enrich the shortlist (parallel; small N).
-    const people = await Promise.all(rows.map((r) => enrichOne(r, ctx.space.id, now)));
+    // Ambiguous → enrich the whole shortlist in two queries total (batched).
+    const people = await enrichMany(rows, ctx.space.id, now);
     const lines = people.map((p) => `• ${summariseOne(p)}`).join('\n');
     return {
       summary: `Found ${people.length} people:\n${lines}`,

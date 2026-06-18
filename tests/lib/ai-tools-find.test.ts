@@ -105,6 +105,7 @@ describe('findPersonTool', () => {
       ContactActivity: {
         rows: [
           {
+            contactId: 'c_1',
             type: 'call',
             content: 'Discussed budget',
             createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
@@ -113,8 +114,8 @@ describe('findPersonTool', () => {
       },
       DealContact: {
         rows: [
-          { Deal: { id: 'd_1', status: 'active' } },
-          { Deal: { id: 'd_2', status: 'lost' } },
+          { contactId: 'c_1', Deal: { id: 'd_1', status: 'active' } },
+          { contactId: 'c_1', Deal: { id: 'd_2', status: 'lost' } },
         ],
       },
     };
