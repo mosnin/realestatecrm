@@ -30,7 +30,8 @@ export type PeopleDetailActionIntent =
   | 'log-call'
   | 'welcome'
   | 'reach-out'
-  | 'schedule-tour';
+  | 'schedule-tour'
+  | 'clear-followup';
 
 export interface PeopleDetailAction {
   id: string;
@@ -63,7 +64,7 @@ export function buildPeopleDetailActions(
   if (overdue) {
     return [
       { id: 'check-in', label: 'Send a check-in', intent: 'check-in' },
-      { id: 'clear-followup', label: 'Clear follow-up', intent: 'log-call' },
+      { id: 'clear-followup', label: 'Clear follow-up', intent: 'clear-followup' },
     ];
   }
 
