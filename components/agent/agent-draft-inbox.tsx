@@ -777,7 +777,7 @@ export function AgentDraftInbox({ slug }: Props) {
         drafts.map((d) => fetch(`/api/agent/drafts/${d.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'approved', content: d.content }),
+          body: JSON.stringify({ status: 'approved', content: d.content }),
         }).then((r) => { if (!r.ok) throw new Error(r.status.toString()); }))
       );
       const failed = results.filter((r) => r.status === 'rejected').length;
