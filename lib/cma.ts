@@ -33,6 +33,7 @@ import {
 } from '@/lib/rentcast';
 import type {
   CmaDataSource,
+  CmaDataSourceReason,
   CmaSubject,
   CmaComp,
   CmaStats,
@@ -126,6 +127,7 @@ export function computeStats(
     suggestedHigh = high;
   }
 
+  const estimatedValue = opts?.estimatedValue ?? null;
   return {
     compCount: comps.length,
     pricedCount: priced.length,
@@ -135,8 +137,11 @@ export function computeStats(
     avgPricePerSqft,
     suggestedLow,
     suggestedHigh,
-    estimatedValue: opts?.estimatedValue ?? null,
+    estimatedValue,
     basis,
+    // No market estimate AND too few priced comps to defend a valuation — the UI
+    // must present this as "not enough data", never as a market value.
+    insufficientData: estimatedValue == null && priced.length < MIN_RELIABLE_COMPS,
   };
 }
 
@@ -264,6 +269,9 @@ const COMP_SELECT =
 const MAX_CRM_COMPS = 6;
 /** Max CRM comps merged in as SECONDARY comps on the RentCast path. */
 const MAX_CRM_SECONDARY_COMPS = 4;
+/** Below this many priced comps — with no market estimate — a report can't
+ *  stand behind a valuation, so it's flagged insufficientData for honest UI. */
+const MIN_RELIABLE_COMPS = 3;
 
 /**
  * Score a candidate against the subject. Lower is closer. Mirrors the
@@ -405,7 +413,10 @@ export async function buildCma(args: BuildCmaArgs): Promise<CmaPayload> {
   }
 
   // ── PRIMARY: RentCast market data ─────────────────────────────────────────
+  // Track WHY we'd fall back to CRM so the report can say so honestly.
+  let fallbackReason: CmaDataSourceReason = 'rentcast_unconfigured';
   if (rentcastConfigured()) {
+    fallbackReason = 'rentcast_no_match';
     let rc: RentcastValueResult | null = null;
     try {
       // RentCast wants a full single-line address; fold in city/state if the
@@ -454,6 +465,7 @@ export async function buildCma(args: BuildCmaArgs): Promise<CmaPayload> {
         comps,
         stats,
         dataSource: 'rentcast',
+        dataSourceReason: 'rentcast',
         generatedAt: new Date().toISOString(),
       };
     }
@@ -472,6 +484,7 @@ export async function buildCma(args: BuildCmaArgs): Promise<CmaPayload> {
     comps,
     stats,
     dataSource: 'crm',
+    dataSourceReason: fallbackReason,
     generatedAt: new Date().toISOString(),
   };
 }
