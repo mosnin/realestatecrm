@@ -173,8 +173,16 @@ export function FilesPanel() {
         file.source === 'chat'
           ? `/api/ai/attachments?id=${encodeURIComponent(file.id)}`
           : `/api/files/${file.id}`;
-      const res = await fetch(endpoint, { method: 'DELETE' });
-      if (res.ok) await refresh();
+      try {
+        const res = await fetch(endpoint, { method: 'DELETE' });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error || 'Could not delete that file.');
+        }
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not delete that file.');
+      }
     },
     [refresh],
   );

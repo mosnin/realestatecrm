@@ -155,7 +155,7 @@ export default async function LeadsPage({
             Share your intake link — new applications will appear here.
           </p>
           <Link
-            href={`/s/${slug}/intake/share`}
+            href={`/s/${slug}/intake`}
             className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Get your intake link <ArrowRight size={12} />
