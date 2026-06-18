@@ -57,6 +57,9 @@ import { markDealLostTool } from './mark-deal-lost';
 import { deleteDealTool } from './delete-deal';
 import { noteOnDealTool } from './note-on-deal';
 import { addChecklistItemTool } from './add-checklist-item';
+import { draftOfferTool } from './draft-offer';
+import { draftCounterOfferTool } from './draft-counter-offer';
+import { draftContingencyTool } from './draft-contingency';
 
 // Tours
 import { scheduleTourTool } from './schedule-tour';
@@ -158,6 +161,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
   deleteDealTool as ToolDefinition,
   noteOnDealTool as ToolDefinition,
   addChecklistItemTool as ToolDefinition,
+  // Offer drafting — reviewable AgentDraft summaries tied to a deal
+  draftOfferTool as ToolDefinition,
+  draftCounterOfferTool as ToolDefinition,
+  draftContingencyTool as ToolDefinition,
 
   // ── Tours ──────────────────────────────────────────────────────────────
   scheduleTourTool as ToolDefinition,
