@@ -77,6 +77,9 @@ export const TOOLSETS: Record<string, readonly string[]> = {
     'delete_deal',
     'add_checklist_item',
     'find_stuck_deals',
+    'draft_offer',
+    'draft_counter_offer',
+    'draft_contingency',
   ],
   tours: ['schedule_tour', 'reschedule_tour', 'cancel_tour', 'delete_tour', 'find_tours', 'get_weather'],
   properties: [
