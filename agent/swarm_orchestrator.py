@@ -66,7 +66,9 @@ async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_
     await db.table("SwarmEvent").insert(row).execute()
 
 
-async def plan_swarm(goal: str, custom_agents: list[dict], client: AsyncOpenAI, space_id: str) -> dict:
+async def plan_swarm(
+    goal: str, custom_agents: list[dict], client: AsyncOpenAI, space_id: str
+) -> dict:
     """Ask GPT-4o to decompose the goal into parallel sub-tasks. Returns a plan dict."""
     agent_roster = "\n".join(
         f"- Agent {i}: {a['name']} — {a.get('systemPrompt', '')[:200]}"
@@ -279,13 +281,19 @@ async def run_swarm(payload: dict) -> None:
         # One check up front (same per-space daily counter the autonomous
         # orchestrator uses) is enough; refuse the whole run when spent.
         if not await check_budget(space_id, _SWARM_DAILY_TOKEN_BUDGET):
-            logger.warning("swarm_skipped_budget_exhausted", swarm_run_id=swarm_run_id, space_id=space_id)
+            logger.warning(
+                "swarm_skipped_budget_exhausted",
+                swarm_run_id=swarm_run_id,
+                space_id=space_id,
+            )
             await db.table("SwarmRun").update({
                 "status": "failed",
                 "errorMessage": "Daily token budget exhausted — swarm skipped.",
                 "completedAt": datetime.now(timezone.utc).isoformat(),
             }).eq("id", swarm_run_id).execute()
-            await emit_event(db, swarm_run_id, "swarm_failed", {"error": "Daily token budget exhausted."})
+            await emit_event(
+                db, swarm_run_id, "swarm_failed", {"error": "Daily token budget exhausted."}
+            )
             return
 
         # Planning phase
