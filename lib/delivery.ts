@@ -5,13 +5,24 @@
  *   1. Realtor's connected Gmail/Outlook via Composio (sends as the realtor —
  *      their address, their domain, their reply-to). Requires {spaceId, userId}
  *      in options + an active IntegrationConnection row for the toolkit.
- *   2. Resend with shared FROM_EMAIL (platform-branded sender — the fallback
- *      for realtors who haven't connected their own inbox yet).
+ *   2. Resend with the shared RESEND_FROM_EMAIL (platform-branded sender —
+ *      used for realtors who haven't connected their own inbox yet, and as the
+ *      automatic fallback when the connected-inbox send fails; see below).
  *
- * If a connected inbox is found but the Composio call fails, we return the
- * error — we do NOT silently fall back to the shared sender. Sending from
- * the wrong identity is worse than not sending; the realtor should see the
- * failure and reconnect/retry.
+ * If a connected inbox is found but the Composio send fails (the SDK throws,
+ * returns not-successful, or Composio isn't configured), we DON'T just give up
+ * — losing a human-approved transactional message is the worst outcome. We
+ * fall back to the shared Resend sender (best-effort, well-logged) so the
+ * message still goes out. The result records this: `method` becomes 'email',
+ * `fallback` is true, and `primaryError` carries the original inbox failure so
+ * the realtor can still be told "we sent this from the platform address, not
+ * your inbox — reconnect to send as yourself." Identity drift is recoverable;
+ * a silently-dropped message is not.
+ *
+ * The not-configured-vs-failed distinction is preserved end-to-end: a missing
+ * inbox connection skips straight to Resend (config gap, not a failure), and
+ * if Resend itself is unconfigured we return { sent: false, error:
+ * 'not_configured' } rather than pretending we sent.
  *
  * SMS routing:
  *   1. Telnyx REST (only path for now; per-realtor SMS-as-themselves is
@@ -38,6 +49,16 @@ export interface DeliveryResult {
   /** 'gmail' / 'outlook' = via realtor's inbox; 'email' = via shared Resend. */
   method: 'gmail' | 'outlook' | 'email' | 'sms' | 'note';
   error?: string;
+  /**
+   * True when the primary path (the realtor's connected inbox) failed and we
+   * delivered via the shared Resend sender instead. `method` already reflects
+   * the path that actually delivered ('email'); this flag lets callers tell a
+   * fallback delivery apart from a first-choice shared-sender delivery, and
+   * `primaryError` carries the original inbox failure for surfacing/telemetry.
+   */
+  fallback?: boolean;
+  /** The primary (inbox) error that triggered the Resend fallback, if any. */
+  primaryError?: string;
 }
 
 export interface DraftPayload {
@@ -154,7 +175,12 @@ async function deliverEmail(
   fromName: string,
 ): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL;
+  // The rest of the codebase (lib/email.ts, lib/tour-emails.ts, env.ts,
+  // .env.example) standardizes on RESEND_FROM_EMAIL; FROM_EMAIL was a stray
+  // key here that no environment actually sets, which quietly made this path
+  // report "not_configured" even when Resend was fully wired. Read the real
+  // key, keep FROM_EMAIL as a backward-compatible fallback.
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? process.env.FROM_EMAIL;
 
   if (!apiKey || !fromEmail) {
     return { sent: false, method: 'email', error: 'not_configured' };
@@ -179,6 +205,47 @@ async function deliverEmail(
   } catch (err) {
     return { sent: false, method: 'email', error: String(err) };
   }
+}
+
+/**
+ * Run the shared Resend sender as a FALLBACK after the realtor's inbox path
+ * failed, and reconcile the two outcomes into one DeliveryResult.
+ *
+ *   Resend succeeds → { sent: true, method: 'email', fallback: true,
+ *                       primaryError } so the caller can still tell the realtor
+ *                       "delivered via the platform address, not your inbox."
+ *   Resend fails    → { sent: false } with a combined error naming BOTH the
+ *                     inbox failure and the Resend failure, and Resend's own
+ *                     'not_configured' marker preserved when that's the cause
+ *                     (keeps the not-configured-vs-failed distinction intact).
+ */
+async function fallbackToResend(
+  draft: DraftPayload,
+  contact: ContactPayload,
+  fromName: string,
+  primaryError: string | undefined,
+): Promise<DeliveryResult> {
+  const result = await deliverEmail(draft, contact, fromName);
+
+  if (result.sent) {
+    logger.info('[delivery] shared-sender fallback delivered after inbox failure', {
+      primaryError,
+    });
+    return { ...result, fallback: true, primaryError };
+  }
+
+  // Both paths failed — give the caller the whole story in one error string,
+  // but keep the machine-readable 'not_configured' marker when the shared
+  // sender simply wasn't set up (vs. an actual send rejection).
+  logger.error('[delivery] shared-sender fallback also failed', {
+    primaryError,
+    fallbackError: result.error,
+  });
+  const combined =
+    result.error === 'not_configured'
+      ? `inbox send failed (${primaryError ?? 'unknown'}); fallback sender not_configured`
+      : `inbox send failed (${primaryError ?? 'unknown'}); fallback also failed (${result.error ?? 'unknown'})`;
+  return { ...result, fallback: true, primaryError, error: combined };
 }
 
 // ─── SMS via Telnyx REST API ──────────────────────────────────────────────────
@@ -253,7 +320,18 @@ export async function sendDraft(
         try {
           const toolkit = await activeInboxToolkit(options.spaceId, options.userId);
           if (toolkit) {
-            return deliverViaInbox(toolkit, draft, contact, options.userId);
+            const primary = await deliverViaInbox(toolkit, draft, contact, options.userId);
+            if (primary.sent) return primary;
+
+            // Primary path (the realtor's inbox) failed — threw, returned
+            // not-successful, or Composio isn't configured. Rather than drop a
+            // human-approved message, fall back to the shared Resend sender.
+            // Best-effort: if Resend also fails we surface BOTH errors.
+            logger.warn(
+              '[delivery] inbox send failed; falling back to shared sender',
+              { toolkit, primaryError: primary.error },
+            );
+            return fallbackToResend(draft, contact, fromName, primary.error);
           }
         } catch (err) {
           // Lookup failure must not block the send — fall back to Resend.
@@ -264,6 +342,8 @@ export async function sendDraft(
           }, err as Error);
         }
       }
+      // No connected inbox (or the lookup itself blew up) — shared sender is
+      // the first-choice path here, not a fallback, so no fallback metadata.
       return deliverEmail(draft, contact, fromName);
     }
     case 'sms':
