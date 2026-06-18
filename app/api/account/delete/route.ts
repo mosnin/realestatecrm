@@ -77,7 +77,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: blocker }, { status: 409 });
   }
 
-  // Audit BEFORE anything is touched — we keep the spaceId in the log.
+  // Audit BEFORE anything is touched. NOTE: this row carries spaceId = space.id
+  // and is therefore NOT a durable record of the completed deletion — if the
+  // hard-delete cascade ever reaches AuditLog (it doesn't today: AuditLog has no
+  // FK to Space, but a future schema change could add one), this row would be
+  // swept along with everything else space-scoped. The durable record is the
+  // POST-deletion audit below, written with spaceId = null. We keep this
+  // pre-audit anyway as a forensic "deletion attempted" marker.
   await audit({
     actorClerkId: userId,
     action: 'DELETE',
@@ -87,6 +93,7 @@ export async function POST(req: NextRequest) {
     req,
     metadata: {
       kind: 'account-deletion',
+      phase: 'requested',
       slug: space.slug,
       name: space.name,
       hardDelete: hardDeleteEnabled(),
@@ -135,6 +142,28 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  // Durable completion record. Written AFTER the cascade with spaceId = null so
+  // it can never be cascaded away with the space it describes — this is the row
+  // a compliance/GDPR audit reads to prove the erasure happened. We keep the
+  // deleted space id in metadata (text, not an FK) for forensic reference.
+  await audit({
+    actorClerkId: userId,
+    action: 'DELETE',
+    resource: 'Space',
+    resourceId: space.id,
+    // spaceId intentionally omitted → persisted as null (see audit()). A null
+    // spaceId is exactly what keeps this row out of any space-scoped cascade.
+    req,
+    metadata: {
+      kind: 'account-deletion',
+      phase: 'completed',
+      deletedSpaceId: space.id,
+      slug: space.slug,
+      name: space.name,
+      hardDelete: true,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -110,6 +110,25 @@ const PREFIX_SPECS: PrefixSpec[] = [
     },
   },
   {
+    // Chat attachments uploaded via the prompt box. Every object is an
+    // Attachment row whose `storagePath` holds the full key; any
+    // chat-attachments/ object with no matching storagePath is an orphan
+    // (DB insert failed after upload, or the row was swept on space delete).
+    prefix: STORAGE_PREFIXES.chatAttachments,
+    label: 'chat-attachments',
+    referencedKeys: async (candidates) => {
+      const { data } = await supabase
+        .from('Attachment')
+        .select('storagePath')
+        .in('storagePath', candidates);
+      return new Set(
+        ((data ?? []) as { storagePath: string }[])
+          .map((r) => r.storagePath)
+          .filter(Boolean),
+      );
+    },
+  },
+  {
     prefix: STORAGE_PREFIXES.contactDocuments,
     label: 'contact-documents',
     referencedKeys: async (candidates) => {

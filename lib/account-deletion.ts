@@ -17,6 +17,9 @@
  * delete, while we still hold the spaceId):
  *   - `Attachment`     — has spaceId but no FK to Space
  *   - `TelemetryEvent` — has nullable spaceId, no FK to Space
+ *   - Wasabi storage objects — Postgres can't cascade into object storage, so
+ *     we enumerate the keys and best-effort delete the blobs before the row
+ *     cascade fires (see deleteSpaceStorageObjects).
  *
  * What is intentionally retained (see docs/DATA-DELETION.md §retention):
  *   - Stripe customer/invoice records (held by Stripe; legal/financial retention)
@@ -32,9 +35,69 @@
 
 import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { deleteObjectsBestEffort } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 
 export function hardDeleteEnabled(): boolean {
   return process.env.ACCOUNT_DELETION_HARD_DELETE === 'true';
+}
+
+/**
+ * Collect every Wasabi object key owned by a space, across the four tables that
+ * carry a storage reference, and best-effort delete the underlying blobs.
+ *
+ * GDPR erasure means the bytes, not just the DB rows. The cascade deletes the
+ * rows (File/DealDocument/ContactDocument via Space FK; Attachment is swept
+ * explicitly), but Postgres knows nothing about Wasabi — without this the
+ * objects survive forever. So we enumerate the keys WHILE the rows still exist
+ * (before the cascade fires) and drop the blobs.
+ *
+ * Best-effort by design: a Wasabi failure here must never abort the DB
+ * deletion (the user's right to erasure of their data outranks orphan-cleanup),
+ * and the nightly storage-gc cron sweeps anything we miss. We log failures.
+ *
+ * Storage columns per table (verified against the migrations):
+ *   - Attachment.storagePath        (chat-attachments/…)
+ *   - File.storageKey               (files/… and studio/… — studio media is File rows)
+ *   - DealDocument.storagePath      (deal-documents/…)
+ *   - ContactDocument.storageKey    (contact-documents/…)
+ */
+async function deleteSpaceStorageObjects(spaceId: string): Promise<void> {
+  const keys: string[] = [];
+
+  const collect = (
+    rows: Array<Record<string, unknown>> | null,
+    col: string,
+  ): void => {
+    for (const row of rows ?? []) {
+      const v = row[col];
+      if (typeof v === 'string' && v.length > 0) keys.push(v);
+    }
+  };
+
+  // Attachment + File are space-scoped directly. DealDocument + ContactDocument
+  // also carry spaceId, so a single spaceId filter reaches every blob.
+  const [att, file, deal, contact] = await Promise.all([
+    supabase.from('Attachment').select('storagePath').eq('spaceId', spaceId),
+    supabase.from('File').select('storageKey').eq('spaceId', spaceId),
+    supabase.from('DealDocument').select('storagePath').eq('spaceId', spaceId),
+    supabase.from('ContactDocument').select('storageKey').eq('spaceId', spaceId),
+  ]);
+
+  collect(att.data as Array<Record<string, unknown>> | null, 'storagePath');
+  collect(file.data as Array<Record<string, unknown>> | null, 'storageKey');
+  collect(deal.data as Array<Record<string, unknown>> | null, 'storagePath');
+  collect(contact.data as Array<Record<string, unknown>> | null, 'storageKey');
+
+  if (keys.length === 0) return;
+
+  const { ok, failed } = await deleteObjectsBestEffort(keys);
+  if (failed.length > 0) {
+    logger.error(
+      '[account-deletion] storage blob delete had failures — orphans left for storage-gc',
+      { spaceId, attempted: keys.length, ok, failed: failed.length },
+    );
+  }
 }
 
 /**
@@ -76,6 +139,12 @@ export async function hardDeleteSpaceAndUser(params: {
   }
 
   const { userDbId, spaceId } = params;
+
+  // 0. Storage blobs FIRST — enumerate object keys while the rows that
+  //    reference them still exist, then best-effort delete the Wasabi
+  //    objects. Must precede the row deletes below (and the User cascade),
+  //    or the keys are gone before we can read them. Never throws.
+  await deleteSpaceStorageObjects(spaceId);
 
   // 1. Non-cascading tables — must go first, while the spaceId still resolves.
   const { error: attErr } = await supabase.from('Attachment').delete().eq('spaceId', spaceId);
