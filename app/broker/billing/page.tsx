@@ -189,6 +189,13 @@ export default async function BrokerBillingPage() {
             ? { portal: '/api/broker/billing/portal', cancel: '/api/broker/billing/cancel' }
             : undefined
         }
+        // Suppress BillingPage's own Subscribe/Resubscribe buttons. When the
+        // brokerage isn't subscribed we render <BrokerageSubscribe> above (the
+        // plan picker that POSTs scope:'brokerage' to /api/billing/checkout —
+        // the correct entity). BillingPage's subscribe handler posts only
+        // { slug } to the Space checkout flow, which 400s for a broker_only
+        // owner (slug='') and bills the wrong Stripe entity for legacy owners.
+        hideSubscribe
       />
       {/* Credits are keyed to the runtime space; a brokerage-entity broker
           with no personal Space simply has no per-space summary to show. */}

@@ -11,6 +11,13 @@ export default async function TemplatesPage() {
   const ctx = await getBrokerMemberContext();
   if (!ctx) redirect('/');
 
+  // Only the owner/admins can author the library; the write API routes
+  // (POST/PATCH/DELETE/publish) hard-gate to those roles and 403 otherwise.
+  // Realtor members can read the playbook but the write controls must be
+  // hidden for them — surfacing buttons that always 403 is a broken flow.
+  const canManage =
+    ctx.membership.role === 'broker_owner' || ctx.membership.role === 'broker_admin';
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
@@ -19,11 +26,13 @@ export default async function TemplatesPage() {
           The team’s playbook
         </h1>
         <p className={cn(BODY_MUTED)}>
-          Write a message once. Push the latest to every agent.
+          {canManage
+            ? 'Write a message once. Push the latest to every agent.'
+            : 'Your team’s shared message templates.'}
         </p>
       </header>
 
-      <TemplatesClient />
+      <TemplatesClient canManage={canManage} />
     </div>
   );
 }
