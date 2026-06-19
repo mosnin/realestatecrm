@@ -92,6 +92,18 @@ export function DealCard({
     else router.push(`/s/${slug}/deals/${deal.id}`);
   }
 
+  // Keyboard parity for the card body — Enter / Space open the deal, matching
+  // the click affordance. The drag handle and quick-action buttons are real
+  // <button>s with their own focus + stopPropagation, so they're reachable
+  // independently in the tab order.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleOpen();
+    }
+  }
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -106,16 +118,21 @@ export function DealCard({
       transition={{ duration: 0.2, ease: EASE_APPLE, delay: staggerDelay }}
     >
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Open deal ${deal.title}`}
         className={cn(
           'group bg-background border border-border/70 rounded-md p-3 cursor-pointer',
           'transition-colors duration-150',
           'hover:bg-foreground/[0.04]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           // Closed deals recede — still scannable, visually quieter.
           deal.status === 'won' && 'opacity-75',
           deal.status === 'lost' && 'opacity-55',
           deal.status === 'on_hold' && 'opacity-70',
         )}
         onClick={handleOpen}
+        onKeyDown={handleKeyDown}
       >
         <div className="flex items-start gap-2">
           {/* Drag handle — stops propagation so clicking doesn't open the panel */}

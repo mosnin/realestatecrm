@@ -3,12 +3,13 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
-import { Phone, Flame, Thermometer, Snowflake, HelpCircle, ArrowRight } from 'lucide-react';
+import { Flame, Thermometer, Snowflake, HelpCircle, ArrowRight, Inbox, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
 import { PeopleTabs } from '@/components/people/people-tabs';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { H1, H3, BODY_MUTED, TITLE_FONT } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 export default async function LeadsPage({
   params,
@@ -41,16 +42,21 @@ export default async function LeadsPage({
   } catch (err) {
     console.error('[leads] DB query failed', { slug, error: err });
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            We couldn&apos;t load your leads. This is usually temporary.
+      <div className="flex min-h-[50vh] items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+            <Inbox size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
+          </div>
+          <h1 className={H3}>Your leads didn&apos;t load</h1>
+          <p className={cn(BODY_MUTED, 'mt-1.5')}>
+            Something glitched on the way in. No leads were lost — this is almost
+            always a passing thing.
           </p>
           <a
             href={`/s/${slug}/leads`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
           >
+            <RotateCcw size={14} />
             Try again
           </a>
         </div>
@@ -162,7 +168,22 @@ export default async function LeadsPage({
           </Link>
         </div>
       ) : (
-        <Suspense fallback={<div className="text-sm text-muted-foreground py-8 text-center">Loading leads...</div>}>
+        <Suspense
+          fallback={
+            <div className="rounded-xl border border-border/70 divide-y divide-border/60 overflow-hidden animate-pulse">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-4">
+                  <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-1/2 bg-muted rounded" />
+                    <div className="h-2.5 w-1/3 bg-muted/70 rounded" />
+                  </div>
+                  <div className="h-5 w-14 bg-muted/70 rounded-full shrink-0" />
+                </div>
+              ))}
+            </div>
+          }
+        >
           <LeadsView leads={leads} slug={slug} newLeadIds={newLeadIds} />
         </Suspense>
       )}
