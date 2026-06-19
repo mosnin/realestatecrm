@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { formatCompact } from '@/lib/formatting';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import type { BrokerMorningResponse } from '@/app/api/broker/morning/route';
 
 /**
@@ -155,6 +156,10 @@ export function BrokerMorningStory() {
  * intentionally NOT the snapshot strip from app/broker/page.tsx (that's
  * the heavier card grid further down the page); this is the quiet beat
  * between the focal sentence and the rest of the dashboard.
+ *
+ * Once the real numbers arrive they count up via the shared AnimatedNumber
+ * (honors prefers-reduced-motion). While loading, each value holds a quiet
+ * em-dash so the row never jumps when the figures land.
  */
 function StatsRow({
   stats,
@@ -165,22 +170,31 @@ function StatsRow({
 }) {
   return (
     <div className="flex items-center gap-4 text-[11px] tabular-nums text-muted-foreground">
-      <Stat label="realtors" value={loading ? '—' : `${stats.realtors}`} />
+      <Stat label="realtors" value={stats.realtors} loading={loading} />
       <Divider />
-      <Stat label="active deals" value={loading ? '—' : `${stats.activeDeals}`} />
+      <Stat label="active deals" value={stats.activeDeals} loading={loading} />
       <Divider />
-      <Stat
-        label="GCI MTD"
-        value={loading ? '—' : formatCompact(stats.gciMtd)}
-      />
+      <Stat label="GCI MTD" value={stats.gciMtd} loading={loading} format={formatCompact} />
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  loading,
+  format,
+}: {
+  label: string;
+  value: number;
+  loading?: boolean;
+  format?: (n: number) => string;
+}) {
   return (
     <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-foreground/80">{value}</span>
+      <span className="text-foreground/80">
+        {loading ? '—' : <AnimatedNumber value={value} format={format} />}
+      </span>
       <span>{label}</span>
     </span>
   );
