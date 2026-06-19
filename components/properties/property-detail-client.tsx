@@ -3,24 +3,25 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2,
+  Pencil, Trash2, ExternalLink, Briefcase, CalendarDays, Share2,
+  BedDouble, Bath, Ruler, Tag, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
-import { formatCurrency } from '@/lib/formatting';
+import { formatCurrency, formatCompact } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
-import { SECTION_LABEL } from '@/lib/typography';
+import { SECTION_LABEL, TITLE_FONT, H3 } from '@/lib/typography';
+import { EASE_OUT, DURATION_BASE } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { Button } from '@/components/ui/button';
 import { PropertyForm } from './property-form';
 import { PropertyShareDialog } from './property-share-dialog';
 import { PropertyStatusBadge } from './property-status-badge';
+import { PropertyGallery } from './property-gallery';
 import { PropertyAnalysisPanel } from './property-analysis-panel';
-
-/** Apple ease-out cubic — entrances. */
-const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 interface Props {
   slug: string;
@@ -31,6 +32,7 @@ interface Props {
 
 export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }: Props) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const [property, setProperty] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -67,14 +69,13 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
     router.push(`/s/${slug}/properties`);
   }
 
-  const cover = property.photos[0];
   const addr = formatPropertyAddress(property);
   const facts = formatPropertyFacts(property);
 
   if (editing) {
     return (
       <div className="rounded-xl border border-border/70 bg-card p-5">
-        <h1 className="text-lg font-semibold mb-4">Edit property</h1>
+        <h1 className={cn(H3, 'mb-4')}>Edit property</h1>
         <PropertyForm
           initial={property}
           onCancel={() => setEditing(false)}
@@ -86,42 +87,34 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
     );
   }
 
+  const numericStats = [
+    property.beds != null
+      ? { icon: BedDouble, value: property.beds, label: property.beds === 1 ? 'Bed' : 'Beds' }
+      : null,
+    property.baths != null
+      ? { icon: Bath, value: property.baths, label: property.baths === 1 ? 'Bath' : 'Baths' }
+      : null,
+    property.squareFeet != null
+      ? { icon: Ruler, value: property.squareFeet, label: 'Sq ft', fmt: (n: number) => Math.round(n).toLocaleString() }
+      : null,
+    property.listPrice != null
+      ? { icon: Tag, value: property.listPrice, label: 'List price', fmt: formatCompact }
+      : null,
+  ].filter((s): s is NonNullable<typeof s> => s !== null);
+
   return (
     <div className="space-y-8">
-      {/* ── Hero ────────────────────────────────────────────────────────
-          Full-width 16:9 photo. Real estate leads with the photo — the
-          old 360px sidebar treatment hid it behind chrome. When no photo
-          is on file: same aspect ratio, hairline border, calm muted copy
-          (not a coloured block). */}
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
-        {cover ? (
-          // Hero entrance — tiny 1.02→1 settle + fade-in over 250ms. The
-          // scale is intentionally below the spec ceiling so the photo
-          // never reads as "zooming in" — only as landing into place.
-          <motion.img
-            src={cover}
-            alt={addr}
-            className="aspect-video w-full object-cover"
-            initial={{ opacity: 0, scale: 1.02 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.25, ease: EASE_APPLE }}
-          />
-        ) : (
-          <div className="aspect-video w-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Building2 size={28} className="text-muted-foreground/50" aria-hidden />
-            <p className="text-xs text-muted-foreground">No photo on file yet.</p>
-          </div>
-        )}
-      </div>
+      {/* ── Cinematic header ────────────────────────────────────────────
+          Real estate leads with the photo. The gallery shows the full set
+          (stage + thumbnail rail), not just the cover. When no photo is on
+          file: a calm 16:9 placeholder, same hairline frame. */}
+      <PropertyGallery photos={property.photos} alt={addr} />
 
       {/* ── Title + status sentence ─────────────────────────────────────
-          Page-level focal: serif Times h1 + status pill row + price.
-          Same vocabulary as the contact detail page. */}
+          Page-level focal: serif Times h1 + status pill row. Same
+          vocabulary as the contact detail page. */}
       <header className="space-y-2">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
           {addr}
         </h1>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -131,17 +124,44 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
           )}
           {facts && <span>· {facts}</span>}
         </div>
-        {property.listPrice != null && (
-          <p
-            className="text-3xl tracking-tight text-foreground tabular-nums pt-2"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            {formatCurrency(property.listPrice)}
-          </p>
-        )}
       </header>
 
-      {/* ── Facts grid + listing/notes ───────────────────────────────── */}
+      {/* ── Glanceable key stats ────────────────────────────────────────
+          The four numbers a buyer asks first — beds / baths / sq ft / price.
+          Paper-flat, hairline-divided, focal numerals count up on entry.
+          Same stat-strip vocabulary as the commissions page. Only rendered
+          when there's at least one numeric fact to show. */}
+      {numericStats.length > 0 && (
+        <motion.dl
+          initial={reduce ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className={cn(
+            'grid gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70',
+            numericStats.length >= 4
+              ? 'grid-cols-2 sm:grid-cols-4'
+              : numericStats.length === 3
+                ? 'grid-cols-3'
+                : numericStats.length === 2
+                  ? 'grid-cols-2'
+                  : 'grid-cols-1',
+          )}
+        >
+          {numericStats.map((s) => (
+            <div key={s.label} className="bg-card p-4 sm:p-5">
+              <dt className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <s.icon size={12} strokeWidth={1.75} aria-hidden />
+                {s.label}
+              </dt>
+              <dd className="mt-1.5 text-[25px] leading-none tracking-tight tabular-nums text-foreground" style={TITLE_FONT}>
+                <AnimatedNumber value={s.value} format={s.fmt} />
+              </dd>
+            </div>
+          ))}
+        </motion.dl>
+      )}
+
+      {/* ── Secondary facts + listing/notes ──────────────────────────── */}
       <section className="space-y-4 border-t border-border/60 pt-6">
         {(property.yearBuilt != null || property.lotSizeSqft != null || property.mlsNumber) && (
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
@@ -281,12 +301,19 @@ function LinkedSection({
             <li key={item.key}>
               <Link
                 href={item.href}
-                className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+                className="group flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{item.primary}</p>
                   <p className="text-xs text-muted-foreground truncate">{item.secondary}</p>
                 </div>
+                {/* Quiet directional cue — slides in a hair on hover so the
+                    row reads as navigable without shouting. */}
+                <ChevronRight
+                  size={14}
+                  aria-hidden
+                  className="flex-shrink-0 text-muted-foreground/40 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
+                />
               </Link>
             </li>
           ))}

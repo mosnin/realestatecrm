@@ -83,10 +83,11 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
   );
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-7">
       {/* Photos first — the realtor is showing a house, not filing an MLS
           form. The featured tile sets what the list, the deal card, and
-          the listing detail show. */}
+          the listing detail show. No group label: the editor is the hero,
+          it carries its own affordance. */}
       <Field label="Photos">
         <PropertyPhotoEditor
           value={v.photos ?? []}
@@ -94,138 +95,150 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
         />
       </Field>
 
-      {/* Address row */}
-      <div className="grid grid-cols-[1fr_120px] gap-2">
-        <Field label="Address" required>
-          <Input
-            type="text"
-            required
-            value={v.address ?? ''}
-            onChange={(e) => set('address', e.target.value)}
-            placeholder="123 Main St"
-          />
-        </Field>
-        <Field label="Unit">
-          <Input
-            type="text"
-            value={v.unitNumber ?? ''}
-            onChange={(e) => set('unitNumber', e.target.value)}
-            placeholder="4B"
-          />
-        </Field>
-      </div>
+      {/* Location — the one required fact (address) leads. Quiet group
+          labels give the dense field grids rest points for the eye. */}
+      <Group label="Location">
+        <div className="grid grid-cols-[1fr_120px] gap-2">
+          <Field label="Address" required>
+            <Input
+              type="text"
+              required
+              value={v.address ?? ''}
+              onChange={(e) => set('address', e.target.value)}
+              placeholder="123 Main St"
+            />
+          </Field>
+          <Field label="Unit">
+            <Input
+              type="text"
+              value={v.unitNumber ?? ''}
+              onChange={(e) => set('unitNumber', e.target.value)}
+              placeholder="4B"
+            />
+          </Field>
+        </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="City">
-          <Input type="text" value={v.city ?? ''} onChange={(e) => set('city', e.target.value)} />
-        </Field>
-        <Field label="State">
-          <Input type="text" value={v.stateRegion ?? ''} onChange={(e) => set('stateRegion', e.target.value)} />
-        </Field>
-        <Field label="ZIP">
-          <Input type="text" value={v.postalCode ?? ''} onChange={(e) => set('postalCode', e.target.value)} />
-        </Field>
-      </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="City">
+            <Input type="text" value={v.city ?? ''} onChange={(e) => set('city', e.target.value)} />
+          </Field>
+          <Field label="State">
+            <Input type="text" value={v.stateRegion ?? ''} onChange={(e) => set('stateRegion', e.target.value)} />
+          </Field>
+          <Field label="ZIP">
+            <Input type="text" value={v.postalCode ?? ''} onChange={(e) => set('postalCode', e.target.value)} />
+          </Field>
+        </div>
+      </Group>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="MLS #">
-          <Input
-            type="text"
-            value={v.mlsNumber ?? ''}
-            onChange={(e) => set('mlsNumber', e.target.value)}
-            placeholder="Unique per space"
-          />
-        </Field>
-        <Field label="Listing URL">
-          <Input
-            type="url"
-            value={v.listingUrl ?? ''}
-            onChange={(e) => set('listingUrl', e.target.value)}
-            placeholder="https://…"
-          />
-        </Field>
-      </div>
+      {/* Listing — how the property is catalogued and where it lives online. */}
+      <Group label="Listing">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="MLS #">
+            <Input
+              type="text"
+              value={v.mlsNumber ?? ''}
+              onChange={(e) => set('mlsNumber', e.target.value)}
+              placeholder="Unique per space"
+            />
+          </Field>
+          <Field label="Listing URL">
+            <Input
+              type="url"
+              value={v.listingUrl ?? ''}
+              onChange={(e) => set('listingUrl', e.target.value)}
+              placeholder="https://…"
+            />
+          </Field>
+        </div>
 
-      <div className="grid grid-cols-4 gap-2">
-        <Field label="Type">
-          <select
-            value={v.propertyType ?? ''}
-            onChange={(e) => set('propertyType', (e.target.value || null) as PropertyType | null)}
-            className={selectClasses}
-          >
-            <option value="">—</option>
-            {PROPERTY_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Status">
-          <select
-            value={v.listingStatus ?? 'active'}
-            onChange={(e) => set('listingStatus', e.target.value as PropertyListingStatus)}
-            className={selectClasses}
-          >
-            {PROPERTY_LISTING_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Beds">
-          <Input
-            type="number"
-            step="0.5"
-            min="0"
-            value={v.beds ?? ''}
-            onChange={(e) => set('beds', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Baths">
-          <Input
-            type="number"
-            step="0.5"
-            min="0"
-            value={v.baths ?? ''}
-            onChange={(e) => set('baths', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-      </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Type">
+            <select
+              value={v.propertyType ?? ''}
+              onChange={(e) => set('propertyType', (e.target.value || null) as PropertyType | null)}
+              className={selectClasses}
+            >
+              <option value="">—</option>
+              {PROPERTY_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Status">
+            <select
+              value={v.listingStatus ?? 'active'}
+              onChange={(e) => set('listingStatus', e.target.value as PropertyListingStatus)}
+              className={selectClasses}
+            >
+              {PROPERTY_LISTING_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </Group>
 
-      <div className="grid grid-cols-4 gap-2">
-        <Field label="Sq ft">
-          <Input
-            type="number"
-            min="0"
-            value={v.squareFeet ?? ''}
-            onChange={(e) => set('squareFeet', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Lot (sqft)">
-          <Input
-            type="number"
-            min="0"
-            value={v.lotSizeSqft ?? ''}
-            onChange={(e) => set('lotSizeSqft', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Year built">
-          <Input
-            type="number"
-            min="1600"
-            max="2200"
-            value={v.yearBuilt ?? ''}
-            onChange={(e) => set('yearBuilt', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-        <Field label="List price">
-          <Input
-            type="number"
-            min="0"
-            step="1000"
-            value={v.listPrice ?? ''}
-            onChange={(e) => set('listPrice', e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </Field>
-      </div>
+      {/* Specs & price — the numbers a buyer asks first. */}
+      <Group label="Specs & price">
+        <div className="grid grid-cols-4 gap-2">
+          <Field label="Beds">
+            <Input
+              type="number"
+              step="0.5"
+              min="0"
+              value={v.beds ?? ''}
+              onChange={(e) => set('beds', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Baths">
+            <Input
+              type="number"
+              step="0.5"
+              min="0"
+              value={v.baths ?? ''}
+              onChange={(e) => set('baths', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Sq ft">
+            <Input
+              type="number"
+              min="0"
+              value={v.squareFeet ?? ''}
+              onChange={(e) => set('squareFeet', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Lot (sqft)">
+            <Input
+              type="number"
+              min="0"
+              value={v.lotSizeSqft ?? ''}
+              onChange={(e) => set('lotSizeSqft', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Year built">
+            <Input
+              type="number"
+              min="1600"
+              max="2200"
+              value={v.yearBuilt ?? ''}
+              onChange={(e) => set('yearBuilt', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+          <Field label="List price">
+            <Input
+              type="number"
+              min="0"
+              step="1000"
+              value={v.listPrice ?? ''}
+              onChange={(e) => set('listPrice', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+        </div>
+      </Group>
 
       <Field label="Notes">
         <Textarea
@@ -257,5 +270,22 @@ function Field({ label, required, children }: { label: string; required?: boolea
       </span>
       {children}
     </label>
+  );
+}
+
+/**
+ * A titled field cluster. The quiet small-caps label sits above a hairline
+ * so the long form reads as a few calm groups (Location → Listing → Specs)
+ * instead of one undifferentiated wall of inputs. Rows inside breathe at the
+ * field rhythm; groups breathe wider (the form's `space-y-7`).
+ */
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="space-y-3">
+      <legend className="mb-2 w-full border-b border-border/60 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </legend>
+      {children}
+    </fieldset>
   );
 }
