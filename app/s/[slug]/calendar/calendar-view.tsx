@@ -102,6 +102,18 @@ const CHIP_OPTIMISTIC_VARIANTS: Variants = {
   animate: { opacity: 1, scale: 1, transition: { duration: DUR_RING, ease: EASE } },
 };
 
+/* Agenda / search list: day sections fade + 6px slide-up in sequence so a
+ * day's worth of events lands as one calm beat rather than all at once.
+ * 50ms between sections — the cadence reads as "settling", not "animating".
+ * `reduced` collapses to an instant flat list via `initial={false}`. */
+const DAY_SECTION_CONTAINER: Variants = {
+  animate: { transition: { staggerChildren: 0.05 } },
+};
+const DAY_SECTION_ITEM: Variants = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: DUR_QUICK, ease: EASE } },
+};
+
 interface CalendarEventOut {
   id: string;
   title: string;
@@ -406,9 +418,7 @@ export function CalendarView({
           />
         )}
 
-        {connected && loading && (
-          <p className={BODY_MUTED}>One moment — pulling your events.</p>
-        )}
+        {connected && loading && <CalendarLoadingState view={view} />}
 
         {connected && !loading && errorMessage && (
           <Card>
@@ -650,6 +660,75 @@ function ToggleRow({
   );
 }
 
+/* ── Loading state ──────────────────────────────────────────────────── */
+/* A shaped skeleton that echoes the surface the realtor is about to see —
+ * grid for Month/Week, stacked rows for Day/Agenda. Calmer than a spinner:
+ * the page settles into itself rather than flashing a generic loader. The
+ * `aria-busy` + sr-only line keeps the original "pulling your events"
+ * message available to assistive tech (it was a visible <p> before). */
+function CalendarLoadingState({ view }: { view: ViewMode }) {
+  const reduced = useReducedMotion();
+  const pulse = reduced ? '' : 'animate-pulse';
+  const grid = view === 'month' || view === 'week';
+  return (
+    <motion.div
+      role="status"
+      aria-busy="true"
+      initial={reduced ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: DUR_QUICK, ease: EASE }}
+    >
+      <span className="sr-only">One moment — pulling your events.</span>
+      {grid ? (
+        <div className={cn('overflow-hidden rounded-md border border-border/60', pulse)}>
+          <div className="grid grid-cols-7 border-b border-border/60 bg-muted/20">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="px-3 py-2">
+                <div className="h-2.5 w-8 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 grid-rows-5">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'min-h-[88px] p-2 space-y-2',
+                  i >= 7 ? 'border-t border-border/60' : '',
+                  i % 7 !== 0 ? 'border-l border-border/60' : '',
+                )}
+              >
+                <div className="h-5 w-5 rounded-full bg-muted" />
+                {i % 3 === 0 && <div className="h-3.5 w-[80%] rounded bg-muted/70" />}
+                {i % 5 === 0 && <div className="h-3.5 w-[60%] rounded bg-muted/60" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className={cn('space-y-8', pulse)}>
+          {Array.from({ length: 2 }).map((_, s) => (
+            <div key={s} className="space-y-3">
+              <div className="h-2.5 w-24 rounded bg-muted" />
+              <div className="divide-y divide-border/60 border-y border-border/60">
+                {Array.from({ length: 3 }).map((_, r) => (
+                  <div key={r} className="flex items-start gap-3 py-4">
+                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3.5 w-[45%] rounded bg-muted/70" />
+                      <div className="h-2.5 w-[30%] rounded bg-muted/50" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 /* ── Month view ─────────────────────────────────────────────────────── */
 
 function MonthView({
@@ -733,28 +812,36 @@ function MonthView({
                   initial="initial"
                   animate="enter"
                   className={cn(
-                    'min-h-[96px] text-left p-2 hover:bg-muted/30 transition-colors duration-150 flex flex-col gap-1',
+                    'group/cell min-h-[96px] text-left p-2 transition-colors duration-150 flex flex-col gap-1',
+                    // Today gets a whisper of warmth so the eye finds "now"
+                    // without a hard chip. Other cells stay neutral and only
+                    // lift on hover.
+                    isToday ? 'bg-foreground/[0.025] hover:bg-foreground/[0.045]' : 'hover:bg-muted/30',
                     borderRules,
                   )}
                 >
-                  {/* Day-number badge. The today-ring is a separately
-                   * animated overlay — 240ms opacity glow on mount. If the
-                   * realtor lands on the month and today already has a
-                   * ring, we want it to feel like it's lighting up, not
-                   * sitting there static. */}
+                  {/* Day-number badge. Today reads as a solid foreground pill —
+                   * the single loudest mark in the grid, the way Apple's
+                   * calendar lights up the current date. The pill fades +
+                   * scales in on mount (240ms) so landing on the month feels
+                   * like today is lighting up, not sitting there static. */}
                   <span
                     className={cn(
-                      'relative inline-flex items-center justify-center h-6 w-6 rounded-full text-xs tabular-nums',
-                      isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/50',
+                      'relative inline-flex items-center justify-center h-6 min-w-6 px-1 rounded-full text-xs tabular-nums transition-colors',
+                      isToday
+                        ? 'font-medium text-background'
+                        : isCurrentMonth
+                          ? 'text-foreground'
+                          : 'text-muted-foreground/50',
                     )}
                   >
                     {isToday && (
                       <motion.span
                         aria-hidden
-                        initial={reduced ? { opacity: 1 } : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        initial={reduced ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: DUR_RING, ease: EASE }}
-                        className="absolute inset-0 rounded-full ring-1 ring-foreground/30"
+                        className="absolute inset-0 rounded-full bg-foreground"
                       />
                     )}
                     <span className="relative">{day.getDate()}</span>
@@ -809,11 +896,14 @@ function ChipInCell({
       variants={reduced ? undefined : variants}
       whileTap={reduced ? undefined : { scale: 0.97 }}
       transition={reduced ? undefined : { duration: DUR_PRESS, ease: EASE }}
-      className="text-[11px] truncate rounded bg-muted/40 px-1.5 py-0.5 text-foreground"
+      // Subtle left-accent bar (the foreground rendered at low opacity reads
+      // as a quiet "spine" on each event) + a hairline so chips sit as cards
+      // rather than flat fills. The whole chip warms a touch on hover.
+      className="relative flex items-center gap-1 truncate rounded-[5px] border border-border/60 bg-card/80 pl-2 pr-1.5 py-0.5 text-[11px] text-foreground shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:bg-foreground/[0.04] before:absolute before:inset-y-1 before:left-0.5 before:w-[2px] before:rounded-full before:bg-foreground/35 before:content-['']"
       title={event.title}
       onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
     >
-      {label}
+      <span className="truncate">{label}</span>
     </motion.span>
   );
 }
@@ -877,19 +967,20 @@ function WeekView({
               const isToday = key === todayKey;
               return (
                 <div key={key} className="px-2 py-2">
-                  <p className={cn(SECTION_LABEL)}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</p>
+                  <p className={cn(SECTION_LABEL, isToday && 'text-foreground')}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</p>
                   <span
                     className={cn(
-                      'relative text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full',
+                      'relative text-sm tabular-nums mt-0.5 inline-flex items-center justify-center h-6 w-6 rounded-full transition-colors',
+                      isToday && 'font-medium text-background',
                     )}
                   >
                     {isToday && (
                       <motion.span
                         aria-hidden
-                        initial={reduced ? { opacity: 1 } : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        initial={reduced ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: DUR_RING, ease: EASE }}
-                        className="absolute inset-0 rounded-full ring-1 ring-foreground/30"
+                        className="absolute inset-0 rounded-full bg-foreground"
                       />
                     )}
                     <span className="relative">{d.getDate()}</span>
@@ -1083,7 +1174,9 @@ function EventChip({ event, reduced }: { event: CalendarEventOut; reduced: boole
       variants={reduced ? undefined : variants}
       whileTap={reduced ? undefined : { scale: 0.97 }}
       transition={reduced ? undefined : { duration: DUR_PRESS, ease: EASE }}
-      className="block text-xs rounded bg-muted/40 px-2 py-1 text-foreground truncate"
+      // Card-like event block with a quiet left spine — the Day view has the
+      // most room, so the chip earns a touch more presence than Month/Week.
+      className="relative block truncate rounded-md border border-border/60 bg-card/80 pl-2.5 pr-2 py-1 text-xs text-foreground shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:bg-foreground/[0.04] before:absolute before:inset-y-1 before:left-0.5 before:w-[2px] before:rounded-full before:bg-foreground/35 before:content-['']"
       title={event.title}
     >
       <span className="font-medium">{event.title}</span>
@@ -1128,6 +1221,7 @@ function matchesQuery(ev: CalendarEventOut, q: string): boolean {
 }
 
 function SearchResultsView({ events, query }: { events: CalendarEventOut[]; query: string }) {
+  const reduced = useReducedMotion();
   const results = useMemo(
     () => events.filter((ev) => matchesQuery(ev, query))
            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
@@ -1155,12 +1249,24 @@ function SearchResultsView({ events, query }: { events: CalendarEventOut[]; quer
     grouped.set(key, arr);
   }
   const dayKeys = Array.from(grouped.keys()).sort();
+  const todayKey = localDayKey(new Date());
 
   return (
-    <div className="space-y-10">
+    <motion.div
+      className="space-y-10"
+      variants={reduced ? undefined : DAY_SECTION_CONTAINER}
+      initial={reduced ? false : 'initial'}
+      animate="animate"
+    >
       {dayKeys.map((dayKey) => (
-        <section key={dayKey} className="space-y-3">
-          <p className={SECTION_LABEL}>{formatDayHeading(dayKey)}</p>
+        <motion.section
+          key={dayKey}
+          className="space-y-3"
+          variants={reduced ? undefined : DAY_SECTION_ITEM}
+        >
+          <p className={cn(SECTION_LABEL, dayKey === todayKey && 'text-foreground')}>
+            {formatDayHeading(dayKey)}
+          </p>
           <ul className="divide-y divide-border/60 border-y border-border/60">
             {grouped.get(dayKey)!.map((ev) => (
               <li key={ev.id} className="py-4">
@@ -1168,15 +1274,16 @@ function SearchResultsView({ events, query }: { events: CalendarEventOut[]; quer
               </li>
             ))}
           </ul>
-        </section>
+        </motion.section>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
 /* ── Agenda view (preserves original list rendering) ────────────────── */
 
 function AgendaView({ events }: { events: CalendarEventOut[] }) {
+  const reduced = useReducedMotion();
   // Group by local day so the page reads as a timeline.
   const grouped = new Map<string, CalendarEventOut[]>();
   for (const ev of events) {
@@ -1186,10 +1293,19 @@ function AgendaView({ events }: { events: CalendarEventOut[] }) {
     grouped.set(key, arr);
   }
   const dayKeys = Array.from(grouped.keys()).sort();
+  const todayKey = localDayKey(new Date());
 
   if (events.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-12 text-center">
+      <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
+        <motion.div
+          initial={reduced ? false : { opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: DUR_RING, ease: EASE }}
+          className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.04]"
+        >
+          <CalendarIcon size={18} strokeWidth={1.5} className="text-muted-foreground/60" />
+        </motion.div>
         <p className={BODY}>Nothing on the books in the next 30 days.</p>
         <p className={`${BODY_MUTED} mt-1`}>Quiet stretch.</p>
       </div>
@@ -1197,10 +1313,21 @@ function AgendaView({ events }: { events: CalendarEventOut[] }) {
   }
 
   return (
-    <div className="space-y-10">
+    <motion.div
+      className="space-y-10"
+      variants={reduced ? undefined : DAY_SECTION_CONTAINER}
+      initial={reduced ? false : 'initial'}
+      animate="animate"
+    >
       {dayKeys.map((dayKey) => (
-        <section key={dayKey} className="space-y-3">
-          <p className={SECTION_LABEL}>{formatDayHeading(dayKey)}</p>
+        <motion.section
+          key={dayKey}
+          className="space-y-3"
+          variants={reduced ? undefined : DAY_SECTION_ITEM}
+        >
+          <p className={cn(SECTION_LABEL, dayKey === todayKey && 'text-foreground')}>
+            {formatDayHeading(dayKey)}
+          </p>
           <ul className="divide-y divide-border/60 border-y border-border/60">
             {grouped.get(dayKey)!.map((ev) => (
               <li key={ev.id} className="py-4">
@@ -1208,9 +1335,9 @@ function AgendaView({ events }: { events: CalendarEventOut[] }) {
               </li>
             ))}
           </ul>
-        </section>
+        </motion.section>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
@@ -1240,18 +1367,26 @@ function EventRow({ event }: { event: CalendarEventOut }) {
 
   const body = (
     <div className="flex items-start justify-between gap-3">
-      <div className="space-y-1 min-w-0">
-        <p className={`${BODY} font-medium truncate`}>{event.title}</p>
-        <p className={META}>
-          {formatTimeRange(event.start, event.end, event.allDay)}
-          {attendeeLine && <span> &middot; with {attendeeLine}</span>}
-        </p>
+      <div className="flex min-w-0 items-start gap-3">
+        {/* Quiet time-spine: a hairline dot anchors each event to the day's
+         *  rhythm — the agenda reads as a timeline, not a flat list. */}
+        <span
+          aria-hidden
+          className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30 transition-colors group-hover/row:bg-foreground/60"
+        />
+        <div className="min-w-0 space-y-1">
+          <p className={`${BODY} font-medium truncate`}>{event.title}</p>
+          <p className={META}>
+            {formatTimeRange(event.start, event.end, event.allDay)}
+            {attendeeLine && <span> &middot; with {attendeeLine}</span>}
+          </p>
+        </div>
       </div>
       {event.htmlLink && (
         <ExternalLink
           size={14}
           strokeWidth={1.75}
-          className="mt-0.5 text-muted-foreground shrink-0"
+          className="mt-0.5 shrink-0 text-muted-foreground transition-all group-hover/row:translate-x-0.5 group-hover/row:-translate-y-0.5 group-hover/row:text-foreground"
         />
       )}
     </div>
@@ -1263,43 +1398,50 @@ function EventRow({ event }: { event: CalendarEventOut }) {
         href={event.htmlLink}
         target="_blank"
         rel="noopener noreferrer"
-        className="block hover:bg-muted/30 -mx-3 px-3 py-0.5 rounded transition-colors"
+        className="group/row block hover:bg-muted/30 -mx-3 px-3 py-0.5 rounded transition-colors"
       >
         {body}
       </a>
     );
   }
-  return body;
+  return <div className="group/row">{body}</div>;
 }
 
 /* ── Not connected state (preserved) ────────────────────────────────── */
 
 function NotConnectedState({ slug }: { slug: string }) {
+  const reduced = useReducedMotion();
   return (
-    <Card>
-      <CardContent className="p-6 space-y-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 w-9 h-9 rounded-lg bg-foreground/[0.04] flex items-center justify-center shrink-0">
-            <CalendarIcon size={16} strokeWidth={1.75} className="text-muted-foreground" />
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DUR_RING, ease: EASE }}
+    >
+      <Card>
+        <CardContent className="p-6 space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 w-9 h-9 rounded-lg bg-foreground/[0.04] flex items-center justify-center shrink-0">
+              <CalendarIcon size={16} strokeWidth={1.75} className="text-muted-foreground" />
+            </div>
+            <div className="space-y-1.5">
+              <p className={BODY}>
+                Connect your calendar and I&apos;ll put tours on it, watch for
+                conflicts, and pull your day into the brief.
+              </p>
+              <p className={BODY_MUTED}>
+                Google Calendar is the fast path. Outlook works too.
+              </p>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <p className={BODY}>
-              Connect your calendar and I&apos;ll put tours on it, watch for
-              conflicts, and pull your day into the brief.
-            </p>
-            <p className={BODY_MUTED}>
-              Google Calendar is the fast path. Outlook works too.
-            </p>
+          <div>
+            <Link href={`/s/${slug}/integrations`} className={PRIMARY_PILL}>
+              <Plug className="h-4 w-4" />
+              Connect calendar
+            </Link>
           </div>
-        </div>
-        <div>
-          <Link href={`/s/${slug}/integrations`} className={PRIMARY_PILL}>
-            <Plug className="h-4 w-4" />
-            Connect calendar
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 

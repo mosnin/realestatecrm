@@ -17,12 +17,14 @@ import {
   Search,
   LayoutGrid,
   List,
+  ChevronDown,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { DURATION_FAST, EASE_OUT } from '@/lib/motion';
+import { DURATION_FAST, DURATION_BASE, EASE_OUT, EASE_APPLE } from '@/lib/motion';
+import { Expandable, ExpandableContent } from '@/components/ui/expandable';
 import { useRealtime } from '@/hooks/use-realtime';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -88,21 +90,41 @@ interface ToursClientProps {
   tourSettings?: TourSettings;
 }
 
-const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
-  scheduled: { label: 'Scheduled', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  confirmed: { label: 'Confirmed', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
-  completed: { label: 'Completed', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-  no_show: { label: 'No Show', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+const STATUS_CONFIG: Record<TourStatus, { label: string; color: string; dot: string }> = {
+  scheduled: { label: 'Scheduled', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', dot: 'bg-blue-500' },
+  confirmed: { label: 'Confirmed', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', dot: 'bg-emerald-500' },
+  completed: { label: 'Completed', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-slate-400' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300', dot: 'bg-red-500' },
+  no_show: { label: 'No Show', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', dot: 'bg-amber-500' },
 };
+
+/** Status chip with a small leading dot — the dot does the at-a-glance
+ *  signalling, the label confirms it. One vocabulary across table + card. */
+function StatusChip({ status, className }: { status: TourStatus; className?: string }) {
+  const conf = STATUS_CONFIG[status];
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap',
+        conf.color,
+        className,
+      )}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', conf.dot)} />
+      {conf.label}
+    </span>
+  );
+}
 
 type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
 export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [], tourSettings: initialTourSettings }: ToursClientProps) {
+  const reduced = useReducedMotion();
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'card'>('table');
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -471,16 +493,22 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
-                  {filtered.map((tour) => {
+                  {filtered.map((tour, i) => {
                     const { date, time } = formatDateTime(tour.startsAt);
                     const endTime = formatDateTime(tour.endsAt).time;
                     const dur = getDuration(tour.startsAt, tour.endsAt);
-                    const statusConf = STATUS_CONFIG[tour.status];
                     const isPast = new Date(tour.startsAt) < now;
 
                     return (
-                      <tr
+                      <motion.tr
                         key={tour.id}
+                        initial={reduced ? false : { opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={
+                          reduced
+                            ? undefined
+                            : { duration: DURATION_FAST, ease: EASE_OUT, delay: Math.min(i, 12) * 0.025 }
+                        }
                         className={cn(
                           'group hover:bg-muted/30 transition-colors',
                           isPast && tour.status !== 'completed' && 'opacity-70',
@@ -507,9 +535,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap', statusConf.color)}>
-                            {statusConf.label}
-                          </span>
+                          <StatusChip status={tour.status} />
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell text-xs">
                           {tour.Contact ? (
@@ -576,7 +602,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                             )}
                           </div>
                         </td>
-                      </tr>
+                      </motion.tr>
                     );
                   })}
                 </tbody>
@@ -584,32 +610,46 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
             </div>
           </div>
         ) : (
-          /* ── Card view (existing) ── */
+          /* ── Card view — premium expandable agenda rows ── */
           <div className="space-y-3">
-          {filtered.map((tour) => {
+          {filtered.map((tour, i) => {
             const { date, time } = formatDateTime(tour.startsAt);
             const endTime = formatDateTime(tour.endsAt).time;
             const dur = getDuration(tour.startsAt, tour.endsAt);
-            const statusConf = STATUS_CONFIG[tour.status];
             const isPast = new Date(tour.startsAt) < now;
+            const isExpanded = expandedCardId === tour.id;
+            // The row earns an expand affordance only when there's something
+            // worth revealing — notes, a linked contact, or the lifecycle
+            // timeline. Cancelled tours collapse the timeline noise.
+            const hasDetail = Boolean(tour.notes) || Boolean(tour.Contact) || tour.status !== 'cancelled';
 
             return (
-              <div
+              <Expandable
                 key={tour.id}
+                expanded={isExpanded}
+                onToggle={() => setExpandedCardId(isExpanded ? null : tour.id)}
+                initial={reduced ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={
+                  reduced
+                    ? undefined
+                    : { duration: DURATION_BASE, ease: EASE_OUT, delay: Math.min(i, 12) * 0.03 }
+                }
                 className={cn(
-                  'relative rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent/20',
-                  isPast && tour.status !== 'completed' && 'opacity-70'
+                  'group relative rounded-xl border bg-card p-4 transition-colors duration-200',
+                  isExpanded ? 'border-border bg-foreground/[0.015]' : 'border-border/80 hover:border-border hover:bg-foreground/[0.012]',
+                  isPast && tour.status !== 'completed' && 'opacity-70',
                 )}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                   {/* Date/time column */}
                   <div className="flex items-center gap-3 sm:min-w-[180px]">
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 transition-colors group-hover:bg-foreground/[0.06]">
                       <CalendarDays size={18} className="text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{date}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium tabular-nums">{date}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {time} – {endTime} ({dur} min)
                       </p>
                     </div>
@@ -620,40 +660,71 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                     <div className="flex items-center gap-2">
                       <User size={13} className="text-muted-foreground flex-shrink-0" />
                       <span className="text-sm font-medium truncate">{tour.guestName}</span>
-                      <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', statusConf.color)}>
-                        {statusConf.label}
-                      </span>
+                      <StatusChip status={tour.status} />
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Mail size={11} /> {tour.guestEmail}</span>
                       {tour.guestPhone && <span className="flex items-center gap-1"><Phone size={11} /> {tour.guestPhone}</span>}
                       {tour.propertyAddress && <span className="flex items-center gap-1"><MapPin size={11} /> {tour.propertyAddress}</span>}
                     </div>
-                    {tour.notes && (
-                      <p className="text-xs text-muted-foreground/80 italic mt-1">{tour.notes}</p>
-                    )}
-                    {tour.Contact && (
-                      <a
-                        href={`/s/${slug}/contacts/${tour.Contact.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline mt-1"
+
+                    {/* Expandable detail — notes, linked contact, the lifecycle
+                     *  timeline, and feedback live here so the resting row stays
+                     *  calm. ExpandableContent spring-animates its own height. */}
+                    {hasDetail && (
+                      <ExpandableContent
+                        preset="fade"
+                        keepMounted={false}
+                        className="-mx-0.5"
                       >
-                        Linked: {tour.Contact.name}
-                      </a>
+                        <div className="space-y-2 pt-2">
+                          {tour.notes && (
+                            <p className="text-xs text-muted-foreground/80 italic">{tour.notes}</p>
+                          )}
+                          {tour.Contact && (
+                            <a
+                              href={`/s/${slug}/contacts/${tour.Contact.id}`}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                            >
+                              Linked: {tour.Contact.name}
+                            </a>
+                          )}
+                          <div className="flex items-center gap-3">
+                            <TourTimeline
+                              status={tour.status}
+                              createdAt={tour.createdAt}
+                              startsAt={tour.startsAt}
+                              googleEventId={tour.googleEventId}
+                              sourceDealId={tour.sourceDealId}
+                            />
+                            <TourFeedbackBadge tourId={tour.id} slug={slug} status={tour.status} />
+                          </div>
+                        </div>
+                      </ExpandableContent>
                     )}
-                    <div className="flex items-center gap-3">
-                      <TourTimeline
-                        status={tour.status}
-                        createdAt={tour.createdAt}
-                        startsAt={tour.startsAt}
-                        googleEventId={tour.googleEventId}
-                        sourceDealId={tour.sourceDealId}
-                      />
-                      <TourFeedbackBadge tourId={tour.id} slug={slug} status={tour.status} />
-                    </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5 sm:flex-shrink-0 relative">
+                    {/* Expand toggle — chevron rotates 180° when open. Only
+                     *  rendered when there's detail to reveal. */}
+                    {hasDetail && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCardId(isExpanded ? null : tour.id)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? 'Hide tour detail' : 'Show tour detail'}
+                        className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <motion.span
+                          animate={reduced ? undefined : { rotate: isExpanded ? 180 : 0 }}
+                          transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
+                          className="flex"
+                        >
+                          <ChevronDown size={15} />
+                        </motion.span>
+                      </button>
+                    )}
                     {!isPast && tour.status !== 'cancelled' && (
                       <TourPrepCard tourId={tour.id} />
                     )}
@@ -729,7 +800,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                     </div>
                   </div>
                 </div>
-              </div>
+              </Expandable>
             );
           })}
         </div>

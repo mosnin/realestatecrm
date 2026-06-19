@@ -1,6 +1,8 @@
 'use client';
 
+import { motion, useReducedMotion } from 'framer-motion';
 import { STAT_NUMBER_COMPACT, TITLE_FONT, CAPTION } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 
 interface TourStats {
@@ -64,6 +66,7 @@ function computeStats(tours: TourStatsStripProps['tours']): TourStats {
 }
 
 export function TourStatsStrip({ tours }: TourStatsStripProps) {
+  const reduced = useReducedMotion();
   const stats = computeStats(tours);
 
   const items: Array<{ label: string; value: React.ReactNode }> = [
@@ -83,11 +86,26 @@ export function TourStatsStrip({ tours }: TourStatsStripProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <motion.div
+      className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+      variants={reduced ? undefined : { animate: { transition: { staggerChildren: 0.06 } } }}
+      initial={reduced ? false : 'initial'}
+      animate="animate"
+    >
       {items.map((item) => (
-        <div
+        <motion.div
           key={item.label}
-          className="rounded-lg border border-border/70 bg-background p-5 flex flex-col items-start gap-1"
+          variants={
+            reduced
+              ? undefined
+              : {
+                  initial: { opacity: 0, y: 8 },
+                  animate: { opacity: 1, y: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT } },
+                }
+          }
+          // A whisper of lift on hover — the card reads as a live instrument,
+          // not static chrome. Hairline brightens to register the focus.
+          className="group flex flex-col items-start gap-1 rounded-xl border border-border/70 bg-background p-5 transition-colors duration-200 hover:border-border hover:bg-foreground/[0.015]"
         >
           <p
             className={`${STAT_NUMBER_COMPACT} leading-none`}
@@ -96,8 +114,8 @@ export function TourStatsStrip({ tours }: TourStatsStripProps) {
             {item.value}
           </p>
           <p className={CAPTION}>{item.label}</p>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }

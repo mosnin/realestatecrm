@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   CalendarDays,
   CheckCircle2,
@@ -9,11 +10,11 @@ import {
   UserCheck,
   Briefcase,
   ChevronDown,
-  ChevronUp,
   AlertTriangle,
   Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DURATION_BASE, EASE_APPLE } from '@/lib/motion';
 
 interface TimelineEvent {
   label: string;
@@ -34,6 +35,7 @@ interface TourTimelineProps {
 }
 
 export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourceDealId, feedbackRating }: TourTimelineProps) {
+  const reduced = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
 
   const events: TimelineEvent[] = [];
@@ -119,13 +121,25 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
     <div className="mt-2">
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
       >
-        {/* Mini dots preview */}
+        {/* Mini dots preview — the active step pulses gently so the eye is
+         *  drawn to where the tour is *right now* in its lifecycle. */}
         <div className="flex items-center gap-0.5">
           {events.map((e, i) => (
-            <span
+            <motion.span
               key={i}
+              animate={
+                reduced || !e.active
+                  ? undefined
+                  : { opacity: [1, 0.45, 1] }
+              }
+              transition={
+                reduced || !e.active
+                  ? undefined
+                  : { duration: 1.8, ease: 'easeInOut', repeat: Infinity }
+              }
               className={cn(
                 'w-1.5 h-1.5 rounded-full',
                 e.completed ? 'bg-emerald-500' : e.active ? 'bg-primary' : 'bg-muted-foreground/30'
@@ -134,10 +148,24 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
           ))}
         </div>
         <span className="ml-1">{events.length} steps</span>
-        {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+        <motion.span
+          animate={reduced ? undefined : { rotate: expanded ? 180 : 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_APPLE }}
+          className="flex"
+        >
+          <ChevronDown size={10} />
+        </motion.span>
       </button>
 
+      <AnimatePresence initial={false}>
       {expanded && (
+        <motion.div
+          initial={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_APPLE }}
+          className="overflow-hidden"
+        >
         <div className="mt-2 pl-1 space-y-0">
           {events.map((event, i) => {
             const Icon = event.icon;
@@ -171,7 +199,9 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
             );
           })}
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
