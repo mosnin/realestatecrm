@@ -1,0 +1,19 @@
+# Supabase CLI configuration.
+#
+# Minimal on purpose. This repo does NOT run the Supabase local dev stack
+# (no `supabase start`, no Docker postgres). The only job of this file is to
+# let the CLI recognize the project root and locate the committed migrations
+# so `supabase db push --linked` can apply pending migrations to production.
+#
+# The production project is selected at runtime via
+# `supabase link --project-ref <ref>` (CI passes the ref from the
+# SUPABASE_PROJECT_REF GitHub var). `project_id` below is only a local label
+# for the CLI; it is not a secret and is not the production project ref.
+
+project_id = "realestatecrm"
+
+[db]
+# Migrations live in supabase/migrations/ (the directory next to this file),
+# which is the CLI default. They are append-only forward migrations, applied
+# in lexical (timestamp) filename order. See docs/RELEASE.md.
+major_version = 15

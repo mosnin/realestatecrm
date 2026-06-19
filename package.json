@@ -10,7 +10,10 @@
     "test:watch": "vitest",
     "test:contract": "node --test scripts/*.test.mjs",
     "eval": "RUN_EVALS=1 vitest run tests/evals/",
-    "agent:eval": "python3 tests/agent-eval/run.py"
+    "agent:eval": "python3 tests/agent-eval/run.py",
+    "db:status": "supabase migration list --linked",
+    "db:diff": "supabase db push --linked --dry-run",
+    "db:migrate": "supabase db push --linked"
   },
   "dependencies": {
     "@amplitude/unified": "^1.0.5",
