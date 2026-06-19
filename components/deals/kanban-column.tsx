@@ -11,6 +11,7 @@ import { Plus, SquarePen, Trash2, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 
 type DealWithRelations = Deal & {
@@ -165,7 +166,9 @@ export function KanbanColumn({
 
   return (
     <div className="group/column flex flex-col w-72 flex-shrink-0">
-      {/* Column header */}
+      {/* Column header — stage color dot + name, a count chip, and the
+          per-stage total (count-up animated). The dot ties the column to its
+          cards' left-edge wash; the total is the stage's one number. */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2 min-w-0">
           {dragHandleProps && (
@@ -179,17 +182,22 @@ export function KanbanColumn({
               <GripVertical size={13} className="rotate-90" />
             </button>
           )}
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
+            style={{ backgroundColor: stage.color }}
+            aria-hidden
+          />
           <span className="text-base font-semibold text-foreground truncate">
             {stage.name}
           </span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
+          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-foreground/[0.06] text-[11px] font-medium text-muted-foreground tabular-nums">
             {deals.length}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           {totalValue > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">
-              {formatCompact(totalValue)}
+              <AnimatedNumber value={totalValue} format={formatCompact} duration={600} />
             </span>
           )}
           <button
@@ -245,9 +253,9 @@ export function KanbanColumn({
           {deals.length === 0 && (
             <div
               className={cn(
-                'flex flex-col items-center justify-center gap-1.5 py-8 text-center transition-colors duration-150',
+                'flex flex-col items-center justify-center gap-1.5 py-8 text-center rounded-md transition-all duration-150',
                 isCardDragging && isOver
-                  ? 'text-foreground'
+                  ? 'text-foreground ring-1 ring-inset ring-dashed ring-foreground/25'
                   : 'text-muted-foreground/50',
               )}
             >

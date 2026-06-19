@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Check, Loader2, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatting';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import {
   COMMISSION_PARTIES,
   computeCommission,
@@ -259,7 +260,9 @@ function Summary({ label, value, subValue, bold }: { label: string; value: numbe
     <div className="px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className={cn('tabular-nums mt-0.5', bold ? 'text-lg font-semibold' : 'text-sm font-medium')}>
-        {formatCurrency(value)}
+        {/* Count-up on entry and whenever a split changes the math, so the net
+            visibly re-settles when a row is added or marked paid. */}
+        <AnimatedNumber value={value} format={formatCurrency} duration={500} />
       </p>
       {subValue && <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">{subValue}</p>}
     </div>

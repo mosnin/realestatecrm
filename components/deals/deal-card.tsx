@@ -86,6 +86,11 @@ export function DealCard({
   const isActive = deal.status === 'active';
   const checklistSummary = summarizeChecklist(deal.checklist ?? []);
   const canAdvance = isActive && nextStage && onAdvanceStage;
+  // The stage color rides the card as a hairline left edge — a quiet wash
+  // (12% alpha) that tells the eye which lane a card belongs to during a
+  // drag without painting a bright pill. Pure decoration, theme-agnostic
+  // since stage colors are author-chosen hex.
+  const stageColor = deal.stage?.color ?? null;
 
   function handleOpen() {
     if (onOpenDeal) onOpenDeal(deal);
@@ -122,9 +127,13 @@ export function DealCard({
         tabIndex={0}
         aria-label={`Open deal ${deal.title}`}
         className={cn(
-          'group bg-background border border-border/70 rounded-md p-3 cursor-pointer',
-          'transition-colors duration-150',
-          'hover:bg-foreground/[0.04]',
+          'group relative overflow-hidden bg-background border border-border/70 rounded-md p-3 cursor-pointer',
+          // Lift on hover: a 1px rise + a soft shadow, settled with the same
+          // Apple curve the board uses. transform-gpu keeps it on the
+          // compositor. The dnd transform lives on the parent motion.div, so
+          // this inner lift never fights drag positioning.
+          'transition-[background-color,box-shadow,transform,border-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu',
+          'hover:bg-foreground/[0.04] hover:-translate-y-px hover:border-border hover:shadow-[0_6px_16px_-8px_rgb(0_0_0/0.18)]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           // Closed deals recede — still scannable, visually quieter.
           deal.status === 'won' && 'opacity-75',
@@ -134,6 +143,15 @@ export function DealCard({
         onClick={handleOpen}
         onKeyDown={handleKeyDown}
       >
+        {/* Stage-color edge — a 2px wash on the left rail. Brightens a touch
+            on hover so the lift reads as "picked up". */}
+        {stageColor && (
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 w-[2px] opacity-50 transition-opacity duration-200 group-hover:opacity-90"
+            style={{ backgroundColor: stageColor }}
+          />
+        )}
         <div className="flex items-start gap-2">
           {/* Drag handle — stops propagation so clicking doesn't open the panel */}
           <button
@@ -182,21 +200,24 @@ export function DealCard({
               </p>
             )}
 
-            {/* Focal value — serif Times, the loudest note on the card. */}
+            {/* Focal value — serif Times, the loudest note on the card. One
+                step up the ladder (17px) so it lands as the card's headline,
+                with the GCI sitting quietly on the same baseline as a paired
+                read ("this is worth X, you make Y"). */}
             {deal.value != null && (
-              <p
-                className="text-base tabular-nums text-foreground mt-1.5 leading-none"
-                style={TITLE_FONT}
-              >
-                {formatCurrency(deal.value)}
-              </p>
-            )}
-
-            {/* GCI — quiet meta */}
-            {deal.value != null && deal.commissionRate != null && (
-              <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                GCI {formatCompact((deal.value * deal.commissionRate) / 100)}
-              </p>
+              <div className="mt-2 flex items-baseline gap-2">
+                <p
+                  className="text-[17px] tabular-nums text-foreground leading-none"
+                  style={TITLE_FONT}
+                >
+                  {formatCurrency(deal.value)}
+                </p>
+                {deal.commissionRate != null && (
+                  <p className="text-[11px] text-muted-foreground tabular-nums leading-none">
+                    GCI {formatCompact((deal.value * deal.commissionRate) / 100)}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Next-action line — the most actionable text on the card */}

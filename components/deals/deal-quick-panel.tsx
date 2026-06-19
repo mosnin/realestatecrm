@@ -11,6 +11,7 @@ import {
 import { Trophy, XCircle, ArrowUpRight, Activity, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, timeAgo } from '@/lib/formatting';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { dealHealth, HEALTH_META, inferNextAction } from '@/lib/deals/health';
 import {
   H2,
@@ -188,7 +189,11 @@ export function DealQuickPanel({
                   className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
                   style={TITLE_FONT}
                 >
-                  {deal.value != null ? formatCurrency(deal.value) : '—'}
+                  {deal.value != null ? (
+                    <AnimatedNumber value={deal.value} format={formatCurrency} duration={600} />
+                  ) : (
+                    '—'
+                  )}
                 </p>
                 {gci != null && (
                   <p className="text-[11px] text-muted-foreground mt-1">
