@@ -35,6 +35,9 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newDueAt, setNewDueAt] = useState('');
+  // Which item is being renamed inline, and the in-flight draft for it.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
 
   // Hydrate on mount only if nothing was passed in.
   useEffect(() => {
@@ -106,6 +109,39 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     if (!res.ok) {
       setItems((list) => list.map((i) => i.id === item.id ? { ...i, dueAt: prev } : i));
       toast.error("Couldn't save that due date.");
+    }
+  }
+
+  function startEditing(item: DealChecklistItem) {
+    setEditingId(item.id);
+    setEditLabel(item.label);
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditLabel('');
+  }
+
+  async function saveLabel(item: DealChecklistItem) {
+    const label = editLabel.trim();
+    // Nothing to do — empty or unchanged. Just close the editor.
+    if (!label || label === item.label) {
+      cancelEditing();
+      return;
+    }
+    const prev = item.label;
+    // Optimistic
+    setItems((list) => list.map((i) => i.id === item.id ? { ...i, label } : i));
+    cancelEditing();
+
+    const res = await fetch(`/api/deals/${dealId}/checklist/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label }),
+    });
+    if (!res.ok) {
+      setItems((list) => list.map((i) => i.id === item.id ? { ...i, label: prev } : i));
+      toast.error("Couldn't rename that item.");
     }
   }
 
@@ -228,9 +264,34 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
                 {KIND_ICON[item.kind] ?? '•'}
               </span>
 
-              <span className={cn('text-sm flex-1 min-w-0', done && 'line-through')}>
-                {item.label}
-              </span>
+              {editingId === item.id ? (
+                <input
+                  type="text"
+                  value={editLabel}
+                  autoFocus
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  onBlur={() => saveLabel(item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); saveLabel(item); }
+                    else if (e.key === 'Escape') { e.preventDefault(); cancelEditing(); }
+                  }}
+                  maxLength={200}
+                  className="text-sm flex-1 min-w-0 bg-transparent border-b border-foreground outline-none py-0.5"
+                  aria-label={`Rename ${item.label}`}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startEditing(item)}
+                  className={cn(
+                    'text-sm flex-1 min-w-0 text-left truncate hover:text-foreground transition-colors cursor-text',
+                    done && 'line-through',
+                  )}
+                  aria-label={`Rename ${item.label}`}
+                >
+                  {item.label}
+                </button>
+              )}
 
               {overdue && !done && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 dark:text-red-400">

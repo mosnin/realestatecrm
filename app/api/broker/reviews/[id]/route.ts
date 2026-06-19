@@ -4,6 +4,7 @@ import { getBrokerMemberContext, requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { sendPushToSpace } from '@/lib/push';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -301,6 +302,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       dealId: current.dealId,
     },
   });
+
+  // Notify the agent (space owner) that the broker resolved their review.
+  // The flag-creation path pings the broker via notifyBroker; this is the
+  // symmetric agent-facing ping. Best-effort — a missing push subscription or
+  // a deal lookup miss must never fail the resolve. We need the deal's spaceId
+  // to target the agent's space; the resolved row only carries dealId, so we
+  // resolve it here. sendPushToSpace is the same primitive broker-sla uses to
+  // nudge a realtor about a broker-side event.
+  void (async () => {
+    try {
+      const { data: deal } = await supabase
+        .from('Deal')
+        .select('spaceId, title')
+        .eq('id', updated.dealId)
+        .maybeSingle<{ spaceId: string; title: string | null }>();
+      if (!deal?.spaceId) return;
+      const verb = nextStatus === 'approved' ? 'approved' : 'closed';
+      const dealName = deal.title ?? 'your deal';
+      await sendPushToSpace(deal.spaceId, {
+        title: `Your broker ${verb} the review on ${dealName}.`,
+        body: updated.resolvedNote?.slice(0, 280) || 'Open the review to see the details.',
+      });
+    } catch (err) {
+      logger.warn('[broker/reviews/PATCH] agent resolve notify failed', { reviewId }, err);
+    }
+  })();
 
   try {
     const shaped = await shapeReview(updated);

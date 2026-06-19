@@ -4,11 +4,14 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { sendPushToSpace } from '@/lib/push';
+import { notifyBroker } from '@/lib/broker-notify';
 
 type Params = { params: Promise<{ id: string }> };
 
 type ReviewRow = {
   id: string;
+  dealId: string;
   brokerageId: string;
   requestingUserId: string;
   status: 'open' | 'approved' | 'closed';
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   // to authorize. Use maybeSingle so missing rows yield a controlled 404.
   const { data: review, error: loadErr } = await supabase
     .from('DealReviewRequest')
-    .select('id, brokerageId, requestingUserId, status')
+    .select('id, dealId, brokerageId, requestingUserId, status')
     .eq('id', reviewId)
     .maybeSingle<ReviewRow>();
 
@@ -132,6 +135,49 @@ export async function POST(req: NextRequest, { params }: Params) {
       authorUserId: dbUser.id,
     },
   });
+
+  // Cross-notify the OTHER party that the thread moved. Best-effort.
+  //
+  // The missing direction this fix exists for: broker -> agent. When a broker
+  // comments, the agent who filed the review had no signal the broker replied.
+  // No self-notify: if the commenter IS the requesting agent we never ping the
+  // agent's own space; instead we mirror the flag-creation path and ping the
+  // broker bell (notifyBroker), matching how the broker already learns about
+  // agent-side activity on a review.
+  const authorName = authorRow?.name ?? 'Someone';
+  if (isBrokerMember && !isRequester) {
+    // Broker commented → push to the agent's space (resolve dealId → spaceId).
+    void (async () => {
+      try {
+        const { data: deal } = await supabase
+          .from('Deal')
+          .select('spaceId, title')
+          .eq('id', review.dealId)
+          .maybeSingle<{ spaceId: string; title: string | null }>();
+        if (!deal?.spaceId) return;
+        const dealName = deal.title ?? 'your deal';
+        await sendPushToSpace(deal.spaceId, {
+          title: `Your broker replied on the review for ${dealName}.`,
+          body: commentBody.slice(0, 280),
+        });
+      } catch (err) {
+        logger.warn('[broker/reviews/comments/POST] agent comment notify failed', { reviewId }, err);
+      }
+    })();
+  } else if (isRequester) {
+    // Agent commented → no self-notify; surface to the broker bell instead.
+    void notifyBroker({
+      brokerageId: review.brokerageId,
+      type: 'review_requested',
+      title: `${authorName} replied on a review.`,
+      body: commentBody.slice(0, 280),
+      metadata: {
+        reviewRequestId: reviewId,
+        dealId: review.dealId,
+        authorUserId: dbUser.id,
+      },
+    });
+  }
 
   return NextResponse.json(
     {
