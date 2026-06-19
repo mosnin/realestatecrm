@@ -1,0 +1,31 @@
+-- Two-way calendar sync — inbound state on Tour.
+--
+-- The calendar mirror (lib/calendar/mirror.ts) is WRITE-ONLY: Chippi pushes
+-- a tour onto the realtor's Google Calendar and logs a CalendarEventMirror
+-- row, but when the realtor (or the guest) deletes / moves / RSVPs to that
+-- event IN Google, the CRM Tour goes stale. The inbound half
+-- (lib/calendar/tour-sync.ts, fired from the Composio calendar triggers)
+-- maps the external event back to its Tour and applies the change. These two
+-- columns are the state that half needs:
+--
+--   * externalResponseStatus — the guest's last RSVP as Google reports it
+--     ('accepted' | 'declined' | 'tentative' | 'needsAction'). Recorded so
+--     the realtor sees "guest accepted" on the tour without opening Google.
+--     Free-text (no CHECK) because Google/Composio response vocab can drift
+--     and a surprise value must be RECORDED, never rejected — the sync is
+--     best-effort and an unknown status is still signal.
+--
+--   * lastExternalSyncAt — when we last applied an inbound calendar change to
+--     this tour. Forensics + a coarse idempotency aid: the sync's real
+--     idempotency is state-based (don't re-cancel a cancelled tour, don't
+--     re-move a tour already at the new time), but this timestamp lets ops
+--     see at a glance which tours the inbound path has touched.
+--
+-- Additive + idempotent: ADD COLUMN IF NOT EXISTS, re-runnable as a no-op.
+-- RLS: "Tour" already has ROW LEVEL SECURITY enabled (20260319000001); adding
+-- columns doesn't change that, and every writer is the service-role client in
+-- lib/supabase (RLS-bypassing by design — same as every other Tour write), so
+-- no new policy is required or appropriate here.
+
+ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "externalResponseStatus" text;
+ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "lastExternalSyncAt"      timestamptz;

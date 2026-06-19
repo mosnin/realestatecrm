@@ -35,6 +35,19 @@ vi.mock('@/lib/routines', () => ({
   fireRoutineRun: fireRoutineRunMock,
 }));
 
+// Inbound calendar→Tour sync. dispatchTrigger runs this for calendar
+// event-change slugs (the two-way fix); mocked here so we assert the WIRING
+// (right slug → sync called with the connection's space/provider) without
+// re-testing the sync internals (covered in calendar-tour-sync.test.ts).
+const { syncCalendarEventToTourMock } = vi.hoisted(() => ({
+  syncCalendarEventToTourMock: vi.fn<
+    (arg: { spaceId: string; provider: string; triggerSlug: string; payload: Record<string, unknown> }) => Promise<{ action: string; tourId?: string; reason?: string }>
+  >(async () => ({ action: 'noop' })),
+}));
+vi.mock('@/lib/calendar/tour-sync', () => ({
+  syncCalendarEventToTour: syncCalendarEventToTourMock,
+}));
+
 // ── Supabase mock — captures upsert/delete/select on IntegrationTrigger
 
 type Terminal = { data: unknown; error: unknown };
@@ -105,6 +118,8 @@ beforeEach(() => {
   deleteTriggerMock.mockReset();
   fireRoutineRunMock.mockReset();
   fireRoutineRunMock.mockResolvedValue('ok');
+  syncCalendarEventToTourMock.mockReset();
+  syncCalendarEventToTourMock.mockResolvedValue({ action: 'noop' });
   supabaseState.terminal = { data: null, error: null };
   supabaseState.calls = [];
 });
@@ -467,6 +482,65 @@ describe('dispatchTrigger', () => {
     expect(result.dispatched).toBe('noop');
     expect(result.reason).toBe('no_dispatch');
     expect(fireRoutineRunMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── dispatchTrigger → inbound calendar sync wiring (two-way fix) ─────────────
+
+describe('dispatchTrigger — calendar sync wiring', () => {
+  const calConn = () => freshConnection({ toolkit: 'googlecalendar' });
+
+  it('runs the inbound sync for the CANCELED_DELETED calendar slug', async () => {
+    await dispatchTrigger({
+      triggerSlug: 'GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER',
+      connection: calConn(),
+      payload: { event_id: 'gcal_evt_1', summary: 'Tour: Sam' },
+    });
+    expect(syncCalendarEventToTourMock).toHaveBeenCalledTimes(1);
+    expect(syncCalendarEventToTourMock.mock.calls[0][0]).toMatchObject({
+      spaceId: 'space-1',
+      provider: 'googlecalendar',
+      triggerSlug: 'GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER',
+    });
+  });
+
+  it('runs the inbound sync for the ATTENDEE_RESPONSE_CHANGED calendar slug', async () => {
+    await dispatchTrigger({
+      triggerSlug: 'GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER',
+      connection: calConn(),
+      payload: { event_id: 'gcal_evt_1', responseStatus: 'declined' },
+    });
+    expect(syncCalendarEventToTourMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('still DRAFTs after syncing (CRM correction + guest follow-up both happen)', async () => {
+    const result = await dispatchTrigger({
+      triggerSlug: 'GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER',
+      connection: calConn(),
+      payload: { event_id: 'gcal_evt_1', summary: 'Tour: Sam', startTime: 'soon' },
+    });
+    // The sync corrects the Tour; the DRAFT drafts the guest-facing note.
+    expect(syncCalendarEventToTourMock).toHaveBeenCalledTimes(1);
+    expect(result.dispatched).toBe('DRAFT');
+    expect(fireRoutineRunMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT run the sync for a non-calendar slug', async () => {
+    await dispatchTrigger({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { subject: 'Hi', from: 'a@b', snippet: 'x' },
+    });
+    expect(syncCalendarEventToTourMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT run the sync for the STARTING_SOON reminder slug', async () => {
+    await dispatchTrigger({
+      triggerSlug: 'GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER',
+      connection: calConn(),
+      payload: { summary: 'Tour', attendees: [{ email: 'x@y' }] },
+    });
+    expect(syncCalendarEventToTourMock).not.toHaveBeenCalled();
   });
 });
 
