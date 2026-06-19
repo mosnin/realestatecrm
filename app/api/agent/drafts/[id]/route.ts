@@ -1,10 +1,14 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
+import { recordOutboundMessageSafe } from '@/lib/inbox';
+import { logger } from '@/lib/logger';
 import { LEVENSHTEIN_CAP, normalizedLevenshtein } from '@/lib/draft-feedback';
+import type { InboxChannel } from '@/lib/types';
 
 /**
  * Pulls feedback fields from the PATCH body and validates them server-side.
@@ -180,6 +184,64 @@ export async function PATCH(
     .single();
 
   if (updateError) throw updateError;
+
+  // ── Record the sent message on the contact's inbox thread + timeline ──────
+  // Only on a genuine send (sent=true). A draft marked 'approved' because
+  // delivery failed/was unconfigured never left the building, so there's no
+  // outbound message to record. Both writes below are BEST-EFFORT: this draft
+  // is already sent + persisted, and neither a missing thread row nor a missing
+  // activity row may turn that success into a failure.
+  if (deliveryResult.sent) {
+    const channel = existing.channel as InboxChannel;
+
+    // 1) Threaded-inbox transcript (Phase 2 wire-in). `finalContent` is the
+    // body actually sent (the realtor's edit when they edited, else the
+    // original). DeliveryResult carries no provider message id, so externalId
+    // is left unset; method/fallback go into metadata for provenance.
+    await recordOutboundMessageSafe(
+      {
+        spaceId: space.id,
+        contactId: existing.contactId,
+        channel,
+        body: finalContent,
+        subject: existing.subject,
+        agentDraftId: existing.id,
+        metadata: {
+          source: 'approved_draft',
+          method: deliveryResult.method,
+          ...(deliveryResult.fallback ? { fallback: true } : {}),
+        },
+      },
+      { route: 'agent/drafts/[id]', draftId: existing.id, spaceId: space.id },
+    );
+
+    // 2) Contact timeline activity. This path previously wrote NO ContactActivity
+    // (the gap) — so the send was invisible on the timeline and didn't move
+    // lastContactedAt. Mirror the agent/send shape to keep the two paths
+    // consistent. Best-effort, like the agent/send write.
+    if (existing.contactId) {
+      try {
+        await supabase.from('ContactActivity').insert({
+          id: crypto.randomUUID(),
+          spaceId: space.id,
+          contactId: existing.contactId,
+          type: channel === 'email' ? 'email' : 'note',
+          content:
+            channel === 'email'
+              ? `[Agent] Email sent: ${existing.subject ?? ''}`
+              : `[Agent] ${channel === 'sms' ? 'SMS' : 'Message'} sent: ${finalContent.slice(0, 140)}${finalContent.length > 140 ? '…' : ''}`,
+          metadata: {
+            channel,
+            source: 'approved_draft',
+            draftId: existing.id,
+            ...(channel === 'sms' ? { via: 'sms' } : {}),
+          },
+        });
+      } catch (err) {
+        logger.error('[agent/drafts] activity log failed (non-fatal)', { draftId: existing.id }, err);
+      }
+    }
+  }
 
   void audit({
     actorClerkId: userId,

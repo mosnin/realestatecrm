@@ -26,6 +26,8 @@ import { sendEmailFromCRM } from '@/lib/email';
 import { sendSMS } from '@/lib/sms';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { recordOutboundMessageSafe } from '@/lib/inbox';
+import type { InboxChannel } from '@/lib/types';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -166,6 +168,26 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[agent/send] activity log failed (non-fatal)', err);
   }
+
+  // Record the sent message on the contact's inbox thread (Phase 2 wire-in).
+  // Alongside the ContactActivity above — the activity feeds the timeline,
+  // this feeds the threaded transcript. Best-effort: a thread-write failure
+  // must not fail a send that already went out. The transport returns no
+  // provider message id here, so externalId is left unset.
+  await recordOutboundMessageSafe(
+    {
+      spaceId,
+      contactId,
+      channel: channel as InboxChannel,
+      body: content,
+      subject: subject ?? null,
+      metadata: {
+        source: 'background_agent',
+        ...(runId ? { agentRunId: runId } : {}),
+      },
+    },
+    { route: 'agent/send', spaceId, runId },
+  );
 
   return NextResponse.json({ success: true, channel, deliveredTo });
 }
