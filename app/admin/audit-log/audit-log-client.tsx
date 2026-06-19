@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useMemo, Fragment } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, ScrollText } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/utils';
+import { SECTION_LABEL, CAPTION } from '@/lib/typography';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -164,47 +166,44 @@ export function AuditLogClient({ logs, userMap }: AuditLogClientProps) {
       </div>
 
       {/* Results count */}
-      <p className="text-xs text-muted-foreground">
+      <p className={CAPTION}>
         Showing {filtered.length} of {logs.length} entries
       </p>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-12 text-center">
-            <p className="text-sm font-medium text-muted-foreground">
-              No audit logs found
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {logs.length === 0
-                ? 'No audit events have been recorded yet.'
-                : 'Try adjusting your filters or search query.'}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={ScrollText}
+          title={logs.length === 0 ? 'No audit events yet.' : 'No matching events.'}
+          description={
+            logs.length === 0
+              ? 'Platform activity will be recorded here as it happens.'
+              : 'Try adjusting your filters or search query.'
+          }
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden bg-card">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Timestamp
                   </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Actor
                   </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Action
                   </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Resource
                   </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Space
                   </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                    IP Address
+                  <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
+                    IP address
                   </th>
                   <th className="w-8" />
                 </tr>

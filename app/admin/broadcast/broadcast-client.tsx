@@ -14,7 +14,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Send, Users, Loader2, Eye } from 'lucide-react';
+import { Send, Users, Loader2, Eye, Megaphone } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SECTION_LABEL } from '@/lib/typography';
 
 export type SegmentKey =
   | 'all'
@@ -174,7 +176,7 @@ export function BroadcastClient({
     <div className="space-y-6">
       {/* Segment picker */}
       <section>
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">1. Choose a segment</p>
+        <p className={cn(SECTION_LABEL, 'mb-2')}>1. Choose a segment</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {SEGMENT_ORDER.map((key) => {
             const info = SEGMENT_LABELS[key];
@@ -216,7 +218,7 @@ export function BroadcastClient({
 
       {/* Composer */}
       <section className="space-y-3">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">2. Compose</p>
+        <p className={SECTION_LABEL}>2. Compose</p>
         <div>
           <div className="flex items-center justify-between mb-1">
             <label htmlFor="subject" className="text-xs font-medium text-muted-foreground">
@@ -261,7 +263,7 @@ export function BroadcastClient({
       {/* Preview */}
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">3. Preview recipients</p>
+          <p className={SECTION_LABEL}>3. Preview recipients</p>
           <Button
             type="button"
             size="sm"
@@ -326,27 +328,24 @@ export function BroadcastClient({
 
       {/* Past broadcasts */}
       <section className="space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Past broadcasts</p>
+        <p className={SECTION_LABEL}>Past broadcasts</p>
         {pastBroadcasts.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card px-4 py-8 text-center">
-            <p className="text-sm text-muted-foreground">No broadcasts yet.</p>
-          </div>
+          <EmptyState
+            icon={Megaphone}
+            title="No broadcasts yet."
+            description="Emails you send will be logged here with their delivery counts."
+            size="sm"
+          />
         ) : (
           <div className="rounded-xl border border-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Subject
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Segment
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Sent
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">
+                    <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Subject</th>
+                    <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Segment</th>
+                    <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Sent</th>
+                    <th className={cn('text-left px-4 py-3 hidden sm:table-cell', SECTION_LABEL)}>
                       Date
                     </th>
                   </tr>

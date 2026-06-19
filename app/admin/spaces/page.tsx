@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { SpaceListClient } from './space-list-client';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 
 export const metadata = { title: 'Spaces — Admin — Chippi' };
 
@@ -48,16 +49,11 @@ export default async function AdminSpacesPage({
 
   return (
     <div className="space-y-8 pb-12 max-w-5xl mx-auto">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Management.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Spaces
-        </h1>
-        <p className="text-sm text-muted-foreground">{totalCount} total spaces.</p>
-      </header>
+      <AdminPageHeader
+        eyebrow="Management."
+        title="Spaces"
+        subtitle={`${totalCount} total spaces.`}
+      />
 
       <SpaceListClient
         spaces={(spaces ?? []).map((s) => ({

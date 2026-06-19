@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { BroadcastClient, type SegmentKey, type PastBroadcast } from './broadcast-client';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 
 export const metadata = { title: 'Broadcast — Admin — Chippi' };
 
@@ -92,18 +93,11 @@ export default async function AdminBroadcastPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Growth.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Email broadcast
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Send an email to a segment of users. Limited to 3 broadcasts per hour.
-        </p>
-      </header>
+      <AdminPageHeader
+        eyebrow="Growth."
+        title="Email broadcast"
+        subtitle="Send an email to a segment of users. Limited to 3 broadcasts per hour."
+      />
       <BroadcastClient counts={counts} pastBroadcasts={pastBroadcasts} />
     </div>
   );

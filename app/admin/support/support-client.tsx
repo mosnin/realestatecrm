@@ -31,6 +31,7 @@ import {
 import { LifeBuoy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SECTION_LABEL } from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -200,26 +201,24 @@ export function SupportClient({
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       {visible.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card">
-          <EmptyState
-            icon={LifeBuoy}
-            title="Nothing here. Quiet day."
-            description="Help requests from realtors will land here for triage."
-          />
-        </div>
+        <EmptyState
+          icon={LifeBuoy}
+          title="Nothing here. Quiet day."
+          description="Help requests from realtors will land here for triage."
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Submitter</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Space</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Category</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Subject</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Priority</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Submitter</th>
+                  <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>Space</th>
+                  <th className={cn('text-left px-4 py-3 hidden md:table-cell', SECTION_LABEL)}>Category</th>
+                  <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Subject</th>
+                  <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Status</th>
+                  <th className={cn('text-left px-4 py-3 hidden md:table-cell', SECTION_LABEL)}>Priority</th>
+                  <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>Created</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">

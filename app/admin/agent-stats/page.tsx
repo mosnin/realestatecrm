@@ -2,7 +2,12 @@ import { supabase } from '@/lib/supabase';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bot, Zap, DollarSign, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
+import { Zap, Bot } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+import { StatGrid } from '@/app/admin/components/stat-grid';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SECTION_LABEL, CAPTION, META } from '@/lib/typography';
 
 export const metadata = { title: 'Agent System Health — Admin' };
 
@@ -96,21 +101,6 @@ function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-function ErrorRateBadge({ rate }: { rate: number }) {
-  const color =
-    rate > 5
-      ? 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15'
-      : rate > 1
-        ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-        : 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15';
-
-  return (
-    <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 tabular-nums ${color}`}>
-      {rate.toFixed(1)}%
-    </span>
-  );
-}
-
 export default async function AgentStatsPage({
   searchParams,
 }: {
@@ -134,19 +124,14 @@ export default async function AgentStatsPage({
 
   if (fetchError || !stats) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            Could not load agent stats. This is usually temporary.
-          </p>
-          <a
-            href="/admin/agent-stats"
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Try again
-          </a>
-        </div>
+      <div className="space-y-8 pb-12">
+        <AdminPageHeader eyebrow="System." title="Agent health" />
+        <EmptyState
+          icon={Bot}
+          title="Couldn’t load agent stats."
+          description="This is usually temporary. Reload to try again."
+          action={{ label: 'Reload', href: '/admin/agent-stats' }}
+        />
       </div>
     );
   }
@@ -162,127 +147,61 @@ export default async function AgentStatsPage({
   const dayOptions = [7, 30, 90];
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <header className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">System.</p>
-          <h1
-            className="text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Agent health
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Last {days} day{days !== 1 ? 's' : ''} · all spaces.
-          </p>
-        </header>
-        {/* Time range switcher */}
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
-          {dayOptions.map((d) => (
-            <a
-              key={d}
-              href={`/admin/agent-stats?days=${d}`}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                days === d
-                  ? 'bg-card text-foreground border border-border/70'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {d}d
-            </a>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-12 pb-12">
+      <AdminPageHeader
+        eyebrow="System."
+        title="Agent health"
+        subtitle={`Last ${days} day${days !== 1 ? 's' : ''} · all spaces.`}
+        actions={
+          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+            {dayOptions.map((d) => (
+              <a
+                key={d}
+                href={`/admin/agent-stats?days=${d}`}
+                aria-current={days === d ? 'page' : undefined}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  days === d
+                    ? 'bg-card text-foreground border border-border/70 shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {d}d
+              </a>
+            ))}
+          </div>
+        }
+      />
 
-      {/* Key metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Total Tasks */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6 flex flex-col justify-between h-full">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Total tasks</p>
-                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{fmt(stats.totalTasks)}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {fmt(stats.tasksByStatus['completed'] ?? 0)} completed
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                <Bot size={15} className="text-violet-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Success Rate */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6 flex flex-col justify-between h-full">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Success rate</p>
-                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
-                  {successRate.toFixed(1)}%
-                </p>
-                <div className="mt-1">
-                  <ErrorRateBadge rate={stats.errorRate} />
-                  <span className="text-[11px] text-muted-foreground ml-1">error rate</span>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                <Activity size={15} className="text-emerald-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Total Cost */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6 flex flex-col justify-between h-full">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Total cost</p>
-                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
-                  {fmtCost(stats.totalCostUsd)}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">USD, all spaces</p>
-              </div>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                <DollarSign size={15} className="text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Avg Cost / Task */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6 flex flex-col justify-between h-full">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">Avg cost / task</p>
-                <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">
-                  {fmtCost(stats.avgCostUsd)}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">per task run</p>
-              </div>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                <TrendingUp size={15} className="text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Key metrics — one hairline grid. Error rate rides along the success
+          cell's sub-line and tints the cell amber past the alert threshold. */}
+      <StatGrid
+        aria-label="Agent task metrics"
+        cells={[
+          {
+            label: 'Total tasks',
+            value: stats.totalTasks,
+            sub: `${fmt(stats.tasksByStatus['completed'] ?? 0)} completed`,
+          },
+          {
+            label: 'Success rate',
+            value: `${successRate.toFixed(1)}%`,
+            sub: `${stats.errorRate.toFixed(1)}% error rate`,
+            alert: stats.errorRate > 5,
+          },
+          { label: 'Total cost', value: fmtCost(stats.totalCostUsd), sub: 'USD · all spaces' },
+          { label: 'Avg cost / task', value: fmtCost(stats.avgCostUsd), sub: 'per task run' },
+        ]}
+      />
 
       {/* Status breakdown + Top tools (side by side) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Status breakdown */}
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
-            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
-              Tasks by status
-            </h2>
+            <h2 className={cn(SECTION_LABEL, 'mb-4')}>Tasks by status</h2>
             {stats.totalTasks === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks in this period.</p>
+              <EmptyState icon={Bot} title="No tasks in this period." size="sm" variant="flush" />
             ) : (
               <div className="space-y-3">
                 {(['completed', 'running', 'queued', 'paused', 'failed', 'cancelled'] as const).map(
@@ -329,13 +248,11 @@ export default async function AgentStatsPage({
         <Card className="rounded-xl border bg-card">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Zap size={14} className="text-amber-500" />
-              <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                Top tools
-              </h2>
+              <Zap size={14} className="text-muted-foreground" />
+              <h2 className={SECTION_LABEL}>Top tools</h2>
             </div>
             {stats.topTools.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tool calls recorded in this period.</p>
+              <EmptyState icon={Zap} title="No tool calls in this period." size="sm" variant="flush" />
             ) : (
               <ol className="space-y-2.5">
                 {stats.topTools.map((tool, i) => {
@@ -374,22 +291,20 @@ export default async function AgentStatsPage({
       <Card className="rounded-xl border bg-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              Tasks by space
-            </h2>
-            <span className="text-xs text-muted-foreground">Top 20 by task count</span>
+            <h2 className={SECTION_LABEL}>Tasks by space</h2>
+            <span className={CAPTION}>Top 20 by task count</span>
           </div>
           {stats.tasksBySpace.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No task data in this period.</p>
+            <EmptyState icon={Bot} title="No task data in this period." size="sm" variant="flush" />
           ) : (
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="pb-2 pr-4 font-medium">#</th>
-                    <th className="pb-2 pr-4 font-medium">Space ID</th>
-                    <th className="pb-2 pr-4 font-medium text-right">Tasks</th>
-                    <th className="pb-2 font-medium text-right">Total Cost</th>
+                  <tr className="text-left border-b border-border">
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium')}>#</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium')}>Space ID</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium text-right')}>Tasks</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 font-medium text-right')}>Total cost</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -436,19 +351,17 @@ export default async function AgentStatsPage({
       </Card>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-border">
-        <p className="text-xs text-muted-foreground text-center">
-          Showing data from the last {days} day{days !== 1 ? 's' : ''} ·{' '}
-          {new Date().toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          })}
-        </p>
-      </div>
+      <p className={cn(META, 'text-center border-t border-border/60 pt-4')}>
+        Last {days} day{days !== 1 ? 's' : ''} ·{' '}
+        {new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })}
+      </p>
     </div>
   );
 }

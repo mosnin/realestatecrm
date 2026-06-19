@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import { ArrowRightLeft, Ban, Coins, DollarSign, RefreshCw, Plus, Undo2, Gift } from 'lucide-react';
 
 type AccountType = 'space' | 'brokerage';
@@ -151,7 +152,6 @@ export function AccountBillingPanel({
   }
 
   async function handleRevokeComp() {
-    if (!confirm('Revoke free access for this account? They will need a paid subscription to keep using the app.')) return;
     setCompLoading(true);
     setCompResult(null);
     try {
@@ -165,11 +165,11 @@ export function AccountBillingPanel({
         setComp(data.comp);
         setCompResult('Free access revoked.');
         router.refresh();
-      } else {
-        setCompResult(data.error || 'Could not revoke free access.');
+        return;
       }
+      return data.error || 'Could not revoke free access.';
     } catch {
-      setCompResult('Network error. Try again.');
+      return 'Network error. Try again.';
     } finally {
       setCompLoading(false);
     }
@@ -312,7 +312,6 @@ export function AccountBillingPanel({
   }
 
   async function handleReverseTxn(txnId: string) {
-    if (!confirm('Reverse this credit transaction? This adjusts the credit ledger only — it does NOT refund money.')) return;
     setCreditResult(null);
     try {
       const res = await fetch('/api/admin/billing', {
@@ -325,11 +324,11 @@ export function AccountBillingPanel({
         setCreditResult('Credit transaction reversed.');
         await loadCredits();
         router.refresh();
-      } else {
-        setCreditResult(data.error || 'Reverse failed.');
+        return;
       }
+      return data.error || 'Reverse failed.';
     } catch {
-      setCreditResult('Network error. Try again.');
+      return 'Network error. Try again.';
     }
   }
 
@@ -434,16 +433,24 @@ export function AccountBillingPanel({
                   : ' · no expiry'}
               </p>
               {comp.compNote && <p className="text-muted-foreground">Note: {comp.compNote}</p>}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRevokeComp}
-                disabled={compLoading}
-                className="text-xs gap-1.5 text-destructive hover:text-destructive"
-              >
-                <Ban size={13} />
-                {compLoading ? 'Revoking…' : 'Revoke free access'}
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={compLoading}
+                    className="text-xs gap-1.5 text-destructive hover:text-destructive"
+                  >
+                    <Ban size={13} />
+                    {compLoading ? 'Revoking…' : 'Revoke free access'}
+                  </Button>
+                }
+                title="Revoke free access"
+                description={`Revoke complimentary access for this ${accountType}? They will need a paid subscription to keep using the app.`}
+                confirmLabel="Revoke free access"
+                tone="danger"
+                onConfirm={handleRevokeComp}
+              />
             </div>
           ) : (
             <div className="flex flex-wrap items-end gap-2">
@@ -653,10 +660,19 @@ export function AccountBillingPanel({
                     {t.workflow || t.reason || '—'} · {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                   {t.delta < 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => handleReverseTxn(t.id)} className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-foreground">
-                      <Undo2 size={11} />
-                      Reverse
-                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-foreground">
+                          <Undo2 size={11} />
+                          Reverse
+                        </Button>
+                      }
+                      title="Reverse credit transaction"
+                      description="This adjusts the in-app credit ledger only — it does NOT refund money. Use “Refund payment” to return money via Stripe."
+                      confirmLabel="Reverse transaction"
+                      tone="danger"
+                      onConfirm={() => handleReverseTxn(t.id)}
+                    />
                   )}
                 </div>
               ))}

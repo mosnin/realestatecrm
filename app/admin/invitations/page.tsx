@@ -1,8 +1,10 @@
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Mail } from 'lucide-react';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { RevokeInvitation } from './revoke-invitation';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const statusStyle = (status: string) => {
   switch (status) {
@@ -23,8 +25,14 @@ export default async function AdminInvitationsPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-sm text-muted-foreground">Couldn&apos;t load invitations.</p>
+      <div className="space-y-8 pb-12 max-w-5xl mx-auto">
+        <AdminPageHeader eyebrow="Management." title="Invitations" />
+        <EmptyState
+          icon={Mail}
+          title="Couldn’t load invitations."
+          description="This is usually temporary. Reload to try again."
+          action={{ label: 'Reload', href: '/admin/invitations' }}
+        />
       </div>
     );
   }
@@ -44,25 +52,18 @@ export default async function AdminInvitationsPage() {
 
   return (
     <div className="space-y-8 pb-12 max-w-5xl mx-auto">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Management.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Invitations
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {invs.length} invitation{invs.length !== 1 ? 's' : ''} across all brokerages.
-        </p>
-      </header>
+      <AdminPageHeader
+        eyebrow="Management."
+        title="Invitations"
+        subtitle={`${invs.length} invitation${invs.length !== 1 ? 's' : ''} across all brokerages.`}
+      />
 
       {invs.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-8 text-center">
-            <p className="text-sm text-muted-foreground">No invitations yet.</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Mail}
+          title="No invitations yet."
+          description="Invitations sent from any brokerage will show up here."
+        />
       ) : (
         <div className="space-y-2">
           {invs.map((inv) => {

@@ -13,7 +13,11 @@ import { isPlatformAdmin } from '@/lib/permissions';
 import { PLANS } from '@/lib/plans';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
-import { H3 } from '@/lib/typography';
+import { H3, SECTION_LABEL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+import { StatGrid } from '@/app/admin/components/stat-grid';
+import { EmptyState } from '@/components/ui/empty-state';
 import { BillingCreditTool } from './credit-tool';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
@@ -161,19 +165,14 @@ export default async function AdminBillingPage() {
   } catch (err) {
     console.error('[admin/billing] DB queries failed', { error: err });
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            Couldn&apos;t load billing dashboard. This is usually temporary.
-          </p>
-          <a
-            href="/admin/billing"
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Try again
-          </a>
-        </div>
+      <div className="space-y-8 pb-12">
+        <AdminPageHeader eyebrow="Management." title="Billing" />
+        <EmptyState
+          icon={DollarSign}
+          title="Couldn’t load the billing dashboard."
+          description="This is usually temporary. Reload to try again."
+          action={{ label: 'Reload', href: '/admin/billing' }}
+        />
       </div>
     );
   }
@@ -184,40 +183,31 @@ export default async function AdminBillingPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Management.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Billing
-        </h1>
-        <p className="text-sm text-muted-foreground">Subscription metrics and revenue overview.</p>
-      </header>
+      <AdminPageHeader
+        eyebrow="Management."
+        title="Billing"
+        subtitle="Subscription metrics and revenue overview."
+      />
 
-      {/* ── KPI strip — hairline grid ────────────────────────────── */}
-      <section
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+      {/* ── KPI strip — hairline grid (count-up via StatGrid) ────── */}
+      <StatGrid
         aria-label="Billing key metrics"
-      >
-        {[
+        columnsClassName="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        cells={[
           {
             label: 'MRR',
             value: `$${mrr.toLocaleString()}`,
             sub: `${statusCounts.active} active × $${PRICE_PER_SEAT}`,
-            alert: false,
           },
           {
             label: 'Active',
             value: statusCounts.active,
             sub: totalSpaces > 0 ? `${Math.round((statusCounts.active / totalSpaces) * 100)}% of spaces` : '—',
-            alert: false,
           },
           {
             label: 'Trialing',
             value: statusCounts.trialing,
             sub: `${trialExpiringSoon.length} expiring soon`,
-            alert: false,
           },
           {
             label: 'Past due',
@@ -231,22 +221,8 @@ export default async function AdminBillingPage() {
             sub: totalSpaces > 0 ? `${Math.round((statusCounts.canceled / totalSpaces) * 100)}% churn` : '—',
             alert: statusCounts.canceled > 0,
           },
-        ].map(({ label, value, sub, alert }) => (
-          <div key={label} className="bg-background px-4 py-4">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-              {label}
-            </p>
-            <p
-              className={`text-[25px] leading-tight tracking-tight tabular-nums ${
-                alert ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
-              }`}
-            >
-              {value}
-            </p>
-            <p className="text-[11px] tabular-nums text-muted-foreground mt-1">{sub}</p>
-          </div>
-        ))}
-      </section>
+        ]}
+      />
 
       {/* ── Subscription Breakdown ──────────────────────────────── */}
       <Card>
@@ -275,9 +251,9 @@ export default async function AdminBillingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="text-right py-2 px-4 text-xs font-semibold text-muted-foreground">Count</th>
-                  <th className="text-right py-2 pl-4 text-xs font-semibold text-muted-foreground">% of Total</th>
+                  <th className={cn('text-left py-2 pr-4', SECTION_LABEL)}>Status</th>
+                  <th className={cn('text-right py-2 px-4', SECTION_LABEL)}>Count</th>
+                  <th className={cn('text-right py-2 pl-4', SECTION_LABEL)}>% of total</th>
                 </tr>
               </thead>
               <tbody>
@@ -346,22 +322,23 @@ export default async function AdminBillingPage() {
       <div>
         <p className={`${H3} mb-3`}>Recent subscriptions</p>
         {recentSubscriptions.length === 0 ? (
-          <Card>
-            <CardContent className="px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No active subscriptions yet.</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={CreditCard}
+            title="No active subscriptions yet."
+            description="Paid and trialing Space subscriptions will appear here."
+            size="sm"
+          />
         ) : (
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Space Name</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Owner Email</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Status</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Period End</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Stripe Customer</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Space name</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Owner email</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Status</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Period end</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Stripe customer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -435,22 +412,23 @@ export default async function AdminBillingPage() {
       <div>
         <p className={`${H3} mb-3`}>Brokerage subscriptions</p>
         {brokerageSubscriptions.length === 0 ? (
-          <Card>
-            <CardContent className="px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No brokerage subscriptions yet.</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={CreditCard}
+            title="No brokerage subscriptions yet."
+            description="Team and Team Plus subscriptions billed to a brokerage will appear here."
+            size="sm"
+          />
         ) : (
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Brokerage</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Plan</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Status</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Period End</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">Stripe</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Brokerage</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Plan</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Status</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Period end</th>
+                    <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Stripe</th>
                   </tr>
                 </thead>
                 <tbody>

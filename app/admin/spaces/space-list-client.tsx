@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Search, X, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SECTION_LABEL } from '@/lib/typography';
 
 type SpaceRow = {
   id: string;
@@ -137,10 +138,10 @@ export function SpaceListClient({
             key={f.value}
             onClick={() => setStatusFilter(f.value)}
             className={cn(
-              'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+              'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors duration-150',
               statusFilter === f.value
                 ? 'bg-foreground text-background border-foreground'
-                : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                : 'bg-card text-muted-foreground border-border/70 hover:bg-foreground/[0.04] hover:text-foreground'
             )}
           >
             {f.label}
@@ -160,28 +161,26 @@ export function SpaceListClient({
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={Building}
-            title="No spaces found"
-            description={
-              search
-                ? 'Try a different search term.'
-                : 'No spaces match the current filter.'
-            }
-          />
-        </Card>
+        <EmptyState
+          icon={Building}
+          title="No spaces found."
+          description={
+            search
+              ? 'Try a different search term.'
+              : 'No spaces match the current filter.'
+          }
+        />
       ) : (
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Name / Slug</th>
-                  <th className="px-4 py-3 font-medium">Owner</th>
-                  <th className="px-4 py-3 font-medium">Subscription</th>
-                  <th className="px-4 py-3 font-medium">Period End</th>
-                  <th className="px-4 py-3 font-medium">Created</th>
+                <tr className="border-b border-border text-left">
+                  <th className={cn('px-4 py-3', SECTION_LABEL)}>Name / slug</th>
+                  <th className={cn('px-4 py-3', SECTION_LABEL)}>Owner</th>
+                  <th className={cn('px-4 py-3', SECTION_LABEL)}>Subscription</th>
+                  <th className={cn('px-4 py-3', SECTION_LABEL)}>Period end</th>
+                  <th className={cn('px-4 py-3', SECTION_LABEL)}>Created</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

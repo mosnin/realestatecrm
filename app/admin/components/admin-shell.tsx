@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
+import { PageTransition } from '@/components/motion/page-transition';
 import { PAGE_MAX, SIDEBAR_WIDTH } from '@/lib/geometry';
 import { SECTION_LABEL } from '@/lib/typography';
 import { useState } from 'react';
@@ -355,11 +356,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
+        {/* Page content — PageTransition fades each route in on nav, matching
+            the realtor + broker shells. Mounts inside <main> so the chrome
+            never re-animates. Honors reduced-motion via MotionProvider. */}
         <main className="flex-1 px-4 py-8 md:px-8 md:py-10 pb-24 md:pb-12">
-          <div className={cn('w-full mx-auto', PAGE_MAX)}>
+          <PageTransition className={cn('w-full mx-auto', PAGE_MAX)}>
             {children}
-          </div>
+          </PageTransition>
         </main>
       </div>
 

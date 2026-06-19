@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { AuditLogClient } from './audit-log-client';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+
+export const metadata = { title: 'Audit Log — Admin — Chippi' };
 
 export default async function AuditLogPage() {
   const isAdmin = await isPlatformAdmin();
@@ -38,16 +41,11 @@ export default async function AuditLogPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">System.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Audit log
-        </h1>
-        <p className="text-sm text-muted-foreground">Platform-wide activity log for SOC 2 compliance.</p>
-      </header>
+      <AdminPageHeader
+        eyebrow="System."
+        title="Audit log"
+        subtitle="Platform-wide activity log for SOC 2 compliance."
+      />
       <AuditLogClient logs={logs} userMap={userMap} />
     </div>
   );

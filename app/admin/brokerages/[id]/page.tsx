@@ -314,21 +314,28 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
             </Card>
           </div>
 
-          {/* Admin actions */}
+          {/* Admin actions — recoverable action up top; the irreversible
+              delete sits below a hairline in a tinted danger zone so it can
+              never be mistaken for the safe suspend toggle. */}
           <div className="space-y-2">
             <p className={SECTION_LABEL}>Admin actions</p>
             <Card>
-              <CardContent className="px-4 py-4 space-y-2">
+              <CardContent className="px-4 py-4 space-y-3">
                 <BrokerageActions
                   action="toggle-status"
                   brokerageId={brokerage.id}
                   currentStatus={brokerage.status}
                 />
-                <BrokerageActions
-                  action="delete"
-                  brokerageId={brokerage.id}
-                  brokerageName={brokerage.name}
-                />
+                <div className="rounded-lg border border-destructive/25 bg-destructive/[0.03] px-3 py-3 space-y-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-destructive/80">
+                    Danger zone
+                  </p>
+                  <BrokerageActions
+                    action="delete"
+                    brokerageId={brokerage.id}
+                    brokerageName={brokerage.name}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>

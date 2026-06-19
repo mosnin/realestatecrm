@@ -1,8 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, TrendingUp, CreditCard, CheckCircle2, XCircle, AlertTriangle, DollarSign } from 'lucide-react';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+import { StatGrid } from '@/app/admin/components/stat-grid';
+import { SECTION_LABEL, CAPTION } from '@/lib/typography';
+
+export const metadata = { title: 'Cohorts — Admin — Chippi' };
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
@@ -185,22 +190,15 @@ export default async function AdminCohortsPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Growth.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Cohort analysis
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Weekly signup cohorts and their retention through the funnel.
-        </p>
-      </header>
+      <AdminPageHeader
+        eyebrow="Growth."
+        title="Cohort analysis"
+        subtitle="Weekly signup cohorts and their retention through the funnel."
+      />
 
       <Card className="rounded-xl border bg-card">
         <CardContent className="px-5 py-4">
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className={cn(CAPTION, 'leading-relaxed')}>
             Each row represents users who signed up during a particular ISO week
             (Monday start, UTC). Percentages are calculated against the signup
             count for that cohort. Paid = <code>active</code> +{' '}
@@ -213,13 +211,11 @@ export default async function AdminCohortsPage() {
       </Card>
 
       {fetchError && (
-        <Card className="rounded-xl border border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5">
-          <CardContent className="px-5 py-4">
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              Could not load cohort data. Check server logs.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5 px-5 py-4">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Couldn’t load cohort data. This is usually temporary — reload to try again.
+          </p>
+        </div>
       )}
 
       {/* ── Cohort retention table ───────────────────────────────────── */}
@@ -228,30 +224,14 @@ export default async function AdminCohortsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/40 border-b border-border">
               <tr className="text-left">
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Week
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Signups
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Onboarded
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Workspace
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Trial
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Paid
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Churned
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  Still active
-                </th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Week</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Signups</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Onboarded</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Workspace</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Trial</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Paid</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Churned</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Still active</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -278,69 +258,20 @@ export default async function AdminCohortsPage() {
 
       {/* ── Top-level stats ──────────────────────────────────────────── */}
       <div className="space-y-3">
-        <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-          Overall
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {[
-            {
-              label: 'Total signups',
-              value: totalSignups,
-              icon: Users,
-              color: 'text-blue-500',
-            },
-            {
-              label: 'Paid',
-              value: totalPaid,
-              icon: CheckCircle2,
-              color: 'text-emerald-500',
-            },
-            {
-              label: 'Trial',
-              value: totalTrial,
-              icon: CreditCard,
-              color: 'text-blue-500',
-            },
-            {
-              label: 'Past due',
-              value: totalPastDue,
-              icon: AlertTriangle,
-              color: 'text-amber-500',
-            },
-            {
-              label: 'Canceled',
-              value: totalCanceled,
-              icon: XCircle,
-              color: 'text-rose-500',
-            },
-            {
-              label: 'Paid conv.',
-              value: `${overallPaidRate}%`,
-              icon: TrendingUp,
-              color: 'text-emerald-500',
-            },
-            {
-              label: 'Churn rate',
-              value: `${overallChurnRate}%`,
-              icon: DollarSign,
-              color: 'text-rose-500',
-            },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <Card key={label} className="rounded-xl border bg-card h-full">
-              <CardContent className="p-5 h-full flex flex-col justify-between">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{value}</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                    <Icon size={15} className={color} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <h2 className={SECTION_LABEL}>Overall</h2>
+        <StatGrid
+          aria-label="Overall cohort metrics"
+          columnsClassName="grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"
+          cells={[
+            { label: 'Total signups', value: totalSignups },
+            { label: 'Paid', value: totalPaid },
+            { label: 'Trial', value: totalTrial },
+            { label: 'Past due', value: totalPastDue, alert: totalPastDue > 0 },
+            { label: 'Canceled', value: totalCanceled },
+            { label: 'Paid conv.', value: `${overallPaidRate}%` },
+            { label: 'Churn rate', value: `${overallChurnRate}%`, alert: overallChurnRate > 0 },
+          ]}
+        />
       </div>
     </div>
   );
