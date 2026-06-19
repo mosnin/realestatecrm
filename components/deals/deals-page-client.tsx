@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X, Bookmark } from 'lucide-react';
+import { toast } from 'sonner';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
 import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED, QUIET_LINK } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
-import type { Pipeline, DealStage, Deal } from '@/lib/types';
+import type { Pipeline, DealStage, Deal, SavedView } from '@/lib/types';
 
 type StageWithDeals = DealStage & { deals: Deal[] };
 
@@ -71,6 +72,94 @@ export function DealsPageClient({
   // (`PipelineSummary`) re-fetches in lockstep. Without this the strip would
   // still say "0 active deals" right after the realtor created one.
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
+
+  // ── Saved views (server-backed, space-scoped) ────────────────────────────
+  // A saved view restores the board's whole cut — status tab, focus chip, and
+  // search — so a realtor doesn't have to re-narrow the pipeline on every
+  // reload. Persisted via /api/saved-views (entity 'deal').
+  type DealViewFilters = {
+    boardStatus?: BoardStatus;
+    focus?: BoardFocus;
+    searchQuery?: string;
+  };
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
+  const [savingView, setSavingView] = useState(false);
+
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/saved-views?slug=${encodeURIComponent(slug)}&entity=deal`,
+        );
+        if (!res.ok) return;
+        const data: SavedView[] = await res.json();
+        if (!cancelled) setSavedViews(Array.isArray(data) ? data : []);
+      } catch {
+        /* non-fatal — the board still works without saved views */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  async function handleSaveDealView() {
+    const name = saveViewName.trim();
+    if (!name || savingView) return;
+    const filters: DealViewFilters = { boardStatus, focus, searchQuery };
+    setSavingView(true);
+    try {
+      const res = await fetch('/api/saved-views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, entity: 'deal', name, filters }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Couldn't save that view. Try again.");
+        return;
+      }
+      const created: SavedView = await res.json();
+      setSavedViews((prev) => [created, ...prev]);
+      setSaveViewName('');
+      setShowSaveInput(false);
+      toast.success('View saved.');
+    } catch {
+      toast.error("Couldn't save that view. Try again.");
+    } finally {
+      setSavingView(false);
+    }
+  }
+
+  function applyDealView(view: SavedView) {
+    const f = (view.filters ?? {}) as DealViewFilters;
+    setBoardStatus(f.boardStatus ?? 'active');
+    setFocus(f.boardStatus === 'closed' ? null : f.focus ?? null);
+    setSearchQuery(f.searchQuery ?? '');
+  }
+
+  async function deleteDealView(id: string) {
+    const prev = savedViews;
+    setSavedViews((views) => views.filter((v) => v.id !== id));
+    try {
+      const res = await fetch(
+        `/api/saved-views?slug=${encodeURIComponent(slug)}&id=${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) throw new Error('delete failed');
+    } catch {
+      setSavedViews(prev);
+      toast.error("Couldn't delete that view. Try again.");
+    }
+  }
+
+  const dealViews = savedViews.filter(
+    (v) => v.entity === 'deal' || v.page === 'deals' || (!v.entity && !v.page),
+  );
 
   // Load pipelines (triggers bootstrap if this is the first visit).
   // When the server already gave us pipelines we still want to restore the
@@ -297,7 +386,80 @@ export function DealsPageClient({
                 <X size={12} />
               </button>
             )}
+
+            {/* Save the current cut (status + focus + search) as a named view. */}
+            <button
+              type="button"
+              onClick={() => setShowSaveInput((s) => !s)}
+              aria-pressed={showSaveInput}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+            >
+              <Bookmark size={12} />
+              Save view
+            </button>
           </div>
+        </div>
+      )}
+
+      {/* Save-view inline input */}
+      {hasPipelines && showSaveInput && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={saveViewName}
+            onChange={(e) => setSaveViewName(e.target.value)}
+            placeholder="Name this view…"
+            className="text-xs rounded-md border border-border/70 bg-background px-2.5 h-8 w-44 focus:outline-none focus:ring-2 focus:ring-ring"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveDealView();
+              if (e.key === 'Escape') setShowSaveInput(false);
+            }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleSaveDealView}
+            disabled={savingView || !saveViewName.trim()}
+            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
+          >
+            {savingView ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSaveInput(false)}
+            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Saved-view chips */}
+      {hasPipelines && dealViews.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-muted-foreground mr-1">Saved:</span>
+          {dealViews.map((v) => (
+            <span
+              key={v.id}
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full pl-2.5 pr-1 h-6 border border-border/70 bg-background"
+            >
+              <button
+                type="button"
+                onClick={() => applyDealView(v)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {v.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteDealView(v.id)}
+                aria-label={`Delete saved view ${v.name}`}
+                className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <X size={9} />
+              </button>
+            </span>
+          ))}
         </div>
       )}
 

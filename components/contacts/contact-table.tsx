@@ -155,47 +155,113 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  // Bulk-tag popover state — the free-text tag to add/remove across the
+  // selection, plus the popover open flag so it closes after an action.
+  const [bulkTagOpen, setBulkTagOpen] = useState(false);
+  const [bulkTagInput, setBulkTagInput] = useState('');
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
+  const [savingView, setSavingView] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirm();
 
-  // Load saved views from localStorage on mount
+  // The complete cut a saved view restores. Captures the WHOLE filter set
+  // (not just the stage) so reloading a complex view — "Buyers · hot · tagged
+  // spring-move, name A–Z" — comes back exactly as the realtor left it.
+  type ContactViewFilters = {
+    search?: string;
+    typeFilter?: string;
+    leadTypeFilter?: typeof leadTypeFilter;
+    tagFilter?: string;
+    sortBy?: typeof sortBy;
+  };
+
+  // Load saved views from the server (space-scoped). Falls back to the legacy
+  // per-browser localStorage payload if the API is unreachable, so a saved cut
+  // never silently vanishes on a flaky network.
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`saved-views-contacts-${slug}`);
-      if (stored) setSavedViews(JSON.parse(stored));
-    } catch {
-      /* ignore */
-    }
+    if (!slug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/saved-views?slug=${encodeURIComponent(slug)}&entity=contact`,
+        );
+        if (!res.ok) throw new Error('fetch failed');
+        const data: SavedView[] = await res.json();
+        if (!cancelled) setSavedViews(Array.isArray(data) ? data : []);
+      } catch {
+        try {
+          const stored = localStorage.getItem(`saved-views-contacts-${slug}`);
+          if (stored && !cancelled) setSavedViews(JSON.parse(stored));
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
-  function persistSavedViews(views: SavedView[]) {
-    setSavedViews(views);
-    localStorage.setItem(`saved-views-contacts-${slug}`, JSON.stringify(views));
-  }
-
-  function handleSaveView() {
-    if (!saveViewName.trim()) return;
-    const newView: SavedView = {
-      id: crypto.randomUUID(),
-      name: saveViewName.trim(),
-      page: 'contacts',
-      filters: { typeFilter },
+  async function handleSaveView() {
+    const name = saveViewName.trim();
+    if (!name || savingView) return;
+    const filters: ContactViewFilters = {
+      search,
+      typeFilter,
+      leadTypeFilter,
+      tagFilter,
+      sortBy,
     };
-    persistSavedViews([...savedViews, newView]);
-    setSaveViewName('');
-    setShowSaveInput(false);
+    setSavingView(true);
+    try {
+      const res = await fetch('/api/saved-views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, entity: 'contact', name, filters }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Couldn't save that view. Try again.");
+        return;
+      }
+      const created: SavedView = await res.json();
+      setSavedViews((prev) => [created, ...prev]);
+      setSaveViewName('');
+      setShowSaveInput(false);
+      toast.success('View saved.');
+    } catch {
+      toast.error("Couldn't save that view. Try again.");
+    } finally {
+      setSavingView(false);
+    }
   }
 
   function applyView(view: SavedView) {
-    const f = view.filters as { typeFilter?: string };
-    if (f.typeFilter) setTypeFilter(f.typeFilter);
+    const f = (view.filters ?? {}) as ContactViewFilters;
+    setSearch(f.search ?? '');
+    setTypeFilter(f.typeFilter ?? 'ALL');
+    setLeadTypeFilter(f.leadTypeFilter ?? 'all');
+    setTagFilter(f.tagFilter ?? '');
+    if (f.sortBy) setSortBy(f.sortBy);
   }
 
-  function deleteView(id: string) {
-    persistSavedViews(savedViews.filter((v) => v.id !== id));
+  async function deleteView(id: string) {
+    const prev = savedViews;
+    // Optimistic — the chip vanishes immediately; restore on failure.
+    setSavedViews((views) => views.filter((v) => v.id !== id));
+    try {
+      const res = await fetch(
+        `/api/saved-views?slug=${encodeURIComponent(slug)}&id=${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) throw new Error('delete failed');
+    } catch {
+      setSavedViews(prev);
+      toast.error("Couldn't delete that view. Try again.");
+    }
   }
 
   const fetchContacts = useCallback(async () => {
@@ -308,6 +374,37 @@ export function ContactTable({ slug }: ContactTableProps) {
     }
   }
 
+  /**
+   * One round-trip for a bulk action — the server applies it to all selected
+   * ids inside its space and hands back per-id results. Returns the parsed
+   * `{ ok, applied, results }` payload (or null on a transport error) so each
+   * caller can phrase its own toast. Clears the selection + refetches.
+   */
+  type BulkResult = {
+    ok: boolean;
+    applied: number;
+    results: { id: string; ok: boolean; error?: string }[];
+  };
+  async function runBulk(
+    payload: Record<string, unknown>,
+  ): Promise<BulkResult | null> {
+    const ids = [...selectedIds];
+    try {
+      const res = await fetch('/api/contacts/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, ids, ...payload }),
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as BulkResult;
+    } catch {
+      return null;
+    } finally {
+      setSelectedIds(new Set());
+      fetchContacts();
+    }
+  }
+
   async function handleBulkDelete() {
     const ids = [...selectedIds];
     const confirmed = await confirm({
@@ -315,6 +412,8 @@ export function ContactTable({ slug }: ContactTableProps) {
       description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
+    // Delete stays on the per-id DELETE route — the bulk endpoint is for
+    // reversible mutations; destructive removal keeps its existing path.
     try {
       const results = await Promise.allSettled(
         ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })),
@@ -345,48 +444,38 @@ export function ContactTable({ slug }: ContactTableProps) {
       const contact = contacts.find((c) => c.id === id);
       if (contact) prevTypes.set(id, contact.type);
     }
-    try {
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          fetch(`/api/contacts/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: newType }),
-          }),
-        ),
-      );
-      const failures = results.filter(
-        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok),
-      );
-      const successes = ids.length - failures.length;
-      const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
-      if (successes > 0) {
-        toast.success(`Moved ${successes} to ${stageLabel}.`, {
-          action: {
-            label: 'Undo',
-            onClick: () => undoBulkStageChange(prevTypes),
-          },
-        });
-      }
-      if (failures.length > 0) {
-        toast.error(`${failures.length} got stuck. Try those again.`);
-      }
-    } catch {
+    const result = await runBulk({ action: 'set-stage', stage: newType });
+    if (!result) {
       toast.error("Couldn't update those contacts. Try again.");
-    } finally {
-      setSelectedIds(new Set());
-      fetchContacts();
+      return;
     }
+    const successes = result.applied;
+    const failures = result.results.length - successes;
+    const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
+    if (successes > 0) {
+      toast.success(`Moved ${successes} to ${stageLabel}.`, {
+        action: { label: 'Undo', onClick: () => undoBulkStageChange(prevTypes) },
+      });
+    }
+    if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
   }
 
   async function undoBulkStageChange(prevTypes: Map<string, Client['type']>) {
+    // Undo restores each contact's prior stage. Grouped by target stage so the
+    // whole undo is at most three bulk calls rather than N.
+    const byStage = new Map<Client['type'], string[]>();
+    for (const [id, type] of prevTypes) {
+      const arr = byStage.get(type) ?? [];
+      arr.push(id);
+      byStage.set(type, arr);
+    }
     try {
       await Promise.allSettled(
-        [...prevTypes.entries()].map(([id, type]) =>
-          fetch(`/api/contacts/${id}`, {
-            method: 'PATCH',
+        [...byStage.entries()].map(([type, ids]) =>
+          fetch('/api/contacts/bulk', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type }),
+            body: JSON.stringify({ slug, ids, action: 'set-stage', stage: type }),
           }),
         ),
       );
@@ -395,6 +484,42 @@ export function ContactTable({ slug }: ContactTableProps) {
       toast.error("Couldn't undo. Try moving them manually.");
     } finally {
       fetchContacts();
+    }
+  }
+
+  async function handleBulkTag(tag: string, mode: 'add' | 'remove') {
+    const t = tag.trim();
+    if (!t) return;
+    const count = selectedIds.size;
+    const result = await runBulk({
+      action: mode === 'add' ? 'tag-add' : 'tag-remove',
+      tag: t,
+    });
+    if (!result) {
+      toast.error("Couldn't update tags. Try again.");
+      return;
+    }
+    const verb = mode === 'add' ? 'Tagged' : 'Untagged';
+    if (result.applied > 0) toast.success(`${verb} ${result.applied} contact${result.applied !== 1 ? 's' : ''}.`);
+    const failures = result.results.length - result.applied;
+    if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
+    if (result.applied === 0 && failures === 0) toast.success(`No change for ${count}.`);
+  }
+
+  async function handleBulkArchive() {
+    const count = selectedIds.size;
+    const result = await runBulk({ action: 'archive' });
+    if (!result) {
+      toast.error("Couldn't archive those contacts. Try again.");
+      return;
+    }
+    if (result.applied > 0) {
+      toast.success(`Archived ${result.applied} contact${result.applied !== 1 ? 's' : ''}.`);
+    }
+    const failures = result.results.length - result.applied;
+    if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
+    if (result.applied === 0 && failures === 0 && count > 0) {
+      toast.error("Couldn't archive those contacts. Try again.");
     }
   }
 
@@ -461,7 +586,12 @@ export function ContactTable({ slug }: ContactTableProps) {
     return list;
   })();
 
-  const contactViews = savedViews.filter((v) => v.page === 'contacts');
+  // Tolerate both the server shape (entity) and the legacy localStorage shape
+  // (page) so a fallback payload still renders. A view with neither field set
+  // (shouldn't happen) is assumed to be a contact view.
+  const contactViews = savedViews.filter(
+    (v) => v.entity === 'contact' || v.page === 'contacts' || (!v.entity && !v.page),
+  );
 
   const leadTypeChips: {
     key: 'all' | 'new' | 'rental' | 'buyer';
@@ -822,9 +952,10 @@ export function ContactTable({ slug }: ContactTableProps) {
           <button
             type="button"
             onClick={handleSaveView}
-            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+            disabled={savingView || !saveViewName.trim()}
+            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
           >
-            Save
+            {savingView ? 'Saving…' : 'Save'}
           </button>
           <button
             type="button"
@@ -1135,6 +1266,89 @@ export function ContactTable({ slug }: ContactTableProps) {
               <SelectItem value="APPLICATION">Applied</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Bulk tag — add or remove one tag across the whole selection.
+              Suggestions come from the workspace's existing user tags. */}
+          <Popover
+            open={bulkTagOpen}
+            onOpenChange={(o) => {
+              setBulkTagOpen(o);
+              if (!o) setBulkTagInput('');
+            }}
+          >
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+                <TagIcon size={12} />
+                Tag
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-60 p-0">
+              <div className="border-b border-border/60 p-2">
+                <Input
+                  value={bulkTagInput}
+                  onChange={(e) => setBulkTagInput(e.target.value)}
+                  placeholder="Tag name…"
+                  className="h-8 text-xs"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && bulkTagInput.trim()) {
+                      setBulkTagOpen(false);
+                      handleBulkTag(bulkTagInput, 'add');
+                    }
+                  }}
+                />
+                <div className="mt-2 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!bulkTagInput.trim()}
+                    onClick={() => {
+                      setBulkTagOpen(false);
+                      handleBulkTag(bulkTagInput, 'add');
+                    }}
+                    className="flex-1 h-7 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!bulkTagInput.trim()}
+                    onClick={() => {
+                      setBulkTagOpen(false);
+                      handleBulkTag(bulkTagInput, 'remove');
+                    }}
+                    className="flex-1 h-7 rounded-md text-xs font-medium border border-border/70 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-50 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+              {allTags.length > 0 && (
+                <div className="max-h-40 overflow-y-auto py-1">
+                  {allTags
+                    .filter((t) =>
+                      bulkTagInput.trim()
+                        ? t.toLowerCase().includes(bulkTagInput.trim().toLowerCase())
+                        : true,
+                    )
+                    .slice(0, 50)
+                    .map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setBulkTagOpen(false);
+                          handleBulkTag(tag, 'add');
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
           {selectedIds.size >= 2 && (
             <Button
               size="sm"
@@ -1154,6 +1368,15 @@ export function ContactTable({ slug }: ContactTableProps) {
           >
             <Download size={12} />
             Export
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBulkArchive}
+            className="h-8 gap-1.5 text-xs"
+          >
+            <Inbox size={12} />
+            Archive
           </Button>
           <Button
             size="sm"
