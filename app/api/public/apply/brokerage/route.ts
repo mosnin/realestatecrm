@@ -767,6 +767,12 @@ export async function POST(req: NextRequest) {
         success: true,
         id: contact.id,
         applicationRef,
+        // Returned so the client confirmation can link straight into the
+        // applicant's status portal (mirrors the per-realtor /api/public/apply
+        // contract). Only this fresh-submission path exposes it; the dedupe
+        // paths above return ref-only and the status page falls back to the
+        // read-only view.
+        statusPortalToken,
       },
       { status: 201 },
     );
