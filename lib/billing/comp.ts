@@ -19,13 +19,29 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { PlanId } from '@/lib/plans';
+import { PLANS, type PlanId } from '@/lib/plans';
 
-// The effective plan a comped account reports — the top tier of each kind, so a
-// demo account sees the full feature set. (Virtual: never written to the row, so
-// it can't drift the stored plan or trip Stripe reconciliation.)
+// The DEFAULT effective plan a comped account reports — the top tier of each
+// kind, so an internal demo account sees the full feature set. (Virtual: never
+// written to the row, so it can't drift the stored plan or trip Stripe
+// reconciliation.) An invite-code redemption can pin a comped Space to a
+// SPECIFIC plan instead (Space."compPlan"); resolveCompSpacePlan applies that
+// override and falls back here when it's unset (every existing demo comp).
 export const COMP_SPACE_PLAN: PlanId = 'pro';
 export const COMP_BROKERAGE_PLAN: PlanId = 'team_plus';
+
+/**
+ * The plan a comped Space reports. An invite-code redemption stores the granted
+ * PlanId on Space."compPlan" so a code that grants the $97 'solo' tier resolves
+ * to 'solo' (not the demo default). Anything else — NULL (every demo comp granted
+ * before invite codes existed), or a value that isn't a known PlanId — falls back
+ * to COMP_SPACE_PLAN, so this can't change today's demo behavior. Pure.
+ */
+export function resolveCompSpacePlan(compPlan: unknown): PlanId {
+  return typeof compPlan === 'string' && compPlan in PLANS
+    ? (compPlan as PlanId)
+    : COMP_SPACE_PLAN;
+}
 
 /** Pure check: is comp currently active for these raw column values? */
 export function isCompActive(compAccess: unknown, compExpiresAt: unknown): boolean {
@@ -34,6 +50,27 @@ export function isCompActive(compAccess: unknown, compExpiresAt: unknown): boole
   const exp = new Date(compExpiresAt as string).getTime();
   if (Number.isNaN(exp)) return true; // unparseable (shouldn't happen) → treat as no-expiry
   return exp > Date.now();
+}
+
+/**
+ * Resilient lookup of a Space's pinned comp plan (Space."compPlan"). Returns the
+ * resolved PlanId — the column's value when it's a known plan, else
+ * COMP_SPACE_PLAN. Fails to the default on ANY error (column not present yet, row
+ * missing, query error), so resolveBillingAccount keeps working before this
+ * branch's migration is applied and never throws on a legacy schema.
+ */
+export async function getCompSpacePlan(spaceId: string): Promise<PlanId> {
+  try {
+    const { data, error } = await supabase
+      .from('Space')
+      .select('compPlan')
+      .eq('id', spaceId)
+      .maybeSingle();
+    if (error || !data) return COMP_SPACE_PLAN;
+    return resolveCompSpacePlan((data as { compPlan?: unknown }).compPlan);
+  } catch {
+    return COMP_SPACE_PLAN;
+  }
 }
 
 /**
