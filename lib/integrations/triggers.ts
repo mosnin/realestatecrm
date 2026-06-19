@@ -35,6 +35,8 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { createTrigger, deleteTrigger } from './composio';
 import { fireRoutineRun } from '@/lib/routines';
+import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
+import type { CalendarProvider } from '@/lib/calendar/mirror';
 import type { IntegrationConnectionRow } from './connections';
 
 export type TriggerStatus = 'active' | 'paused' | 'failed';
@@ -1003,6 +1005,68 @@ export async function summariesForConnections(connectionIds: string[]): Promise<
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 /**
+ * Calendar event-change slugs that must SYNC back to the mapped Tour (the
+ * two-way calendar fix), in addition to whatever their dispatch kind does.
+ *
+ *   - CANCELED_DELETED → the external event vanished → cancel the tour.
+ *   - ATTENDEE_RESPONSE_CHANGED → an RSVP, OR a drag-to-new-time some Composio
+ *     generations surface here → record the RSVP / move the tour.
+ *
+ * STARTING_SOON is deliberately NOT here — it's a reminder, not a state change.
+ * The sync itself is the single place that decides delete vs move vs rsvp from
+ * the payload; this set just gates WHICH slugs get fed to it.
+ *
+ * These slugs keep their existing DRAFT dispatch too: the sync corrects the CRM
+ * (the truth), the DRAFT drafts the guest-facing follow-up (the outreach). Two
+ * different jobs; both wanted.
+ */
+const CALENDAR_SYNC_SLUGS = new Set<string>([
+  'GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER',
+  'GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER',
+]);
+
+/** Map a connection toolkit to a calendar provider slug, or null if the
+ *  connection isn't a calendar we sync. Keeps the sync gated to the two
+ *  provider slugs lib/calendar/mirror.ts knows how to map. */
+function calendarProviderForToolkit(toolkit: string): CalendarProvider | null {
+  if (toolkit === 'googlecalendar' || toolkit === 'outlook_calendar') return toolkit;
+  return null;
+}
+
+/**
+ * Run the inbound calendar→Tour sync for a calendar event-change delivery.
+ * Best-effort: never throws (syncCalendarEventToTour swallows its own errors),
+ * so a sync failure can't change the DRAFT dispatch outcome that follows.
+ * No-ops cleanly when the connection isn't a mappable calendar provider.
+ */
+async function runCalendarSync(args: {
+  triggerSlug: string;
+  connection: IntegrationConnectionRow;
+  payload: Record<string, unknown> | undefined;
+}): Promise<void> {
+  const provider = calendarProviderForToolkit(args.connection.toolkit);
+  if (!provider) return;
+  // Flatten envelope wrappers (payload/data/message) so the sync's flat-key
+  // extractors find the event id / times / status regardless of Composio's
+  // V1/V2/V3 payload shape — same normalisation the templater uses.
+  const flat = flattenPayload(args.payload ?? {});
+  const result = await syncCalendarEventToTour({
+    spaceId: args.connection.spaceId,
+    provider,
+    triggerSlug: args.triggerSlug,
+    payload: flat,
+  });
+  if (result.action !== 'noop') {
+    logger.info('[integrations.triggers] calendar sync applied', {
+      slug: args.triggerSlug,
+      connectionId: args.connection.id,
+      action: result.action,
+      tourId: result.tourId,
+    });
+  }
+}
+
+/**
  * Dispatch one delivery to the right downstream path. Called by the
  * Inngest handler — keeps the inngest function thin and the dispatch
  * logic testable in isolation.
@@ -1018,6 +1082,18 @@ export async function dispatchTrigger(args: {
   payload: Record<string, unknown> | undefined;
   deliveryId?: string;
 }): Promise<{ dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop'; reason?: string }> {
+  // Inbound calendar sync FIRST — correct the CRM Tour (cancel/move/RSVP) for
+  // calendar event-change slugs before the kind-based routing drafts any
+  // guest-facing follow-up. State-based idempotent + best-effort, so an
+  // Inngest retry can't double-apply and a sync hiccup can't sink the dispatch.
+  if (CALENDAR_SYNC_SLUGS.has(args.triggerSlug)) {
+    await runCalendarSync({
+      triggerSlug: args.triggerSlug,
+      connection: args.connection,
+      payload: args.payload,
+    });
+  }
+
   const kind: TriggerKind | undefined = TRIGGER_DISPATCH[args.triggerSlug];
   if (!kind) {
     logger.info('[integrations.triggers] no dispatch handler — dropping', {

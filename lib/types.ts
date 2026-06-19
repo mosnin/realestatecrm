@@ -633,6 +633,14 @@ export type Tour = {
   googleEventId: string | null;
   reminder24SentAt: Date | null;
   reminder1hSentAt: Date | null;
+  /** Guest's last RSVP as the external calendar reports it
+   *  ('accepted' | 'declined' | 'tentative' | 'needsAction'), recorded by the
+   *  inbound calendar sync (lib/calendar/tour-sync.ts). Null until an RSVP
+   *  change arrives. Free-text — Google/Composio response vocab can drift. */
+  externalResponseStatus: string | null;
+  /** When the inbound calendar sync last applied an external change (delete /
+   *  move / RSVP) to this tour. Null until the first inbound sync touches it. */
+  lastExternalSyncAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
