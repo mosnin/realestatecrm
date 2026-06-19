@@ -1,16 +1,19 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ChevronRight, FileText, CalendarCheck } from 'lucide-react';
+import { ChevronRight, FileText, CalendarCheck, Home } from 'lucide-react';
 import { getClientUser } from '@/lib/client-auth';
 import { getClientPortalData } from '@/lib/client-portal-data';
+import { getClientDeals } from '@/lib/client-deals';
 import { TITLE_FONT } from '@/lib/typography';
 import { LogoutButton } from '../portal-actions';
 import { PortalFadeIn, PortalStagger, PortalStaggerItem } from '../portal-motion';
 import {
   StatusPill,
+  DealProgressPill,
   PortalEmptyState,
   formatTourDate,
   formatDate,
+  formatDealDate,
 } from '../portal-ui';
 
 export const dynamic = 'force-dynamic';
@@ -20,16 +23,25 @@ export default async function DashboardPage() {
   if (!user) redirect('/clients/login');
   if (!user.emailVerifiedAt) redirect('/clients/verify');
 
-  const { applications, tours } = await getClientPortalData(user.email);
+  const [{ applications, tours }, deals] = await Promise.all([
+    getClientPortalData(user.email),
+    getClientDeals(user.email),
+  ]);
 
   const firstName = (user.name ?? '').trim().split(/\s+/)[0] || null;
-  const total = applications.length + tours.length;
+  const total = applications.length + tours.length + deals.length;
   const statusSentence =
     total === 0
       ? 'nothing in flight yet — it lands here the moment you apply or book.'
-      : `${applications.length} application${applications.length === 1 ? '' : 's'} and ${tours.length} tour${
-          tours.length === 1 ? '' : 's'
-        } in motion.`;
+      : [
+          deals.length > 0 ? `${deals.length} deal${deals.length === 1 ? '' : 's'}` : null,
+          applications.length > 0
+            ? `${applications.length} application${applications.length === 1 ? '' : 's'}`
+            : null,
+          tours.length > 0 ? `${tours.length} tour${tours.length === 1 ? '' : 's'}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') + ' in motion.';
 
   return (
     <main className="mx-auto max-w-3xl space-y-12 px-4 py-10 pb-16 sm:px-6">
@@ -61,6 +73,40 @@ export default async function DashboardPage() {
             }
           />
         </PortalFadeIn>
+      )}
+
+      {/* Deals — the highest-signal item: a live transaction in progress. Shown
+          first so an engaged buyer/seller lands on "where are we" immediately. */}
+      {deals.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Your deals
+          </h2>
+          <PortalStagger className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+            {deals.map((deal) => {
+              const closeDate = formatDealDate(deal.closeDate);
+              return (
+                <PortalStaggerItem key={deal.id}>
+                  <Link
+                    href={`/clients/deals/${deal.id}`}
+                    className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-foreground/[0.04]"
+                  >
+                    <Home size={15} className="shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{deal.title}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {deal.stageName ?? 'In progress'}
+                        {closeDate ? ` · close ${closeDate}` : ''}
+                      </p>
+                    </div>
+                    <DealProgressPill progress={deal.progress} />
+                    <ChevronRight size={15} className="shrink-0 text-muted-foreground" />
+                  </Link>
+                </PortalStaggerItem>
+              );
+            })}
+          </PortalStagger>
+        </section>
       )}
 
       {/* Applications */}
