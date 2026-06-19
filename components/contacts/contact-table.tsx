@@ -34,6 +34,7 @@ import {
   Tag as TagIcon,
   AlertTriangle,
   ChevronRight,
+  Users,
 } from 'lucide-react';
 import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
@@ -57,6 +58,7 @@ import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
+import { DuplicatesPanel } from './duplicates-panel';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { motion } from 'framer-motion';
@@ -139,6 +141,7 @@ export function ContactTable({ slug }: ContactTableProps) {
     'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'
   >('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -920,6 +923,10 @@ export function ContactTable({ slug }: ContactTableProps) {
                   <Upload size={12} />
                   Import
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDuplicatesOpen(true)}>
+                  <Users size={12} />
+                  Find duplicates
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => handleExportAll()}
                   disabled={contacts.length === 0}
@@ -1447,6 +1454,12 @@ export function ContactTable({ slug }: ContactTableProps) {
           }}
         />
       )}
+      <DuplicatesPanel
+        slug={slug}
+        open={duplicatesOpen}
+        onClose={() => setDuplicatesOpen(false)}
+        onMerged={fetchContacts}
+      />
       {ConfirmDialog}
     </div>
   );
