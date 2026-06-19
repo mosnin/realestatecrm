@@ -501,20 +501,7 @@ async def read_realtor_morning_story(
     # The realtor-side route excludes brokerage-routed leads. We mirror
     # that filter so the broker sees what's actually on the realtor's
     # personal desk, not aggregate brokerage flow.
-    new_people_res = await (
-        db.table("Contact")
-        .select("id,name,createdAt")
-        .eq("spaceId", space_id)
-        .is_("brokerageId", None)
-        .order("createdAt", desc=True)
-        .limit(500)
-        .execute()
-    )
-    contacts = new_people_res.data or []
-    new_people = [c for c in contacts if "new-lead" in (c.get("tags") or [])]
-    # tags column wasn't selected — pull it on a tighter query so we don't
-    # bloat the previous one.
-    tags_res = await (
+    contacts_res = await (
         db.table("Contact")
         .select("id,name,tags,leadScore,followUpAt,createdAt")
         .eq("spaceId", space_id)
@@ -522,7 +509,7 @@ async def read_realtor_morning_story(
         .limit(2000)
         .execute()
     )
-    rows = tags_res.data or []
+    rows = contacts_res.data or []
 
     new_people_rows = [
         c for c in rows if "new-lead" in (c.get("tags") or [])
