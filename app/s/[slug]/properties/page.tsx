@@ -4,13 +4,10 @@ import Link from 'next/link';
 import { Building2, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
-import { formatCurrency } from '@/lib/formatting';
-import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX, PRIMARY_PILL } from '@/lib/typography';
 import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { PropertyStatusBadge } from '@/components/properties/property-status-badge';
-import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { PropertyListGrid } from '@/components/properties/property-list-grid';
 
 export default async function PropertiesPage({
   params,
@@ -61,8 +58,19 @@ export default async function PropertiesPage({
     );
   }
 
+  // One quiet sentence about the wall — sale-status counts narrated, not
+  // tallied in a chart. Active is the loud fact; the rest is supporting.
+  const activeCount = properties.filter((p) => p.listingStatus === 'active').length;
+  const subtitle =
+    properties.length === 0
+      ? 'No properties yet.'
+      : activeCount === properties.length
+        ? `${properties.length} ${properties.length === 1 ? 'listing' : 'listings'}, all active.`
+        : `${properties.length} ${properties.length === 1 ? 'listing' : 'listings'}` +
+          (activeCount > 0 ? ` · ${activeCount} active` : '');
+
   return (
-    <div className={cn('space-y-6 mx-auto pb-12', PAGE_MAX)}>
+    <div className={cn('space-y-8 mx-auto pb-12', PAGE_MAX)}>
       {/* Page header — status-sentence pattern: muted greeting → serif h1
           → one-sentence status. Add-listing CTA sits inline; primary
           action lives where the realtor's eye lands after the title. */}
@@ -72,11 +80,7 @@ export default async function PropertiesPage({
           <h1 className={cn(H1)} style={TITLE_FONT}>
             All properties
           </h1>
-          <p className={cn(BODY_MUTED)}>
-            {properties.length === 0
-              ? 'No properties yet.'
-              : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
-          </p>
+          <p className={cn(BODY_MUTED)}>{subtitle}</p>
         </div>
         <Link
           href={`/s/${slug}/properties/new`}
@@ -89,7 +93,7 @@ export default async function PropertiesPage({
 
       {/* Empty state — calm fact, not a directive. */}
       {properties.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-16 text-center">
           <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-sm text-foreground">Quiet — no properties yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
@@ -104,72 +108,11 @@ export default async function PropertiesPage({
           </Link>
         </div>
       ) : (
-        /* divide-y row list — mirrors the deal-property-picker pattern.
-           Thumbnail (4:3 ~128px) + facts on the right. A property list is
-           a working register, not a gallery; rows let the realtor scan
-           facts horizontally without the 4-column grid feeling like a
-           spreadsheet export. */
-        <StaggerList stagger={0.03} className="divide-y divide-border/60">
-          {properties.map((property) => {
-            const addr = formatPropertyAddress(property);
-            const facts = formatPropertyFacts(property);
-            const cover = property.photos[0];
-
-            return (
-              <StaggerItem key={property.id}>
-                <Link
-                  href={`/s/${slug}/properties/${property.id}`}
-                  className="flex items-center gap-4 py-4 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
-                >
-                  {/* Thumbnail */}
-                  <div className="w-[128px] aspect-[4/3] rounded-md bg-muted overflow-hidden flex-shrink-0">
-                    {cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={cover}
-                        alt={addr}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
-                        <Building2 size={20} aria-hidden />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Facts */}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-sm font-medium text-foreground truncate">{addr}</p>
-                    {facts && (
-                      <p className="text-xs text-muted-foreground truncate">{facts}</p>
-                    )}
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <PropertyStatusBadge status={property.listingStatus} />
-                      {property.propertyType && (
-                        <span className="text-xs text-muted-foreground">
-                          · {property.propertyType.replace('_', ' ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Price column — tabular nums, right-aligned, hidden on
-                      narrow screens so the row never wraps awkwardly. */}
-                  <div className="hidden sm:block flex-shrink-0 text-right">
-                    {property.listPrice != null ? (
-                      <p className="text-sm font-semibold tabular-nums text-foreground">
-                        {formatCurrency(property.listPrice)}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">No price</p>
-                    )}
-                  </div>
-                </Link>
-              </StaggerItem>
-            );
-          })}
-        </StaggerList>
+        /* The listing wall — a responsive card grid with strong photo
+           treatment, confident compact prices, hover lift, entrance
+           stagger, and per-card expand for quick specs. The card title
+           and cover both link to the full detail page (route unchanged). */
+        <PropertyListGrid slug={slug} properties={properties} />
       )}
     </div>
   );

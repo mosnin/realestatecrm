@@ -14,9 +14,11 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { PAGE_VARIANTS } from '@/lib/motion';
 import { PropertyForm } from '@/components/properties/property-form';
 import type { Property } from '@/lib/types';
 
@@ -49,7 +51,12 @@ export default function NewPropertyPage() {
   }
 
   return (
-    <div className={cn('space-y-6 max-w-2xl mx-auto pb-12')}>
+    <motion.div
+      initial="initial"
+      animate="enter"
+      variants={PAGE_VARIANTS}
+      className={cn('space-y-6 max-w-2xl mx-auto pb-12')}
+    >
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Properties.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
@@ -64,6 +71,6 @@ export default function NewPropertyPage() {
         submitting={submitting}
         submitLabel="Create listing"
       />
-    </div>
+    </motion.div>
   );
 }

@@ -9,11 +9,11 @@ import {
   H1,
   H3,
   TITLE_FONT,
-  STAT_NUMBER_COMPACT,
   SECTION_LABEL,
   PAGE_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { CommissionStatCell } from '@/components/properties/commission-stat-cell';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,25 +124,30 @@ export default async function PropertiesCommissionsPage({
         </p>
       </header>
 
-      {/* Stat strip — paper-flat, hairline-divided */}
+      {/* Stat strip — paper-flat, hairline-divided. Focal numerals count up
+          on entry (CommissionStatCell → AnimatedNumber, reduced-motion aware). */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <StatCell
-          value={formatCompact(closedNet)}
+        <CommissionStatCell
+          value={closedNet}
+          format={formatCompact}
           label="Closed net YTD"
           sub={`${closedYtd.length} won deal${closedYtd.length === 1 ? '' : 's'}`}
         />
-        <StatCell
-          value={formatCompact(closedGci)}
+        <CommissionStatCell
+          value={closedGci}
+          format={formatCompact}
           label="Closed GCI YTD"
           sub="before splits"
         />
-        <StatCell
-          value={formatCompact(expectedNet)}
+        <CommissionStatCell
+          value={expectedNet}
+          format={formatCompact}
           label="Expected net"
           sub={`${inFlight.length} active deal${inFlight.length === 1 ? '' : 's'}`}
         />
-        <StatCell
-          value={formatCompact(stillOwedOut)}
+        <CommissionStatCell
+          value={stillOwedOut}
+          format={formatCompact}
           label="Still owed out"
           sub="unpaid splits across closed"
         />
@@ -262,22 +267,3 @@ function CommissionTable({
   );
 }
 
-function StatCell({
-  value,
-  label,
-  sub,
-}: {
-  value: string;
-  label: string;
-  sub: string;
-}) {
-  return (
-    <div className="bg-background p-5">
-      <p className={STAT_NUMBER_COMPACT} style={TITLE_FONT}>
-        {value}
-      </p>
-      <p className="text-sm text-foreground mt-1.5">{label}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
-    </div>
-  );
-}
