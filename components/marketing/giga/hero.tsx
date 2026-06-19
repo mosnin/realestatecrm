@@ -77,6 +77,35 @@ export function Hero() {
             </PillPrimary>
           </div>
         </BlurRise>
+
+        {/* Social-proof clip card — inline on mobile/tablet (the absolute card
+            below is lg-only to avoid overlapping this centered stack). Keeps
+            the "watch a walkthrough" proof on the storefront for the ~90% of
+            first visits that aren't desktop. */}
+        <BlurRise trigger="load" delay={0.5} className="mt-8 w-full max-w-sm lg:hidden">
+          <Link
+            href={DEMO}
+            className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3 backdrop-blur-xl transition-colors hover:bg-white/[0.1]"
+          >
+            <span className="relative flex h-12 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/marketing/product/realtors.jpg"
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover opacity-70"
+              />
+              <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white text-black">
+                <Play className="ml-0.5 h-3 w-3" />
+              </span>
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block text-[13px] font-medium text-white">See Chippi run a floor</span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-white/55">
+                A 90-second walkthrough on real numbers
+              </span>
+            </span>
+          </Link>
+        </BlurRise>
       </div>
 
       {/* Bottom-left video / testimonial card */}

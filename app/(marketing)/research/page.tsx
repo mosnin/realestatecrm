@@ -5,7 +5,7 @@
  * matching the rest of the redesign.
  */
 
-import { Band, BlurRise, EyebrowPill, Serif } from '@/components/marketing/giga/primitives';
+import { Band, BlurRise, EyebrowPill, PillGhost, PillPrimary, Serif } from '@/components/marketing/giga/primitives';
 
 export const metadata = {
   title: 'Research · Chippi',
@@ -36,6 +36,18 @@ export default function ResearchPage() {
               The full story, hundreds of agent interviews, shadowed deals, and the workflows that
               shaped every feature, is on the way.
             </p>
+          </BlurRise>
+          {/* Don't dead-end the visitor while the story is in progress — give
+              them the two natural next steps off this page. */}
+          <BlurRise trigger="load" delay={0.24}>
+            <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
+              <PillPrimary href="/demo" withArrow>
+                See a demo
+              </PillPrimary>
+              <PillGhost href="/company">
+                Meet the team
+              </PillGhost>
+            </div>
           </BlurRise>
         </Band>
       </section>

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { EASE_APPLE, EASE_OUT } from '@/lib/motion';
+import { BODY_MUTED, PRIMARY_PILL, TITLE_FONT } from '@/lib/typography';
 
 interface PostTourFeedbackProps {
   token: string;
@@ -12,7 +13,24 @@ interface PostTourFeedbackProps {
   businessName: string;
 }
 
+/** Reactions keyed to the chosen rating — the line that confirms the tap
+ *  landed and gives the moment a little warmth. */
+const RATING_COPY: Record<number, string> = {
+  1: 'Sorry it missed the mark.',
+  2: 'Thanks for the honest read.',
+  3: 'Good to know.',
+  4: 'Glad it went well.',
+  5: 'Wonderful — thank you.',
+};
+
+// Paper-flat field — identical family to the booking form's inputs so the
+// applicant-facing surfaces read as one product.
+const TEXTAREA_CLASS =
+  'w-full bg-background border border-border/70 rounded-md px-3 py-2 text-base min-h-[72px] ' +
+  'focus:border-foreground/30 focus:outline-none transition-colors placeholder:text-muted-foreground/70';
+
 export function PostTourFeedback({ token, guestName, businessName }: PostTourFeedbackProps) {
+  const reduce = useReducedMotion();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -34,10 +52,10 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
         setSubmitted(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Couldn't send that feedback. Try again.");
+        setError(data.error || "That didn't go through — usually temporary.");
       }
     } catch {
-      setError("I lost the connection. Try again.");
+      setError("Couldn't reach the server — usually temporary.");
     } finally {
       setSubmitting(false);
     }
@@ -45,68 +63,154 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
 
   if (submitted) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center space-y-3">
-        <CheckCircle2 size={32} className="mx-auto text-emerald-500" />
-        <h3 className="text-lg font-semibold">Thank you, {guestName}!</h3>
-        <p className="text-sm text-muted-foreground">Your feedback helps {businessName} improve.</p>
-      </div>
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: EASE_OUT }}
+        className="rounded-xl border border-border/70 bg-background p-6 text-center"
+      >
+        <motion.div
+          initial={reduce ? false : { scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={reduce ? undefined : { delay: 0.1, type: 'spring', stiffness: 200, damping: 15 }}
+          className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10"
+        >
+          <Check size={18} className="text-emerald-600 dark:text-emerald-400" />
+        </motion.div>
+        <h3 className="mt-4 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+          Thank you, {guestName.split(' ')[0] || guestName}.
+        </h3>
+        <p className={cn(BODY_MUTED, 'mx-auto mt-1.5 max-w-xs')}>
+          Your note helps {businessName} get better with every tour.
+        </p>
+      </motion.div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-      <div className="text-center space-y-1">
-        <h3 className="text-lg font-semibold">How was your tour?</h3>
-        <p className="text-sm text-muted-foreground">Rate your experience with {businessName}</p>
+    <div className="rounded-xl border border-border/70 bg-background p-6">
+      <div className="text-center">
+        <h3 className="text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+          How was your tour?
+        </h3>
+        <p className={cn(BODY_MUTED, 'mt-1.5')}>A quick rating helps {businessName}.</p>
       </div>
 
-      {/* Star rating */}
-      <div className="flex justify-center gap-2">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            onClick={() => setRating(n)}
-            onMouseEnter={() => setHoveredRating(n)}
-            onMouseLeave={() => setHoveredRating(0)}
-            className="p-1 transition-transform hover:scale-110"
-          >
-            <Star
-              size={28}
-              className={cn(
-                'transition-colors',
-                n <= (hoveredRating || rating)
-                  ? 'text-amber-400 fill-amber-400'
-                  : 'text-muted-foreground/20'
-              )}
-            />
-          </button>
-        ))}
-      </div>
-
-      {rating > 0 && (
-        <p className="text-center text-sm text-muted-foreground">
-          {rating <= 2 ? 'We appreciate your honesty' : rating <= 3 ? 'Good to know' : rating === 4 ? 'Great!' : 'Wonderful!'}
-        </p>
-      )}
-
-      <Textarea
-        placeholder="Any comments? (optional)"
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        rows={3}
-        className="resize-none"
-      />
-
-      {error && <p className="text-sm text-destructive text-center">{error}</p>}
-
-      <Button
-        className="w-full"
-        disabled={!rating || submitting}
-        onClick={submitFeedback}
+      {/* Star rating — accessible radiogroup with spring micro-interaction. */}
+      <div
+        role="radiogroup"
+        aria-label="Tour rating"
+        className="mt-5 flex justify-center gap-1.5"
+        onMouseLeave={() => setHoveredRating(0)}
       >
-        {submitting ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Send size={16} className="mr-2" />}
-        Submit Feedback
-      </Button>
+        {[1, 2, 3, 4, 5].map((n) => {
+          const active = n <= (hoveredRating || rating);
+          return (
+            <motion.button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={rating === n}
+              aria-label={`${n} star${n > 1 ? 's' : ''}`}
+              onClick={() => setRating(n)}
+              onMouseEnter={() => setHoveredRating(n)}
+              onFocus={() => setHoveredRating(n)}
+              onBlur={() => setHoveredRating(0)}
+              whileTap={reduce ? undefined : { scale: 0.85 }}
+              className="rounded-full p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+            >
+              <motion.span
+                animate={reduce ? undefined : { scale: active ? 1.08 : 1 }}
+                transition={{ duration: 0.18, ease: EASE_APPLE }}
+                className="block"
+              >
+                <StarGlyph filled={active} />
+              </motion.span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Reaction line — reserves its own height so the layout doesn't jump
+          when a rating is first chosen. */}
+      <div className="mt-2 h-5 text-center">
+        <AnimatePresence mode="wait">
+          {rating > 0 && (
+            <motion.p
+              key={rating}
+              initial={reduce ? false : { opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduce ? undefined : { opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: EASE_OUT }}
+              className="text-sm text-foreground"
+            >
+              {RATING_COPY[rating]}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Comment + submit reveal once a rating is picked — keeps the first
+          ask to a single tap, then invites the optional detail. */}
+      <AnimatePresence initial={false}>
+        {rating > 0 && (
+          <motion.div
+            initial={reduce ? false : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={reduce ? undefined : { opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: EASE_APPLE }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-4 pt-3">
+              <textarea
+                placeholder="Anything you'd like to add? (optional)"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+                className={cn(TEXTAREA_CLASS, 'resize-none')}
+              />
+
+              {error && (
+                <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+              )}
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={submitFeedback}
+                className={cn(PRIMARY_PILL, 'w-full justify-center disabled:opacity-60 disabled:cursor-not-allowed')}
+              >
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? 'Sending…' : 'Send feedback'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/** Star glyph — amber when filled (the universal rating signal), a quiet
+ *  hairline outline when not. Drawn inline so the fill/stroke transition is
+ *  a single element rather than two stacked lucide icons. */
+function StarGlyph({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width={30}
+      height={30}
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={cn(
+        'transition-colors duration-150',
+        filled ? 'text-amber-400' : 'text-muted-foreground/25',
+      )}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    >
+      <path d="M12 2.5l2.93 5.94 6.57.96-4.75 4.63 1.12 6.54L12 18.02 6.13 21.11l1.12-6.54L2.5 9.94l6.57-.96L12 2.5z" />
+    </svg>
   );
 }
