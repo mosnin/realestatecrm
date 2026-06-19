@@ -36,6 +36,8 @@ import { logger } from '@/lib/logger';
 import { createTrigger, deleteTrigger } from './composio';
 import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
+import { recordInboundMessage } from '@/lib/inbox';
+import { normalizeEmail } from '@/lib/contact-dedup';
 import type { CalendarProvider } from '@/lib/calendar/mirror';
 import type { IntegrationConnectionRow } from './connections';
 
@@ -1002,6 +1004,212 @@ export async function summariesForConnections(connectionIds: string[]): Promise<
   return map;
 }
 
+// ─── Inbound email capture ───────────────────────────────────────────────────
+
+/**
+ * The inbound-EMAIL trigger slugs we capture as threaded InboxMessages. These
+ * are the two comms slugs whose payloads carry a sender email we can resolve to
+ * a Contact. Slack/Discord are intentionally NOT here: their "from" is a
+ * provider user id, not an email, so it can't be threaded onto a Contact (and
+ * inbound SMS is deferred — no Telnyx webhook this phase).
+ */
+const INBOUND_EMAIL_SLUGS = new Set<string>([
+  'GMAIL_NEW_GMAIL_MESSAGE',
+  'OUTLOOK_MESSAGE_TRIGGER',
+]);
+
+/**
+ * The fields the inbound-email capture needs from a flattened payload:
+ *   - `from`      sender email (raw — may be "Name <addr>"; normalized below)
+ *   - `subject`   email subject (optional)
+ *   - `body`      best available body text (full body if present, else snippet)
+ *   - `messageId` provider message id → the InboxMessage.externalId for
+ *                 at-least-once dedupe across Composio/Inngest retries
+ */
+interface InboundEmailFields {
+  from: string | null;
+  subject: string | null;
+  body: string | null;
+  messageId: string | null;
+}
+
+/**
+ * Extract sender / subject / body / message-id from a flattened Gmail or
+ * Outlook trigger payload. Reuses the same field-name fallbacks as the
+ * EXTRACTORS map (Composio webhook V1/V2/V3 disagree on key names) and prefers
+ * the FULL body over the snippet, falling back to the snippet when no full body
+ * is present (the launch Gmail trigger often ships only `snippet`).
+ *
+ * Returns all-null fields for a non-email slug or an empty payload — the caller
+ * treats a missing sender/body as "can't capture" and skips.
+ */
+function extractInboundEmail(slug: string, flat: Record<string, unknown>): InboundEmailFields {
+  if (!INBOUND_EMAIL_SLUGS.has(slug)) {
+    return { from: null, subject: null, body: null, messageId: null };
+  }
+  const from =
+    slug === 'OUTLOOK_MESSAGE_TRIGGER'
+      ? pickString(flat, 'from', 'sender', 'fromEmail', 'senderEmail')
+      : pickString(flat, 'sender', 'from', 'fromEmail', 'message.from');
+  const subject =
+    slug === 'OUTLOOK_MESSAGE_TRIGGER'
+      ? pickString(flat, 'subject', 'messageSubject')
+      : pickString(flat, 'subject', 'messageSubject', 'message.subject');
+  // Prefer a full body; fall back to the preview/snippet the templater uses.
+  const body =
+    pickString(
+      flat,
+      'body',
+      'messageBody',
+      'bodyText',
+      'textBody',
+      'plainText',
+      'body.content',
+      'message.body',
+    ) ??
+    (slug === 'OUTLOOK_MESSAGE_TRIGGER'
+      ? pickString(flat, 'bodyPreview', 'preview', 'snippet')
+      : pickString(flat, 'snippet', 'preview', 'messageText', 'message.snippet'));
+  // Provider message id — the idempotency key for the InboxMessage write. Gmail
+  // nests it under `message.message_id`/`id`; Outlook uses a flat `id`/`messageId`.
+  const messageId = pickString(
+    flat,
+    'message_id',
+    'messageId',
+    'message.message_id',
+    'message.messageId',
+    'message.id',
+    'id',
+  );
+  return { from, subject, body, messageId };
+}
+
+/**
+ * A sender email may arrive as a display-name form ("Sarah <sarah@x.com>") or a
+ * bare address. Pull the address out of the angle brackets when present, then
+ * lowercase/trim via the shared normalizer. Returns '' when no address is found.
+ */
+function normalizeSenderEmail(raw: string | null): string {
+  if (!raw) return '';
+  const angle = raw.match(/<([^>]+)>/);
+  return normalizeEmail(angle ? angle[1] : raw);
+}
+
+/**
+ * Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
+ * case-insensitively). Mirrors the cross-client guard in lib/client-portal-data.ts
+ * — `%`/`_` are legal in email local-parts and would otherwise be wildcards.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+/**
+ * Resolve a Contact by email WITHIN a single space (case-insensitive). Mirrors
+ * the email-match guard used by the client portal / dedup: lower+trim, then an
+ * `ilike` on the escaped literal so it stays an exact (not pattern) match.
+ * Returns the contact id, or null when no contact in this space owns the email.
+ */
+async function resolveContactByEmail(
+  spaceId: string,
+  normalizedEmail: string,
+): Promise<string | null> {
+  if (!normalizedEmail) return null;
+  const { data, error } = await supabase
+    .from('Contact')
+    .select('id')
+    .eq('spaceId', spaceId)
+    .ilike('email', escapeLike(normalizedEmail))
+    .maybeSingle();
+  if (error) throw error;
+  return data ? ((data as { id: string }).id) : null;
+}
+
+export type InboundCaptureOutcome =
+  | 'recorded'
+  | 'deduped'
+  | 'no_contact'
+  | 'no_sender'
+  | 'not_email'
+  | 'error';
+
+/**
+ * Capture an inbound EMAIL trigger as a contact-resolved threaded InboxMessage,
+ * BEFORE the DRAFT dispatch fires. Runs only for the inbound-email slugs.
+ *
+ * Flow: extract sender/subject/body/message-id → normalize the sender → resolve
+ * a Contact by email within `connection.spaceId` → on a match, recordInbound
+ * (idempotent on the provider message id). On NO match we skip the message
+ * record (can't thread to an unknown sender) — we do NOT create a contact.
+ *
+ * BEST-EFFORT by contract: every failure path is caught and logged and returns
+ * an outcome string. This NEVER throws, so a capture problem can't break the
+ * trigger handler or the DRAFT dispatch that runs after it. The outcome is
+ * returned purely for logging/tests; the caller ignores it for control flow.
+ */
+export async function captureInboundEmail(args: {
+  triggerSlug: string;
+  connection: IntegrationConnectionRow;
+  payload: Record<string, unknown> | undefined;
+}): Promise<InboundCaptureOutcome> {
+  if (!INBOUND_EMAIL_SLUGS.has(args.triggerSlug)) return 'not_email';
+  try {
+    const flat = flattenPayload(args.payload ?? {});
+    const { from, subject, body, messageId } = extractInboundEmail(args.triggerSlug, flat);
+
+    const senderEmail = normalizeSenderEmail(from);
+    if (!senderEmail) {
+      logger.info('[integrations.triggers] inbound email capture: no sender — skipping', {
+        slug: args.triggerSlug,
+        connectionId: args.connection.id,
+      });
+      return 'no_sender';
+    }
+
+    const contactId = await resolveContactByEmail(args.connection.spaceId, senderEmail);
+    if (!contactId) {
+      // Unknown sender → nothing to thread onto. We deliberately do NOT create
+      // a contact here (out of scope); the DRAFT dispatch still runs after this.
+      logger.info('[integrations.triggers] inbound email capture: no matching contact — skipping', {
+        slug: args.triggerSlug,
+        connectionId: args.connection.id,
+      });
+      return 'no_contact';
+    }
+
+    const result = await recordInboundMessage({
+      spaceId: args.connection.spaceId,
+      contactId,
+      channel: 'email',
+      subject: subject ?? null,
+      // recordInbound requires a string body; an email with neither full body
+      // nor snippet still threads (the subject carries the signal).
+      body: body ?? '',
+      externalId: messageId,
+      metadata: { from, triggerSlug: args.triggerSlug },
+    });
+
+    logger.info('[integrations.triggers] inbound email captured', {
+      slug: args.triggerSlug,
+      connectionId: args.connection.id,
+      contactId,
+      messageId,
+      deduped: result.deduped,
+    });
+    return result.deduped ? 'deduped' : 'recorded';
+  } catch (err) {
+    // Best-effort: a capture failure must NEVER break the trigger handler or
+    // the DRAFT dispatch. Swallow + log; the IntegrationEvent already persisted
+    // the raw delivery upstream, so nothing is lost.
+    logger.error(
+      '[integrations.triggers] inbound email capture failed (non-fatal)',
+      { slug: args.triggerSlug, connectionId: args.connection.id },
+      err,
+    );
+    return 'error';
+  }
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 /**
@@ -1088,6 +1296,20 @@ export async function dispatchTrigger(args: {
   // Inngest retry can't double-apply and a sync hiccup can't sink the dispatch.
   if (CALENDAR_SYNC_SLUGS.has(args.triggerSlug)) {
     await runCalendarSync({
+      triggerSlug: args.triggerSlug,
+      connection: args.connection,
+      payload: args.payload,
+    });
+  }
+
+  // Inbound EMAIL capture — BEFORE the DRAFT dispatch below. For Gmail/Outlook
+  // deliveries this resolves the sender to a Contact (within this connection's
+  // space) and records the message on the contact's thread, so the inbox shows
+  // the inbound that prompted Chippi's draft. Best-effort by contract: it never
+  // throws, no-ops for non-email slugs, and skips silently for an unknown
+  // sender — the DRAFT dispatch fires regardless of the capture outcome.
+  if (INBOUND_EMAIL_SLUGS.has(args.triggerSlug)) {
+    await captureInboundEmail({
       triggerSlug: args.triggerSlug,
       connection: args.connection,
       payload: args.payload,

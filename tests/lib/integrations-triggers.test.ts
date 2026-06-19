@@ -48,6 +48,19 @@ vi.mock('@/lib/calendar/tour-sync', () => ({
   syncCalendarEventToTour: syncCalendarEventToTourMock,
 }));
 
+// Inbound-email capture (Phase 3). dispatchTrigger calls recordInboundMessage
+// for Gmail/Outlook deliveries BEFORE the DRAFT dispatch; mocked here so we
+// assert the WIRING (resolved contact → inbound write with channel/externalId)
+// without re-testing inbox internals (covered in inbox.test.ts).
+const { recordInboundMessageMock } = vi.hoisted(() => ({
+  recordInboundMessageMock: vi.fn<
+    (arg: Record<string, unknown>) => Promise<{ threadId: string; messageId: string; deduped: boolean }>
+  >(async () => ({ threadId: 'thread_1', messageId: 'msg_1', deduped: false })),
+}));
+vi.mock('@/lib/inbox', () => ({
+  recordInboundMessage: recordInboundMessageMock,
+}));
+
 // ── Supabase mock — captures upsert/delete/select on IntegrationTrigger
 
 type Terminal = { data: unknown; error: unknown };
@@ -61,7 +74,7 @@ vi.mock('@/lib/supabase', () => {
     const chainCalls: Array<[string, unknown[]]> = [];
     supabaseState.calls.push({ table, chain: chainCalls });
     const chain: Record<string, unknown> = {};
-    const passthrough = ['select', 'eq', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+    const passthrough = ['select', 'eq', 'ilike', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
     for (const method of passthrough) {
       chain[method] = vi.fn((...args: unknown[]) => {
         chainCalls.push([method, args]);
@@ -86,6 +99,7 @@ import {
   registerForConnection,
   deleteForConnection,
   dispatchTrigger,
+  captureInboundEmail,
   setPausedForConnection,
   summariesForConnections,
   normalizeTriggerEvent,
@@ -120,6 +134,8 @@ beforeEach(() => {
   fireRoutineRunMock.mockResolvedValue('ok');
   syncCalendarEventToTourMock.mockReset();
   syncCalendarEventToTourMock.mockResolvedValue({ action: 'noop' });
+  recordInboundMessageMock.mockReset();
+  recordInboundMessageMock.mockResolvedValue({ threadId: 'thread_1', messageId: 'msg_1', deduped: false });
   supabaseState.terminal = { data: null, error: null };
   supabaseState.calls = [];
 });
@@ -541,6 +557,244 @@ describe('dispatchTrigger — calendar sync wiring', () => {
       payload: { summary: 'Tour', attendees: [{ email: 'x@y' }] },
     });
     expect(syncCalendarEventToTourMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── captureInboundEmail (Phase 3 inbound-email capture) ─────────────────────
+
+// Earlier describes (deleteForConnection/setPaused/summaries) REPLACE
+// supabase.from via mockImplementation and the file resets mocks explicitly
+// (no clearAllMocks), so those replacements persist. Restore the default
+// chain — the one that records calls into supabaseState and honors the shared
+// terminal, and crucially includes `ilike` (the Contact email lookup) — before
+// each capture test so these run independent of prior mutations.
+async function restoreDefaultSupabaseFrom() {
+  const { supabase } = await import('@/lib/supabase');
+  (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+    const chainCalls: Array<[string, unknown[]]> = [];
+    supabaseState.calls.push({ table, chain: chainCalls });
+    const chain: Record<string, unknown> = {};
+    const passthrough = ['select', 'eq', 'ilike', 'is', 'in', 'order', 'limit', 'upsert', 'delete', 'update', 'insert'];
+    for (const method of passthrough) {
+      chain[method] = vi.fn((...args: unknown[]) => {
+        chainCalls.push([method, args]);
+        return chain;
+      });
+    }
+    const term = () => Promise.resolve(supabaseState.terminal);
+    chain.maybeSingle = vi.fn(term);
+    chain.single = vi.fn(term);
+    chain.then = (r: (v: Terminal) => unknown, e?: (e: unknown) => unknown) =>
+      Promise.resolve(supabaseState.terminal).then(r, e);
+    return chain;
+  });
+}
+
+describe('captureInboundEmail', () => {
+  beforeEach(restoreDefaultSupabaseFrom);
+
+  // Point the Contact lookup (the only supabase call in the capture path) at a
+  // matched / unmatched contact via the shared terminal.
+  function contactFound(id: string) {
+    supabaseState.terminal = { data: { id }, error: null };
+  }
+  function contactNotFound() {
+    supabaseState.terminal = { data: null, error: null };
+  }
+
+  it('records an inbound email message when the sender resolves to a contact', async () => {
+    contactFound('contact-9');
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: {
+        from: 'Sarah <Sarah@Example.com>',
+        subject: 'Re: 1421 Maple',
+        snippet: 'Still available?',
+        message_id: 'gmail_msg_1',
+      },
+    });
+
+    expect(outcome).toBe('recorded');
+    expect(recordInboundMessageMock).toHaveBeenCalledTimes(1);
+    expect(recordInboundMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        contactId: 'contact-9',
+        channel: 'email',
+        subject: 'Re: 1421 Maple',
+        body: 'Still available?',
+        externalId: 'gmail_msg_1',
+      }),
+    );
+    // Resolution scoped to the connection's space, matched case-insensitively.
+    const contactCall = supabaseState.calls.find((c) => c.table === 'Contact');
+    expect(contactCall).toBeTruthy();
+    const eqSpace = contactCall!.chain.find(([m]) => m === 'eq');
+    expect(eqSpace).toEqual(['eq', ['spaceId', 'space-1']]);
+    expect(contactCall!.chain.some(([m]) => m === 'ilike')).toBe(true);
+    // metadata carries the raw from + the trigger slug.
+    const arg = recordInboundMessageMock.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(arg.metadata).toMatchObject({
+      from: 'Sarah <Sarah@Example.com>',
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+    });
+  });
+
+  it('uses the full body over the snippet when both are present', async () => {
+    contactFound('contact-9');
+    await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'a@b.com', body: 'Full body text', snippet: 'short' },
+    });
+    const arg = recordInboundMessageMock.mock.calls[0][0] as { body: string };
+    expect(arg.body).toBe('Full body text');
+  });
+
+  it('skips the message record when no contact matches (and does NOT create one)', async () => {
+    contactNotFound();
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'stranger@nowhere.com', snippet: 'hi', message_id: 'm1' },
+    });
+    expect(outcome).toBe('no_contact');
+    expect(recordInboundMessageMock).not.toHaveBeenCalled();
+    // No insert on Contact — we never fabricate a contact for an unknown sender.
+    const contactCall = supabaseState.calls.find((c) => c.table === 'Contact');
+    expect(contactCall!.chain.some(([m]) => m === 'insert')).toBe(false);
+  });
+
+  it('skips when the payload has no resolvable sender email', async () => {
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { subject: 'No sender here' },
+    });
+    expect(outcome).toBe('no_sender');
+    expect(recordInboundMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('no-ops for a non-email slug', async () => {
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'SLACK_DIRECT_MESSAGE_RECEIVED',
+      connection: freshConnection({ toolkit: 'slack' }),
+      payload: { from: 'a@b.com', text: 'hi' },
+    });
+    expect(outcome).toBe('not_email');
+    expect(recordInboundMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a dedupe hit (idempotent on the provider message id)', async () => {
+    contactFound('contact-9');
+    recordInboundMessageMock.mockResolvedValueOnce({
+      threadId: 'thread_1',
+      messageId: 'msg_existing',
+      deduped: true,
+    });
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'a@b.com', snippet: 'hi', message_id: 'gmail_msg_1' },
+    });
+    expect(outcome).toBe('deduped');
+    expect(recordInboundMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never throws — a record failure returns "error" (best-effort contract)', async () => {
+    contactFound('contact-9');
+    recordInboundMessageMock.mockRejectedValueOnce(new Error('db down'));
+    const outcome = await captureInboundEmail({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'a@b.com', snippet: 'hi' },
+    });
+    expect(outcome).toBe('error');
+  });
+
+  it('reads Outlook sender/body field names + V3-nested payloads', async () => {
+    contactFound('contact-9');
+    await captureInboundEmail({
+      triggerSlug: 'OUTLOOK_MESSAGE_TRIGGER',
+      connection: freshConnection({ toolkit: 'outlook' }),
+      // V3 nests under `payload`; flattenPayload collapses it.
+      payload: { payload: { senderEmail: 'o@x.com', subject: 'Hi', bodyPreview: 'preview', id: 'out_1' } },
+    });
+    expect(recordInboundMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'email',
+        contactId: 'contact-9',
+        body: 'preview',
+        externalId: 'out_1',
+      }),
+    );
+  });
+});
+
+// ─── dispatchTrigger → inbound-email capture wiring ──────────────────────────
+
+describe('dispatchTrigger — inbound email capture wiring', () => {
+  beforeEach(restoreDefaultSupabaseFrom);
+
+  it('captures the inbound email AND still DRAFTs when the sender matches', async () => {
+    // The single supabase call in dispatch's email path is the Contact lookup.
+    supabaseState.terminal = { data: { id: 'contact-9' }, error: null };
+    const result = await dispatchTrigger({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'sarah@example.com', subject: 'Hi', snippet: 'available?', message_id: 'm1' },
+    });
+    // Capture happened with the inbound write...
+    expect(recordInboundMessageMock).toHaveBeenCalledTimes(1);
+    expect(recordInboundMessageMock.mock.calls[0][0]).toMatchObject({
+      channel: 'email',
+      contactId: 'contact-9',
+      externalId: 'm1',
+    });
+    // ...and the DRAFT dispatch STILL fires (additive — capture doesn't replace it).
+    expect(result.dispatched).toBe('DRAFT');
+    expect(fireRoutineRunMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the message but STILL DRAFTs when the sender is unknown', async () => {
+    supabaseState.terminal = { data: null, error: null }; // no contact match
+    const result = await dispatchTrigger({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'stranger@nowhere.com', subject: 'Hi', snippet: 'available?' },
+    });
+    expect(recordInboundMessageMock).not.toHaveBeenCalled();
+    expect(result.dispatched).toBe('DRAFT');
+    expect(fireRoutineRunMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a capture failure does NOT break the DRAFT dispatch', async () => {
+    supabaseState.terminal = { data: { id: 'contact-9' }, error: null };
+    recordInboundMessageMock.mockRejectedValueOnce(new Error('db down'));
+    const result = await dispatchTrigger({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: { from: 'sarah@example.com', subject: 'Hi', snippet: 'available?' },
+    });
+    expect(result.dispatched).toBe('DRAFT');
+    expect(fireRoutineRunMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT attempt an email capture for a non-email slug', async () => {
+    await dispatchTrigger({
+      triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+      connection: freshConnection(),
+      payload: {},
+    });
+    recordInboundMessageMock.mockClear();
+    // A calendar slug should never touch the inbound-email path.
+    await dispatchTrigger({
+      triggerSlug: 'GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER',
+      connection: freshConnection({ toolkit: 'googlecalendar' }),
+      payload: { summary: 'Tour', attendees: [{ email: 'x@y' }] },
+    });
+    expect(recordInboundMessageMock).not.toHaveBeenCalled();
   });
 });
 
