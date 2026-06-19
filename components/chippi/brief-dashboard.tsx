@@ -16,6 +16,12 @@
  *   - theme-aware (bg-background / text-foreground) — light + dark
  *   - responsive bento: 4-col grid on desktop, collapses to 1 col on mobile
  *
+ * Motion (this pass): every cell fades up on a 40ms cascade and lifts a
+ * hair on hover; stat numbers count up via AnimatedNumber; actionable rows
+ * lean toward the realtor (arrow slides, hairline accent) as they reach for
+ * them. All of it honors prefers-reduced-motion via brief-motion helpers —
+ * confident, never bouncy. The numbers, links, and actions are untouched.
+ *
  * The bento cells (varied col/row spans):
  *   ┌─────────────────────────────┬───────────────┐
  *   │ GREETING (date + line)      │ NEEDS YOU      │ ← 3 stat tiles inside
@@ -33,6 +39,7 @@
  * pipeline) are omitted entirely.
  */
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -43,6 +50,8 @@ import {
   TrendingUp,
   ArrowUpRight,
   Sparkles,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -54,8 +63,9 @@ import {
   H1,
 } from '@/lib/typography';
 import { formatCompact } from '@/lib/formatting';
-import { DURATION_BASE, EASE_OUT, CHAT_STAGGER_DELAY } from '@/lib/motion';
+import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
+import { BriefCell, useBriefMotionEnabled } from './brief-motion';
 import type { BriefDashboard as DashboardData } from '@/lib/briefing/dashboard';
 import type { BriefCard, SignalKind } from '@/lib/briefing/types';
 
@@ -73,6 +83,9 @@ const ACTION_LABEL: Record<SignalKind, string> = {
   celebrate: 'NOTED',
   tip: 'TIP',
 };
+
+/** How many On Deck rows show before the "show more" drill-down. */
+const ON_DECK_COMPACT = 3;
 
 function deepLink(slug: string, href: string): string {
   if (href.startsWith('http')) return href;
@@ -123,83 +136,54 @@ export function BriefDashboard({ slug, data }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
       {/* GREETING — wide hero row */}
-      <BentoCell span="md:col-span-2 md:row-span-1" delay={delay()} plain>
+      <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()} plain>
         <GreetingCell ownerName={data.ownerName} momentum={brief.momentum} tomorrow={brief.tomorrow} />
-      </BentoCell>
+      </BriefCell>
 
       {/* NEEDS YOU — tall right rail, three linked stat tiles */}
-      <BentoCell span="md:col-span-2 md:row-span-2" delay={delay()}>
+      <BriefCell span="md:col-span-2 md:row-span-2" delay={delay()}>
         <NeedsYouCell slug={slug} needsYou={needsYou} />
-      </BentoCell>
+      </BriefCell>
 
       {/* ON DECK — the ranked action cards from the composed brief */}
       {hasOnDeck && (
-        <BentoCell span="md:col-span-2 md:row-span-1" delay={delay()}>
+        <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()}>
           <OnDeckCell slug={slug} cards={brief.cards} tip={brief.tip} />
-        </BentoCell>
+        </BriefCell>
       )}
 
       {/* TODAY — tours scheduled for today */}
       {hasTours && (
-        <BentoCell span="md:col-span-2" delay={delay()}>
+        <BriefCell span="md:col-span-2" delay={delay()}>
           <ToursCell slug={slug} tours={tours} />
-        </BentoCell>
+        </BriefCell>
       )}
 
       {/* PIPELINE — active deal counts + open value */}
       {hasPipeline && pipeline && (
-        <BentoCell span="md:col-span-2" delay={delay()}>
+        <BriefCell span="md:col-span-2" delay={delay()}>
           <PipelineCell slug={slug} pipeline={pipeline} />
-        </BentoCell>
+        </BriefCell>
       )}
 
       {/* HOT LEADS — named, scored-hot contacts */}
       {hasHotLeads && (
-        <BentoCell span="md:col-span-2" delay={delay()}>
+        <BriefCell span="md:col-span-2" delay={delay()}>
           <HotLeadsCell slug={slug} hotLeads={hotLeads} />
-        </BentoCell>
+        </BriefCell>
       )}
 
       {/* OVERNIGHT — what Chippi did in the last 12h, full width */}
       {hasOvernight && overnight && (
-        <BentoCell span="md:col-span-4" delay={delay()}>
+        <BriefCell span="md:col-span-4" delay={delay()}>
           <OvernightCell slug={slug} overnight={overnight} />
-        </BentoCell>
+        </BriefCell>
       )}
     </div>
   );
 }
 
-// ── Cell frame ────────────────────────────────────────────────────────────────
-
-function BentoCell({
-  children,
-  span,
-  delay = 0,
-  plain = false,
-}: {
-  children: React.ReactNode;
-  span: string;
-  delay?: number;
-  /** Plain cells skip the card chrome (border + bg) — used for the greeting
-   *  so the hero line reads as the page's voice, not a boxed stat. */
-  plain?: boolean;
-}) {
-  return (
-    <motion.div
-      className={cn(
-        span,
-        'min-w-0',
-        !plain && 'rounded-xl border border-border/70 bg-card',
-      )}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay }}
-    >
-      {children}
-    </motion.div>
-  );
-}
+// ── Cell header ───────────────────────────────────────────────────────────────
 
 /** Card heading: small-caps label + optional "view all" affordance. */
 function CellHeader({
@@ -222,10 +206,13 @@ function CellHeader({
       {href && (
         <Link
           href={href}
-          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="group/cta inline-flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           {cta ?? 'View'}
-          <ArrowUpRight size={12} />
+          <ArrowUpRight
+            size={12}
+            className="transition-transform duration-200 group-hover/cta:translate-x-0.5 group-hover/cta:-translate-y-0.5"
+          />
         </Link>
       )}
     </div>
@@ -310,15 +297,17 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
               key={t.label}
               href={t.href}
               className={cn(
-                'group flex items-center gap-4 py-3.5 first:pt-0 last:pb-0 -mx-1 px-1 rounded-md transition-colors',
-                'hover:bg-foreground/[0.03]',
+                'group/row flex items-center gap-4 py-3.5 first:pt-0 last:pb-0 -mx-1.5 px-1.5 rounded-lg transition-colors',
+                'hover:bg-foreground/[0.035] active:bg-foreground/[0.06]',
               )}
             >
+              {/* Number — the loud note. Non-zero counts sit at full weight;
+                  cleared counts recede so the eye lands on what's waiting. */}
               <span
                 className={cn(
                   STAT_NUMBER_COMPACT,
-                  'leading-none w-12 shrink-0 tabular-nums',
-                  dim && 'text-muted-foreground/60',
+                  'leading-none w-12 shrink-0 tabular-nums transition-colors',
+                  dim && 'text-muted-foreground/55',
                 )}
                 style={TITLE_FONT}
               >
@@ -326,21 +315,30 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
               </span>
               <div className="flex-1 min-w-0">
                 <p className={cn(BODY, 'font-medium flex items-center gap-1.5')}>
-                  <t.icon size={13} className="text-muted-foreground/70" />
+                  <t.icon
+                    size={13}
+                    className={cn(
+                      'transition-colors',
+                      dim
+                        ? 'text-muted-foreground/50'
+                        : 'text-muted-foreground/70 group-hover/row:text-foreground',
+                    )}
+                  />
                   {t.label}
                 </p>
                 <p className={cn(BODY_MUTED, 'text-xs mt-0.5')}>{t.sub}</p>
               </div>
               <ArrowUpRight
                 size={15}
-                className="text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0"
+                className="text-muted-foreground/40 group-hover/row:text-foreground group-hover/row:translate-x-0.5 group-hover/row:-translate-y-0.5 transition-all duration-200 shrink-0"
               />
             </Link>
           );
         })}
       </div>
       {allClear && (
-        <p className={cn(BODY_MUTED, 'text-xs mt-3 pt-3 border-t border-border/60')}>
+        <p className={cn(BODY_MUTED, 'text-xs mt-3 pt-3 border-t border-border/60 flex items-center gap-1.5')}>
+          <Check size={12} className="text-muted-foreground/70 shrink-0" />
           All clear. Nothing waiting on you right now.
         </p>
       )}
@@ -360,38 +358,94 @@ function OnDeckCell({
   tip: BriefCard | null;
 }) {
   const rows = tip ? [...cards, tip] : cards;
+  const [expanded, setExpanded] = useState(false);
+  const motionOn = useBriefMotionEnabled();
+
+  const overflow = rows.length - ON_DECK_COMPACT;
+  // The first N always show; overflow rows live in `hidden` and reveal in
+  // place when expanded. Keeping `visible` constant (never the full list)
+  // means each overflow row mounts exactly once — under the animated branch
+  // — so the staggered reveal plays without double-rendering a card.
+  const visible = overflow > 0 ? rows.slice(0, ON_DECK_COMPACT) : rows;
+  const hidden = overflow > 0 ? rows.slice(ON_DECK_COMPACT) : [];
+
   return (
     <div className="p-4 sm:p-5">
       <CellHeader label="On deck" icon={Sparkles} />
       <ul className="mt-2 divide-y divide-border/60">
-        {rows.map((card, idx) => {
-          const href = deepLink(
-            slug,
-            card.draftedAction?.kind === 'open' ? card.draftedAction.href : card.subject.href,
-          );
-          return (
-            <li key={`${card.subject.id}-${idx}`}>
-              <Link
-                href={href}
-                className="group flex items-start gap-3 py-3 -mx-1 px-1 rounded-md hover:bg-foreground/[0.03] transition-colors"
-              >
-                <span className={cn(SECTION_LABEL, 'w-12 shrink-0 pt-0.5 tabular-nums')}>
-                  {ACTION_LABEL[card.kind]}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{card.subject.name}</p>
-                  <p className={cn(BODY_MUTED, 'text-xs mt-0.5 line-clamp-2')}>{card.evidence}</p>
-                </div>
-                <ArrowUpRight
-                  size={15}
-                  className="text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0 mt-0.5"
-                />
-              </Link>
-            </li>
-          );
-        })}
+        {visible.map((card, idx) => (
+          <OnDeckRow key={`${card.subject.id}-${idx}`} slug={slug} card={card} />
+        ))}
+        {/* Overflow rows reveal in place — the cell stays glanceable while
+            still holding every ranked card. AnimatePresence-free height
+            isn't needed; a simple staggered fade reads calm and is cheap. */}
+        {expanded &&
+          hidden.map((card, idx) => (
+            <motion.li
+              key={`hidden-${card.subject.id}-${idx}`}
+              initial={motionOn ? { opacity: 0, y: -4 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION_FAST, ease: EASE_OUT, delay: motionOn ? idx * 0.03 : 0 }}
+            >
+              <OnDeckRowInner slug={slug} card={card} />
+            </motion.li>
+          ))}
       </ul>
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
+        >
+          {expanded ? 'Show less' : `${overflow} more`}
+          <ChevronDown
+            size={12}
+            className={cn('transition-transform duration-200', expanded && 'rotate-180')}
+          />
+        </button>
+      )}
     </div>
+  );
+}
+
+/** A single On Deck row wrapped in its own <li>. */
+function OnDeckRow({ slug, card }: { slug: string; card: BriefCard }) {
+  return (
+    <li>
+      <OnDeckRowInner slug={slug} card={card} />
+    </li>
+  );
+}
+
+/** The row body — shared by the compact list and the expanded overflow rows. */
+function OnDeckRowInner({ slug, card }: { slug: string; card: BriefCard }) {
+  const href = deepLink(
+    slug,
+    card.draftedAction?.kind === 'open' ? card.draftedAction.href : card.subject.href,
+  );
+  return (
+    <Link
+      href={href}
+      className="group/row flex items-start gap-3 py-3 -mx-1.5 px-1.5 rounded-lg hover:bg-foreground/[0.035] active:bg-foreground/[0.06] transition-colors"
+    >
+      <span
+        className={cn(
+          SECTION_LABEL,
+          'w-12 shrink-0 pt-0.5 tabular-nums transition-colors group-hover/row:text-foreground/80',
+        )}
+      >
+        {ACTION_LABEL[card.kind]}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{card.subject.name}</p>
+        <p className={cn(BODY_MUTED, 'text-xs mt-0.5 line-clamp-2')}>{card.evidence}</p>
+      </div>
+      <ArrowUpRight
+        size={15}
+        className="text-muted-foreground/40 group-hover/row:text-foreground group-hover/row:translate-x-0.5 group-hover/row:-translate-y-0.5 transition-all duration-200 shrink-0 mt-0.5"
+      />
+    </Link>
   );
 }
 
@@ -401,20 +455,22 @@ function ToursCell({ slug, tours }: { slug: string; tours: DashboardData['tours'
   return (
     <div className="p-4 sm:p-5">
       <CellHeader label="Today" icon={CalendarClock} href={`/s/${slug}/calendar`} cta="Calendar" />
-      <ul className="mt-2 space-y-2.5">
+      <ul className="mt-2 space-y-1">
         {tours.map((t) => {
           const name = t.guestName?.trim() || 'Tour';
           return (
             <li key={t.id}>
               <Link
                 href={deepLink(slug, t.href)}
-                className="flex items-baseline gap-3 group"
+                className="group/row flex items-baseline gap-3 -mx-1.5 px-1.5 py-1.5 rounded-lg hover:bg-foreground/[0.035] active:bg-foreground/[0.06] transition-colors"
               >
-                <span className="text-sm tabular-nums text-muted-foreground w-12 shrink-0">
+                <span className="text-sm tabular-nums text-muted-foreground w-12 shrink-0 transition-colors group-hover/row:text-foreground">
                   {formatEventTime(t.startsAt)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="text-sm text-foreground group-hover:underline">{name}</span>
+                  <span className="text-sm text-foreground group-hover/row:underline underline-offset-2 decoration-foreground/30">
+                    {name}
+                  </span>
                   {t.propertyAddress && (
                     <span className={cn(BODY_MUTED, 'text-xs block truncate')}>{t.propertyAddress}</span>
                   )}
@@ -514,17 +570,17 @@ function HotLeadsCell({ slug, hotLeads }: { slug: string; hotLeads: DashboardDat
             <li key={lead.id}>
               <Link
                 href={`/s/${slug}/contacts/${lead.id}`}
-                className="group flex items-center gap-3 py-2.5 -mx-1 px-1 rounded-md hover:bg-foreground/[0.03] transition-colors"
+                className="group/row flex items-center gap-3 py-2.5 -mx-1.5 px-1.5 rounded-lg hover:bg-foreground/[0.035] active:bg-foreground/[0.06] transition-colors"
               >
                 <Flame size={13} className="text-amber-500 shrink-0" />
                 <span className="flex-1 min-w-0">
-                  <span className="text-sm text-foreground truncate block group-hover:underline">
+                  <span className="text-sm text-foreground truncate block group-hover/row:underline underline-offset-2 decoration-foreground/30">
                     {lead.name}
                   </span>
                   <span className={cn(BODY_MUTED, 'text-xs')}>{sub}</span>
                 </span>
                 {typeof lead.leadScore === 'number' && (
-                  <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                  <span className="text-xs tabular-nums text-muted-foreground shrink-0 transition-colors group-hover/row:text-foreground">
                     {lead.leadScore}
                   </span>
                 )}
