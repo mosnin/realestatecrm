@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -11,7 +12,9 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const body = await req.json() as { directive?: unknown };
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const body = (read.data ?? {}) as { directive?: unknown };
   const { directive } = body;
 
   if (!directive || typeof directive !== 'string' || directive.trim().length < 3) {

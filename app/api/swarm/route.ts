@@ -10,6 +10,17 @@ import { getSpaceForUser } from '@/lib/space';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
+import { z } from 'zod';
+import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
+
+/** Shape guard for a swarm run. The 2000-char goal limit and "required"
+ *  ordering are preserved below; this bounds the field types and caps the
+ *  customAgentIds array so an unbounded list can't be parsed into memory. */
+const swarmBodySchema = z.object({
+  spaceId: z.string().max(200).optional(),
+  goal: z.string().max(5000).optional(),
+  customAgentIds: z.array(z.string().max(200)).max(50).optional(),
+});
 
 // ── GET /api/swarm?spaceId=... ───────────────────────────────────────────────
 // List recent swarm runs for a space, newest-first, capped at 20.
@@ -72,12 +83,11 @@ interface CustomAgentRow {
 }
 
 export async function POST(req: NextRequest) {
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const parsed = parseOrBadRequest(swarmBodySchema, read.data);
+  if (!parsed.ok) return parsed.response;
+  const body: PostBody = parsed.data;
 
   const spaceId = typeof body.spaceId === 'string' ? body.spaceId.trim() : '';
   const goal = typeof body.goal === 'string' ? body.goal.trim() : '';
