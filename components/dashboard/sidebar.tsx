@@ -59,6 +59,7 @@ import {
   Plug,
   Gauge,
   TrendingUp,
+  Coins,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -173,6 +174,7 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/profitability', label: 'Profitability', icon: Coins, exact: false, adminOnly: false },
       { href: '/broker/usage', label: 'Usage', icon: Gauge, exact: false, adminOnly: false },
       { href: '/broker/import-export', label: 'Import / export', icon: Upload, exact: false, adminOnly: true },
     ],
