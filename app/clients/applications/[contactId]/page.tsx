@@ -6,6 +6,7 @@ import { clientOwnsContact, getClientPortalData } from '@/lib/client-portal-data
 import { supabase } from '@/lib/supabase';
 import { TITLE_FONT } from '@/lib/typography';
 import { StatusPill, formatDate } from '../../portal-ui';
+import { PortalFadeIn } from '../../portal-motion';
 import { ApplicationDetailClient } from './detail-client';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,7 @@ export default async function ApplicationDetailPage({
 
   return (
     <main className="mx-auto max-w-3xl space-y-12 px-4 py-10 pb-16 sm:px-6">
+      <PortalFadeIn>
       <header className="space-y-3">
         <Link
           href="/clients/dashboard"
@@ -81,6 +83,7 @@ export default async function ApplicationDetailPage({
           </div>
         )}
       </header>
+      </PortalFadeIn>
 
       <ApplicationDetailClient
         contactId={contactId}

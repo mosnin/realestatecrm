@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getClientUser } from '@/lib/client-auth';
 import { TITLE_FONT } from '@/lib/typography';
+import { PortalFadeIn } from '../portal-motion';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,10 @@ export default async function ClientPortalLanding() {
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-3xl flex-col justify-center px-4 py-16 sm:px-6">
-      <div className="max-w-xl space-y-6">
+      <PortalFadeIn className="max-w-xl space-y-6">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Your portal
+        </p>
         <h1
           className="text-3xl tracking-tight text-foreground sm:text-4xl"
           style={TITLE_FONT}
@@ -25,9 +29,9 @@ export default async function ClientPortalLanding() {
           Track your application. Book tours. Message your agent.
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          One place for everything you have in motion with a realtor — wherever
-          you applied, whatever you&apos;re touring. Sign in with the email you
-          used and it&apos;s all here.
+          One calm place for everything you have in motion with a realtor —
+          wherever you applied, whatever you&apos;re touring. Sign in with the
+          email you used and it&apos;s all here.
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Link
@@ -43,7 +47,7 @@ export default async function ClientPortalLanding() {
             Sign in
           </Link>
         </div>
-      </div>
+      </PortalFadeIn>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   Send,
   Loader2,
@@ -10,6 +11,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -77,6 +79,32 @@ export function ApplicationDetailClient({
   );
 }
 
+/**
+ * Section entrance — each portal section fades + rises on mount. Lives at
+ * the section level (not a shared wrapper) so a section that renders null
+ * (e.g. InfoRequests with no requests) leaves no phantom gap. Respects
+ * prefers-reduced-motion: opacity-only, no translate.
+ */
+function SectionReveal({
+  children,
+  delay = 0,
+}: {
+  children: ReactNode;
+  delay?: number;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.section
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay }}
+      className="space-y-4"
+    >
+      {children}
+    </motion.section>
+  );
+}
+
 /* ─── Info-requests ───────────────────────────────────────────────────────── */
 
 function InfoRequests({ contactId, initial }: { contactId: string; initial: InfoRequest[] }) {
@@ -85,7 +113,7 @@ function InfoRequests({ contactId, initial }: { contactId: string; initial: Info
   if (requests.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <SectionReveal>
       <h2 className={SECTION_LABEL}>
         {pending.length > 0 ? 'Your agent needs something' : 'Requests'}
       </h2>
@@ -106,7 +134,7 @@ function InfoRequests({ contactId, initial }: { contactId: string; initial: Info
           />
         ))}
       </ul>
-    </section>
+    </SectionReveal>
   );
 }
 
@@ -188,6 +216,7 @@ function Thread({ contactId, initial }: { contactId: string; initial: Message[] 
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -227,7 +256,7 @@ function Thread({ contactId, initial }: { contactId: string; initial: Message[] 
   }
 
   return (
-    <section className="space-y-4">
+    <SectionReveal>
       <h2 className={SECTION_LABEL}>Messages</h2>
       <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
         <div className="max-h-96 space-y-3 overflow-y-auto px-4 py-4">
@@ -239,27 +268,34 @@ function Thread({ contactId, initial }: { contactId: string; initial: Message[] 
             messages.map((m) => {
               const isClient = m.senderType === 'client';
               return (
-                <div key={m.id} className={cn('flex', isClient ? 'justify-end' : 'justify-start')}>
+                <motion.div
+                  key={m.id}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+                  className={cn('flex', isClient ? 'justify-end' : 'justify-start')}
+                >
                   <div
                     className={cn(
-                      'max-w-[80%] rounded-xl px-3.5 py-2.5',
+                      'max-w-[80%] border px-3.5 py-2.5',
+                      // The client's own voice gets a warm orange-tinted
+                      // bubble — the same brand warmth the intake gives the
+                      // applicant's answers — instead of a cold black slab.
+                      // The realtor's replies sit in a quiet neutral bubble.
                       isClient
-                        ? 'rounded-br-sm bg-foreground text-background'
-                        : 'rounded-bl-sm bg-muted text-foreground',
+                        ? 'rounded-2xl rounded-br-md border-orange-200/70 bg-orange-50 text-foreground dark:border-orange-500/25 dark:bg-orange-500/10'
+                        : 'rounded-2xl rounded-bl-md border-border/60 bg-muted text-foreground',
                     )}
                   >
-                    <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>
+                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{m.body}</p>
                     <time
                       dateTime={m.createdAt}
-                      className={cn(
-                        'mt-1 block text-[11px] tabular-nums',
-                        isClient ? 'text-background/60' : 'text-muted-foreground',
-                      )}
+                      className="mt-1 block text-[11px] tabular-nums text-muted-foreground"
                     >
                       {formatTime(m.createdAt)}
                     </time>
                   </div>
-                </div>
+                </motion.div>
               );
             })
           )}
@@ -296,7 +332,7 @@ function Thread({ contactId, initial }: { contactId: string; initial: Message[] 
           </div>
         </div>
       </div>
-    </section>
+    </SectionReveal>
   );
 }
 
@@ -342,7 +378,7 @@ function Documents({ contactId, initial }: { contactId: string; initial: Doc[] }
   }
 
   return (
-    <section className="space-y-4">
+    <SectionReveal>
       <h2 className={SECTION_LABEL}>Documents</h2>
 
       <div
@@ -412,6 +448,6 @@ function Documents({ contactId, initial }: { contactId: string; initial: Doc[] }
           ))}
         </ul>
       )}
-    </section>
+    </SectionReveal>
   );
 }

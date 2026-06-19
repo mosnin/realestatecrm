@@ -16,7 +16,10 @@ import {
   MessageSquare,
   Loader2,
 } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { TITLE_FONT } from '@/lib/typography';
 import type { IntakeFormConfig, ApplicationData } from '@/lib/types';
 import { getSubmissionDisplay, type DisplayField } from '@/lib/form-versioning';
 
@@ -165,8 +168,17 @@ export function ApplicationStatusClient({
   const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const reduce = useReducedMotion();
   const currentConfig = getStatusConfig(contact.status);
   const CurrentIcon = currentConfig.icon;
+
+  // Shared card-entrance variants — every panel rises in sequence so the
+  // portal lands as one calm reveal, matching the intake's motion language.
+  // Reduced-motion collapses to opacity-only with no stagger.
+  const cardVariants = {
+    initial: reduce ? { opacity: 0 } : { opacity: 0, y: 8 },
+    enter: { opacity: 1, y: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT } },
+  };
 
   // Scroll to bottom of messages when new messages arrive
   useEffect(() => {
@@ -265,12 +277,22 @@ export function ApplicationStatusClient({
   // ── Full Portal Mode ────────────────────────────────────────────────────
 
   return (
-    <div className="w-full max-w-lg space-y-4" role="main" aria-label="Application status portal">
+    <motion.div
+      className="w-full max-w-lg space-y-4"
+      role="main"
+      aria-label="Application status portal"
+      initial="initial"
+      animate="enter"
+      variants={{
+        initial: {},
+        enter: { transition: { staggerChildren: reduce ? 0 : 0.06 } },
+      }}
+    >
       {/* Header Card */}
-      <div className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
+      <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
-            <h1 className="text-lg font-semibold text-foreground truncate">
+            <h1 className="text-2xl tracking-tight text-foreground truncate" style={TITLE_FONT}>
               {contact.name}
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -299,11 +321,11 @@ export function ApplicationStatusClient({
             <p className="text-sm text-foreground">{contact.statusNote}</p>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Status Timeline */}
       {statusHistory.length > 0 && (
-        <nav aria-label="Application status timeline" className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
+        <motion.nav variants={cardVariants} aria-label="Application status timeline" className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">Status Timeline</h2>
           <ol className="space-y-0 list-none m-0 p-0" aria-label="Status updates">
             {statusHistory.map((update: StatusUpdate, i: number) => {
@@ -361,12 +383,12 @@ export function ApplicationStatusClient({
               );
             })}
           </ol>
-        </nav>
+        </motion.nav>
       )}
 
       {/* Application Summary (Collapsible) */}
       {appDisplayFields.length > 0 && (
-        <div className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
+        <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm overflow-hidden">
           <button
             onClick={() => setShowAppData(!showAppData)}
             aria-expanded={showAppData}
@@ -401,19 +423,21 @@ export function ApplicationStatusClient({
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Your tours — what's scheduled, awaiting confirmation, or completed.
           Each scheduled tour gets a Confirm / Can't make it action pair so
           the realtor doesn't have to chase the applicant via SMS. */}
       {token && contact.applicationRef && tours.length > 0 && (
-        <YourToursPanel
-          applicationRef={contact.applicationRef}
-          token={token}
-          tours={tours}
-          onResponded={() => { void refreshData(); }}
-        />
+        <motion.div variants={cardVariants}>
+          <YourToursPanel
+            applicationRef={contact.applicationRef}
+            token={token}
+            tours={tours}
+            onResponded={() => { void refreshData(); }}
+          />
+        </motion.div>
       )}
 
       {/* Tour request — quiet CTA above the message thread. Opens an inline
@@ -421,15 +445,17 @@ export function ApplicationStatusClient({
           Chippi focus card and as a message in this thread. Only rendered
           when the applicant is authenticated via portal token. */}
       {token && contact.applicationRef && (
-        <TourRequestPanel
-          applicationRef={contact.applicationRef}
-          token={token}
-          onSubmitted={() => { void refreshData(); }}
-        />
+        <motion.div variants={cardVariants}>
+          <TourRequestPanel
+            applicationRef={contact.applicationRef}
+            token={token}
+            onSubmitted={() => { void refreshData(); }}
+          />
+        </motion.div>
       )}
 
       {/* Messages */}
-      <section aria-label="Messages" className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
+      <motion.section variants={cardVariants} aria-label="Messages" className="rounded-2xl bg-card border border-border/60 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
           <div className="flex items-center gap-2">
             <MessageSquare size={14} className="text-muted-foreground" aria-hidden="true" />
@@ -463,33 +489,37 @@ export function ApplicationStatusClient({
             messages.map((msg: PortalMessage) => {
               const isApplicant = msg.senderType === 'applicant';
               return (
-                <div
+                <motion.div
                   key={msg.id}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
                   className={cn('flex', isApplicant ? 'justify-end' : 'justify-start')}
                 >
                   <div
                     className={cn(
-                      'max-w-[80%] rounded-xl px-3.5 py-2.5',
+                      'max-w-[80%] border px-3.5 py-2.5',
+                      // The applicant's own voice gets the same warm
+                      // orange-tinted bubble the intake gave their answers —
+                      // continuity from the conversation they just finished,
+                      // not a cold black slab. The realtor sits in neutral.
                       isApplicant
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-muted text-foreground rounded-bl-sm',
+                        ? 'rounded-2xl rounded-br-md border-orange-200/70 bg-orange-50 text-foreground dark:border-orange-500/25 dark:bg-orange-500/10'
+                        : 'rounded-2xl rounded-bl-md border-border/60 bg-muted text-foreground',
                     )}
                   >
-                    <p className="text-xs font-medium mb-0.5 opacity-70">
+                    <p className="text-xs font-medium mb-0.5 text-muted-foreground">
                       {isApplicant ? 'You' : businessName}
                     </p>
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                     <time
                       dateTime={msg.createdAt}
-                      className={cn(
-                        'text-[10px] mt-1 block',
-                        isApplicant ? 'text-primary-foreground/60' : 'text-muted-foreground',
-                      )}
+                      className="text-[10px] mt-1 block text-muted-foreground"
                     >
                       {formatTime(msg.createdAt)}
                     </time>
                   </div>
-                </div>
+                </motion.div>
               );
             })
           )}
@@ -541,16 +571,16 @@ export function ApplicationStatusClient({
             {messageText.length}/2000 characters
           </p>
         </div>
-      </section>
+      </motion.section>
 
       {/* What happens next */}
-      <div className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
+      <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           What happens next?
         </p>
         <NextStepsText status={contact.status} businessName={businessName} />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -617,9 +647,11 @@ function SimpleStatusView({
 
   return (
     <div className="w-full max-w-md" role="main" aria-label="Application status">
-      <div className="rounded-xl bg-card border border-border/60 shadow-sm p-6 space-y-6">
+      <div className="rounded-2xl bg-card border border-border/60 shadow-sm p-6 space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-xl font-semibold">Application Status</h1>
+          <h1 className="text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+            Application Status
+          </h1>
           <p className="text-sm text-muted-foreground">for {contact.name}</p>
           <p className="text-xs text-muted-foreground">
             Submitted{' '}

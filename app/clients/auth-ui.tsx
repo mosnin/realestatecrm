@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'motion/react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TITLE_FONT } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
 /* ─── Shared shell ────────────────────────────────────────────────────────── */
 
@@ -20,9 +22,15 @@ export function AuthShell({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const reduce = useReducedMotion();
   return (
     <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-3xl flex-col justify-center px-4 py-12 sm:px-6">
-      <div className="mx-auto w-full max-w-[380px] space-y-6">
+      <motion.div
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="mx-auto w-full max-w-[380px] space-y-6"
+      >
         <header className="space-y-1.5">
           <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
             {title}
@@ -31,7 +39,7 @@ export function AuthShell({
         </header>
         {children}
         {footer && <div className="pt-1 text-sm text-muted-foreground">{footer}</div>}
-      </div>
+      </motion.div>
     </main>
   );
 }
