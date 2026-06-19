@@ -5,12 +5,20 @@
  * Records the inbound message as a ContactActivity and optionally
  * marks the source AgentDraft as having received a response.
  *
+ * Dual-write (Phase 3): in addition to the ContactActivity above, this also
+ * records the reply on the contact's threaded inbox via recordInboundMessage,
+ * so internal callers and the Composio webhook capture path share ONE
+ * message-write path. The ContactActivity + inbound-trigger behavior is
+ * unchanged; the inbox write is best-effort and never fails the request.
+ *
  * Secured with AGENT_INTERNAL_SECRET (not user auth — this is a webhook).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { recordInboundMessage } from '@/lib/inbox';
+import { logger } from '@/lib/logger';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -80,6 +88,24 @@ export async function POST(req: NextRequest) {
   if (activityError) {
     console.error('[agent/inbound] ContactActivity insert failed', activityError);
     return NextResponse.json({ error: 'Failed to record message' }, { status: 500 });
+  }
+
+  // Dual-write the reply onto the contact's threaded inbox so the inbox UI and
+  // the Composio capture path share one message-write path. Best-effort: a
+  // thread-write hiccup must not fail an inbound webhook whose ContactActivity
+  // already landed. recordInbound is idempotent when an externalId is present;
+  // this caller has no provider message id, so redelivery protection here rests
+  // on the upstream caller (the agent tool is @idempotent_tool).
+  try {
+    await recordInboundMessage({
+      spaceId,
+      contactId,
+      channel,
+      body: content,
+      metadata: { source: 'agent_inbound', draftId: draftId ?? null },
+    });
+  } catch (e) {
+    logger.error('[agent/inbound] inbox record failed (non-fatal)', { contactId, channel }, e);
   }
 
   // Update lastContactedAt
