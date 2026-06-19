@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   MessageCircle,
   User,
@@ -18,6 +19,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DURATION_BASE, EASE_APPLE } from '@/lib/motion';
 
 interface TourPrepData {
   guestName: string;
@@ -40,6 +42,7 @@ interface TourPrepCardProps {
 }
 
 export function TourPrepCard({ tourId }: TourPrepCardProps) {
+  const reduced = useReducedMotion();
   const [prep, setPrep] = useState<TourPrepData | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -74,8 +77,16 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
         {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
       </button>
 
+      <AnimatePresence>
       {expanded && prep && (
-        <div className="absolute right-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden">
+        <motion.div
+          initial={reduced ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.97 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_APPLE }}
+          style={{ transformOrigin: 'top right' }}
+          className="absolute right-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden"
+        >
           {/* Header */}
           <div className="px-4 py-3 bg-primary/5 border-b border-border">
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">
@@ -173,8 +184,9 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
