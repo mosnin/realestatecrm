@@ -42,6 +42,18 @@ function getTierKey(lead: Contact): TierKey {
   return 'unscored';
 }
 
+/** Avatar tint keyed to lead heat — same vocabulary the list rows use, so the
+ *  panel reads as the same lead the realtor just tapped. */
+const TIER_AVATAR: Record<TierKey, string> = {
+  hot: 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30',
+  warm: 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30',
+  cold: 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25',
+  unscored: 'bg-muted text-muted-foreground ring-border/60',
+};
+function tierAvatar(key: TierKey): string {
+  return TIER_AVATAR[key];
+}
+
 function DetailChip({
   icon: Icon,
   label,
@@ -160,7 +172,7 @@ export function LeadDetailPanel({
 
         {/* Header */}
         <div className="flex items-start gap-3 px-5 pt-3 sm:pt-5 pb-4 border-b border-border flex-shrink-0">
-          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground flex-shrink-0 mt-0.5">
+          <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 mt-0.5 ring-1', tierAvatar(tierKey))}>
             {getInitials(lead.name)}
           </div>
           <div className="flex-1 min-w-0">

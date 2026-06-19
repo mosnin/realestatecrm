@@ -10,10 +10,12 @@ import {
   ArrowRight,
   FileText,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { ACTIVITY_META } from '@/lib/constants';
+import { EASE_APPLE } from '@/lib/motion';
 
 type ManualActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up';
 
@@ -238,13 +240,22 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
             <div className="absolute left-[13px] top-4 bottom-4 w-px bg-border" />
 
             <div className="space-y-4">
-              {timeline.map((entry) => {
+              {timeline.map((entry, idx) => {
                 const meta = getEntryMeta(entry);
                 const Icon = meta.icon;
                 const isSystem = entry.kind !== 'activity';
+                // Apple list cadence — fade + 6px slide, capped to the first
+                // 10 events so a long history doesn't choreograph the page.
+                const animate = idx < 10;
                 return (
-                  <div key={entry.id} className="flex gap-3 relative">
-                    <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10', meta.color)}>
+                  <motion.div
+                    key={entry.id}
+                    initial={animate ? { opacity: 0, y: 6 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: EASE_APPLE, delay: animate ? idx * 0.03 : 0 }}
+                    className="flex gap-3 relative"
+                  >
+                    <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10 ring-4 ring-card', meta.color)}>
                       <Icon size={13} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -260,7 +271,7 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
                         </p>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
