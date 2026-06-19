@@ -31,7 +31,7 @@ describe('redeemInviteCode (lib) — normalize + RPC shape + mapping', () => {
   it('normalizes the code and calls the atomic function with p_* params', async () => {
     await redeemInviteCode({ code: '  SuMMer-2026 ', spaceId: 'sp1', userClerkId: 'u_clerk' });
     expect(rpcMock).toHaveBeenCalledTimes(1);
-    const [fn, args] = rpcMock.mock.calls[0] as [string, Record<string, unknown>];
+    const [fn, args] = rpcMock.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(fn).toBe('redeem_invite_code_atomic');
     expect(args.p_code).toBe('summer-2026'); // trimmed + lowercased
     expect(args.p_space_id).toBe('sp1');
