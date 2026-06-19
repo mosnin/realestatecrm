@@ -44,6 +44,15 @@ function SubscribeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // ── Invite-code redemption (free access, bypasses payment) ───────────────
+  // A subtle path under the plans: reveal an input, POST the code to
+  // /api/billing/redeem-invite (which redeems for the caller's OWN space only),
+  // and on success follow the in-app redirect it returns.
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   // Did the URL explicitly pin the tier? If so it wins and we never override it.
   const urlPlan = searchParams.get('plan');
   const urlPinnedPlan = urlPlan === 'solo' || urlPlan === 'pro';
@@ -121,6 +130,29 @@ function SubscribeContent() {
     } catch {
       setError("That didn't go through. Usually temporary.");
       setLoading(false);
+    }
+  }
+
+  async function handleRedeemInvite() {
+    if (!inviteCode.trim()) return;
+    setInviteLoading(true);
+    setInviteError('');
+    try {
+      const res = await fetch('/api/billing/redeem-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: inviteCode.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.redirect) {
+        window.location.href = data.redirect;
+        return;
+      }
+      setInviteError(data.error || "That code didn't work.");
+      setInviteLoading(false);
+    } catch {
+      setInviteError("That didn't go through. Usually temporary.");
+      setInviteLoading(false);
     }
   }
 
@@ -263,6 +295,51 @@ function SubscribeContent() {
             Manage billing
           </a>
         </p>
+
+        {/* Invite code — a quiet path to free access for those who have one. */}
+        <div className="mt-4 text-center">
+          {!showInvite ? (
+            <button
+              type="button"
+              onClick={() => setShowInvite(true)}
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Have an invite code?
+            </button>
+          ) : (
+            <div className="mx-auto max-w-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => {
+                    setInviteCode(e.target.value);
+                    setInviteError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRedeemInvite();
+                  }}
+                  placeholder="Enter code"
+                  autoFocus
+                  disabled={inviteLoading}
+                  className="h-9 flex-1 rounded-lg border border-border/70 bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-muted-foreground focus:border-foreground/40 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={handleRedeemInvite}
+                  disabled={inviteLoading || !inviteCode.trim()}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-foreground px-3.5 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inviteLoading && <Loader2 size={13} className="animate-spin" />}
+                  {inviteLoading ? 'Applying' : 'Apply'}
+                </button>
+              </div>
+              {inviteError && (
+                <p className="text-xs text-rose-600 dark:text-rose-400">{inviteError}</p>
+              )}
+            </div>
+          )}
+        </div>
       </motion.div>
     </div>
   );

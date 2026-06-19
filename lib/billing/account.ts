@@ -13,7 +13,7 @@
 import { supabase } from '@/lib/supabase';
 import type { PlanId } from '@/lib/plans';
 import type { BillingAccount } from '@/lib/billing/credits';
-import { isAccountComped, COMP_SPACE_PLAN, COMP_BROKERAGE_PLAN } from '@/lib/billing/comp';
+import { isAccountComped, getCompSpacePlan, COMP_BROKERAGE_PLAN } from '@/lib/billing/comp';
 
 export interface BillingContext {
   account: BillingAccount;
@@ -45,14 +45,17 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
   if (error) throw error;
   if (!space) throw new Error(`resolveBillingAccount: space ${spaceId} not found`);
 
-  // Complimentary access overrides Stripe entirely: the space funds itself, at
-  // the top tier, with no spend gate. Checked FIRST so a comped demo account
-  // never routes into (or drains) a brokerage pool. Resilient — false if the
-  // comp columns aren't present yet.
+  // Complimentary access overrides Stripe entirely: the space funds itself, with
+  // no spend gate, at its comp plan — Space.compPlan when an invite code pinned
+  // one (e.g. the $97 'solo' tier), else the demo default (COMP_SPACE_PLAN).
+  // Checked FIRST so a comped account never routes into (or drains) a brokerage
+  // pool. Both reads are resilient: isAccountComped is false if the comp columns
+  // aren't present yet, and getCompSpacePlan falls back to the default if the
+  // compPlan column isn't present yet — so this ships safely before the migration.
   if (await isAccountComped('Space', space.id as string)) {
     return {
       account: { type: 'space', id: space.id as string },
-      plan: COMP_SPACE_PLAN,
+      plan: await getCompSpacePlan(space.id as string),
       subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
       isComped: true,
     };

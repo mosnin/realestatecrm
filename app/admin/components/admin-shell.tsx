@@ -32,6 +32,7 @@ import {
   ArrowLeft,
   Gauge,
   LifeBuoy,
+  Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ const navSections = [
       { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, exact: false },
       { href: '/admin/spaces', label: 'Spaces', icon: Building, exact: false },
       { href: '/admin/billing', label: 'Billing', icon: CreditCard, exact: false },
+      { href: '/admin/invite-codes', label: 'Invite codes', icon: Ticket, exact: false },
       { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
     ],
   },
