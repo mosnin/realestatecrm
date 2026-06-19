@@ -20,6 +20,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { BriefDashboard } from '@/components/chippi/brief-dashboard';
+import { DispatchIslandDock } from '@/components/chippi/dispatch-island-dock';
 import { composeBriefDashboard } from '@/lib/briefing/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,10 @@ export default async function ChippiBriefPage({
   return (
     <ChippiPageShell greeting="Today.">
       <BriefDashboard slug={slug} data={dashboard} />
+      {/* Floating, morphing status islands (live agent activity + notifications).
+          Additive glance layer — fixed-position, so it overlays the console
+          without disturbing the bento grid above. */}
+      <DispatchIslandDock slug={slug} />
     </ChippiPageShell>
   );
 }
