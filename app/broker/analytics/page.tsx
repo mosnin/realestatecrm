@@ -25,6 +25,11 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
+import { AnalyticsBreakdowns } from './breakdowns';
+import {
+  buildLeadSourceBreakdown,
+  buildWinLossByReason,
+} from '@/lib/broker-analytics-breakdowns';
 
 export const metadata: Metadata = { title: 'Analytics -- Brokerage' };
 
@@ -54,25 +59,31 @@ export default async function BrokerAnalyticsPage() {
     spaceIds.length > 0
       ? supabase
           .from('Contact')
-          .select('id, spaceId, type')
+          .select('id, spaceId, type, source')
           .in('spaceId', spaceIds)
           .limit(50000)
       : Promise.resolve({ data: [] }),
     spaceIds.length > 0
       ? supabase
           .from('Deal')
-          .select('id, spaceId, status, value')
+          .select('id, spaceId, status, value, closeReason')
           .in('spaceId', spaceIds)
           .limit(50000)
       : Promise.resolve({ data: [] }),
   ]);
 
-  const contacts = (contactsRes.data ?? []) as { id: string; spaceId: string; type: string }[];
+  const contacts = (contactsRes.data ?? []) as {
+    id: string;
+    spaceId: string;
+    type: string;
+    source: string | null;
+  }[];
   const deals = (dealsRes.data ?? []) as {
     id: string;
     spaceId: string;
     status: string;
     value: number | null;
+    closeReason: string | null;
   }[];
 
   // Build per-space stat buckets.
@@ -174,6 +185,15 @@ export default async function BrokerAnalyticsPage() {
 
   const isEmpty = totalLeads === 0;
 
+  // Additive breakdowns: lead-source attribution + win/loss-by-reason. Pure
+  // aggregations over the same brokerage-wide rows already fetched above.
+  const leadSourceRows = buildLeadSourceBreakdown(
+    contacts.map((c) => ({ source: c.source, type: c.type })),
+  );
+  const winLossByReason = buildWinLossByReason(
+    deals.map((d) => ({ status: d.status, closeReason: d.closeReason })),
+  );
+
   return (
     <div className={cn('max-w-5xl mx-auto pb-56 md:pb-24', SECTION_RHYTHM)}>
 
@@ -230,6 +250,9 @@ export default async function BrokerAnalyticsPage() {
 
           {/* Agent funnel + table -- all client interactivity */}
           <AnalyticsClient agents={agentData} />
+
+          {/* Lead-source attribution + win/loss-by-reason breakdowns */}
+          <AnalyticsBreakdowns leadSources={leadSourceRows} winLoss={winLossByReason} />
 
         </div>
       )}

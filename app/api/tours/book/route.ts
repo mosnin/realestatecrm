@@ -125,6 +125,8 @@ export async function POST(req: NextRequest) {
       type: 'TOUR',
       tags: ['tour-booking'],
       sourceLabel: 'tour-booking',
+      // Structured lead-source attribution: public tour-booking is a web form.
+      source: 'web_form',
       // `'unscored'` violated the CHECK constraint
       // (`contact_scoring_status_check` allows pending/scored/failed only),
       // so every auto-create silently failed and the tour was booked with

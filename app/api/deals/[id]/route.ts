@@ -8,6 +8,7 @@ import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { dealHasOpenSignatureRequests } from '@/lib/esign';
+import { normalizeCloseReason } from '@/lib/close-reason';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -93,6 +94,21 @@ export async function PATCH(
     if (body.status !== undefined && !VALID_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
+
+    // ── Close-reason taxonomy (Feature B) ───────────────────────────────────
+    // Optional, non-blocking structured reason for a won/lost outcome. We only
+    // persist it on the won/lost transition, and only if the supplied key is
+    // valid for that outcome (normalizeCloseReason mismatches → null, never
+    // throws). A missing/unknown reason simply leaves the column null — the
+    // affordance is never forced. The free-form `closeReasonDetail` is capped.
+    const closingOutcome: 'won' | 'lost' | null =
+      body.status === 'won' ? 'won' : body.status === 'lost' ? 'lost' : null;
+    const closeReasonVal: import('@/lib/close-reason').CloseReason | null =
+      closingOutcome ? normalizeCloseReason(body.closeReason, closingOutcome) : null;
+    const closeReasonDetailVal: string | null =
+      body.closeReasonDetail != null && String(body.closeReasonDetail).trim() !== ''
+        ? String(body.closeReasonDetail).trim().slice(0, 2000)
+        : null;
 
     // Validate milestones
     let milestonesVal: import('@/lib/types').DealMilestone[] | undefined = undefined;
@@ -391,6 +407,12 @@ export async function PATCH(
         ...(body.wonLostReason !== undefined && { wonLostReason: body.wonLostReason ? String(body.wonLostReason).slice(0, 120) : null }),
         ...(body.wonLostNote !== undefined && { wonLostNote: body.wonLostNote ? String(body.wonLostNote).slice(0, 2000) : null }),
         ...(body.status === 'active' && { wonLostReason: null, wonLostNote: null }),
+        // Structured close-reason taxonomy (Feature B): persisted only on the
+        // won/lost transition; cleared when the deal reopens to 'active' so a
+        // stale reason can't confuse a later close. Mirrors wonLostReason above.
+        ...(closingOutcome && body.closeReason !== undefined && { closeReason: closeReasonVal }),
+        ...(closingOutcome && body.closeReasonDetail !== undefined && { closeReasonDetail: closeReasonDetailVal }),
+        ...(body.status === 'active' && { closeReason: null, closeReasonDetail: null }),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
@@ -423,6 +445,11 @@ export async function PATCH(
       }
       if ((body.status === 'won' || body.status === 'lost') && body.wonLostNote) {
         statusMetadata.note = String(body.wonLostNote).slice(0, 120);
+      }
+      // Stamp the structured close-reason key into the activity metadata too, so
+      // the timeline carries the same taxonomy the analytics group on.
+      if (closeReasonVal) {
+        statusMetadata.closeReason = closeReasonVal;
       }
       activityInserts.push({
         id: crypto.randomUUID(),

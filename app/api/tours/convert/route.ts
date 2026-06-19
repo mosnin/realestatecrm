@@ -75,6 +75,10 @@ export async function POST(req: NextRequest) {
         phone: tour.guestPhone || null,
         type: 'TOUR',
         tags: ['from-tour'],
+        // Structured lead-source attribution: this contact is auto-created as a
+        // byproduct of converting a tour with no linked contact — not a real
+        // acquisition channel, so 'other'.
+        source: 'other',
         // 'unscored' violates contact_scoring_status_check (pending|scored|failed);
         // it silently failed the insert so the deal was created with no contact link.
         scoringStatus: 'pending',

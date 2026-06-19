@@ -601,6 +601,9 @@ export async function POST(req: NextRequest) {
       scoringStatus: 'pending',
       scoreLabel: 'unscored',
       sourceLabel: resolvedSourceLabel,
+      // Structured lead-source attribution: this is the public per-realtor
+      // intake form. (sourceLabel above remains the free-form sub-channel.)
+      source: 'web_form',
       applicationData,
       applicationRef,
       statusPortalToken,

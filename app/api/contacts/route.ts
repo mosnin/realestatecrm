@@ -4,6 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { normalizeLeadSource } from '@/lib/lead-source';
 import type { Contact } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags } = body;
+  const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags, source, sourceDetail } = body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -150,6 +151,13 @@ export async function POST(req: NextRequest) {
   const VALID_TYPES = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
   const contactType = VALID_TYPES.includes(type) ? type : 'QUALIFICATION';
 
+  // Lead-source attribution. An explicit, valid `source` from the caller wins
+  // (API integrations may pass one); otherwise this endpoint represents a
+  // manual create. normalizeLeadSource never throws, so a bad value can't crash
+  // the create — it simply falls back to 'manual'.
+  const sourceVal = normalizeLeadSource(source) ?? 'manual';
+  const sourceDetailVal = sourceDetail ? String(sourceDetail).trim().slice(0, 500) : null;
+
   const { data: contact, error } = await supabase.from('Contact').insert({
     id,
     spaceId: space.id,
@@ -163,6 +171,8 @@ export async function POST(req: NextRequest) {
     preferences: preferencesVal,
     properties: propsVal,
     tags: tagsVal,
+    source: sourceVal,
+    sourceDetail: sourceDetailVal,
   }).select().single();
   if (error) {
     console.error('[contacts/POST] insert error:', error);
