@@ -14,14 +14,29 @@
  *   - Table "Won" column: muted, not emerald; data is data, not a status signal.
  *   - StaggerList/StaggerItem on the agent card grid so rows land in sequence.
  *   - No buyer funnel tab — buyer fields have no server data; dead UI is cut.
+ *
+ * What the numbers say (the brutal-audit upgrade):
+ *   - Every agent card carries a vs-team delta on its headline conversion AND a
+ *     team benchmark on each pass-through, so "above / below the room" is legible
+ *     without arithmetic.
+ *   - A one-line "biggest leak" read names the weakest stage for the team and
+ *     each agent — the single place to coach.
+ *   - The table is sortable on every numeric column (click a header), and the
+ *     weakest pass-through cell per row is quietly marked so bottlenecks surface.
  */
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED, CAPTION, META } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import {
+  biggestLeak,
+  FUNNEL_STEP_LABEL as STEP_LABEL,
+  type FunnelStepKey as StepKey,
+} from '@/lib/broker-funnel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +80,38 @@ function initials(name: string) {
     .join('');
 }
 
+// ── vs-team delta chip ─────────────────────────────────────────────────────────
+//
+// Neutral by default. Above the room reads emerald, below reads amber (coaching,
+// not failure — rose stays reserved for destructive). Exactly on pace is muted.
+
+function DeltaChip({ delta }: { delta: number }) {
+  const rounded = Math.round(delta);
+  if (rounded === 0) {
+    return (
+      <span className={cn(META, 'inline-flex items-center gap-0.5')}>
+        <Minus size={9} aria-hidden />
+        on pace
+      </span>
+    );
+  }
+  const up = rounded > 0;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums',
+        up
+          ? 'text-emerald-700 dark:text-emerald-400'
+          : 'text-amber-700 dark:text-amber-400',
+      )}
+    >
+      {up ? <ArrowUp size={9} aria-hidden /> : <ArrowDown size={9} aria-hidden />}
+      {up ? '+' : ''}
+      {rounded} pt vs team
+    </span>
+  );
+}
+
 // ── Neutral funnel bar ────────────────────────────────────────────────────────
 //
 // STYLESHEET rule: neutral-first. Every bar uses the same foreground fill
@@ -87,9 +134,11 @@ function FunnelBar({
         {label}
       </span>
       <div className="relative h-6 rounded-sm overflow-hidden bg-foreground/[0.04]">
-        <div
-          className="absolute inset-y-0 left-0 rounded-sm bg-foreground/[0.12] transition-all duration-500"
-          style={{ width: `${pct}%` }}
+        <motion.div
+          className="absolute inset-y-0 left-0 rounded-sm bg-foreground/[0.12]"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.5, ease: EASE_OUT }}
         />
         <span className="absolute inset-y-0 left-2 flex items-center text-xs tabular-nums text-foreground font-medium">
           {value}
@@ -100,19 +149,50 @@ function FunnelBar({
 }
 
 // ── Step conversion label between funnel rows ─────────────────────────────────
+//
+// Carries an optional team benchmark so an agent's pass-through reads against
+// the room. The benchmark is a quiet trailing note, never a second loud number.
 
-function StepRate({ pct }: { pct: number }) {
+function StepRate({
+  pct,
+  benchmark,
+  weak,
+}: {
+  pct: number;
+  benchmark?: number;
+  weak?: boolean;
+}) {
   return (
-    <div className="pl-[calc(6rem+0.75rem)]">
-      <span className={cn(META, 'tabular-nums')}>{pct}% pass-through</span>
+    <div className="pl-[calc(6rem+0.75rem)] flex items-center gap-2">
+      <span
+        className={cn(
+          'text-[11px] tabular-nums',
+          weak ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground',
+        )}
+      >
+        {pct}% pass-through
+      </span>
+      {typeof benchmark === 'number' && (
+        <span className={cn(META, 'tabular-nums')}>· team {benchmark}%</span>
+      )}
     </div>
   );
 }
 
 // ── Agent funnel card ─────────────────────────────────────────────────────────
 
-function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
+function AgentFunnelCard({
+  agent,
+  teamConversion,
+  teamRates,
+}: {
+  agent: AgentFunnelData;
+  teamConversion: number;
+  teamRates: Record<StepKey, number>;
+}) {
   const max = agent.totalLeads;
+  const leak = biggestLeak(agent);
+  const delta = agent.overallConversion - teamConversion;
 
   return (
     <section className="rounded-xl border border-border/70 bg-background px-4 py-4 space-y-3">
@@ -125,7 +205,7 @@ function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
           <p className="text-sm font-medium truncate text-foreground">{agent.name}</p>
           <p className={cn(CAPTION, 'truncate')}>{agent.role}</p>
         </div>
-        {/* Focal number: serif Times, tabular-nums */}
+        {/* Focal number: serif Times, tabular-nums + vs-team delta beneath */}
         <div className="text-right flex-shrink-0">
           <p
             className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
@@ -133,38 +213,107 @@ function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
           >
             {agent.overallConversion}%
           </p>
-          <p className={CAPTION}>lead to win</p>
+          {agent.totalLeads > 0 ? (
+            <DeltaChip delta={delta} />
+          ) : (
+            <p className={CAPTION}>lead to win</p>
+          )}
         </div>
       </div>
 
-      {/* Funnel bars: neutral fills, consistent label column */}
+      {/* Funnel bars: neutral fills, consistent label column. Each pass-through
+          carries the team benchmark; the agent's weakest step is marked. */}
       <div className="space-y-1.5 pt-1">
         <FunnelBar label="Leads" value={agent.totalLeads} maxValue={max} />
-        <StepRate pct={agent.leadToTour} />
+        <StepRate
+          pct={agent.leadToTour}
+          benchmark={teamRates.leadToTour}
+          weak={leak?.key === 'leadToTour'}
+        />
         <FunnelBar label="Tours" value={agent.tours} maxValue={max} />
-        <StepRate pct={agent.tourToApp} />
+        <StepRate
+          pct={agent.tourToApp}
+          benchmark={teamRates.tourToApp}
+          weak={leak?.key === 'tourToApp'}
+        />
         <FunnelBar label="Applications" value={agent.applications} maxValue={max} />
-        <StepRate pct={agent.appToDeal} />
+        <StepRate
+          pct={agent.appToDeal}
+          benchmark={teamRates.appToDeal}
+          weak={leak?.key === 'appToDeal'}
+        />
         <FunnelBar label="Deals" value={agent.totalDeals} maxValue={max} />
         <FunnelBar label="Won" value={agent.wonDeals} maxValue={max} />
       </div>
 
-      {/* Sub-rates footer: quiet, muted */}
-      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/60">
-        <div className="text-center">
-          <p className="text-xs tabular-nums font-medium text-foreground">{agent.leadToTour}%</p>
-          <p className={cn(CAPTION, 'mt-0.5')}>Lead to tour</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs tabular-nums font-medium text-foreground">{agent.tourToApp}%</p>
-          <p className={cn(CAPTION, 'mt-0.5')}>Tour to app</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs tabular-nums font-medium text-foreground">{agent.appToDeal}%</p>
-          <p className={cn(CAPTION, 'mt-0.5')}>App to deal</p>
-        </div>
+      {/* Biggest leak — the one coaching sentence. Replaces the old footer that
+          merely re-printed the three pass-through rates already shown inline. */}
+      <div className="pt-3 border-t border-border/60">
+        {leak ? (
+          <p className={CAPTION}>
+            Biggest leak:{' '}
+            <span className="text-foreground font-medium">{STEP_LABEL[leak.key]}</span>{' '}
+            <span className="tabular-nums">at {leak.pct}%</span>
+          </p>
+        ) : (
+          <p className={CAPTION}>Not enough flow yet to spot a leak.</p>
+        )}
       </div>
     </section>
+  );
+}
+
+// ── Sortable table header cell ─────────────────────────────────────────────────
+
+type TableSortKey =
+  | 'name'
+  | 'totalLeads'
+  | 'tours'
+  | 'applications'
+  | 'totalDeals'
+  | 'wonDeals'
+  | 'wonValue'
+  | 'leadToTour'
+  | 'tourToApp'
+  | 'appToDeal'
+  | 'overallConversion';
+
+function Th({
+  label,
+  sortKey,
+  active,
+  dir,
+  onSort,
+  align = 'right',
+  className,
+}: {
+  label: string;
+  sortKey: TableSortKey;
+  active: boolean;
+  dir: 'asc' | 'desc';
+  onSort: (k: TableSortKey) => void;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
+  return (
+    <th className={cn(SECTION_LABEL, align === 'right' ? 'text-right' : 'text-left', 'px-3 py-2', className)}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={`Sort by ${label}`}
+        className={cn(
+          'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+          align === 'right' && 'flex-row-reverse',
+          active && 'text-foreground',
+        )}
+      >
+        {label}
+        <span className="w-2.5 inline-flex justify-center">
+          {active &&
+            (dir === 'desc' ? <ArrowDown size={10} aria-hidden /> : <ArrowUp size={10} aria-hidden />)}
+        </span>
+      </button>
+    </th>
   );
 }
 
@@ -173,6 +322,10 @@ function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
 export function AnalyticsClient({ agents }: Props) {
   const [view, setView] = useState<'funnel' | 'table'>('funnel');
   const [sortBy, setSortBy] = useState<'name' | 'leads' | 'conversion'>('leads');
+  const [tableSort, setTableSort] = useState<{ key: TableSortKey; dir: 'asc' | 'desc' }>({
+    key: 'totalLeads',
+    dir: 'desc',
+  });
 
   const sorted = useMemo(() => {
     const copy = [...agents];
@@ -204,6 +357,52 @@ export function AnalyticsClient({ agents }: Props) {
     };
   }, [agents]);
 
+  const teamRates = useMemo<Record<StepKey, number>>(
+    () => ({
+      leadToTour: teamTotals.leadToTour,
+      tourToApp: teamTotals.tourToApp,
+      appToDeal: teamTotals.appToDeal,
+    }),
+    [teamTotals],
+  );
+
+  const teamLeak = useMemo(
+    () =>
+      biggestLeak({
+        totalLeads: teamTotals.totalLeads,
+        tours: teamTotals.tours,
+        applications: teamTotals.applications,
+        leadToTour: teamTotals.leadToTour,
+        tourToApp: teamTotals.tourToApp,
+        appToDeal: teamTotals.appToDeal,
+      }),
+    [teamTotals],
+  );
+
+  // Table rows — independent sort so the broker can rank on any column.
+  const tableRows = useMemo(() => {
+    const copy = [...agents];
+    const { key, dir } = tableSort;
+    copy.sort((a, b) => {
+      if (key === 'name') {
+        const cmp = a.name.localeCompare(b.name);
+        return dir === 'asc' ? cmp : -cmp;
+      }
+      const va = a[key] as number;
+      const vb = b[key] as number;
+      return dir === 'asc' ? va - vb : vb - va;
+    });
+    return copy;
+  }, [agents, tableSort]);
+
+  const handleTableSort = (key: TableSortKey) => {
+    setTableSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+        : { key, dir: key === 'name' ? 'asc' : 'desc' },
+    );
+  };
+
   const views = [
     { id: 'funnel' as const, label: 'Funnels' },
     { id: 'table' as const, label: 'Table' },
@@ -233,14 +432,23 @@ export function AnalyticsClient({ agents }: Props) {
 
         <div className="space-y-1.5">
           <FunnelBar label="Leads" value={teamTotals.totalLeads} maxValue={teamTotals.totalLeads} />
-          <StepRate pct={teamTotals.leadToTour} />
+          <StepRate pct={teamTotals.leadToTour} weak={teamLeak?.key === 'leadToTour'} />
           <FunnelBar label="Tours" value={teamTotals.tours} maxValue={teamTotals.totalLeads} />
-          <StepRate pct={teamTotals.tourToApp} />
+          <StepRate pct={teamTotals.tourToApp} weak={teamLeak?.key === 'tourToApp'} />
           <FunnelBar label="Applications" value={teamTotals.applications} maxValue={teamTotals.totalLeads} />
-          <StepRate pct={teamTotals.appToDeal} />
+          <StepRate pct={teamTotals.appToDeal} weak={teamLeak?.key === 'appToDeal'} />
           <FunnelBar label="Deals" value={teamTotals.totalDeals} maxValue={teamTotals.totalLeads} />
           <FunnelBar label="Won" value={teamTotals.wonDeals} maxValue={teamTotals.totalLeads} />
         </div>
+
+        {/* The team's single coaching headline — where the pipeline leaks most. */}
+        {teamLeak && (
+          <p className={cn(CAPTION, 'pt-1')}>
+            The team loses the most at{' '}
+            <span className="text-foreground font-medium">{STEP_LABEL[teamLeak.key]}</span>{' '}
+            — only <span className="tabular-nums">{teamLeak.pct}%</span> get through.
+          </p>
+        )}
       </section>
 
       {/* ── View toggle + sort control ──────────────────────────────────────── */}
@@ -275,20 +483,23 @@ export function AnalyticsClient({ agents }: Props) {
           })}
         </div>
 
-        {/* Sort control */}
-        <div className="flex items-center gap-2 pb-1">
-          <label htmlFor="analytics-sort" className={SECTION_LABEL}>Sort</label>
-          <select
-            id="analytics-sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="text-sm border border-border/70 rounded-md px-2 h-8 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:ring-offset-1 focus:ring-offset-background transition-colors"
-          >
-            <option value="leads">Leads</option>
-            <option value="conversion">Conversion</option>
-            <option value="name">Name</option>
-          </select>
-        </div>
+        {/* Sort control — only meaningful in the funnel (card) view; the table
+            sorts via its own clickable headers. */}
+        {view === 'funnel' && (
+          <div className="flex items-center gap-2 pb-1">
+            <label htmlFor="analytics-sort" className={SECTION_LABEL}>Sort</label>
+            <select
+              id="analytics-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="text-sm border border-border/70 rounded-md px-2 h-8 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:ring-offset-1 focus:ring-offset-background transition-colors"
+            >
+              <option value="leads">Leads</option>
+              <option value="conversion">Conversion</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ── Funnel view ─────────────────────────────────────────────────────── */}
@@ -297,7 +508,11 @@ export function AnalyticsClient({ agents }: Props) {
           <StaggerList key={`funnel-${sortBy}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sorted.map((agent) => (
               <StaggerItem key={agent.userId}>
-                <AgentFunnelCard agent={agent} />
+                <AgentFunnelCard
+                  agent={agent}
+                  teamConversion={teamTotals.overallConversion}
+                  teamRates={teamRates}
+                />
               </StaggerItem>
             ))}
           </StaggerList>
@@ -314,72 +529,76 @@ export function AnalyticsClient({ agents }: Props) {
       {/* ── Table view ──────────────────────────────────────────────────────── */}
       {view === 'table' && (
         <div className="overflow-x-auto">
+          <p className={cn(META, 'mb-2')}>Tap a column to sort.</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/60">
-                <th className={cn(SECTION_LABEL, 'text-left px-3 py-2')}>Agent</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2')}>Leads</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2')}>Tours</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2 hidden md:table-cell')}>Apps</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2')}>Deals</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2 hidden sm:table-cell')}>Won</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2 hidden lg:table-cell')}>Won value</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2')}>L to T</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2 hidden md:table-cell')}>T to A</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2 hidden md:table-cell')}>A to D</th>
-                <th className={cn(SECTION_LABEL, 'text-right px-3 py-2')}>Conv.</th>
+                <Th label="Agent" sortKey="name" align="left" active={tableSort.key === 'name'} dir={tableSort.dir} onSort={handleTableSort} />
+                <Th label="Leads" sortKey="totalLeads" active={tableSort.key === 'totalLeads'} dir={tableSort.dir} onSort={handleTableSort} />
+                <Th label="Tours" sortKey="tours" active={tableSort.key === 'tours'} dir={tableSort.dir} onSort={handleTableSort} />
+                <Th label="Apps" sortKey="applications" active={tableSort.key === 'applications'} dir={tableSort.dir} onSort={handleTableSort} className="hidden md:table-cell" />
+                <Th label="Deals" sortKey="totalDeals" active={tableSort.key === 'totalDeals'} dir={tableSort.dir} onSort={handleTableSort} />
+                <Th label="Won" sortKey="wonDeals" active={tableSort.key === 'wonDeals'} dir={tableSort.dir} onSort={handleTableSort} className="hidden sm:table-cell" />
+                <Th label="Won value" sortKey="wonValue" active={tableSort.key === 'wonValue'} dir={tableSort.dir} onSort={handleTableSort} className="hidden lg:table-cell" />
+                <Th label="L → T" sortKey="leadToTour" active={tableSort.key === 'leadToTour'} dir={tableSort.dir} onSort={handleTableSort} />
+                <Th label="T → A" sortKey="tourToApp" active={tableSort.key === 'tourToApp'} dir={tableSort.dir} onSort={handleTableSort} className="hidden md:table-cell" />
+                <Th label="A → D" sortKey="appToDeal" active={tableSort.key === 'appToDeal'} dir={tableSort.dir} onSort={handleTableSort} className="hidden md:table-cell" />
+                <Th label="Conv." sortKey="overallConversion" active={tableSort.key === 'overallConversion'} dir={tableSort.dir} onSort={handleTableSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {sorted.length === 0 && (
+              {tableRows.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-3 py-10 text-center">
                     <span className={BODY_MUTED}>No agent data yet.</span>
                   </td>
                 </tr>
               )}
-              {sorted.map((a) => (
-                <tr
-                  key={a.userId}
-                  className="hover:bg-foreground/[0.04] transition-colors duration-150"
-                >
-                  {/* Agent */}
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[10px] font-medium text-foreground flex-shrink-0">
-                        {initials(a.name)}
+              {tableRows.map((a) => {
+                const leak = biggestLeak(a);
+                return (
+                  <tr
+                    key={a.userId}
+                    className="hover:bg-foreground/[0.04] transition-colors duration-150"
+                  >
+                    {/* Agent */}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[10px] font-medium text-foreground flex-shrink-0">
+                          {initials(a.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate text-foreground">{a.name}</p>
+                          <p className={cn(CAPTION, 'truncate')}>{a.role}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate text-foreground">{a.name}</p>
-                        <p className={cn(CAPTION, 'truncate')}>{a.role}</p>
-                      </div>
-                    </div>
-                  </td>
-                  {/* Volume numbers: tabular-nums, muted weight */}
-                  <td className="px-3 py-3 text-right tabular-nums text-sm font-medium text-foreground">{a.totalLeads}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground">{a.tours}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden md:table-cell">{a.applications}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground">{a.totalDeals}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden sm:table-cell">{a.wonDeals}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden lg:table-cell">{formatCompact(a.wonValue)}</td>
-                  {/* Rate columns */}
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground">{a.leadToTour}%</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden md:table-cell">{a.tourToApp}%</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden md:table-cell">{a.appToDeal}%</td>
-                  {/* Overall conversion: tabular serif, the focal data point per row */}
-                  <td className="px-3 py-3 text-right">
-                    <span
-                      className="tabular-nums text-sm font-medium text-foreground"
-                      style={TITLE_FONT}
-                    >
-                      {a.overallConversion}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    {/* Volume numbers: tabular-nums, muted weight */}
+                    <td className="px-3 py-3 text-right tabular-nums text-sm font-medium text-foreground">{a.totalLeads}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground">{a.tours}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden md:table-cell">{a.applications}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground">{a.totalDeals}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden sm:table-cell">{a.wonDeals}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden lg:table-cell">{formatCompact(a.wonValue)}</td>
+                    {/* Rate columns — the weakest carrying step reads amber */}
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm', leak?.key === 'leadToTour' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.leadToTour}%</td>
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'tourToApp' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.tourToApp}%</td>
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'appToDeal' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.appToDeal}%</td>
+                    {/* Overall conversion: tabular serif, the focal data point per row */}
+                    <td className="px-3 py-3 text-right">
+                      <span
+                        className="tabular-nums text-sm font-medium text-foreground"
+                        style={TITLE_FONT}
+                      >
+                        {a.overallConversion}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {/* Team totals row — quiet emphasis, foreground/[0.04] bg */}
-              {sorted.length > 0 && (
+              {tableRows.length > 0 && (
                 <tr className="bg-foreground/[0.04]">
                   <td className="px-3 py-3">
                     <p className={cn(SECTION_LABEL, 'pl-[calc(1.75rem+0.625rem)]')}>Team</p>
