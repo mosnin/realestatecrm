@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
+import { normalizeLeadSource } from '@/lib/lead-source';
 
 export type AssignLeadResult =
   | { ok: true; newContactId: string; assignedToSpaceId: string }
@@ -110,6 +111,11 @@ export async function assignLeadToRealtor(params: {
     scoreSummary: contact.scoreSummary,
     scoreDetails: contact.scoreDetails,
     sourceLabel: `brokerage: ${brokerage.name}`,
+    // Carry the original lead's structured source through the clone so
+    // attribution survives the broker assignment; fall back to 'referral'
+    // (the broker handed this lead over) when the source isn't a known value.
+    source: normalizeLeadSource(contact.source) ?? 'referral',
+    sourceDetail: contact.sourceDetail ?? null,
     applicationData: contact.applicationData,
     applicationRef: contact.applicationRef,
     applicationStatus: contact.applicationStatus,

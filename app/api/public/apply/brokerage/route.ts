@@ -617,6 +617,8 @@ export async function POST(req: NextRequest) {
       scoringStatus: 'pending',
       scoreLabel: 'unscored',
       sourceLabel: 'brokerage-intake',
+      // Structured lead-source attribution: brokerage-wide public intake form.
+      source: 'brokerage_form',
       applicationData,
       applicationRef,
       statusPortalToken,

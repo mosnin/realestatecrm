@@ -4,6 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
 import { notifyNewDeal } from '@/lib/notify';
 import { logger } from '@/lib/logger';
+import { normalizeCloseReason } from '@/lib/close-reason';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds, propertyId, status } = body;
+  const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds, propertyId, status, closeReason, closeReasonDetail } = body;
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -110,6 +111,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
   const statusVal: string = status ?? 'active';
+
+  // Close-reason taxonomy (Feature B): only meaningful when the deal is created
+  // directly in a terminal status. normalizeCloseReason validates the key
+  // against the outcome and never throws — anything unrecognized becomes null.
+  const createOutcome: 'won' | 'lost' | null =
+    statusVal === 'won' ? 'won' : statusVal === 'lost' ? 'lost' : null;
+  const closeReasonVal = createOutcome ? normalizeCloseReason(closeReason, createOutcome) : null;
+  const closeReasonDetailVal =
+    createOutcome && closeReasonDetail != null && String(closeReasonDetail).trim() !== ''
+      ? String(closeReasonDetail).trim().slice(0, 2000)
+      : null;
 
   // Verify the target stage belongs to this space (prevents cross-space stage injection)
   const { data: stageCheck, error: stageCheckErr } = await supabase
@@ -282,6 +294,9 @@ export async function POST(req: NextRequest) {
     // a deal born 'won' never gets a close timestamp, so avgTimeToCloseDays
     // (lib/deal-metrics.ts) silently drops it from the average.
     ...((statusVal === 'won' || statusVal === 'lost') && { closedAt: nowIso }),
+    // Structured close reason when born in a terminal status (mirrors PATCH).
+    ...(closeReasonVal && { closeReason: closeReasonVal }),
+    ...(closeReasonDetailVal && { closeReasonDetail: closeReasonDetailVal }),
     position: lastPosition + 1,
   }).select().single();
   if (dealError) throw dealError;

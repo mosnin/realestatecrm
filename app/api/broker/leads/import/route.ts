@@ -220,6 +220,8 @@ export async function POST(req: NextRequest) {
       type: 'QUALIFICATION',
       tags: ['new-lead', 'imported', 'brokerage-lead'],
       scoringStatus: 'pending',
+      // Structured lead-source attribution: brokerage CSV import.
+      source: 'import',
       applicationData: Object.keys(applicationData).length > 0 ? applicationData : null,
       properties: [],
     });

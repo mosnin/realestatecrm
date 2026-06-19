@@ -225,6 +225,15 @@ export type Contact = {
   formLeadType: 'rental' | 'buyer' | 'seller' | null;
   /** Who sent this lead — free-form. Used for referral-fee tracking later. */
   referralSource: string | null;
+  /**
+   * Structured lead-source attribution — WHERE this lead came from. Stable enum
+   * (see lib/lead-source.ts) captured at creation so the broker analytics
+   * lead-source breakdown can group reliably. Distinct from the free-form
+   * sourceLabel / referralSource above.
+   */
+  source: import('@/lib/lead-source').LeadSource | null;
+  /** Free-form context for `source` (referral name, utm value, etc.). */
+  sourceDetail: string | null;
   /** Hide this contact from the main People view until this date. */
   snoozedUntil: Date | null;
   createdAt: Date;
@@ -352,6 +361,14 @@ export type Deal = {
   /** Captured when a deal is marked won or lost so we can learn from it later. */
   wonLostReason: string | null;
   wonLostNote: string | null;
+  /**
+   * Structured win/loss close-reason — stable enum key (see lib/close-reason.ts)
+   * stamped on the won/lost transition so win/loss analysis can group reliably.
+   * Distinct from the free-form wonLostReason above (which is kept for back-compat).
+   */
+  closeReason: import('@/lib/close-reason').CloseReason | null;
+  /** Free-form context for `closeReason`. */
+  closeReasonDetail: string | null;
   /** Nullable FK to Property. Deals without a linked property still work. */
   propertyId: string | null;
   createdAt: Date;

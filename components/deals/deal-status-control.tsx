@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { closeReasonOptions, type CloseReason } from '@/lib/close-reason';
 
 type Status = 'active' | 'won' | 'lost' | 'on_hold';
 
@@ -53,15 +54,17 @@ const STATUS_META: Record<Status, StatusMeta> = {
 
 const ALL_STATUSES: Status[] = ['active', 'won', 'lost', 'on_hold'];
 
-const WON_REASONS = ['Price', 'Relationship', 'Speed', 'Location', 'Other'];
-const LOST_REASONS = [
-  'Price too high',
-  'Financing fell through',
-  'Chose another agent',
-  'Timing',
-  'Property issue',
-  'Other',
-];
+// Reason pills come from the shared close-reason taxonomy (lib/close-reason.ts)
+// so the structured `closeReason` key the analytics group on stays in lockstep
+// with what the user picks here.
+const WON_REASON_OPTIONS = closeReasonOptions('won');
+const LOST_REASON_OPTIONS = closeReasonOptions('lost');
+
+function reasonLabelFor(key: CloseReason): string {
+  return (
+    [...WON_REASON_OPTIONS, ...LOST_REASON_OPTIONS].find((o) => o.key === key)?.label ?? key
+  );
+}
 
 interface DealStatusControlProps {
   dealId: string;
@@ -77,7 +80,9 @@ export function DealStatusControl({
   const [status, setStatus] = useState<Status>(initialStatus);
   const [open, setOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<'won' | 'lost' | null>(null);
-  const [selectedReason, setSelectedReason] = useState('');
+  // The selected reason is the structured taxonomy key (or '' = none chosen);
+  // its human label is sent as the back-compat `wonLostReason`.
+  const [selectedReason, setSelectedReason] = useState<CloseReason | ''>('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,8 +108,8 @@ export function DealStatusControl({
 
   async function applyStatus(
     newStatus: Status,
-    wonLostReason?: string,
-    wonLostNote?: string,
+    closeReason?: CloseReason | '',
+    note?: string,
   ) {
     const previous = status;
     // Optimistic update so the badge reflects the new value immediately
@@ -113,8 +118,16 @@ export function DealStatusControl({
 
     try {
       const body: Record<string, string | undefined> = { status: newStatus };
-      if (wonLostReason) body.wonLostReason = wonLostReason;
-      if (wonLostNote?.trim()) body.wonLostNote = wonLostNote.trim();
+      if (closeReason) {
+        // Structured taxonomy key (what analytics group on) …
+        body.closeReason = closeReason;
+        // … plus the human label kept for back-compat with the existing field.
+        body.wonLostReason = reasonLabelFor(closeReason);
+      }
+      if (note?.trim()) {
+        body.closeReasonDetail = note.trim();
+        body.wonLostNote = note.trim();
+      }
 
       const res = await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
@@ -144,7 +157,7 @@ export function DealStatusControl({
     }
   }
 
-  const reasons = pendingStatus === 'won' ? WON_REASONS : LOST_REASONS;
+  const reasons = pendingStatus === 'won' ? WON_REASON_OPTIONS : LOST_REASON_OPTIONS;
   const currentMeta = STATUS_META[status];
   const CurrentIcon = currentMeta.Icon;
 
@@ -202,25 +215,26 @@ export function DealStatusControl({
             <div className="space-y-2.5">
               <p className="text-xs font-semibold px-0.5">
                 {pendingStatus === 'won' ? 'Why did you win?' : 'Why was it lost?'}
+                <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
               </p>
 
               {/* Reason pills */}
               <div className="flex flex-wrap gap-1.5">
                 {reasons.map((r) => (
                   <button
-                    key={r}
+                    key={r.key}
                     type="button"
-                    onClick={() => setSelectedReason(r)}
+                    onClick={() => setSelectedReason(r.key)}
                     className={cn(
                       'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
-                      selectedReason === r
+                      selectedReason === r.key
                         ? pendingStatus === 'won'
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
                           : 'border-red-500 bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
                         : 'border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground',
                     )}
                   >
-                    {r}
+                    {r.label}
                   </button>
                 ))}
               </div>
@@ -234,11 +248,11 @@ export function DealStatusControl({
                 className="resize-none text-xs"
               />
 
-              {/* Actions */}
+              {/* Actions — reason is optional, so Confirm is never blocked on it. */}
               <div className="flex items-center gap-2 pt-0.5">
                 <Button
                   size="sm"
-                  disabled={!selectedReason || saving}
+                  disabled={saving}
                   onClick={() => applyStatus(pendingStatus, selectedReason, note)}
                   className="h-7 text-xs"
                 >

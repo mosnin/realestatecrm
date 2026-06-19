@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
         tags: [],
         properties: [],
         scoringStatus: 'unscored',
+        // Structured lead-source attribution: per-realtor CSV import.
+        source: 'import' as const,
         createdAt: now,
         updatedAt: now,
       };

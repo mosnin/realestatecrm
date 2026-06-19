@@ -355,6 +355,8 @@ async def _resolve_or_stub_contact(
         "type": "QUALIFICATION",
         "properties": [],
         "tags": ["auto-created"],
+        # Structured lead-source attribution: agent auto-created stub.
+        "source": "agent",
     }
     if clean_email:
         stub["email"] = clean_email[:320]

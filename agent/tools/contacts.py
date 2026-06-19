@@ -257,6 +257,8 @@ async def create_contact(
         "type": "QUALIFICATION",
         "properties": [],
         "tags": clean_tags,
+        # Structured lead-source attribution: the AI agent created this contact.
+        "source": "agent",
         "createdAt": now,
         "updatedAt": now,
     }

@@ -356,6 +356,19 @@ async def reassign_lead(
         "scoreSummary": full.get("scoreSummary"),
         "scoreDetails": full.get("scoreDetails"),
         "sourceLabel": full.get("sourceLabel") or "reassigned by broker",
+        # Carry the original lead's structured source through the reassignment so
+        # attribution survives; fall back to 'referral' (a broker handed it over)
+        # for legacy rows with no/invalid source. Keep this list in sync with
+        # lib/lead-source.ts and the contact_source_check DB constraint.
+        "source": (
+            full.get("source")
+            if full.get("source") in {
+                "web_form", "brokerage_form", "api", "import",
+                "referral", "manual", "agent", "other",
+            }
+            else "referral"
+        ),
+        "sourceDetail": full.get("sourceDetail"),
         "applicationData": full.get("applicationData"),
         "applicationRef": full.get("applicationRef"),
         "applicationStatus": full.get("applicationStatus"),
