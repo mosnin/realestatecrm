@@ -24,6 +24,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 import type { InboxChannel, InboxDirection } from '@/lib/types';
 
 /** Postgres unique_violation — raised when the partial unique index on
@@ -267,6 +268,46 @@ export async function recordOutboundMessage(
   if (bumpError) throw bumpError;
 
   return { threadId: thread.id, messageId, deduped: false };
+}
+
+/**
+ * Best-effort wrapper around recordOutboundMessage for the live send paths
+ * (approved-draft send, autonomous agent send).
+ *
+ * The transcript write is a SIDE EFFECT of a send that has ALREADY happened —
+ * the message is out the door. So unlike the core helper (which throws so a
+ * dropped *capture* is loud), this wrapper must never let a thread/record
+ * failure turn a successful send into a failure: it logs and returns null
+ * instead of throwing.
+ *
+ * Two skip-without-error cases return null:
+ *   - no contactId: a thread is keyed on (spaceId, contactId); a send not tied
+ *     to a contact (e.g. a draft with a dealId but no contactId) simply has no
+ *     thread to land on. We skip rather than fabricate one.
+ *   - the record write throws: logged, swallowed.
+ *
+ * `context` is folded into the log line only (the caller's route tag + any ids
+ * worth correlating), never written to the row.
+ */
+export async function recordOutboundMessageSafe(
+  args: Omit<RecordOutboundArgs, 'contactId'> & {
+    contactId: string | null | undefined;
+  },
+  context: Record<string, unknown> = {},
+): Promise<RecordMessageResult | null> {
+  if (!args.contactId) {
+    logger.info('[inbox] outbound record skipped: no contactId', context);
+    return null;
+  }
+  try {
+    return await recordOutboundMessage({ ...args, contactId: args.contactId });
+  } catch (err) {
+    // A failed transcript write must not surface as a send failure. The send
+    // already succeeded; the worst case here is a missing thread row, not a
+    // double-send or a lost message.
+    logger.error('[inbox] outbound record failed (non-fatal)', context, err);
+    return null;
+  }
 }
 
 /**

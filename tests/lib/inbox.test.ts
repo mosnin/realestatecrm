@@ -42,6 +42,10 @@ function enqueue(table: string, t: Terminal): void {
   queueFor(table).push(t);
 }
 
+vi.mock('@/lib/logger', () => ({
+  logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock('@/lib/supabase', () => {
   function makeChain(table: string): Record<string, unknown> {
     const log = opsFor(table);
@@ -80,6 +84,7 @@ vi.mock('@/lib/supabase', () => {
 import {
   recordInboundMessage,
   recordOutboundMessage,
+  recordOutboundMessageSafe,
   markThreadRead,
 } from '@/lib/inbox';
 
@@ -260,6 +265,54 @@ describe('recordOutboundMessage', () => {
     expect(res).toEqual({ threadId: 'thread_1', messageId: 'out_existing', deduped: true });
     expect(countOp('InboxMessage', 'insert')).toBe(0);
     expect(countOp('InboxThread', 'update')).toBe(0);
+  });
+});
+
+describe('recordOutboundMessageSafe (best-effort wrapper)', () => {
+  it('delegates to recordOutboundMessage and returns its result on the happy path', async () => {
+    enqueue('InboxThread', { data: { id: 'thread_1', unreadCount: 0 }, error: null });
+    enqueue('InboxMessage', { data: { id: 'out_1' }, error: null });
+    enqueue('InboxThread', { data: null, error: null });
+
+    const res = await recordOutboundMessageSafe({
+      spaceId: 'space_1',
+      contactId: 'contact_1',
+      channel: 'email',
+      body: 'hi',
+      agentDraftId: 'draft_1',
+    });
+
+    expect(res).toEqual({ threadId: 'thread_1', messageId: 'out_1', deduped: false });
+    const insert = firstOp('InboxMessage', 'insert')!.arg as Record<string, unknown>;
+    expect(insert).toMatchObject({ direction: 'outbound', agentDraftId: 'draft_1' });
+  });
+
+  it('returns null and writes nothing when contactId is missing (a thread needs a contact)', async () => {
+    const res = await recordOutboundMessageSafe({
+      spaceId: 'space_1',
+      contactId: null,
+      channel: 'email',
+      body: 'hi',
+    });
+
+    expect(res).toBeNull();
+    // No DB work at all — not even a thread upsert.
+    expect(countOp('InboxThread', 'upsert')).toBe(0);
+    expect(countOp('InboxMessage', 'insert')).toBe(0);
+  });
+
+  it('swallows a record error and returns null instead of throwing (send must not fail)', async () => {
+    // Thread upsert errors → recordOutboundMessage throws → wrapper swallows.
+    enqueue('InboxThread', { data: null, error: { message: 'db down' } });
+
+    const res = await recordOutboundMessageSafe({
+      spaceId: 'space_1',
+      contactId: 'contact_1',
+      channel: 'sms',
+      body: 'hi',
+    });
+
+    expect(res).toBeNull();
   });
 });
 
