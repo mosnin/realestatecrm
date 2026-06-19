@@ -117,6 +117,11 @@ export type SpaceSetting = {
   notifyTourBookings: boolean;
   notifyNewDeals: boolean;
   notifyFollowUps: boolean;
+  // Notification digest (opt-in roll-up; default 'off' = per-event sends).
+  // The space-level default cadence; members can override via NotificationPreference.
+  digestCadence: 'off' | 'daily' | 'weekly';
+  // When the owner's space-default digest last went out (idempotency stamp).
+  lastDigestAt: string | null;
   // Daily brief settings (Phase B3 / B6)
   briefEnabled: boolean;
   briefHour: number;

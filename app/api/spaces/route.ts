@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from('SpaceSetting')
       .select(
-        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber, timezone,' +
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, digestCadence, phoneNumber, timezone,' +
         'briefEnabled, briefHour, briefEmail, briefSms,' +
         'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
       notifyTourBookings: settings?.notifyTourBookings ?? true,
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
+      digestCadence: (settings as { digestCadence?: string } | null)?.digestCadence ?? 'off',
       phoneNumber: settings?.phoneNumber ?? '',
       timezone: settings?.timezone ?? 'America/New_York',
       // Daily brief settings (Phase B3 / B6)
@@ -116,6 +117,7 @@ export async function PATCH(req: NextRequest) {
     notifyTourBookings,
     notifyNewDeals,
     notifyFollowUps,
+    digestCadence,
     briefEnabled,
     briefHour,
     briefEmail,
@@ -265,6 +267,11 @@ export async function PATCH(req: NextRequest) {
   if (typeof notifyTourBookings === 'boolean') settingsPayload.notifyTourBookings = notifyTourBookings;
   if (typeof notifyNewDeals === 'boolean') settingsPayload.notifyNewDeals = notifyNewDeals;
   if (typeof notifyFollowUps === 'boolean') settingsPayload.notifyFollowUps = notifyFollowUps;
+  // Digest cadence (space default): only the three legal values are accepted;
+  // anything else is ignored so a malformed payload can't write garbage.
+  if (digestCadence === 'off' || digestCadence === 'daily' || digestCadence === 'weekly') {
+    settingsPayload.digestCadence = digestCadence;
+  }
   if (typeof briefEnabled === 'boolean') settingsPayload.briefEnabled = briefEnabled;
   // briefHour: integer 0-23 in the space's timezone. Reject malformed
   // values silently so a typo'd payload doesn't write garbage.

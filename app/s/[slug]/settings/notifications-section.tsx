@@ -17,13 +17,24 @@ interface NotificationsSectionProps {
   slug: string;
 }
 
+type DigestCadence = 'off' | 'daily' | 'weekly';
+
+const CADENCE_OPTIONS: { value: DigestCadence; label: string }[] = [
+  { value: 'off', label: 'As they happen' },
+  { value: 'daily', label: 'Daily summary' },
+  { value: 'weekly', label: 'Weekly summary' },
+];
+
 /**
- * One toggle. Email me when something happens, or don't. Cadence, channels,
- * and per-event filters were all the team failing to pick a default. The
- * default is: when a real lead/tour/deal lands, you want to know.
+ * One toggle for the master email switch, plus an opt-in digest cadence. The
+ * default cadence is "As they happen" (off) — the existing per-event behavior,
+ * unchanged. Choosing Daily/Weekly rolls notable events into one summary email
+ * and is saved as a PER-MEMBER override (so each member of a brokerage space
+ * tunes their own), resolved over the space default server-side.
  */
 export function NotificationsSection({ slug }: NotificationsSectionProps) {
   const [notifications, setNotifications] = useState(true);
+  const [cadence, setCadence] = useState<DigestCadence>('off');
   const [userEmail, setUserEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -31,14 +42,25 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
 
   useEffect(() => {
     if (!slug) return;
-    fetch(`/api/spaces?slug=${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const s = data.settings ?? data;
-        setNotifications(s.notifications ?? true);
-        setUserEmail(data.ownerEmail ?? data.email ?? '');
+    Promise.all([
+      fetch(`/api/spaces?slug=${encodeURIComponent(slug)}`)
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch(`/api/notification-preferences?slug=${encodeURIComponent(slug)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ])
+      .then(([spaceData, prefData]) => {
+        if (spaceData) {
+          const s = spaceData.settings ?? spaceData;
+          setNotifications(s.notifications ?? true);
+          setUserEmail(spaceData.ownerEmail ?? spaceData.email ?? '');
+        }
+        // Effective cadence = member override ?? space default, resolved server-side.
+        if (prefData?.effective?.digestCadence) {
+          setCadence(prefData.effective.digestCadence as DigestCadence);
+        }
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -46,14 +68,27 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch('/api/spaces', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, notifications }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
+      // Master email toggle lives on the space (SpaceSetting.notifications);
+      // the digest cadence is the caller's per-member override.
+      const [spaceRes, prefRes] = await Promise.all([
+        fetch('/api/spaces', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, notifications }),
+        }),
+        fetch('/api/notification-preferences', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, digestCadence: cadence }),
+        }),
+      ]);
+      if (!spaceRes.ok) {
+        const d = await spaceRes.json().catch(() => ({}));
         throw new Error(d.error || 'Could not save.');
+      }
+      if (!prefRes.ok) {
+        const d = await prefRes.json().catch(() => ({}));
+        throw new Error(d.error || 'Could not save your digest preference.');
       }
       setSaved(true);
       toast.success('Notifications saved.');
@@ -80,6 +115,38 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
           </p>
         </div>
         <Switch checked={notifications} onCheckedChange={setNotifications} />
+      </div>
+
+      <div
+        className={cn(
+          'flex items-center justify-between gap-4 py-3 border-t border-border/60 transition-opacity',
+          !notifications && 'opacity-50',
+        )}
+      >
+        <div className="min-w-0">
+          <p className={`${BODY} font-medium`}>Email frequency</p>
+          <p className={`${CAPTION} mt-0.5`}>
+            {cadence === 'off'
+              ? 'One email per event, as it happens.'
+              : `One ${cadence} summary email instead of per-event emails.`}
+          </p>
+        </div>
+        <select
+          value={cadence}
+          onChange={(e) => setCadence(e.target.value as DigestCadence)}
+          disabled={!notifications}
+          className={cn(
+            'h-9 px-3 rounded-md border border-border/70 bg-background text-sm',
+            'focus:outline-none focus:ring-2 focus:ring-foreground/30',
+            'disabled:cursor-not-allowed',
+          )}
+        >
+          {CADENCE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <PushToggle slug={slug} />
