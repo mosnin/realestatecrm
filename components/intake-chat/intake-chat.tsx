@@ -8,8 +8,11 @@
  * presentation changed. Each question becomes a Chippi turn; the matching
  * input widget appears inline below it. Tap-to-submit on choice questions;
  * type + send on free-text. When the question list is exhausted (respecting
- * `visibleWhen`), we POST to /api/public/apply with the same payload shape
- * the dynamic form sent.
+ * `visibleWhen`), we POST the same payload shape the dynamic form sent —
+ * to /api/public/apply for per-realtor intakes, or to
+ * /api/public/apply/brokerage when a `brokerageId` is present (the
+ * brokerage variant rendered from /apply/b/[brokerageId]) so brokerage
+ * auto-assignment, broker notification, and lead tagging run.
  *
  * What this is NOT:
  *   - It is NOT an LLM-driven interview. The form-config drives order.
@@ -147,6 +150,27 @@ function formatAnswerText(question: FormQuestion, value: string | string[]): str
 
 function isTapToSubmit(type: FormQuestion['type']): boolean {
   return type === 'select' || type === 'radio';
+}
+
+/**
+ * Choose the submission endpoint for an intake.
+ *
+ * Brokerage intakes (rendered from /apply/b/[brokerageId], which passes a
+ * `brokerageId`) MUST hit the dedicated brokerage endpoint so the
+ * brokerage-only logic runs: auto-assignment via routeBrokerageLead, the
+ * broker dashboard notification, and the 'brokerage-lead' tag. The
+ * per-realtor /api/public/apply route keys off `slug` and ignores
+ * `brokerageId` entirely, so posting a brokerage intake there silently
+ * drops all of that routing.
+ *
+ * The brokerage route requires `brokerageId` (which buildApplicationPayload
+ * already includes) and tolerates the extra `slug` field via its
+ * passthrough schema, so the payload shape is identical for both.
+ */
+export function resolveApplyEndpoint(brokerageId?: string | null): string {
+  return brokerageId
+    ? '/api/public/apply/brokerage'
+    : '/api/public/apply';
 }
 
 /**
@@ -409,8 +433,13 @@ export function IntakeChat({
       visibleQuestionCount,
     });
 
+    // Brokerage intakes route to the dedicated brokerage endpoint so
+    // brokerage auto-assignment, broker notification, and lead tagging run.
+    // See resolveApplyEndpoint for the full rationale.
+    const endpoint = resolveApplyEndpoint(brokerageId);
+
     try {
-      const res = await fetch('/api/public/apply', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
