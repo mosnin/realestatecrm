@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { AnimatePresence, motion } from 'motion/react';
-import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell, ArrowRight, CalendarPlus } from 'lucide-react';
 import { cn, formatPhoneAsTyped } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Label } from '@/components/ui/label';
 import { fireConversionEvents } from '@/lib/tracking-events';
+import { EASE_APPLE, EASE_OUT } from '@/lib/motion';
+import { googleCalendarUrl, icsDataUri } from '@/lib/calendar-links';
 import { PRIMARY_PILL, QUIET_LINK, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 interface BookingFormProps {
@@ -46,6 +48,7 @@ const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
 const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
 export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f', profileHref }: BookingFormProps) {
+  const reduce = useReducedMotion();
   const primaryTextColor = pickContrastColor(accentColor);
   const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
@@ -211,43 +214,100 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   }
 
   if (step === 'confirmed') {
-    const dateLabel = selectedTime
-      ? new Date(selectedTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+    const start = selectedTime ? new Date(selectedTime) : null;
+    const dateLabel = start
+      ? start.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
       : '';
-    const timeLabel = selectedTime ? formatTime(selectedTime) : '';
+    const timeLabel = start ? formatTime(selectedTime!) : '';
+
+    // Build the calendar links from what the guest just booked. The slot ISO
+    // is the authoritative instant; effectiveDuration mirrors the server's
+    // tour length so the event block matches the real appointment.
+    const confirmedProperty = selectedPropertyId
+      ? properties.find((p) => p.id === selectedPropertyId)
+      : null;
+    const locationForCal =
+      (propertyAddress.trim() || confirmedProperty?.address || '').trim() || null;
+    const calTitle = `Tour with ${businessName}`;
+    const calDetails = `Your tour with ${businessName}.`;
+    let gCalUrl: string | null = null;
+    let icsUrl: string | null = null;
+    if (start) {
+      const end = new Date(start.getTime() + effectiveDuration * 60_000);
+      const evt = { title: calTitle, start, end, location: locationForCal, details: calDetails };
+      gCalUrl = googleCalendarUrl(evt);
+      icsUrl = icsDataUri(evt);
+    }
+
     return (
       <>
         <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={reduce ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="text-center space-y-4 py-8"
+          transition={{ duration: 0.4, ease: EASE_OUT }}
+          className="text-center py-8"
         >
           <motion.div
-            initial={{ scale: 0 }}
+            initial={reduce ? false : { scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
+            transition={reduce ? undefined : { delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
             className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
           >
             <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
           </motion.div>
-          <h2 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+          <h2 className="mt-4 text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
             Confirmed.
           </h2>
-          <p className="text-base text-muted-foreground max-w-sm mx-auto">
+          <p className="mt-3 text-base text-muted-foreground max-w-sm mx-auto">
             Your tour is set for <span className="font-medium text-foreground">{dateLabel}</span>{' '}
             at <span className="font-medium text-foreground">{timeLabel}</span>.
             {` ${businessName} will reach out if anything changes.`}
           </p>
-          {profileHref && (
-            <Link
-              href={profileHref}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors pt-2"
+
+          {/* Add to calendar — the highest-value moment to capture the slot
+              while it's fresh. Two routes cover every calendar app. */}
+          {(gCalUrl || icsUrl) && (
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduce ? 0 : 0.35, duration: 0.3, ease: EASE_OUT }}
+              className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2"
             >
-              See {businessName}&apos;s page
-              <ArrowRight size={14} aria-hidden />
-            </Link>
+              {gCalUrl && (
+                <a
+                  href={gCalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(PRIMARY_PILL, 'w-full sm:w-auto justify-center')}
+                  style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                >
+                  <CalendarPlus size={15} aria-hidden />
+                  Add to Google Calendar
+                </a>
+              )}
+              {icsUrl && (
+                <a
+                  href={icsUrl}
+                  download="tour.ics"
+                  className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium text-muted-foreground border border-border/70 hover:bg-foreground/[0.04] hover:text-foreground transition-colors w-full sm:w-auto justify-center"
+                >
+                  Apple / Outlook
+                </a>
+              )}
+            </motion.div>
+          )}
+
+          {profileHref && (
+            <div className="mt-5">
+              <Link
+                href={profileHref}
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                See {businessName}&apos;s page
+                <ArrowRight size={14} aria-hidden />
+              </Link>
+            </div>
           )}
         </motion.div>
       </>
@@ -269,7 +329,12 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   return (
     <>
-      <div className="rounded-xl bg-background border border-border/70 p-6">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, ease: EASE_APPLE }}
+        className="rounded-xl bg-background border border-border/70 p-6"
+      >
         {/* ─── Property section ─────────────────────────────────────────── */}
         {showProperty && (
           <section>
@@ -291,9 +356,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 {properties.map((p) => {
                   const active = selectedPropertyId === p.id;
                   return (
-                    <button
+                    <motion.button
                       key={p.id}
                       type="button"
+                      whileTap={reduce ? undefined : { scale: 0.99 }}
                       onClick={() => selectProperty(p.id)}
                       className={cn(
                         'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
@@ -307,7 +373,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                         <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
                         {p.address && <p className="text-xs text-muted-foreground truncate">{p.address}</p>}
                       </div>
-                    </button>
+                    </motion.button>
                   );
                 })}
                 <button
@@ -446,9 +512,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                   {slots.map((s) => {
                     const active = selectedDate === s.date;
                     return (
-                      <button
+                      <motion.button
                         key={s.date}
                         type="button"
+                        whileTap={reduce ? undefined : { scale: 0.96 }}
                         onClick={() => { setSelectedDate(s.date); setSelectedTime(null); }}
                         className={cn(
                           'flex-shrink-0 px-3 py-2 rounded-md text-center transition-colors min-w-[72px]',
@@ -463,45 +530,72 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                         <div className="text-sm font-medium">
                           {new Date(s.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </div>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
 
-                {selectedDate && selectedDaySlots && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto">
-                    {selectedDaySlots.times.map((t) => {
-                      const active = selectedTime === t;
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setSelectedTime(t)}
-                          className={cn(
-                            'h-9 px-3 rounded-md text-sm transition-colors',
-                            active
-                              ? 'font-medium'
-                              : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
-                          )}
-                          style={active ? { backgroundColor: accentColor, color: primaryTextColor } : undefined}
-                        >
-                          {formatTime(t)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                <AnimatePresence mode="wait">
+                  {selectedDate && selectedDaySlots && (
+                    <motion.div
+                      key={selectedDate}
+                      initial={reduce ? false : 'initial'}
+                      animate="enter"
+                      variants={
+                        reduce
+                          ? undefined
+                          : { enter: { transition: { staggerChildren: 0.018 } } }
+                      }
+                      className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto"
+                    >
+                      {selectedDaySlots.times.map((t) => {
+                        const active = selectedTime === t;
+                        return (
+                          <motion.button
+                            key={t}
+                            type="button"
+                            variants={
+                              reduce
+                                ? undefined
+                                : {
+                                    initial: { opacity: 0, y: 4 },
+                                    enter: { opacity: 1, y: 0, transition: { duration: 0.18, ease: EASE_OUT } },
+                                  }
+                            }
+                            whileTap={reduce ? undefined : { scale: 0.96 }}
+                            onClick={() => setSelectedTime(t)}
+                            className={cn(
+                              'h-9 px-3 rounded-md text-sm transition-colors',
+                              active
+                                ? 'font-medium'
+                                : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
+                            )}
+                            style={active ? { backgroundColor: accentColor, color: primaryTextColor } : undefined}
+                          >
+                            {formatTime(t)}
+                          </motion.button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                {selectedTime && (
-                  <button
-                    type="button"
-                    onClick={() => setStep('details')}
-                    className={cn(PRIMARY_PILL, 'w-full justify-center')}
-                    style={{ backgroundColor: accentColor, color: primaryTextColor }}
-                  >
-                    Continue
-                  </button>
-                )}
+                <AnimatePresence>
+                  {selectedTime && (
+                    <motion.button
+                      type="button"
+                      initial={reduce ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduce ? undefined : { opacity: 0, y: 8 }}
+                      transition={{ duration: 0.24, ease: EASE_APPLE }}
+                      onClick={() => setStep('details')}
+                      className={cn(PRIMARY_PILL, 'w-full justify-center')}
+                      style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                    >
+                      Continue
+                    </motion.button>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </section>
@@ -511,7 +605,11 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         {showDetailsSection && (
           <>
             <div className="border-t border-border/60 my-8" />
-            <section>
+            <motion.section
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: EASE_APPLE }}
+            >
               <div className="flex items-center justify-between mb-4">
                 <p className={SECTION_LABEL}>Your details</p>
                 <button
@@ -612,7 +710,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {submitting ? 'Booking…' : 'Confirm booking'}
               </button>
-            </section>
+            </motion.section>
           </>
         )}
 
@@ -620,7 +718,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         {error && step !== 'details' && (
           <p className="text-xs text-rose-600 dark:text-rose-400 mt-4 text-center">{error}</p>
         )}
-      </div>
+      </motion.div>
 
       {/* Processing overlay — kept minimal, paper-flat */}
       <AnimatePresence>

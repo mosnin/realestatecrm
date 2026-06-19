@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { Loader2, ArrowRight, CalendarClock } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { EASE_APPLE } from '@/lib/motion';
 import { PostTourFeedback } from '@/components/tours/post-tour-feedback';
 import {
   BODY,
@@ -66,6 +68,7 @@ const STATUS_TONE: Record<string, { label: string; className: string }> = {
 };
 
 export function TourManageClient({ tour, token, businessName, bookingSlug, profileHref }: TourManageClientProps) {
+  const reduce = useReducedMotion();
   const [status, setStatus] = useState(tour.status);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -76,6 +79,11 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
   const isCompleted = status === 'completed';
   const canCancel = !isCancelled && !isPast && !isCompleted;
   const canRebook = (isCancelled || isPast) && bookingSlug;
+  // An upcoming tour can be rescheduled: the guest picks a new slot on the
+  // booking page (the manage API has no reschedule action, so reschedule =
+  // pick-a-new-time, then cancel the old one). Only offered when we have a
+  // booking slug to send them to.
+  const canReschedule = canCancel && Boolean(bookingSlug);
 
   async function cancelTour() {
     setLoading(true);
@@ -118,7 +126,12 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
   if (isCancelled) {
     return (
       <div className="w-full max-w-md">
-        <div className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-4">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, ease: EASE_APPLE }}
+          className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-4"
+        >
           <h1
             className="text-3xl tracking-tight text-foreground"
             style={TITLE_FONT}
@@ -126,8 +139,8 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
             Cancelled.
           </h1>
           <p className={cn(BODY_MUTED, 'max-w-sm mx-auto')}>
-            Your tour with {businessName} has been cancelled. You can book a new
-            time below.
+            Your tour with {businessName} has been cancelled.
+            {canRebook ? ' You can book a new time below.' : ''}
           </p>
           {canRebook && (
             <div className="pt-2">
@@ -150,14 +163,19 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
               </Link>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-xl bg-background border border-border/70 p-6">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, ease: EASE_APPLE }}
+        className="rounded-xl bg-background border border-border/70 p-6"
+      >
         {/* ─── Heading ─────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -209,29 +227,43 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
 
         {/* ─── Actions ───────────────────────────────────────────── */}
         {(canCancel || canRebook) && (
-          <div className="border-t border-border/60 mt-8 pt-6 flex items-center justify-between gap-3">
+          <div className="border-t border-border/60 mt-8 pt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className={CAPTION}>
-              Need help? Contact {businessName} directly.
+              Need to change something? Contact {businessName} directly.
             </p>
-            {canCancel && (
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(true)}
-                disabled={loading}
-                className={cn(GHOST_PILL, 'disabled:opacity-60')}
-              >
-                {loading && <Loader2 size={14} className="animate-spin" />}
-                Cancel tour
-              </button>
-            )}
-            {canRebook && (
-              <a
-                href={`/book/${bookingSlug}`}
-                className={cn(PRIMARY_PILL, 'justify-center')}
-              >
-                Book a new tour
-              </a>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {canReschedule && (
+                <a
+                  href={`/book/${bookingSlug}`}
+                  className={cn(
+                    GHOST_PILL,
+                    'border border-border/70 hover:bg-foreground/[0.04]',
+                  )}
+                >
+                  <CalendarClock size={14} aria-hidden />
+                  Reschedule
+                </a>
+              )}
+              {canCancel && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={loading}
+                  className={cn(GHOST_PILL, 'disabled:opacity-60')}
+                >
+                  {loading && <Loader2 size={14} className="animate-spin" />}
+                  Cancel tour
+                </button>
+              )}
+              {canRebook && (
+                <a
+                  href={`/book/${bookingSlug}`}
+                  className={cn(PRIMARY_PILL, 'justify-center')}
+                >
+                  Book a new tour
+                </a>
+              )}
+            </div>
           </div>
         )}
 
@@ -240,7 +272,7 @@ export function TourManageClient({ tour, token, businessName, bookingSlug, profi
             Need help? Contact {businessName} directly.
           </p>
         )}
-      </div>
+      </motion.div>
 
       {/* ─── Cancel confirmation ──────────────────────────────────── */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
