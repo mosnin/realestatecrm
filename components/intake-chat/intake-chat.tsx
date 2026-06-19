@@ -32,7 +32,7 @@ import {
   useCallback,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { motion } from 'motion/react';
+import { motion, MotionConfig } from 'motion/react';
 import { validateQuestion } from '@/components/form-renderer/question-renderer';
 import { IntakeChatSuccess } from './intake-chat-success';
 import { cn, formatPhoneAsTyped } from '@/lib/utils';
@@ -499,25 +499,28 @@ export function IntakeChat({
       : null;
 
     return (
-      <div className="space-y-8">
-        <IntakeChatSuccess
-          businessName={businessName}
-          firstName={firstName}
-          realtorName={agentName}
-          agentPhoto={agentPhoto}
-          applicationRef={applicationRef}
-          thankYouTitle={customization.thankYouTitle}
-          thankYouMessage={customization.thankYouMessage}
-          accentColor={customization.accentColor}
-          bookHref={`/book/${slug}`}
-          statusHref={statusHref}
-          profileHref={`/p/${slug}`}
-        />
-      </div>
+      <MotionConfig reducedMotion="user">
+        <div className="space-y-8">
+          <IntakeChatSuccess
+            businessName={businessName}
+            firstName={firstName}
+            realtorName={agentName}
+            agentPhoto={agentPhoto}
+            applicationRef={applicationRef}
+            thankYouTitle={customization.thankYouTitle}
+            thankYouMessage={customization.thankYouMessage}
+            accentColor={customization.accentColor}
+            bookHref={`/book/${slug}`}
+            statusHref={statusHref}
+            profileHref={`/p/${slug}`}
+          />
+        </div>
+      </MotionConfig>
     );
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="space-y-8">
       {showProgress && (
         <ProgressBar
@@ -579,6 +582,7 @@ export function IntakeChat({
 
       <div ref={bottomRef} />
     </div>
+    </MotionConfig>
   );
 }
 
@@ -841,11 +845,20 @@ function ChoiceCards({
   // confirmation chat apps train leads to expect, and the difference
   // between "responsive" and "did my tap register?" on slow connections.
   const [pending, setPending] = useState<string | null>(null);
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear the pending-flash timer on unmount so a tap right before the
+  // question advances doesn't fire onCommit after this widget is gone.
+  useEffect(() => {
+    return () => {
+      if (commitTimer.current) clearTimeout(commitTimer.current);
+    };
+  }, []);
 
   const handleTap = (value: string) => {
     if (pending) return;
     setPending(value);
-    setTimeout(() => onCommit(value), 180);
+    commitTimer.current = setTimeout(() => onCommit(value), 180);
   };
 
   return (

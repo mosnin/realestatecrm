@@ -5,6 +5,7 @@ import { getClientUser } from '@/lib/client-auth';
 import { getClientPortalData } from '@/lib/client-portal-data';
 import { TITLE_FONT } from '@/lib/typography';
 import { LogoutButton } from '../portal-actions';
+import { PortalFadeIn, PortalStagger, PortalStaggerItem } from '../portal-motion';
 import {
   StatusPill,
   PortalEmptyState,
@@ -32,22 +33,34 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-12 px-4 py-10 pb-16 sm:px-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">Your portal.</p>
-          <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
-            {firstName ? `Welcome back, ${firstName}.` : 'Welcome back.'}
-          </h1>
-          <p className="text-sm text-muted-foreground">{statusSentence}</p>
-        </div>
-        <LogoutButton />
-      </header>
+      <PortalFadeIn>
+        <header className="flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <p className="text-sm text-muted-foreground">Your portal.</p>
+            <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+              {firstName ? `Welcome back, ${firstName}.` : 'Welcome back.'}
+            </h1>
+            <p className="text-sm text-muted-foreground">{statusSentence}</p>
+          </div>
+          <LogoutButton />
+        </header>
+      </PortalFadeIn>
 
       {total === 0 && (
-        <PortalEmptyState
-          headline="Nothing here yet."
-          whatsNext="Apply or book a tour with a realtor using this email and it shows up here."
-        />
+        <PortalFadeIn delay={0.05}>
+          <PortalEmptyState
+            headline="Nothing in motion yet."
+            whatsNext="The moment you apply or book a tour with a realtor using this email, it lands right here — applications, tours, and messages, all in one place."
+            action={
+              <a
+                href="https://usechippi.com"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-sm text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+              >
+                Find a realtor on Chippi
+              </a>
+            }
+          />
+        </PortalFadeIn>
       )}
 
       {/* Applications */}
@@ -56,9 +69,9 @@ export default async function DashboardPage() {
           <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Applications
           </h2>
-          <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+          <PortalStagger className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
             {applications.map((app) => (
-              <li key={app.contactId}>
+              <PortalStaggerItem key={app.contactId}>
                 <Link
                   href={`/clients/applications/${app.contactId}`}
                   className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-foreground/[0.04]"
@@ -76,9 +89,9 @@ export default async function DashboardPage() {
                   <StatusPill status={app.status} />
                   <ChevronRight size={15} className="shrink-0 text-muted-foreground" />
                 </Link>
-              </li>
+              </PortalStaggerItem>
             ))}
-          </ul>
+          </PortalStagger>
         </section>
       )}
 
@@ -88,9 +101,12 @@ export default async function DashboardPage() {
           <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Tours
           </h2>
-          <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+          <PortalStagger className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
             {tours.map((tour) => (
-              <li key={tour.id} className="flex items-center gap-3 px-4 py-3.5">
+              <PortalStaggerItem
+                key={tour.id}
+                className="flex items-center gap-3 px-4 py-3.5"
+              >
                 <CalendarCheck size={15} className="shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground tabular-nums">
@@ -102,9 +118,9 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 {tour.status && <StatusPill status={tour.status} />}
-              </li>
+              </PortalStaggerItem>
             ))}
-          </ul>
+          </PortalStagger>
         </section>
       )}
 

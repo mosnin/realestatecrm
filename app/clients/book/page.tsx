@@ -5,6 +5,7 @@ import { getClientUser } from '@/lib/client-auth';
 import { getClientPortalData } from '@/lib/client-portal-data';
 import { TITLE_FONT } from '@/lib/typography';
 import { PortalEmptyState } from '../portal-ui';
+import { PortalFadeIn } from '../portal-motion';
 import { BookTourForm } from './book-form';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export default async function BookTourPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-12 px-4 py-10 pb-16 sm:px-6">
+      <PortalFadeIn>
       <header className="space-y-3">
         <Link
           href="/clients/dashboard"
@@ -48,6 +50,7 @@ export default async function BookTourPage() {
           </p>
         </div>
       </header>
+      </PortalFadeIn>
 
       {realtors.length === 0 ? (
         <PortalEmptyState

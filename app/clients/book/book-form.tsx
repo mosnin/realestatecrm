@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'motion/react';
 import { CalendarCheck } from 'lucide-react';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { Field, TextInput, SubmitButton, FormError } from '../auth-ui';
 
 export function BookTourForm({
@@ -17,6 +19,7 @@ export function BookTourForm({
   guestPhone: string;
 }) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const [slug, setSlug] = useState(realtors[0]?.slug ?? '');
   const [startsAt, setStartsAt] = useState('');
   const [propertyAddress, setPropertyAddress] = useState('');
@@ -53,13 +56,31 @@ export function BookTourForm({
 
   if (done) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4">
-        <CalendarCheck size={18} className="text-emerald-600 dark:text-emerald-400" />
-        <div>
-          <p className="text-sm font-medium text-foreground">Tour requested.</p>
-          <p className="text-xs text-muted-foreground">Your agent will confirm the time.</p>
-        </div>
-      </div>
+      <motion.div
+        initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="flex flex-col items-center rounded-2xl border border-border/60 bg-card px-6 py-10 text-center"
+        role="status"
+      >
+        <motion.span
+          initial={reduce ? { opacity: 1 } : { scale: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={
+            reduce
+              ? { duration: 0 }
+              : { delay: 0.12, type: 'spring', stiffness: 200, damping: 15 }
+          }
+          className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"
+          aria-hidden
+        >
+          <CalendarCheck size={22} className="text-emerald-600 dark:text-emerald-400" />
+        </motion.span>
+        <p className="text-sm font-medium text-foreground">Tour requested.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Your agent will confirm the time — taking you back to your portal.
+        </p>
+      </motion.div>
     );
   }
 

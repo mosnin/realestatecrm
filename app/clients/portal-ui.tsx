@@ -2,7 +2,10 @@
  * Shared, presentational portal pieces used across dashboard + detail. Pure
  * server-safe components (no client hooks) so they can render in RSC.
  */
+import type { ReactNode } from 'react';
+import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TITLE_FONT } from '@/lib/typography';
 
 /* ─── Status pill ─────────────────────────────────────────────────────────── */
 
@@ -54,18 +57,79 @@ export function StatusPill({ status }: { status: string }) {
 
 /* ─── Empty state ─────────────────────────────────────────────────────────── */
 
+/**
+ * Portal empty state — warm, not a dashed grey box. A soft brand-tinted
+ * Sparkles disc (the same warm-orange identity tint the intake hero uses
+ * for its monogram — sanctioned brand context, not chrome), a serif
+ * headline that matches every other focal moment in the portal, and a
+ * single calm line of "what's next". An optional action slot lets the
+ * caller drop a CTA in without the empty state dead-ending the client.
+ */
 export function PortalEmptyState({
   headline,
   whatsNext,
+  action,
 }: {
   headline: string;
   whatsNext: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-      <p className="text-sm text-foreground">{headline}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{whatsNext}</p>
+    <div className="flex flex-col items-center rounded-2xl border border-border/60 bg-card px-6 py-12 text-center">
+      <span
+        aria-hidden
+        className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-50 text-orange-500 dark:bg-orange-500/15 dark:text-orange-400"
+      >
+        <Sparkles size={20} strokeWidth={1.75} />
+      </span>
+      <p className="text-lg tracking-tight text-foreground" style={TITLE_FONT}>
+        {headline}
+      </p>
+      <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-muted-foreground">
+        {whatsNext}
+      </p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
+  );
+}
+
+/* ─── Loading skeleton ────────────────────────────────────────────────────── */
+
+/**
+ * Portal page skeleton — honours the same neutral, paper-flat vocabulary
+ * the real portal pages use (serif-height header slug, rounded card rows)
+ * so the route transition reads as the same product loading, not a
+ * different screen. Used by the per-route loading.tsx files so navigation
+ * inside the portal never flashes blank.
+ */
+export function PortalSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <main
+      className="mx-auto max-w-3xl space-y-12 px-4 py-10 pb-16 sm:px-6"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <div className="space-y-2">
+        <div className="h-4 w-24 animate-pulse rounded bg-muted/60" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted/70" />
+        <div className="h-4 w-48 animate-pulse rounded bg-muted/50" />
+      </div>
+      <div className="space-y-4">
+        <div className="h-3 w-20 animate-pulse rounded bg-muted/50" />
+        <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+          {Array.from({ length: rows }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-4">
+              <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-muted/60" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="h-3.5 w-2/5 animate-pulse rounded bg-muted/60" />
+                <div className="h-3 w-1/4 animate-pulse rounded bg-muted/40" />
+              </div>
+              <div className="h-5 w-16 animate-pulse rounded-full bg-muted/50" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
   );
 }
 
