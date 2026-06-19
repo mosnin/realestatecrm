@@ -402,13 +402,16 @@ async def find_at_risk_agents(
         )
 
         # ── 4. Un-worked assigned leads ─────────────────────────────────────
-        # Over-fetch and filter in Python; same pattern as find_breached_leads.
+        # Over-fetch and filter the 'assigned-by-broker' tag in Python; same
+        # pattern (and same caveat) as find_breached_leads. Cap raised
+        # 2000 → 25000 so large spaces don't undercount. The real fix is a
+        # JSONB array-contains query in the db shim (out of scope here).
         unworked_res = await (
             db.table("Contact")
             .select("id,tags")
             .eq("spaceId", space_id)
             .is_("lastContactedAt", None)
-            .limit(2000)
+            .limit(25000)
             .execute()
         )
         unworked_count = sum(
@@ -418,11 +421,15 @@ async def find_at_risk_agents(
         )
 
         # ── 5. SLA tag counts ───────────────────────────────────────────────
+        # Scan contacts for SLA tags in Python (the db shim has no JSONB
+        # array-contains operator — that's the real fix, out of scope here).
+        # Cap raised from 5000 → 25000 so high-volume spaces don't silently
+        # undercount sla-nudged / sla-escalated leads past the old ceiling.
         sla_res = await (
             db.table("Contact")
             .select("id,tags")
             .eq("spaceId", space_id)
-            .limit(5000)
+            .limit(25000)
             .execute()
         )
         sla_nudge_count = 0

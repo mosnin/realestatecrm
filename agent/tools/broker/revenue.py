@@ -1,8 +1,14 @@
 """Broker read tools — commission revenue across the brokerage.
 
-One tool: commission_report(period). Sums GCI by realtor for a chosen window
-and returns the brokerage total. GCI = value * commissionRate / 100, same
-formula as `lib/commissions.ts` (verified read).
+One tool: commission_report(period). Sums GROSS GCI by realtor for a chosen
+window and returns the brokerage total. GCI = value * commissionRate / 100,
+same formula as `lib/commissions.ts` (verified read).
+
+"Gross GCI" means the total commission GENERATED on won deals — the full
+commission the deal produced, NOT the brokerage's net split of it. The
+house's cut (commission-split / cap math) lives in the CommissionLedger and
+is out of scope here. Every field and label below says "gross GCI" so the
+agent never frames this as the brokerage's take-home.
 
 Deal has no dedicated `closedAt` column — wins are recognised by the
 `status='won'` row paired with `updatedAt` (which is when the status moved
@@ -51,9 +57,11 @@ async def commission_report(
     ctx: RunContextWrapper[AgentContext],
     period: str = "mtd",
 ) -> dict[str, Any]:
-    """Commission revenue across the brokerage, broken out by realtor + total."""
+    """Gross GCI (total commission generated) on won deals, by realtor + brokerage total."""
     # period: 'mtd' (default) | 'ytd' | 'last_30d'; unknown values fall back to mtd.
-    # GCI = value * commissionRate / 100 over status='won' with updatedAt in window.
+    # gross_gci = value * commissionRate / 100 over status='won' with updatedAt in window.
+    # This is the FULL commission generated, NOT the brokerage's net split. Frame it as
+    # "gross GCI generated", never as the house's take-home.
     require_broker_role(ctx)
     brokerage_id = ctx.context.brokerage_id
 
@@ -74,7 +82,7 @@ async def commission_report(
             "ok": True,
             "period": normalised_period,
             "by_realtor": [],
-            "brokerage_total": 0.0,
+            "brokerage_gross_gci_total": 0.0,
         }
 
     space_to_owner: dict[str, str] = {
@@ -114,7 +122,7 @@ async def commission_report(
             "id": owner_id,
             "name": u.get("name") or u.get("email") or "Realtor",
             "deals_closed": 0,
-            "gci_earned": 0.0,
+            "gross_gci": 0.0,
         }
 
     total = 0.0
@@ -130,7 +138,7 @@ async def commission_report(
         rate = d.get("commissionRate")
         if value is not None and rate is not None:
             gci = float(value) * float(rate) / 100.0
-            bucket["gci_earned"] += gci
+            bucket["gross_gci"] += gci
             total += gci
 
     # Round at the end so we don't accumulate float error in the loop.
@@ -140,15 +148,17 @@ async def commission_report(
             "id": bucket["id"],
             "name": bucket["name"],
             "deals_closed": bucket["deals_closed"],
-            "gci_earned": round(bucket["gci_earned"], 2),
+            "gross_gci": round(bucket["gross_gci"], 2),
         })
-    by_realtor.sort(key=lambda r: r["gci_earned"], reverse=True)
+    by_realtor.sort(key=lambda r: r["gross_gci"], reverse=True)
 
     return {
         "ok": True,
         "period": normalised_period,
+        # gross GCI = total commission generated on won deals, not the
+        # brokerage's net split. Field named explicitly so the agent reports it right.
         "by_realtor": by_realtor,
-        "brokerage_total": round(total, 2),
+        "brokerage_gross_gci_total": round(total, 2),
     }
 
 
