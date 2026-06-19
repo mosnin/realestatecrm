@@ -172,7 +172,8 @@ const optionalSchema = z.object({
   // Webhook signing secrets
   CLERK_WEBHOOK_SECRET: z.string().optional(),       // app/api/webhooks/clerk
   COMPOSIO_WEBHOOK_SECRET: z.string().optional(),    // app/api/webhooks/composio
-  TELNYX_WEBHOOK_SECRET: z.string().optional(),      // app/api/webhooks/telnyx-voice
+  TELNYX_WEBHOOK_SECRET: z.string().optional(),      // app/api/webhooks/telnyx-voice (legacy shared-secret gate)
+  TELNYX_PUBLIC_KEY: z.string().optional(),          // app/api/webhooks/telnyx-voice (Ed25519 signature verification)
 
   // Telnyx voice
   TELNYX_AGENT_NUMBER: z.string().optional(),        // app/api/calls

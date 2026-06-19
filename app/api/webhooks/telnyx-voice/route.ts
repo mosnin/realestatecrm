@@ -9,11 +9,16 @@
  *   - call.hangup           → mark completed/failed/no_answer + duration
  *   - call.recording.saved  → download, transcribe, Chippi-summarize, persist
  *
- * Auth: this is a machine-to-machine webhook, so there's no Clerk session. We
- * gate on a shared secret query param (?secret=TELNYX_WEBHOOK_SECRET) when one
- * is configured. (Telnyx Ed25519 signature verification would be stronger but
- * needs the public key + raw-body handling; the shared secret is the pragmatic
- * gate and the route does nothing destructive — it only updates rows it owns.)
+ * Auth: this is a machine-to-machine webhook, so there's no Clerk session.
+ * Primary gate is Telnyx Ed25519 signature verification (TELNYX_PUBLIC_KEY,
+ * base64, from Mission Control) over the raw body + timestamp — same strength
+ * as the Stripe webhook's signature check, with built-in 5-minute replay
+ * protection. A legacy shared-secret query param (?secret=TELNYX_WEBHOOK_SECRET)
+ * is still honored as a second factor when configured.
+ *
+ * Idempotency: Telnyx retries on non-200, so we dedup by event id via Redis,
+ * mirroring the Stripe webhook (lib/redis no-op proxy → best-effort when Redis
+ * is absent). Already-processed events are skipped.
  *
  * This route NEVER throws and ALWAYS returns 200 — a non-200 makes Telnyx retry
  * the event, which would compound any transient failure.
@@ -21,7 +26,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { verifyTelnyxSignature } from '@/lib/telnyx-webhook';
 import {
   bridgeAndRecord,
   decodeClientState,
@@ -36,25 +43,56 @@ export const runtime = 'nodejs';
 const ok = () => NextResponse.json({ ok: true });
 
 export async function POST(req: NextRequest) {
-  // Shared-secret gate (only enforced when configured).
+  // Read the raw body ONCE — Ed25519 verification must run over the exact bytes
+  // Telnyx signed; re-serializing parsed JSON would not match the signature.
+  const rawBody = await req.text();
+
+  // ── Auth: Ed25519 signature (primary) ──────────────────────────────────────
+  const sigResult = await verifyTelnyxSignature(rawBody, req.headers);
+  if (sigResult === 'invalid') {
+    logger.warn('[telnyx-voice] rejected — bad/missing signature');
+    // Still 200 so a probe can't distinguish a bad signature from a bad route.
+    return ok();
+  }
+  if (sigResult === 'unconfigured') {
+    // No public key set (e.g. preview without Telnyx). Fall through to the
+    // shared-secret gate so the route still has *a* gate when configured.
+    logger.warn('[telnyx-voice] TELNYX_PUBLIC_KEY unset — skipping signature check');
+  }
+
+  // ── Auth: legacy shared-secret gate (second factor when configured) ─────────
   const expected = process.env.TELNYX_WEBHOOK_SECRET;
   if (expected) {
     const provided = req.nextUrl.searchParams.get('secret');
     if (provided !== expected) {
       logger.warn('[telnyx-voice] rejected — bad secret');
-      // Still 200 so a probe can't distinguish a wrong secret from a bad route,
-      // but we do nothing.
       return ok();
     }
   }
 
   let event: any;
   try {
-    const body = await req.json();
-    event = body?.data ?? body;
+    event = rawBody ? JSON.parse(rawBody) : {};
+    event = event?.data ?? event;
   } catch {
     logger.warn('[telnyx-voice] unparseable body');
     return ok();
+  }
+
+  // ── Idempotency: dedup by Telnyx event id (mirrors Stripe webhook) ──────────
+  const eventId: string | undefined = event?.id;
+  if (eventId) {
+    const eventKey = `telnyx:event:${eventId}`;
+    try {
+      const alreadyProcessed = await redis.get(eventKey);
+      if (alreadyProcessed) {
+        logger.info('[telnyx-voice] duplicate event skipped', { eventId });
+        return ok();
+      }
+      await redis.set(eventKey, '1', { ex: 86400 }); // Expire after 24h
+    } catch {
+      // Redis unavailable — proceed anyway (best-effort dedup).
+    }
   }
 
   const eventType: string | undefined = event?.event_type ?? event?.record_type;
