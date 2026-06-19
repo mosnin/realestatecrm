@@ -7,6 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { isValidDocumentKind, defaultDocumentKind } from '@/lib/deals/documents';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
+import { validateUpload } from '@/lib/storage/limits';
 
 export const runtime = 'nodejs';
 
@@ -100,6 +101,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (file.size === 0) return NextResponse.json({ error: 'Empty file' }, { status: 400 });
   if (!ALLOWED_MIME.has(file.type)) {
     return NextResponse.json({ error: 'Unsupported file type. Allowed: PDF, image, Word.' }, { status: 400 });
+  }
+
+  // Content-sniff before we trust the client-supplied MIME. Without this a
+  // user can rename evil.html → evil.pdf, set Content-Type: application/pdf,
+  // and we'd store executable markup as a "document". Pull the first 16
+  // bytes (the window MIME_RULES signatures live in) and let the shared
+  // validator confirm the real bytes match the declared type. ALLOWED_MIME
+  // is already gated to a subset of MIME_RULES, so an allowed type always has
+  // a rule here; this purely adds the magic-byte verdict on top.
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const sniff = validateUpload({ mimeType: file.type, sizeBytes: file.size, header });
+  if (!sniff.ok) {
+    return NextResponse.json({ error: sniff.reason ?? 'File content does not match declared type' }, { status: 400 });
   }
 
   const label = typeof labelRaw === 'string' && labelRaw.trim()

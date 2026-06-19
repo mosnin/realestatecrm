@@ -134,7 +134,7 @@ export async function GET() {
     //    longest-stuck one) ──────────────────────────────────────────────
     supabase
       .from('Deal')
-      .select('id, title, status, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
+      .select('id, title, status, stageChangedAt, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
       .eq('spaceId', space.id)
       .eq('status', 'active')
       .limit(500),
@@ -190,6 +190,7 @@ export async function GET() {
     id: string;
     title: string;
     status: string;
+    stageChangedAt: string | null;
     updatedAt: string | null;
     closeDate: string | null;
     followUpAt: string | null;
@@ -204,6 +205,7 @@ export async function GET() {
     const updated = d.updatedAt ? new Date(d.updatedAt) : nowDate;
     const health = dealHealth({
       status: 'active',
+      stageChangedAt: d.stageChangedAt as unknown as Date | null,
       updatedAt: updated as unknown as Date,
       closeDate: d.closeDate as unknown as Date | null,
       followUpAt: d.followUpAt as unknown as Date | null,

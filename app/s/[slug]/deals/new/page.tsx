@@ -97,6 +97,31 @@ export default function NewDealPage() {
     setSubmitting(true);
     setSubmitError('');
     try {
+      // "Add a new property" mode: the realtor typed a free-text address but
+      // never picked an existing Property, so propertyId is still null. Create
+      // the Property first so the deal links to a real row instead of leaving
+      // the address as dangling free-text. If creation fails, abort the deal
+      // create — don't silently produce a deal with an orphaned address.
+      let resolvedPropertyId = propertyId;
+      if (!resolvedPropertyId && address.trim()) {
+        const propRes = await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, address: address.trim() }),
+        });
+        if (!propRes.ok) {
+          const propBody = await propRes.json().catch(() => ({}));
+          const propMessage =
+            (propBody as { error?: string }).error ?? "Couldn't create that property.";
+          setSubmitError(propMessage);
+          toast.error(propMessage);
+          setSubmitting(false);
+          return;
+        }
+        const newProperty = (await propRes.json()) as { id: string };
+        resolvedPropertyId = newProperty.id;
+      }
+
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,7 +136,7 @@ export default function NewDealPage() {
           ...(probability && { probability: parseInt(probability, 10) }),
           ...(closeDate && { closeDate }),
           ...(address.trim() && { address: address.trim() }),
-          ...(propertyId && { propertyId }),
+          ...(resolvedPropertyId && { propertyId: resolvedPropertyId }),
           ...(description.trim() && { description: description.trim() }),
           contactIds: selectedContacts.map(c => c.id),
         }),

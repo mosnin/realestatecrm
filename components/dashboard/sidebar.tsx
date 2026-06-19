@@ -1062,6 +1062,7 @@ function RealtorNav({
   overdueFollowUpCount,
   pendingDraftCount,
   activePropertyCount,
+  isBrokerageMember,
 }: {
   slug: string;
   base: string;
@@ -1071,6 +1072,13 @@ function RealtorNav({
   overdueFollowUpCount: number;
   pendingDraftCount: number;
   activePropertyCount: number;
+  /**
+   * True when this realtor belongs to at least one brokerage. Gates the
+   * "Reviews" row: deal-reviews are broker feedback on deals the agent
+   * flagged, so a solo realtor (no broker) has no reviews to see. Threaded
+   * from RealtorSidebarShell, which already receives brokerageMemberships.
+   */
+  isBrokerageMember: boolean;
 }) {
   const { collapsed } = useSidebarCollapsed();
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
@@ -1107,6 +1115,21 @@ function RealtorNav({
   const workspaceItems = realtorNavItems.filter(
     (item) => !item.isAI && WORKSPACE_HREFS.has(item.href),
   );
+  // Reviews — broker feedback on deals the agent flagged for review
+  // (/s/[slug]/reviews). Lives in lib/nav-items.ts's blind spot: that file
+  // can't gate by brokerage membership, so the row is defined here and only
+  // shown to realtors who belong to a brokerage (a solo realtor has no broker
+  // to review them; their reviews page would just be empty). Appended to the
+  // workspace bucket so it sits alongside Deals/Properties and inherits the
+  // exact same row chrome via renderItem. Uses the same Flag icon as the
+  // broker-side "Reviews" entry for a shared icon vocabulary.
+  if (isBrokerageMember) {
+    workspaceItems.push({
+      href: '/reviews',
+      label: 'Reviews',
+      icon: Flag,
+    });
+  }
   // Setup bucket — once-and-done surfaces (gets the SETUP small-caps header).
   const setupItems = realtorNavItems.filter(
     (item) => !item.isAI && SETUP_HREFS.has(item.href),
@@ -1805,6 +1828,7 @@ function RealtorSidebarShell({
           overdueFollowUpCount={overdueFollowUpCount}
           pendingDraftCount={pendingDraftCount}
           activePropertyCount={activePropertyCount}
+          isBrokerageMember={brokerageMemberships.length > 0}
         />
 
         {/* Notification card slot — reserved space the inspiration the
