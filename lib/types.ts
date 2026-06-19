@@ -540,11 +540,32 @@ export type ContactActivity = {
   createdAt: Date;
 };
 
+/**
+ * The list a SavedView belongs to. Matches the `entity` CHECK constraint in
+ * 20260716000000_saved_views.sql.
+ */
+export type SavedViewEntity = 'contact' | 'deal';
+
+/**
+ * A named, persisted filter set for the contact or deal list. Server-backed via
+ * /api/saved-views (table "SavedView"), space-scoped.
+ *
+ * `page` is the legacy client-only discriminant that predated the server table
+ * (contact-table.tsx persisted views to localStorage keyed by `page`). It is
+ * kept OPTIONAL so older localStorage payloads still parse; new code keys off
+ * `entity`. `filters` is the opaque, client-owned re-hydration payload.
+ */
 export type SavedView = {
   id: string;
+  spaceId?: string;
+  userId?: string | null;
+  entity?: SavedViewEntity;
   name: string;
-  page: 'contacts' | 'leads';
+  /** @deprecated legacy localStorage discriminant — prefer `entity`. */
+  page?: 'contacts' | 'leads' | 'deals';
   filters: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Message = {
