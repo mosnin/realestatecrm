@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PhoneIncoming, Briefcase, CalendarCheck } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 
@@ -29,6 +29,7 @@ const TYPE_ICON: Record<ActivityItem['type'], typeof PhoneIncoming> = {
 export function TeamActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -40,15 +41,21 @@ export function TeamActivityFeed() {
     return () => controller.abort();
   }, []);
 
+  // Loading: a calm hairline-divided skeleton that mirrors the real row
+  // geometry (icon chip + two text lines) so the feed doesn't reflow when the
+  // data lands. The chip matches the resting icon-chip below.
   if (loading) {
     return (
-      <ul className="divide-y divide-border/60">
+      <ul className="divide-y divide-border/60" aria-hidden>
         {Array.from({ length: 4 }).map((_, i) => (
           <li key={i} className="flex items-start gap-3 py-3">
-            <div className="mt-0.5 h-3.5 w-3.5 rounded-full bg-muted animate-pulse" />
-            <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-3/4 bg-muted/30 animate-pulse rounded" />
-              <div className="h-2.5 w-1/3 bg-muted/20 animate-pulse rounded" />
+            <div className="h-7 w-7 shrink-0 rounded-full bg-muted/60 animate-pulse" />
+            <div className="flex-1 space-y-1.5 pt-1">
+              <div
+                className="h-3 bg-muted/40 animate-pulse rounded"
+                style={{ width: `${72 - i * 8}%` }}
+              />
+              <div className="h-2.5 w-1/4 bg-muted/25 animate-pulse rounded" />
             </div>
           </li>
         ))}
@@ -68,7 +75,7 @@ export function TeamActivityFeed() {
     <motion.ul
       className="divide-y divide-border/60"
       variants={STAGGER_CONTAINER}
-      initial="initial"
+      initial={reduce ? false : 'initial'}
       animate="enter"
     >
       {activities.map((item) => {
@@ -76,14 +83,15 @@ export function TeamActivityFeed() {
         return (
           <motion.li
             key={item.id}
-            variants={STAGGER_ITEM}
-            className="flex items-start gap-3 py-3"
+            variants={reduce ? undefined : STAGGER_ITEM}
+            className="group/act flex items-center gap-3 py-3"
           >
-            <Icon
-              size={14}
-              className="mt-0.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
+            {/* The category glyph rides in a quiet chip that warms on hover —
+                a faint affordance that the row is alive, staying neutral-first
+                (no decorative color) per the surface's own rule. */}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/55 text-muted-foreground transition-colors group-hover/act:bg-foreground/[0.06] group-hover/act:text-foreground">
+              <Icon size={13} aria-hidden />
+            </span>
             <p className="text-sm leading-snug">
               <span className="font-medium">{item.actor}</span>{' '}
               <span className="text-muted-foreground">{item.action}</span>{' '}

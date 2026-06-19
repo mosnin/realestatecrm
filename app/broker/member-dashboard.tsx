@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { BODY_MUTED, H1, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
+import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
+import { BriefReveal } from '@/components/broker/brief-section';
 
 type MemberDashboardProps = {
   ctx: {
@@ -254,40 +256,37 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
 
       {/* ── Stats row — hairline-divider snapshot, mirrors deal-quick-panel.
           Foreground for values, muted for labels. Icons stay for scanning
-          but render muted; no colored backgrounds. ── */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+          but render muted; no colored backgrounds. The focal counts tick up
+          on entry (BriefKpiTile → AnimatedNumber, reduced-motion aware). ── */}
+      <BriefReveal
+        delay={0.04}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+      >
         {[
           { label: 'Leads assigned', value: assignedCount, icon: PhoneIncoming },
           { label: 'Leads contacted', value: contactedCount, icon: PhoneOutgoing },
           { label: 'Active deals', value: activeDealsCount, icon: Briefcase },
           { label: 'Deals closed', value: wonDealsCount, icon: CheckCircle2 },
         ].map(({ label, value, icon: Icon }) => (
-          <div key={label} className="bg-background px-4 py-4">
-            <p className={cn(SECTION_LABEL, 'flex items-center gap-1.5')}>
-              <Icon size={11} className="text-muted-foreground" aria-hidden />
-              {label}
-            </p>
-            <p
-              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-              style={TITLE_FONT}
-            >
-              {value}
-            </p>
-          </div>
+          <BriefKpiTile key={label} label={label} value={value} icon={Icon} dim={value === 0} />
         ))}
-      </section>
+      </BriefReveal>
 
       {/* ── Two-column layout: Recent leads + Overdue follow-ups ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <BriefReveal delay={0.08} as="div" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent assigned leads */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className={SECTION_LABEL}>Recent assigned leads</h2>
             <Link
               href="/broker/my-leads"
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              className="group/all text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              View all <ArrowRight size={12} />
+              View all{' '}
+              <ArrowRight
+                size={12}
+                className="transition-transform duration-200 group-hover/all:translate-x-0.5"
+              />
             </Link>
           </div>
 
@@ -305,10 +304,10 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
                 <li key={lead.id}>
                   <Link
                     href={spaceSlug ? `/s/${spaceSlug}/leads/${lead.id}` : '#'}
-                    className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+                    className="group/lead flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-muted-foreground">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 transition-colors group-hover/lead:bg-foreground/[0.07]">
+                      <span className="text-xs font-semibold text-muted-foreground transition-colors group-hover/lead:text-foreground">
                         {(lead.name ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
                       </span>
                     </div>
@@ -353,13 +352,13 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
                   <li key={contact.id}>
                     <Link
                       href={spaceSlug ? `/s/${spaceSlug}/leads/${contact.id}` : '#'}
-                      className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+                      className="group/fu flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
                     >
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 transition-colors group-hover/fu:bg-foreground/[0.07]">
                         {isOverdue ? (
-                          <AlertTriangle size={14} className="text-muted-foreground" />
+                          <AlertTriangle size={14} className="text-muted-foreground transition-colors group-hover/fu:text-foreground" />
                         ) : (
-                          <Clock size={14} className="text-muted-foreground" />
+                          <Clock size={14} className="text-muted-foreground transition-colors group-hover/fu:text-foreground" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -386,10 +385,10 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
             </ul>
           )}
         </div>
-      </div>
+      </BriefReveal>
 
       {/* ── Latest announcements ── */}
-      <div className="space-y-3">
+      <BriefReveal delay={0.12} as="div" className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className={SECTION_LABEL}>Announcements</h2>
         </div>
@@ -424,7 +423,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
             ))}
           </ul>
         )}
-      </div>
+      </BriefReveal>
     </div>
   );
 }

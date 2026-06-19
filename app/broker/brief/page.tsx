@@ -19,6 +19,9 @@ import { dealHealth } from '@/lib/deals/health';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
+import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
+import { BriefReveal } from '@/components/broker/brief-section';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import {
   aggregateDraftStats,
   draftStatsWindowStart,
@@ -460,28 +463,33 @@ export default async function BrokerBriefPage() {
           name, one line of what it does, a quiet pill into /broker/chippi.
           No orange wash, no shadow — the surface stays out of the way and the
           invitation is the loud note. */}
-      <Link
-        href="/broker"
-        className="group/chippi block rounded-xl border border-border/70 bg-card px-5 py-5 hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className="flex-1 min-w-0 space-y-1">
-            <p
-              className="text-[21px] leading-snug tracking-tight text-foreground"
-              style={TITLE_FONT}
-            >
-              Talk to Chippi
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Ask about team health, reassign a lead, flag a deal, send an announcement.
-            </p>
+      <BriefReveal delay={0.02} as="div">
+        <Link
+          href="/broker"
+          className="group/chippi block rounded-xl border border-border/70 bg-card px-5 py-5 hover:bg-muted/30 hover:border-border transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex-1 min-w-0 space-y-1">
+              <p
+                className="text-[21px] leading-snug tracking-tight text-foreground"
+                style={TITLE_FONT}
+              >
+                Talk to Chippi
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Ask about team health, reassign a lead, flag a deal, send an announcement.
+              </p>
+            </div>
+            <span className={cn(CHIPPI_PILL, 'flex-shrink-0')}>
+              Open
+              <ArrowUpRight
+                size={15}
+                className="transition-transform duration-200 group-hover/chippi:translate-x-0.5 group-hover/chippi:-translate-y-0.5"
+              />
+            </span>
           </div>
-          <span className={cn(CHIPPI_PILL, 'flex-shrink-0')}>
-            Open
-            <ArrowUpRight size={15} />
-          </span>
-        </div>
-      </Link>
+        </Link>
+      </BriefReveal>
 
       {/* First-run nudge — only when the team hasn't been set up yet.
           Neutral icon: this is a settings affordance, not Chippi speaking,
@@ -508,46 +516,42 @@ export default async function BrokerBriefPage() {
       {/* Snapshot — three numbers the broker actually cares about.
           Uses TITLE_FONT + SECTION_LABEL so the snapshot vocabulary
           matches the Commission grid below; one numeric vocabulary
-          on the whole page. */}
-      <section className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
-        <div className="bg-background p-4">
-          <p className={SECTION_LABEL}>Pipeline</p>
-          <p
-            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-            style={TITLE_FONT}
-          >
-            ${formatCompact(totalPipeline)}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            {totalDeals} active deal{totalDeals === 1 ? '' : 's'}
-          </p>
-        </div>
-        <div className="bg-background p-4">
-          <p className={SECTION_LABEL}>Won</p>
-          <p
-            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-            style={TITLE_FONT}
-          >
-            ${formatCompact(totalWonValue)}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-1">closed this period</p>
-        </div>
-        <div className="bg-background p-4">
-          <p className={SECTION_LABEL}>Funnel</p>
-          <p
-            className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-            style={TITLE_FONT}
-          >
-            {totalLeads}&nbsp;→&nbsp;{totalApplications}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-1">leads → applications</p>
-        </div>
-      </section>
+          on the whole page. The focal numerals count up on entry
+          (BriefKpiTile → AnimatedNumber, reduced-motion aware). The
+          $-prefix is kept inside the formatter so the displayed string
+          is byte-identical to the prior server render. */}
+      <BriefReveal
+        delay={0.04}
+        className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+      >
+        <BriefKpiTile
+          label="Pipeline"
+          value={totalPipeline}
+          format={(n) => `$${formatCompact(n)}`}
+          sub={`${totalDeals} active deal${totalDeals === 1 ? '' : 's'}`}
+        />
+        <BriefKpiTile
+          label="Won"
+          value={totalWonValue}
+          format={(n) => `$${formatCompact(n)}`}
+          sub="closed this period"
+        />
+        <BriefKpiTile
+          label="Funnel"
+          display={
+            <>
+              {totalLeads}&nbsp;→&nbsp;{totalApplications}
+            </>
+          }
+          sub="leads → applications"
+        />
+      </BriefReveal>
 
       {/* Commission — money is the loudest signal. Hairline-divider grid
           mirrors deal-quick-panel.tsx's snapshot vocabulary. Section header
-          drills into /broker/commissions for the per-deal breakdown. */}
-      <section>
+          drills into /broker/commissions for the per-deal breakdown. Focal
+          figures count up on entry (BriefKpiTile, reduced-motion aware). */}
+      <BriefReveal delay={0.08}>
         <Link
           href="/broker/commissions"
           className="group/commission flex items-center gap-3 pb-3 border-b border-border/60"
@@ -555,63 +559,38 @@ export default async function BrokerBriefPage() {
           <h2 className={SECTION_LABEL}>Commission</h2>
           <ArrowRight
             size={11}
-            className="text-muted-foreground/40 group-hover/commission:text-muted-foreground transition-colors"
+            className="text-muted-foreground/40 group-hover/commission:translate-x-0.5 group-hover/commission:text-muted-foreground transition-all duration-200"
           />
         </Link>
         <div className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70 mt-4">
-          <div className="bg-background p-4">
-            <p className={SECTION_LABEL}>MTD commission</p>
-            <p
-              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-              style={TITLE_FONT}
-            >
-              {formatCompact(mtdCommission)}
-            </p>
-          </div>
-          <div className="bg-background p-4">
-            <p className={SECTION_LABEL}>YTD commission</p>
-            <p
-              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-              style={TITLE_FONT}
-            >
-              {formatCompact(ytdCommission)}
-            </p>
-          </div>
-          <div className="bg-background p-4">
-            <p className={SECTION_LABEL}>Top realtor (MTD)</p>
-            <p
-              className="text-2xl tracking-tight mt-1.5 text-foreground truncate"
-              style={TITLE_FONT}
-            >
-              {topRealtorMtd ? topRealtorMtd.name : <span className="text-muted-foreground">—</span>}
-            </p>
-            {topRealtorMtd && (
-              <p className="text-[11px] text-muted-foreground tabular-nums mt-1">
-                {formatCompact(topRealtorMtd.amount)}
-              </p>
-            )}
-          </div>
-          <div className="bg-background p-4">
-            <p className={SECTION_LABEL}>Deals closed MTD</p>
-            <p
-              className="text-2xl tracking-tight tabular-nums mt-1.5 text-foreground"
-              style={TITLE_FONT}
-            >
-              {mtdDealsClosed}
-            </p>
-          </div>
+          <BriefKpiTile label="MTD commission" value={mtdCommission} format={formatCompact} />
+          <BriefKpiTile label="YTD commission" value={ytdCommission} format={formatCompact} />
+          <BriefKpiTile
+            label="Top realtor (MTD)"
+            display={
+              topRealtorMtd ? (
+                <span className="block truncate">{topRealtorMtd.name}</span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )
+            }
+            sub={topRealtorMtd ? formatCompact(topRealtorMtd.amount) : undefined}
+          />
+          <BriefKpiTile label="Deals closed MTD" value={mtdDealsClosed} />
         </div>
         {mtdCommission === 0 && (
           <p className="text-[13px] text-muted-foreground mt-3">
             Quiet — no deals closed this month yet.
           </p>
         )}
-      </section>
+      </BriefReveal>
 
       {/* Revenue — projected GCI for the month at a glance.
           Focal number in serif Times + one-line pace read + the single biggest
-          deal to watch. Computation mirrors app/broker/forecast/page.tsx. */}
-      <section>
+          deal to watch. Computation mirrors app/broker/forecast/page.tsx.
+          The projected figure and the won/in-flight strip count up on entry
+          (AnimatedNumber, reduced-motion aware) — the loudest money beat. */}
+      <BriefReveal delay={0.12}>
         <Link
           href="/broker/forecast"
           className="group/revenue flex items-center gap-3 pb-3 border-b border-border/60"
@@ -619,7 +598,7 @@ export default async function BrokerBriefPage() {
           <h2 className={SECTION_LABEL}>Revenue</h2>
           <ArrowRight
             size={11}
-            className="text-muted-foreground/40 group-hover/revenue:text-muted-foreground transition-colors"
+            className="text-muted-foreground/40 group-hover/revenue:translate-x-0.5 group-hover/revenue:text-muted-foreground transition-all duration-200"
           />
         </Link>
 
@@ -635,7 +614,7 @@ export default async function BrokerBriefPage() {
                 className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')}
                 style={TITLE_FONT}
               >
-                {formatCurrency(revTotalForecast)}
+                <AnimatedNumber value={revTotalForecast} format={formatCurrency} />
               </p>
               {revPaceSentence && (
                 <p className={cn(CAPTION, 'mt-1')}>
@@ -652,7 +631,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  {formatCompact(revWonGci)}
+                  <AnimatedNumber value={revWonGci} format={formatCompact} />
                 </p>
               </div>
               <div className="bg-background px-4 py-3">
@@ -661,7 +640,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  {formatCompact(revInFlightGci)}
+                  <AnimatedNumber value={revInFlightGci} format={formatCompact} />
                 </p>
               </div>
             </div>
@@ -678,20 +657,23 @@ export default async function BrokerBriefPage() {
                 </div>
                 <Link
                   href="/broker/forecast"
-                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                  className="group/fc inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 >
                   Full forecast
-                  <ArrowUpRight size={11} />
+                  <ArrowUpRight
+                    size={11}
+                    className="transition-transform duration-200 group-hover/fc:translate-x-0.5 group-hover/fc:-translate-y-0.5"
+                  />
                 </Link>
               </div>
             )}
           </div>
         )}
-      </section>
+      </BriefReveal>
 
       {/* Speed to lead — only when slaEnabled is on */}
       {slaEnabled && (
-        <section>
+        <BriefReveal delay={0.14}>
           <div className="flex items-center gap-3 pb-3 border-b border-border/60">
             <h2 className={SECTION_LABEL}>Speed to lead</h2>
           </div>
@@ -715,12 +697,12 @@ export default async function BrokerBriefPage() {
               <span className="text-muted-foreground">Every lead has been answered.</span>
             )}
           </p>
-        </section>
+        </BriefReveal>
       )}
 
       {/* Pending invitations — only when there are some */}
       {pendingInvitations.length > 0 && (
-        <section>
+        <BriefReveal delay={0.16}>
           <div className="flex items-center gap-3 pb-3 border-b border-border/60">
             <h2 className={SECTION_LABEL}>Pending invitations</h2>
             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -728,10 +710,13 @@ export default async function BrokerBriefPage() {
             </span>
             <Link
               href="/broker/invitations"
-              className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="group/inv ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Manage
-              <ArrowRight size={11} />
+              <ArrowRight
+                size={11}
+                className="transition-transform duration-200 group-hover/inv:translate-x-0.5"
+              />
             </Link>
           </div>
           <ul className="divide-y divide-border/60">
@@ -754,11 +739,11 @@ export default async function BrokerBriefPage() {
               );
             })}
           </ul>
-        </section>
+        </BriefReveal>
       )}
 
       {/* The swarm — your team today */}
-      <section>
+      <BriefReveal delay={0.18}>
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
           <h2 className={SECTION_LABEL}>Your team</h2>
           {activeMembers > 0 && (
@@ -766,15 +751,19 @@ export default async function BrokerBriefPage() {
           )}
           <Link
             href="/broker/members"
-            className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="group/mng ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >
             Manage
-            <ArrowRight size={11} />
+            <ArrowRight
+              size={11}
+              className="transition-transform duration-200 group-hover/mng:translate-x-0.5"
+            />
           </Link>
         </div>
 
         {memberRows.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <Building2 size={26} className="mx-auto mb-3 text-muted-foreground/55" aria-hidden />
             <p className="text-sm text-foreground">Your team, in here.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Invite your first realtor and their work will land in this view.
@@ -804,7 +793,7 @@ export default async function BrokerBriefPage() {
                     href={href}
                     className="group/row flex items-center gap-3 py-3 -mx-2 px-2 rounded-lg hover:bg-muted/30 transition-colors"
                   >
-                    <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground">
+                    <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground transition-colors group-hover/row:bg-foreground/[0.07] group-hover/row:text-foreground">
                       {initial}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -847,7 +836,7 @@ export default async function BrokerBriefPage() {
                     </div>
                     <ChevronRight
                       size={13}
-                      className="flex-shrink-0 text-muted-foreground/0 group-hover/row:text-muted-foreground/60 transition-colors"
+                      className="flex-shrink-0 text-muted-foreground/0 -translate-x-0.5 group-hover/row:text-muted-foreground/60 group-hover/row:translate-x-0 transition-all duration-200"
                     />
                   </Link>
                 </li>
@@ -855,22 +844,24 @@ export default async function BrokerBriefPage() {
             })}
           </ul>
         )}
-      </section>
+      </BriefReveal>
 
       {/* Draft impact — how Chippi's drafts have actually been landing across
           the team over the last 30 days. Sits below the team list so the
           realtor row remains the focal element of the page. */}
-      <DraftImpactCard stats={draftStats} />
+      <BriefReveal delay={0.2} as="div">
+        <DraftImpactCard stats={draftStats} />
+      </BriefReveal>
 
       {/* What the team did — proof of work across the swarm */}
-      <section>
+      <BriefReveal delay={0.22}>
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
           <h2 className={SECTION_LABEL}>What the team did</h2>
         </div>
         <div className="pt-4">
           <TeamActivityFeed />
         </div>
-      </section>
+      </BriefReveal>
     </div>
   );
 }

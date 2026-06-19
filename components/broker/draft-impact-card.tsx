@@ -1,4 +1,5 @@
 import type { DraftStats } from '@/lib/draft-stats';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 /**
  * "Draft impact" — single card on the broker dashboard. Reports how Chippi's
@@ -12,11 +13,15 @@ import type { DraftStats } from '@/lib/draft-stats';
  *
  * Empty state (total === 0): one sentence, no numbers, no skeleton.
  *
- * The math lives in `lib/draft-stats.ts`; this file only renders.
+ * The math lives in `lib/draft-stats.ts`; this file only renders. The focal
+ * approval percentage counts up on entry via the shared AnimatedNumber (a
+ * client island; honors prefers-reduced-motion), matching the brief's other
+ * stat surfaces. No data, copy, or number changes — the count-up lands on the
+ * exact figure the server computed.
  */
 export function DraftImpactCard({ stats }: { stats: DraftStats }) {
   return (
-    <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-1.5">
+    <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-1.5 transition-colors hover:border-border">
       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         Draft impact
       </p>
@@ -45,7 +50,7 @@ function DraftImpactBody({ stats }: { stats: DraftStats }) {
         className="text-3xl tracking-tight tabular-nums text-foreground"
         style={{ fontFamily: 'var(--font-title)' }}
       >
-        {approvalPct}%
+        <AnimatedNumber value={approvalPct} format={(n) => `${Math.round(n)}%`} />
       </p>
       <p className="text-sm text-muted-foreground tabular-nums">
         {sent} of {stats.total} drafts went out.
