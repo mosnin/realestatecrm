@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, useReducedMotion } from 'framer-motion';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
 interface Tab {
   href: string;
@@ -11,10 +13,13 @@ interface Tab {
 
 /**
  * Analytics tab strip — underline pattern, paper-flat.
- * Active tab gets a foreground bottom border; idle tabs are muted.
+ * Active tab gets a foreground bottom border; idle tabs are muted. The active
+ * underline is a single shared element that slides between tabs (layoutId) so
+ * switching sections reads as one continuous motion rather than a hard cut.
  */
 export function AnalyticsTabs({ slug }: { slug: string }) {
   const pathname = usePathname() || '';
+  const reduce = useReducedMotion();
 
   const tabs: Tab[] = [
     { href: '/analytics', label: 'Overview', matchPath: '/analytics' },
@@ -51,14 +56,26 @@ export function AnalyticsTabs({ slug }: { slug: string }) {
           <Link
             key={tab.href}
             href={`/s/${slug}${tab.href}`}
-            className={`flex items-center px-3 py-2 -mb-px text-sm whitespace-nowrap border-b-2 transition-colors duration-150 ${
+            className={`relative flex items-center px-3 py-2 -mb-px text-sm whitespace-nowrap transition-colors duration-150 ${
               isActive
-                ? 'border-foreground text-foreground font-medium'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'text-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             aria-current={isActive ? 'page' : undefined}
           >
             {tab.label}
+            {isActive && (
+              <motion.span
+                layoutId="analytics-tab-underline"
+                className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground"
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { duration: DURATION_BASE, ease: EASE_OUT }
+                }
+                aria-hidden
+              />
+            )}
           </Link>
         );
       })}

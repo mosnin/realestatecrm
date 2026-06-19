@@ -14,18 +14,21 @@ import {
 } from 'recharts';
 import {
   StatCell,
+  StatStrip,
   ChartSection,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  EmptyState,
   PAPER_SERIES,
   PAPER_GRID,
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { LeadsAnalyticsData } from '@/lib/analytics-data';
-import { SECTION_RHYTHM, BODY_MUTED } from '@/lib/typography';
+import { SECTION_RHYTHM } from '@/lib/typography';
+import { Users } from 'lucide-react';
 
 const leadsVolumeConfig = {
   count: { label: 'Leads', color: 'hsl(var(--foreground))' },
@@ -104,7 +107,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
   return (
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip>
         <StatCell label="Total leads" value={data.totalLeads} sub="all time" />
         <StatCell
           label="Avg score"
@@ -121,11 +124,11 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
           value={data.buyerLeadCount}
           sub={`${data.rentalLeadCount} rental`}
         />
-      </div>
+      </StatStrip>
 
       {/* Volume + scoring */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Lead volume over time" sub="New leads submitted each month">
+        <ChartSection title="Lead volume over time" sub="New leads submitted each month" index={0}>
           <ChartContainer config={leadsVolumeConfig} className="h-[220px] w-full">
             <AreaChart data={data.leadsOverTime}>
               <defs>
@@ -151,7 +154,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
           </ChartContainer>
         </ChartSection>
 
-        <ChartSection title="Score distribution" sub="Leads grouped by AI score tier">
+        <ChartSection title="Score distribution" sub="Leads grouped by AI score tier" index={1}>
           <ChartContainer config={scoreBucketsConfig} className="h-[220px] w-full">
             <BarChart data={data.leadScoreBuckets} barSize={32}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -172,7 +175,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       </div>
 
       {/* Qualification metrics strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip>
         <StatCell label="Pass affordability" value={passRate} sub="pass 3x rent rule" />
         <StatCell
           label="Screening flags"
@@ -193,12 +196,12 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
           }
           sub="of total leads"
         />
-      </div>
+      </StatStrip>
 
       {/* Qualification breakdowns */}
       <div className="grid sm:grid-cols-2 gap-4">
         {data.employmentBreakdown.length > 0 && (
-          <ChartSection title="Employment status" sub="How leads are currently employed">
+          <ChartSection title="Employment status" sub="How leads are currently employed" index={0}>
             <ChartContainer config={employmentConfig} className="h-[220px] w-full">
               <BarChart data={data.employmentBreakdown} layout="vertical" barSize={14} margin={{ left: 0 }}>
                 <CartesianGrid horizontal={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -212,7 +215,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.affordabilityBuckets.length > 0 && (
-          <ChartSection title="Income affordability" sub="Leads who meet the 3x monthly rent rule">
+          <ChartSection title="Income affordability" sub="Leads who meet the 3x monthly rent rule" index={1}>
             <ChartContainer config={affordabilityConfig} className="h-[220px] w-full">
               <PieChart>
                 <Pie
@@ -246,7 +249,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.moveInUrgency.length > 0 && (
-          <ChartSection title="Move-in urgency" sub="How soon leads want to move in">
+          <ChartSection title="Move-in urgency" sub="How soon leads want to move in" index={2}>
             <ChartContainer config={urgencyConfig} className="h-[200px] w-full">
               <BarChart data={data.moveInUrgency} barSize={28}>
                 <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -267,7 +270,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.screeningFlags.length > 0 && (
-          <ChartSection title="Screening flags" sub="Leads with disclosed issues">
+          <ChartSection title="Screening flags" sub="Leads with disclosed issues" index={3}>
             <ChartContainer config={screeningConfig} className="h-[200px] w-full">
               <BarChart data={data.screeningFlags} layout="vertical" barSize={14} margin={{ left: 8 }}>
                 <CartesianGrid horizontal={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -281,7 +284,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.leadStateDistribution.length > 0 && (
-          <ChartSection title="AI lead state" sub="How the AI has categorized your leads">
+          <ChartSection title="AI lead state" sub="How the AI has categorized your leads" index={4}>
             <ChartContainer config={leadStateConfig} className="h-[220px] w-full">
               <PieChart>
                 <Pie
@@ -308,7 +311,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.topRiskFlags.length > 0 && (
-          <ChartSection title="Top AI risk flags" sub="Most common risks flagged across leads">
+          <ChartSection title="Top AI risk flags" sub="Most common risks flagged across leads" index={5}>
             <ChartContainer config={riskFlagsConfig} className="h-[220px] w-full">
               <BarChart data={data.topRiskFlags} layout="vertical" barSize={12} margin={{ left: 8 }}>
                 <CartesianGrid horizontal={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -322,7 +325,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.avgScoreByMonth.some((m) => m.avg != null) && (
-          <ChartSection title="Avg lead score over time" sub="Monthly average AI qualification score">
+          <ChartSection title="Avg lead score over time" sub="Monthly average AI qualification score" index={6}>
             <ChartContainer config={avgScoreConfig} className="h-[200px] w-full">
               <BarChart data={data.avgScoreByMonth} barSize={22}>
                 <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -351,7 +354,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
         )}
 
         {data.buyerBudgetDistribution.length > 0 && (
-          <ChartSection title="Buyer budget distribution" sub="Budget ranges across buyer leads">
+          <ChartSection title="Buyer budget distribution" sub="Budget ranges across buyer leads" index={7}>
             <ChartContainer config={buyerBudgetConfig} className="h-[220px] w-full">
               <BarChart data={data.buyerBudgetDistribution} barSize={28}>
                 <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -373,11 +376,9 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       </div>
 
       {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
-        <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className={BODY_MUTED}>
-            Once leads submit full applications, the qualification breakdown shows up here.
-          </p>
-        </div>
+        <EmptyState glyph={<Users size={18} strokeWidth={1.5} aria-hidden />}>
+          Once leads submit full applications, the qualification breakdown shows up here.
+        </EmptyState>
       )}
     </div>
   );

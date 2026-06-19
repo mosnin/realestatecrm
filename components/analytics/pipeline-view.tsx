@@ -12,14 +12,18 @@ import {
   PieChart,
   Pie,
 } from 'recharts';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Briefcase } from 'lucide-react';
 import {
   StatCell,
+  StatStrip,
   ChartSection,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  EmptyState,
   formatCurrency,
   PAPER_SERIES,
   PAPER_GRID,
@@ -31,8 +35,9 @@ import {
   STAT_NUMBER,
   TITLE_FONT,
   CAPTION,
-  BODY_MUTED,
 } from '@/lib/typography';
+import { DURATION_SLOW, EASE_OUT } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 const dealsByStageCountConfig = {
   count: { label: 'Deals', color: 'hsl(var(--foreground))' },
@@ -53,6 +58,10 @@ const dealsByPriorityConfig = {
   None: { label: 'None', color: 'hsl(var(--muted-foreground) / 0.25)' },
 } satisfies ChartConfig;
 
+// Win-rate gauge geometry — r=52 matches the SVG below; precomputed so the
+// animated arc and the static dasharray agree exactly.
+const CIRCUMFERENCE = 2 * Math.PI * 52;
+
 // Priority fills — High darkest, None lightest. Ordered emphasis.
 const PRIORITY_FILLS: Record<string, string> = {
   High: 'hsl(var(--foreground))',
@@ -62,14 +71,16 @@ const PRIORITY_FILLS: Record<string, string> = {
 };
 
 export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
+  const reduce = useReducedMotion();
   return (
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip>
         <StatCell label="Total deals" value={data.totalDeals} />
         <StatCell
           label="Pipeline value"
-          value={formatCurrency(data.totalPipelineValue)}
+          value={data.totalPipelineValue}
+          format={formatCurrency}
           sub="active deals"
         />
         <StatCell
@@ -82,11 +93,11 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
           value={data.wonDeals + data.lostDeals > 0 ? `${data.dealWinRate}%` : '--'}
           sub={`${data.wonDeals} won / ${data.lostDeals} lost`}
         />
-      </div>
+      </StatStrip>
 
       {/* Stage distribution */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage">
+        <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage" index={0}>
           <ChartContainer config={dealsByStageCountConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -98,7 +109,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
           </ChartContainer>
         </ChartSection>
 
-        <ChartSection title="Value per stage" sub="Total deal value per pipeline stage">
+        <ChartSection title="Value per stage" sub="Total deal value per pipeline stage" index={1}>
           <ChartContainer config={dealsByStageValueConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -120,7 +131,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
 
       {/* Trends + priority */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Deals over time" sub="New deals created each month">
+        <ChartSection title="Deals over time" sub="New deals created each month" index={0}>
           <ChartContainer config={dealsOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.dealsOverTime}>
               <defs>
@@ -147,7 +158,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
         </ChartSection>
 
         {data.dealsByPriority.length > 0 && (
-          <ChartSection title="Deals by priority" sub="Distribution across priority levels">
+          <ChartSection title="Deals by priority" sub="Distribution across priority levels" index={1}>
             <ChartContainer config={dealsByPriorityConfig} className="h-[220px] w-full">
               <PieChart>
                 <Pie
@@ -179,7 +190,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
 
       {/* Win rate visual */}
       {data.wonDeals + data.lostDeals > 0 && (
-        <ChartSection title="Win/Loss breakdown" sub="Deal outcomes at a glance">
+        <ChartSection title="Win/Loss breakdown" sub="Deal outcomes at a glance" index={2}>
           <div className="flex flex-col items-center justify-center py-4">
             <div className="relative w-32 h-32">
               <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
@@ -192,7 +203,10 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                   className="text-muted-foreground/20"
                   strokeWidth="10"
                 />
-                <circle
+                {/* Progress arc draws in clockwise on entry by animating the
+                    dash offset; dasharray stays constant so the final geometry
+                    is byte-identical to a static render. */}
+                <motion.circle
                   cx="60"
                   cy="60"
                   r="52"
@@ -201,12 +215,25 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                   className="text-foreground"
                   strokeWidth="10"
                   strokeLinecap="round"
-                  strokeDasharray={`${(data.dealWinRate / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
+                  strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                  initial={
+                    reduce
+                      ? false
+                      : { strokeDashoffset: CIRCUMFERENCE }
+                  }
+                  animate={{
+                    strokeDashoffset:
+                      CIRCUMFERENCE - (data.dealWinRate / 100) * CIRCUMFERENCE,
+                  }}
+                  transition={{ duration: DURATION_SLOW, ease: EASE_OUT }}
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={STAT_NUMBER} style={TITLE_FONT}>
-                  {data.dealWinRate}%
+                  <AnimatedNumber
+                    value={data.dealWinRate}
+                    format={(n) => `${Math.round(n)}%`}
+                  />
                 </span>
               </div>
             </div>
@@ -218,11 +245,9 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       )}
 
       {data.totalDeals === 0 && (
-        <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className={BODY_MUTED}>
-            Add a deal and the pipeline charts show up here.
-          </p>
-        </div>
+        <EmptyState glyph={<Briefcase size={18} strokeWidth={1.5} aria-hidden />}>
+          Add a deal and the pipeline charts show up here.
+        </EmptyState>
       )}
     </div>
   );
