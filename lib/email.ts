@@ -274,6 +274,112 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   }
 }
 
+// ── Notification digest (daily / weekly roll-up of notable events) ──────────
+
+export interface DigestSection {
+  /** Section heading, e.g. "New leads". */
+  label: string;
+  /** One line per event in this section. */
+  items: string[];
+  /** Where the CTA for this section points (relative path under the space). */
+  href: string;
+}
+
+export interface NotificationDigestParams {
+  toEmail: string;
+  spaceName: string;
+  spaceSlug: string;
+  /** 'daily' or 'weekly' — drives the subject + intro copy. */
+  cadence: 'daily' | 'weekly';
+  /** Notable events grouped by type. Empty sections are dropped. */
+  sections: DigestSection[];
+}
+
+/**
+ * Send ONE roll-up email summarizing the period's notable events for a realtor
+ * who opted into a daily/weekly digest. Mirrors the house style of the other
+ * notification emails (dark header card, section tables, CTA). Best-effort:
+ * logs on failure, never throws — the digest cron's idempotency stamp is
+ * written by the caller only after this resolves.
+ */
+export async function sendNotificationDigest(params: NotificationDigestParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    logger.warn('[email] RESEND_API_KEY not set — skipping notification digest');
+    return;
+  }
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = getFromAddress();
+
+  const { toEmail, spaceName, spaceSlug, cadence, sections } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+
+  const periodLabel = cadence === 'weekly' ? 'this week' : 'today';
+  const totalEvents = sections.reduce((n, s) => n + s.items.length, 0);
+
+  const sectionsHtml = sections
+    .map((s) => {
+      const itemsHtml = s.items
+        .map(
+          (item) =>
+            `<tr><td style="padding:6px 0;font-size:13px;color:#111827;border-bottom:1px solid #f1f5f9">${esc(item)}</td></tr>`,
+        )
+        .join('');
+      const sectionUrl = `${appUrl}/s/${spaceSlug}${s.href}`;
+      return `
+        <tr><td style="padding:20px 28px 0">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">${esc(s.label)} (${s.items.length})</p>
+          <table cellpadding="0" cellspacing="0" style="width:100%">${itemsHtml}</table>
+          <a href="${sectionUrl}" style="display:inline-block;margin-top:10px;font-size:13px;font-weight:600;color:#0f172a;text-decoration:none">View ${esc(s.label.toLowerCase())} &rarr;</a>
+        </td></tr>`;
+    })
+    .join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${esc(spaceName)}</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">Your ${cadence} summary</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px 0">
+          <p style="margin:0;font-size:14px;color:#374151">You had <strong>${totalEvents}</strong> notable event${totalEvents !== 1 ? 's' : ''} ${periodLabel}.</p>
+        </td></tr>
+        ${sectionsHtml}
+        <tr><td style="padding:24px 28px">
+          <a href="${appUrl}/s/${esc(spaceSlug)}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">Open ${esc(spaceName)} &rarr;</a>
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">You're receiving this ${cadence} digest because you turned it on for <strong>${esc(spaceName)}</strong>. Change the cadence in your notification settings.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const safeSpaceName = spaceName.replace(/[\r\n\t]/g, ' ').slice(0, 100);
+  try {
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `Your ${cadence} summary — ${totalEvents} update${totalEvents !== 1 ? 's' : ''} — ${safeSpaceName}`,
+      html,
+    });
+    if (result.error) {
+      logger.error('[email] notification digest: Resend API error', { to: redactEmail(toEmail), resendError: result.error });
+    } else {
+      logger.info('[email] notification digest sent', { to: redactEmail(toEmail), messageId: result.data?.id });
+    }
+  } catch (err) {
+    logger.error('[email] notification digest failed', { to: redactEmail(toEmail) }, err);
+  }
+}
+
 export interface SendEmailAttachment {
   /** Filename the recipient sees. */
   filename: string;

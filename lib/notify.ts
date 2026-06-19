@@ -12,6 +12,13 @@
  *   - notifyNewDeals (per-event: new deals)
  *   - notifyFollowUps (per-event: follow-up reminders)
  *
+ * Preferences resolve through lib/notify-prefs (member override ?? space
+ * default). When the owner has opted into a DAILY/WEEKLY digest, the per-event
+ * EMAIL for the covered event types is suppressed here — the digest cron
+ * (app/api/cron/notification-digest) sends the roll-up instead. SMS and push
+ * stay immediate. With the default cadence 'off', nothing is suppressed and
+ * this module behaves exactly as before.
+ *
  * All functions are non-blocking and never throw.
  */
 
@@ -23,6 +30,11 @@ import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
 import { sendPushToSpace } from '@/lib/push';
 import { formatCompact } from '@/lib/formatting';
 import { logger } from '@/lib/logger';
+import {
+  resolveEffectivePrefs,
+  isEmailDigestSuppressed,
+  type NotifiableEventType,
+} from '@/lib/notify-prefs';
 
 interface SpaceOwnerInfo {
   ownerEmail: string;
@@ -39,11 +51,22 @@ interface SpaceOwnerInfo {
   notifyFollowUps: boolean;
   // Web push master toggle
   pushEnabled: boolean;
+  /**
+   * True when the owner has a daily/weekly digest covering this event type, so
+   * the per-event EMAIL must be suppressed (the digest cron sends the roll-up).
+   * SMS/push are unaffected. Always false when cadence is 'off'.
+   */
+  emailDigestSuppressed: (eventType: NotifiableEventType) => boolean;
 }
 
 /**
  * Fetch the space owner's contact info and notification preferences.
  * Returns null if space/owner not found.
+ *
+ * Channel + event-type toggles come from resolveEffectivePrefs, which layers
+ * the owner's per-member NotificationPreference override (if any) over the
+ * space defaults. The owner's override is keyed by their Clerk user id, so we
+ * resolve that from the User row alongside their email.
  */
 async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null> {
   try {
@@ -51,17 +74,26 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
       supabase
         .from('SpaceSetting')
-        .select('notifications, smsNotifications, phoneNumber, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, notifyPush')
+        .select('phoneNumber')
         .eq('spaceId', spaceId)
         .maybeSingle(),
     ]);
 
     if (!space) return null;
 
-    const { data: owner } = await supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle();
+    const { data: owner } = await supabase
+      .from('User')
+      .select('email, clerkId')
+      .eq('id', space.ownerId)
+      .maybeSingle();
     if (!owner?.email) return null;
 
-    const smsEnabled = settings?.smsNotifications ?? false;
+    // Effective prefs = owner override ?? space default (lib/notify-prefs).
+    // Passing the owner's clerkId lets a member override for their OWN space
+    // apply; with no override row this returns the space defaults verbatim.
+    const prefs = await resolveEffectivePrefs(spaceId, owner.clerkId ?? null);
+
+    const smsEnabled = prefs.channels.sms;
     const ownerPhone = settings?.phoneNumber ?? null;
 
     // Log diagnostic info for SMS delivery issues
@@ -78,13 +110,14 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       ownerPhone,
       spaceName: space.name,
       spaceSlug: space.slug,
-      emailEnabled: settings?.notifications ?? true,
+      emailEnabled: prefs.channels.email,
       smsEnabled,
-      notifyNewLeads: settings?.notifyNewLeads ?? true,
-      notifyTourBookings: settings?.notifyTourBookings ?? true,
-      notifyNewDeals: settings?.notifyNewDeals ?? true,
-      notifyFollowUps: settings?.notifyFollowUps ?? true,
-      pushEnabled: settings?.notifyPush ?? true,
+      notifyNewLeads: prefs.eventTypes.newLeads,
+      notifyTourBookings: prefs.eventTypes.tourBookings,
+      notifyNewDeals: prefs.eventTypes.newDeals,
+      notifyFollowUps: prefs.eventTypes.followUps,
+      pushEnabled: prefs.channels.push,
+      emailDigestSuppressed: (eventType) => isEmailDigestSuppressed(prefs, eventType),
     };
   } catch (err) {
     logger.error('[notify] failed to fetch space owner info', { spaceId }, err);
@@ -119,8 +152,8 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
 
   const promises: Promise<unknown>[] = [];
 
-  // Email notification
-  if (info.emailEnabled) {
+  // Email notification — suppressed when a digest will carry new leads.
+  if (info.emailEnabled && !info.emailDigestSuppressed('newLeads')) {
     promises.push(
       sendNewLeadNotification({
         toEmail: info.ownerEmail,
@@ -186,8 +219,8 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
 
   const promises: Promise<unknown>[] = [];
 
-  // Email notification to agent
-  if (info.emailEnabled) {
+  // Email notification to agent — suppressed when a digest will carry tours.
+  if (info.emailEnabled && !info.emailDigestSuppressed('tourBookings')) {
     promises.push(
       sendAgentNotification(info.ownerEmail, params.tourData)
         .catch((err) => logger.error('[notify] tour email failed', { spaceId: params.spaceId }, err))
@@ -249,8 +282,8 @@ export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> 
 
   const promises: Promise<unknown>[] = [];
 
-  // Email notification
-  if (info.emailEnabled) {
+  // Email notification — suppressed when a digest will carry new deals.
+  if (info.emailEnabled && !info.emailDigestSuppressed('newDeals')) {
     promises.push(
       sendNewDealNotification({
         toEmail: info.ownerEmail,
