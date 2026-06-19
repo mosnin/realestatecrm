@@ -79,7 +79,7 @@ describe('POST /api/billing/redeem-invite — success', () => {
     expect(json.redirect).toBe('/s/jane-doe');
 
     // The space came from the session, NOT the body — the redeem call uses sp1.
-    const arg = redeemMock.mock.calls[0][0] as Record<string, unknown>;
+    const arg = (redeemMock.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(arg.spaceId).toBe('sp1');
     expect(arg.userClerkId).toBe('user_clerk');
 
@@ -90,7 +90,7 @@ describe('POST /api/billing/redeem-invite — success', () => {
 
   it('ignores a spaceId in the body — always the authed user’s own space', async () => {
     await POST(req({ code: 'WELCOME', spaceId: 'someone-elses-space' }));
-    expect((redeemMock.mock.calls[0][0] as Record<string, unknown>).spaceId).toBe('sp1');
+    expect(((redeemMock.mock.calls[0] as unknown[])[0] as Record<string, unknown>).spaceId).toBe('sp1');
     expect(getSpaceForUserMock).toHaveBeenCalledWith('user_clerk');
   });
 });

@@ -98,7 +98,7 @@ describe('POST — create', () => {
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.code).toEqual({ id: 'ic1', code: 'abc', plan: 'solo' });
-    const arg = createMock.mock.calls[0][0] as Record<string, unknown>;
+    const arg = (createMock.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(arg.code).toBe('WELCOME');
     expect(arg.plan).toBe('solo');
     expect(arg.maxUses).toBe(5);
@@ -108,12 +108,12 @@ describe('POST — create', () => {
 
   it('defaults plan to solo (the $97 tier) when omitted', async () => {
     await POST(jsonReq('POST', {}));
-    expect((createMock.mock.calls[0][0] as Record<string, unknown>).plan).toBe('solo');
+    expect(((createMock.mock.calls[0] as unknown[])[0] as Record<string, unknown>).plan).toBe('solo');
   });
 
   it('passes null maxUses / compDurationDays through (unlimited / indefinite)', async () => {
     await POST(jsonReq('POST', { plan: 'solo' }));
-    const arg = createMock.mock.calls[0][0] as Record<string, unknown>;
+    const arg = (createMock.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(arg.maxUses).toBeNull();
     expect(arg.compDurationDays).toBeNull();
     expect(arg.expiresAt).toBeNull();
