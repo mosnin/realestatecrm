@@ -843,3 +843,93 @@ export type AgentRunLedger = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ── Agent profitability / ROI (broker analytics) ────────────────────────────
+// Additive types for the per-agent profitability rollup. The aggregation logic
+// lives in lib/agent-profitability.ts (pure, testable); these are the row
+// shapes it consumes and produces. Money is derived from CommissionLedger rows,
+// the brokerage's frozen money-of-record (see that file's header for the
+// GCI/split/net derivation and why cost-per-lead is intentionally absent).
+
+/** The minimal CommissionLedger shape the profitability rollup needs. */
+export interface ProfitabilityLedgerRow {
+  /** Producing agent (CommissionLedger.agentUserId). */
+  agentUserId: string;
+  /** Agent's commission slice in dollars. */
+  agentAmount: number | null;
+  /** Brokerage's commission slice in dollars — the house's NET on this deal. */
+  brokerAmount: number | null;
+  /** Referral payout in dollars (0 when none). */
+  referralAmount: number | null;
+  /** 'void' rows are excluded from all figures; 'paid'/'pending' both count. */
+  status: 'pending' | 'paid' | 'void';
+}
+
+/** One agent the broker wants reported, with their lead volume. */
+export interface AgentProfitabilityInput {
+  agentUserId: string;
+  name: string;
+  email: string;
+  /** Display role label (e.g. 'Realtor', 'Owner', 'Admin'). */
+  role: string;
+  /** Total leads (Contact count) acquired in the agent's space. */
+  leads: number;
+}
+
+/** Per-agent profitability row. All dollar figures are USD, rounded to cents. */
+export interface AgentProfitability {
+  agentUserId: string;
+  name: string;
+  email: string;
+  role: string;
+  /** Leads acquired (Contact count in the agent's space). */
+  leads: number;
+  /** Won deals on the ledger (excludes voided rows). */
+  dealsClosed: number;
+  /** Gross commission income = agentShare + brokerageNet + referralShare. */
+  gci: number;
+  /** The agent's commission cut. */
+  agentShare: number;
+  /** What the brokerage keeps — the NET to the house. */
+  brokerageNet: number;
+  /** Commission paid out to referring parties. */
+  referralShare: number;
+  /** Brokerage net still pending payout. */
+  pendingNet: number;
+  /** Brokerage net already paid out. */
+  paidNet: number;
+  /**
+   * Lead -> deal conversion as a 0–100 percentage (one decimal), or null when
+   * the agent has no leads (no rate to report — distinct from a real 0%).
+   */
+  leadToDealRate: number | null;
+  /**
+   * Cost per lead in dollars. Always null today: no spend input exists in the
+   * data model, and a money surface must not fabricate one. See costDataAvailable.
+   */
+  costPerLead: number | null;
+  /** False until a real per-lead cost input exists; gates the cost-per-lead UI. */
+  costDataAvailable: boolean;
+}
+
+/** Brokerage-wide totals across the per-agent profitability rows. */
+export interface AgentProfitabilityTotals {
+  /** Number of agents reported (the full roster passed in). */
+  agentCount: number;
+  /** Agents who closed at least one deal. */
+  activeAgents: number;
+  leads: number;
+  dealsClosed: number;
+  gci: number;
+  agentShare: number;
+  brokerageNet: number;
+  referralShare: number;
+  pendingNet: number;
+  paidNet: number;
+  /** Team lead -> deal conversion from summed leads/deals; null when no leads. */
+  teamLeadToDealRate: number | null;
+  /** Always null today — no spend input exists. */
+  costPerLead: number | null;
+  /** False until a real per-lead cost input exists. */
+  costDataAvailable: boolean;
+}
