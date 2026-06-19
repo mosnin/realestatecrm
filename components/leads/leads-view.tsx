@@ -39,15 +39,55 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ConvertLeadDialog } from './convert-lead-dialog';
 import type { Contact, ApplicationData, LeadScoreDetails, SavedView } from '@/lib/types';
 import { downloadCSV, downloadLeadsCSV } from '@/lib/csv';
 import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
+import { EASE_APPLE } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { TableRowSkeleton, CardSkeleton } from '@/components/ui/skeleton';
+
+/**
+ * Lead-temperature avatar tint. The same red/amber/blue tier vocabulary the
+ * rest of the surface uses, applied as a soft ring + initials color so the
+ * heat of a lead reads from the avatar alone — no badge to parse. Unscored
+ * stays neutral so the signal only appears when there's a signal to give.
+ */
+const TIER_AVATAR: Record<TierKey, string> = {
+  hot: 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30',
+  warm: 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30',
+  cold: 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25',
+  unscored: 'bg-muted/60 text-muted-foreground ring-border/60',
+};
+
+/** Hairline left-rail color for a list row, keyed to lead heat. */
+const TIER_RAIL: Record<TierKey, string> = {
+  hot: 'bg-red-400/80 dark:bg-red-500/70',
+  warm: 'bg-amber-400/80 dark:bg-amber-500/70',
+  cold: 'bg-blue-400/70 dark:bg-blue-500/60',
+  unscored: 'bg-transparent',
+};
+
+/**
+ * Per-row entrance — Apple list cadence (200ms fade + 8px slide-up), capped
+ * to the first 12 rows so a long application list doesn't choreograph the
+ * whole page on load. Honors reduced-motion: framer-motion drops the
+ * transform when the OS setting is on. Mirrors the contact-table row entrance
+ * so the two lists read as one product.
+ */
+const rowEntrance = (idx: number) => {
+  const animate = idx < 12;
+  return {
+    initial: animate ? ({ opacity: 0, y: 8 } as const) : false,
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.2, ease: EASE_APPLE, delay: animate ? idx * 0.025 : 0 },
+  };
+};
 
 const TIERS = LEAD_TIERS;
 
@@ -486,10 +526,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                 key={key}
                 type="button"
                 onClick={() => setTierFilter(key)}
+                aria-pressed={tierFilter === key}
                 className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-[0.97]',
                   tierFilter === key
-                    ? 'bg-foreground text-background'
+                    ? 'bg-foreground text-background shadow-sm'
                     : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
                 )}
               >
@@ -499,7 +540,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                   'ml-0.5 tabular-nums',
                   tierFilter === key ? 'opacity-80' : 'opacity-60',
                 )}>
-                  {count}
+                  <AnimatedNumber value={count} duration={500} />
                 </span>
               </button>
             );
@@ -515,17 +556,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                 key={key}
                 type="button"
                 onClick={() => setLeadTypeFilter(key)}
+                aria-pressed={leadTypeFilter === key}
                 className={cn(
-                  'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-[0.97]',
                   leadTypeFilter === key
-                    ? 'bg-foreground text-background'
+                    ? 'bg-foreground text-background shadow-sm'
                     : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
                 )}
               >
                 {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : key === 'buyer' ? 'Buyer' : 'Seller'}
                 {key !== 'all' && (
                   <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
-                    {filterCounts[key]}
+                    <AnimatedNumber value={filterCounts[key]} duration={500} />
                   </span>
                 )}
               </button>
@@ -645,9 +687,14 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
 
       {/* ── Empty state ── */}
       {!loading && filtered.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border/70 bg-card py-12 text-center px-6">
-          <div className="w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center mx-auto mb-4">
-            <Search size={20} className="text-muted-foreground" />
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: EASE_APPLE }}
+          className="rounded-xl border border-dashed border-border/70 bg-card py-12 text-center px-6"
+        >
+          <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mx-auto mb-4">
+            <Search size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
           </div>
           <p className="font-semibold text-foreground mb-1">
             {search ? 'Nothing matches.' : tierFilter === 'needs-followup' ? "You're caught up." : tierFilter !== 'all' ? `Nothing in ${tierFilter}.` : 'No leads yet.'}
@@ -671,13 +718,13 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
               Clear all filters
             </button>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* ── Card view ── */}
       {!loading && view === 'card' && filtered.length > 0 && (
         <div className="space-y-3">
-          {filtered.map((lead) => {
+          {filtered.map((lead, idx) => {
             const isNew = newLeadIds.has(lead.id);
             const app = lead.applicationData as ApplicationData | null;
             const details = lead.scoreDetails as LeadScoreDetails | null;
@@ -697,10 +744,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
             const isSelected = selectedIds.has(lead.id);
 
             return (
-              <div
+              <motion.div
                 key={lead.id}
+                {...rowEntrance(idx)}
+                whileHover={{ y: -2 }}
                 className={cn(
-                  'group rounded-lg border bg-card overflow-hidden transition-colors duration-150',
+                  'group rounded-lg border bg-card overflow-hidden transition-shadow duration-200 hover:shadow-md hover:shadow-foreground/[0.04]',
                   isSelected ? 'border-primary/40 bg-primary/5' :
                   tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
@@ -718,7 +767,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                       className="rounded border-border cursor-pointer flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{ opacity: isSelected ? 1 : undefined }}
                     />
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
+                    <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ring-1', TIER_AVATAR[tierKey])}>
                       {getInitials(lead.name)}
                     </div>
                     <div className="min-w-0">
@@ -935,7 +984,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -966,7 +1015,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {filtered.map((lead) => {
+                {filtered.map((lead, idx) => {
                   const isNew = newLeadIds.has(lead.id);
                   const app = lead.applicationData as ApplicationData | null;
                   const rawBudget = app?.monthlyRent ?? lead.budget;
@@ -979,14 +1028,24 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                   const isSelected = selectedIds.has(lead.id);
 
                   return (
-                    <tr
+                    <motion.tr
                       key={lead.id}
+                      {...rowEntrance(idx)}
                       className={cn(
-                        'group hover:bg-muted/30 transition-colors',
+                        'group relative transition-colors duration-150 hover:bg-muted/40',
                         isSelected && 'bg-primary/5',
                       )}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 relative">
+                        {/* Lead-heat rail — a hairline of temperature on the
+                            leading edge. Unscored rows show nothing. */}
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full transition-opacity',
+                            TIER_RAIL[tierKey],
+                          )}
+                        />
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -995,13 +1054,13 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                        <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3 group/name">
+                          <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ring-1', TIER_AVATAR[tierKey])}>
                             {getInitials(lead.name)}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
+                              <span className="font-medium text-foreground decoration-foreground/30 underline-offset-2 group-hover/name:underline transition-colors">{lead.name}</span>
                               <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
                                 {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
                               </span>
@@ -1072,7 +1131,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                           </Link>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>

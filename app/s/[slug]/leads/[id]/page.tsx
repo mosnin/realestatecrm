@@ -5,8 +5,11 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { getInitials, formatMoney, timeAgo } from '@/lib/formatting';
+import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import {
   ArrowLeft,
@@ -26,6 +29,23 @@ function tierStyles(label: string | null) {
   if (label === 'hot') return 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400';
   if (label === 'warm') return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
   return 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300';
+}
+
+/** Avatar tint keyed to lead heat — same red/amber/blue vocabulary the list
+ *  uses, so the detail header reads as the same lead the realtor just tapped. */
+function tierAvatar(label: string | null) {
+  if (label === 'hot') return 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30';
+  if (label === 'warm') return 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30';
+  if (label === 'cold') return 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25';
+  return 'bg-muted/60 text-muted-foreground ring-border/60';
+}
+
+/** Hairline accent rail on the score card, keyed to lead heat. */
+function tierRail(label: string | null) {
+  if (label === 'hot') return 'before:bg-red-400/80 dark:before:bg-red-500/70';
+  if (label === 'warm') return 'before:bg-amber-400/80 dark:before:bg-amber-500/70';
+  if (label === 'cold') return 'before:bg-blue-400/70 dark:before:bg-blue-500/60';
+  return 'before:bg-border';
 }
 
 export default async function LeadDetailPage({
@@ -80,15 +100,16 @@ export default async function LeadDetailPage({
       </div>
 
       <section className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
+        <div className="px-5 py-5 border-b border-border flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className={cn('w-12 h-12 rounded-xl font-bold flex items-center justify-center shrink-0 ring-1', tierAvatar(lead.scoreLabel))}>
               {getInitials(lead.name)}
             </div>
-            <div>
-              <h1 className="text-xl font-semibold leading-tight">{lead.name}</h1>
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <span>{timeAgo(new Date(lead.createdAt))}</span>
+            <div className="min-w-0">
+              <p className={cn(SECTION_LABEL, 'mb-1')}>Lead</p>
+              <h1 className="text-2xl leading-tight tracking-tight text-foreground truncate" style={TITLE_FONT}>{lead.name}</h1>
+              <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                <span className="tabular-nums">{timeAgo(new Date(lead.createdAt))}</span>
                 {lead.sourceLabel && (
                   <span className="inline-flex items-center gap-1"><Tag size={10} />{lead.sourceLabel}</span>
                 )}
@@ -120,17 +141,27 @@ export default async function LeadDetailPage({
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          <div className="rounded-lg border border-border p-3">
-            <div className="flex items-center gap-2 text-sm font-semibold mb-1">
-              <MessageCircle size={14} className="text-primary" /> AI score
+          <div className={cn(
+            'relative rounded-xl border border-border p-4 pl-5 overflow-hidden',
+            'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-r-full',
+            tierRail(lead.scoreLabel),
+          )}>
+            <div className={cn(SECTION_LABEL, 'flex items-center gap-1.5 mb-2')}>
+              <MessageCircle size={12} className="text-orange-500 dark:text-orange-400" /> AI score
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-3xl font-bold tabular-nums">{lead.leadScore != null ? Math.round(lead.leadScore) : '—'}</span>
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-3xl tracking-tight text-foreground tabular-nums" style={TITLE_FONT}>
+                {lead.leadScore != null ? (
+                  <AnimatedNumber value={Math.round(lead.leadScore)} duration={700} />
+                ) : (
+                  '—'
+                )}
+              </span>
               <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 ${tierStyles(lead.scoreLabel)}`}>
                 {lead.scoreLabel ?? 'unscored'}
               </span>
             </div>
-            {lead.scoreSummary && <p className="text-sm text-muted-foreground mt-2">{lead.scoreSummary}</p>}
+            {lead.scoreSummary && <p className="text-sm text-muted-foreground mt-2.5 leading-relaxed">{lead.scoreSummary}</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -155,12 +186,12 @@ export default async function LeadDetailPage({
 
 function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value: string | null }) {
   return (
-    <div className="rounded-lg border border-border px-3 py-2.5">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground flex items-center gap-1.5">
+    <div className="rounded-xl border border-border/70 bg-card px-3.5 py-3 transition-colors hover:border-border">
+      <div className={cn(SECTION_LABEL, 'flex items-center gap-1.5')}>
         <Icon size={12} />
         {label}
       </div>
-      <p className="text-sm font-medium mt-1">{value ?? '—'}</p>
+      <p className={cn('text-sm mt-1', value ? 'font-medium text-foreground' : 'text-muted-foreground/70')}>{value ?? '—'}</p>
     </div>
   );
 }

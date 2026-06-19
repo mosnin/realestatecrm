@@ -63,6 +63,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { motion } from 'framer-motion';
 import { EASE_APPLE, DURATION_FAST } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 type Client = {
   id: string;
@@ -101,6 +102,22 @@ function scoreTier(
   if (score >= 75) return { label: 'Hot', dot: 'bg-lead-hot', text: 'text-lead-hot' };
   if (score >= 45) return { label: 'Warm', dot: 'bg-lead-warm', text: 'text-lead-warm' };
   return { label: 'Cold', dot: 'bg-lead-cold', text: 'text-lead-cold' };
+}
+
+/**
+ * Avatar ring + initials tint keyed to lead heat. The score chip already
+ * shows the number; this lets the heat read from the avatar at the start of
+ * the row too — a quiet ring, not a fill, so a wall of contacts doesn't turn
+ * into a wall of color. Unscored stays fully neutral.
+ */
+function scoreAvatar(score: number | null): string {
+  const tier = scoreTier(score);
+  if (!tier) return 'bg-muted/40 text-muted-foreground ring-1 ring-transparent';
+  if (tier.label === 'Hot')
+    return 'bg-red-50 text-red-700 ring-1 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30';
+  if (tier.label === 'Warm')
+    return 'bg-amber-50 text-amber-700 ring-1 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30';
+  return 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25';
 }
 
 /**
@@ -689,7 +706,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                       : 'bg-foreground/[0.04] text-muted-foreground',
                   )}
                 >
-                  {chip.count}
+                  <AnimatedNumber value={chip.count} duration={500} />
                 </span>
                 {active && (
                   <span
@@ -1508,7 +1525,7 @@ function ContactRow({
   // the visual layout never drifts between modes.
   const body = (
     <>
-      <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+      <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0', scoreAvatar(contact.leadScore))}>
         {getInitials(contact.name)}
       </div>
       <div className="min-w-0 flex-1">
@@ -1688,7 +1705,7 @@ function ContactCard({
                 aria-label={`Select ${contact.name}`}
               />
             )}
-            <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+            <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0', scoreAvatar(contact.leadScore))}>
               {getInitials(contact.name)}
             </div>
             <div className="min-w-0">

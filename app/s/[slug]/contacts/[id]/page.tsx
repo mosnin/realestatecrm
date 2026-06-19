@@ -29,6 +29,7 @@ import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
 import { ContactActionPills } from '@/components/contacts/contact-action-pills';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
@@ -302,7 +303,11 @@ export default async function ClientDetailPage({
                 className="text-3xl tracking-tight text-foreground tabular-nums"
                 style={{ fontFamily: 'var(--font-title)' }}
               >
-                {contact.leadScore != null ? Math.round(contact.leadScore) : '—'}
+                {contact.leadScore != null ? (
+                  <AnimatedNumber value={Math.round(contact.leadScore)} duration={700} />
+                ) : (
+                  '—'
+                )}
               </span>
               {contact.scoreLabel && (
                 <span className={cn('text-xs font-medium', tierBadgeClasses(contact.scoreLabel))}>
