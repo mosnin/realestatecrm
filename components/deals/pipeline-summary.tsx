@@ -263,12 +263,13 @@ export function PipelineSummary({
           risk, Closing this month) are filter triggers: clicking selects
           and the cell presses in via motion.layoutId so the eye sees a
           continuous element move into a new state. Same vocabulary as the
-          contact tab strip. */}
-      <div
-        className={cn(
-          'grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70',
-          loading && 'opacity-60',
-        )}
+          contact tab strip. The strip fades up once on mount so it arrives
+          with the page rather than snapping in. */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: loading ? 0.6 : 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70"
       >
         <StatCell
           number={<AnimatedNumber value={stats.active} />}
@@ -295,6 +296,10 @@ export function PipelineSummary({
           label="At risk"
           sub={stats.atRisk > 0 ? 'need attention' : 'all moving'}
           dim={stats.atRisk === 0}
+          // A single amber dot — the health vocabulary's "needs a nudge" —
+          // only when there's actually something at risk. Restraint: no dot
+          // when the board is clean, so the warning means something.
+          accentClass={stats.atRisk > 0 ? 'bg-amber-500' : undefined}
           selected={focus === 'at-risk'}
           onClick={
             stats.atRisk > 0
@@ -310,8 +315,9 @@ export function PipelineSummary({
               ? `${formatCompact(stats.wonThisMonthValue)} closed`
               : 'nothing closed yet'
           }
+          accentClass={stats.wonThisMonth > 0 ? 'bg-emerald-500' : undefined}
         />
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -321,13 +327,17 @@ interface StatCellProps {
   label: string;
   sub: string;
   dim?: boolean;
+  /** A single status dot beside the label — `bg-amber-500` for at-risk,
+   *  `bg-emerald-500` for won. Omitted when there's nothing to flag, so the
+   *  dot always carries meaning. */
+  accentClass?: string;
   /** Filter triggers light up when active — motion.layoutId background
    *  slides between cells so the page reads as one connected control. */
   selected?: boolean;
   onClick?: () => void;
 }
 
-function StatCell({ number, label, sub, dim, selected, onClick }: StatCellProps) {
+function StatCell({ number, label, sub, dim, accentClass, selected, onClick }: StatCellProps) {
   const isInteractive = !!onClick;
   const Component = isInteractive ? 'button' : 'div';
   return (
@@ -361,7 +371,15 @@ function StatCell({ number, label, sub, dim, selected, onClick }: StatCellProps)
       >
         {number}
       </p>
-      <p className={cn(BODY, 'mt-2 relative')}>{label}</p>
+      <p className={cn(BODY, 'mt-2 relative flex items-center gap-1.5')}>
+        {accentClass && (
+          <span
+            className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', accentClass)}
+            aria-hidden
+          />
+        )}
+        {label}
+      </p>
       <p className={cn(SECTION_LABEL, 'mt-1 normal-case tracking-normal text-[11px] relative')}>
         {sub}
       </p>

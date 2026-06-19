@@ -224,10 +224,10 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
       {/* Progress header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{complete}/{total} complete</span>
+          <span className="text-sm font-semibold tabular-nums">{complete}/{total} complete</span>
           <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full bg-foreground transition-all"
+              className="h-full bg-foreground transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
               style={{ width: `${total === 0 ? 0 : (complete / total) * 100}%` }}
             />
           </div>

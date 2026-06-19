@@ -12,6 +12,7 @@ import { WizardStepDetails } from '@/components/deals/wizard-step-details';
 import { WizardStepNotes } from '@/components/deals/wizard-step-notes';
 import { toast } from 'sonner';
 import { EASE_APPLE } from '@/lib/motion';
+import { TITLE_FONT } from '@/lib/typography';
 import type { Property } from '@/lib/types';
 import { formatPropertyAddress } from '@/lib/properties';
 
@@ -181,7 +182,9 @@ export default function NewDealPage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-xl font-semibold">New Deal</h1>
+        <h1 className="text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+          New Deal
+        </h1>
       </div>
 
       {/* Step progress */}

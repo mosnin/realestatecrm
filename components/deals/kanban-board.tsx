@@ -1220,16 +1220,23 @@ export function KanbanBoard({
                 // No spring physics — when released, `dropAnimation` does
                 // a 180ms ease-out snap into the target slot.
                 <div
-                  className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-lg opacity-95 transform-gpu"
+                  className="relative w-72 overflow-hidden rounded-md border border-border bg-background px-3 py-3 shadow-[0_16px_40px_-12px_rgb(0_0_0/0.35)] opacity-95 transform-gpu"
                   style={{ transform: 'scale(1.03) rotate(1deg)' }}
                 >
+                  {activeDeal.stage?.color && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-[2px] opacity-90"
+                      style={{ backgroundColor: activeDeal.stage.color }}
+                    />
+                  )}
                   <div className="flex items-start gap-2">
                     <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
                       {activeDeal.value != null && (
                         <p
-                          className="text-base tabular-nums text-foreground mt-1 leading-none"
+                          className="text-[17px] tabular-nums text-foreground mt-1 leading-none"
                           style={TITLE_FONT}
                         >
                           {formatCurrency(activeDeal.value)}

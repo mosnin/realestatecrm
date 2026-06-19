@@ -22,6 +22,7 @@ import {
   SECTION_LABEL,
 } from '@/lib/typography';
 import { PAGE_MAX } from '@/lib/geometry';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { DealDetailClient } from '@/components/deals/deal-detail-client';
 import { DealInlineField } from '@/components/deals/deal-inline-field';
 import { DealFollowUpField } from '@/components/deals/deal-follow-up-field';
@@ -352,7 +353,11 @@ export default async function DealDetailPage({
               className="text-2xl tracking-tight tabular-nums text-foreground"
               style={TITLE_FONT}
             >
-              {value != null ? formatCurrency(value) : '—'}
+              {value != null ? (
+                <AnimatedNumber value={value} format={formatCurrency} duration={650} />
+              ) : (
+                '—'
+              )}
             </p>
           </StatCell>
           <StatCell label="GCI">
@@ -360,7 +365,11 @@ export default async function DealDetailPage({
               className="text-2xl tracking-tight tabular-nums text-foreground"
               style={TITLE_FONT}
             >
-              {gci != null ? formatCompact(gci) : '—'}
+              {gci != null ? (
+                <AnimatedNumber value={gci} format={formatCompact} duration={650} />
+              ) : (
+                '—'
+              )}
             </p>
             {commissionRate != null && (
               <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
