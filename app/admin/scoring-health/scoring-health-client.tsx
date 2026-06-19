@@ -1,13 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
-  Activity,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
   RefreshCw,
   Loader2,
   Check,
@@ -17,6 +13,11 @@ import {
 import Link from 'next/link';
 import type { SpaceFailureRow, FailedLeadRow } from './page';
 import { EmptyState } from '@/components/ui/empty-state';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
+import { StatGrid } from '@/app/admin/components/stat-grid';
+import { cn } from '@/lib/utils';
+import { SECTION_LABEL, CAPTION, META } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
 type Stats = {
   totalContacts: number;
@@ -103,189 +104,122 @@ export function ScoringHealthClient({
 
   const visibleFailed = failedLeads.filter((l) => !hidden.has(l.id));
 
-  const metrics = [
-    {
-      label: 'Total contacts',
-      value: stats.totalContacts,
-      sub: `${scoredRate}% scored`,
-      icon: Activity,
-      color: 'text-blue-500',
-      accent: false,
-    },
-    {
-      label: 'Successfully scored',
-      value: stats.totalScored,
-      sub: `${scoredRate}% of all`,
-      icon: CheckCircle2,
-      color: 'text-emerald-500',
-      accent: false,
-    },
-    {
-      label: 'Failed scoring',
-      value: stats.totalFailed,
-      sub: `${failedRate}% of all`,
-      icon: AlertTriangle,
-      color: 'text-rose-500',
-      accent: stats.totalFailed > 0,
-    },
-    {
-      label: 'Pending',
-      value: stats.totalPending,
-      sub: 'awaiting scoring',
-      icon: Clock,
-      color: 'text-amber-500',
-      accent: false,
-    },
-  ];
-
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <header className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">System.</p>
-          <h1
-            className="text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Scoring health
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Monitor AI scoring failures and retry from a single place.
-          </p>
-        </header>
-      </div>
+    <div className="space-y-12 pb-12">
+      <AdminPageHeader
+        eyebrow="System."
+        title="Scoring health"
+        subtitle="Monitor AI scoring failures and retry from a single place."
+      />
 
-      {/* Top metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {metrics.map(({ label, value, sub, icon: Icon, color, accent }) => (
-          <Card
-            key={label}
-            className={`rounded-xl border bg-card h-full ${
-              accent
-                ? 'border-rose-300/50 bg-rose-50/30 dark:border-rose-500/20 dark:bg-rose-500/5'
-                : ''
-            }`}
-          >
-            <CardContent className="p-6 h-full flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p
-                    className={`text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums ${
-                      accent ? 'text-rose-600 dark:text-rose-400' : ''
-                    }`}
-                  >
-                    {value}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    accent ? 'bg-rose-100 dark:bg-rose-500/10' : 'bg-muted'
-                  }`}
-                >
-                  <Icon size={15} className={accent ? 'text-rose-600 dark:text-rose-400' : color} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Pulse stats — one hairline grid, neutral. The failure cell tints
+          amber only when there's something to look at. */}
+      <StatGrid
+        aria-label="Scoring metrics"
+        cells={[
+          { label: 'Total contacts', value: stats.totalContacts, sub: `${scoredRate}% scored` },
+          { label: 'Scored', value: stats.totalScored, sub: `${scoredRate}% of all` },
+          {
+            label: 'Failed',
+            value: stats.totalFailed,
+            sub: `${failedRate}% of all`,
+            alert: stats.totalFailed > 0,
+          },
+          { label: 'Pending', value: stats.totalPending, sub: 'awaiting scoring' },
+        ]}
+      />
 
-      {/* Trend row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
-            <p className="text-xs text-muted-foreground font-medium">
-              Failed (last 7 days)
-            </p>
-            <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{failedInPeriod}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Rolling window</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
-            <p className="text-xs text-muted-foreground font-medium">Failed (all time)</p>
-            <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{stats.totalFailed}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Across all contacts</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Failure trend — two quiet figures */}
+      <StatGrid
+        aria-label="Failure trend"
+        columnsClassName="grid-cols-2"
+        cells={[
+          {
+            label: 'Failed · last 7 days',
+            value: failedInPeriod,
+            sub: 'rolling window',
+            alert: failedInPeriod > 0,
+          },
+          {
+            label: 'Failed · all time',
+            value: stats.totalFailed,
+            sub: 'across all contacts',
+          },
+        ]}
+      />
 
       {/* Per-space failures */}
-      <div className="space-y-3">
-        <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-          Top spaces by failure count
-        </h2>
+      <section className="space-y-3">
+        <p className={SECTION_LABEL}>Top spaces by failure count</p>
         {perSpace.length === 0 ? (
-          <Card className="rounded-xl border bg-card">
-            <EmptyState
-              icon={Inbox}
-              title="No failed scoring on any space."
-              size="sm"
-            />
-          </Card>
+          <EmptyState
+            icon={Inbox}
+            title="No failed scoring on any space."
+            description="When the model fails to score a lead, the workspace shows up here."
+            size="sm"
+          />
         ) : (
-          <Card className="rounded-xl border bg-card">
-            <div className="divide-y divide-border">
-              {perSpace.map((row) => (
-                <div
-                  key={row.spaceId}
-                  className="flex items-center gap-3 px-4 py-3"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                    <Building2 size={14} className="text-violet-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {row.spaceName || row.spaceSlug || row.spaceId}
-                    </p>
-                    {row.spaceSlug && (
-                      <p className="text-xs text-muted-foreground truncate">/{row.spaceSlug}</p>
-                    )}
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums text-rose-600 dark:text-rose-400">
-                    {row.failedCount}
-                  </span>
+          <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+            {perSpace.map((row) => (
+              <li key={row.spaceId} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-foreground/[0.05] flex items-center justify-center flex-shrink-0">
+                  <Building2 size={14} className="text-muted-foreground" />
                 </div>
-              ))}
-            </div>
-          </Card>
+                <div className="min-w-0 flex-1">
+                  {row.spaceSlug ? (
+                    <Link
+                      href={`/s/${row.spaceSlug}`}
+                      className="text-sm font-medium truncate hover:underline underline-offset-2"
+                    >
+                      {row.spaceName || row.spaceSlug || row.spaceId}
+                    </Link>
+                  ) : (
+                    <p className="text-sm font-medium truncate">
+                      {row.spaceName || row.spaceId}
+                    </p>
+                  )}
+                  {row.spaceSlug && (
+                    <p className={cn(CAPTION, 'truncate')}>/{row.spaceSlug}</p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                  {row.failedCount}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+      </section>
 
       {/* Failed leads */}
-      <div className="space-y-3">
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-            Recent failed leads
-          </h2>
-          <span className="text-xs text-muted-foreground">
-            {visibleFailed.length} shown
-          </span>
+          <p className={SECTION_LABEL}>Recent failed leads</p>
+          <span className={CAPTION}>{visibleFailed.length} shown</span>
         </div>
         {visibleFailed.length === 0 ? (
-          <Card className="rounded-xl border bg-card">
-            <EmptyState
-              icon={Inbox}
-              title="No failed leads in view."
-              size="sm"
-            />
-          </Card>
+          <EmptyState
+            icon={Check}
+            title="Nothing waiting to be rescored."
+            description="Leads you retry disappear from this list once they score."
+            size="sm"
+          />
         ) : (
-          <Card className="rounded-xl border bg-card">
-            <div className="divide-y divide-border">
+          <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+            <AnimatePresence initial={false}>
               {visibleFailed.map((lead) => {
                 const state = rowState[lead.id] ?? 'idle';
                 const msg = rowMessage[lead.id];
                 return (
-                  <div
+                  <motion.li
                     key={lead.id}
+                    layout
+                    exit={{ opacity: 0, height: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT } }}
                     className="flex items-center gap-3 px-4 py-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold truncate">
+                        <p className="text-sm font-medium truncate">
                           {lead.name || 'Unnamed lead'}
                         </p>
                         {lead.spaceSlug && (
@@ -297,10 +231,10 @@ export function ScoringHealthClient({
                           </Link>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className={cn(CAPTION, 'truncate')}>
                         {lead.scoreSummary || 'No summary available'}
                       </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                      <p className={cn(META, 'mt-0.5')}>
                         {new Date(lead.createdAt).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -310,13 +244,14 @@ export function ScoringHealthClient({
                       </p>
                       {msg && (
                         <p
-                          className={`text-[11px] mt-0.5 ${
+                          className={cn(
+                            'text-[11px] mt-0.5',
                             state === 'success'
                               ? 'text-emerald-600 dark:text-emerald-400'
                               : state === 'error'
                                 ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-muted-foreground'
-                          }`}
+                                : 'text-muted-foreground',
+                          )}
                         >
                           {msg}
                         </p>
@@ -342,13 +277,13 @@ export function ScoringHealthClient({
                           ? 'Done'
                           : 'Retry'}
                     </Button>
-                  </div>
+                  </motion.li>
                 );
               })}
-            </div>
-          </Card>
+            </AnimatePresence>
+          </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Building2, X, CheckCircle2, XCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SECTION_LABEL } from '@/lib/typography';
 
 type BrokerageRow = {
   id: string;
@@ -117,39 +119,29 @@ export function BrokerageListClient({
 
       {/* Empty state */}
       {brokerages.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-5 py-12 text-center">
-          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
-            <Building2 size={20} className="text-muted-foreground" />
-          </div>
-          <p className="font-semibold mb-1">No brokerages found</p>
-          <p className="text-sm text-muted-foreground">
-            {query ? 'Try a different search term.' : 'No brokerages match the current filter.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={Building2}
+          title="No brokerages found."
+          description={query ? 'Try a different search term.' : 'No brokerages match the current filter.'}
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
-                    Brokerage
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden sm:table-cell">
+                  <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Brokerage</th>
+                  <th className={cn('text-left px-4 py-3 hidden sm:table-cell', SECTION_LABEL)}>
                     Owner
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden md:table-cell">
+                  <th className={cn('text-left px-4 py-3 hidden md:table-cell', SECTION_LABEL)}>
                     Members
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
-                    Status
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden lg:table-cell">
+                  <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Status</th>
+                  <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>
                     Created
                   </th>
-                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted-foreground">
-                    &nbsp;
-                  </th>
+                  <th className={cn('text-right px-4 py-3', SECTION_LABEL)}>&nbsp;</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">

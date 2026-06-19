@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { SupportClient, type SupportTicket } from './support-client';
+import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 
 export const metadata = { title: 'Support — Admin — Chippi' };
 
@@ -40,18 +41,11 @@ export default async function AdminSupportPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">System.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Support
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Help requests from realtors. {tickets.length} total.
-        </p>
-      </header>
+      <AdminPageHeader
+        eyebrow="System."
+        title="Support"
+        subtitle={`Help requests from realtors. ${tickets.length} total.`}
+      />
       <SupportClient initialTickets={tickets} spaceMap={spaceMap} />
     </div>
   );

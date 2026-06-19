@@ -13,6 +13,7 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import { Coins, Plus, RefreshCw, Search, Undo2 } from 'lucide-react';
 
 type AccountType = 'space' | 'brokerage';
@@ -103,24 +104,18 @@ export function BillingCreditTool() {
 
   async function handleReverse(txnId: string) {
     if (!loadedAccount) return;
-    if (!confirm('Reverse this credit transaction? This adjusts the credit ledger only — it does NOT refund money.')) return;
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/billing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'refund', accountType: loadedAccount.type, accountId: loadedAccount.id, txnId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setResult('Credit transaction reversed.');
-        await load(loadedAccount.type, loadedAccount.id);
-      } else {
-        setResult(data.error || 'Reverse failed.');
-      }
-    } catch {
-      setResult('Network error.');
+    const res = await fetch('/api/admin/billing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'refund', accountType: loadedAccount.type, accountId: loadedAccount.id, txnId }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setResult('Credit transaction reversed.');
+      await load(loadedAccount.type, loadedAccount.id);
+      return;
     }
+    return data.error || 'Reverse failed.';
   }
 
   const selectClass =
@@ -213,10 +208,19 @@ export function BillingCreditTool() {
                       {t.workflow || t.reason || '—'} · {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                     {t.delta < 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => handleReverse(t.id)} className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-foreground">
-                        <Undo2 size={11} />
-                        Reverse
-                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-foreground">
+                            <Undo2 size={11} />
+                            Reverse
+                          </Button>
+                        }
+                        title="Reverse credit transaction"
+                        description="This adjusts the in-app credit ledger only — it does NOT refund money. Use a Stripe refund to return money."
+                        confirmLabel="Reverse transaction"
+                        tone="danger"
+                        onConfirm={() => handleReverse(t.id)}
+                      />
                     )}
                   </div>
                 ))}
