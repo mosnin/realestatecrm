@@ -946,3 +946,58 @@ export interface AgentProfitabilityTotals {
   /** False until a real per-lead cost input exists. */
   costDataAvailable: boolean;
 }
+
+// ── Threaded inbox: InboxThread + InboxMessage ───────────────────────────────
+// The durable, contact-scoped transcript of every message in and out, on every
+// channel. Threading is PER CONTACT (one thread per (spaceId, contactId)); the
+// channel lives on each message. The write helpers live in lib/inbox.ts; these
+// are the row shapes. Mirrors the "InboxThread"/"InboxMessage" tables
+// (supabase/migrations/20260724000000_inbox.sql). Phase 1 is storage-only —
+// nothing reads or writes these yet.
+
+/** Direction of a message / a thread's most recent message. */
+export type InboxDirection = 'inbound' | 'outbound';
+
+/** Transport a message arrived/was sent on. Per-message — a thread interleaves. */
+export type InboxChannel = 'email' | 'sms' | 'portal' | 'note';
+
+/** Lifecycle of a thread. */
+export type InboxThreadStatus = 'open' | 'closed';
+
+/** One thread — the rollup for a (spaceId, contactId). */
+export type InboxThread = {
+  id: string;
+  spaceId: string;
+  contactId: string;
+  /** When the most recent message (either direction) landed. */
+  lastMessageAt: string;
+  /** Direction of that most recent message. Null before the first message. */
+  lastDirection: InboxDirection | null;
+  /** Inbound messages not yet read. Bumped on inbound, zeroed on read. */
+  unreadCount: number;
+  status: InboxThreadStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** One message on a thread. */
+export type InboxMessage = {
+  id: string;
+  spaceId: string;
+  threadId: string;
+  contactId: string;
+  direction: InboxDirection;
+  channel: InboxChannel;
+  subject: string | null;
+  body: string;
+  /** Provider message id (gmail id / twilio sid / …); the dedupe anchor. Null
+   *  for messages with no external origin (e.g. notes). */
+  externalId: string | null;
+  /** The approved AgentDraft this outbound message was sent from, when any.
+   *  Null once the draft row is deleted (ON DELETE SET NULL). */
+  agentDraftId: string | null;
+  metadata: Record<string, unknown> | null;
+  /** When this (inbound) message was marked read. Null = unread. */
+  readAt: string | null;
+  createdAt: string;
+};
