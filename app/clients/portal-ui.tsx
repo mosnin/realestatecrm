@@ -55,6 +55,45 @@ export function StatusPill({ status }: { status: string }) {
   );
 }
 
+/* ─── Deal progress pill ────────────────────────────────────────────────────
+ * The client-facing, friendly progress label for a deal. We NEVER render the
+ * raw Deal.status / stage kind to a client; this maps the sanctioned
+ * ClientDealProgress values (see lib/client-deals.ts) to warm language + tone.
+ */
+
+const DEAL_PROGRESS_TONE: Record<string, string> = {
+  in_progress: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+  under_contract: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15',
+  closing: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  closed: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+  on_hold: 'text-muted-foreground bg-muted',
+  fell_through: 'text-muted-foreground bg-muted',
+};
+
+const DEAL_PROGRESS_LABEL: Record<string, string> = {
+  in_progress: 'In progress',
+  under_contract: 'Under contract',
+  closing: 'Closing',
+  closed: 'Closed',
+  on_hold: 'On hold',
+  fell_through: 'Closed out',
+};
+
+export function DealProgressPill({ progress }: { progress: string }) {
+  const tone = DEAL_PROGRESS_TONE[progress] ?? 'text-muted-foreground bg-muted';
+  const label = DEAL_PROGRESS_LABEL[progress] ?? progress.replace(/_/g, ' ');
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+        tone,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 /* ─── Empty state ─────────────────────────────────────────────────────────── */
 
 /**
@@ -148,6 +187,18 @@ export function formatTourDate(iso: string | null): string {
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** Nullable date formatter for deal dates (close date, milestone due dates). */
+export function formatDealDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
