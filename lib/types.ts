@@ -58,6 +58,10 @@ export type Brokerage = {
   slaEnabled: boolean;
   slaFirstResponseMinutes: number;
   slaEscalateMinutes: number;
+  // E-sign close gate (added in 20260710000000_deal_require_signed_before_close.sql).
+  // OFF by default: when true, a deal can't be closed (status -> 'won') while it
+  // still has an in-progress SignatureRequest. Enforced in the deal PATCH route.
+  requireSignedDocsBeforeClose: boolean;
 };
 
 export type BrokerageMembership = {

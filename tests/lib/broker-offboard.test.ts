@@ -123,6 +123,7 @@ function makeBrokerage(overrides: Partial<Brokerage> = {}): Brokerage {
     slaEnabled: false,
     slaFirstResponseMinutes: 60,
     slaEscalateMinutes: 120,
+    requireSignedDocsBeforeClose: false,
     websiteUrl: null,
     logoUrl: null,
     joinCode: null,
