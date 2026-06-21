@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker, canManageLeads } from '@/lib/permissions';
 import { assignLeadToRealtor } from '@/lib/broker-assign-lead';
 import { z } from 'zod';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 const assignLeadSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
@@ -35,14 +36,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Parse request body ───────────────────────────────────────────────────
-  let requestBody: unknown;
-  try {
-    requestBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
 
-  const parsed = assignLeadSchema.safeParse(requestBody);
+  const parsed = assignLeadSchema.safeParse(read.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid request data', issues: parsed.error.issues },

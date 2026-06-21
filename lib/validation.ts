@@ -96,6 +96,55 @@ export async function readJsonWithLimit(
   }
 }
 
+/**
+ * Read an optional JSON request body. Empty bodies resolve to the provided
+ * fallback instead of failing; oversized or malformed non-empty bodies still
+ * fail closed.
+ */
+export async function readOptionalJsonWithLimit(
+  req: Request,
+  maxBytes: number,
+  fallback: unknown = {},
+): Promise<JsonReadResult> {
+  const declared = parseInt(req.headers.get('content-length') ?? '', 10);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'request body too large' }, { status: 413 }),
+    };
+  }
+
+  let raw: string;
+  try {
+    raw = await req.text();
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'could not read request body' }, { status: 400 }),
+    };
+  }
+
+  if (Buffer.byteLength(raw, 'utf8') > maxBytes) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'request body too large' }, { status: 413 }),
+    };
+  }
+
+  if (!raw.trim()) {
+    return { ok: true, data: fallback };
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(raw) };
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'invalid json body' }, { status: 400 }),
+    };
+  }
+}
+
 export interface ParseOk<T> {
   ok: true;
   data: T;

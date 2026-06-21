@@ -60,6 +60,10 @@ export async function GET(req: NextRequest) {
         .from('Message')
         .select('conversationId, content')
         .in('conversationId', ids)
+        // Defense-in-depth: the ids come from already-filtered conversations,
+        // but Message also carries spaceId. Keep previews scoped to this
+        // workspace so malformed legacy rows cannot bleed into the sidebar.
+        .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
         .limit(ids.length * 20); // generous cap; deduplication below
 

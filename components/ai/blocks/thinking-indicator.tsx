@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChainOfThought, ThinkingBar } from '@/components/ai/prompt-kit';
 
 /**
  * Thinking indicator shown while Chippi is mid-turn.
@@ -43,16 +44,15 @@ export function ThinkingIndicator({
       <div className="flex items-center gap-1.5">
         <AnimatePresence mode="wait" initial={false}>
           {action && (
-            <motion.span
+            <motion.div
               key={action}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="chippi-thinking-shimmer text-[13px] font-medium leading-relaxed"
             >
-              {action}
-            </motion.span>
+              <ThinkingBar label={action} />
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -85,10 +85,11 @@ export function ThinkingIndicator({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <p className="text-[12px] text-foreground/35 leading-relaxed max-w-prose whitespace-pre-wrap pl-0.5 pb-1">
-              {streamingReasoning}
-              <span className="chippi-cursor" aria-hidden="true" />
-            </p>
+            <ChainOfThought
+              content={streamingReasoning ?? ''}
+              streaming
+              className="max-w-prose border-0 bg-transparent px-0 py-0 pl-0.5 pb-1 text-foreground/35"
+            />
           </motion.div>
         )}
       </AnimatePresence>

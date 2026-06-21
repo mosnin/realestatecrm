@@ -91,6 +91,16 @@ export async function DELETE(
       );
     }
 
+    const contactTags = Array.isArray((contact as { tags?: unknown }).tags)
+      ? ((contact as { tags: unknown[] }).tags).filter((tag): tag is string => typeof tag === 'string')
+      : [];
+    if (contactTags.includes('assigned')) {
+      return NextResponse.json(
+        { error: 'Unassign this lead before deleting it.' },
+        { status: 409 },
+      );
+    }
+
     // ── Capture document storage keys BEFORE deleting the Contact ────────
     // The FK cascade removes ContactDocument rows the moment the Contact is
     // gone; Wasabi objects don't cascade, so grab the keys now or orphan PII.

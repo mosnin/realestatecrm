@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { audit, type AuditAction } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,12 +41,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id: membershipId } = await params;
 
   // Parse body.
-  let body: { destinationMembershipId?: unknown; dryRun?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const body = (read.data ?? {}) as { destinationMembershipId?: unknown; dryRun?: unknown };
 
   const destinationMembershipId = body?.destinationMembershipId;
   if (typeof destinationMembershipId !== 'string' || destinationMembershipId.length === 0) {
@@ -102,6 +100,44 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const dryRun = Boolean(body?.dryRun);
+
+  if (!dryRun) {
+    // Re-check the exact membership rows we authorized before invoking the
+    // transfer RPC. This prevents a race where the target or destination is
+    // promoted, removed, or swapped between the initial authorization checks
+    // and the destructive offboarding transaction.
+    const { data: stableTarget } = await supabase
+      .from('BrokerageMembership')
+      .select('id')
+      .eq('id', target.id)
+      .eq('brokerageId', ctx.brokerage.id)
+      .eq('userId', target.userId)
+      .eq('role', target.role)
+      .maybeSingle();
+
+    if (!stableTarget) {
+      return NextResponse.json(
+        { error: 'Member changed. Refresh and try again.' },
+        { status: 409 },
+      );
+    }
+
+    const { data: stableDestination } = await supabase
+      .from('BrokerageMembership')
+      .select('id')
+      .eq('id', destination.id)
+      .eq('brokerageId', ctx.brokerage.id)
+      .eq('userId', destination.userId)
+      .eq('role', destination.role)
+      .maybeSingle();
+
+    if (!stableDestination) {
+      return NextResponse.json(
+        { error: 'Destination changed. Refresh and try again.' },
+        { status: 409 },
+      );
+    }
+  }
 
   // Execute the transfer via the Postgres RPC (handles the real transaction).
   const { data: rpcData, error: rpcError } = await supabase.rpc('offboard_brokerage_member', {

@@ -195,10 +195,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [initialConversationId]);
 
   // ── Phase 4c: always-allow for this chat ──────────────────────────────────
-  // Auto-approvals are keyed by conversationId so switching chats resets the
-  // list. sessionStorage (not localStorage) matches the "for this chat"
-  // semantics: a fresh tab / new session forgets what you trusted before.
-  const STORAGE_PREFIX = 'agent-allow:';
+  // Auto-approvals are keyed by BOTH surface endpoint and conversationId so
+  // switching chats or moving between realtor/broker surfaces resets the list.
+  // This matters for migrated legacy rows where the broker and realtor tables
+  // can temporarily share a conversation id while storage is being backfilled.
+  // sessionStorage (not localStorage) matches the "for this chat" semantics:
+  // a fresh tab / new session forgets what you trusted before.
+  const STORAGE_PREFIX = `agent-allow:${taskEndpoint}:`;
   const allowedToolsRef = useRef<Set<string>>(new Set());
   // Dedup guard for the auto-approve effect (declared up here so the
   // conversation-change effect below can reset it when switching chats).
@@ -239,7 +242,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       /* corrupt JSON / access denied — fall through to empty */
     }
     setAllowedTools(new Set());
-  }, [initialConversationId]);
+  }, [initialConversationId, STORAGE_PREFIX]);
 
   function commitAllow(toolName: string) {
     const next = new Set(allowedToolsRef.current);

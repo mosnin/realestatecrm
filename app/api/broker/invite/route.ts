@@ -6,6 +6,7 @@ import { sendBrokerageInvitation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 /**
  * POST /api/broker/invite
@@ -22,19 +23,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let email: string, roleToAssign: string;
-  try {
-    ({ email, roleToAssign } = await req.json());
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const { email, roleToAssign } = (read.data ?? {}) as { email?: string; roleToAssign?: string };
 
   // Validate inputs
-  const trimmedEmail = (email ?? '').trim().toLowerCase().slice(0, 320);
+  const trimmedEmail = (email ?? '').trim().toLowerCase();
+  if (trimmedEmail.length > 320) {
+    return NextResponse.json({ error: 'Email must be 320 characters or fewer' }, { status: 400 });
+  }
   if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
   }
-  if (!['broker_admin', 'realtor_member'].includes(roleToAssign)) {
+  if (typeof roleToAssign !== 'string' || !['broker_admin', 'realtor_member'].includes(roleToAssign)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
 
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
     .eq('brokerageId', brokerage.id)
     .eq('email', trimmedEmail)
     .eq('status', 'pending')
+    .gt('expiresAt', new Date().toISOString())
     .maybeSingle();
   if (existing) {
     // Resend the invitation email (original may have failed or been missed)

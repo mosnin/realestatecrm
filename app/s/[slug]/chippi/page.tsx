@@ -88,6 +88,7 @@ export default async function ChippiPage({
         .from('Conversation')
         .select('id, spaceId, title')
         .eq('id', targetConvId)
+        .eq('spaceId', space.id)
         .maybeSingle();
       const isOwnRealtorConversation = isRealtorConversation(
         convRow as { spaceId: string; title: string } | null,

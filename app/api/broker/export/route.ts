@@ -34,18 +34,50 @@ export async function GET() {
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  // Fetch stats
-  const [leadRows, contactRows, dealRows] = await Promise.all([
+  // Fetch stats. Contact rows are scoped by brokerageId, and deal rows are
+  // derived through those scoped contacts so a member's unrelated workspace
+  // deals cannot leak into this brokerage export.
+  const [leadRows, contactRows] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).limit(10000).then((r) => r.data ?? [])
+      ? supabase
+          .from('Contact')
+          .select('id, spaceId')
+          .in('spaceId', spaceIds)
+          .eq('brokerageId', brokerage.id)
+          .contains('tags', ['new-lead'])
+          .limit(10000)
+          .then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).limit(10000).then((r) => r.data ?? [])
-      : Promise.resolve([]),
-    spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value, status').in('spaceId', spaceIds).limit(10000).then((r) => r.data ?? [])
+      ? supabase
+          .from('Contact')
+          .select('id, spaceId')
+          .in('spaceId', spaceIds)
+          .eq('brokerageId', brokerage.id)
+          .limit(10000)
+          .then((r) => r.data ?? [])
       : Promise.resolve([]),
   ]);
+
+  const contactIds = (contactRows as { id: string }[]).map((r) => r.id);
+  const dealContactRows = contactIds.length > 0
+    ? await supabase
+        .from('DealContact')
+        .select('dealId, contactId')
+        .in('contactId', contactIds)
+        .limit(10000)
+        .then((r) => r.data ?? [])
+    : [];
+  const scopedDealIds = Array.from(new Set((dealContactRows as { dealId: string }[]).map((r) => r.dealId)));
+  const dealRows = scopedDealIds.length > 0
+    ? await supabase
+        .from('Deal')
+        .select('id, spaceId, value, status')
+        .in('id', scopedDealIds)
+        .in('spaceId', spaceIds)
+        .limit(10000)
+        .then((r) => r.data ?? [])
+    : [];
 
   const leadsBySpace = (leadRows as { spaceId: string }[]).reduce<Record<string, number>>(
     (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; }, {}
@@ -103,8 +135,10 @@ export async function GET() {
 
   return new NextResponse(csv, {
     headers: {
-      'Content-Type': 'text/csv',
+      'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${brokerage.name.replace(/[^a-zA-Z0-9]/g, '_')}_team_export_${new Date().toISOString().split('T')[0]}.csv"`,
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

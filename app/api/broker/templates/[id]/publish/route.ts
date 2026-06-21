@@ -266,7 +266,8 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
               sourceVersion: tmpl.version,
               updatedAt: nowIso,
             })
-            .eq('id', row.id);
+            .eq('id', row.id)
+            .eq('spaceId', space.id);
 
           if (updateErr) {
             skipped += 1;
@@ -298,7 +299,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
 
   // 6. Stamp the source row. If this fails we still return the counts —
   //    the per-agent writes already landed.
-  const { error: stampErr } = await supabase
+  const { data: stampedTemplate, error: stampErr } = await supabase
     .from('BrokerageTemplate')
     .update({
       publishedAt,
@@ -311,7 +312,10 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
       updatedAt: publishedAt,
     })
     .eq('id', tmpl.id)
-    .eq('brokerageId', ctx.brokerage.id);
+    .eq('brokerageId', ctx.brokerage.id)
+    .eq('version', tmpl.version)
+    .select('id')
+    .maybeSingle();
 
   if (stampErr) {
     logger.error(
@@ -320,6 +324,15 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
       stampErr,
     );
     // Don't 500 — the core publish succeeded.
+  }
+  if (!stampErr && !stampedTemplate) {
+    logger.warn('[broker/templates/publish] source changed before stamp', {
+      templateId,
+      brokerageId: ctx.brokerage.id,
+      version: tmpl.version,
+      pushed,
+      skipped,
+    });
   }
 
   void audit({

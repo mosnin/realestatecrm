@@ -17,6 +17,7 @@
 
 import { useMemo } from 'react';
 import { ToolGroup, type NestedTool, type NestedToolCategory } from '@/components/ui/tool-group';
+import { Steps } from '@/components/ai/prompt-kit';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ToursResult } from './tool-results/tours-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
@@ -215,7 +216,7 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
     .filter(Boolean);
 
   return (
-    <div className="space-y-2">
+    <Steps state={state} count={blocks.length}>
       <ToolGroup
         state={state}
         nestedTools={nestedTools}
@@ -236,7 +237,7 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
         </p>
       )}
       {richCards.length > 0 && <div className="space-y-2">{richCards}</div>}
-    </div>
+    </Steps>
   );
 }
 

@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { sendPushToSpace } from '@/lib/push';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,8 +32,6 @@ type CommentRow = {
 };
 
 type UserLite = { id: string; name: string | null; email: string | null };
-type DealLite = { id: string; title: string | null; value: number | null; spaceId: string };
-type SpaceLite = { id: string; slug: string };
 
 type ShapedReview = {
   id: string;
@@ -52,17 +52,13 @@ type ShapedReview = {
 };
 
 async function shapeReview(row: ReviewRow): Promise<ShapedReview> {
-  const [userRes, dealRes, commentsRes] = await Promise.all([
+  const [userRes, scopedDeal, commentsRes] = await Promise.all([
     supabase
       .from('User')
       .select('id, name, email')
       .eq('id', row.requestingUserId)
       .maybeSingle<UserLite>(),
-    supabase
-      .from('Deal')
-      .select('id, title, value, spaceId')
-      .eq('id', row.dealId)
-      .maybeSingle<DealLite>(),
+    loadBrokerageScopedReviewDeal({ dealId: row.dealId, brokerageId: row.brokerageId }),
     supabase
       .from('DealReviewComment')
       .select('id, reviewRequestId, authorUserId, body, createdAt')
@@ -71,35 +67,20 @@ async function shapeReview(row: ReviewRow): Promise<ShapedReview> {
   ]);
 
   if (userRes.error) throw userRes.error;
-  if (dealRes.error) throw dealRes.error;
   if (commentsRes.error) throw commentsRes.error;
 
-  const deal = dealRes.data ?? null;
+  const deal = scopedDeal?.deal ?? null;
+  const space = scopedDeal?.space ?? null;
   const comments = (commentsRes.data ?? []) as CommentRow[];
   const authorIds = Array.from(new Set(comments.map((c) => c.authorUserId)));
 
-  // Parallelise the second wave: Space (needs deal.spaceId) and comment
-  // authors (needs comments[]). These two queries depend on different
-  // earlier queries, so fire them concurrently instead of sequentially —
-  // saves one round-trip on the detail page's initial render.
-  const [spaceRes, authorsRes] = await Promise.all([
-    deal
-      ? supabase
-          .from('Space')
-          .select('id, slug')
-          .eq('id', deal.spaceId)
-          .maybeSingle<SpaceLite>()
-      : Promise.resolve({ data: null, error: null } as { data: SpaceLite | null; error: null }),
-    authorIds.length
-      ? supabase.from('User').select('id, name').in('id', authorIds)
-      : Promise.resolve({ data: [], error: null } as {
-          data: Array<{ id: string; name: string | null }>;
-          error: null;
-        }),
-  ]);
-  if (spaceRes.error) throw spaceRes.error;
+  const authorsRes = authorIds.length
+    ? await supabase.from('User').select('id, name').in('id', authorIds)
+    : ({ data: [], error: null } as {
+        data: Array<{ id: string; name: string | null }>;
+        error: null;
+      });
   if (authorsRes.error) throw authorsRes.error;
-  const space: SpaceLite | null = spaceRes.data ?? null;
   const authorsById = new Map(
     ((authorsRes.data ?? []) as { id: string; name: string | null }[]).map((u) => [u.id, u]),
   );
@@ -205,12 +186,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { id: reviewId } = await params;
 
-  let body: { status?: unknown; resolvedNote?: unknown };
-  try {
-    body = (await req.json()) as { status?: unknown; resolvedNote?: unknown };
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as { status?: unknown; resolvedNote?: unknown };
 
   const nextStatus = body?.status;
   if (nextStatus !== 'approved' && nextStatus !== 'closed') {
@@ -312,15 +291,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   // nudge a realtor about a broker-side event.
   void (async () => {
     try {
-      const { data: deal } = await supabase
-        .from('Deal')
-        .select('spaceId, title')
-        .eq('id', updated.dealId)
-        .maybeSingle<{ spaceId: string; title: string | null }>();
-      if (!deal?.spaceId) return;
+      const scopedDeal = await loadBrokerageScopedReviewDeal({
+        dealId: updated.dealId,
+        brokerageId: updated.brokerageId,
+      });
+      if (!scopedDeal) return;
       const verb = nextStatus === 'approved' ? 'approved' : 'closed';
-      const dealName = deal.title ?? 'your deal';
-      await sendPushToSpace(deal.spaceId, {
+      const dealName = scopedDeal.deal.title ?? 'your deal';
+      await sendPushToSpace(scopedDeal.deal.spaceId, {
         title: `Your broker ${verb} the review on ${dealName}.`,
         body: updated.resolvedNote?.slice(0, 280) || 'Open the review to see the details.',
       });

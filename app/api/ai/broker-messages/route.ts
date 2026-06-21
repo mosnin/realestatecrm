@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
+import { getAuthorizedBrokerConversation } from '@/lib/chat/broker-conversation-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -39,19 +40,14 @@ export async function GET(req: NextRequest) {
     const conversationId = req.nextUrl.searchParams.get('conversationId');
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
 
-    // Verify the conversation belongs to THIS brokerage before loading any
-    // message. brokerageId is the boundary — ownership of the conversation row
-    // is what gates access, not a title string.
-    const { data: conv, error: convErr } = await supabase
-      .from('BrokerConversation')
-      .select('id, brokerageId')
-      .eq('id', conversationId)
-      .maybeSingle();
-    if (convErr) {
-      console.error('[broker-messages] Conversation lookup failed:', convErr);
+    let authorized;
+    try {
+      authorized = await getAuthorizedBrokerConversation(conversationId, brokerCtx);
+    } catch (err) {
+      console.error('[broker-messages] Conversation authorization failed:', err);
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
     }
-    if (!conv || conv.brokerageId !== brokerCtx.brokerage.id) {
+    if (!authorized || authorized.brokerCtx.brokerage.id !== brokerCtx.brokerage.id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -59,6 +55,9 @@ export async function GET(req: NextRequest) {
       .from('BrokerMessage')
       .select('id, role, content, blocks, createdAt')
       .eq('conversationId', conversationId)
+      // Defense-in-depth: BrokerMessage carries brokerageId too. Keep child
+      // rows scoped to the verified brokerage, not just the conversation id.
+      .eq('brokerageId', brokerCtx.brokerage.id)
       .order('createdAt', { ascending: true })
       .limit(MESSAGE_LIMIT);
     if (error) {

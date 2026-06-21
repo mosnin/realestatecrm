@@ -132,9 +132,9 @@ describe('GET /api/ai/messages — broker/team conversations are denied', () => 
   it('404s a [BROKER_CHIPPI] conversation and returns NO message rows', async () => {
     // The caller legitimately owns the space (broker_owner owns their realtor
     // space). Ownership passes; the reserved-title guard is what denies.
-    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private notes' } });
     seed('User', { data: { id: 'u_1' } });
-    seed('Space', { data: { id: 's_realtor_1', ownerId: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private notes' } });
     // If the guard were missing, this is the row set that would leak.
     seed('Message', { data: [{ id: 'm_1', role: 'assistant', content: 'broker secret', blocks: null, createdAt: '2026-01-01' }] });
 
@@ -146,9 +146,9 @@ describe('GET /api/ai/messages — broker/team conversations are denied', () => 
   });
 
   it('404s a [BROKERAGE_CHAT] conversation and returns NO message rows', async () => {
-    seed('Conversation', { data: { id: 'c_team_1', spaceId: 's_realtor_1', title: '[BROKERAGE_CHAT] team room' } });
     seed('User', { data: { id: 'u_1' } });
-    seed('Space', { data: { id: 's_realtor_1', ownerId: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_team_1', spaceId: 's_realtor_1', title: '[BROKERAGE_CHAT] team room' } });
     seed('Message', { data: [{ id: 'm_1', role: 'assistant', content: 'team secret', blocks: null, createdAt: '2026-01-01' }] });
 
     const res = await getMessages(messagesRequest('c_team_1'));
@@ -159,9 +159,9 @@ describe('GET /api/ai/messages — broker/team conversations are denied', () => 
   });
 
   it('serves a plain realtor conversation (control: the guard is not over-broad)', async () => {
-    seed('Conversation', { data: { id: 'c_realtor_1', spaceId: 's_realtor_1', title: 'Follow up with the Garcias' } });
     seed('User', { data: { id: 'u_1' } });
-    seed('Space', { data: { id: 's_realtor_1', ownerId: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_realtor_1', spaceId: 's_realtor_1', title: 'Follow up with the Garcias' } });
     seed('Message', { data: [{ id: 'm_1', role: 'user', content: 'hi', blocks: null, createdAt: '2026-01-01' }] });
 
     const res = await getMessages(messagesRequest('c_realtor_1'));
@@ -212,10 +212,11 @@ describe('GET /api/ai/conversations — list excludes BOTH reserved prefixes', (
 
 describe('PATCH /api/ai/conversations/[id] — broker conversation denied', () => {
   it('404s renaming a [BROKER_CHIPPI] conversation even when ownership matches', async () => {
-    // Embedded Space(ownerId) on the conversation row; owner lookup then
-    // succeeds. The reserved-title guard is what denies the rename.
-    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private', Space: { ownerId: 'u_1' } } });
+    // Flat User → owned Space → scoped Conversation authorization succeeds. The
+    // reserved-title guard is what denies the rename.
     seed('User', { data: { id: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private' } });
 
     const res = await patchConversation(idRequest({ title: 'hijacked' }), idParams);
     expect(res.status).toBe(404);
@@ -224,16 +225,18 @@ describe('PATCH /api/ai/conversations/[id] — broker conversation denied', () =
 
 describe('DELETE /api/ai/conversations/[id] — broker conversation denied', () => {
   it('404s deleting a [BROKER_CHIPPI] conversation even when ownership matches', async () => {
-    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private', Space: { ownerId: 'u_1' } } });
     seed('User', { data: { id: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_broker_1', spaceId: 's_realtor_1', title: '[BROKER_CHIPPI] private' } });
 
     const res = await deleteConversation(idRequest(), idParams);
     expect(res.status).toBe(404);
   });
 
   it('404s deleting a [BROKERAGE_CHAT] conversation even when ownership matches', async () => {
-    seed('Conversation', { data: { id: 'c_team_1', spaceId: 's_realtor_1', title: '[BROKERAGE_CHAT] team', Space: { ownerId: 'u_1' } } });
     seed('User', { data: { id: 'u_1' } });
+    seed('Space', { data: [{ id: 's_realtor_1', ownerId: 'u_1' }] });
+    seed('Conversation', { data: { id: 'c_team_1', spaceId: 's_realtor_1', title: '[BROKERAGE_CHAT] team' } });
 
     const res = await deleteConversation(idRequest(), idParams);
     expect(res.status).toBe(404);

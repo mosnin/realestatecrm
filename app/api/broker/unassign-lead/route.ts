@@ -3,6 +3,7 @@ import { requireBroker, canManageLeads } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 const unassignLeadSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
@@ -43,12 +44,10 @@ export async function POST(req: NextRequest) {
   const { brokerage, dbUserId } = ctx;
 
   // ── Parse request body ───────────────────────────────────────────────────
-  let requestBody: unknown;
-  try {
-    requestBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const requestBody = bodyResult.data;
 
   const parsed = unassignLeadSchema.safeParse(requestBody);
   if (!parsed.success) {
@@ -83,6 +82,10 @@ export async function POST(req: NextRequest) {
 
     // Also check contacts with brokerageId (brokerage-level leads)
     let brokerContact = contact;
+    let updateScope: { column: 'spaceId' | 'brokerageId'; value: string } = {
+      column: 'spaceId',
+      value: brokerSpace.id,
+    };
     if (!brokerContact) {
       const { data: brokerageContact, error: brokerageContactError } = await supabase
         .from('Contact')
@@ -92,6 +95,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (brokerageContactError) throw brokerageContactError;
       brokerContact = brokerageContact;
+      updateScope = { column: 'brokerageId', value: brokerage.id };
     }
     if (!brokerContact) {
       return NextResponse.json(
@@ -101,7 +105,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Verify the contact has 'assigned' tag ────────────────────────────
-    const existingTags: string[] = brokerContact.tags ?? [];
+    const existingTags: string[] = Array.isArray(brokerContact.tags)
+      ? brokerContact.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
+      : [];
     if (!existingTags.includes('assigned')) {
       return NextResponse.json(
         { error: 'This lead is not currently assigned' },
@@ -303,7 +309,8 @@ export async function POST(req: NextRequest) {
         applicationStatusNote: null,
         updatedAt: now,
       })
-      .eq('id', contactId);
+      .eq('id', contactId)
+      .eq(updateScope.column, updateScope.value);
     if (updateError) throw updateError;
 
     console.info('[unassign-lead] lead unassigned', {

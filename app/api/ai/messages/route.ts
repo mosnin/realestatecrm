@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { getAuthorizedRealtorConversation } from '@/lib/chat/realtor-conversation-auth';
 
 const MESSAGE_LIMIT = 50;
 
@@ -22,52 +22,14 @@ export async function GET(req: NextRequest) {
     const conversationId = req.nextUrl.searchParams.get('conversationId');
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
 
-    // Two flat queries instead of an embedded join — `Space(ownerId)` can
-    // come back either as an object or an array depending on PostgREST's
-    // FK inference, and the previous code (`conv.Space.ownerId`) silently
-    // produced `undefined` in the array case, killing the auth check
-    // with a 403 the client couldn't see.
-    const { data: conv, error: convErr } = await supabase
-      .from('Conversation')
-      .select('id, spaceId, title')
-      .eq('id', conversationId)
-      .maybeSingle();
-    if (convErr) {
-      console.error('[messages] Conversation lookup failed:', convErr);
+    let authorized;
+    try {
+      authorized = await getAuthorizedRealtorConversation({ clerkUserId: userId, conversationId });
+    } catch (err) {
+      console.error('[messages] Conversation authorization failed:', err);
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
     }
-    if (!conv) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-    const { data: dbUser, error: userErr } = await supabase
-      .from('User')
-      .select('id')
-      .eq('clerkId', userId)
-      .maybeSingle();
-    if (userErr) {
-      console.error('[messages] User lookup failed:', userErr);
-      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
-    }
-    if (!dbUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-    const { data: space, error: spaceErr } = await supabase
-      .from('Space')
-      .select('id, ownerId')
-      .eq('id', conv.spaceId)
-      .maybeSingle();
-    if (spaceErr) {
-      console.error('[messages] Space lookup failed:', spaceErr);
-      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
-    }
-    if (!space || space.ownerId !== dbUser.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Surface guard: broker-Chippi and team conversations have their own
-    // broker-gated routes. Never serve them through the realtor messages
-    // endpoint, even when the caller owns the space. A broker_owner also
-    // owns their personal realtor space, so ownership alone is not isolation.
-    // The reserved-title check lives in lib/chat/conversation-access.
-    if (isReservedConversationTitle(conv.title)) {
+    if (!authorized) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -75,6 +37,10 @@ export async function GET(req: NextRequest) {
       .from('Message')
       .select('id, role, content, blocks, createdAt')
       .eq('conversationId', conversationId)
+      // Defense-in-depth: the parent conversation was authorized above, but
+      // Message also carries spaceId. Keep the child fetch scoped to the same
+      // space so malformed legacy rows cannot appear in the transcript.
+      .eq('spaceId', authorized.space.id)
       .order('createdAt', { ascending: true })
       .limit(MESSAGE_LIMIT);
     if (error) {

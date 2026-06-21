@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { logger } from '@/lib/logger';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { _sanitisePropertyBody as sanitiseBody } from '@/app/api/properties/route';
 
 /**
@@ -25,14 +26,25 @@ interface MemberSpace {
   ownerName: string | null;
 }
 
-/** The brokerage's member spaces (every realtor's Space under the brokerage,
+/** The brokerage's member spaces (every realtor with an active membership,
  *  plus the owner's own Space — the pool's home). Used to validate assignment
  *  targets and to label assigned properties. */
 async function loadMemberSpaces(brokerageId: string, ownerId: string): Promise<MemberSpace[]> {
+  const { data: memberships } = await supabase
+    .from('BrokerageMembership')
+    .select('userId')
+    .eq('brokerageId', brokerageId)
+    .limit(2000);
+
+  const memberOwnerIds = (memberships ?? [])
+    .map((member) => (member as { userId?: string | null }).userId)
+    .filter((userId): userId is string => Boolean(userId));
+  const allowedOwnerIds = Array.from(new Set([ownerId, ...memberOwnerIds]));
+
   const { data: spaces } = await supabase
     .from('Space')
     .select('id, name, ownerId')
-    .or(`brokerageId.eq.${brokerageId},ownerId.eq.${ownerId}`)
+    .in('ownerId', allowedOwnerIds)
     .limit(2000);
   const rows = (spaces ?? []) as { id: string; name: string; ownerId: string }[];
   if (rows.length === 0) return [];
@@ -68,7 +80,10 @@ export async function POST(req: NextRequest) {
   const ctx = await resolveBrokerContext();
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
   if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 
   // The pool's home Space — the broker owner's. Required because Property.spaceId

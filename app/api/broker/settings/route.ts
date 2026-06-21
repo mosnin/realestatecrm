@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker, canEditSettings } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 type AssignmentMethod = 'manual' | 'round_robin' | 'score_based';
 
@@ -99,17 +100,28 @@ async function resolveAutoAssignMeta(brokerageId: string): Promise<{
     }
   }
 
-  // Resolve the last-assigned user's name, if any. Pure lookup; if the row is
-  // gone we just leave the name null.
+  // Resolve the last-assigned user's name only after proving the cursor still
+  // points at a realtor in this brokerage. If the pointer is stale or corrupted,
+  // do not leak a name from another brokerage.
   let lastAssignedUserName: string | null = null;
   if (lastAssignedUserId) {
-    const { data: userRow } = await supabase
-      .from('User')
-      .select('name, email')
-      .eq('id', lastAssignedUserId)
-      .maybeSingle<{ name: string | null; email: string | null }>();
-    if (userRow) {
-      lastAssignedUserName = userRow.name?.trim() || userRow.email || null;
+    const { data: memberRow } = await supabase
+      .from('BrokerageMembership')
+      .select('id')
+      .eq('brokerageId', brokerageId)
+      .eq('userId', lastAssignedUserId)
+      .eq('role', 'realtor_member')
+      .maybeSingle<{ id: string }>();
+
+    if (memberRow) {
+      const { data: userRow } = await supabase
+        .from('User')
+        .select('name, email')
+        .eq('id', lastAssignedUserId)
+        .maybeSingle<{ name: string | null; email: string | null }>();
+      if (userRow) {
+        lastAssignedUserName = userRow.name?.trim() || userRow.email || null;
+      }
     }
   }
 
@@ -187,12 +199,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Only the owner or admins can update settings' }, { status: 403 });
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   const updates: Record<string, unknown> = {};
 
@@ -332,14 +342,22 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
 
-  const { error: updateErr } = await supabase
+  const { data: updatedBrokerage, error: updateErr } = await supabase
     .from('Brokerage')
     .update(updates)
-    .eq('id', ctx.brokerage.id);
+    .eq('id', ctx.brokerage.id)
+    .select('id')
+    .maybeSingle<{ id: string }>();
 
   if (updateErr) {
     console.error('[broker/settings] update failed', updateErr);
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+  }
+  if (!updatedBrokerage) {
+    return NextResponse.json(
+      { error: 'Brokerage settings changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({

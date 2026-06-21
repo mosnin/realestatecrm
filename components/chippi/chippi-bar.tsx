@@ -325,6 +325,7 @@ export function ChippiBar({ slug }: Props) {
                       <div className="flex-1 min-w-0 pt-0.5">
                         <Transcript
                           blocks={msg.blocks}
+                          messageId={msg.id}
                           role={msg.role}
                           streaming={msg.streaming && isStreaming}
                           liveCallIds={liveCallIds}
@@ -348,6 +349,7 @@ export function ChippiBar({ slug }: Props) {
                   <Transcript
                     key={msg.id}
                     blocks={msg.blocks}
+                    messageId={msg.id}
                     role={msg.role}
                     streaming={msg.streaming && isStreaming}
                     liveCallIds={liveCallIds}

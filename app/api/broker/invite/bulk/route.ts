@@ -6,6 +6,7 @@ import { sendBrokerageInvitation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 /**
  * POST /api/broker/invite/bulk
@@ -21,13 +22,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let entries: Array<{ email: string; role?: string }>;
-  try {
-    const body = await req.json();
-    entries = body.entries;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const entries = ((read.data ?? {}) as { entries?: Array<{ email: string; role?: string }> }).entries;
 
   if (!Array.isArray(entries) || entries.length === 0) {
     return NextResponse.json({ error: 'No entries provided' }, { status: 400 });
@@ -66,24 +63,83 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many pending invitations. Cancel some first.' }, { status: 429 });
   }
 
-  // Seat-limit enforcement (BP3b): check once against the full requested count
-  // so the batch is atomic — either everything fits under the plan cap or the
-  // whole request is rejected. No partial commits.
-  const seatCheck = await checkSeatCapacity(brokerage.id, entries.length);
-  if (!seatCheck.ok) {
-    const { plan, seatLimit, used } = seatCheck.usage;
-    const needed = seatCheck.needed ?? entries.length;
-    return NextResponse.json(
-      {
-        error: `Seat limit reached — your ${plan} plan allows ${seatLimit} seats and ${used} are in use. Upgrade or remove a member to invite ${needed} more.`,
-        code: 'seat_limit',
-        plan,
-        used,
-        limit: seatLimit,
-        needed,
-      },
-      { status: 402 }
-    );
+  // Seat-limit enforcement (BP3b): check once against the syntactically valid
+  // invite rows that can actually create *new* seats. Invalid rows, duplicate
+  // emails in this batch, existing members, and already-pending invites are
+  // returned as per-row errors/duplicates below and must not make the whole
+  // batch fail as over-seat.
+  const validInviteEmails = Array.from(new Set(
+    entries
+      .map((entry) => {
+        const email = (entry.email ?? '').trim().toLowerCase();
+        const roleIsValid = !entry.role || ['broker_admin', 'realtor_member'].includes(entry.role);
+        return email.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && roleIsValid
+          ? email
+          : null;
+      })
+      .filter((email): email is string => Boolean(email)),
+  ));
+
+  const existingMemberEmails = new Set<string>();
+  const pendingInviteEmails = new Set<string>();
+  if (validInviteEmails.length > 0) {
+    const [existingUsersRes, existingInvitesRes] = await Promise.all([
+      supabase.from('User').select('id, email').in('email', validInviteEmails),
+      supabase
+        .from('Invitation')
+        .select('email')
+        .eq('brokerageId', brokerage.id)
+        .eq('status', 'pending')
+        .gt('expiresAt', new Date().toISOString())
+        .in('email', validInviteEmails),
+    ]);
+    if (existingUsersRes.error || existingInvitesRes.error) {
+      return NextResponse.json({ error: 'Failed to validate invitations' }, { status: 500 });
+    }
+
+    const existingUsers = (existingUsersRes.data ?? []) as Array<{ id: string; email: string }>;
+    if (existingUsers.length > 0) {
+      const existingUserIds = existingUsers.map((user) => user.id);
+      const { data: existingMemberships, error: existingMembershipsError } = await supabase
+        .from('BrokerageMembership')
+        .select('userId')
+        .eq('brokerageId', brokerage.id)
+        .in('userId', existingUserIds);
+      if (existingMembershipsError) {
+        return NextResponse.json({ error: 'Failed to validate invitations' }, { status: 500 });
+      }
+      const existingMemberIds = new Set((existingMemberships ?? []).map((row) => row.userId as string));
+      for (const user of existingUsers) {
+        if (existingMemberIds.has(user.id)) existingMemberEmails.add(user.email.toLowerCase());
+      }
+    }
+
+    for (const invite of (existingInvitesRes.data ?? []) as Array<{ email: string }>) {
+      pendingInviteEmails.add(invite.email.toLowerCase());
+    }
+  }
+
+  const requestedSeatCount = Math.min(
+    remaining,
+    validInviteEmails.filter((email) => !existingMemberEmails.has(email) && !pendingInviteEmails.has(email)).length,
+  );
+  if (requestedSeatCount > 0) {
+    const seatCheck = await checkSeatCapacity(brokerage.id, requestedSeatCount);
+    if (!seatCheck.ok) {
+      const { plan, seatLimit, used } = seatCheck.usage;
+      const needed = seatCheck.needed ?? requestedSeatCount;
+      return NextResponse.json(
+        {
+          error: `Seat limit reached — your ${plan} plan allows ${seatLimit} seats and ${used} are in use. Upgrade or remove a member to invite ${needed} more.`,
+          code: 'seat_limit',
+          plan,
+          used,
+          limit: seatLimit,
+          needed,
+        },
+        { status: 402 }
+      );
+    }
   }
 
   // Resolve inviter name
@@ -103,12 +159,20 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const email = (entry.email ?? '').trim().toLowerCase().slice(0, 320);
+    const email = (entry.email ?? '').trim().toLowerCase();
+    if (email.length > 320) {
+      results.push({ email: entry.email ?? '', status: 'error', error: 'Email must be 320 characters or fewer' });
+      continue;
+    }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       results.push({ email: entry.email ?? '', status: 'error', error: 'Invalid email' });
       continue;
     }
 
+    if (entry.role && !['broker_admin', 'realtor_member'].includes(entry.role)) {
+      results.push({ email, status: 'error', error: 'Invalid role' });
+      continue;
+    }
     const roleToAssign = entry.role === 'broker_admin' ? 'broker_admin' : 'realtor_member';
 
     // Only the owner can invite admins
@@ -139,6 +203,7 @@ export async function POST(req: Request) {
       .eq('brokerageId', brokerage.id)
       .eq('email', email)
       .eq('status', 'pending')
+      .gt('expiresAt', new Date().toISOString())
       .maybeSingle();
 
     if (existing) {

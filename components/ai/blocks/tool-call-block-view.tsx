@@ -20,6 +20,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tool, ToolStatus, type ToolState } from '@/components/ai/prompt-kit';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ToursResult } from './tool-results/tours-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
@@ -224,7 +225,7 @@ export function ToolCallBlockView({
     ensureRowShimmerStyles();
   }, []);
 
-  const status: 'running' | ToolCallBlock['status'] = live ? 'running' : block.status;
+  const status: ToolState = live ? 'running' : block.status;
 
   const {
     label,
@@ -376,11 +377,12 @@ export function ToolCallBlockView({
 
   return (
     <motion.div
-      className={cn('group relative flex flex-col', className)}
+      className={cn('group relative', className)}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
+      <Tool state={status}>
       {/* Compact step row. Collapsed by default — args, summary, and full
           result detail live behind the expand chevron. Three pieces stay
           visible without an expand-click: (1) the rich result card below,
@@ -423,15 +425,7 @@ export function ToolCallBlockView({
         {(!argsHint || !expanded) && <span className="flex-1" />}
 
         {/* Status badge */}
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 text-[11px] font-medium flex-shrink-0 ml-1',
-            tint,
-          )}
-        >
-          {iconEl}
-          {label}
-        </span>
+        <ToolStatus state={status} label={label} icon={iconEl} className={cn('ml-1', tint)} />
 
         {/* Expand chevron — only shown when there's something to expand */}
         {hasDetails && (
@@ -507,6 +501,7 @@ export function ToolCallBlockView({
           </motion.div>
         )}
       </AnimatePresence>
+      </Tool>
     </motion.div>
   );
 }

@@ -4,7 +4,19 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_MULTIPART_SIZE = MAX_FILE_SIZE + 256 * 1024; // multipart overhead headroom
 const MAX_ROWS = 1000;
+const CSV_MIME_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel']);
+const IMPORT_FIELD_LIMITS = {
+  name: 120,
+  email: 254,
+  phone: 40,
+  budget: 50,
+  address: 500,
+  notes: 2000,
+  moveInDate: 100,
+  assignTo: 254,
+} as const;
 
 /**
  * POST /api/broker/leads/import
@@ -30,6 +42,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const declaredLength = Number.parseInt(req.headers.get('content-length') ?? '', 10);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_MULTIPART_SIZE) {
+    return NextResponse.json(
+      { error: `Upload too large. Maximum CSV size is 5MB.` },
+      { status: 413 },
+    );
+  }
+
   // ── Parse form data ─────────────────────────────────────────────────────
   let formData: FormData;
   try {
@@ -46,6 +66,15 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json(
       { error: `File too large. Maximum size is 5MB.` },
+      { status: 413 },
+    );
+  }
+
+  const fileName = file.name.toLowerCase();
+  const fileType = file.type.toLowerCase();
+  if (!fileName.endsWith('.csv') && (!fileType || !CSV_MIME_TYPES.has(fileType))) {
+    return NextResponse.json(
+      { error: 'Only CSV files are supported.' },
       { status: 400 },
     );
   }
@@ -186,6 +215,24 @@ export async function POST(req: NextRequest) {
     const notes = colIdx.notes !== -1 ? fields[colIdx.notes]?.trim() ?? '' : '';
     const moveInDate = colIdx.moveInDate !== -1 ? fields[colIdx.moveInDate]?.trim() ?? '' : '';
     const assignTo = colIdx.assignTo !== -1 ? fields[colIdx.assignTo]?.trim().toLowerCase() ?? '' : '';
+
+    const fieldLengths: Array<[keyof typeof IMPORT_FIELD_LIMITS, string]> = [
+      ['name', name],
+      ['email', email],
+      ['phone', phone],
+      ['budget', budgetRaw],
+      ['address', address],
+      ['notes', notes],
+      ['moveInDate', moveInDate],
+      ['assignTo', assignTo],
+    ];
+    const tooLong = fieldLengths.find(([field, value]) => value.length > IMPORT_FIELD_LIMITS[field]);
+    if (tooLong) {
+      const [field, value] = tooLong;
+      errors.push(`Row ${rowNum}: ${field} exceeds ${IMPORT_FIELD_LIMITS[field]} characters (${value.length}).`);
+      skipped++;
+      continue;
+    }
 
     // Resolve target space
     let targetSpaceId = defaultSpaceId;

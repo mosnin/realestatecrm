@@ -29,8 +29,10 @@ export async function GET() {
     const csv = 'Name,Email,Phone,Lead Type,Budget,Score,Score Label,Status,Property Address,Notes,Move-in Date,Employment,Income,Assigned To,Created At\n';
     return new NextResponse(csv, {
       headers: {
-        'Content-Type': 'text/csv',
+        'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="leads_export_${new Date().toISOString().split('T')[0]}.csv"`,
+        'Cache-Control': 'private, no-store, max-age=0',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   }
@@ -47,8 +49,10 @@ export async function GET() {
     const csv = 'Name,Email,Phone,Lead Type,Budget,Score,Score Label,Status,Property Address,Notes,Move-in Date,Employment,Income,Assigned To,Created At\n';
     return new NextResponse(csv, {
       headers: {
-        'Content-Type': 'text/csv',
+        'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="leads_export_${new Date().toISOString().split('T')[0]}.csv"`,
+        'Cache-Control': 'private, no-store, max-age=0',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   }
@@ -70,6 +74,7 @@ export async function GET() {
       'name, email, phone, "leadType", budget, "leadScore", "scoreLabel", "scoringStatus", address, notes, "applicationData", "spaceId", "createdAt"',
     )
     .in('spaceId', spaceIds)
+    .contains('tags', ['new-lead'])
     .order('createdAt', { ascending: false })
     .limit(10000);
 
@@ -129,8 +134,10 @@ export async function GET() {
 
   return new NextResponse(csv, {
     headers: {
-      'Content-Type': 'text/csv',
+      'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

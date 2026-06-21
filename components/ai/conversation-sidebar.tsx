@@ -4,15 +4,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Pencil, Check, X, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Conversation } from '@/lib/types';
+import type { ChatConversation } from '@/lib/types';
 
-function groupByDate(conversations: Conversation[]) {
+function groupByDate(conversations: ChatConversation[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-  const groups: { label: string; items: Conversation[] }[] = [
+  const groups: { label: string; items: ChatConversation[] }[] = [
     { label: 'Today', items: [] },
     { label: 'Yesterday', items: [] },
     { label: 'This week', items: [] },
@@ -33,9 +33,9 @@ function groupByDate(conversations: Conversation[]) {
 
 interface ConversationSidebarProps {
   slug: string;
-  conversations: Conversation[];
+  conversations: ChatConversation[];
   activeId: string | null;
-  onSelect: (conv: Conversation) => void;
+  onSelect: (conv: ChatConversation) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
@@ -53,7 +53,7 @@ export function ConversationSidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
-  function startEdit(conv: Conversation) {
+  function startEdit(conv: ChatConversation) {
     setEditingId(conv.id);
     setEditTitle(conv.title);
   }

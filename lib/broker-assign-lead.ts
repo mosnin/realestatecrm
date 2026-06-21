@@ -41,6 +41,10 @@ export async function assignLeadToRealtor(params: {
   if (contactError) throw contactError;
 
   let contact = contactInSpace;
+  let updateScope: { column: 'spaceId' | 'brokerageId'; value: string } = {
+    column: 'spaceId',
+    value: brokerSpace.id,
+  };
   if (!contact) {
     const { data: contactByBrokerageId, error: brokerageContactError } = await supabase
       .from('Contact')
@@ -50,6 +54,7 @@ export async function assignLeadToRealtor(params: {
       .maybeSingle();
     if (brokerageContactError) throw brokerageContactError;
     contact = contactByBrokerageId;
+    updateScope = { column: 'brokerageId', value: brokerage.id };
   }
 
   if (!contact) {
@@ -148,7 +153,8 @@ export async function assignLeadToRealtor(params: {
       applicationStatusNote: assignmentMeta,
       updatedAt: now,
     })
-    .eq('id', contactId);
+    .eq('id', contactId)
+    .eq(updateScope.column, updateScope.value);
   if (updateError) throw updateError;
 
   console.info('[assign-lead] lead assigned', {
