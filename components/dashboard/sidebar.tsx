@@ -60,6 +60,7 @@ import {
   Gauge,
   TrendingUp,
   Coins,
+  CalendarClock,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -149,6 +150,7 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
       { href: '/broker/activity', label: 'Audit log', icon: Shield, exact: false, adminOnly: true },
       { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
+      { href: '/broker/routines', label: 'Routines', icon: CalendarClock, exact: false, adminOnly: true },
       {
         href: '/broker/settings',
         label: 'Settings',

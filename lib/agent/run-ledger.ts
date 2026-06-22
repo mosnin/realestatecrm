@@ -38,7 +38,12 @@ export type { AgentRunLedger, AgentRunLedgerStatus } from '@/lib/types';
 
 /** Where a dispatch originated. Free text in the DB (no CHECK) — kept as a
  *  union here for call-site safety; add a member when a new source appears. */
-export type AgentRunTrigger = 'sweep' | 'routine' | 'run_now' | 'composio_trigger';
+export type AgentRunTrigger =
+  | 'sweep'
+  | 'routine'
+  | 'run_now'
+  | 'composio_trigger'
+  | 'broker_routine';
 
 const TABLE = 'AgentRunLedger';
 

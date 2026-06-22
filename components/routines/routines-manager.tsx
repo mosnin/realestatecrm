@@ -169,7 +169,7 @@ function formatRelative(iso: string): string {
 
 // ── Manager ──────────────────────────────────────────────────────────────────
 
-export function RoutinesManager() {
+export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: string } = {}) {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -184,7 +184,7 @@ export function RoutinesManager() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/routines');
+        const res = await fetch(apiBase);
         if (!res.ok) throw new Error('load failed');
         const data = await res.json();
         if (!active) return;
@@ -198,13 +198,13 @@ export function RoutinesManager() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [apiBase]);
 
   async function createRoutine(payload: ComposerValue) {
     setBusyId('new');
     setActionError('');
     try {
-      const res = await fetch('/api/routines', {
+      const res = await fetch(apiBase, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -227,7 +227,7 @@ export function RoutinesManager() {
     setBusyId(id);
     setActionError('');
     try {
-      const res = await fetch(`/api/routines/${id}`, {
+      const res = await fetch(`${apiBase}/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -252,7 +252,7 @@ export function RoutinesManager() {
     setRoutines((rs) => rs.map((r) => (r.id === routine.id ? { ...r, enabled: next } : r)));
     setActionError('');
     try {
-      const res = await fetch(`/api/routines/${routine.id}`, {
+      const res = await fetch(`${apiBase}/${routine.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: next }),
@@ -272,7 +272,7 @@ export function RoutinesManager() {
     setBusyId(id);
     setActionError('');
     try {
-      const res = await fetch(`/api/routines/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${apiBase}/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete failed');
       setRoutines((rs) => rs.filter((r) => r.id !== id));
       if (editingId === id) setEditingId(null);
@@ -287,10 +287,10 @@ export function RoutinesManager() {
     setRunningId(id);
     setActionError('');
     try {
-      const res = await fetch(`/api/routines/${id}`, { method: 'POST' });
+      const res = await fetch(`${apiBase}/${id}`, { method: 'POST' });
       if (!res.ok && res.status !== 202) throw new Error('run failed');
       // Pull the refreshed run stamps so the card shows "Ran just now".
-      const listRes = await fetch('/api/routines');
+      const listRes = await fetch(apiBase);
       if (listRes.ok) {
         const data = await listRes.json();
         if (Array.isArray(data.routines)) setRoutines(data.routines);
