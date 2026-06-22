@@ -12,7 +12,7 @@ import {
   type SentAttachmentMeta,
 } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
+import { History, X, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -28,7 +28,7 @@ import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
-import type { Conversation } from '@/lib/types';
+import type { ChatConversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
@@ -39,6 +39,8 @@ import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
+import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
+import { SystemMessage } from '@/components/ai/prompt-kit';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -56,7 +58,7 @@ interface ChippiWorkspaceProps {
   /** When 'settings', renders the agent settings panel instead of the workspace. */
   view?: 'workspace' | 'settings';
   initialMessages: LegacyMessage[];
-  initialConversations: Conversation[];
+  initialConversations: ChatConversation[];
   initialConversationId: string | null;
   /** Pre-send this message on mount (used when arriving from the command palette). */
   initialInput?: string;
@@ -178,9 +180,10 @@ export function ChippiWorkspace({
   variant = 'realtor',
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
+  const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
   const { user } = useUser();
   const router = useRouter();
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
+  const [conversations, setConversations] = useState<ChatConversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     initialConversationId,
   );
@@ -215,6 +218,7 @@ export function ChippiWorkspace({
   }, [activeConversationId]);
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
+  const effectiveIsSplit = !isBroker && isSplit;
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -237,18 +241,10 @@ export function ChippiWorkspace({
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
-    // Broker variant routes through `/api/ai/broker-task` — the broker
-    // version re-checks `resolveBrokerContext()` (defense layer 2) before
-    // forwarding the turn to Modal with `mode: 'broker'`.
-    ...(isBroker
-      ? {
-          taskEndpoint: '/api/ai/broker-task',
-          conversationsEndpoint: '/api/ai/broker-conversations',
-          // The broker conversations route reads brokerage scope from the
-          // Clerk session, not from the body — no payload needed.
-          conversationCreatePayload: {},
-        }
-      : {}),
+    taskEndpoint: endpoints.taskEndpoint,
+    conversationsEndpoint: endpoints.conversationsEndpoint,
+    resumeEndpointBase: endpoints.resumeEndpointBase,
+    conversationCreatePayload: endpoints.conversationCreatePayload,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
       // Mark as loaded so the conversation-loading effect won't try to
@@ -263,20 +259,17 @@ export function ChippiWorkspace({
           : [
               {
                 id,
-                spaceId: '',
                 title: 'New conversation',
                 createdAt: new Date(),
                 updatedAt: new Date(),
-              } as Conversation,
+              } as ChatConversation,
               ...prev,
             ],
       );
       // Reflect the new conversation in the URL so a refresh (or share)
       // lands on the same transcript. `replace` so the history doesn't
-      // grow a step for every new chat. The base path differs per variant
-      // — realtor sits at /s/<slug>/chippi, broker at /broker/chippi.
-      const newConvBase = isBroker ? '/broker' : `/s/${slug}/chippi`;
-      router.replace(`${newConvBase}?conversationId=${id}`, { scroll: false });
+      // grow a step for every new chat.
+      router.replace(`${endpoints.routeBase}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
     },
   });
 
@@ -382,8 +375,7 @@ export function ChippiWorkspace({
       const next = new URLSearchParams(searchParams.toString());
       next.delete('view');
       const qs = next.toString();
-      const baseUrl = isBroker ? '/broker' : `/s/${slug}/chippi`;
-      router.replace(`${baseUrl}${qs ? `?${qs}` : ''}`, { scroll: false });
+      router.replace(`${endpoints.routeBase}${qs ? `?${qs}` : ''}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -393,37 +385,37 @@ export function ChippiWorkspace({
   // "Message"). Choosing by variant, mirroring taskEndpoint / conversations-
   // Endpoint above, is what fixes the broker "can't load history after reload"
   // 404 — the realtor endpoint refuses broker conversations by design.
-  const messagesEndpoint = isBroker ? '/api/ai/broker-messages' : '/api/ai/messages';
+  const messagesEndpoint = endpoints.messagesEndpoint;
 
   // Per-conversation mutations (rename / delete) hit the broker-gated
   // `/api/ai/broker-conversations/<id>` for the broker variant — the realtor
   // `/api/ai/conversations/<id>` route refuses broker rows (and the broker
   // rows live in a different table entirely). Returns the base path; callers
   // append the conversation id.
-  const conversationItemBase = isBroker ? '/api/ai/broker-conversations' : '/api/ai/conversations';
+  const conversationItemBase = endpoints.conversationItemBase;
+  const conversationItemUrl = useCallback(
+    (id: string) => `${conversationItemBase}/${encodeURIComponent(id)}`,
+    [conversationItemBase],
+  );
 
   const loadConversation = useCallback(
-    async (convId: string) => {
+    async (convId: string): Promise<LegacyMessage[] | null> => {
       try {
-        const res = await fetch(`${messagesEndpoint}?conversationId=${convId}`);
+        const res = await fetch(`${messagesEndpoint}?conversationId=${encodeURIComponent(convId)}`);
         if (!res.ok) {
           const errBody = await res.text().catch(() => '');
           console.error('[Chat] fetch failed', res.status, errBody);
-          toast.error("Couldn't load that conversation.", {
-            action: { label: 'Retry', onClick: () => void loadConversation(convId) },
-          });
-          return;
+          toast.error("Couldn't load that conversation.");
+          return null;
         }
-        const data = (await res.json()) as LegacyMessage[];
-        setMessages(legacyToUi(data));
+        return (await res.json()) as LegacyMessage[];
       } catch (err) {
         console.error('[Chat] fetch error', err);
-        toast.error("Couldn't load that conversation.", {
-          action: { label: 'Retry', onClick: () => void loadConversation(convId) },
-        });
+        toast.error("Couldn't load that conversation.");
+        return null;
       }
     },
-    [setMessages, messagesEndpoint],
+    [messagesEndpoint],
   );
 
   useEffect(() => {
@@ -445,45 +437,77 @@ export function ChippiWorkspace({
     // Already showing this conversation — nothing to do.
     if (targetId === loadedConvIdRef.current) return;
 
-    loadedConvIdRef.current = targetId;
     setActiveConversationId(targetId);
+    setMessages([]);
 
     // Server already fetched the right messages for this exact conversation —
     // use them immediately (zero extra round-trip).
     if (targetId === initialConversationId && initialMessages.length > 0) {
+      loadedConvIdRef.current = targetId;
       setMessages(legacyToUi(initialMessages));
       return;
     }
 
     // Server props are empty or stale (e.g. router-cache served an old render,
     // or this is a conversation outside the server's top-50 list). Fetch fresh.
-    void loadConversation(targetId);
-  }, [urlConversationId, initialConversationId, initialMessages, isStreaming, loadConversation, setMessages]);
+    let cancelled = false;
+    void loadConversation(targetId).then((data) => {
+      if (cancelled) return;
+      if (data) {
+        loadedConvIdRef.current = targetId;
+        setMessages(legacyToUi(data));
+        return;
+      }
+
+      // A failed load must not leave the previous transcript visible under the
+      // newly requested id. Reset back to an empty surface state and remove the
+      // invalid conversation id from the URL.
+      loadedConvIdRef.current = '';
+      setActiveConversationId(null);
+      setMessages([]);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('conversationId');
+      const qs = next.toString();
+      router.replace(`${endpoints.routeBase}${qs ? `?${qs}` : ''}`, { scroll: false });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    urlConversationId,
+    initialConversationId,
+    initialMessages,
+    isStreaming,
+    loadConversation,
+    setMessages,
+    searchParams,
+    router,
+    endpoints.routeBase,
+  ]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingApproval, isStreaming]);
 
   // Resolve the route base once. Same URL shape both variants — broker
-  // sits at /broker/chippi, realtor at /s/<slug>/chippi.
-  const chippiBaseUrl = isBroker ? '/broker' : `/s/${slug}/chippi`;
+  // sits at /broker, realtor at /s/<slug>/chippi.
+  const chippiBaseUrl = endpoints.routeBase;
 
-  function handleSelectConversation(conv: Conversation) {
+  function handleSelectConversation(conv: ChatConversation) {
     setDrawerOpen(false);
     if (conv.id === activeConversationId) return;
     startConversationTransition(() => {
-      router.push(`${chippiBaseUrl}?conversationId=${conv.id}`, { scroll: false });
+      router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(conv.id)}`, { scroll: false });
     });
   }
 
   async function handleNewConversation() {
-    const endpoint = isBroker ? '/api/ai/broker-conversations' : '/api/ai/conversations';
-    const body = isBroker ? {} : { slug };
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(endpoints.conversationsEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(endpoints.conversationCreatePayload),
       });
       if (!res.ok) {
         toast.error("Couldn't start a new chat.", {
@@ -491,11 +515,11 @@ export function ChippiWorkspace({
         });
         return;
       }
-      const conv = (await res.json()) as Conversation;
+      const conv = (await res.json()) as ChatConversation;
       setConversations((prev) => [conv, ...prev]);
       setDrawerOpen(false);
       startConversationTransition(() => {
-        router.push(`${chippiBaseUrl}?conversationId=${conv.id}`, { scroll: false });
+        router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(conv.id)}`, { scroll: false });
       });
     } catch (err) {
       console.error('[Chat] new conversation failed', err);
@@ -519,14 +543,11 @@ export function ChippiWorkspace({
       // a page nav after the realtor walked away from the toast.
       for (const [id, timer] of pendingDeleteTimersRef.current.entries()) {
         clearTimeout(timer);
-        void fetch(`${conversationItemBase}/${id}`, { method: 'DELETE' });
+        void fetch(conversationItemUrl(id), { method: 'DELETE' });
       }
       pendingDeleteTimersRef.current.clear();
     };
-    // conversationItemBase is constant per mount (isBroker never changes), so
-    // an empty dep array is correct — this is an unmount-only flush.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [conversationItemUrl]);
 
   async function handleDeleteConversation(id: string) {
     // Snapshot for restore on undo. Capture both the row and the active-
@@ -553,7 +574,7 @@ export function ChippiWorkspace({
     const timer = setTimeout(async () => {
       pendingDeleteTimersRef.current.delete(id);
       try {
-        const res = await fetch(`${conversationItemBase}/${id}`, { method: 'DELETE' });
+        const res = await fetch(conversationItemUrl(id), { method: 'DELETE' });
         if (!res.ok) {
           // Server rejected the delete — put the row back and tell the
           // realtor. They've already moved on by now, so the toast carries
@@ -597,7 +618,7 @@ export function ChippiWorkspace({
           });
           if (wasActive) {
             startConversationTransition(() => {
-              router.push(`${chippiBaseUrl}?conversationId=${id}`, { scroll: false });
+              router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
             });
           }
         },
@@ -607,7 +628,7 @@ export function ChippiWorkspace({
 
   async function handleRenameConversation(id: string, title: string) {
     try {
-      const res = await fetch(`${conversationItemBase}/${id}`, {
+      const res = await fetch(conversationItemUrl(id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
@@ -618,7 +639,7 @@ export function ChippiWorkspace({
         });
         return;
       }
-      const updated = (await res.json()) as Conversation;
+      const updated = (await res.json()) as ChatConversation;
       setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
     } catch (err) {
       console.error('[Chat] rename conversation failed', err);
@@ -631,6 +652,13 @@ export function ChippiWorkspace({
   const handleMentionSearch = useCallback(
     async (query: string): Promise<MentionItem[]> => {
       const results: MentionItem[] = [];
+      if (isBroker) {
+        // The @ mention search endpoints are realtor/space-scoped. The broker
+        // surface must not probe them with an empty slug (or accidentally query
+        // a realtor workspace); broker-specific mentions should use dedicated
+        // brokerage-scoped endpoints when added.
+        return results;
+      }
       try {
         const [contactsRes, dealsRes] = await Promise.all([
           fetch(`/api/contacts?slug=${encodeURIComponent(slug)}&search=${encodeURIComponent(query)}`),
@@ -675,7 +703,7 @@ export function ChippiWorkspace({
       }
       return results;
     },
-    [slug],
+    [isBroker, slug],
   );
 
   const handleSend = useCallback(
@@ -1146,7 +1174,7 @@ export function ChippiWorkspace({
           message-limit counter; the DOET audit (PR #101) called it a
           score-2 Discoverability failure. */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5">
-        <ApprovalsPill />
+        {!isBroker && <ApprovalsPill />}
         {/* One three-dots menu — folds New chat, History, Brief/Drafts, and
             (realtor) Run now / Memory / Chippi settings into a single animated
             dropdown so the chat surface stays open instead of carrying a row of
@@ -1190,7 +1218,7 @@ export function ChippiWorkspace({
                 className="cursor-pointer"
               >
                 <Inbox size={14} className="mr-2" />
-                Drafts
+                {isBroker ? 'Reviews' : 'Drafts'}
               </Link>
             </DropdownMenuItem>
             {!isBroker && (
@@ -1228,7 +1256,7 @@ export function ChippiWorkspace({
         </DropdownMenu>
         {/* Split panel disabled on broker variant — RightPanel tabs
             (contacts/deals/etc.) are realtor-scoped in Phase 1. */}
-        {!isBroker && <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />}
+        {!isBroker && <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />}
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -1267,7 +1295,7 @@ export function ChippiWorkspace({
         {/* Left panel — all chat/workspace content */}
         <div
           className="flex flex-col h-full overflow-hidden min-w-0"
-          style={{ width: isSplit ? `${leftWidthPercent}%` : '100%' }}
+          style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}
         >
 
       {/* ── Today view (no active conversation) ───────────────────── */}
@@ -1442,6 +1470,7 @@ export function ChippiWorkspace({
                             })}
                             <Transcript
                               blocks={msg.blocks}
+                              messageId={msg.id}
                               role={msg.role}
                               streaming={msg.streaming && isStreaming}
                               liveCallIds={liveCallIds}
@@ -1489,6 +1518,7 @@ export function ChippiWorkspace({
                       <Transcript
                         key={msg.id}
                         blocks={msg.blocks}
+                        messageId={msg.id}
                         role={msg.role}
                         streaming={msg.streaming && isStreaming}
                         liveCallIds={liveCallIds}
@@ -1581,25 +1611,21 @@ export function ChippiWorkspace({
             className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
           >
             {atLimit ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
-                </div>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                  You&apos;ve reached the 50-message limit for this conversation.
-                </p>
-                <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
-                  Start a new conversation to continue chatting.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={handleNewConversation}
-                  variant="outline"
-                  className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800"
-                >
-                  Start new conversation
-                </Button>
-              </div>
+              <SystemMessage
+                tone="warning"
+                heading="You've reached the 50-message limit for this conversation."
+                description="Start a new conversation to continue chatting."
+                action={(
+                  <Button
+                    size="sm"
+                    onClick={handleNewConversation}
+                    variant="outline"
+                    className="border-amber-400 text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-800"
+                  >
+                    Start new conversation
+                  </Button>
+                )}
+              />
             ) : (
               renderInput()
             )}
@@ -1612,7 +1638,7 @@ export function ChippiWorkspace({
         </div>{/* end left panel */}
 
         {/* Right panel — visible only when split */}
-        {isSplit && (
+        {effectiveIsSplit && (
           <>
             <PanelResizeHandle
               onResize={setLeftWidthPercent}

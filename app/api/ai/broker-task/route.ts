@@ -122,6 +122,7 @@ async function resolveConversation(
       .from('BrokerConversation')
       .select('id, brokerageId')
       .eq('id', conversationId)
+      .eq('brokerageId', brokerageId)
       .maybeSingle();
     if (data && data.brokerageId === brokerageId) {
       return conversationId;
@@ -138,10 +139,11 @@ async function resolveConversation(
   return id;
 }
 
-async function loadHistory(conversationId: string): Promise<HistoryRow[]> {
+async function loadHistory(brokerageId: string, conversationId: string): Promise<HistoryRow[]> {
   const { data } = await supabase
     .from('BrokerMessage')
     .select('role, content, createdAt')
+    .eq('brokerageId', brokerageId)
     .eq('conversationId', conversationId)
     .order('createdAt', { ascending: false })
     .limit(HISTORY_LIMIT);
@@ -457,27 +459,34 @@ export async function POST(req: NextRequest) {
   // settings/usage want a space, and the direct (in-process) path needs none.
   const runtimeSpaceId = await resolveRuntimeSpaceId(brokerCtx.brokerage.ownerId);
 
-  // Route decision is pure — compute it BEFORE any persistence so an
-  // agent-path precondition failure (Modal unconfigured, no runtime space)
-  // can refuse cleanly. The previous order saved the user message first and
-  // THEN 503'd, leaving an orphaned user message with no assistant reply in
-  // the thread.
-  const route = decideBrokerRoute(message);
+  // Route decision is pure — compute it BEFORE any persistence. If Modal is not
+  // configured (or this brokerage lacks the owner runtime Space Modal uses for
+  // usage/settings), degrade to the in-process broker snapshot path instead of
+  // saving a user turn and then 503'ing. Missing AGENT_INTERNAL_SECRET is still
+  // fail-closed because that is an auth boundary, not an availability issue.
+  let route = decideBrokerRoute(message);
+  if (route === 'agent' && !process.env.MODAL_CHAT_URL) {
+    logger.warn('[ai/broker-task] MODAL_CHAT_URL not set — falling back to direct broker snapshot', {
+      brokerageId,
+    });
+    route = 'direct';
+  }
+  if (route === 'agent' && !process.env.AGENT_INTERNAL_SECRET) {
+    logger.error('[ai/broker-task] AGENT_INTERNAL_SECRET not set');
+    return NextResponse.json(
+      { error: 'Agent backend auth not configured. Set AGENT_INTERNAL_SECRET.' },
+      { status: 503 },
+    );
+  }
+  if (route === 'agent' && !runtimeSpaceId) {
+    logger.warn('[ai/broker-task] no runtime space for agentic turn — falling back to direct broker snapshot', {
+      brokerageId,
+    });
+    route = 'direct';
+  }
+
   if (route === 'agent') {
-    if (!process.env.MODAL_CHAT_URL) {
-      logger.error('[ai/broker-task] MODAL_CHAT_URL not set');
-      return NextResponse.json(
-        { error: 'Agent backend not configured. Set MODAL_CHAT_URL.' },
-        { status: 503 },
-      );
-    }
-    if (!runtimeSpaceId) {
-      logger.warn('[ai/broker-task] no runtime space for agentic turn', { brokerageId });
-      return NextResponse.json(
-        { error: 'Broker actions are not available for this brokerage yet.' },
-        { status: 503 },
-      );
-    }
+    const runtimeSpaceIdForAgent = runtimeSpaceId as string;
 
     // Platform admins get unlimited usage — exempt from the budget gate.
     // Token usage is still recorded downstream, so admin consumption is tracked.
@@ -497,9 +506,9 @@ export async function POST(req: NextRequest) {
         supabase
           .from('AgentSettings')
           .select('dailyTokenBudget')
-          .eq('spaceId', runtimeSpaceId)
+          .eq('spaceId', runtimeSpaceIdForAgent)
           .maybeSingle(),
-        getTodayTokenUsage(runtimeSpaceId),
+        getTodayTokenUsage(runtimeSpaceIdForAgent),
       ]);
       const dailyTokenBudget: number =
         ((settingsResult.data as { dailyTokenBudget?: number | null } | null)
@@ -507,7 +516,7 @@ export async function POST(req: NextRequest) {
       if (!isAdmin && usageResult.total >= dailyTokenBudget) {
         logger.warn('[ai/broker-task] daily token budget exceeded', {
           brokerageId,
-          runtimeSpaceId,
+          runtimeSpaceId: runtimeSpaceIdForAgent,
           todayTokens: usageResult.total,
           dailyTokenBudget,
         });
@@ -537,7 +546,7 @@ export async function POST(req: NextRequest) {
 
   let history: HistoryRow[];
   try {
-    history = await loadHistory(conversationId);
+    history = await loadHistory(brokerageId, conversationId);
   } catch (err) {
     logger.warn(
       '[ai/broker-task] history load failed — continuing without it',
@@ -581,9 +590,10 @@ export async function POST(req: NextRequest) {
   // Preconditions (MODAL_CHAT_URL, runtimeSpaceId) were verified BEFORE the
   // user message was persisted — see the route-decision block above.
   const modalChatUrl = process.env.MODAL_CHAT_URL as string;
+  const agentInternalSecret = process.env.AGENT_INTERNAL_SECRET as string;
 
   const payload = {
-    secret: process.env.AGENT_INTERNAL_SECRET ?? '',
+    secret: agentInternalSecret,
     space_id: runtimeSpaceId,
     user_id: clerkUserId,
     message,

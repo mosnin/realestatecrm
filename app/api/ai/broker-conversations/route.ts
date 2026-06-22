@@ -54,6 +54,7 @@ export async function GET(_req: NextRequest) {
       .from('BrokerMessage')
       .select('conversationId, content')
       .in('conversationId', ids)
+      .eq('brokerageId', brokerCtx.brokerage.id)
       .order('createdAt', { ascending: false })
       .limit(ids.length * 20);
     if (msgs) {

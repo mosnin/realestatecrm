@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -67,12 +68,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  let body: Record<string, unknown>;
-  try {
-    body = (await req.json()) as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
@@ -195,19 +194,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const row = existing as CommissionLedgerRow;
 
-  // If a referralUserId was supplied (and not null), the User must exist.
+  // If a referralUserId was supplied (and not null), it must be a member of
+  // this brokerage. Validate via membership rather than a global User lookup so
+  // this endpoint does not leak or attach users from other brokerages.
   if (referralUserIdVal !== undefined && referralUserIdVal !== null) {
-    const { data: userRow, error: userErr } = await supabase
-      .from('User')
+    const { data: referralMember, error: referralMemberErr } = await supabase
+      .from('BrokerageMembership')
       .select('id')
-      .eq('id', referralUserIdVal)
-      .maybeSingle();
-    if (userErr) {
-      console.error('[broker/commissions/ledger/PATCH] user lookup failed', userErr);
+      .eq('brokerageId', ctx.brokerage.id)
+      .eq('userId', referralUserIdVal)
+      .maybeSingle<{ id: string }>();
+    if (referralMemberErr) {
+      console.error('[broker/commissions/ledger/PATCH] referral membership lookup failed', referralMemberErr);
       return NextResponse.json({ error: 'Failed to validate referralUserId' }, { status: 500 });
     }
-    if (!userRow) {
-      return NextResponse.json({ error: 'Referral user not found' }, { status: 404 });
+    if (!referralMember) {
+      return NextResponse.json({ error: 'Referral user not found in brokerage' }, { status: 404 });
     }
   }
 

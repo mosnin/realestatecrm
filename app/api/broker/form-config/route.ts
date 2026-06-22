@@ -5,6 +5,7 @@ import { audit } from '@/lib/audit';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import { auth } from '@clerk/nextjs/server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { readJsonWithLimit, readOptionalJsonWithLimit } from '@/lib/validation';
 
 const MAX_FORM_CONFIG_SIZE = 512_000;
 const MAX_TOTAL_QUESTIONS = 200;
@@ -69,12 +70,10 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, MAX_FORM_CONFIG_SIZE);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   const leadType = body.leadType as string | undefined;
   if (!leadType || (leadType !== 'rental' && leadType !== 'buyer')) {
@@ -113,14 +112,22 @@ export async function PUT(req: NextRequest) {
 
   const column = leadType === 'rental' ? 'brokerageRentalFormConfig' : 'brokerageBuyerFormConfig';
 
-  const { error: updateErr } = await supabase
+  const { data: updatedBrokerage, error: updateErr } = await supabase
     .from('Brokerage')
     .update({ [column]: formConfig })
-    .eq('id', ctx.brokerage.id);
+    .eq('id', ctx.brokerage.id)
+    .select('id')
+    .maybeSingle<{ id: string }>();
 
   if (updateErr) {
     console.error('[broker/form-config] update failed', updateErr);
     return NextResponse.json({ error: 'Failed to save form config' }, { status: 500 });
+  }
+  if (!updatedBrokerage) {
+    return NextResponse.json(
+      { error: 'Brokerage form config changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({
@@ -164,14 +171,15 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  let body: Record<string, unknown> = {};
-  try {
-    body = await req.json();
-  } catch {
-    // No body is OK — resets both
-  }
+  const bodyResult = await readOptionalJsonWithLimit(req, MAX_FORM_CONFIG_SIZE);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   const leadType = body.leadType as string | undefined;
+  if (leadType && leadType !== 'rental' && leadType !== 'buyer') {
+    return NextResponse.json({ error: 'leadType must be "rental" or "buyer"' }, { status: 400 });
+  }
 
   const updates: Record<string, unknown> = {};
   if (!leadType || leadType === 'rental') {
@@ -184,14 +192,22 @@ export async function DELETE(req: NextRequest) {
     updates.brokerageFormConfig = null; // Also clear legacy column
   }
 
-  const { error: updateErr } = await supabase
+  const { data: updatedBrokerage, error: updateErr } = await supabase
     .from('Brokerage')
     .update(updates)
-    .eq('id', ctx.brokerage.id);
+    .eq('id', ctx.brokerage.id)
+    .select('id')
+    .maybeSingle<{ id: string }>();
 
   if (updateErr) {
     console.error('[broker/form-config] delete failed', updateErr);
     return NextResponse.json({ error: 'Failed to reset form config' }, { status: 500 });
+  }
+  if (!updatedBrokerage) {
+    return NextResponse.json(
+      { error: 'Brokerage form config changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({

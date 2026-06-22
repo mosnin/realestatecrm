@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
 
 type StatusFilter = 'open' | 'approved' | 'closed' | 'all';
 
@@ -18,8 +19,6 @@ type ReviewRow = {
 };
 
 type UserLite = { id: string; name: string | null; email: string | null };
-type DealLite = { id: string; title: string | null; value: number | null; spaceId: string };
-type SpaceLite = { id: string; slug: string };
 
 /**
  * GET /api/broker/reviews?status=open|approved|closed|all
@@ -70,10 +69,14 @@ export async function GET(req: NextRequest) {
   const userIds = Array.from(new Set(rows.map((r) => r.requestingUserId)));
   const dealIds = Array.from(new Set(rows.map((r) => r.dealId)));
 
-  // Fetch requesting users, deals, and comment counts in parallel.
-  const [usersRes, dealsRes, commentsRes] = await Promise.all([
+  // Fetch requesting users, brokerage-scoped deals, and comment counts in parallel.
+  const [usersRes, scopedDeals, commentsRes] = await Promise.all([
     supabase.from('User').select('id, name, email').in('id', userIds),
-    supabase.from('Deal').select('id, title, value, spaceId').in('id', dealIds),
+    Promise.all(
+      dealIds.map((dealId) =>
+        loadBrokerageScopedReviewDeal({ dealId, brokerageId: ctx.brokerage.id }),
+      ),
+    ),
     supabase.from('DealReviewComment').select('id, reviewRequestId').in('reviewRequestId', reviewIds),
   ]);
 
@@ -81,29 +84,14 @@ export async function GET(req: NextRequest) {
     logger.error('[broker/reviews/GET] user fetch failed', { brokerageId: ctx.brokerage.id }, usersRes.error);
     return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 });
   }
-  if (dealsRes.error) {
-    logger.error('[broker/reviews/GET] deal fetch failed', { brokerageId: ctx.brokerage.id }, dealsRes.error);
-    return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 });
-  }
   if (commentsRes.error) {
     logger.error('[broker/reviews/GET] comment count failed', { brokerageId: ctx.brokerage.id }, commentsRes.error);
     return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 });
   }
 
-  const deals = (dealsRes.data ?? []) as DealLite[];
-  const spaceIds = Array.from(new Set(deals.map((d) => d.spaceId)));
-  const spacesRes = spaceIds.length
-    ? await supabase.from('Space').select('id, slug').in('id', spaceIds)
-    : { data: [] as SpaceLite[], error: null };
-  if (spacesRes.error) {
-    logger.error('[broker/reviews/GET] space fetch failed', { brokerageId: ctx.brokerage.id }, spacesRes.error);
-    return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 });
-  }
-
   const usersById = new Map<string, UserLite>(((usersRes.data ?? []) as UserLite[]).map((u) => [u.id, u]));
-  const dealsById = new Map<string, DealLite>(deals.map((d) => [d.id, d]));
-  const spacesById = new Map<string, SpaceLite>(
-    ((spacesRes.data ?? []) as SpaceLite[]).map((s) => [s.id, s]),
+  const scopedDealById = new Map(
+    scopedDeals.filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)).map((entry) => [entry.deal.id, entry]),
   );
   const commentCountByReview = new Map<string, number>();
   for (const c of (commentsRes.data ?? []) as { id: string; reviewRequestId: string }[]) {
@@ -112,8 +100,9 @@ export async function GET(req: NextRequest) {
 
   const shaped = rows.map((r) => {
     const user = usersById.get(r.requestingUserId) ?? null;
-    const deal = dealsById.get(r.dealId) ?? null;
-    const space = deal ? spacesById.get(deal.spaceId) ?? null : null;
+    const scopedDeal = scopedDealById.get(r.dealId) ?? null;
+    const deal = scopedDeal?.deal ?? null;
+    const space = scopedDeal?.space ?? null;
     return {
       id: r.id,
       dealId: r.dealId,

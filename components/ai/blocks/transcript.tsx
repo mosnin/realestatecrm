@@ -17,6 +17,8 @@ interface TranscriptProps {
   blocks: MessageBlock[];
   /** Whose turn these blocks belong to. User turns only carry text blocks. */
   role: 'user' | 'assistant';
+  /** Stable persisted message id, used to key per-message UI primitives. */
+  messageId?: string;
   /**
    * When this turn is still streaming, the trailing text block gets a
    * pulsing caret. Pass `true` for the assistant turn that is currently
@@ -76,6 +78,7 @@ interface TranscriptProps {
 export function Transcript({
   blocks,
   role,
+  messageId,
   streaming,
   liveCallIds,
   pendingApproval,
@@ -179,6 +182,7 @@ export function Transcript({
                 key={`text-${item.originalIndex}`}
                 block={item.block}
                 role={role}
+                markdownId={messageId ? `${messageId}-${item.originalIndex}` : undefined}
                 streaming={item.originalIndex === lastTextIndex}
               />
             );

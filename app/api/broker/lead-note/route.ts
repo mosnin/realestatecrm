@@ -2,11 +2,107 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+
+type ContactNoteRow = {
+  id: string;
+  notes: string | null;
+  spaceId: string | null;
+  brokerageId?: string | null;
+  applicationStatusNote?: string | null;
+};
+
+type ContactUpdateScope = { column: 'spaceId' | 'brokerageId'; value: string };
 
 const addNoteSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
   note: z.string().min(1, 'Note cannot be empty').max(2000, 'Note too long'),
 });
+
+async function resolveBrokerContactAccess(params: {
+  contactId: string;
+  brokerage: { id: string; ownerId: string };
+  select: string;
+}): Promise<{
+  contact: ContactNoteRow | null;
+  updateScope: ContactUpdateScope | null;
+  brokerSpaceId: string | null;
+}> {
+  const { contactId, brokerage, select } = params;
+
+  const { data: ownerSpace } = await supabase
+    .from('Space')
+    .select('id')
+    .eq('ownerId', brokerage.ownerId)
+    .maybeSingle();
+  const brokerSpaceId = ownerSpace?.id ?? null;
+
+  if (brokerSpaceId) {
+    const { data: brokerSpaceContact, error: brokerSpaceError } = await supabase
+      .from('Contact')
+      .select(select)
+      .eq('id', contactId)
+      .eq('spaceId', brokerSpaceId)
+      .maybeSingle();
+    if (brokerSpaceError) throw brokerSpaceError;
+    if (brokerSpaceContact) {
+      return {
+        contact: brokerSpaceContact as unknown as ContactNoteRow,
+        updateScope: { column: 'spaceId', value: brokerSpaceId },
+        brokerSpaceId,
+      };
+    }
+  }
+
+  const { data: brokerageContact, error: brokerageContactError } = await supabase
+    .from('Contact')
+    .select(select)
+    .eq('id', contactId)
+    .eq('brokerageId', brokerage.id)
+    .maybeSingle();
+  if (brokerageContactError) throw brokerageContactError;
+  if (brokerageContact) {
+    return {
+      contact: brokerageContact as unknown as ContactNoteRow,
+      updateScope: { column: 'brokerageId', value: brokerage.id },
+      brokerSpaceId,
+    };
+  }
+
+  const { data: contact, error: contactError } = await supabase
+    .from('Contact')
+    .select(select)
+    .eq('id', contactId)
+    .maybeSingle();
+  if (contactError) throw contactError;
+  if (!contact) return { contact: null, updateScope: null, brokerSpaceId };
+
+  const row = contact as unknown as ContactNoteRow;
+  if (!row.spaceId) return { contact: null, updateScope: null, brokerSpaceId };
+
+  const { data: spaceOwner } = await supabase
+    .from('Space')
+    .select('ownerId')
+    .eq('id', row.spaceId)
+    .maybeSingle();
+
+  if (!spaceOwner) return { contact: null, updateScope: null, brokerSpaceId };
+
+  const { data: membership } = await supabase
+    .from('BrokerageMembership')
+    .select('id')
+    .eq('brokerageId', brokerage.id)
+    .eq('userId', spaceOwner.ownerId)
+    .maybeSingle();
+
+  if (!membership) return { contact: null, updateScope: null, brokerSpaceId };
+
+  return {
+    contact: row,
+    updateScope: { column: 'spaceId', value: row.spaceId },
+    brokerSpaceId,
+  };
+}
 
 /**
  * POST /api/broker/lead-note
@@ -25,14 +121,10 @@ export async function POST(req: NextRequest) {
 
   const { brokerage, dbUserId } = ctx;
 
-  let requestBody: unknown;
-  try {
-    requestBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
 
-  const parsed = addNoteSchema.safeParse(requestBody);
+  const parsed = addNoteSchema.safeParse(read.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid request data', issues: parsed.error.issues },
@@ -51,51 +143,14 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     const brokerName = brokerUser?.name ?? brokerUser?.email ?? 'Broker';
 
-    // Find the broker's space
-    const { data: ownerSpace } = await supabase
-      .from('Space')
-      .select('id')
-      .eq('ownerId', brokerage.ownerId)
-      .maybeSingle();
-    const brokerSpaceId = ownerSpace?.id ?? null;
+    const { contact, updateScope, brokerSpaceId } = await resolveBrokerContactAccess({
+      contactId,
+      brokerage,
+      select: 'id, notes, spaceId, brokerageId, applicationStatusNote',
+    });
 
-    // First check: is this contact in the broker's own space?
-    const { data: contact } = await supabase
-      .from('Contact')
-      .select('id, notes, spaceId, applicationStatusNote')
-      .eq('id', contactId)
-      .maybeSingle();
-
-    if (!contact) {
+    if (!contact || !updateScope) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    }
-
-    // Verify the contact belongs to broker space or a realtor in this brokerage
-    let authorized = false;
-
-    if (contact.spaceId === brokerSpaceId) {
-      authorized = true;
-    } else {
-      // Check if the contact's space belongs to a brokerage member
-      const { data: spaceOwner } = await supabase
-        .from('Space')
-        .select('ownerId')
-        .eq('id', contact.spaceId)
-        .maybeSingle();
-
-      if (spaceOwner) {
-        const { data: membership } = await supabase
-          .from('BrokerageMembership')
-          .select('id')
-          .eq('brokerageId', brokerage.id)
-          .eq('userId', spaceOwner.ownerId)
-          .maybeSingle();
-        if (membership) authorized = true;
-      }
-    }
-
-    if (!authorized) {
-      return NextResponse.json({ error: 'Not authorized to add notes to this contact' }, { status: 403 });
     }
 
     // Build the note prefix
@@ -122,19 +177,26 @@ export async function POST(req: NextRequest) {
         notes: updatedNotes,
         updatedAt: now.toISOString(),
       })
-      .eq('id', contactId);
+      .eq('id', contactId)
+      .eq(updateScope.column, updateScope.value);
 
     if (updateError) throw updateError;
 
-    // If this is an assigned lead, also add the note to the realtor's copy
+    // If this is an assigned broker-owned lead, also add the note to the realtor's copy.
+    // The update is bound to the assigned space from the assignment metadata so a stale
+    // or tampered assignedContactId cannot update an arbitrary contact with the same id.
     if (contact.spaceId === brokerSpaceId && contact.applicationStatusNote) {
       try {
-        const meta = JSON.parse(contact.applicationStatusNote);
-        if (meta.assignedContactId) {
+        const meta = JSON.parse(contact.applicationStatusNote) as {
+          assignedContactId?: string;
+          assignedSpaceId?: string;
+        };
+        if (meta.assignedContactId && meta.assignedSpaceId) {
           const { data: realtorContact } = await supabase
             .from('Contact')
             .select('id, notes')
             .eq('id', meta.assignedContactId)
+            .eq('spaceId', meta.assignedSpaceId)
             .maybeSingle();
 
           if (realtorContact) {
@@ -149,7 +211,8 @@ export async function POST(req: NextRequest) {
                 notes: realtorUpdated,
                 updatedAt: now.toISOString(),
               })
-              .eq('id', meta.assignedContactId);
+              .eq('id', meta.assignedContactId)
+              .eq('spaceId', meta.assignedSpaceId);
           }
         }
       } catch {
@@ -189,49 +252,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data: contact } = await supabase
-      .from('Contact')
-      .select('id, notes, spaceId')
-      .eq('id', contactId)
-      .maybeSingle();
+    const { contact } = await resolveBrokerContactAccess({
+      contactId,
+      brokerage,
+      select: 'id, notes, spaceId, brokerageId',
+    });
 
     if (!contact) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    }
-
-    // Verify the contact belongs to the broker's space or a brokerage member's space
-    const { data: ownerSpace } = await supabase
-      .from('Space')
-      .select('id')
-      .eq('ownerId', brokerage.ownerId)
-      .maybeSingle();
-    const brokerSpaceId = ownerSpace?.id ?? null;
-
-    let authorized = false;
-
-    if (contact.spaceId === brokerSpaceId) {
-      authorized = true;
-    } else {
-      // Check if the contact's space belongs to a brokerage member
-      const { data: spaceOwner } = await supabase
-        .from('Space')
-        .select('ownerId')
-        .eq('id', contact.spaceId)
-        .maybeSingle();
-
-      if (spaceOwner) {
-        const { data: membership } = await supabase
-          .from('BrokerageMembership')
-          .select('id')
-          .eq('brokerageId', brokerage.id)
-          .eq('userId', spaceOwner.ownerId)
-          .maybeSingle();
-        if (membership) authorized = true;
-      }
-    }
-
-    if (!authorized) {
-      return NextResponse.json({ error: 'Not authorized to view notes for this contact' }, { status: 403 });
     }
 
     return NextResponse.json({ notes: contact.notes ?? '' });

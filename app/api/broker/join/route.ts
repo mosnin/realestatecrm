@@ -8,6 +8,7 @@ import { checkSeatCapacity } from '@/lib/brokerage-seats';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForMemberJoined } from '@/lib/notification-voice';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 /**
  * POST /api/broker/join
@@ -29,16 +30,17 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`broker:join:${clerkId}`, 10, 3600);
   if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
 
-  let code: string;
-  try {
-    ({ code } = await req.json());
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
 
-  const normalizedCode = (code ?? '').trim().toUpperCase();
+  const { code } = bodyResult.data as { code?: unknown };
+
+  const normalizedCode = (typeof code === 'string' ? code : '').trim().toUpperCase();
   if (!normalizedCode) {
     return NextResponse.json({ error: 'Invite code required' }, { status: 400 });
+  }
+  if (normalizedCode.length > 64 || !/^[A-Z0-9_-]+$/.test(normalizedCode)) {
+    return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 });
   }
 
   // Resolve current user
@@ -115,6 +117,10 @@ export async function POST(req: NextRequest) {
     .insert({ brokerageId: brokerage.id, userId: user.id, role: 'realtor_member' });
 
   if (memberErr) {
+    const message = memberErr.message ?? '';
+    if (memberErr.code === '23505' || message.includes('duplicate key') || message.includes('unique')) {
+      return NextResponse.json({ brokerageName: brokerage.name, alreadyMember: true }, { status: 200 });
+    }
     console.error('[broker/join] membership insert failed', memberErr);
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
@@ -135,7 +141,11 @@ export async function POST(req: NextRequest) {
     .eq('ownerId', user.id)
     .maybeSingle();
   if (space && !space.brokerageId) {
-    await supabase.from('Space').update({ brokerageId: brokerage.id }).eq('id', space.id);
+    await supabase
+      .from('Space')
+      .update({ brokerageId: brokerage.id })
+      .eq('id', space.id)
+      .is('brokerageId', null);
   }
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: brokerage.id, role: 'realtor_member', method: 'join_code' } });

@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { getAuthorizedRealtorConversation } from '@/lib/chat/realtor-conversation-auth';
 
 const rateLimited = () =>
   NextResponse.json(
@@ -11,32 +11,11 @@ const rateLimited = () =>
   );
 
 async function getConversationAndVerifyOwner(conversationId: string, userId: string) {
-  const { data: conv, error } = await supabase
-    .from('Conversation')
-    .select('id, spaceId, title, Space(ownerId)')
-    .eq('id', conversationId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!conv) return null;
-
-  const { data: user } = await supabase
-    .from('User')
-    .select('id')
-    .eq('clerkId', userId)
-    .eq('id', (conv as any).Space.ownerId)
-    .maybeSingle();
-  if (!user) return null;
-
-  // Surface guard: broker-Chippi and team conversations have their own
-  // broker-gated routes. A broker_owner also owns their personal realtor
-  // space, so ownership alone is not isolation. Refuse to rename/delete a
-  // broker conversation through the realtor endpoint. The reserved-title
-  // check lives in lib/chat/conversation-access.
-  if (isReservedConversationTitle((conv as { title?: string }).title)) {
-    return null;
-  }
-
-  return conv;
+  const authorized = await getAuthorizedRealtorConversation({
+    clerkUserId: userId,
+    conversationId,
+  });
+  return authorized?.conversation ?? null;
 }
 
 export async function PATCH(
@@ -63,6 +42,7 @@ export async function PATCH(
       .from('Conversation')
       .update({ title: title.trim(), updatedAt: new Date().toISOString() })
       .eq('id', id)
+      .eq('spaceId', conv.spaceId)
       .select()
       .single();
     if (error) return NextResponse.json({ error: 'Failed to rename conversation' }, { status: 500 });

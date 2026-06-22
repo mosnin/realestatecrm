@@ -5,6 +5,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 // ── Shared types / schema ─────────────────────────────────────────────────────
 //
@@ -101,12 +102,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const rawBody = bodyResult.data;
 
   const parsed = createSchema.safeParse(rawBody);
   if (!parsed.success) {

@@ -12,6 +12,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
+import { getAuthorizedBrokerConversation } from '@/lib/chat/broker-conversation-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -22,17 +23,6 @@ const rateLimited = () =>
     { status: 429, headers: { 'Retry-After': '60' } },
   );
 
-/** Resolve the conversation only if it belongs to the caller's brokerage. */
-async function ownedConversation(conversationId: string, brokerageId: string) {
-  const { data } = await supabase
-    .from('BrokerConversation')
-    .select('id, brokerageId')
-    .eq('id', conversationId)
-    .maybeSingle();
-  if (!data || data.brokerageId !== brokerageId) return null;
-  return data;
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const brokerCtx = await resolveBrokerContext();
   if (!brokerCtx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -41,8 +31,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!allowed) return rateLimited();
 
   const { id } = await params;
-  const conv = await ownedConversation(id, brokerCtx.brokerage.id);
-  if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+  const authorized = await getAuthorizedBrokerConversation(id, brokerCtx);
+  if (!authorized || authorized.brokerCtx.brokerage.id !== brokerCtx.brokerage.id) {
+    return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+  }
 
   const { title } = await req.json();
   if (!title || typeof title !== 'string') {
@@ -69,8 +61,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!allowed) return rateLimited();
 
   const { id } = await params;
-  const conv = await ownedConversation(id, brokerCtx.brokerage.id);
-  if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+  const authorized = await getAuthorizedBrokerConversation(id, brokerCtx);
+  if (!authorized || authorized.brokerCtx.brokerage.id !== brokerCtx.brokerage.id) {
+    return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+  }
 
   // "BrokerMessage" rows cascade on the conversation FK, so deleting the
   // conversation row removes its messages too.

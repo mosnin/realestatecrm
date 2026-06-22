@@ -232,6 +232,8 @@ CREATE TABLE IF NOT EXISTS "Conversation" (
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS "Conversation_id_spaceId_key"
+  ON "Conversation" ("id", "spaceId");
 
 CREATE TABLE IF NOT EXISTS "Message" (
   id               text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -239,7 +241,11 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "conversationId" text REFERENCES "Conversation"(id) ON DELETE CASCADE,
   role             text NOT NULL,
   content          text NOT NULL,
-  "createdAt"      timestamptz NOT NULL DEFAULT now()
+  "createdAt"      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "Message_conversation_space_fk"
+    FOREIGN KEY ("conversationId", "spaceId")
+    REFERENCES "Conversation" ("id", "spaceId")
+    ON DELETE CASCADE
 );
 
 -- Broker Chippi conversations live in their OWN tables, keyed by brokerageId
@@ -255,6 +261,8 @@ CREATE TABLE IF NOT EXISTS "BrokerConversation" (
 );
 CREATE INDEX IF NOT EXISTS "BrokerConversation_brokerageId_updatedAt_idx"
   ON "BrokerConversation" ("brokerageId", "updatedAt" DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS "BrokerConversation_id_brokerageId_key"
+  ON "BrokerConversation" ("id", "brokerageId");
 
 CREATE TABLE IF NOT EXISTS "BrokerMessage" (
   "id"             text PRIMARY KEY,
@@ -263,10 +271,53 @@ CREATE TABLE IF NOT EXISTS "BrokerMessage" (
   "role"           text NOT NULL,
   "content"        text NOT NULL DEFAULT '',
   "blocks"         jsonb,
-  "createdAt"      timestamptz NOT NULL DEFAULT now()
+  "createdAt"      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "BrokerMessage_conversation_brokerage_fk"
+    FOREIGN KEY ("conversationId", "brokerageId")
+    REFERENCES "BrokerConversation" ("id", "brokerageId")
+    ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "BrokerMessage_conversationId_createdAt_idx"
   ON "BrokerMessage" ("conversationId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerMessage_brokerageId_conversationId_createdAt_idx"
+  ON "BrokerMessage" ("brokerageId", "conversationId", "createdAt");
+
+-- Brokerage team chat conversations live in their OWN tables, keyed by
+-- brokerageId (NOT spaceId), so team chat no longer relies on reserved
+-- '[BROKERAGE_CHAT]' title prefixes inside the realtor chat tables. See
+-- migration 20260726000000_brokerage_chat_separate_storage.sql.
+CREATE TABLE IF NOT EXISTS "BrokerageChatConversation" (
+  "id"          text PRIMARY KEY,
+  "brokerageId" text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "title"       text NOT NULL DEFAULT 'Team chat',
+  "createdAt"   timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "BrokerageChatConversation_brokerageId_updatedAt_idx"
+  ON "BrokerageChatConversation" ("brokerageId", "updatedAt" DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS "BrokerageChatConversation_id_brokerageId_key"
+  ON "BrokerageChatConversation" ("id", "brokerageId");
+
+CREATE TABLE IF NOT EXISTS "BrokerageChatMessage" (
+  "id"             text PRIMARY KEY,
+  "brokerageId"    text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "conversationId" text NOT NULL REFERENCES "BrokerageChatConversation"(id) ON DELETE CASCADE,
+  "senderUserId"   text REFERENCES "User"(id) ON DELETE SET NULL,
+  "role"           text NOT NULL,
+  "content"        text NOT NULL DEFAULT '',
+  "blocks"         jsonb,
+  "createdAt"      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "BrokerageChatMessage_conversation_brokerage_fk"
+    FOREIGN KEY ("conversationId", "brokerageId")
+    REFERENCES "BrokerageChatConversation" ("id", "brokerageId")
+    ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "BrokerageChatMessage_conversationId_createdAt_idx"
+  ON "BrokerageChatMessage" ("conversationId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerageChatMessage_brokerageId_createdAt_idx"
+  ON "BrokerageChatMessage" ("brokerageId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerageChatMessage_brokerageId_conversationId_createdAt_idx"
+  ON "BrokerageChatMessage" ("brokerageId", "conversationId", "createdAt");
 
 -- Chat attachments: files the realtor uploads via the prompt box.
 -- Owned by spaceId; the cowork agent reads them via the read_attachment tool.
@@ -606,6 +657,8 @@ CREATE INDEX IF NOT EXISTS idx_conversation_space_updated
 CREATE INDEX IF NOT EXISTS idx_message_conversation_created
   ON "Message" ("conversationId", "createdAt" ASC);
 CREATE INDEX IF NOT EXISTS idx_message_space_id    ON "Message"("spaceId");
+CREATE INDEX IF NOT EXISTS "Message_spaceId_conversationId_createdAt_idx"
+  ON "Message" ("spaceId", "conversationId", "createdAt");
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner     ON "Brokerage"("ownerId");
 CREATE INDEX        IF NOT EXISTS idx_brokerage_status    ON "Brokerage"(status);

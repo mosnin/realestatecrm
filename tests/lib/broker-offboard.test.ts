@@ -389,6 +389,8 @@ describe('POST /api/broker/members/[id]/offboard', () => {
 
     it('real-run returns moved counts and fires an OFFBOARD audit event', async () => {
       seedHappyPathLookups();
+      queueSingle('BrokerageMembership', { id: 'mem_target' });
+      queueSingle('BrokerageMembership', { id: 'mem_dest' });
       queueRpc({
         dryRun: false,
         contacts_moved: 5,
@@ -425,6 +427,57 @@ describe('POST /api/broker/members/[id]/offboard', () => {
   });
 
   describe('failures', () => {
+    it('returns 409 when the target membership changes before a real offboard', async () => {
+      queueSingle('BrokerageMembership', {
+        id: 'mem_target',
+        userId: 'u_leaving',
+        role: 'realtor_member',
+      });
+      queueSingle('BrokerageMembership', {
+        id: 'mem_dest',
+        userId: 'u_dest',
+        role: 'broker_admin',
+      });
+      queueRows('User', [
+        { id: 'u_leaving', name: 'Leaving Person', email: 'leave@x.com', status: 'active' },
+        { id: 'u_dest', name: 'Dest Person', email: 'dest@x.com', status: 'active' },
+      ]);
+      queueSingle('BrokerageMembership', null);
+
+      const { status, json } = await invoke('mem_target', { destinationMembershipId: 'mem_dest' });
+
+      expect(status).toBe(409);
+      expect(json.error).toMatch(/changed/i);
+      expect(rpcMock).not.toHaveBeenCalled();
+      expect(auditMock).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when the destination membership changes before a real offboard', async () => {
+      queueSingle('BrokerageMembership', {
+        id: 'mem_target',
+        userId: 'u_leaving',
+        role: 'realtor_member',
+      });
+      queueSingle('BrokerageMembership', {
+        id: 'mem_dest',
+        userId: 'u_dest',
+        role: 'broker_admin',
+      });
+      queueRows('User', [
+        { id: 'u_leaving', name: 'Leaving Person', email: 'leave@x.com', status: 'active' },
+        { id: 'u_dest', name: 'Dest Person', email: 'dest@x.com', status: 'active' },
+      ]);
+      queueSingle('BrokerageMembership', { id: 'mem_target' });
+      queueSingle('BrokerageMembership', null);
+
+      const { status, json } = await invoke('mem_target', { destinationMembershipId: 'mem_dest' });
+
+      expect(status).toBe(409);
+      expect(json.error).toMatch(/destination changed/i);
+      expect(rpcMock).not.toHaveBeenCalled();
+      expect(auditMock).not.toHaveBeenCalled();
+    });
+
     it('returns 500 when the rpc returns an error', async () => {
       queueSingle('BrokerageMembership', {
         id: 'mem_target',
@@ -440,6 +493,8 @@ describe('POST /api/broker/members/[id]/offboard', () => {
         { id: 'u_leaving', name: 'Leaving Person', email: 'leave@x.com', status: 'active' },
         { id: 'u_dest', name: 'Dest Person', email: 'dest@x.com', status: 'active' },
       ]);
+      queueSingle('BrokerageMembership', { id: 'mem_target' });
+      queueSingle('BrokerageMembership', { id: 'mem_dest' });
       queueRpc(null, { message: 'bang' });
 
       const { status, json } = await invoke('mem_target', { destinationMembershipId: 'mem_dest' });

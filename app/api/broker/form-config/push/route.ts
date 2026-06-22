@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { readOptionalJsonWithLimit } from '@/lib/validation';
 
 const MAX_FORM_CONFIG_SIZE = 512_000;
 const MAX_TOTAL_QUESTIONS = 200;
@@ -72,12 +73,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Optional body fallback — validate if present, ignore if garbage.
-  let body: Record<string, unknown> = {};
-  try {
-    body = await req.json();
-  } catch {
-    // No body is fine — we read the brokerage configs from the DB below.
-  }
+  const bodyResult = await readOptionalJsonWithLimit(req, MAX_FORM_CONFIG_SIZE);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
   const bodyRental = formConfigSchema.safeParse(body.rentalFormConfig);
   const bodyBuyer = formConfigSchema.safeParse(body.buyerFormConfig);
 
@@ -221,13 +220,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         if (setting) {
-          const { error: updateErr } = await supabase
+          const { data: updatedSetting, error: updateErr } = await supabase
             .from('SpaceSetting')
             .update({ ...configUpdate, formConfigSource: 'brokerage' })
-            .eq('spaceId', space.id);
+            .eq('spaceId', space.id)
+            .neq('formConfigSource', 'custom')
+            .select('id')
+            .maybeSingle<{ id: string }>();
           if (updateErr) {
             skipped += 1;
             logger.error('[broker/form-config/push] update failed', { spaceId: space.id }, updateErr);
+          } else if (!updatedSetting) {
+            skipped += 1;
+            logger.info('[broker/form-config/push] skipped (customized during push)', { spaceId: space.id });
           } else {
             pushed += 1;
           }

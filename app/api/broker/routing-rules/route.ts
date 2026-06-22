@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
@@ -98,14 +99,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
 
-  const parsed = createSchema.safeParse(rawBody);
+  const parsed = createSchema.safeParse(read.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid data', issues: parsed.error.issues },

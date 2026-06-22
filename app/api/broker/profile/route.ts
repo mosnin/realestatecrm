@@ -19,6 +19,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 interface MemberProfile {
   displayName: string | null;
@@ -72,12 +73,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   const updates: Record<string, unknown> = {};
 
@@ -126,14 +125,24 @@ export async function PATCH(req: Request) {
 
   // Self-scoped: update the caller's OWN membership row only. The id comes
   // from the resolved broker context, never from the client.
-  const { error: updateErr } = await supabase
+  const { data: updatedMembership, error: updateErr } = await supabase
     .from('BrokerageMembership')
     .update(updates)
-    .eq('id', ctx.membership.id);
+    .eq('id', ctx.membership.id)
+    .eq('brokerageId', ctx.brokerage.id)
+    .eq('userId', ctx.dbUserId)
+    .select('id')
+    .maybeSingle<{ id: string }>();
 
   if (updateErr) {
     console.error('[broker/profile] update failed', updateErr);
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+  }
+  if (!updatedMembership) {
+    return NextResponse.json(
+      { error: 'Profile membership changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({

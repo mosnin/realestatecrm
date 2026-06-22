@@ -3,6 +3,22 @@ import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+
+function optionalTrimmedString(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().slice(0, maxLength);
+  return trimmed || undefined;
+}
+
+function optionalHttpUrl(value: unknown, fieldName: string): { ok: true; value?: string } | { ok: false; error: string } {
+  const url = optionalTrimmedString(value, 500);
+  if (!url) return { ok: true };
+  if (!/^https?:\/\/.+/i.test(url)) {
+    return { ok: false, error: `${fieldName} must start with http:// or https://` };
+  }
+  return { ok: true, value: url };
+}
 
 /**
  * POST /api/broker/create
@@ -17,12 +33,10 @@ export async function POST(req: Request) {
   const { allowed } = await checkRateLimit(`broker:create:${clerkId}`, 3, 86400);
   if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again tomorrow.' }, { status: 429 });
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as Record<string, unknown>;
 
   const { name, logoUrl, websiteUrl, officeAddress, officePhone, agentCount, brokerageType, primaryMarket, commissionStructure, geographicCoverage } = body as {
     name?: string;
@@ -41,6 +55,19 @@ export async function POST(req: Request) {
   if (!trimmedName || trimmedName.length > 120) {
     return NextResponse.json({ error: 'Brokerage name required (max 120 chars)' }, { status: 400 });
   }
+
+  const normalizedLogoUrl = optionalHttpUrl(logoUrl, 'logoUrl');
+  if (!normalizedLogoUrl.ok) {
+    return NextResponse.json({ error: normalizedLogoUrl.error }, { status: 400 });
+  }
+  const normalizedWebsiteUrl = optionalHttpUrl(websiteUrl, 'websiteUrl');
+  if (!normalizedWebsiteUrl.ok) {
+    return NextResponse.json({ error: normalizedWebsiteUrl.error }, { status: 400 });
+  }
+  const normalizedOfficeAddress = optionalTrimmedString(officeAddress, 500);
+  const normalizedOfficePhone = optionalTrimmedString(officePhone, 40);
+  const normalizedAgentCount = optionalTrimmedString(agentCount, 20);
+  const normalizedGeographicCoverage = optionalTrimmedString(geographicCoverage, 500);
 
   // Validate enum fields
   const validBrokerageTypes = ['independent', 'franchise', 'virtual'];
@@ -95,15 +122,15 @@ export async function POST(req: Request) {
       id: brokerageId,
       name: trimmedName,
       ownerId: user.id,
-      ...(logoUrl && { logoUrl: String(logoUrl).slice(0, 500) }),
-      ...(websiteUrl && { websiteUrl: String(websiteUrl).slice(0, 500) }),
-      ...(officeAddress && { officeAddress: String(officeAddress).slice(0, 500) }),
-      ...(officePhone && { officePhone: String(officePhone).slice(0, 40) }),
-      ...(agentCount && { agentCount: String(agentCount).slice(0, 20) }),
+      ...(normalizedLogoUrl.value && { logoUrl: normalizedLogoUrl.value }),
+      ...(normalizedWebsiteUrl.value && { websiteUrl: normalizedWebsiteUrl.value }),
+      ...(normalizedOfficeAddress && { officeAddress: normalizedOfficeAddress }),
+      ...(normalizedOfficePhone && { officePhone: normalizedOfficePhone }),
+      ...(normalizedAgentCount && { agentCount: normalizedAgentCount }),
       ...(brokerageType && { brokerageType }),
       ...(primaryMarket && { primaryMarket }),
       ...(commissionStructure && { commissionStructure }),
-      ...(geographicCoverage && { geographicCoverage: String(geographicCoverage).slice(0, 500) }),
+      ...(normalizedGeographicCoverage && { geographicCoverage: normalizedGeographicCoverage }),
     })
     .select()
     .single();

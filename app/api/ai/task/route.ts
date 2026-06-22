@@ -154,6 +154,7 @@ async function resolveConversation(
       .from('Conversation')
       .select('id, spaceId, title')
       .eq('id', conversationId)
+      .eq('spaceId', spaceId)
       .maybeSingle();
     // Reject reserved broker/team titles. A broker_owner's personal spaceId
     // equals their realtor space, and the pre-migration broker/team rows still
@@ -911,9 +912,17 @@ async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
       { status: 503 },
     );
   }
+  const agentInternalSecret = process.env.AGENT_INTERNAL_SECRET;
+  if (!agentInternalSecret) {
+    logger.error('[ai/task] AGENT_INTERNAL_SECRET not set — refusing Modal agent call', { spaceSlug });
+    return NextResponse.json(
+      { error: 'Agent backend auth not configured. Set AGENT_INTERNAL_SECRET.' },
+      { status: 503 },
+    );
+  }
 
   const payload = {
-    secret: process.env.AGENT_INTERNAL_SECRET ?? '',
+    secret: agentInternalSecret,
     space_id: ctx.space.id,
     // Composio scopes connections per "entity" (Clerk userId). Without
     // this, Modal can't know which realtor's Gmail / Slack / etc. to

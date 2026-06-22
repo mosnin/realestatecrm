@@ -5,6 +5,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -69,12 +70,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
 
   const { id: templateId } = await params;
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const rawBody = bodyResult.data;
 
   const parsed = patchSchema.safeParse(rawBody);
   if (!parsed.success) {
@@ -163,6 +162,7 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     .update(patch)
     .eq('id', templateId)
     .eq('brokerageId', ctx.brokerage.id)
+    .eq('version', existing.version)
     .select(TEMPLATE_COLUMNS)
     .maybeSingle<BrokerageTemplateRow>();
 
@@ -175,7 +175,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     return NextResponse.json({ error: 'Failed to update template' }, { status: 500 });
   }
   if (!updated) {
-    return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Template changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({
@@ -222,11 +225,31 @@ export async function DELETE(req: NextRequest, { params }: Params): Promise<Next
 
   const { id: templateId } = await params;
 
+  const { data: existing, error: loadErr } = await supabase
+    .from('BrokerageTemplate')
+    .select('id, version')
+    .eq('id', templateId)
+    .eq('brokerageId', ctx.brokerage.id)
+    .maybeSingle<{ id: string; version: number }>();
+
+  if (loadErr) {
+    logger.error(
+      '[broker/templates/DELETE] load failed',
+      { templateId, brokerageId: ctx.brokerage.id },
+      loadErr,
+    );
+    return NextResponse.json({ error: 'Failed to load template' }, { status: 500 });
+  }
+  if (!existing) {
+    return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+  }
+
   const { data: deleted, error: deleteErr } = await supabase
     .from('BrokerageTemplate')
     .delete()
     .eq('id', templateId)
     .eq('brokerageId', ctx.brokerage.id)
+    .eq('version', existing.version)
     .select('id')
     .maybeSingle<{ id: string }>();
 
@@ -239,7 +262,10 @@ export async function DELETE(req: NextRequest, { params }: Params): Promise<Next
     return NextResponse.json({ error: 'Failed to delete template' }, { status: 500 });
   }
   if (!deleted) {
-    return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Template changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({

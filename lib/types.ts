@@ -616,6 +616,25 @@ export type Conversation = {
   preview?: string | null;
 };
 
+/**
+ * UI-level conversation shape shared by realtor and broker Chippi surfaces.
+ *
+ * Realtor conversations carry `spaceId`; broker conversations carry
+ * `brokerageId`. Components that only render/select/rename/delete chats should
+ * use this common shape instead of forcing broker rows into `Conversation` with
+ * fake `spaceId` values.
+ */
+export type ChatConversation = {
+  id: string;
+  title: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  /** Last message content truncated to 60 chars, or null if no messages yet. */
+  preview?: string | null;
+  spaceId?: string;
+  brokerageId?: string;
+};
+
 export type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
 export type Tour = {

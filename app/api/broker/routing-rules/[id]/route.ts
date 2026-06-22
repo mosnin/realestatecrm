@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
@@ -119,14 +120,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
 
   const { id: ruleId } = await params;
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
 
-  const parsed = patchSchema.safeParse(rawBody);
+  const parsed = patchSchema.safeParse(read.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid data', issues: parsed.error.issues },
@@ -224,6 +221,7 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     .update(patch)
     .eq('id', ruleId)
     .eq('brokerageId', ctx.brokerage.id)
+    .eq('updatedAt', existing.updatedAt)
     .select(RULE_COLUMNS)
     .maybeSingle<DealRoutingRuleRow>();
 
@@ -236,7 +234,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     return NextResponse.json({ error: 'Failed to update rule' }, { status: 500 });
   }
   if (!updated) {
-    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Rule changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({
@@ -277,11 +278,31 @@ export async function DELETE(req: NextRequest, { params }: Params): Promise<Next
 
   const { id: ruleId } = await params;
 
+  const { data: existing, error: loadErr } = await supabase
+    .from('DealRoutingRule')
+    .select('id, updatedAt')
+    .eq('id', ruleId)
+    .eq('brokerageId', ctx.brokerage.id)
+    .maybeSingle<{ id: string; updatedAt: string }>();
+
+  if (loadErr) {
+    logger.error(
+      '[broker/routing-rules/DELETE] load failed',
+      { ruleId, brokerageId: ctx.brokerage.id },
+      loadErr,
+    );
+    return NextResponse.json({ error: 'Failed to load rule' }, { status: 500 });
+  }
+  if (!existing) {
+    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
+  }
+
   const { data: deleted, error: deleteErr } = await supabase
     .from('DealRoutingRule')
     .delete()
     .eq('id', ruleId)
     .eq('brokerageId', ctx.brokerage.id)
+    .eq('updatedAt', existing.updatedAt)
     .select('id')
     .maybeSingle<{ id: string }>();
 
@@ -294,7 +315,10 @@ export async function DELETE(req: NextRequest, { params }: Params): Promise<Next
     return NextResponse.json({ error: 'Failed to delete rule' }, { status: 500 });
   }
   if (!deleted) {
-    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Rule changed. Refresh and try again.' },
+      { status: 409 },
+    );
   }
 
   void audit({

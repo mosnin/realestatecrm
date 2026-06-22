@@ -6,6 +6,8 @@ import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { sendPushToSpace } from '@/lib/push';
 import { notifyBroker } from '@/lib/broker-notify';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,12 +33,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id: reviewId } = await params;
 
-  let body: { body?: unknown };
-  try {
-    body = (await req.json()) as { body?: unknown };
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as { body?: unknown };
 
   const raw = body?.body;
   if (typeof raw !== 'string') {
@@ -149,14 +149,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Broker commented → push to the agent's space (resolve dealId → spaceId).
     void (async () => {
       try {
-        const { data: deal } = await supabase
-          .from('Deal')
-          .select('spaceId, title')
-          .eq('id', review.dealId)
-          .maybeSingle<{ spaceId: string; title: string | null }>();
-        if (!deal?.spaceId) return;
-        const dealName = deal.title ?? 'your deal';
-        await sendPushToSpace(deal.spaceId, {
+        const scopedDeal = await loadBrokerageScopedReviewDeal({
+          dealId: review.dealId,
+          brokerageId: review.brokerageId,
+        });
+        if (!scopedDeal) return;
+        const dealName = scopedDeal.deal.title ?? 'your deal';
+        await sendPushToSpace(scopedDeal.deal.spaceId, {
           title: `Your broker replied on the review for ${dealName}.`,
           body: commentBody.slice(0, 280),
         });

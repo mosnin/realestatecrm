@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { logger } from '@/lib/logger';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 /**
  * PATCH /api/broker/properties/[id]/assign — assign a pool property to a member
@@ -19,8 +20,10 @@ export async function PATCH(
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
-  const body = (await req.json().catch(() => null)) as { assignedSpaceId?: unknown } | null;
-  if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  const bodyResult = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!bodyResult.ok) return bodyResult.response;
+
+  const body = bodyResult.data as { assignedSpaceId?: unknown };
 
   const target =
     body.assignedSpaceId === null || body.assignedSpaceId === ''
@@ -37,8 +40,9 @@ export async function PATCH(
     .from('Property')
     .select('id, brokerageId')
     .eq('id', id)
+    .eq('brokerageId', ctx.brokerage.id)
     .maybeSingle();
-  if (!prop || (prop as { brokerageId?: string }).brokerageId !== ctx.brokerage.id) {
+  if (!prop) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -51,8 +55,21 @@ export async function PATCH(
       .eq('id', target)
       .maybeSingle();
     const s = space as { brokerageId?: string; ownerId?: string } | null;
-    const inBrokerage =
-      s && (s.brokerageId === ctx.brokerage.id || s.ownerId === ctx.brokerage.ownerId);
+    if (!s?.ownerId) {
+      return NextResponse.json({ error: 'That realtor is not in your brokerage.' }, { status: 400 });
+    }
+
+    let inBrokerage = s.ownerId === ctx.brokerage.ownerId;
+    if (!inBrokerage) {
+      const { data: membership } = await supabase
+        .from('BrokerageMembership')
+        .select('id')
+        .eq('brokerageId', ctx.brokerage.id)
+        .eq('userId', s.ownerId)
+        .maybeSingle();
+      inBrokerage = Boolean(membership);
+    }
+
     if (!inBrokerage) {
       return NextResponse.json({ error: 'That realtor is not in your brokerage.' }, { status: 400 });
     }
@@ -62,6 +79,7 @@ export async function PATCH(
     .from('Property')
     .update({ assignedSpaceId: target, updatedAt: new Date().toISOString() })
     .eq('id', id)
+    .eq('brokerageId', ctx.brokerage.id)
     .select()
     .single();
   if (error) {

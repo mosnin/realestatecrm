@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker, canManageRoles, canChangeRole } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,14 +32,11 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'You cannot change your own role' }, { status: 403 });
   }
 
-  let role: string;
-  try {
-    ({ role } = await req.json());
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const { role } = (read.data ?? {}) as { role?: string };
 
-  if (!['broker_admin', 'realtor_member'].includes(role)) {
+  if (typeof role !== 'string' || !['broker_admin', 'realtor_member'].includes(role)) {
     return NextResponse.json({ error: 'Invalid role. Must be broker_admin or realtor_member.' }, { status: 400 });
   }
 
@@ -66,18 +64,24 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Role unchanged' }, { status: 200 });
   }
 
-  // Scope the update to both the membership ID and brokerage ID to prevent
-  // a TOCTOU race where membership might have moved brokerages between the
-  // fetch above and this write.
-  const { error: updateErr } = await supabase
+  // Scope the update to the membership ID, brokerage ID, and the role we
+  // authorized above. The original-role predicate prevents a TOCTOU race where
+  // the target is promoted to owner/admin between the permission check and write.
+  const { data: updatedMembership, error: updateErr } = await supabase
     .from('BrokerageMembership')
     .update({ role })
     .eq('id', membershipId)
-    .eq('brokerageId', ctx.brokerage.id);
+    .eq('brokerageId', ctx.brokerage.id)
+    .eq('role', membership.role)
+    .select('id')
+    .maybeSingle();
 
   if (updateErr) {
     console.error('[broker/members/role] update failed', updateErr);
     return NextResponse.json({ error: 'Failed to update role' }, { status: 500 });
+  }
+  if (!updatedMembership) {
+    return NextResponse.json({ error: 'Member role changed. Refresh and try again.' }, { status: 409 });
   }
 
   void audit({

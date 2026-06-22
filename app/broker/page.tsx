@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
 import { MemberDashboard } from './member-dashboard';
-import type { Conversation } from '@/lib/types';
+import type { ChatConversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 /**
@@ -50,7 +50,7 @@ export default async function BrokerHomePage({
     .eq('brokerageId', ctx.brokerage.id)
     .order('updatedAt', { ascending: false })
     .limit(50);
-  const conversations = (convData ?? []) as Conversation[];
+  const conversations = (convData ?? []) as ChatConversation[];
 
   let initialMessages: { role: 'user' | 'assistant'; content: string; blocks?: MessageBlock[] | null }[] = [];
   let initialConversationId: string | null = null;
@@ -64,6 +64,7 @@ export default async function BrokerHomePage({
       .from('BrokerConversation')
       .select('id, brokerageId')
       .eq('id', urlConversationId)
+      .eq('brokerageId', ctx.brokerage.id)
       .maybeSingle();
     const isThisBrokerageConversation =
       convRow != null && (convRow as { brokerageId: string }).brokerageId === ctx.brokerage.id;
@@ -73,6 +74,7 @@ export default async function BrokerHomePage({
       const { data: msgData } = await supabase
         .from('BrokerMessage')
         .select('role, content, blocks')
+        .eq('brokerageId', ctx.brokerage.id)
         .eq('conversationId', urlConversationId)
         .order('createdAt', { ascending: true })
         .limit(50);

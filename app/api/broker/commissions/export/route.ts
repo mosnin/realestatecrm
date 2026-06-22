@@ -39,15 +39,17 @@ interface LedgerExportRow {
  *   - If the value contains a comma, double-quote, or newline, wrap in
  *     double quotes and double up any internal quotes.
  *   - null / undefined -> empty string.
- *
- * Note: this mirrors the simple CSV escape in lib/csv.ts. Formula-injection
- * hardening lives in that shared helper; here the field set is fixed and
- * operator-only, so we keep the escape minimal per spec.
+ *   - Prefix spreadsheet formula triggers because exported notes and names
+ *     can contain user-entered text.
  */
 function escapeCsv(val: unknown): string {
   if (val == null) return '';
-  const str = typeof val === 'string' ? val : String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+  let str = typeof val === 'string' ? val : String(val);
+  const original = str;
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `\t${str}`;
+  }
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r') || str !== original) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
@@ -214,6 +216,8 @@ export async function GET(req: NextRequest) {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="commissions-${slug}-${month}.csv"`,
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
