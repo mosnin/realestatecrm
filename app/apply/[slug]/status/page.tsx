@@ -1,11 +1,29 @@
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { getSignedDownloadUrl } from '@/lib/storage';
+import { logger } from '@/lib/logger';
 import { ApplicationStatusClient } from './application-status-client';
-import { PublicPageMinimalShell } from '@/components/public-page-shell';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 
 // Disable caching so status updates show immediately
 export const dynamic = 'force-dynamic';
+
+/** Stored photos are object KEYs; sign a 24h URL on read. Legacy http(s)
+ *  values pass through. Mirrors /p, /apply, and /book. */
+async function resolveStoredPhoto(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return await getSignedDownloadUrl(value, 60 * 60 * 24);
+  } catch (err) {
+    logger.warn('[apply/status] signed url failed', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
 
 /**
  * Friendly error page shown when a portal link is invalid or expired,
@@ -13,50 +31,49 @@ export const dynamic = 'force-dynamic';
  */
 function PortalErrorPage({
   businessName,
-  logoUrl,
   hasToken,
 }: {
   businessName: string;
-  logoUrl?: string | null;
   hasToken: boolean;
 }) {
   return (
-    <PublicPageMinimalShell logoUrl={logoUrl} businessName={businessName}>
-      <div className="w-full max-w-md text-center space-y-4" role="alert">
-        <div className="mx-auto w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-muted-foreground"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="m15 9-6 6" />
-            <path d="m9 9 6 6" />
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold text-foreground">
-          {hasToken ? 'Invalid or Expired Link' : 'Application Not Found'}
-        </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {hasToken
-            ? 'This portal link is no longer valid. It may have expired or been replaced by a newer one. Please check your latest email from ' +
-              businessName +
-              ' for an updated link.'
-            : 'We could not find an application with that reference number. Please double-check the link from your confirmation email.'}
-        </p>
-        <p className="text-xs text-muted-foreground pt-2">
-          If you continue to have trouble, contact {businessName} directly for assistance.
-        </p>
+    <div className="mx-auto w-full max-w-md text-center" role="alert">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-muted-foreground"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="m15 9-6 6" />
+          <path d="m9 9 6 6" />
+        </svg>
       </div>
-    </PublicPageMinimalShell>
+      <h1
+        className="mt-5 text-2xl tracking-tight text-foreground sm:text-3xl"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        {hasToken ? 'Invalid or expired link' : 'Application not found'}
+      </h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        {hasToken
+          ? 'This portal link is no longer valid. It may have expired or been replaced by a newer one. Please check your latest email from ' +
+            businessName +
+            ' for an updated link.'
+          : 'We could not find an application with that reference number. Please double-check the link from your confirmation email.'}
+      </p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        If you continue to have trouble, contact {businessName} directly for assistance.
+      </p>
+    </div>
   );
 }
 
@@ -78,11 +95,47 @@ export default async function ApplicationStatusPage({
   // Fetch settings early so we can use them in error pages too
   const { data: settings } = await supabase
     .from('SpaceSetting')
-    .select('businessName, logoUrl')
+    .select('businessName, logoUrl, realtorPhotoUrl')
     .eq('spaceId', space.id)
     .maybeSingle();
 
   const businessName = settings?.businessName || space.name;
+
+  // Resolve the same identity material /apply and /book use so the status
+  // page wears the immersive shell and reads as one applicant-facing family.
+  const [{ data: ownerData }, { data: profileRow }] = await Promise.all([
+    supabase.from('User').select('name, avatar').eq('id', space.ownerId).maybeSingle(),
+    supabase.from('ProfilePage').select('coverPhotoUrl, profilePhotoUrl').eq('spaceId', space.id).maybeSingle(),
+  ]);
+  const [agentPhoto, coverPhotoUrl] = await Promise.all([
+    resolveStoredPhoto(
+      (profileRow as { profilePhotoUrl?: string | null } | null)?.profilePhotoUrl ??
+        settings?.realtorPhotoUrl ??
+        ownerData?.avatar ??
+        null,
+    ),
+    resolveStoredPhoto(
+      (profileRow as { coverPhotoUrl?: string | null } | null)?.coverPhotoUrl ?? null,
+    ),
+  ]);
+  const agentName = ownerData?.name || businessName;
+  const hidePoweredBy =
+    space.stripeSubscriptionStatus === 'active' || space.stripeSubscriptionStatus === 'trialing';
+
+  // Shared immersive wrapper for every status-page outcome (error + portal).
+  const Shell = ({ children }: { children: ReactNode }) => (
+    <IntakeChatShell
+      businessName={businessName}
+      agentName={agentName}
+      agentPhoto={agentPhoto}
+      coverPhotoUrl={coverPhotoUrl}
+      logoUrl={settings?.logoUrl ?? null}
+      profileHref={`/p/${slug}`}
+      hidePoweredBy={hidePoweredBy}
+    >
+      {children}
+    </IntakeChatShell>
+  );
 
   // Build query — if token is provided, validate both ref AND token (portal mode)
   let query = supabase
@@ -103,11 +156,9 @@ export default async function ApplicationStatusPage({
   // Show a helpful, branded error page instead of generic 404
   if (!contact) {
     return (
-      <PortalErrorPage
-        businessName={businessName}
-        logoUrl={settings?.logoUrl}
-        hasToken={!!token}
-      />
+      <Shell>
+        <PortalErrorPage businessName={businessName} hasToken={!!token} />
+      </Shell>
     );
   }
 
@@ -175,10 +226,7 @@ export default async function ApplicationStatusPage({
   }
 
   return (
-    <PublicPageMinimalShell
-      logoUrl={settings?.logoUrl}
-      businessName={businessName}
-    >
+    <Shell>
       <ApplicationStatusClient
         contact={{
           name: contact.name,
@@ -197,6 +245,6 @@ export default async function ApplicationStatusPage({
         token={portalMode ? token! : null}
         slug={slug}
       />
-    </PublicPageMinimalShell>
+    </Shell>
   );
 }
