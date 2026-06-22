@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart,
   Bar,
@@ -19,6 +20,7 @@ import {
 import type { ChartConfig } from '@/components/ui/chart';
 import {
   StatCell,
+  StatStrip,
   ChartSection,
   PAPER_GRID,
 } from './chart-primitives';
@@ -32,6 +34,12 @@ import {
   STAT_NUMBER,
   PRIMARY_PILL,
 } from '@/lib/typography';
+import { DURATION_BASE, DURATION_SLOW, EASE_OUT } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
+
+// Conversion gauge geometry — r=52 matches the SVG; precomputed so the
+// animated arc and the static dasharray agree exactly.
+const GAUGE_CIRCUMFERENCE = 2 * Math.PI * 52;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +81,13 @@ interface FormAnalyticsResponse {
 
 function fmtNum(n: number): string {
   return n.toLocaleString('en-US');
+}
+
+// Count-up formatter: rounds the in-flight value so the AnimatedNumber never
+// flashes a fractional frame. Final inputs are integers, so the settled string
+// is byte-identical to fmtNum(value).
+function fmtNumCount(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
 }
 
 function fmtDuration(ms: number): string {
@@ -152,7 +167,7 @@ function TimePeriodSelector({
 function ScoreBadge({ label, score }: { label: string | null; score: number | null }) {
   const display = label ? label.charAt(0).toUpperCase() + label.slice(1) : 'Unscored';
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 transition-colors duration-150 group-hover:border-border group-hover:text-foreground/80">
       {display}
       {score != null && <span className="tabular-nums">{score}</span>}
     </span>
@@ -213,6 +228,7 @@ export function FormAnalytics({
   standalone?: boolean;
   showRecentLeads?: boolean;
 }) {
+  const reduce = useReducedMotion();
   const [days, setDays] = useState(30);
   const [data, setData] = useState<FormAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -293,14 +309,19 @@ export function FormAnalytics({
           </p>
           <TimePeriodSelector days={days} onChange={setDays} />
         </div>
-        <div className="rounded-xl border border-border/70 bg-background px-6 py-16 text-center">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className="rounded-xl border border-border/70 bg-background px-6 py-16 text-center"
+        >
           <p className={H1} style={TITLE_FONT}>
             Nothing to chart yet.
           </p>
           <p className={`${BODY_MUTED} mt-2 max-w-sm mx-auto`}>
             Once applicants start hitting your form, the charts show up here.
           </p>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -361,20 +382,23 @@ export function FormAnalytics({
       </div>
 
       {/* Key metrics strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip cols="grid-cols-2 lg:grid-cols-4">
         <StatCell
           label="Visitors"
-          value={fmtNum(data.totalStarts)}
+          value={data.totalStarts}
+          format={fmtNumCount}
           sub={`${fmtNum(data.totalSessions)} unique sessions`}
         />
         <StatCell
           label="Conversions"
-          value={fmtNum(data.totalSubmits)}
+          value={data.totalSubmits}
+          format={fmtNumCount}
           sub={`${data.completionRate}% completion`}
         />
         <StatCell
           label="Abandoned"
-          value={fmtNum(data.totalAbandons)}
+          value={data.totalAbandons}
+          format={fmtNumCount}
           sub={
             worstDropOff.dropOffPercent > 0
               ? `Worst: ${worstDropOff.stepTitle}`
@@ -390,12 +414,12 @@ export function FormAnalytics({
               : 'No timing data'
           }
         />
-      </div>
+      </StatStrip>
 
       {/* Charts row */}
       <div className="grid md:grid-cols-2 gap-4">
         {/* Completion funnel */}
-        <ChartSection title="Completion funnel" sub="Users retained at each step">
+        <ChartSection title="Completion funnel" sub="Users retained at each step" index={0}>
           <ChartContainer config={funnelChartConfig} className="h-[240px] w-full">
             <BarChart data={funnelChartData} barSize={32}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -430,7 +454,7 @@ export function FormAnalytics({
 
         {/* Drop-off analysis */}
         {data.dropOff.length > 0 && (
-          <ChartSection title="Drop-off analysis" sub="Percentage of users lost at each step">
+          <ChartSection title="Drop-off analysis" sub="Percentage of users lost at each step" index={1}>
             <div className="space-y-2.5">
               {data.dropOff.map((step: DropOffStep) => {
                 const isWorst =
@@ -445,16 +469,20 @@ export function FormAnalytics({
                       {step.stepTitle}
                     </span>
                     <div className="flex-1 h-7 bg-foreground/[0.04] rounded-md overflow-hidden relative border border-border/70">
-                      <div
+                      <motion.div
                         className={cn(
-                          'h-full transition-all duration-150',
+                          'h-full',
                           isWorst
                             ? 'bg-foreground/80'
                             : 'bg-foreground/40',
                         )}
-                        style={{
-                          width: `${Math.max(step.dropOffPercent, 2)}%`,
-                        }}
+                        initial={
+                          reduce
+                            ? false
+                            : { width: 0 }
+                        }
+                        animate={{ width: `${Math.max(step.dropOffPercent, 2)}%` }}
+                        transition={{ duration: DURATION_SLOW, ease: EASE_OUT }}
                         role="meter"
                         aria-valuenow={step.dropOffPercent}
                         aria-valuemin={0}
@@ -479,7 +507,7 @@ export function FormAnalytics({
 
         {/* Avg time per step */}
         {avgTimeData.length > 0 && (
-          <ChartSection title="Average time per step" sub="How long users spend on each form section">
+          <ChartSection title="Average time per step" sub="How long users spend on each form section" index={2}>
             <ChartContainer config={avgTimeChartConfig} className="h-[240px] w-full">
               <BarChart data={avgTimeData} layout="vertical" barSize={16} margin={{ left: 0 }}>
                 <CartesianGrid horizontal={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -509,7 +537,7 @@ export function FormAnalytics({
         )}
 
         {/* Conversion rate visual */}
-        <ChartSection title="Conversion rate" sub="Visitors who completed the form">
+        <ChartSection title="Conversion rate" sub="Visitors who completed the form" index={3}>
           <div className="flex flex-col items-center justify-center py-4">
             <div className="relative w-32 h-32">
               <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
@@ -522,7 +550,9 @@ export function FormAnalytics({
                   className="text-muted-foreground/20"
                   strokeWidth="10"
                 />
-                <circle
+                {/* Arc draws in clockwise via the dash offset; dasharray stays
+                    constant so the settled geometry matches a static render. */}
+                <motion.circle
                   cx="60"
                   cy="60"
                   r="52"
@@ -531,12 +561,25 @@ export function FormAnalytics({
                   className="text-foreground"
                   strokeWidth="10"
                   strokeLinecap="round"
-                  strokeDasharray={`${(data.completionRate / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
+                  strokeDasharray={`${GAUGE_CIRCUMFERENCE} ${GAUGE_CIRCUMFERENCE}`}
+                  initial={
+                    reduce
+                      ? false
+                      : { strokeDashoffset: GAUGE_CIRCUMFERENCE }
+                  }
+                  animate={{
+                    strokeDashoffset:
+                      GAUGE_CIRCUMFERENCE - (data.completionRate / 100) * GAUGE_CIRCUMFERENCE,
+                  }}
+                  transition={{ duration: DURATION_SLOW, ease: EASE_OUT }}
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={STAT_NUMBER} style={TITLE_FONT}>
-                  {data.completionRate}%
+                  <AnimatedNumber
+                    value={data.completionRate}
+                    format={(n) => `${Math.round(n)}%`}
+                  />
                 </span>
               </div>
             </div>
@@ -556,7 +599,15 @@ export function FormAnalytics({
               Last {data.recentLeads.length} from form submissions
             </p>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
+          <motion.div
+            className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70"
+            initial="initial"
+            animate="enter"
+            variants={{
+              initial: {},
+              enter: { transition: { staggerChildren: reduce ? 0 : 0.04 } },
+            }}
+          >
             {data.recentLeads.map((lead) => {
               const initials =
                 lead.name
@@ -566,11 +617,19 @@ export function FormAnalytics({
                   ?.toUpperCase()
                   ?.slice(0, 2) || '??';
               return (
-                <div
+                <motion.div
                   key={lead.id}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
+                  variants={{
+                    initial: reduce ? { opacity: 0 } : { opacity: 0, y: 6 },
+                    enter: {
+                      opacity: 1,
+                      y: 0,
+                      transition: { duration: DURATION_BASE, ease: EASE_OUT },
+                    },
+                  }}
+                  className="group flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
                 >
-                  <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0 transition-colors duration-150 group-hover:bg-foreground/[0.09] group-hover:text-foreground">
                     {initials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -589,10 +648,10 @@ export function FormAnalytics({
                   <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
                     {timeAgo(lead.createdAt)}
                   </span>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         </section>
       )}
     </div>

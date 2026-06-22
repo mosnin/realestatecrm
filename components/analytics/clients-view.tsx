@@ -10,8 +10,10 @@ import {
   CartesianGrid,
   Cell,
 } from 'recharts';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   StatCell,
+  StatStrip,
   ChartSection,
   ChartContainer,
   ChartTooltip,
@@ -28,6 +30,8 @@ import {
   CAPTION,
   H3,
 } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 const contactsOverTimeConfig = {
   count: { label: 'Contacts', color: 'hsl(var(--foreground))' },
@@ -44,12 +48,13 @@ const STAGE_FILLS: Record<string, string> = {
 };
 
 export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
+  const reduce = useReducedMotion();
   // Build a stat strip — total + each stage + conversion. Total cells = 2 + stages.
   const stageCells = data.contactsByStage.slice(0, 2); // cap to keep the strip tidy at 4 cols
   return (
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip>
         <StatCell label="Total contacts" value={data.totalContacts} sub="in your book" />
         {stageCells.map((s) => (
           <StatCell key={s.label} label={s.label} value={s.count} />
@@ -59,11 +64,11 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
           value={data.leadToClientRate > 0 ? `${data.leadToClientRate}%` : '--'}
           sub={`from ${data.totalLeads} leads`}
         />
-      </div>
+      </StatStrip>
 
       {/* Charts */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Contacts over time" sub="New contacts added each month">
+        <ChartSection title="Contacts over time" sub="New contacts added each month" index={0}>
           <ChartContainer config={contactsOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.contactsOverTime}>
               <defs>
@@ -88,7 +93,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
           </ChartContainer>
         </ChartSection>
 
-        <ChartSection title="Contacts by stage" sub="Current distribution across stages">
+        <ChartSection title="Contacts by stage" sub="Current distribution across stages" index={1}>
           <ChartContainer config={contactsByStageConfig} className="h-[220px] w-full">
             <BarChart data={data.contactsByStage} barSize={32}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
@@ -109,20 +114,27 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
       </div>
 
       {/* Conversion funnel — paper-flat, hairline boxes with serif numbers */}
-      <ChartSection title="Client pipeline funnel" sub="Conversion rates across your renter pipeline">
+      <ChartSection title="Client pipeline funnel" sub="Conversion rates across your renter pipeline" index={2}>
         <div className="flex flex-col sm:flex-row gap-4 items-stretch py-2">
           {data.contactFunnel.map((stage, i) => {
             const opacity = 1 - i * 0.15;
             return (
-              <div
+              <motion.div
                 key={stage.label}
-                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: DURATION_BASE,
+                  ease: EASE_OUT,
+                  delay: reduce ? 0 : 0.1 + Math.min(i, 4) * 0.06,
+                }}
+                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 transition-colors duration-200 hover:border-border"
               >
                 <p
                   className={STAT_NUMBER}
                   style={{ ...TITLE_FONT, opacity }}
                 >
-                  {stage.count}
+                  <AnimatedNumber value={stage.count} />
                 </p>
                 <div className="flex flex-col">
                   <p className={H3}>{stage.label}</p>
@@ -132,7 +144,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
                     </p>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>

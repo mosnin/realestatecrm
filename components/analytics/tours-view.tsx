@@ -10,14 +10,18 @@ import {
   PieChart,
   Pie,
 } from 'recharts';
+import { motion, useReducedMotion } from 'framer-motion';
+import { CalendarClock } from 'lucide-react';
 import {
   StatCell,
+  StatStrip,
   ChartSection,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  EmptyState,
   PAPER_SERIES,
   PAPER_GRID,
 } from './chart-primitives';
@@ -29,8 +33,9 @@ import {
   TITLE_FONT,
   CAPTION,
   H3,
-  BODY_MUTED,
 } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 const toursOverTimeConfig = {
   count: { label: 'Tours', color: 'hsl(var(--foreground))' },
@@ -56,10 +61,11 @@ const STATUS_FILLS: Record<string, string> = {
 };
 
 export function ToursView({ data }: { data: ToursAnalyticsData }) {
+  const reduce = useReducedMotion();
   return (
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StatStrip>
         <StatCell label="Total tours" value={data.totalTours} sub="all time" />
         <StatCell label="Completed" value={data.completedTours} sub="tours finished" />
         <StatCell
@@ -72,11 +78,11 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
           value={data.completedTours > 0 ? `${data.tourConversionRate}%` : '--'}
           sub={`${data.toursConvertedToDeals} converted`}
         />
-      </div>
+      </StatStrip>
 
       {/* Charts */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Tours over time" sub="Tour bookings per month">
+        <ChartSection title="Tours over time" sub="Tour bookings per month" index={0}>
           <ChartContainer config={toursOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.toursOverTime}>
               <defs>
@@ -102,7 +108,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
           </ChartContainer>
         </ChartSection>
 
-        <ChartSection title="Tours by status" sub="Breakdown of tour outcomes">
+        <ChartSection title="Tours by status" sub="Breakdown of tour outcomes" index={1}>
           {data.toursByStatus.length > 0 ? (
             <ChartContainer config={toursByStatusConfig} className="h-[220px] w-full">
               <PieChart>
@@ -138,7 +144,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
       </div>
 
       {/* Conversion funnel */}
-      <ChartSection title="Tour conversion funnel" sub="From booked tours to closed deals">
+      <ChartSection title="Tour conversion funnel" sub="From booked tours to closed deals" index={2}>
         <div className="flex flex-col sm:flex-row gap-4 items-stretch py-2">
           {[
             { label: 'Booked', count: data.totalTours },
@@ -151,15 +157,22 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                 ? Math.round((stage.count / data.totalTours) * 100)
                 : null;
             return (
-              <div
+              <motion.div
                 key={stage.label}
-                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: DURATION_BASE,
+                  ease: EASE_OUT,
+                  delay: reduce ? 0 : 0.1 + i * 0.06,
+                }}
+                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 transition-colors duration-200 hover:border-border"
               >
                 <p
                   className={STAT_NUMBER}
                   style={{ ...TITLE_FONT, opacity }}
                 >
-                  {stage.count}
+                  <AnimatedNumber value={stage.count} />
                 </p>
                 <div className="flex flex-col">
                   <p className={H3}>{stage.label}</p>
@@ -167,18 +180,16 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                     <p className={CAPTION}>{pct}% of booked</p>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
       </ChartSection>
 
       {data.totalTours === 0 && (
-        <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className={BODY_MUTED}>
-            Tour analytics will appear here once tours are scheduled and completed.
-          </p>
-        </div>
+        <EmptyState glyph={<CalendarClock size={18} strokeWidth={1.5} aria-hidden />}>
+          Tour analytics will appear here once tours are scheduled and completed.
+        </EmptyState>
       )}
     </div>
   );
