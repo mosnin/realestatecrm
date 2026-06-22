@@ -40,10 +40,31 @@ vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-// The route has no dynamic form config in this test → legacy path.
+// No custom config in this test → the route falls back to the default
+// template (getDefaultFormConfig never returns null). A minimal config with no
+// required fields keeps this test focused on brokerage routing, not scoring.
 vi.mock('@/lib/form-builder', () => ({
   getFormConfigs: vi.fn(async () => ({ rental: null, buyer: null, source: 'legacy' })),
-  getDefaultFormConfig: vi.fn(() => null),
+  getDefaultFormConfig: vi.fn(() => ({
+    version: 1,
+    leadType: 'rental',
+    sections: [
+      {
+        id: '00000000-0000-4000-a000-000000000001',
+        title: 'Details',
+        position: 0,
+        questions: [
+          {
+            id: '00000000-0000-4000-b000-000000000001',
+            type: 'text',
+            label: 'Anything else?',
+            required: false,
+            position: 0,
+          },
+        ],
+      },
+    ],
+  })),
 }));
 
 const { notifyBrokerMock } = vi.hoisted(() => ({

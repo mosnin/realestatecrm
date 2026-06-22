@@ -108,17 +108,10 @@ export async function POST(
     result = await scoreLeadApplicationDynamic({
       contactId: id,
       formConfig,
-      answers: formConfig && applicationData
+      answers: applicationData
         ? (applicationData as Record<string, string | string[] | number | boolean>)
         : undefined,
       scoringModel,
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone ?? '',
-      budget: contact.budget,
-      applicationData: !formConfig
-        ? (applicationData as (Record<string, unknown> & { legalName: string }) | null)
-        : undefined,
       leadType: resolvedLeadType as 'rental' | 'buyer',
     });
   } catch (scoringErr) {
