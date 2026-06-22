@@ -3,7 +3,6 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
-import { WelcomeTourGate } from '@/components/onboarding/welcome-tour-gate';
 import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
@@ -41,19 +40,14 @@ export default async function ChippiPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Verify the authenticated user owns this space. `onboard` is read here too so
-  // the first-login WelcomeTour is only ever offered to a fully set-up account
-  // (the /setup funnel owns everyone before that). The localStorage gate in
-  // WelcomeTourGate then ensures it shows once and never again for returning
-  // users — see components/onboarding/welcome-tour.ts.
+  // Verify the authenticated user owns this space.
   const { data: spaceOwner } = await supabase
     .from('User')
-    .select('id, onboard')
+    .select('id')
     .eq('clerkId', userId)
     .eq('id', space.ownerId)
     .maybeSingle();
   if (!spaceOwner) notFound();
-  const isOnboarded = spaceOwner.onboard === true;
 
   // Load conversations for this space
   let conversations: Conversation[] = [];
@@ -140,10 +134,6 @@ export default async function ChippiPage({
 
   return (
     <div className="flex h-full flex-col">
-      {/* First-login product tour. Additive to the /setup funnel; gated to
-          onboarded users + a one-time localStorage stamp so returning users
-          never see it. */}
-      <WelcomeTourGate isOnboarded={isOnboarded} />
       <ChippiWorkspace
         slug={slug}
         view={view}

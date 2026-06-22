@@ -7,9 +7,7 @@ import type { LeadScoringResult } from '@/lib/lead-scoring';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import {
   applicationFingerprintKey,
-  buildApplicationData,
   normalizePhone,
-  publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForNewBrokerageLead } from '@/lib/notification-voice';
@@ -48,16 +46,6 @@ function parseBudgetToNumber(val: unknown): number | null {
   }
   return null;
 }
-
-/**
- * Brokerage-specific intake schema.
- * Same as the regular application schema but uses `brokerageId` instead of `slug`.
- */
-const brokerageApplicationSchema = publicApplicationSchema
-  .omit({ slug: true })
-  .extend({
-    brokerageId: z.string().uuid('Invalid brokerage ID'),
-  });
 
 // ── Dynamic form config helpers (mirrors main apply route) ──────────────
 
@@ -114,7 +102,9 @@ async function fetchBrokerageFormConfig(
     logger.warn('[apply/brokerage] form config fetch failed', { brokerageId, spaceId, leadType }, err);
   }
 
-  return null;
+  // No custom config: fall back to the default template the public intake
+  // renders, so submissions are scored against the real question set.
+  return getDefaultFormConfig(leadType);
 }
 
 type VisibilityCondition = {
@@ -356,25 +346,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Brokerage configuration error' }, { status: 500 });
     }
 
-    // ── Fetch the correct form config based on leadType ────────────────────
-    let formConfig: IntakeFormConfig | null = null;
+    // ── Resolve the form config (custom, or default template) ──────────────
+    // Never null — fetchBrokerageFormConfig falls back to the default template,
+    // so every submission is scored against a real question set.
+    let formConfig: IntakeFormConfig;
     try {
-      formConfig = await fetchBrokerageFormConfig(brokerage.id, space.id, resolvedLeadType);
-      if (formConfig) {
-        formConfig = formConfigSchema.parse(formConfig);
-      }
+      const rawConfig = await fetchBrokerageFormConfig(brokerage.id, space.id, resolvedLeadType);
+      formConfig = formConfigSchema.parse(rawConfig);
     } catch (err) {
-      logger.warn('[apply/brokerage] form config invalid or fetch failed, falling back to legacy', {
+      logger.warn('[apply/brokerage] form config invalid or fetch failed, using default template', {
         brokerageId: brokerage.id,
         spaceId: space.id,
         leadType: resolvedLeadType,
       }, err);
-      formConfig = null;
+      formConfig = getDefaultFormConfig(resolvedLeadType);
     }
 
     // ── Fetch the saved ScoringModel (AI-generated weights/ranges) ─────
     let scoringModel: ScoringModel | null = null;
-    if (formConfig) {
+    {
       try {
         const scoringColumn = resolvedLeadType === 'buyer'
           ? 'buyerScoringModel'
@@ -409,85 +399,47 @@ export async function POST(req: NextRequest) {
     let formConfigSnapshot: IntakeFormConfig | null = null;
     let privacyConsent: boolean | undefined;
 
-    if (formConfig) {
-      // ── Dynamic form config path ──────────────────────────────────────
-      logger.debug('[apply/brokerage] using dynamic form config', {
-        brokerageId: brokerage.id,
-        spaceId: space.id,
-        leadType: resolvedLeadType,
-        version: formConfig.version,
-      });
-      const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
-        formConfig,
-        requestBody as Record<string, unknown>,
-      );
+    // ── Score against the dynamic intake form config ────────────────────
+    // Every submission is validated and scored against a real form config
+    // (custom or the default template). There is no legacy hardcoded path.
+    logger.debug('[apply/brokerage] using form config', {
+      brokerageId: brokerage.id,
+      spaceId: space.id,
+      leadType: resolvedLeadType,
+      version: formConfig.version,
+    });
+    const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
+      formConfig,
+      requestBody as Record<string, unknown>,
+    );
 
-      const parsed = dynamicSchema.safeParse(requestBody);
-      if (!parsed.success) {
-        logger.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
-        return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
-      }
-
-      const data = parsed.data as Record<string, unknown>;
-      const extracted = extractContactFields(data, formConfig);
-
-      contactName = extracted.name;
-      contactEmail = extracted.email;
-      contactPhone = extracted.phone;
-      contactNotes = extracted.notes;
-      contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.monthlyGrossIncome ?? null);
-      contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
-      contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
-      privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
-      formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
-
-      applicationData = {
-        ...data,
-        submittedAt: new Date().toISOString(),
-        formConfigVersion: formConfig.version,
-        leadType: contactLeadType,
-        brokerageId: brokerage.id,
-        brokerageName: brokerage.name,
-      };
-    } else {
-      // ── Legacy path (backwards compatible) ────────────────────────────
-      const parsed = brokerageApplicationSchema.safeParse(requestBody);
-      if (!parsed.success) {
-        logger.warn('[apply/brokerage] validation failed', { issues: parsed.error.issues });
-        return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
-      }
-
-      const payload = parsed.data;
-      contactName = payload.legalName;
-      contactEmail = payload.email ?? null;
-      contactPhone = payload.phone ?? '';
-      contactBudget = parseBudgetToNumber(
-        resolvedLeadType === 'buyer'
-          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
-          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
-      );
-      contactPreferences = payload.propertyAddress ?? null;
-      contactAddress = payload.currentAddress ?? null;
-      privacyConsent = payload.privacyConsent;
-
-      const noteParts: string[] = [];
-      if (payload.targetMoveInDate) noteParts.push(`Timeline: ${payload.targetMoveInDate}`);
-      if (payload.propertyAddress) noteParts.push(`Property: ${payload.propertyAddress}`);
-      if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
-      if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
-      if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
-      contactNotes = noteParts.length > 0 ? noteParts.join('\n') : null;
-
-      const legacyAppData = buildApplicationData({
-        ...payload,
-        slug: `brokerage:${payload.brokerageId}`,
-      });
-      applicationData = {
-        ...legacyAppData,
-        brokerageId: brokerage.id,
-        brokerageName: brokerage.name,
-      };
+    const parsed = dynamicSchema.safeParse(requestBody);
+    if (!parsed.success) {
+      logger.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
+      return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
     }
+
+    const data = parsed.data as Record<string, unknown>;
+    const extracted = extractContactFields(data, formConfig);
+
+    contactName = extracted.name;
+    contactEmail = extracted.email;
+    contactPhone = extracted.phone;
+    contactNotes = extracted.notes;
+    contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.monthlyGrossIncome ?? null);
+    contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
+    contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
+    privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
+    formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
+
+    applicationData = {
+      ...data,
+      submittedAt: new Date().toISOString(),
+      formConfigVersion: formConfig.version,
+      leadType: contactLeadType,
+      brokerageId: brokerage.id,
+      brokerageName: brokerage.name,
+    };
 
     const fingerprint = applicationFingerprintKey({
       legalName: contactName,
@@ -663,20 +615,10 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      // Use dynamic scoring when we have a form config, legacy otherwise
       scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
         formConfig: formConfigSnapshot,
-        answers: formConfigSnapshot
-          ? (applicationData as Record<string, string | string[] | number | boolean>)
-          : undefined,
-        name: contactName,
-        email: contactEmail,
-        phone: contactPhone,
-        budget: contactBudget,
-        applicationData: !formConfigSnapshot
-          ? (applicationData as Record<string, unknown> & { legalName: string })
-          : undefined,
+        answers: applicationData as Record<string, string | string[] | number | boolean>,
         leadType: contactLeadType,
         scoringModel,
       });

@@ -117,16 +117,7 @@ export async function POST(req: NextRequest) {
       scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
         formConfig,
-        answers: formConfig
-          ? (applicationData as Record<string, string | string[] | number | boolean>)
-          : undefined,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone ?? '',
-        budget: contact.budget,
-        applicationData: !formConfig
-          ? (applicationData as ApplicationData | null)
-          : undefined,
+        answers: applicationData as Record<string, string | string[] | number | boolean>,
         leadType: resolvedLeadType,
         scoringModel,
       });

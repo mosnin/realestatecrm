@@ -10,9 +10,7 @@ import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import type { Contact } from '@/lib/types';
 import {
   applicationFingerprintKey,
-  buildApplicationData,
   normalizePhone,
-  publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
 import { sendApplicationConfirmation } from '@/lib/email';
@@ -122,7 +120,10 @@ async function fetchFormConfigForLeadType(
     logger.warn('[apply] legacy fetchFormConfig also failed', { spaceId }, err);
   }
 
-  return null;
+  // No custom config: fall back to the default template the public intake
+  // renders, so submissions are validated and scored against the same real
+  // question set the applicant actually answered.
+  return getDefaultFormConfig(leadType);
 }
 
 type VisibilityCondition = {
@@ -326,26 +327,26 @@ export async function POST(req: NextRequest) {
         ? rawSourceLabel
         : 'intake-form';
 
-    // ── Determine if this space uses a dynamic form config ────────────────
-    // Fetch the CORRECT config based on leadType (rental vs buyer)
-    let formConfig: IntakeFormConfig | null = null;
+    // ── Resolve the dynamic form config (custom, or default template) ─────
+    // Fetch the CORRECT config based on leadType (rental vs buyer). This is
+    // never null — fetchFormConfigForLeadType falls back to the default
+    // template, so every submission is scored against a real question set.
+    let formConfig: IntakeFormConfig;
     try {
       const rawConfig = await fetchFormConfigForLeadType(space.id, space.brokerageId, resolvedLeadType);
-      if (rawConfig) {
-        // Re-validate the stored config to guard against corrupt data
-        formConfig = formConfigSchema.parse(rawConfig);
-      }
+      // Re-validate the stored config to guard against corrupt data
+      formConfig = formConfigSchema.parse(rawConfig);
     } catch (err) {
-      logger.warn('[apply] form config invalid or fetch failed, falling back to legacy', {
+      logger.warn('[apply] form config invalid or fetch failed, using default template', {
         spaceId: space.id,
         leadType: resolvedLeadType,
       }, err);
-      formConfig = null;
+      formConfig = getDefaultFormConfig(resolvedLeadType);
     }
 
     // ── Fetch the saved ScoringModel (AI-generated weights/ranges) ─────
     let scoringModel: ScoringModel | null = null;
-    if (formConfig) {
+    {
       try {
         const scoringColumn = resolvedLeadType === 'buyer'
           ? 'buyerScoringModel'
@@ -367,7 +368,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Validate & extract submission data ────────────────────────────────
-    // Two code paths: dynamic form config vs legacy publicApplicationSchema
+    // Single path: validate + score against the dynamic intake form config.
     let contactName: string;
     let contactEmail: string | null;
     let contactPhone: string;
@@ -381,86 +382,53 @@ export async function POST(req: NextRequest) {
     let privacyConsent: boolean | undefined;
     let slugForFingerprint: string;
 
-    if (formConfig) {
-      // ── Dynamic form config path ──────────────────────────────────────
-      logger.debug('[apply] using dynamic form config', { spaceId: space.id, version: formConfig.version });
-      const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
-        formConfig,
-        requestBody as Record<string, unknown>,
-      );
+    // ── Score against the dynamic intake form config ────────────────────
+    // Every submission is validated and scored against a real form config
+    // (custom or the default template the public intake renders). There is no
+    // legacy hardcoded-field path.
+    logger.debug('[apply] using form config', { spaceId: space.id, version: formConfig.version });
+    const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
+      formConfig,
+      requestBody as Record<string, unknown>,
+    );
 
-      const parsed = dynamicSchema.safeParse(requestBody);
-      if (!parsed.success) {
-        logger.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
-        // Only return field-level path/message to the client, not full Zod internals
-        const safeIssues = parsed.error.issues.map((i: z.ZodIssue) => ({
-          path: i.path,
-          message: i.message,
-        }));
-        return NextResponse.json({ error: 'Invalid submission data', issues: safeIssues }, { status: 400 });
-      }
-
-      const data = parsed.data as Record<string, unknown>;
-      const extracted = extractContactFields(data, formConfig);
-
-      contactName = extracted.name;
-      contactEmail = extracted.email;
-      contactPhone = extracted.phone;
-      contactNotes = extracted.notes;
-      // Use the resolved leadType from the "Getting Started" step, not the config's leadType
-      // (the config's leadType reflects which form template it is, but the user's choice is authoritative)
-      contactLeadType = resolvedLeadType;
-      // `data.budget` is the generic key emitted by the AI chat; the traditional
-      // form uses `monthlyRent` (rental) or `buyerBudget` (buyer). Check all.
-      contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.budget ?? data.monthlyGrossIncome ?? null);
-      contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
-      contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
-      privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
-      slugForFingerprint = rawSlug;
-      formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
-
-      // Build applicationData from all submitted answers
-      applicationData = {
-        ...data,
-        submittedAt: new Date().toISOString(),
-        formConfigVersion: formConfig.version,
-        leadType: contactLeadType,
-      };
-    } else {
-      // ── Legacy path (backwards compatible) ────────────────────────────
-      const parsed = publicApplicationSchema.safeParse(requestBody);
-      if (!parsed.success) {
-        logger.warn('[apply] validation failed', { issues: parsed.error.issues });
-        return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
-      }
-
-      const payload = parsed.data;
-      contactName = payload.legalName;
-      contactEmail = payload.email ?? null;
-      contactPhone = payload.phone;
-      // Use resolvedLeadType which was extracted from raw body before validation
-      contactLeadType = resolvedLeadType;
-      contactBudget = parseBudgetToNumber(
-        payload.leadType === 'buyer'
-          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
-          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
-      );
-      contactPreferences = payload.propertyAddress ?? null;
-      contactAddress = payload.currentAddress ?? null;
-      privacyConsent = payload.privacyConsent;
-      slugForFingerprint = payload.slug;
-
-      // Build notes for backwards compat with existing lead cards
-      const noteParts: string[] = [];
-      if (payload.targetMoveInDate) noteParts.push(`Timeline: ${payload.targetMoveInDate}`);
-      if (payload.propertyAddress) noteParts.push(`Property: ${payload.propertyAddress}`);
-      if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
-      if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
-      if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
-      contactNotes = noteParts.length > 0 ? noteParts.join('\n') : null;
-
-      applicationData = buildApplicationData(payload);
+    const parsed = dynamicSchema.safeParse(requestBody);
+    if (!parsed.success) {
+      logger.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
+      // Only return field-level path/message to the client, not full Zod internals
+      const safeIssues = parsed.error.issues.map((i: z.ZodIssue) => ({
+        path: i.path,
+        message: i.message,
+      }));
+      return NextResponse.json({ error: 'Invalid submission data', issues: safeIssues }, { status: 400 });
     }
+
+    const data = parsed.data as Record<string, unknown>;
+    const extracted = extractContactFields(data, formConfig);
+
+    contactName = extracted.name;
+    contactEmail = extracted.email;
+    contactPhone = extracted.phone;
+    contactNotes = extracted.notes;
+    // Use the resolved leadType from the "Getting Started" step, not the config's leadType
+    // (the config's leadType reflects which form template it is, but the user's choice is authoritative)
+    contactLeadType = resolvedLeadType;
+    // `data.budget` is the generic key emitted by the AI chat; the traditional
+    // form uses `monthlyRent` (rental) or `buyerBudget` (buyer). Check all.
+    contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.budget ?? data.monthlyGrossIncome ?? null);
+    contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
+    contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
+    privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
+    slugForFingerprint = rawSlug;
+    formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
+
+    // Build applicationData from all submitted answers
+    applicationData = {
+      ...data,
+      submittedAt: new Date().toISOString(),
+      formConfigVersion: formConfig.version,
+      leadType: contactLeadType,
+    };
 
     const fingerprint = applicationFingerprintKey({
       slug: slugForFingerprint,
@@ -661,16 +629,7 @@ export async function POST(req: NextRequest) {
       scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
         formConfig: formConfigSnapshot,
-        answers: formConfigSnapshot
-          ? (applicationData as Record<string, string | string[] | number | boolean>)
-          : undefined,
-        name: contactName,
-        email: contactEmail,
-        phone: contactPhone,
-        budget: contactBudget,
-        applicationData: !formConfigSnapshot
-          ? (applicationData as Record<string, unknown> & { legalName: string })
-          : undefined,
+        answers: applicationData as Record<string, string | string[] | number | boolean>,
         leadType: contactLeadType,
         scoringModel,
       });
