@@ -376,7 +376,7 @@ export function BookingForm({
         initial={reduce ? false : { opacity: 0, y: 12, filter: 'blur(8px)' }}
         animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
         transition={{ duration: 0.5, ease: EASE_APPLE }}
-        className="mt-9 rounded-3xl border border-border/60 bg-card/70 p-5 text-left shadow-sm backdrop-blur-sm sm:p-6"
+        className="mt-10 text-left"
       >
         {/* ─── Property section ─────────────────────────────────────────── */}
         {showProperty && (
@@ -446,7 +446,7 @@ export function BookingForm({
 
         {/* Divider only between sections that are both visible */}
         {showProperty && showDateSection && (
-          <div className="my-7 border-t border-border/60" />
+          <div className="my-9 border-t border-border/40" />
         )}
 
         {/* ─── Date + time section ──────────────────────────────────────── */}
@@ -648,7 +648,7 @@ export function BookingForm({
         {/* ─── Details section ──────────────────────────────────────────── */}
         {showDetailsSection && (
           <>
-            <div className="my-7 border-t border-border/60" />
+            <div className="my-9 border-t border-border/40" />
             <motion.section
               initial={reduce ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
