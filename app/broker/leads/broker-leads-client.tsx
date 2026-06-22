@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
   Select,
@@ -93,18 +95,20 @@ interface Props {
 function scorePill(label: string | null) {
   if (!label) return null;
   const l = label.toLowerCase();
+  // Each temperature carries its tint; the bg deepens a touch when the row is
+  // hovered so the chip warms with the row. Text and label are unchanged.
   const className =
     l === 'hot'
-      ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
+      ? 'text-rose-700 bg-rose-50 group-hover/row:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/15 dark:group-hover/row:bg-rose-500/25'
       : l === 'warm'
-        ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+        ? 'text-amber-700 bg-amber-50 group-hover/row:bg-amber-100 dark:text-amber-400 dark:bg-amber-500/15 dark:group-hover/row:bg-amber-500/25'
         : l === 'cold'
-          ? 'text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-500/15'
+          ? 'text-sky-700 bg-sky-50 group-hover/row:bg-sky-100 dark:text-sky-400 dark:bg-sky-500/15 dark:group-hover/row:bg-sky-500/25'
           : 'text-muted-foreground bg-muted/60';
   return (
     <span
       className={cn(
-        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 transition-colors',
         className,
       )}
     >
@@ -352,6 +356,23 @@ function LeadNotes({ contactId }: { contactId: string }) {
   );
 }
 
+// ── Row entrance ──────────────────────────────────────────────────────────────
+//
+// Lead rows cascade in on first mount: an 8px fade-up with a CAPPED stagger
+// so a long inbox never turns into a drawn-out parade — past the cap the delay
+// plateaus. Honors reduced motion (renders settled, no transform, no delay).
+const ROW_STAGGER_STEP = 0.035;
+const ROW_STAGGER_CAP = 8;
+
+function rowEntrance(index: number, reduce: boolean) {
+  const delay = reduce ? 0 : Math.min(index, ROW_STAGGER_CAP) * ROW_STAGGER_STEP;
+  return {
+    initial: reduce ? false : { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: DURATION_BASE, ease: EASE_OUT, delay },
+  } as const;
+}
+
 // ── Unassigned row ────────────────────────────────────────────────────────────
 
 function UnassignedRow({
@@ -359,12 +380,15 @@ function UnassignedRow({
   realtors,
   onAssigned,
   onDeleted,
+  index = 0,
 }: {
   lead: LeadRow;
   realtors: RealtorOption[];
   onAssigned: (leadId: string, realtor: RealtorOption) => void;
   onDeleted: (leadId: string) => void;
+  index?: number;
 }) {
+  const reduce = useReducedMotion();
   const [assigning, setAssigning] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -409,9 +433,9 @@ function UnassignedRow({
   const typeLabel = leadTypeLabel(lead.leadType);
 
   return (
-    <li>
+    <motion.li {...rowEntrance(index, !!reduce)}>
       <div className="group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-muted/30 transition-colors">
-        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-colors group-hover/row:bg-muted/70 group-hover/row:text-foreground">
           {getInitials(lead.name || lead.email || '?')}
         </div>
 
@@ -495,7 +519,7 @@ function UnassignedRow({
           </div>
         </div>
       )}
-    </li>
+    </motion.li>
   );
 }
 
@@ -505,11 +529,14 @@ function AssignedRow({
   lead,
   progress,
   onUnassigned,
+  index = 0,
 }: {
   lead: LeadRow;
   progress?: AssignedLeadProgress;
   onUnassigned?: (leadId: string, realtorName: string) => void;
+  index?: number;
 }) {
+  const reduce = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -543,7 +570,7 @@ function AssignedRow({
   const typeLabel = leadTypeLabel(lead.leadType);
 
   return (
-    <li>
+    <motion.li {...rowEntrance(index, !!reduce)}>
       <div
         role={canExpand ? 'button' : undefined}
         tabIndex={canExpand ? 0 : undefined}
@@ -559,7 +586,7 @@ function AssignedRow({
           canExpand ? 'cursor-pointer hover:bg-muted/30' : 'hover:bg-muted/30',
         )}
       >
-        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-colors group-hover/row:bg-muted/70 group-hover/row:text-foreground">
           {getInitials(lead.name || lead.email || '?')}
         </div>
 
@@ -756,7 +783,7 @@ function AssignedRow({
           </div>
         </div>
       )}
-    </li>
+    </motion.li>
   );
 }
 
@@ -788,6 +815,7 @@ export function BrokerLeadsClient({
   realtors,
   assignedLeadProgress = {},
 }: Props) {
+  const reduce = useReducedMotion();
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
   const [search, setSearch] = useState('');
@@ -914,13 +942,18 @@ export function BrokerLeadsClient({
       {/* Fresh-brokerage empty state — no leads at all. Canonical dashed card,
           one sentence, first-person Chippi voice. */}
       {!hasAnyLeads && (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center"
+        >
           <Inbox size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-base text-foreground">No leads yet.</p>
           <p className={cn(BODY_MUTED, 'mt-1.5')}>
             Your intake form will land them here — I&rsquo;ll route them to your team.
           </p>
-        </div>
+        </motion.div>
       )}
 
       {/* Unassigned — the one demanding routing. Shown first so it's the
@@ -944,10 +977,11 @@ export function BrokerLeadsClient({
             </div>
           ) : (
             <ul className="divide-y divide-border/60">
-              {filteredUnassigned.map((lead) => (
+              {filteredUnassigned.map((lead, i) => (
                 <UnassignedRow
                   key={lead.id}
                   lead={lead}
+                  index={i}
                   realtors={realtors}
                   onAssigned={handleAssigned}
                   onDeleted={(id) =>
@@ -976,10 +1010,11 @@ export function BrokerLeadsClient({
             </div>
           ) : (
             <ul className="divide-y divide-border/60">
-              {filteredAssigned.map((lead) => (
+              {filteredAssigned.map((lead, i) => (
                 <AssignedRow
                   key={lead.id}
                   lead={lead}
+                  index={i}
                   progress={assignedLeadProgress[lead.id]}
                   onUnassigned={handleUnassigned}
                 />

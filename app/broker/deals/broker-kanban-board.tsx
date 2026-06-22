@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { BrokerKanbanColumn } from './broker-kanban-column';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
@@ -27,8 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { TITLE_FONT } from '@/lib/typography';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatting';
 import type { BrokerDealItem } from './broker-deal-card';
@@ -218,6 +220,7 @@ function MobileKanban({
 
 export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const [realtor, setRealtor] = useState<string>('all');
 
   function handleOpenDeal(deal: BrokerDealItem) {
@@ -248,12 +251,18 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
 
   if (columns.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center"
+      >
+        <Inbox size={26} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
         <p className="text-sm text-foreground">No active deals across your brokerage.</p>
         <p className="text-xs text-muted-foreground mt-1">
           Deals created by your member realtors will appear here.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
@@ -281,12 +290,18 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
       )}
 
       {visibleColumns.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center"
+        >
+          <Inbox size={26} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-sm text-foreground">No active deals for {realtor}.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Switch back to all realtors to see the full pipeline.
           </p>
-        </div>
+        </motion.div>
       ) : (
         <>
           {/* Mobile: snap-to-stage */}
