@@ -14,7 +14,12 @@ import type { ScoringModel, ScoringModelAIResponse } from './scoring-model-types
 // ── System fields & informational-only fields that should not be scored ─────
 
 const SYSTEM_FIELD_IDS = new Set(['name', 'email', 'phone']);
-const SKIP_TYPES = new Set(['textarea']);
+// Types the model has no mechanism to score: free-form text and dates can't be
+// mapped to option scores or numeric ranges, so assigning them weight only
+// creates "dead weight" that deflates every lead's score. Only choice fields
+// (option scores), number fields (ranges), and checkboxes (true/false) are
+// scoreable.
+const SKIP_TYPES = new Set(['textarea', 'text', 'email', 'phone', 'date']);
 
 function isScorableQuestion(q: {
   id: string;
@@ -490,9 +495,11 @@ export function generateFallbackModel(
     const q = scorableQuestions.find((sq) => sq.id === item.id)!;
     const entry: ScoringModel['weights'][string] = { weight: item.intWeight };
 
-    // Generate option scores for radio/select
+    // Generate option scores for choice fields (radio/select/multi_select).
+    // multi_select is fully supported by computeModelBasedScore, so it must
+    // get optionScores too — otherwise its weight would be dead weight.
     if (
-      (q.type === 'radio' || q.type === 'select') &&
+      (q.type === 'radio' || q.type === 'select' || q.type === 'multi_select') &&
       q.options &&
       q.options.length > 0
     ) {
@@ -503,6 +510,12 @@ export function generateFallbackModel(
         optScores[opt.value] = Math.round(((count - i) / count) * 100);
       });
       entry.optionScores = optScores;
+    }
+
+    // Checkboxes score on the boolean answer; the scorer matches the
+    // stringified value, so map "true"/"false" explicitly.
+    if (q.type === 'checkbox') {
+      entry.optionScores = { true: 100, false: 0 };
     }
 
     // Generate range buckets for number fields (money-related)
