@@ -47,6 +47,16 @@ export function getWasabiClient(): S3Client {
     // Force path-style addressing — Wasabi supports both but path-style
     // sidesteps DNS lookup quirks and works with custom endpoints.
     forcePathStyle: true,
+    // Opt out of the AWS SDK's default flexible-checksum behavior. As of
+    // recent @aws-sdk/client-s3 releases the SDK defaults to WHEN_SUPPORTED,
+    // which adds a CRC32 integrity checksum to PutObject via an `aws-chunked`
+    // streaming trailer (x-amz-content-sha256: STREAMING-UNSIGNED-PAYLOAD-TRAILER).
+    // Wasabi — like other S3-compatible providers (R2, Backblaze, MinIO) — does
+    // not support that trailer and rejects the request, so uploads fail outright.
+    // WHEN_REQUIRED disables it for operations that don't mandate a checksum
+    // (i.e. our uploads), restoring Wasabi compatibility.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
   return cachedClient;
 }
