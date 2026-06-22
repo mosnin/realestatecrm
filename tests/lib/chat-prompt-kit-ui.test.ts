@@ -16,12 +16,14 @@ describe('chat Prompt Kit UI phases', () => {
     expect(transcript).toContain('markdownId={messageId ? `${messageId}-${item.originalIndex}` : undefined}');
   });
 
-  it('phase 2 uses ThinkingBar and TextShimmer for thinking state', () => {
+  it('phase 2 uses ThinkingBar with the blinking-text indicator (no pulsing dot)', () => {
     const thinkingIndicator = read('components/ai/blocks/thinking-indicator.tsx');
     const thinkingBar = read('components/ai/prompt-kit/thinking-bar.tsx');
     expect(thinkingIndicator).toContain("ThinkingBar } from '@/components/ai/prompt-kit'");
     expect(thinkingIndicator).toContain('<ThinkingBar label={action} />');
-    expect(thinkingBar).toContain('<TextShimmer');
+    // The thinking label IS the indicator — a blinking text line, not a dot.
+    expect(thinkingBar).toContain('<TextBlink');
+    expect(thinkingBar).not.toContain('animate-ping');
   });
 
   it('phase 3 uses SystemMessage for the usage-limit state', () => {

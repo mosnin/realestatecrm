@@ -803,6 +803,21 @@
   animation: chippi-cursor-blink 0.9s step-start infinite;
 }
 
+/* ── Text blink ─────────────────────────────────────────────────────────────
+ * A calm opacity blink for live "thinking / reasoning / streaming" labels.
+ * Soft fade (ease-in-out), not a hard cursor blink, so a whole word breathes
+ * instead of flashing. Replaces the old pulsing-dot indicator. */
+@keyframes text-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.32; }
+}
+.text-blink {
+  animation: text-blink 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-blink { animation: none; opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chippi-cursor { animation: none; opacity: 1; }
 }

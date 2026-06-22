@@ -25,20 +25,6 @@ export const metadata = {
     'Real estate deserves to work the way the rest of the world already does. We built Chippi to close the gap between what is now possible and what agents actually get.',
 };
 
-/* The founders, real bios (no fabricated photos). */
-const FOUNDERS = [
-  {
-    name: 'Orlando',
-    role: 'Co-founder',
-    bio: 'Spent a decade in the short-term rental space, running into the same wall: real-estate software and the workflows around it were built for a pre-AI world. The productivity that is possible now is not the productivity agents actually get.',
-  },
-  {
-    name: 'Preston',
-    role: 'Co-founder',
-    bio: 'A decade building in e-commerce, software, and technology. Recently built groundbreaking AI agent-orchestration frameworks alongside several products of his own, the machinery that lets an agent do real work, not just answer questions.',
-  },
-];
-
 /* Beliefs, the things we will not move on. */
 const BELIEFS = [
   {
@@ -122,41 +108,6 @@ export default function CompanyPage() {
                 </p>
               </div>
             </BlurRise>
-          </div>
-        </Band>
-
-        {/* Founders */}
-        <Band className="py-24 sm:py-28">
-          <BlurRise className="mx-auto max-w-2xl text-center">
-            <Eyebrow className="justify-center">The founders</Eyebrow>
-            <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              Built by people who know the work.
-            </Serif>
-            <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-white/55">
-              Orlando and Preston teamed up to solve the problem from both ends: the agent&apos;s day
-              and the brokerage&apos;s floor.
-            </p>
-          </BlurRise>
-          <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
-            {FOUNDERS.map((f, i) => (
-              <BlurRise key={f.name} delay={i * 0.08}>
-                <div className="h-full rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#ff7a45] to-[#ff5fa2] text-[17px] font-semibold text-black">
-                    {f.name[0]}
-                  </span>
-                  <h3 style={{ fontFamily: 'var(--font-sans)' }} className="mt-6 text-[18px] font-semibold text-white">
-                    {f.name}
-                  </h3>
-                  <p
-                    style={{ fontFamily: 'var(--font-mono-display)' }}
-                    className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#ff9a6e]"
-                  >
-                    {f.role}
-                  </p>
-                  <p className="mt-4 text-[14px] leading-relaxed text-white/55">{f.bio}</p>
-                </div>
-              </BlurRise>
-            ))}
           </div>
         </Band>
 

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useClerk } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, MessageCircle, CheckCircle2, Loader2, Shield, Zap } from 'lucide-react';
+import { ArrowRight, MessageCircle, CheckCircle2, Loader2, Shield, Zap, Home, LogOut } from 'lucide-react';
 
 /**
  * Blocks dashboard access for users without an active subscription.
@@ -18,6 +19,7 @@ export function SubscriptionGate({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { signOut } = useClerk();
   const [loading, setLoading] = useState(false);
 
   // Always allow billing and settings pages
@@ -122,6 +124,25 @@ export function SubscriptionGate({
             Manage billing
           </a>
         </p>
+
+        {/* Escape hatches — never trap a user on the paywall. They can always
+            head back to the marketing site or sign out and return later. */}
+        <div className="flex items-center justify-center gap-5 text-xs text-muted-foreground">
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <Home size={13} /> Back to home
+          </a>
+          <span aria-hidden className="text-border">·</span>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectUrl: '/' })}
+            className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <LogOut size={13} /> Log out
+          </button>
+        </div>
       </div>
     </div>
   );
