@@ -315,3 +315,81 @@ describe('computeModelBasedScore — AI scoring model path', () => {
     expect(r.score).toBeLessThan(45);
   });
 });
+
+describe('computeModelBasedScore — dead weight on unscoreable questions', () => {
+  // Regression lock: a ScoringModel can carry weight on questions it has no
+  // mechanism to score (a date or free-text field with neither optionScores
+  // nor ranges). That "dead weight" must NOT sit in the denominator, otherwise
+  // it silently caps every lead's score below 100 — a perfect applicant on a
+  // form whose model wasted 37% of its weight maxes out at 63/100.
+  const config: IntakeFormConfig = {
+    version: 1,
+    leadType: 'rental',
+    sections: [
+      {
+        id: 's1',
+        title: 'Mixed',
+        position: 0,
+        questions: [
+          {
+            id: 'income',
+            type: 'select',
+            label: 'Income',
+            position: 0,
+            required: false,
+            options: [
+              { value: 'high', label: 'High' },
+              { value: 'low', label: 'Low' },
+            ],
+          },
+          { id: 'movein', type: 'date', label: 'Move-in date', position: 1, required: false },
+          { id: 'employer', type: 'text', label: 'Employer', position: 2, required: false },
+        ],
+      },
+    ],
+  } as unknown as IntakeFormConfig;
+
+  const model: ScoringModel = {
+    totalWeight: 100,
+    reasoning: '',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    leadType: 'rental',
+    weights: {
+      income: { weight: 63, optionScores: { high: 100, low: 0 } },
+      movein: { weight: 25 }, // date — no way to score
+      employer: { weight: 12 }, // text — no way to score
+    },
+  };
+
+  it('a perfect answer on the only scoreable question reaches 100, not 63', () => {
+    const r = computeModelBasedScore(config, { income: 'high', movein: '2026-07-01', employer: 'Acme' }, model);
+    expect(r.score).toBe(100);
+  });
+
+  it('the worst answer on the only scoreable question reaches 0', () => {
+    const r = computeModelBasedScore(config, { income: 'low' }, model);
+    expect(r.score).toBe(0);
+  });
+
+  it('excludes dead-weight questions from the breakdown entirely', () => {
+    const r = computeModelBasedScore(config, { income: 'high' }, model);
+    expect(r.breakdown.map((b) => b.questionId)).toEqual(['income']);
+    expect(r.hasModel).toBe(true);
+  });
+
+  it('a model made up entirely of dead weight reports hasModel=false', () => {
+    const deadModel: ScoringModel = {
+      totalWeight: 100,
+      reasoning: '',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      leadType: 'rental',
+      weights: {
+        movein: { weight: 50 },
+        employer: { weight: 50 },
+      },
+    };
+    const r = computeModelBasedScore(config, { movein: '2026-07-01', employer: 'Acme' }, deadModel);
+    expect(r.hasModel).toBe(false);
+    expect(r.score).toBe(0);
+  });
+});

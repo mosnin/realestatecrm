@@ -304,12 +304,36 @@ export type ModelScoringResult = {
 };
 
 /**
+ * A question can only contribute to the model-based score if the model actually
+ * defines a way to score it — option scores for choice fields or numeric ranges
+ * for number fields. A weight on a question with neither (e.g. a free-text or
+ * date field) is "dead weight": it can never earn points, so including it in the
+ * denominator silently deflates EVERY lead's score, capping even a perfect
+ * applicant below 100. We therefore exclude such questions from scoring entirely
+ * — mirroring how `computeDeterministicScore` skips questions without mappings.
+ */
+function modelQuestionIsScoreable(qModel: {
+  optionScores?: Record<string, number>;
+  ranges?: { min: number; max: number | null; points: number }[];
+}): boolean {
+  const hasOptionScores =
+    qModel.optionScores != null && Object.keys(qModel.optionScores).length > 0;
+  const hasRanges = qModel.ranges != null && qModel.ranges.length > 0;
+  return hasOptionScores || hasRanges;
+}
+
+/**
  * Score answers using an AI-generated ScoringModel.
  *
  * For questions with `ranges`, matches the numeric answer to a range bucket.
  * For questions with `optionScores`, maps the selected option value to its score.
  * The final score = sum of (points/100) * (weight/totalWeight) * 100 across all
- * scored questions, yielding a 0-100 result.
+ * scoreable questions, yielding a 0-100 result.
+ *
+ * Only questions the model can actually score (option scores or ranges) count
+ * toward `totalWeight`; dead weight on unscoreable fields is ignored so the
+ * configured weights remain the true relative influence and a perfect applicant
+ * can reach 100.
  */
 export function computeModelBasedScore(
   formConfig: IntakeFormConfig,
@@ -327,10 +351,19 @@ export function computeModelBasedScore(
   }
 
   let totalScore = 0;
-  const totalWeight = Object.values(model.weights).reduce((s, w) => s + w.weight, 0) || 100;
+  // Denominator counts ONLY scoreable questions (those with option scores or
+  // ranges). Falls back to 100 only to avoid divide-by-zero; when nothing is
+  // scoreable the loop below contributes nothing and the score stays 0.
+  const totalWeight =
+    Object.values(model.weights)
+      .filter((w) => w.weight > 0 && modelQuestionIsScoreable(w))
+      .reduce((s, w) => s + w.weight, 0) || 100;
 
   for (const [questionId, qModel] of Object.entries(model.weights)) {
     if (qModel.weight <= 0) continue;
+
+    // Skip dead weight: questions the model has no rule to score.
+    if (!modelQuestionIsScoreable(qModel)) continue;
 
     const question = questionMap.get(questionId);
     const label = question?.label || questionId;
@@ -399,6 +432,9 @@ export function computeModelBasedScore(
   return {
     score: Math.max(0, Math.min(100, Math.round(totalScore))),
     breakdown,
-    hasModel: Object.keys(model.weights).length > 0,
+    // The model only counts as usable if it can actually score something —
+    // a model made up entirely of dead weight yields no signal, so callers
+    // should fall back rather than trust a forced 0.
+    hasModel: breakdown.length > 0,
   };
 }
