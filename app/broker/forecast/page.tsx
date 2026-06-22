@@ -26,6 +26,7 @@ import {
   CHIPPI_PILL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
 
@@ -505,7 +506,7 @@ export default async function BrokerForecastPage() {
           <section className="space-y-1">
             <p className={SECTION_LABEL}>Projected GCI, {monthName}</p>
             <p className={cn(STAT_NUMBER)} style={TITLE_FONT}>
-              {formatCurrency(totalForecast)}
+              <AnimatedNumber value={totalForecast} format={formatCurrency} />
             </p>
             <p className={cn(CAPTION, 'tabular-nums')}>
               {activeCount} active deal{activeCount === 1 ? '' : 's'} in the model
@@ -522,7 +523,7 @@ export default async function BrokerForecastPage() {
           >
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(wonGci)}
+                <AnimatedNumber value={wonGci} format={formatCompact} />
               </p>
               <p className={cn(CAPTION, 'mt-1')}>
                 Won so far
@@ -533,13 +534,13 @@ export default async function BrokerForecastPage() {
             </div>
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(totalProjectedGci)}
+                <AnimatedNumber value={totalProjectedGci} format={formatCompact} />
               </p>
               <p className={cn(CAPTION, 'mt-1')}>In flight (weighted)</p>
             </div>
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(totalForecast)}
+                <AnimatedNumber value={totalForecast} format={formatCompact} />
               </p>
               <p className={cn(CAPTION, 'mt-1')}>Total projected</p>
             </div>

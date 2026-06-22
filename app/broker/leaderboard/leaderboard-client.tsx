@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import type { RealtorStats } from './page';
 import { Trophy, Zap, Flame, Medal } from 'lucide-react';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 type SortMetric = 'dealsClosed' | 'pipelineValue' | 'totalLeads' | 'conversionRate';
 
@@ -105,57 +107,69 @@ export function LeaderboardClient({ initialStats }: { initialStats: RealtorStats
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-border/60">
+        <StaggerList key={metric} className="divide-y divide-border/60">
           {sorted.map((agent, idx) => {
             const rank = idx + 1;
             return (
-              <li key={agent.userId} className="flex items-center gap-3 py-4">
-                <span
-                  className="w-8 text-right tabular-nums text-foreground"
-                  style={TITLE_FONT}
-                  aria-label={`Rank ${rank}`}
-                >
-                  <span className="text-[21px] leading-none tracking-tight">{rank}</span>
-                </span>
-                <Avatar name={agent.name} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{agent.name}</p>
-                  {agent.badges.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {agent.badges.map((b) => (
-                        <BadgeChip key={b} badge={b} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="hidden sm:flex flex-col items-end flex-shrink-0">
-                  <p
-                    className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
+              <StaggerItem key={agent.userId}>
+                <div className="flex items-center gap-3 py-4">
+                  <span
+                    className="w-8 text-right tabular-nums text-foreground"
                     style={TITLE_FONT}
+                    aria-label={`Rank ${rank}`}
                   >
-                    {formatValue(metric, agent[metric])}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{metricLabels[metric].toLowerCase()}</p>
+                    <span className="text-[21px] leading-none tracking-tight">{rank}</span>
+                  </span>
+                  <Avatar name={agent.name} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{agent.name}</p>
+                    {agent.badges.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {agent.badges.map((b) => (
+                          <BadgeChip key={b} badge={b} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden sm:flex flex-col items-end flex-shrink-0">
+                    <p
+                      className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
+                      style={TITLE_FONT}
+                    >
+                      <AnimatedNumber
+                        value={agent[metric]}
+                        format={(n) =>
+                          formatValue(metric, metric === 'pipelineValue' ? n : Math.round(n))
+                        }
+                      />
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{metricLabels[metric].toLowerCase()}</p>
+                  </div>
+                  <div className="sm:hidden text-right">
+                    <p
+                      className="text-base leading-tight tabular-nums text-foreground"
+                      style={TITLE_FONT}
+                    >
+                      <AnimatedNumber
+                        value={agent[metric]}
+                        format={(n) =>
+                          formatValue(metric, metric === 'pipelineValue' ? n : Math.round(n))
+                        }
+                      />
+                    </p>
+                  </div>
+                  {/* Secondary metric on wide screens — pipeline as the steady cross-check. */}
+                  <div className="hidden lg:flex flex-col items-end flex-shrink-0 w-28 text-right">
+                    <p className="text-sm font-medium tabular-nums text-foreground">
+                      {formatPipeline(agent.pipelineValue)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">pipeline</p>
+                  </div>
                 </div>
-                <div className="sm:hidden text-right">
-                  <p
-                    className="text-base leading-tight tabular-nums text-foreground"
-                    style={TITLE_FONT}
-                  >
-                    {formatValue(metric, agent[metric])}
-                  </p>
-                </div>
-                {/* Secondary metric on wide screens — pipeline as the steady cross-check. */}
-                <div className="hidden lg:flex flex-col items-end flex-shrink-0 w-28 text-right">
-                  <p className="text-sm font-medium tabular-nums text-foreground">
-                    {formatPipeline(agent.pipelineValue)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">pipeline</p>
-                </div>
-              </li>
+              </StaggerItem>
             );
           })}
-        </ul>
+        </StaggerList>
       )}
     </div>
   );

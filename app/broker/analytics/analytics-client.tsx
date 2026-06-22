@@ -26,11 +26,12 @@
  */
 
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED, CAPTION, META } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import {
   biggestLeak,
@@ -126,6 +127,7 @@ function FunnelBar({
   value: number;
   maxValue: number;
 }) {
+  const reduce = useReducedMotion();
   const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, value > 0 ? 2 : 0) : 0;
 
   return (
@@ -136,7 +138,7 @@ function FunnelBar({
       <div className="relative h-6 rounded-sm overflow-hidden bg-foreground/[0.04]">
         <motion.div
           className="absolute inset-y-0 left-0 rounded-sm bg-foreground/[0.12]"
-          initial={{ width: 0 }}
+          initial={reduce ? false : { width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.5, ease: EASE_OUT }}
         />
@@ -211,7 +213,10 @@ function AgentFunnelCard({
             className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
             style={TITLE_FONT}
           >
-            {agent.overallConversion}%
+            <AnimatedNumber
+              value={agent.overallConversion}
+              format={(n) => `${Math.round(n)}%`}
+            />
           </p>
           {agent.totalLeads > 0 ? (
             <DeltaChip delta={delta} />
@@ -320,6 +325,7 @@ function Th({
 // ── Main client component ─────────────────────────────────────────────────────
 
 export function AnalyticsClient({ agents }: Props) {
+  const reduce = useReducedMotion();
   const [view, setView] = useState<'funnel' | 'table'>('funnel');
   const [sortBy, setSortBy] = useState<'name' | 'leads' | 'conversion'>('leads');
   const [tableSort, setTableSort] = useState<{ key: TableSortKey; dir: 'asc' | 'desc' }>({
@@ -412,7 +418,12 @@ export function AnalyticsClient({ agents }: Props) {
     <div className="space-y-6">
 
       {/* ── Team funnel summary ─────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border/70 bg-background px-4 sm:px-5 py-5 space-y-4">
+      <motion.section
+        className="rounded-xl border border-border/70 bg-background px-4 sm:px-5 py-5 space-y-4"
+        initial={reduce ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      >
         <div className="flex items-end justify-between gap-4 pb-3 border-b border-border/60">
           <div className="space-y-0.5">
             <p className={SECTION_LABEL}>Team funnel</p>
@@ -424,7 +435,10 @@ export function AnalyticsClient({ agents }: Props) {
               className="text-[25px] leading-tight tracking-tight tabular-nums text-foreground"
               style={TITLE_FONT}
             >
-              {teamTotals.overallConversion}%
+              <AnimatedNumber
+                value={teamTotals.overallConversion}
+                format={(n) => `${Math.round(n)}%`}
+              />
             </p>
             <p className={CAPTION}>lead to win</p>
           </div>
@@ -449,7 +463,7 @@ export function AnalyticsClient({ agents }: Props) {
             — only <span className="tabular-nums">{teamLeak.pct}%</span> get through.
           </p>
         )}
-      </section>
+      </motion.section>
 
       {/* ── View toggle + sort control ──────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap border-b border-border/60 pb-0">
