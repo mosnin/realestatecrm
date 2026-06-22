@@ -43,3 +43,29 @@ export function blurRise(reduce: boolean | null, y = 14, blur = 10) {
     animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
   } as const;
 }
+
+/**
+ * Full blur-rise WITH a symmetric exit, for `AnimatePresence mode="wait"`
+ * step transitions — the onboarding cold-open vocabulary where one focal
+ * stage blur-rises in as the previous one blur-falls away. The active
+ * intake question is a discrete step, not a line in a scrolling thread, so
+ * it enters and leaves as a whole.
+ *
+ * @param reduce  reduced-motion → opacity-only cross-fade (no blur/translate).
+ * @param y       enter offset; exit mirrors to `-y` so the stage lifts away.
+ * @param blur    enter/exit blur radius in px.
+ */
+export function blurRiseStep(reduce: boolean | null, y = 18, blur = 12) {
+  if (reduce) {
+    return {
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      exit: { opacity: 0 },
+    } as const;
+  }
+  return {
+    initial: { opacity: 0, y, filter: `blur(${blur}px)` },
+    animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+    exit: { opacity: 0, y: -y, filter: `blur(${blur}px)` },
+  } as const;
+}

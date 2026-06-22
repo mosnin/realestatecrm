@@ -1,30 +1,29 @@
 'use client';
 
 /**
- * IntakeChat — the realtor's intake form rendered as a chat.
+ * IntakeChat — the realtor's intake form, presented as a full-screen,
+ * one-question-at-a-time flow in the onboarding's vocabulary.
  *
  * The flow, the questions, the customization, the validation, and the
- * submission contract are exactly what the dynamic form did. Only the
- * presentation changed. Each question becomes a Chippi turn; the matching
- * input widget appears inline below it. Tap-to-submit on choice questions;
- * type + send on free-text. When the question list is exhausted (respecting
- * `visibleWhen`), we POST the same payload shape the dynamic form sent —
- * to /api/public/apply for per-realtor intakes, or to
- * /api/public/apply/brokerage when a `brokerageId` is present (the
- * brokerage variant rendered from /apply/b/[brokerageId]) so brokerage
- * auto-assignment, broker notification, and lead tagging run.
+ * submission contract are EXACTLY what the dynamic form did — this is a
+ * presentational layer over a deterministic state machine. The form-config
+ * drives order; there is no LLM, no streaming, no Modal.
  *
- * What this is NOT:
- *   - It is NOT an LLM-driven interview. The form-config drives order.
- *     No streaming, no __FIELDS__ markers, no Modal. The "chat with an
- *     AI agent" feel is a presentational layer over a deterministic
- *     state machine.
- *   - It is NOT a redesign of the form-builder or the customization
- *     surface. Realtors edit their questions in the existing form
- *     builder; the chat presents them.
+ * What changed in this redesign: instead of a scrolling chat thread inside a
+ * small card, the applicant sees one focal question at a time, centered on a
+ * full-bleed brand-warm canvas (IntakeChatShell). The active question is the
+ * page's hero — a large serif line that types in — with its answer affordance
+ * directly beneath it. Answering blur-rises the next question in and the old
+ * one away (AnimatePresence step transitions, the onboarding cold-open
+ * vocabulary). Progress is shown as expanding dots; a quiet Back affordance
+ * lets the applicant revise the previous answer.
  *
- * Validation is sourced from `validateQuestion()` in the form-renderer
- * module so the chat enforces the same rules the form did.
+ * Endpoints: per-realtor intakes POST to /api/public/apply; brokerage
+ * intakes (a `brokerageId` is present) POST to /api/public/apply/brokerage so
+ * brokerage auto-assignment, broker notification, and lead tagging run.
+ *
+ * Validation is sourced from `validateQuestion()` in the form-renderer module
+ * so the flow enforces the same rules the form did.
  */
 
 import {
@@ -35,11 +34,11 @@ import {
   useCallback,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { motion, MotionConfig, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { validateQuestion } from '@/components/form-renderer/question-renderer';
 import { IntakeChatSuccess } from './intake-chat-success';
 import { TypingText } from '@/components/onboarding/typing-text';
-import { blurRise, INTAKE_EASE } from './intake-motion';
+import { blurRiseStep, INTAKE_EASE } from './intake-motion';
 import { cn, formatPhoneAsTyped } from '@/lib/utils';
 import {
   DURATION_BASE,
@@ -54,6 +53,7 @@ import {
 import { TITLE_FONT } from '@/lib/typography';
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowUp,
   Check,
   Loader2,
@@ -65,12 +65,6 @@ import type { IntakeFormConfig, FormQuestion } from '@/lib/types';
 type AnswerMap = Record<string, string | string[]>;
 type LeadType = 'rental' | 'buyer';
 type Phase = 'asking' | 'submitting' | 'done' | 'error';
-
-interface ChatTurn {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-}
 
 export interface IntakeChatCustomization {
   accentColor: string;
@@ -138,22 +132,6 @@ function evaluateVisibility(
   }
 }
 
-function formatAnswerText(question: FormQuestion, value: string | string[]): string {
-  if (Array.isArray(value)) {
-    return value
-      .map((v) => question.options?.find((o) => o.value === v)?.label ?? v)
-      .join(', ');
-  }
-  if (question.type === 'checkbox') {
-    return value === 'true' ? 'Yes' : 'No';
-  }
-  return question.options?.find((o) => o.value === value)?.label ?? value;
-}
-
-function isTapToSubmit(type: FormQuestion['type']): boolean {
-  return type === 'select' || type === 'radio';
-}
-
 /**
  * Choose the submission endpoint for an intake.
  *
@@ -164,10 +142,6 @@ function isTapToSubmit(type: FormQuestion['type']): boolean {
  * per-realtor /api/public/apply route keys off `slug` and ignores
  * `brokerageId` entirely, so posting a brokerage intake there silently
  * drops all of that routing.
- *
- * The brokerage route requires `brokerageId` (which buildApplicationPayload
- * already includes) and tolerates the extra `slug` field via its
- * passthrough schema, so the payload shape is identical for both.
  */
 export function resolveApplyEndpoint(brokerageId?: string | null): string {
   return brokerageId
@@ -256,7 +230,7 @@ export function IntakeChat({
   brokerageId,
 }: IntakeChatProps) {
   // Flow resolution. When no realtor-customized config is supplied, fall
-  // back to the library defaults so the chat always has questions to ask
+  // back to the library defaults so the flow always has questions to ask
   // (this is what makes the brokerage variant work without configuration).
   const hasAnyConfig =
     Boolean(rentalFormConfig) || Boolean(buyerFormConfig) || Boolean(legacyFormConfig);
@@ -288,7 +262,10 @@ export function IntakeChat({
   // State
   const [leadType, setLeadType] = useState<LeadType | null>(initialLeadType);
   const [answers, setAnswers] = useState<AnswerMap>({});
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  // Chronological list of question ids the applicant has answered or skipped.
+  // Drives the Back affordance (pop the last one) without re-deriving order
+  // from the answers map.
+  const [answeredOrder, setAnsweredOrder] = useState<string[]>([]);
   const [pendingValue, setPendingValue] = useState<string | string[]>('');
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('asking');
@@ -317,15 +294,11 @@ export function IntakeChat({
   }, [questionList, answers]);
 
   // Refs
-  const bottomRef = useRef<HTMLDivElement>(null);
   const askedRef = useRef<Set<string>>(new Set());
   const submitFiredRef = useRef(false);
 
-  // Reset pending input state whenever the active question changes.
-  // The active question's label is rendered by CurrentQuestion (in serif
-  // Times — the focal moment per question). Past questions live in
-  // `turns` and read as quiet history; commitAnswer pushes the previous
-  // active question into `turns` as the lead advances.
+  // Reset pending input state whenever the active question changes (unless we
+  // already primed it — e.g. Back restores the prior value before this fires).
   useEffect(() => {
     if (!currentQuestion) return;
     if (askedRef.current.has(currentQuestion.id)) return;
@@ -345,19 +318,7 @@ export function IntakeChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestion, phase, answers]);
 
-  // Auto-scroll on every meaningful change. `block: 'nearest'` keeps the
-  // scroll inside the chat's own scroll container (the shell's <main>) and
-  // doesn't fight the page or pull the sticky header out of frame.
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [turns, currentQuestion, phase]);
-
-  // Commit a single answer and advance.
-  //
-  // On commit we push BOTH the question (as a past assistant turn) and
-  // the answer (as a user turn) into history. The active question is the
-  // focal serif moment; once answered, it recedes into muted history so
-  // the eye stays on whatever comes next.
+  // Commit a single answer and advance to the next question.
   const commitAnswer = useCallback(
     (question: FormQuestion, value: string | string[]) => {
       const error = validateQuestion(question, value);
@@ -368,44 +329,46 @@ export function IntakeChat({
       if (question.id === LEAD_TYPE_QUESTION_ID) {
         setLeadType(value as LeadType);
       }
-      setTurns((prev) => [
-        ...prev,
-        {
-          id: `ask:${question.id}`,
-          role: 'assistant',
-          text: question.label,
-        },
-        {
-          id: `ans:${question.id}`,
-          role: 'user',
-          text: formatAnswerText(question, value),
-        },
-      ]);
       setAnswers((prev) => ({ ...prev, [question.id]: value }));
+      setAnsweredOrder((prev) => [...prev, question.id]);
       setPendingValue('');
       setPendingError(null);
     },
     [],
   );
 
-  // Skip an optional question with no user-visible bubble. The question
-  // itself still moves into history so the conversation doesn't appear
-  // to skip mid-thread — silent advance for the answer, quiet retention
-  // for the ask.
+  // Skip an optional question — record an empty answer and advance.
   const skipOptional = useCallback((question: FormQuestion) => {
     if (question.required) return;
-    setTurns((prev) => [
-      ...prev,
-      {
-        id: `ask:${question.id}`,
-        role: 'assistant',
-        text: question.label,
-      },
-    ]);
     setAnswers((prev) => ({ ...prev, [question.id]: '' }));
+    setAnsweredOrder((prev) => [...prev, question.id]);
     setPendingValue('');
     setPendingError(null);
   }, []);
+
+  // Step back to the previous question, restoring its prior answer as the
+  // pending value so the applicant sees what they entered and can adjust it.
+  const goBack = useCallback(() => {
+    if (answeredOrder.length === 0) return;
+    const lastId = answeredOrder[answeredOrder.length - 1];
+    const prior = answers[lastId];
+
+    setAnsweredOrder((o) => o.slice(0, -1));
+    setAnswers((prev) => {
+      const next = { ...prev };
+      delete next[lastId];
+      return next;
+    });
+    if (lastId === LEAD_TYPE_QUESTION_ID) setLeadType(null);
+
+    // Mark as already-asked so the reset effect leaves our restored value
+    // alone; then restore what they had.
+    askedRef.current.add(lastId);
+    setPendingValue(prior ?? '');
+    setPendingError(null);
+    submitFiredRef.current = false;
+    if (phase !== 'asking') setPhase('asking');
+  }, [answeredOrder, answers, phase]);
 
   async function submit() {
     if (!activeConfig || !leadType) {
@@ -435,9 +398,6 @@ export function IntakeChat({
       visibleQuestionCount,
     });
 
-    // Brokerage intakes route to the dedicated brokerage endpoint so
-    // brokerage auto-assignment, broker notification, and lead tagging run.
-    // See resolveApplyEndpoint for the full rationale.
     const endpoint = resolveApplyEndpoint(brokerageId);
 
     try {
@@ -467,152 +427,145 @@ export function IntakeChat({
     }
   }
 
-  // Progress: count of visible questions vs how many the lead has
-  // answered (or actively skipped).
+  // Progress: count of visible questions vs how many have been answered.
   //
   // Dual-config wrinkle: while the lead-type question is unanswered the
-  // questionList is just `[LEAD_TYPE_QUESTION]`, which renders as
-  // "Question 1 of 1" — false advertising. Project the total from the
-  // larger of the two configs (rental vs buyer) so the lead sees an
-  // honest upper bound until they pick a path. Once they pick, the live
-  // total kicks in from the active config.
+  // questionList is just `[LEAD_TYPE_QUESTION]`. Project an honest upper
+  // bound from the larger of the two configs so the applicant doesn't see
+  // "1 of 1" and then keep going.
   const liveTotal = questionList.filter((q) =>
     evaluateVisibility(q.visibleWhen, answers),
   ).length;
   const projectedDualTotal =
     hasDual && leadType === null
-      ? // Upper-bound projection so the lead sees an honest "1 of N" before
-        // they pick rental/buyer. Count ALL questions in the larger form,
-        // not just unconditional ones — a conditional question still fires
-        // when its trigger answer comes in, and a form that says "1 of 5"
-        // and then keeps going past 5 reads as a lie.
-        1 + Math.max(
+      ? 1 + Math.max(
           flattenQuestions(effectiveRental).length,
           flattenQuestions(effectiveBuyer).length,
         )
       : 0;
   const totalQuestions = Math.max(liveTotal, projectedDualTotal);
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = answeredOrder.length;
   const showProgress =
     phase === 'asking' && totalQuestions > 0 && answeredCount < totalQuestions;
+  const canGoBack = phase === 'asking' && answeredOrder.length > 0;
 
-  // Past assistant turns (everything except the live one) read as quiet
-  // muted text; the active question gets the focal serif treatment in
-  // CurrentQuestion. Past user turns stay as accent-tinted bubbles —
-  // they ARE the lead's answers in the lead's voice.
-  //
-  // The Chippi intro shows ONCE, before the first question is answered.
-  // Calm, single-sentence chief-of-staff voice (STYLESHEET.md → Voice).
-  // It establishes who's running the conversation without stealing focus
-  // from the realtor's hero or the question itself.
-  const showChippiIntro = phase === 'asking' && answeredCount === 0;
+  // The applicant's first name (for the success headline), parsed from the
+  // name answer they gave.
+  const nameAnswer = answers['name'];
+  const fullName = typeof nameAnswer === 'string' ? nameAnswer.trim() : '';
+  const firstName = fullName.split(/\s+/)[0] || '';
 
-  // End-of-flow transition: when the application is submitted, the chat
-  // history, progress bar, and Chippi intro all disappear and the success
-  // card takes over the full surface. Anything else stacks confirmation
-  // below the last question — which reads as "you submitted, here's a
-  // receipt below your conversation" instead of "you're done, well done."
-  if (phase === 'done') {
-    // Pull the applicant's first name from the name answer they just gave so
-    // the confirmation can address them directly. `answers.name` holds the full
-    // name captured by the system name field (id 'name').
-    const nameAnswer = answers['name'];
-    const fullName = typeof nameAnswer === 'string' ? nameAnswer.trim() : '';
-    const firstName = fullName.split(/\s+/)[0] || '';
+  const statusHref = applicationRef
+    ? statusPortalToken
+      ? `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}&token=${encodeURIComponent(statusPortalToken)}`
+      : `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}`
+    : null;
 
-    // Build a working status-portal link when the API handed back a token; fall
-    // back to a ref-only link (read-only status view) otherwise. Omit entirely
-    // if we somehow have neither.
-    const statusHref = applicationRef
-      ? statusPortalToken
-        ? `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}&token=${encodeURIComponent(statusPortalToken)}`
-        : `/apply/${slug}/status?ref=${encodeURIComponent(applicationRef)}`
-      : null;
-
-    return (
-      <MotionConfig reducedMotion="user">
-        <div className="space-y-8">
-          <IntakeChatSuccess
-            businessName={businessName}
-            firstName={firstName}
-            realtorName={agentName}
-            agentPhoto={agentPhoto}
-            applicationRef={applicationRef}
-            thankYouTitle={customization.thankYouTitle}
-            thankYouMessage={customization.thankYouMessage}
-            accentColor={customization.accentColor}
-            bookHref={`/book/${slug}`}
-            statusHref={statusHref}
-            profileHref={`/p/${slug}`}
-          />
-        </div>
-      </MotionConfig>
-    );
-  }
+  const reduce = useReducedMotion();
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="space-y-8">
+      {/* Back — quiet ghost affordance, top-left of the viewport. Only when
+          there's somewhere to go back to and we're still asking. */}
+      <AnimatePresence>
+        {canGoBack && (
+          <motion.button
+            type="button"
+            onClick={goBack}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed left-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] text-muted-foreground/80 transition-colors hover:bg-foreground/[0.04] hover:text-foreground sm:left-6 sm:top-6"
+          >
+            <ArrowLeft size={15} aria-hidden />
+            Back
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Progress dots — onboarding vocabulary, centered above the question. */}
       {showProgress && (
-        <ProgressBar
-          answered={answeredCount}
-          total={totalQuestions}
-          accentColor={customization.accentColor}
-        />
-      )}
-
-      {showChippiIntro && (
-        <ChippiIntro agentName={agentName} />
-      )}
-
-      {turns.map((turn) => {
-        if (turn.role === 'assistant') {
-          return (
-            <PastAssistantTurn key={turn.id} text={turn.text} />
-          );
-        }
-        return (
-          <UserTurn
-            key={turn.id}
-            text={turn.text}
+        <div className="mb-8 flex justify-center">
+          <ProgressDots
+            answered={answeredCount}
+            total={totalQuestions}
             accentColor={customization.accentColor}
           />
-        );
-      })}
-
-      {phase === 'asking' && currentQuestion && (
-        <CurrentQuestion
-          key={currentQuestion.id}
-          question={currentQuestion}
-          value={pendingValue}
-          onChange={(v) => {
-            setPendingValue(v);
-            if (pendingError) setPendingError(null);
-          }}
-          onCommit={(v) => commitAnswer(currentQuestion, v)}
-          onSkip={() => skipOptional(currentQuestion)}
-          error={pendingError}
-          accentColor={customization.accentColor}
-        />
+        </div>
       )}
 
-      {phase === 'submitting' && (
-        <SubmittingTurn accentColor={customization.accentColor} />
-      )}
-
-      {phase === 'error' && submitError && (
-        <ErrorTurn
-          message={submitError}
-          accentColor={customization.accentColor}
-          onRetry={() => {
-            setSubmitError(null);
-            void submit();
-          }}
-        />
-      )}
-
-      <div ref={bottomRef} />
-    </div>
+      {/* The one focal stage — question, submitting, error, or success. Each
+          blur-rises in as the previous blurs away (AnimatePresence wait). */}
+      <div className="relative">
+        <AnimatePresence mode="wait" initial={false}>
+          {phase === 'done' ? (
+            <motion.div
+              key="done"
+              {...blurRiseStep(reduce)}
+              transition={{ duration: 0.6, ease: INTAKE_EASE }}
+            >
+              <IntakeChatSuccess
+                businessName={businessName}
+                firstName={firstName}
+                realtorName={agentName}
+                agentPhoto={agentPhoto}
+                applicationRef={applicationRef}
+                thankYouTitle={customization.thankYouTitle}
+                thankYouMessage={customization.thankYouMessage}
+                accentColor={customization.accentColor}
+                bookHref={`/book/${slug}`}
+                statusHref={statusHref}
+                profileHref={`/p/${slug}`}
+              />
+            </motion.div>
+          ) : phase === 'submitting' ? (
+            <motion.div
+              key="submitting"
+              {...blurRiseStep(reduce)}
+              transition={{ duration: 0.45, ease: INTAKE_EASE }}
+            >
+              <SubmittingStage accentColor={customization.accentColor} />
+            </motion.div>
+          ) : phase === 'error' && submitError ? (
+            <motion.div
+              key="error"
+              {...blurRiseStep(reduce)}
+              transition={{ duration: 0.45, ease: INTAKE_EASE }}
+            >
+              <ErrorStage
+                message={submitError}
+                accentColor={customization.accentColor}
+                onRetry={() => {
+                  setSubmitError(null);
+                  void submit();
+                }}
+              />
+            </motion.div>
+          ) : currentQuestion ? (
+            <motion.div
+              key={currentQuestion.id}
+              {...blurRiseStep(reduce)}
+              transition={{ duration: 0.5, ease: INTAKE_EASE }}
+            >
+              <CurrentQuestion
+                question={currentQuestion}
+                value={pendingValue}
+                isFirst={answeredCount === 0}
+                agentName={agentName}
+                onChange={(v) => {
+                  setPendingValue(v);
+                  if (pendingError) setPendingError(null);
+                }}
+                onCommit={(v) => commitAnswer(currentQuestion, v)}
+                onSkip={() => skipOptional(currentQuestion)}
+                error={pendingError}
+                accentColor={customization.accentColor}
+              />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </MotionConfig>
   );
 }
@@ -620,20 +573,14 @@ export function IntakeChat({
 // Alias preserved so existing imports don't break.
 export { IntakeChat as IntakeChatView };
 
-// ─── Progress + turn renderers ───────────────────────────────────────────────
+// ─── Progress ────────────────────────────────────────────────────────────────
 
 /**
- * Slim segmented progress bar that lives between the realtor hero and the
- * conversation. One segment per visible question; segments before the
- * cursor fill with the realtor's accent color, the live segment animates
- * to half-opacity, the rest stay muted.
- *
- * Why bars (and not "Question 3 of 14" text)? Because applicants don't
- * read counters — they feel them. A bar fills as you go. The brain
- * registers "almost done" without parsing a fraction. The accessible
- * fraction is still announced via aria-valuetext.
+ * Expanding-dot progress, the onboarding vocabulary: completed steps are
+ * small filled dots in the realtor's accent, the active step is a wide pill,
+ * the rest are faint. The accessible fraction is announced via aria.
  */
-function ProgressBar({
+function ProgressDots({
   answered,
   total,
   accentColor,
@@ -642,10 +589,10 @@ function ProgressBar({
   total: number;
   accentColor: string;
 }) {
-  // Clamp to a max of ~16 segments — past that the eye stops counting
-  // individuals and the bar reads as a continuous fill, which is fine.
-  const segments = Math.min(total, 16);
-  const filled = Math.round((answered / Math.max(total, 1)) * segments);
+  // Clamp the visible dot count; past ~14 the eye reads them as a band, not
+  // a count, so we proportionally map progress onto the clamped scale.
+  const count = Math.min(total, 14);
+  const active = Math.min(Math.round((answered / Math.max(total, 1)) * count), count);
   return (
     <div
       role="progressbar"
@@ -653,99 +600,23 @@ function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuetext={`Question ${Math.min(answered + 1, total)} of ${total}`}
-      className="flex items-center gap-1 -mt-2"
+      className="flex items-center gap-1.5"
     >
-      {Array.from({ length: segments }).map((_, i) => {
-        const isFilled = i < filled;
-        const isCurrent = i === filled;
+      {Array.from({ length: count }).map((_, i) => {
+        const done = i < active;
+        const isActive = i === active;
         return (
-          <span
+          <motion.span
             key={i}
             aria-hidden
-            className={cn(
-              'h-[3px] flex-1 rounded-full transition-colors duration-300',
-              !isFilled && !isCurrent && 'bg-foreground/[0.08]',
-            )}
-            style={
-              isFilled
-                ? { backgroundColor: accentColor }
-                : isCurrent
-                  ? { backgroundColor: withAlpha(accentColor, 0.4) }
-                  : undefined
-            }
+            className={cn('inline-block h-1.5 rounded-full', !done && !isActive && 'bg-foreground/15')}
+            style={done || isActive ? { backgroundColor: done ? withAlpha(accentColor, 0.45) : accentColor } : undefined}
+            animate={{ width: isActive ? 26 : 6 }}
+            transition={{ duration: 0.3, ease: INTAKE_EASE }}
           />
         );
       })}
     </div>
-  );
-}
-
-/**
- * Chippi's calm intro — shown once, before the lead has answered any
- * questions. Chief-of-staff voice (STYLESHEET.md → Voice): one sentence,
- * period, no exclamation marks, no "Welcome!" / "Get started!". It names
- * Chippi and the realtor in one breath so the applicant knows who's
- * actually doing the work and who they're applying to.
- *
- * Visually it's a small inline caption — text-xs muted, no chrome, no
- * pill. It belongs to the conversation's quiet preamble, not to a CTA.
- */
-function ChippiIntro({ agentName }: { agentName: string }) {
-  return (
-    <motion.p
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: 0.05 }}
-      className="text-xs text-muted-foreground leading-relaxed"
-    >
-      Hi — I&rsquo;m Chippi. I work with {agentName}. A few quick questions
-      and they&rsquo;ll know exactly what to send you.
-    </motion.p>
-  );
-}
-
-/**
- * A past assistant question — the lead has already answered it. Reads as
- * quiet history: muted text, no avatar, no serif. The visible focal
- * moment belongs to the CURRENT question (rendered separately in
- * CurrentQuestion with serif Times).
- */
-function PastAssistantTurn({ text }: { text: string }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.p
-      {...blurRise(reduce, 8, 6)}
-      transition={{ duration: 0.32, ease: INTAKE_EASE }}
-      className="text-[15px] leading-snug text-muted-foreground whitespace-pre-wrap"
-    >
-      {text}
-    </motion.p>
-  );
-}
-
-function UserTurn({ text, accentColor }: { text: string; accentColor: string }) {
-  // Accent-tinted bubble — the realtor's brand color at low opacity with
-  // foreground text. Reads as "this is your voice" without the
-  // confrontational pure-black slab the old `bg-foreground` produced. The
-  // accent border at 30% gives the bubble a defined edge without becoming
-  // a loud color block. Blur-rises in on the shared onboarding curve.
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      {...blurRise(reduce, 8, 6)}
-      transition={{ duration: 0.32, ease: INTAKE_EASE }}
-      className="flex justify-end"
-    >
-      <div
-        className="max-w-[80%] ml-auto rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-foreground border"
-        style={{
-          backgroundColor: withAlpha(accentColor, 0.12),
-          borderColor: withAlpha(accentColor, 0.22),
-        }}
-      >
-        {text}
-      </div>
-    </motion.div>
   );
 }
 
@@ -754,6 +625,8 @@ function UserTurn({ text, accentColor }: { text: string; accentColor: string }) 
 interface CurrentQuestionProps {
   question: FormQuestion;
   value: string | string[];
+  isFirst: boolean;
+  agentName: string;
   onChange: (v: string | string[]) => void;
   onCommit: (v: string | string[]) => void;
   onSkip: () => void;
@@ -764,28 +637,22 @@ interface CurrentQuestionProps {
 function CurrentQuestion({
   question,
   value,
+  isFirst,
+  agentName,
   onChange,
   onCommit,
   onSkip,
   error,
   accentColor,
 }: CurrentQuestionProps) {
-  // The active question is the page's one focal element. Serif Times,
-  // tight tracking, generous breathing room above the input. Mirrors the
-  // page-title pattern used everywhere else in Chippi (STYLESHEET.md →
-  // "The status-sentence pattern" and `H1` in lib/typography.ts).
-  //
-  // Presentation mirrors the onboarding chat's `ChippiSays` active line:
-  // the serif question TYPES IN, then the answer affordance below it fades
-  // up a beat later (`AnswerAffordance`) so the eye reads the question
-  // first and then sees how to answer. The whole turn blur-rises into the
-  // thread on the shared expo-out curve. None of this touches answer
-  // handling — `typedDone` only gates the reveal animation.
+  // The active question is the page's one focal element: a large serif line,
+  // centered, that types in (mirroring the onboarding focal line). The answer
+  // affordance fades up a beat after the question finishes typing so the eye
+  // reads the question first. `typedDone` only gates the reveal animation — it
+  // never touches answer handling.
   const reduce = useReducedMotion();
   const [typedDone, setTypedDone] = useState(false);
 
-  // Reset the type-in gate whenever the active question changes so each new
-  // question types in fresh. Reduced motion never blocks the affordance.
   useEffect(() => {
     setTypedDone(false);
   }, [question.id]);
@@ -793,49 +660,54 @@ function CurrentQuestion({
   const affordanceReady = reduce ? true : typedDone;
 
   return (
-    <motion.div
-      key={question.id}
-      {...blurRise(reduce, 10, 8)}
-      transition={{ duration: 0.55, ease: INTAKE_EASE }}
-      className="space-y-5"
-      aria-live="polite"
-    >
-      <div className="space-y-2 max-w-md">
-        <h2
-          className="text-2xl sm:text-[26px] tracking-tight leading-snug text-foreground whitespace-pre-wrap"
-          style={TITLE_FONT}
+    <div className="flex flex-col items-center text-center" aria-live="polite">
+      {/* A single quiet greeting line above the very first question — names
+          Chippi and the realtor in one breath, then gets out of the way. */}
+      {isFirst && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className="mb-4 text-[13px] text-muted-foreground"
         >
-          <TypingText
-            text={question.label}
-            charsPerSecond={48}
-            startDelayMs={140}
-            onDone={() => setTypedDone(true)}
-          />
-          {question.required && (
-            <span aria-hidden className="text-muted-foreground/40"> </span>
-          )}
-        </h2>
-        {question.description && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: affordanceReady ? 1 : 0 }}
-            transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-            className="text-sm leading-relaxed text-muted-foreground"
-          >
-            {question.description}
-          </motion.p>
-        )}
-      </div>
+          Hi — I&rsquo;m Chippi, with {agentName}. A few quick questions.
+        </motion.p>
+      )}
 
-      {/* Answer affordance — fades + rises in a beat after the question
-          finishes typing (onboarding `AnswerAffordance` vocabulary). It
-          stays mounted the whole time so focus/refs inside the composer are
-          never torn down; only opacity/translate animate. */}
+      <h2
+        className="text-3xl leading-tight tracking-tight text-foreground sm:text-4xl"
+        style={TITLE_FONT}
+      >
+        <TypingText
+          text={question.label}
+          charsPerSecond={52}
+          startDelayMs={120}
+          onDone={() => setTypedDone(true)}
+        />
+      </h2>
+
+      {question.description && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: affordanceReady ? 1 : 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+          className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground"
+        >
+          {question.description}
+        </motion.p>
+      )}
+
+      {/* Answer affordance — fades + rises a beat after the question types in.
+          Stays mounted throughout (only opacity/translate animate) so input
+          refs/focus are never torn down. */}
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={affordanceReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-        transition={{ duration: 0.32, ease: EASE_OUT }}
-        className={cn('max-w-md', !affordanceReady && 'pointer-events-none')}
+        initial={{ opacity: 0, y: 10 }}
+        animate={affordanceReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+        transition={{ duration: 0.35, ease: EASE_OUT }}
+        className={cn(
+          'mt-9 w-full',
+          !affordanceReady && 'pointer-events-none',
+        )}
       >
         {renderInputForQuestion({
           question,
@@ -846,21 +718,21 @@ function CurrentQuestion({
           error,
         })}
         {error && (
-          <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>
+          <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">{error}</p>
         )}
         {!question.required && question.type !== 'checkbox' && (
-          <div className="mt-3 flex justify-start">
+          <div className="mt-5 flex justify-center">
             <button
               type="button"
               onClick={onSkip}
-              className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground/70 transition-colors hover:text-foreground"
             >
               Skip this
             </button>
           </div>
         )}
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -890,29 +762,20 @@ function renderInputForQuestion(props: InputProps) {
   return <ChatComposer {...props} />;
 }
 
-// ─── Widgets — chat-native, content-fit, no form chrome ──────────────────────
+// ─── Widgets — centered, content-fit, no form chrome ─────────────────────────
 
-function ChoiceCards({
-  question,
-  onCommit,
-  accentColor,
-}: InputProps) {
+function ChoiceCards({ question, onCommit, accentColor }: InputProps) {
   const options = question.options ?? [];
-  // Two options with short labels → horizontal pair.
-  // 3-4 with short labels → flex-wrap.
-  // 5+ or long labels → stack vertically.
+  // Short labels → a centered wrapping row of pills; long/many → a centered
+  // stack of full-width cards.
   const longest = options.reduce((m, o) => Math.max(m, o.label.length), 0);
   const stack = options.length > 4 || longest > 28;
 
-  // Selected-state flash on tap. Holds the chosen card in an accent-
-  // filled state for 180ms before committing the answer — the visual
-  // confirmation chat apps train leads to expect, and the difference
-  // between "responsive" and "did my tap register?" on slow connections.
+  // Selected-state flash on tap, holding ~180ms before committing — the
+  // visual confirmation chat UIs train people to expect.
   const [pending, setPending] = useState<string | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear the pending-flash timer on unmount so a tap right before the
-  // question advances doesn't fire onCommit after this widget is gone.
   useEffect(() => {
     return () => {
       if (commitTimer.current) clearTimeout(commitTimer.current);
@@ -930,7 +793,12 @@ function ChoiceCards({
       variants={STAGGER_CONTAINER}
       initial="initial"
       animate="enter"
-      className={cn(stack ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2.5')}
+      className={cn(
+        'mx-auto',
+        stack
+          ? 'flex w-full max-w-sm flex-col gap-2.5'
+          : 'flex max-w-md flex-wrap justify-center gap-3',
+      )}
     >
       {options.map((option) => {
         const isPending = pending === option.value;
@@ -943,16 +811,16 @@ function ChoiceCards({
             onClick={() => handleTap(option.value)}
             disabled={otherPending}
             className={cn(
-              'group relative inline-flex items-center gap-2',
-              'rounded-xl border bg-card',
-              'px-5 py-3 text-[15px] font-medium text-foreground',
+              'group relative inline-flex items-center justify-center gap-2',
+              'rounded-2xl border bg-card/80 backdrop-blur-sm',
+              'px-6 py-4 text-base font-medium text-foreground',
               'transition-all duration-150 active:scale-[0.98]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
               isPending
-                ? 'border-transparent text-white'
-                : 'border-border/70 hover:bg-muted/40 hover:border-border',
-              otherPending && 'opacity-50 cursor-not-allowed',
-              stack ? 'w-full text-left justify-start' : 'min-w-[140px] justify-center text-center',
+                ? 'border-transparent text-white shadow-md'
+                : 'border-border/70 hover:-translate-y-0.5 hover:border-border hover:shadow-sm',
+              otherPending && 'cursor-not-allowed opacity-40',
+              stack ? 'w-full text-left justify-start' : 'min-w-[150px]',
             )}
             style={
               isPending
@@ -961,7 +829,7 @@ function ChoiceCards({
             }
             aria-pressed={isPending}
           >
-            {isPending && <Check size={14} aria-hidden />}
+            {isPending && <Check size={16} aria-hidden />}
             {option.label}
           </motion.button>
         );
@@ -988,12 +856,12 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
   const isEmpty = selected.length === 0;
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto w-full max-w-md space-y-5">
       <motion.div
         variants={STAGGER_CONTAINER}
         initial="initial"
         animate="enter"
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap justify-center gap-2.5"
       >
         {options.map((option) => {
           const isOn = selected.includes(option.value);
@@ -1004,15 +872,13 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
               type="button"
               onClick={() => toggle(option.value)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3.5 h-9 text-sm font-medium',
+                'inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-medium',
                 'transition-all duration-150 active:scale-[0.97]',
-                isOn ? 'text-white border-transparent' : 'text-foreground border-border/70 hover:bg-muted/40',
-              )}
-              style={
                 isOn
-                  ? { backgroundColor: accentColor, borderColor: accentColor }
-                  : undefined
-              }
+                  ? 'border-transparent text-white'
+                  : 'border-border/70 text-foreground hover:bg-muted/40',
+              )}
+              style={isOn ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
             >
               {isOn && <Check size={13} aria-hidden />}
               {option.label}
@@ -1020,7 +886,7 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
           );
         })}
       </motion.div>
-      <div className="flex justify-end">
+      <div className="flex justify-center">
         <PrimaryActionButton
           accentColor={accentColor}
           disabled={isEmpty && question.required}
@@ -1034,12 +900,8 @@ function ChoiceChips({ question, value, onChange, onCommit, accentColor }: Input
 }
 
 function YesNoChoice({ onCommit, accentColor }: InputProps) {
-  // Boolean checkbox → present as two tappable cards. The realtor's
-  // original `question.label` (e.g. "I agree to the privacy policy.")
-  // already lives in the assistant turn above; here we just need a clear
-  // affirmative/negative choice.
   return (
-    <div className="flex flex-wrap gap-2.5">
+    <div className="flex flex-wrap justify-center gap-3">
       {[
         { value: 'true', label: 'Yes' },
         { value: 'false', label: 'No' },
@@ -1049,8 +911,8 @@ function YesNoChoice({ onCommit, accentColor }: InputProps) {
           type="button"
           onClick={() => onCommit(option.value)}
           className={cn(
-            'rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-border',
-            'px-6 py-3 text-[15px] font-medium text-foreground min-w-[120px]',
+            'rounded-2xl border border-border/70 bg-card/80 backdrop-blur-sm hover:-translate-y-0.5 hover:border-border hover:shadow-sm',
+            'min-w-[130px] px-7 py-4 text-base font-medium text-foreground',
             'transition-all duration-150 active:scale-[0.98]',
             'focus-visible:outline-none focus-visible:ring-2',
           )}
@@ -1066,24 +928,20 @@ function YesNoChoice({ onCommit, accentColor }: InputProps) {
 function DateField({ value, onChange, onCommit, accentColor, error }: InputProps) {
   const v = typeof value === 'string' ? value : '';
   return (
-    <div className="flex items-stretch gap-2 max-w-md">
+    <div className="mx-auto flex max-w-sm items-stretch gap-2">
       <input
         type="date"
         value={v}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'flex-1 h-11 rounded-xl border bg-background px-4 text-[15px]',
+          'h-12 flex-1 rounded-2xl border bg-background px-4 text-[15px]',
           'transition-colors duration-150',
           error
             ? 'border-rose-500/60'
             : 'border-border/70 focus:border-foreground/40 focus:outline-none',
         )}
       />
-      <PrimaryActionButton
-        accentColor={accentColor}
-        disabled={!v}
-        onClick={() => onCommit(v)}
-      >
+      <PrimaryActionButton accentColor={accentColor} disabled={!v} onClick={() => onCommit(v)}>
         Continue
       </PrimaryActionButton>
     </div>
@@ -1093,8 +951,7 @@ function DateField({ value, onChange, onCommit, accentColor, error }: InputProps
 const EMAIL_INLINE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function ChatComposer({ question, value, onChange, onCommit, accentColor, error }: InputProps) {
-  // Modern chat composer: rounded pill containing the input + a circular
-  // send button. Mirrors the realtor-facing Chippi composer in shape.
+  // A single rounded composer — input + circular send. Centered, comfortable.
   const v = typeof value === 'string' ? value : '';
   const isTextarea = question.type === 'textarea';
   const inputType =
@@ -1115,10 +972,6 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
           : 'text';
 
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  // Inline email validation — fires only after the lead has typed an `@`,
-  // debounced 450ms. Silent while they're mid-address; gentle nudge when
-  // the shape's wrong. Distinct from `error` (which is the Continue-time
-  // gate from validateQuestion).
   const [inlineEmailError, setInlineEmailError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1143,8 +996,6 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
     return () => clearTimeout(t);
   }, [v, question.type, inlineEmailError]);
 
-  // Phone format-as-you-type intercepts onChange so the displayed value
-  // stays (XXX) XXX-XXXX-shaped regardless of how the lead types.
   const handleTextChange = (next: string) => {
     if (question.type === 'phone') {
       onChange(formatPhoneAsTyped(next));
@@ -1174,11 +1025,11 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
   const showInlineError = !error && inlineEmailError !== null;
 
   return (
-    <div className="space-y-1.5">
+    <div className="mx-auto w-full max-w-md space-y-1.5">
       <div
         className={cn(
-          'flex items-end gap-2 rounded-3xl border bg-background pl-4 pr-2 py-1.5',
-          'transition-colors duration-150',
+          'flex items-end gap-2 rounded-[26px] border bg-background/80 py-2 pl-5 pr-2.5 backdrop-blur-sm',
+          'shadow-sm transition-colors duration-150',
           error || showInlineError
             ? 'border-rose-500/60'
             : 'border-border/70 focus-within:border-foreground/40',
@@ -1190,14 +1041,13 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
             value={v}
             onChange={(e) => {
               handleTextChange(e.target.value);
-              // Auto-grow.
               e.currentTarget.style.height = 'auto';
               e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 200)}px`;
             }}
             onKeyDown={onKeyDown}
             rows={1}
             placeholder={question.placeholder ?? 'Type your answer…'}
-            className="flex-1 resize-none bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none leading-relaxed py-2 max-h-[200px]"
+            className="max-h-[200px] flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/50"
             aria-invalid={Boolean(error || showInlineError)}
           />
         ) : (
@@ -1208,12 +1058,8 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
             value={v}
             onChange={(e) => handleTextChange(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={
-              question.placeholder ?? defaultPlaceholderFor(question.type)
-            }
-            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground/50 outline-none py-2"
-            // autoComplete hints let iOS/Android suggest the right value
-            // from the platform keychain — small but real completion lift.
+            placeholder={question.placeholder ?? defaultPlaceholderFor(question.type)}
+            className="flex-1 bg-transparent py-2 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/50"
             autoComplete={
               question.type === 'email'
                 ? 'email'
@@ -1230,22 +1076,19 @@ function ChatComposer({ question, value, onChange, onCommit, accentColor, error 
           disabled={sendDisabled}
           aria-label="Send answer"
           className={cn(
-            'w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center self-end mb-0.5',
+            'mb-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-full',
             'transition-all duration-150 active:scale-[0.94]',
             sendDisabled
-              ? 'bg-foreground/15 text-foreground/40 cursor-not-allowed'
-              : 'text-white',
+              ? 'cursor-not-allowed bg-foreground/15 text-foreground/40'
+              : 'text-white shadow-sm',
           )}
           style={sendDisabled ? undefined : { backgroundColor: accentColor }}
         >
-          <ArrowUp size={16} />
+          <ArrowUp size={17} />
         </button>
       </div>
       {showInlineError && (
-        <p
-          className="px-2 text-xs text-rose-600 dark:text-rose-400"
-          role="status"
-        >
+        <p className="px-2 text-xs text-rose-600 dark:text-rose-400" role="status">
           {inlineEmailError}
         </p>
       )}
@@ -1283,10 +1126,10 @@ function PrimaryActionButton({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       className={cn(
-        'rounded-full px-5 h-10 text-[14px] font-semibold inline-flex items-center justify-center gap-1.5',
+        'inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-7 text-sm font-semibold',
         'transition-all duration-150 active:scale-[0.97]',
         disabled
-          ? 'bg-foreground/15 text-foreground/40 cursor-not-allowed'
+          ? 'cursor-not-allowed bg-foreground/15 text-foreground/40'
           : 'text-white shadow-sm',
       )}
       style={disabled ? undefined : { backgroundColor: accentColor }}
@@ -1299,10 +1142,8 @@ function PrimaryActionButton({
 // ─── Color helper ────────────────────────────────────────────────────────────
 
 /**
- * Add an alpha channel to a hex/rgb-style color string. Mirrors the
- * shell's helper — kept local so the chat doesn't need to import from a
- * sibling component file. Returns the input untouched on unknown formats
- * so a malformed realtor accent color never crashes the page.
+ * Add an alpha channel to a hex/rgb color string. Returns the input
+ * untouched on unknown formats so a malformed accent color never crashes.
  */
 function withAlpha(color: string, alpha: number): string {
   const a = Math.max(0, Math.min(1, alpha));
@@ -1329,26 +1170,24 @@ function withAlpha(color: string, alpha: number): string {
   return color;
 }
 
-// ─── Submitting / Error ──────────────────────────────────────────────────────
+// ─── Submitting / Error stages ───────────────────────────────────────────────
 
-function SubmittingTurn({ accentColor }: { accentColor: string }) {
-  const reduce = useReducedMotion();
+function SubmittingStage({ accentColor }: { accentColor: string }) {
   return (
-    <motion.div
-      {...blurRise(reduce, 8, 6)}
-      transition={{ duration: 0.32, ease: INTAKE_EASE }}
-      className="flex items-center gap-2.5"
-    >
-      <Loader2
-        className="w-4 h-4 animate-spin"
-        style={{ color: accentColor }}
-      />
-      <p className="text-sm text-muted-foreground">Sending your answers.</p>
-    </motion.div>
+    <div className="flex flex-col items-center text-center">
+      <Loader2 className="h-6 w-6 animate-spin" style={{ color: accentColor }} />
+      <p
+        className="mt-5 text-2xl tracking-tight text-foreground sm:text-3xl"
+        style={TITLE_FONT}
+      >
+        Sending your answers.
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">One moment.</p>
+    </div>
   );
 }
 
-function ErrorTurn({
+function ErrorStage({
   message,
   accentColor,
   onRetry,
@@ -1357,26 +1196,26 @@ function ErrorTurn({
   accentColor: string;
   onRetry: () => void;
 }) {
-  const reduce = useReducedMotion();
   return (
-    <motion.div
-      {...blurRise(reduce, 8, 6)}
-      transition={{ duration: 0.32, ease: INTAKE_EASE }}
-      className="space-y-3"
-      role="alert"
-    >
-      <div className="flex items-start gap-2.5 text-sm text-foreground">
-        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
-        <p>{message}</p>
+    <div className="flex flex-col items-center text-center" role="alert">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10">
+        <AlertCircle className="h-6 w-6 text-rose-600 dark:text-rose-400" />
       </div>
+      <p
+        className="mt-5 text-2xl tracking-tight text-foreground sm:text-3xl"
+        style={TITLE_FONT}
+      >
+        That didn&rsquo;t go through.
+      </p>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">{message}</p>
       <button
         type="button"
         onClick={onRetry}
-        className="rounded-full px-3.5 h-8 text-xs font-medium border transition-colors hover:bg-foreground/[0.04]"
-        style={{ borderColor: withAlpha(accentColor, 0.5), color: accentColor }}
+        className="mt-6 inline-flex h-11 items-center justify-center rounded-full px-7 text-sm font-semibold text-white shadow-sm transition-transform duration-150 active:scale-[0.97]"
+        style={{ backgroundColor: accentColor }}
       >
         Try again
       </button>
-    </motion.div>
+    </div>
   );
 }
