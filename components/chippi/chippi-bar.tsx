@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
+import { ThinkingBar } from '@/components/ai/prompt-kit';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
 import { useDictation } from './use-dictation';
 
@@ -363,12 +364,9 @@ export function ChippiBar({ slug }: Props) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
-                    <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.2s]" />
-                    <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.4s]" />
-                    <span className="ml-1 italic">thinking…</span>
-                  </div>
+                  {/* Shimmering "Thinking…" line — same indicator the full
+                      workspace uses, not blinking dots. */}
+                  <ThinkingBar label="Thinking…" />
                 </div>
               )}
 
