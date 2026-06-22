@@ -1,11 +1,12 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { CheckCircle2, CalendarCheck, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { pickContrastColor } from '@/lib/color';
 import { EASE_OUT, DURATION_BASE } from '@/lib/motion';
+import { blurRise, INTAKE_EASE } from './intake-motion';
 
 export interface IntakeChatSuccessProps {
   businessName: string;
@@ -62,12 +63,16 @@ export function IntakeChatSuccess({
   const subtext = customMessage || `${who} will reach out within 24 hours.`;
 
   const ctaTextColor = pickContrastColor(accentColor);
+  const reduce = useReducedMotion();
 
   return (
+    // The finish mirrors the onboarding closing reveal (OnboardingReady):
+    // the elements blur-rise in on the shared expo-out curve, the serif
+    // headline lands as the focal line, then the next-step actions settle
+    // below. Calm, staged, the same product family as onboarding's payoff.
     <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: 4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 12, 8)}
+      transition={{ duration: 0.7, ease: INTAKE_EASE }}
       className={cn(
         'flex flex-col items-center text-center',
         'px-6 py-10 space-y-5',
@@ -85,11 +90,11 @@ export function IntakeChatSuccess({
         <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
       </motion.div>
 
-      {/* Headline + subtext */}
+      {/* Headline + subtext — blur-rises a beat after the mark, the serif
+          line as the payoff (onboarding final-line vocabulary). */}
       <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.28, duration: DURATION_BASE, ease: EASE_OUT }}
+        {...blurRise(reduce, 10, 8)}
+        transition={{ delay: 0.28, duration: 0.6, ease: INTAKE_EASE }}
         className="space-y-1.5"
       >
         <h2

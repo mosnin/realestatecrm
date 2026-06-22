@@ -2,6 +2,7 @@ export { Markdown } from './markdown';
 export { Message, MessageContent } from './message';
 export { SystemMessage } from './system-message';
 export { TextShimmer } from './text-shimmer';
+export { TextBlink } from './text-blink';
 export { ThinkingBar } from './thinking-bar';
 export { Tool, ToolStatus, type ToolState } from './tool';
 export { Steps } from './steps';

@@ -35,9 +35,11 @@ import {
   useCallback,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { motion, MotionConfig } from 'motion/react';
+import { motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { validateQuestion } from '@/components/form-renderer/question-renderer';
 import { IntakeChatSuccess } from './intake-chat-success';
+import { TypingText } from '@/components/onboarding/typing-text';
+import { blurRise, INTAKE_EASE } from './intake-motion';
 import { cn, formatPhoneAsTyped } from '@/lib/utils';
 import {
   DURATION_BASE,
@@ -709,11 +711,11 @@ function ChippiIntro({ agentName }: { agentName: string }) {
  * CurrentQuestion with serif Times).
  */
 function PastAssistantTurn({ text }: { text: string }) {
+  const reduce = useReducedMotion();
   return (
     <motion.p
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 8, 6)}
+      transition={{ duration: 0.32, ease: INTAKE_EASE }}
       className="text-[15px] leading-snug text-muted-foreground whitespace-pre-wrap"
     >
       {text}
@@ -726,12 +728,12 @@ function UserTurn({ text, accentColor }: { text: string; accentColor: string }) 
   // foreground text. Reads as "this is your voice" without the
   // confrontational pure-black slab the old `bg-foreground` produced. The
   // accent border at 30% gives the bubble a defined edge without becoming
-  // a loud color block.
+  // a loud color block. Blur-rises in on the shared onboarding curve.
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 8, 6)}
+      transition={{ duration: 0.32, ease: INTAKE_EASE }}
       className="flex justify-end"
     >
       <div
@@ -773,14 +775,28 @@ function CurrentQuestion({
   // page-title pattern used everywhere else in Chippi (STYLESHEET.md →
   // "The status-sentence pattern" and `H1` in lib/typography.ts).
   //
-  // Description, when present, reads as a quiet helper line under the
-  // serif headline — sans, muted, max-width-bounded so it doesn't sprawl.
+  // Presentation mirrors the onboarding chat's `ChippiSays` active line:
+  // the serif question TYPES IN, then the answer affordance below it fades
+  // up a beat later (`AnswerAffordance`) so the eye reads the question
+  // first and then sees how to answer. The whole turn blur-rises into the
+  // thread on the shared expo-out curve. None of this touches answer
+  // handling — `typedDone` only gates the reveal animation.
+  const reduce = useReducedMotion();
+  const [typedDone, setTypedDone] = useState(false);
+
+  // Reset the type-in gate whenever the active question changes so each new
+  // question types in fresh. Reduced motion never blocks the affordance.
+  useEffect(() => {
+    setTypedDone(false);
+  }, [question.id]);
+
+  const affordanceReady = reduce ? true : typedDone;
+
   return (
     <motion.div
       key={question.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 10, 8)}
+      transition={{ duration: 0.55, ease: INTAKE_EASE }}
       className="space-y-5"
       aria-live="polite"
     >
@@ -789,19 +805,38 @@ function CurrentQuestion({
           className="text-2xl sm:text-[26px] tracking-tight leading-snug text-foreground whitespace-pre-wrap"
           style={TITLE_FONT}
         >
-          {question.label}
+          <TypingText
+            text={question.label}
+            charsPerSecond={48}
+            startDelayMs={140}
+            onDone={() => setTypedDone(true)}
+          />
           {question.required && (
             <span aria-hidden className="text-muted-foreground/40"> </span>
           )}
         </h2>
         {question.description && (
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: affordanceReady ? 1 : 0 }}
+            transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+            className="text-sm leading-relaxed text-muted-foreground"
+          >
             {question.description}
-          </p>
+          </motion.p>
         )}
       </div>
 
-      <div className="max-w-md">
+      {/* Answer affordance — fades + rises in a beat after the question
+          finishes typing (onboarding `AnswerAffordance` vocabulary). It
+          stays mounted the whole time so focus/refs inside the composer are
+          never torn down; only opacity/translate animate. */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={affordanceReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={{ duration: 0.32, ease: EASE_OUT }}
+        className={cn('max-w-md', !affordanceReady && 'pointer-events-none')}
+      >
         {renderInputForQuestion({
           question,
           value,
@@ -824,7 +859,7 @@ function CurrentQuestion({
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -1297,11 +1332,11 @@ function withAlpha(color: string, alpha: number): string {
 // ─── Submitting / Error ──────────────────────────────────────────────────────
 
 function SubmittingTurn({ accentColor }: { accentColor: string }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 8, 6)}
+      transition={{ duration: 0.32, ease: INTAKE_EASE }}
       className="flex items-center gap-2.5"
     >
       <Loader2
@@ -1322,11 +1357,11 @@ function ErrorTurn({
   accentColor: string;
   onRetry: () => void;
 }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      {...blurRise(reduce, 8, 6)}
+      transition={{ duration: 0.32, ease: INTAKE_EASE }}
       className="space-y-3"
       role="alert"
     >

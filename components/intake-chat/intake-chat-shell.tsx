@@ -28,12 +28,13 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { BadgeCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
-import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { brandOrange } from '@/lib/colors';
 import { safeHref, cn } from '@/lib/utils';
 import { TITLE_FONT } from '@/lib/typography';
+import { blurRise, INTAKE_EASE } from './intake-motion';
 
 export interface IntakeChatShellProps {
   /** The realtor's brand-facing name — businessName from SpaceSetting, or
@@ -295,15 +296,20 @@ export function IntakeChatShell({
     trustedLicense || trustedNotice || showEqualHousingMark,
   );
 
+  const reduce = useReducedMotion();
+
   return (
     // Outer canvas. On mobile the chat fills the viewport edge-to-edge.
-    // On sm+ the chat becomes a centred card on a blurred image fill —
-    // same family as /p/[slug] and /book/[slug] so all three applicant-
-    // facing surfaces share one product aesthetic.
-    <div className="relative min-h-dvh bg-background sm:bg-muted/40 text-foreground">
-      {/* Desktop blur canvas — only sm+. Cover photo blurred behind the
-          card; 45% darken so the chat stays legible. Mobile skips this
-          (no card frame on mobile means the blur would be invisible). */}
+    // On sm+ the chat becomes a centred card floating on a calm canvas —
+    // the same staged, brand-warm wash the realtor onboarding rides on
+    // (components/onboarding/onboarding-shell.tsx) so the applicant-facing
+    // intake reads as the SAME product family, not a profile page.
+    <div className="relative min-h-dvh bg-background sm:bg-muted/30 text-foreground">
+      {/* Desktop canvas — only sm+. When the realtor has a cover photo we
+          keep it as a soft blurred fill (their brand frame); otherwise we
+          fall back to the onboarding brand-warm wash — barely-there orange
+          in light mode, a faint glow in dark. Either way the card floats on
+          a calm, non-saturated stage. Mobile skips this (no card frame). */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 hidden sm:block"
@@ -316,12 +322,27 @@ export function IntakeChatShell({
               alt=""
               loading="eager"
               decoding="async"
-              className="h-full w-full scale-110 object-cover blur-[48px]"
+              className="h-full w-full scale-110 object-cover blur-[56px]"
             />
-            <div className="absolute inset-0 bg-black/45" />
+            {/* Calmer darken than before (40% vs 45%) plus a warm-wash veil
+                so even a cover-photo backdrop carries the onboarding warmth
+                rather than reading as a generic dimmed hero. */}
+            <div className="absolute inset-0 bg-black/40" />
+            <div
+              aria-hidden
+              className={brandOrange(
+                'LOGO',
+                'absolute inset-0 bg-gradient-to-br from-orange-500/[0.06] via-transparent to-orange-500/[0.04]',
+              )}
+            />
           </>
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-muted/60 via-muted/40 to-muted/60" />
+          <div
+            className={brandOrange(
+              'LOGO',
+              'h-full w-full bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]',
+            )}
+          />
         )}
       </div>
 
@@ -342,10 +363,13 @@ export function IntakeChatShell({
       />
 
       {/* ── Sticky header — realtor identity hero pinned at the top ──── */}
+      {/* Blur-rises into place on first paint, mirroring the onboarding
+          cold-open's arrival motion (the title line / brand mark rise + a
+          resolving blur on the same expo-out curve). Honors reduced motion
+          via the shared `blurRise` helper. */}
       <motion.header
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        {...blurRise(reduce, 10, 8)}
+        transition={{ duration: 0.7, ease: INTAKE_EASE }}
         className="flex-shrink-0 w-full bg-background/80 backdrop-blur-xl border-b border-border/40"
       >
         <div className="max-w-2xl mx-auto px-5 sm:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5">

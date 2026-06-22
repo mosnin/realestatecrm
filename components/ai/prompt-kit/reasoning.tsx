@@ -42,7 +42,7 @@ export function ReasoningTrigger({ open, label, streaming, className, ...props }
         aria-hidden="true"
       />
       <MessageCircle className="h-3.5 w-3.5 shrink-0 text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
-      <span className={cn('shrink-0', streaming && 'an-tg-shimmer')}>{label}</span>
+      <span className={cn('shrink-0', streaming && 'text-blink')}>{label}</span>
     </button>
   );
 }
