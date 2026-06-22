@@ -132,6 +132,8 @@ export default async function ApplicationStatusPage({
       logoUrl={settings?.logoUrl ?? null}
       profileHref={`/p/${slug}`}
       hidePoweredBy={hidePoweredBy}
+      contentAlign="top"
+      maxWidthClassName="max-w-lg"
     >
       {children}
     </IntakeChatShell>
