@@ -209,7 +209,7 @@ export default async function BrokerProfitabilityPage() {
                 {totals.teamLeadToDealRate != null ? (
                   <AnimatedNumber
                     value={totals.teamLeadToDealRate}
-                    format={(n) => `${Math.round(n)}%`}
+                    format={(n) => `${Math.round(n * 10) / 10}%`}
                   />
                 ) : (
                   '—'
