@@ -90,14 +90,14 @@ export default async function MyLeadsPage() {
       scoreLabel?.toLowerCase() === 'warm' ||
       (leadScore != null && leadScore >= WARM_LEAD_THRESHOLD);
     const className = isHot
-      ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
+      ? 'text-rose-700 bg-rose-50 group-hover/row:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/15 dark:group-hover/row:bg-rose-500/25'
       : isWarm
-        ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+        ? 'text-amber-700 bg-amber-50 group-hover/row:bg-amber-100 dark:text-amber-400 dark:bg-amber-500/15 dark:group-hover/row:bg-amber-500/25'
         : 'text-muted-foreground bg-muted/60';
     return (
       <span
         className={cn(
-          'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+          'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 transition-colors',
           className,
         )}
       >
@@ -163,7 +163,7 @@ export default async function MyLeadsPage() {
                     href={`/s/${space.slug}/leads/${lead.id}`}
                     className="group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-muted/30 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-colors group-hover/row:bg-muted/70 group-hover/row:text-foreground">
                       {getInitials(lead.name || lead.email || '?')}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -199,7 +199,7 @@ export default async function MyLeadsPage() {
                       </span>
                       <ChevronRight
                         size={14}
-                        className="text-muted-foreground/40 flex-shrink-0"
+                        className="text-muted-foreground/40 flex-shrink-0 transition-[color,transform] duration-150 group-hover/row:translate-x-0.5 group-hover/row:text-muted-foreground"
                         aria-hidden
                       />
                     </div>

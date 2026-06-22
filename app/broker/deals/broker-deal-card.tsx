@@ -10,7 +10,7 @@
  * not a wrapper around DealCard, because DealCard is coupled to @dnd-kit/sortable.
  */
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { EASE_APPLE } from '@/lib/motion';
 import { TITLE_FONT } from '@/lib/typography';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,12 @@ interface BrokerDealCardProps {
   deal: BrokerDealItem;
   /** Index for initial-mount stagger. Null = single add, no delay. */
   entranceIndex?: number | null;
+  /**
+   * Owning stage's color — rides the card as a hairline left edge, exactly
+   * like the realtor DealCard. Purely decorative; the broker board passes the
+   * column color down so a card reads its lane at a glance.
+   */
+  stageColor?: string | null;
   onClick: (deal: BrokerDealItem) => void;
 }
 
@@ -56,10 +62,16 @@ function daysInStage(deal: BrokerDealItem): number | null {
 export function BrokerDealCard({
   deal,
   entranceIndex = null,
+  stageColor = null,
   onClick,
 }: BrokerDealCardProps) {
+  const reduce = useReducedMotion();
+  // Initial-mount stagger only — capped at 8 cards so a deep column doesn't
+  // turn into a parade. Reduced motion collapses the delay to zero.
   const staggerDelay =
-    entranceIndex !== null && entranceIndex < 8 ? entranceIndex * 0.03 : 0;
+    !reduce && entranceIndex !== null && entranceIndex < 8
+      ? entranceIndex * 0.03
+      : 0;
 
   const health = dealHealth({
     status: deal.status,
@@ -82,16 +94,22 @@ export function BrokerDealCard({
   return (
     <motion.div
       className="mb-2"
-      initial={{ opacity: 0, y: 8 }}
+      // Entrance: 200ms fade + 8px slide-up, Apple ease — verbatim from the
+      // realtor DealCard. Reduced motion drops straight to the settled state.
+      initial={reduce ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_APPLE } }}
       transition={{ duration: 0.2, ease: EASE_APPLE, delay: staggerDelay }}
     >
       <div
         className={cn(
-          'group bg-background border border-border/70 rounded-md p-3 cursor-pointer',
-          'transition-colors duration-150',
-          'hover:bg-foreground/[0.04]',
+          'group relative overflow-hidden bg-background border border-border/70 rounded-md p-3 cursor-pointer',
+          // Lift on hover — 1px rise + soft shadow + hairline brighten, settled
+          // with the board's Apple curve. transform-gpu keeps it on the
+          // compositor. Mirrors the realtor card so the two boards feel one.
+          'transition-[background-color,box-shadow,transform,border-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu',
+          'hover:bg-foreground/[0.04] hover:-translate-y-px hover:border-border hover:shadow-[0_6px_16px_-8px_rgb(0_0_0/0.18)]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           deal.status === 'won' && 'opacity-75',
           deal.status === 'lost' && 'opacity-55',
           deal.status === 'on_hold' && 'opacity-70',
@@ -106,6 +124,16 @@ export function BrokerDealCard({
           }
         }}
       >
+        {/* Stage-color edge — a 2px wash on the left rail that brightens a
+            touch on hover so the lift reads as "picked up". Decoration only. */}
+        {stageColor && (
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 w-[2px] opacity-50 transition-opacity duration-200 group-hover:opacity-90"
+            style={{ backgroundColor: stageColor }}
+          />
+        )}
+
         {/* Title row with health dot */}
         <div className="flex items-center gap-1.5">
           {isActive && (

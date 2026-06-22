@@ -16,8 +16,11 @@
  * realtor board's behavior.
  */
 
+import { useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { Inbox } from 'lucide-react';
 import { BrokerDealCard, type BrokerDealItem } from './broker-deal-card';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { formatCompact } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 
@@ -37,26 +40,40 @@ export function BrokerKanbanColumn({
 }: BrokerKanbanColumnProps) {
   const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
 
+  // Stagger entrance only on the FIRST mount — afterwards AnimatePresence
+  // handles individual add/remove without re-choreographing the column.
+  // Mirrors the realtor KanbanColumn discipline so a filter change doesn't
+  // re-cascade an entire column.
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      hasMountedRef.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   return (
     <div className="flex flex-col w-72 flex-shrink-0">
-      {/* Column header — mirrors realtor KanbanColumn header exactly */}
+      {/* Column header — mirrors realtor KanbanColumn header exactly: a
+          stage-color dot ringed against the background, the name, a count
+          chip, and the per-stage total counting up. */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className="w-2 h-2 rounded-full flex-shrink-0"
+            className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
             style={{ backgroundColor: stageColor }}
             aria-hidden
           />
           <span className="text-base font-semibold text-foreground truncate">
             {stageName}
           </span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
+          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-foreground/[0.06] text-[11px] font-medium text-muted-foreground tabular-nums">
             {deals.length}
           </span>
         </div>
         {totalValue > 0 && (
           <span className="text-[11px] text-muted-foreground tabular-nums">
-            {formatCompact(totalValue)}
+            <AnimatedNumber value={totalValue} format={formatCompact} duration={600} />
           </span>
         )}
       </div>
@@ -68,18 +85,26 @@ export function BrokerKanbanColumn({
           'bg-foreground/[0.02] border border-border/70',
         )}
       >
-        <AnimatePresence>
+        {/*
+          `initial={false}` after first mount keeps re-renders (filter
+          changes, realtor narrowing) from re-choreographing the whole
+          column — only genuinely added/removed cards animate. The first
+          paint still staggers because hasMountedRef is false on that frame.
+        */}
+        <AnimatePresence initial={!hasMountedRef.current}>
           {deals.map((deal, idx) => (
             <BrokerDealCard
               key={deal.id}
               deal={deal}
-              entranceIndex={idx}
+              stageColor={stageColor}
+              entranceIndex={hasMountedRef.current ? null : idx}
               onClick={onOpenDeal}
             />
           ))}
         </AnimatePresence>
         {deals.length === 0 && (
-          <div className="flex items-center justify-center py-8 text-muted-foreground/40">
+          <div className="flex flex-col items-center justify-center gap-1.5 py-8 text-muted-foreground/40">
+            <Inbox size={16} aria-hidden />
             <p className="text-xs">No deals</p>
           </div>
         )}

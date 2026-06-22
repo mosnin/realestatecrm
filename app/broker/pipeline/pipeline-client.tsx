@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   ChevronDown,
   ChevronRight,
   ArrowUpDown,
 } from 'lucide-react';
 import { formatCompact } from '@/lib/formatting';
+import { AnimatedNumber } from '@/components/motion/animated-number';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 
@@ -102,6 +105,7 @@ const statusLabels: Record<string, string> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function PipelineClient({ deals, stages, realtors, summary }: Props) {
+  const reduce = useReducedMotion();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [realtorFilter, setRealtorFilter] = useState<string>('all');
   const [expandedRealtors, setExpandedRealtors] = useState<Set<string>>(new Set());
@@ -190,13 +194,19 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
     <div className="space-y-10">
       {/* ── Snapshot — four numbers, paper-flat hairline grid. Mirrors */}
       {/* the broker home commission grid: gap-px on a border-bg makes  */}
-      {/* the dividers themselves the structure. */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/70 bg-border/60">
+      {/* the dividers themselves the structure. The strip fades up once */}
+      {/* on mount and the focal numbers count up to their settled value. */}
+      <motion.section
+        initial={reduce ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/70 bg-border/60"
+      >
         {[
-          { label: 'Pipeline', value: formatCompact(summary.totalPipelineValue), foot: `${summary.activeDeals} active ${summary.activeDeals === 1 ? 'deal' : 'deals'}` },
-          { label: 'Active', value: String(summary.activeDeals), foot: 'in flight right now' },
-          { label: 'Won this month', value: String(summary.dealsWonThisMonth), foot: summary.dealsWonThisMonth === 1 ? 'deal closed' : 'deals closed' },
-          { label: 'Lost this month', value: String(summary.dealsLostThisMonth), foot: summary.dealsLostThisMonth === 1 ? 'deal lost' : 'deals lost' },
+          { label: 'Pipeline', value: <AnimatedNumber value={summary.totalPipelineValue} format={formatCompact} />, foot: `${summary.activeDeals} active ${summary.activeDeals === 1 ? 'deal' : 'deals'}` },
+          { label: 'Active', value: <AnimatedNumber value={summary.activeDeals} />, foot: 'in flight right now' },
+          { label: 'Won this month', value: <AnimatedNumber value={summary.dealsWonThisMonth} />, foot: summary.dealsWonThisMonth === 1 ? 'deal closed' : 'deals closed' },
+          { label: 'Lost this month', value: <AnimatedNumber value={summary.dealsLostThisMonth} />, foot: summary.dealsLostThisMonth === 1 ? 'deal lost' : 'deals lost' },
         ].map(({ label, value, foot }) => (
           <div key={label} className="bg-background px-4 py-4">
             <p className={SECTION_LABEL}>{label}</p>
@@ -209,12 +219,17 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
             <p className="text-[11px] text-muted-foreground mt-1">{foot}</p>
           </div>
         ))}
-      </section>
+      </motion.section>
 
       {/* ── Risk strip. Paper-flat, hairline. Meaning still comes through */}
       {/* the rose / amber dots — no heavy card chrome. */}
       {summary.atRiskCount === 0 && summary.stuckCount === 0 && summary.activeDeals > 0 && (
-        <section className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 flex items-start gap-3">
+        <motion.section
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: reduce ? 0 : 0.05 }}
+          className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 flex items-start gap-3"
+        >
           <span className="mt-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-medium">Everything&apos;s healthy.</p>
@@ -223,10 +238,14 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
               {summary.activeDeals === 1 ? '' : 's'}.
             </p>
           </div>
-        </section>
+        </motion.section>
       )}
       {(summary.atRiskCount > 0 || summary.stuckCount > 0) && (
-        <section className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5 space-y-3">
+        <motion.section
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: reduce ? 0 : 0.05 }}
+          className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5 space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <p className="text-sm font-medium">Needs your attention.</p>
@@ -278,7 +297,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
               )}
             </ul>
           )}
-        </section>
+        </motion.section>
       )}
 
       {/* ── Filter strip. Paper-flat row, no card. */}
@@ -336,7 +355,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
                       style={{ backgroundColor: stage.color }}
                       aria-hidden
                     />
@@ -352,12 +371,14 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                   </div>
                 </div>
                 <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: stage.color }}
+                    initial={reduce ? false : { width: 0 }}
+                    animate={{
                       width: `${Math.max(stage.count > 0 ? 4 : 0, (stage.count / maxStageCount) * 100)}%`,
-                      backgroundColor: stage.color,
                     }}
+                    transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
                   />
                 </div>
               </li>
@@ -387,14 +408,14 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                   <button
                     onClick={() => toggleRealtor(agent.userId)}
                     aria-expanded={isExpanded}
-                    className="w-full flex items-center gap-3 py-3 text-left hover:bg-foreground/[0.04] transition-colors rounded-md -mx-2 px-2"
+                    className="group w-full flex items-center gap-3 py-3 text-left hover:bg-foreground/[0.04] transition-colors rounded-md -mx-2 px-2"
                   >
                     {isExpanded ? (
-                      <ChevronDown size={13} className="text-muted-foreground flex-shrink-0" />
+                      <ChevronDown size={13} className="text-muted-foreground flex-shrink-0 transition-colors group-hover:text-foreground" />
                     ) : (
-                      <ChevronRight size={13} className="text-muted-foreground flex-shrink-0" />
+                      <ChevronRight size={13} className="text-muted-foreground flex-shrink-0 transition-colors group-hover:text-foreground" />
                     )}
-                    <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center font-semibold text-xs text-foreground flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center font-semibold text-xs text-foreground flex-shrink-0 transition-colors group-hover:bg-foreground/[0.10]">
                       {agent.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -553,12 +574,19 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
 /**
  * Canonical dashed empty container — matches the broker home placeholder
  * vocabulary. Keep the copy first-person so Chippi stays the narrator.
+ * Fades up quietly on mount; reduced motion drops straight to settled.
  */
 function DashedEmpty({ children }: { children: React.ReactNode }) {
+  const reduce = useReducedMotion();
   return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+      className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center"
+    >
       <p className={cn(BODY_MUTED, 'text-[13px]')}>{children}</p>
-    </div>
+    </motion.div>
   );
 }
 
