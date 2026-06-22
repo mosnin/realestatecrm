@@ -12,21 +12,22 @@
  * no design-system primitives are modified.
  */
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { H3, CAPTION, SECTION_LABEL, META, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { EASE_OUT } from '@/lib/motion';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import type { LeadSourceRow, WinLossByReason } from '@/lib/broker-analytics-breakdowns';
 
 // ── Shared neutral bar ──────────────────────────────────────────────────────
 
 function Bar({ value, maxValue }: { value: number; maxValue: number }) {
+  const reduce = useReducedMotion();
   const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, value > 0 ? 2 : 0) : 0;
   return (
     <div className="relative h-2 w-full rounded-full overflow-hidden bg-foreground/[0.05]">
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full bg-foreground/[0.18]"
-        initial={{ width: 0 }}
+        initial={reduce ? false : { width: 0 }}
         animate={{ width: `${pct}%` }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       />
@@ -35,40 +36,54 @@ function Bar({ value, maxValue }: { value: number; maxValue: number }) {
 }
 
 // ── Section shell (hairline card) ───────────────────────────────────────────
+//
+// Fades up as part of the surface cascade. `index` places it in the sequence so
+// the two breakdown cards land one after the other (calm Apple easing, no
+// overshoot). The hairline border brightens a hair on hover — pure neutral
+// fit-and-finish, no shadow or color bloom. Honors reduced motion: the card is
+// simply present with no transform when the OS setting is on.
 
 function Section({
   title,
   sub,
   children,
+  index = 0,
 }: {
   title: string;
   sub?: string;
   children: React.ReactNode;
+  index?: number;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <section className="rounded-xl border border-border/70 bg-background p-5 space-y-4">
+    <motion.section
+      className="group rounded-xl border border-border/70 bg-background p-5 space-y-4 transition-colors duration-200 hover:border-border"
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: reduce ? 0 : index * 0.05 }}
+    >
       <div className="space-y-0.5">
         <h3 className={H3}>{title}</h3>
         {sub && <p className={CAPTION}>{sub}</p>}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
 // ── Lead-source breakdown ───────────────────────────────────────────────────
 
-function LeadSourceBreakdown({ rows }: { rows: LeadSourceRow[] }) {
+function LeadSourceBreakdown({ rows, index = 0 }: { rows: LeadSourceRow[]; index?: number }) {
   if (rows.length === 0) {
     return (
-      <Section title="Lead source" sub="Where your leads came from">
+      <Section title="Lead source" sub="Where your leads came from" index={index}>
         <p className={CAPTION}>No attributed leads yet.</p>
       </Section>
     );
   }
   const maxLeads = Math.max(...rows.map((r) => r.leads), 1);
   return (
-    <Section title="Lead source" sub="Leads by channel, with conversion to application">
+    <Section title="Lead source" sub="Leads by channel, with conversion to application" index={index}>
       <div className="space-y-3">
         {rows.map((r) => (
           <div key={r.key} className="grid grid-cols-[7rem_1fr_auto] items-center gap-3">
@@ -132,16 +147,16 @@ function ReasonColumn({
   );
 }
 
-function WinLossBreakdown({ data }: { data: WinLossByReason }) {
+function WinLossBreakdown({ data, index = 0 }: { data: WinLossByReason; index?: number }) {
   if (data.totalWon === 0 && data.totalLost === 0) {
     return (
-      <Section title="Win / loss reasons" sub="Why deals closed">
+      <Section title="Win / loss reasons" sub="Why deals closed" index={index}>
         <p className={CAPTION}>No closed deals yet.</p>
       </Section>
     );
   }
   return (
-    <Section title="Win / loss reasons" sub="Why deals were won or lost">
+    <Section title="Win / loss reasons" sub="Why deals were won or lost" index={index}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <ReasonColumn heading="Won" total={data.totalWon} rows={data.won} />
         <ReasonColumn heading="Lost" total={data.totalLost} rows={data.lost} />
@@ -161,8 +176,8 @@ export function AnalyticsBreakdowns({
 }) {
   return (
     <div className={SECTION_RHYTHM}>
-      <LeadSourceBreakdown rows={leadSources} />
-      <WinLossBreakdown data={winLoss} />
+      <LeadSourceBreakdown rows={leadSources} index={0} />
+      <WinLossBreakdown data={winLoss} index={1} />
     </div>
   );
 }

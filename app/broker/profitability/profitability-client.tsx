@@ -21,7 +21,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowDown, ArrowUp, Info } from 'lucide-react';
 import {
   SECTION_LABEL,
@@ -33,6 +33,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, getInitials } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { EASE_OUT } from '@/lib/motion';
 import type {
   AgentProfitability,
@@ -50,6 +51,7 @@ interface Props {
 // not color. Empty (no GCI) renders a flat track.
 
 function SplitBar({ agent }: { agent: AgentProfitability }) {
+  const reduce = useReducedMotion();
   const gci = agent.gci;
   const netPct = gci > 0 ? (agent.brokerageNet / gci) * 100 : 0;
   const agentPct = gci > 0 ? (agent.agentShare / gci) * 100 : 0;
@@ -59,14 +61,14 @@ function SplitBar({ agent }: { agent: AgentProfitability }) {
       {/* Brokerage net — the darker, leading segment (what the house keeps). */}
       <motion.div
         className="h-full bg-foreground/[0.30]"
-        initial={{ width: 0 }}
+        initial={reduce ? false : { width: 0 }}
         animate={{ width: `${netPct}%` }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       />
       {/* Agent share — the lighter remainder. Referral share is the untinted tail. */}
       <motion.div
         className="h-full bg-foreground/[0.12]"
-        initial={{ width: 0 }}
+        initial={reduce ? false : { width: 0 }}
         animate={{ width: `${agentPct}%` }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       />
@@ -95,7 +97,7 @@ function AgentSplitCard({ agent }: { agent: AgentProfitability }) {
             className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
             style={TITLE_FONT}
           >
-            {formatCompact(agent.brokerageNet)}
+            <AnimatedNumber value={agent.brokerageNet} format={formatCompact} />
           </p>
           <p className={CAPTION}>net to brokerage</p>
         </div>

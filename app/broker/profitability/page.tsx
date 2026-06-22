@@ -47,6 +47,7 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 import { ProfitabilityClient } from './profitability-client';
 
 export const metadata: Metadata = { title: 'Profitability -- Brokerage' };
@@ -184,27 +185,35 @@ export default async function BrokerProfitabilityPage() {
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Total GCI</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(totals.gci)}
+                <AnimatedNumber value={totals.gci} format={formatCompact} />
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Net to brokerage</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(totals.brokerageNet)}
+                <AnimatedNumber value={totals.brokerageNet} format={formatCompact} />
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Deals closed</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {totals.dealsClosed.toLocaleString()}
+                <AnimatedNumber
+                  value={totals.dealsClosed}
+                  format={(n) => Math.round(n).toLocaleString()}
+                />
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Lead to deal</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {totals.teamLeadToDealRate != null
-                  ? `${totals.teamLeadToDealRate}%`
-                  : '—'}
+                {totals.teamLeadToDealRate != null ? (
+                  <AnimatedNumber
+                    value={totals.teamLeadToDealRate}
+                    format={(n) => `${Math.round(n * 10) / 10}%`}
+                  />
+                ) : (
+                  '—'
+                )}
               </p>
             </div>
           </section>
