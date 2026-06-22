@@ -32,7 +32,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
-import { BadgeCheck } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { brandOrange } from '@/lib/colors';
 import { safeHref, cn } from '@/lib/utils';
@@ -273,6 +273,20 @@ export function IntakeChatShell({
           backgroundSize: '26px 26px',
         }}
       />
+
+      {/* Persistent escape hatch back to the realtor's public profile. Sits
+          top-right so it never collides with the flow's own top-left Back
+          (previous-question) affordance, and stays available on every step
+          including success. */}
+      {profileHref && (
+        <Link
+          href={profileHref}
+          className="fixed right-4 top-4 z-30 inline-flex items-center gap-1 rounded-full bg-background/60 px-3 py-1.5 text-[13px] text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-foreground/[0.05] hover:text-foreground sm:right-6 sm:top-6"
+        >
+          View profile
+          <ArrowUpRight size={14} aria-hidden />
+        </Link>
+      )}
 
       {/* Focal column. A flex column the height of the viewport: the
           conversation is vertically centered (justify-center) so a short

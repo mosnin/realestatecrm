@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { fireConversionEvents } from '@/lib/tracking-events';
 import { EASE_APPLE, EASE_OUT } from '@/lib/motion';
 import { googleCalendarUrl, icsDataUri } from '@/lib/calendar-links';
-import { PRIMARY_PILL, QUIET_LINK, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
+import { QUIET_LINK, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 interface BookingFormProps {
   slug: string;
@@ -23,6 +23,11 @@ interface BookingFormProps {
    *  realtor's public page so the applicant has somewhere to go after
    *  booking. Same dead-end fix the intake success card has. */
   profileHref?: string | null;
+  /** Focal serif heading for the page — the booking equivalent of the
+   *  intake's active question (e.g. "Book a tour"). */
+  pageTitle?: string;
+  /** Calm one-line intro beneath the title. */
+  pageIntro?: string;
 }
 
 interface DaySlots {
@@ -39,15 +44,23 @@ interface PropertyProfile {
 
 type Step = 'property' | 'date' | 'details' | 'confirmed';
 
-// Uniform paper-flat input class. Identical for input + textarea so the eye
-// reads them as one family.
+// Inputs in the intake composer's vocabulary — rounded, soft, paper-flat.
 const FIELD_BASE =
-  'w-full bg-background border border-border/70 rounded-md px-3 text-base focus:border-foreground/30 focus:outline-none transition-colors placeholder:text-muted-foreground/70';
-const INPUT_CLASS = cn(FIELD_BASE, 'h-10');
-const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
+  'w-full bg-background/80 border border-border/70 rounded-2xl px-4 text-[15px] focus:border-foreground/40 focus:outline-none transition-colors placeholder:text-muted-foreground/50';
+const INPUT_CLASS = cn(FIELD_BASE, 'h-11');
+const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-3 min-h-[80px]');
 const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
-export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f', profileHref }: BookingFormProps) {
+export function BookingForm({
+  slug,
+  duration: defaultDuration,
+  businessName,
+  timezone,
+  accentColor = '#ff964f',
+  profileHref,
+  pageTitle = 'Book a tour',
+  pageIntro,
+}: BookingFormProps) {
   const reduce = useReducedMotion();
   const primaryTextColor = pickContrastColor(accentColor);
   const confettiRef = useRef<ConfettiRef>(null);
@@ -81,6 +94,11 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   // Detect guest timezone
   const guestTz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
   const showTzNote = guestTz && guestTz !== timezone;
+
+  // Shared accent-pill style — matches the intake's primary action button.
+  const accentPillStyle = { backgroundColor: accentColor, color: primaryTextColor };
+  const ACCENT_PILL =
+    'inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-7 text-sm font-semibold shadow-sm transition-all duration-150 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed';
 
   async function loadSlots(propId?: string | null, currentStep?: Step) {
     setLoading(true);
@@ -205,10 +223,30 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
     }
   }
 
+  // ── Focal heading — the booking equivalent of the intake's active question.
+  const Heading = (
+    <div className="flex flex-col items-center text-center">
+      <h1
+        className="text-3xl leading-tight tracking-tight text-foreground sm:text-4xl"
+        style={TITLE_FONT}
+      >
+        {pageTitle}
+      </h1>
+      {pageIntro && (
+        <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+          {pageIntro}
+        </p>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 size={20} className="animate-spin text-muted-foreground" />
+      <div>
+        {Heading}
+        <div className="mt-10 flex justify-center">
+          <Loader2 size={22} className="animate-spin" style={{ color: accentColor }} />
+        </div>
       </div>
     );
   }
@@ -243,23 +281,23 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
       <>
         <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: EASE_OUT }}
-          className="text-center py-8"
+          initial={reduce ? false : { opacity: 0, y: 10, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.6, ease: EASE_APPLE }}
+          className="flex flex-col items-center text-center"
         >
           <motion.div
             initial={reduce ? false : { scale: 0 }}
             animate={{ scale: 1 }}
             transition={reduce ? undefined : { delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
-            className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10"
           >
-            <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
+            <Check size={26} className="text-emerald-600 dark:text-emerald-400" />
           </motion.div>
-          <h2 className="mt-4 text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+          <h2 className="mt-5 text-3xl tracking-tight text-foreground sm:text-4xl" style={TITLE_FONT}>
             Confirmed.
           </h2>
-          <p className="mt-3 text-base text-muted-foreground max-w-sm mx-auto">
+          <p className="mt-3 max-w-sm text-base text-muted-foreground">
             Your tour is set for <span className="font-medium text-foreground">{dateLabel}</span>{' '}
             at <span className="font-medium text-foreground">{timeLabel}</span>.
             {` ${businessName} will reach out if anything changes.`}
@@ -272,15 +310,15 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               initial={reduce ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduce ? 0 : 0.35, duration: 0.3, ease: EASE_OUT }}
-              className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2"
+              className="mt-7 flex w-full max-w-xs flex-col items-center justify-center gap-2.5 sm:max-w-none sm:flex-row"
             >
               {gCalUrl && (
                 <a
                   href={gCalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={cn(PRIMARY_PILL, 'w-full sm:w-auto justify-center')}
-                  style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                  className={cn(ACCENT_PILL, 'w-full sm:w-auto')}
+                  style={accentPillStyle}
                 >
                   <CalendarPlus size={15} aria-hidden />
                   Add to Google Calendar
@@ -290,7 +328,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 <a
                   href={icsUrl}
                   download="tour.ics"
-                  className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium text-muted-foreground border border-border/70 hover:bg-foreground/[0.04] hover:text-foreground transition-colors w-full sm:w-auto justify-center"
+                  className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full border border-border/70 px-5 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground sm:w-auto"
                 >
                   Apple / Outlook
                 </a>
@@ -299,10 +337,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           )}
 
           {profileHref && (
-            <div className="mt-5">
+            <div className="mt-6">
               <Link
                 href={profileHref}
-                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 See {businessName}&apos;s page
                 <ArrowRight size={14} aria-hidden />
@@ -329,16 +367,21 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   return (
     <>
+      {Heading}
+
+      {/* Lifted panel holding the booking controls — sits on the immersive
+          warm canvas the same way the intake's choice cards do, so it reads
+          as part of the experience, not a marooned widget. */}
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: EASE_APPLE }}
-        className="rounded-xl bg-background border border-border/70 p-6"
+        initial={reduce ? false : { opacity: 0, y: 12, filter: 'blur(8px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.5, ease: EASE_APPLE }}
+        className="mt-9 rounded-3xl border border-border/60 bg-card/70 p-5 text-left shadow-sm backdrop-blur-sm sm:p-6"
       >
         {/* ─── Property section ─────────────────────────────────────────── */}
         {showProperty && (
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <p className={SECTION_LABEL}>Property</p>
               {propertyChosen && (
                 <button
@@ -352,7 +395,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
             </div>
 
             {step === 'property' ? (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {properties.map((p) => {
                   const active = selectedPropertyId === p.id;
                   return (
@@ -362,16 +405,16 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                       whileTap={reduce ? undefined : { scale: 0.99 }}
                       onClick={() => selectProperty(p.id)}
                       className={cn(
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
+                        'flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all duration-150',
                         active
-                          ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
-                          : 'border-border/70 hover:bg-foreground/[0.04]',
+                          ? 'border-foreground/30 bg-foreground/[0.04] ring-2 ring-foreground/10'
+                          : 'border-border/70 hover:-translate-y-0.5 hover:border-border hover:shadow-sm',
                       )}
                     >
-                      <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                      <MapPin size={16} className="flex-shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                        {p.address && <p className="text-xs text-muted-foreground truncate">{p.address}</p>}
+                        <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                        {p.address && <p className="truncate text-xs text-muted-foreground">{p.address}</p>}
                       </div>
                     </motion.button>
                   );
@@ -379,7 +422,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 <button
                   type="button"
                   onClick={() => selectProperty(null)}
-                  className="w-full px-4 py-3 rounded-lg border border-dashed border-border/70 text-center text-xs text-muted-foreground hover:bg-foreground/[0.04] transition-colors"
+                  className="w-full rounded-2xl border border-dashed border-border/70 px-4 py-3.5 text-center text-xs text-muted-foreground transition-colors hover:bg-foreground/[0.04]"
                 >
                   Not sure yet / general inquiry
                 </button>
@@ -403,13 +446,13 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
         {/* Divider only between sections that are both visible */}
         {showProperty && showDateSection && (
-          <div className="border-t border-border/60 my-8" />
+          <div className="my-7 border-t border-border/60" />
         )}
 
         {/* ─── Date + time section ──────────────────────────────────────── */}
         {showDateSection && (
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <p className={SECTION_LABEL}>Pick a time</p>
               <div className="flex items-center gap-3">
                 <span className="text-[11px] text-muted-foreground">{effectiveDuration} min</span>
@@ -438,20 +481,20 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 <span className="font-medium">{selectedTime && formatTime(selectedTime)}</span>
               </p>
             ) : slots.length === 0 ? (
-              <div className="text-center py-6 space-y-4">
+              <div className="space-y-4 py-6 text-center">
                 <p className="text-sm text-muted-foreground">No available time slots right now.</p>
                 {!showWaitlist && !waitlistDone && (
                   <button
                     type="button"
                     onClick={() => setShowWaitlist(true)}
-                    className="inline-flex items-center gap-2 px-4 h-9 rounded-md border border-border/70 text-sm text-foreground hover:bg-foreground/[0.04] transition-colors"
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-border/70 px-4 text-sm text-foreground transition-colors hover:bg-foreground/[0.04]"
                   >
                     <Bell size={14} />
                     Join waitlist
                   </button>
                 )}
                 {showWaitlist && !waitlistDone && (
-                  <div className="text-left space-y-3 max-w-sm mx-auto">
+                  <div className="mx-auto max-w-sm space-y-3 text-left">
                     <p className="text-xs text-muted-foreground">Get notified when a slot opens.</p>
                     <div className="space-y-1.5">
                       <Label htmlFor="waitlistDate" className={FIELD_LABEL}>Preferred date</Label>
@@ -490,8 +533,8 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                       type="button"
                       onClick={handleWaitlistSubmit}
                       disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate}
-                      className={cn(PRIMARY_PILL, 'w-full justify-center disabled:opacity-60 disabled:cursor-not-allowed')}
-                      style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                      className={cn(ACCENT_PILL, 'w-full')}
+                      style={accentPillStyle}
                     >
                       {waitlistSubmitting && <Loader2 size={14} className="animate-spin" />}
                       {waitlistSubmitting ? 'Joining…' : 'Join waitlist'}
@@ -507,8 +550,8 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               </div>
             ) : (
               <div className="space-y-5">
-                {/* Date strip — paper-flat. Today/active uses foreground tone. */}
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                {/* Date strip — lifted pills; active uses the realtor accent. */}
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                   {slots.map((s) => {
                     const active = selectedDate === s.date;
                     return (
@@ -518,11 +561,12 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                         whileTap={reduce ? undefined : { scale: 0.96 }}
                         onClick={() => { setSelectedDate(s.date); setSelectedTime(null); }}
                         className={cn(
-                          'flex-shrink-0 px-3 py-2 rounded-md text-center transition-colors min-w-[72px]',
+                          'min-w-[74px] flex-shrink-0 rounded-2xl px-3 py-2.5 text-center transition-all duration-150',
                           active
-                            ? 'bg-foreground text-background'
-                            : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
+                            ? 'text-white shadow-sm'
+                            : 'bg-foreground/[0.04] text-foreground hover:bg-foreground/[0.07]',
                         )}
+                        style={active ? { backgroundColor: accentColor, color: primaryTextColor } : undefined}
                       >
                         <div className="text-[10px] uppercase tracking-wider opacity-70">
                           {new Date(s.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' })}
@@ -546,7 +590,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                           ? undefined
                           : { enter: { transition: { staggerChildren: 0.018 } } }
                       }
-                      className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto"
+                      className="grid max-h-[320px] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4"
                     >
                       {selectedDaySlots.times.map((t) => {
                         const active = selectedTime === t;
@@ -565,10 +609,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                             whileTap={reduce ? undefined : { scale: 0.96 }}
                             onClick={() => setSelectedTime(t)}
                             className={cn(
-                              'h-9 px-3 rounded-md text-sm transition-colors',
+                              'h-10 rounded-xl px-3 text-sm transition-all duration-150',
                               active
-                                ? 'font-medium'
-                                : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
+                                ? 'font-medium text-white shadow-sm'
+                                : 'bg-foreground/[0.04] text-foreground hover:bg-foreground/[0.07]',
                             )}
                             style={active ? { backgroundColor: accentColor, color: primaryTextColor } : undefined}
                           >
@@ -589,8 +633,8 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                       exit={reduce ? undefined : { opacity: 0, y: 8 }}
                       transition={{ duration: 0.24, ease: EASE_APPLE }}
                       onClick={() => setStep('details')}
-                      className={cn(PRIMARY_PILL, 'w-full justify-center')}
-                      style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                      className={cn(ACCENT_PILL, 'w-full')}
+                      style={accentPillStyle}
                     >
                       Continue
                     </motion.button>
@@ -604,18 +648,18 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         {/* ─── Details section ──────────────────────────────────────────── */}
         {showDetailsSection && (
           <>
-            <div className="border-t border-border/60 my-8" />
+            <div className="my-7 border-t border-border/60" />
             <motion.section
               initial={reduce ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.28, ease: EASE_APPLE }}
             >
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <p className={SECTION_LABEL}>Your details</p>
                 <button
                   type="button"
                   onClick={() => setStep('date')}
-                  className={cn(QUIET_LINK, 'text-xs inline-flex items-center gap-1')}
+                  className={cn(QUIET_LINK, 'inline-flex items-center gap-1 text-xs')}
                 >
                   <ChevronLeft size={12} />
                   Back
@@ -623,7 +667,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="guestName" className={FIELD_LABEL}>
                       Full name
@@ -651,7 +695,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="guestPhone" className={FIELD_LABEL}>
                       Phone <span className="ml-1 text-[11px] font-normal text-muted-foreground">(optional)</span>
@@ -697,15 +741,15 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               </div>
 
               {error && (
-                <p className="text-xs text-rose-600 dark:text-rose-400 mt-3">{error}</p>
+                <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">{error}</p>
               )}
 
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting || !guestName.trim() || !guestEmail.trim()}
-                className={cn(PRIMARY_PILL, 'w-full justify-center mt-6 disabled:opacity-60 disabled:cursor-not-allowed')}
-                style={{ backgroundColor: accentColor, color: primaryTextColor }}
+                className={cn(ACCENT_PILL, 'mt-6 w-full')}
+                style={accentPillStyle}
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {submitting ? 'Booking…' : 'Confirm booking'}
@@ -716,7 +760,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
         {/* Surface availability errors at the bottom of the picker step */}
         {error && step !== 'details' && (
-          <p className="text-xs text-rose-600 dark:text-rose-400 mt-4 text-center">{error}</p>
+          <p className="mt-4 text-center text-xs text-rose-600 dark:text-rose-400">{error}</p>
         )}
       </motion.div>
 
@@ -733,9 +777,9 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-3"
+              className="space-y-3 rounded-3xl border border-border/70 bg-background p-6 text-center shadow-lg"
             >
-              <Loader2 size={20} className="animate-spin text-muted-foreground mx-auto" />
+              <Loader2 size={20} className="mx-auto animate-spin" style={{ color: accentColor }} />
               <p className="text-sm text-foreground">Booking your tour…</p>
             </motion.div>
           </motion.div>
