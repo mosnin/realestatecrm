@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { BookingForm } from './booking-form';
-import { PublicPageShell } from '@/components/public-page-shell';
+import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
@@ -139,23 +139,28 @@ export default async function PublicBookingPage({
   return (
     <>
       <TrackingPixels pixels={trackingPixels} />
-      <PublicPageShell
-        logoUrl={logoUrl}
+      <IntakeChatShell
         businessName={businessName}
         agentName={agentName}
-        agentPhone={null}
         agentPhoto={agentPhoto}
-        pageTitle={pageTitle}
-        pageIntro={pageIntro}
-        trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
-        agentPresenceLabel="Booking with"
-        hidePoweredBy={hidePoweredBy}
-        customization={customization}
         coverPhotoUrl={coverPhotoUrl}
+        logoUrl={logoUrl}
         profileHref={`/p/${slug}`}
+        accentColor={customization.accentColor}
+        hidePoweredBy={hidePoweredBy}
+        footerLinks={customization.footerLinks}
       >
-        <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} profileHref={`/p/${slug}`} />
-      </PublicPageShell>
+        <BookingForm
+          slug={slug}
+          duration={duration}
+          businessName={businessName}
+          timezone={timezone}
+          accentColor={customization.accentColor}
+          profileHref={`/p/${slug}`}
+          pageTitle={pageTitle}
+          pageIntro={pageIntro}
+        />
+      </IntakeChatShell>
     </>
   );
 }

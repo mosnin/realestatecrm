@@ -278,7 +278,7 @@ export function ApplicationStatusClient({
 
   return (
     <motion.div
-      className="w-full max-w-lg space-y-4"
+      className="w-full max-w-lg space-y-12"
       role="main"
       aria-label="Application status portal"
       initial="initial"
@@ -288,45 +288,39 @@ export function ApplicationStatusClient({
         enter: { transition: { staggerChildren: reduce ? 0 : 0.06 } },
       }}
     >
-      {/* Header Card */}
-      <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 min-w-0">
-            <h1 className="text-2xl tracking-tight text-foreground truncate" style={TITLE_FONT}>
-              {contact.name}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Ref: {contact.applicationRef}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Submitted {formatDate(contact.createdAt)}
-            </p>
-          </div>
-          <div
-            role="status"
-            aria-label={`Application status: ${currentConfig.label}`}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0',
-              currentConfig.bgColor,
-              currentConfig.color,
-            )}
-          >
-            <CurrentIcon size={13} aria-hidden="true" />
-            {currentConfig.label}
-          </div>
+      {/* Status hero — the words lead. The current status reads as a focal
+          serif line, the same focal vocabulary the intake question uses;
+          the status icon is quieted to a small inline mark so it never
+          competes with the headline. */}
+      <motion.div variants={cardVariants}>
+        <div
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+          role="status"
+          aria-label={`Application status: ${currentConfig.label}`}
+        >
+          <CurrentIcon size={13} className={currentConfig.color} aria-hidden="true" />
+          <span>For {contact.name}</span>
         </div>
+        <h1
+          className="mt-2 text-3xl sm:text-4xl tracking-tight text-foreground"
+          style={TITLE_FONT}
+        >
+          {currentConfig.label}
+        </h1>
         {contact.statusNote && (
-          <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground font-medium mb-0.5">Note</p>
-            <p className="text-sm text-foreground">{contact.statusNote}</p>
-          </div>
+          <p className="mt-3 text-base text-muted-foreground leading-relaxed">
+            {contact.statusNote}
+          </p>
         )}
+        <p className="mt-4 text-xs text-muted-foreground">
+          Ref {contact.applicationRef} · Submitted {formatDate(contact.createdAt)}
+        </p>
       </motion.div>
 
-      {/* Status Timeline */}
+      {/* Status Timeline — a clean vertical list on the canvas, no card. */}
       {statusHistory.length > 0 && (
-        <motion.nav variants={cardVariants} aria-label="Application status timeline" className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Status Timeline</h2>
+        <motion.nav variants={cardVariants} aria-label="Application status timeline">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-5">Timeline</h2>
           <ol className="space-y-0 list-none m-0 p-0" aria-label="Status updates">
             {statusHistory.map((update: StatusUpdate, i: number) => {
               const config = getStatusConfig(update.toStatus);
@@ -386,28 +380,30 @@ export function ApplicationStatusClient({
         </motion.nav>
       )}
 
-      {/* Application Summary (Collapsible) */}
+      {/* Application Summary (Collapsible) — de-boxed; the expand control
+          and the field rows sit directly on the canvas with hairline
+          separators between sections. */}
       {appDisplayFields.length > 0 && (
-        <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm overflow-hidden">
+        <motion.div variants={cardVariants}>
           <button
             onClick={() => setShowAppData(!showAppData)}
             aria-expanded={showAppData}
             aria-controls="application-details-panel"
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors min-h-[44px]"
+            className="w-full flex items-center justify-between text-left transition-colors min-h-[44px] text-muted-foreground hover:text-foreground"
           >
-            <h2 className="text-sm font-semibold text-foreground">
+            <h2 className="text-xs font-semibold uppercase tracking-wider">
               Application Details
             </h2>
             {showAppData ? (
-              <ChevronUp size={16} className="text-muted-foreground" aria-hidden="true" />
+              <ChevronUp size={16} aria-hidden="true" />
             ) : (
-              <ChevronDown size={16} className="text-muted-foreground" aria-hidden="true" />
+              <ChevronDown size={16} aria-hidden="true" />
             )}
           </button>
           {showAppData && (
-            <div id="application-details-panel" className="px-5 pb-5 border-t border-border/40">
+            <div id="application-details-panel" className="mt-5 divide-y divide-border/40">
               {appSections.map(([title, fields]: [string, DisplayField[]]) => (
-                <div key={title} className="mt-4">
+                <div key={title} className="py-4 first:pt-0">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     {title}
                   </p>
@@ -454,12 +450,13 @@ export function ApplicationStatusClient({
         </motion.div>
       )}
 
-      {/* Messages */}
-      <motion.section variants={cardVariants} aria-label="Messages" className="rounded-2xl bg-card border border-border/60 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
+      {/* Messages — on canvas, no card. The thread and the composer sit
+          directly on the warm surface; only a hairline marks the section. */}
+      <motion.section variants={cardVariants} aria-label="Messages">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <MessageSquare size={14} className="text-muted-foreground" aria-hidden="true" />
-            <h2 className="text-sm font-semibold text-foreground">Messages</h2>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Messages</h2>
             {messages.length > 0 && (
               <span className="text-xs text-muted-foreground" aria-label={`${messages.length} messages`}>({messages.length})</span>
             )}
@@ -468,7 +465,7 @@ export function ApplicationStatusClient({
             onClick={refreshData}
             disabled={refreshing}
             aria-label="Refresh messages"
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-foreground/[0.04] transition-colors text-muted-foreground"
           >
             <RefreshCw size={14} className={cn(refreshing && 'animate-spin')} aria-hidden="true" />
           </button>
@@ -479,7 +476,7 @@ export function ApplicationStatusClient({
           role="log"
           aria-live="polite"
           aria-label="Message history"
-          className="max-h-80 overflow-y-auto px-5 py-3 space-y-3"
+          className="max-h-80 overflow-y-auto space-y-3"
         >
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
@@ -526,12 +523,13 @@ export function ApplicationStatusClient({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Message input */}
-        <div className="border-t border-border/40 px-4 py-3">
+        {/* Message composer — the intake's pill composer vocabulary, on
+            canvas: a rounded-[26px] field with a circular send button. */}
+        <div className="mt-4">
           {sendError && (
             <p role="alert" className="text-xs text-destructive mb-2">{sendError}</p>
           )}
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2 rounded-[26px] border border-border/70 bg-background/80 py-2 pl-5 pr-2.5 backdrop-blur-sm transition-colors duration-150 focus-within:border-foreground/40">
             <input
               type="text"
               value={messageText}
@@ -546,7 +544,7 @@ export function ApplicationStatusClient({
               aria-describedby="message-char-count"
               placeholder={`Message ${businessName}...`}
               maxLength={2000}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px]"
+              className="flex-1 bg-transparent py-2 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/50"
               disabled={sending}
             />
             <button
@@ -554,10 +552,10 @@ export function ApplicationStatusClient({
               disabled={!messageText.trim() || sending}
               aria-label={sending ? 'Sending message' : 'Send message'}
               className={cn(
-                'rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium transition-colors',
+                'mb-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-full transition-all duration-150 active:scale-[0.94]',
                 messageText.trim() && !sending
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed',
+                  ? 'bg-foreground text-background'
+                  : 'cursor-not-allowed bg-foreground/15 text-foreground/40',
               )}
             >
               {sending ? (
@@ -567,14 +565,14 @@ export function ApplicationStatusClient({
               )}
             </button>
           </div>
-          <p id="message-char-count" className="text-[10px] text-muted-foreground mt-1.5" aria-live="polite">
+          <p id="message-char-count" className="text-[10px] text-muted-foreground mt-1.5 px-2" aria-live="polite">
             {messageText.length}/2000 characters
           </p>
         </div>
       </motion.section>
 
-      {/* What happens next */}
-      <motion.div variants={cardVariants} className="rounded-2xl bg-card border border-border/60 shadow-sm p-5">
+      {/* What happens next — on canvas, separated by a single hairline. */}
+      <motion.div variants={cardVariants} className="border-t border-border/40 pt-8">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           What happens next?
         </p>
@@ -805,13 +803,10 @@ function YourToursPanel({
   }
 
   return (
-    <section
-      aria-label="Your tours"
-      className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden"
-    >
-      <div className="px-5 py-3 border-b border-border/40 flex items-center gap-2">
+    <section aria-label="Your tours">
+      <div className="mb-4 flex items-center gap-2">
         <CalendarCheck size={14} className="text-muted-foreground" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-foreground">Your tours</h2>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your tours</h2>
         <span className="text-xs text-muted-foreground">({tours.length})</span>
       </div>
 
@@ -832,7 +827,7 @@ function YourToursPanel({
           const declining = pending === `decline:${tour.id}`;
 
           return (
-            <li key={tour.id} className="px-5 py-4">
+            <li key={tour.id} className="py-4 first:pt-0">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0 space-y-1">
                   <p className="text-sm font-medium text-foreground tabular-nums">
@@ -868,7 +863,7 @@ function YourToursPanel({
                     type="button"
                     onClick={() => void respond(tour.id, 'confirm')}
                     disabled={!!pending}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-foreground text-background px-3.5 py-1.5 text-sm font-medium transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground text-background px-7 text-sm font-semibold transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {confirming ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <CheckCircle2 size={12} aria-hidden="true" />}
                     Confirm
@@ -877,7 +872,7 @@ function YourToursPanel({
                     type="button"
                     onClick={() => void respond(tour.id, 'decline')}
                     disabled={!!pending}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] px-3.5 py-1.5 text-sm transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-border/70 bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] px-7 text-sm font-medium transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {declining ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
                     Can&apos;t make it
@@ -890,7 +885,7 @@ function YourToursPanel({
       </ul>
 
       {error && (
-        <div role="alert" className="px-5 py-3 border-t border-border/40 flex items-start gap-2 text-sm text-rose-700 dark:text-rose-300">
+        <div role="alert" className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-sm text-rose-700 dark:text-rose-300">
           <AlertCircle size={14} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
           <span>{error}</span>
         </div>
@@ -971,10 +966,7 @@ function TourRequestPanel({
 
   if (confirmed && !open) {
     return (
-      <div
-        role="status"
-        className="rounded-xl bg-emerald-50/60 dark:bg-emerald-500/10 border border-emerald-200/70 dark:border-emerald-500/20 p-4 flex items-center gap-3"
-      >
+      <div role="status" className="flex items-center gap-3">
         <CalendarCheck size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0 text-sm">
           <p className="font-medium text-foreground">Tour request sent.</p>
@@ -999,9 +991,9 @@ function TourRequestPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-xl border border-dashed border-border/70 hover:border-border bg-muted/20 hover:bg-muted/40 transition-colors p-4 text-left flex items-center gap-3 group"
+        className="w-full text-left flex items-center gap-3 group transition-colors"
       >
-        <div className="w-8 h-8 rounded-lg bg-foreground/[0.04] flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-foreground/[0.04] group-hover:bg-foreground/[0.08] flex items-center justify-center flex-shrink-0 transition-colors">
           <CalendarCheck size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.75} />
         </div>
         <div className="flex-1 min-w-0">
@@ -1013,14 +1005,10 @@ function TourRequestPanel({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl bg-card border border-border/60 shadow-sm p-5 space-y-4"
-      aria-label="Request a tour"
-    >
+    <form onSubmit={handleSubmit} className="space-y-4" aria-label="Request a tour">
       <div className="flex items-center gap-2">
         <CalendarCheck size={14} className="text-muted-foreground" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-foreground">Request a tour</h2>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Request a tour</h2>
       </div>
 
       <div className="space-y-1.5">
@@ -1034,7 +1022,7 @@ function TourRequestPanel({
           onChange={(e) => setPreferredTimes(e.target.value)}
           disabled={submitting}
           placeholder="Saturday or Sunday afternoon · weekday evenings after 6"
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 resize-none"
+          className="w-full rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm transition-colors duration-150 outline-none focus:border-foreground/40 disabled:opacity-50 resize-none placeholder:text-muted-foreground/50"
           maxLength={500}
           required
         />
@@ -1051,7 +1039,7 @@ function TourRequestPanel({
           onChange={(e) => setPropertyAddress(e.target.value)}
           disabled={submitting}
           placeholder="25 Park Slope Place, Brooklyn"
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50"
+          className="w-full rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm transition-colors duration-150 outline-none focus:border-foreground/40 disabled:opacity-50 placeholder:text-muted-foreground/50"
           maxLength={300}
         />
       </div>
@@ -1067,13 +1055,13 @@ function TourRequestPanel({
           onChange={(e) => setNotes(e.target.value)}
           disabled={submitting}
           placeholder="Bringing my partner; we'd love a video walkthrough first if possible."
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 resize-none"
+          className="w-full rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm transition-colors duration-150 outline-none focus:border-foreground/40 disabled:opacity-50 resize-none placeholder:text-muted-foreground/50"
           maxLength={1000}
         />
       </div>
 
       {submitError && (
-        <div role="alert" className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50/60 dark:border-rose-900 dark:bg-rose-950/40 px-3 py-2 text-sm text-rose-800 dark:text-rose-200">
+        <div role="alert" className="flex items-start gap-2 text-sm text-rose-700 dark:text-rose-300">
           <AlertCircle size={14} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
           <span>{submitError}</span>
         </div>
@@ -1083,7 +1071,7 @@ function TourRequestPanel({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground text-background px-7 text-sm font-semibold transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Send size={13} aria-hidden="true" />}
           Send request

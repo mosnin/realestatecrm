@@ -32,7 +32,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
-import { BadgeCheck } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { brandOrange } from '@/lib/colors';
 import { safeHref, cn } from '@/lib/utils';
@@ -63,6 +63,15 @@ export interface IntakeChatShellProps {
   licenseNumber?: string | null;
   fairHousingNotice?: string | null;
   showEqualHousingMark?: boolean;
+  /** Vertical placement of the focal column. 'center' (default) optically
+   *  centers a short screen — right for the intake/booking, where one idea
+   *  lives at a time. 'top' pins the column near the top — right for the
+   *  status page, which is a feed that grows down the page and shouldn't
+   *  start mid-screen. */
+  contentAlign?: 'center' | 'top';
+  /** Focal column width. Defaults to the intake's reading measure; the
+   *  status feed asks for a touch more room. */
+  maxWidthClassName?: string;
   children: ReactNode;
 }
 
@@ -208,6 +217,8 @@ export function IntakeChatShell({
   licenseNumber,
   fairHousingNotice,
   showEqualHousingMark,
+  contentAlign = 'center',
+  maxWidthClassName = 'max-w-xl',
   children,
 }: IntakeChatShellProps) {
   const trustedLicense = licenseNumber?.trim() || '';
@@ -274,14 +285,35 @@ export function IntakeChatShell({
         }}
       />
 
+      {/* Persistent escape hatch back to the realtor's public profile. Sits
+          top-right so it never collides with the flow's own top-left Back
+          (previous-question) affordance, and stays available on every step
+          including success. */}
+      {profileHref && (
+        <Link
+          href={profileHref}
+          className="fixed right-4 top-4 z-30 inline-flex items-center gap-1 rounded-full bg-background/60 px-3 py-1.5 text-[13px] text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-foreground/[0.05] hover:text-foreground sm:right-6 sm:top-6"
+        >
+          View profile
+          <ArrowUpRight size={14} aria-hidden />
+        </Link>
+      )}
+
       {/* Focal column. A flex column the height of the viewport: the
           conversation is vertically centered (justify-center) so a short
           first screen sits in the optical middle of the page instead of
           pinned to the top above a void. When a question's answer area is
           tall the column simply grows and the page scrolls. */}
       <div className="relative z-10 flex min-h-dvh flex-col">
-        <main className="flex flex-1 flex-col justify-center px-6 py-20 sm:py-24">
-          <div className="mx-auto w-full max-w-xl">
+        <main
+          className={cn(
+            'flex flex-1 flex-col px-6',
+            contentAlign === 'top'
+              ? 'justify-start pt-16 pb-20 sm:pt-20'
+              : 'justify-center py-20 sm:py-24',
+          )}
+        >
+          <div className={cn('mx-auto w-full', maxWidthClassName)}>
             {/* Identity mark — blur-rises in on the onboarding arrival curve. */}
             <motion.div
               {...blurRise(reduce, 10, 8)}

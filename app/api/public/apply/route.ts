@@ -423,29 +423,44 @@ export async function POST(req: NextRequest) {
       logger.warn('[apply] idempotency lock unavailable; using DB fallback', { spaceId: space.id }, error);
     }
 
-    // Same-email dedupe across all time (case-insensitive). Submitting the
-     // same email twice always returns the existing contact — different name,
-     // different phone, days later, it doesn't matter. The 5-minute name+phone
-     // window below catches the "double-tap submit" case for emailless flows.
-     if (contactEmail) {
+    // Same-email dedupe across all time (case-insensitive) — BUT only when the
+    // NAME also matches. An email is not an identity: shared household inboxes,
+    // mistyped addresses, and re-used test emails all mean the same address can
+    // belong to different applicants. Returning a prior contact's applicationRef
+    // to a different person would hand them that person's status portal — a
+    // cross-applicant data leak (the new submitter sees someone else's
+    // application status). So we merge only on email + name; a same-email,
+    // different-name submission falls through to a fresh contact with its own
+    // ref + portal. The 5-minute name+phone window below still catches
+    // double-tap resubmits for emailless flows.
+    if (contactEmail) {
       const { data: emailMatches, error: emailDupErr } = await supabase
         .from('Contact')
-        .select('id, applicationRef')
+        .select('id, name, applicationRef')
         .eq('spaceId', space.id)
         .ilike('email', contactEmail)
         .contains('tags', ['application-link'])
         .order('createdAt', { ascending: false })
         .limit(1);
       if (!emailDupErr && emailMatches && emailMatches.length > 0) {
-        const match = emailMatches[0] as { id: string; applicationRef: string | null };
-        return NextResponse.json(
-          {
-            success: true,
-            id: match.id,
-            applicationRef: match.applicationRef ?? undefined,
-          },
-          { status: 200 },
-        );
+        const match = emailMatches[0] as {
+          id: string;
+          name: string | null;
+          applicationRef: string | null;
+        };
+        const sameName =
+          (match.name ?? '').trim().toLowerCase() ===
+          contactName.trim().toLowerCase();
+        if (sameName) {
+          return NextResponse.json(
+            {
+              success: true,
+              id: match.id,
+              applicationRef: match.applicationRef ?? undefined,
+            },
+            { status: 200 },
+          );
+        }
       }
     }
 
