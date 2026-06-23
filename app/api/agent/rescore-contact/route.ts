@@ -13,7 +13,6 @@ import { supabase } from '@/lib/supabase';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -89,17 +88,6 @@ export async function POST(req: NextRequest) {
   const formConfig = (contact as Record<string, unknown>).formConfigSnapshot as IntakeFormConfig | null ?? null;
   const resolvedLeadType = contact.leadType || (contact as Record<string, unknown>).formLeadType as string || 'rental';
 
-  let scoringModel: ScoringModel | null = null;
-  if (formConfig) {
-    const col = resolvedLeadType === 'buyer' ? 'buyerScoringModel' : 'rentalScoringModel';
-    const { data: ss } = await supabase
-      .from('SpaceSetting')
-      .select(col)
-      .eq('spaceId', spaceId)
-      .maybeSingle();
-    if (ss) scoringModel = (ss as Record<string, unknown>)[col] as ScoringModel | null;
-  }
-
   const applicationData = contact.applicationData as Record<string, unknown> | null;
 
   try {
@@ -109,7 +97,6 @@ export async function POST(req: NextRequest) {
       answers: applicationData
         ? (applicationData as Record<string, string | string[] | number | boolean>)
         : undefined,
-      scoringModel,
       leadType: resolvedLeadType as 'rental' | 'buyer',
     });
 

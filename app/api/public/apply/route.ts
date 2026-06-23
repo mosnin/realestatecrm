@@ -17,7 +17,6 @@ import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import { logger } from '@/lib/logger';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
@@ -344,29 +343,6 @@ export async function POST(req: NextRequest) {
       formConfig = getDefaultFormConfig(resolvedLeadType);
     }
 
-    // ── Fetch the saved ScoringModel (AI-generated weights/ranges) ─────
-    let scoringModel: ScoringModel | null = null;
-    {
-      try {
-        const scoringColumn = resolvedLeadType === 'buyer'
-          ? 'buyerScoringModel'
-          : 'rentalScoringModel';
-        const { data: scoringSettings } = await supabase
-          .from('SpaceSetting')
-          .select(scoringColumn)
-          .eq('spaceId', space.id)
-          .maybeSingle();
-        if (scoringSettings) {
-          scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
-        }
-      } catch (err) {
-        logger.warn('[apply] scoring model fetch failed (non-fatal, will use legacy scoring)', {
-          spaceId: space.id,
-          leadType: resolvedLeadType,
-        }, err);
-      }
-    }
-
     // ── Validate & extract submission data ────────────────────────────────
     // Single path: validate + score against the dynamic intake form config.
     let contactName: string;
@@ -631,7 +607,6 @@ export async function POST(req: NextRequest) {
         formConfig: formConfigSnapshot,
         answers: applicationData as Record<string, string | string[] | number | boolean>,
         leadType: contactLeadType,
-        scoringModel,
       });
 
       const { error: scoreUpdateError } = await supabase

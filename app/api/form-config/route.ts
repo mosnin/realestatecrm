@@ -4,7 +4,6 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { generateScoringModel } from '@/lib/scoring/generate-scoring-model';
 
 const MAX_FORM_CONFIG_SIZE = 512_000; // 500KB
 const MAX_TOTAL_QUESTIONS = 200;
@@ -23,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const { data: settings, error } = await supabase
     .from('SpaceSetting')
-    .select('rentalFormConfig, buyerFormConfig, formConfig, formConfigSource, rentalScoringModel, buyerScoringModel')
+    .select('rentalFormConfig, buyerFormConfig, formConfig, formConfigSource')
     .eq('spaceId', space.id)
     .maybeSingle();
   if (error) {
@@ -45,8 +44,6 @@ export async function GET(req: NextRequest) {
     rentalFormConfig,
     buyerFormConfig,
     formConfigSource,
-    rentalScoringModel: settings?.rentalScoringModel ?? null,
-    buyerScoringModel: settings?.buyerScoringModel ?? null,
   });
 }
 
@@ -147,26 +144,6 @@ export async function PUT(req: NextRequest) {
     spaceId: space.id,
     metadata: { field: column, formConfigSource: 'custom', leadType, sectionCount: formConfig.sections.length },
   });
-
-  // Fire-and-forget: generate scoring model in background after saving form config
-  const scoringColumn = leadType === 'rental' ? 'rentalScoringModel' : 'buyerScoringModel';
-  void generateScoringModel(formConfig)
-    .then((scoringModel) => {
-      return supabase
-        .from('SpaceSetting')
-        .update({ [scoringColumn]: scoringModel })
-        .eq('spaceId', space.id);
-    })
-    .then(({ error: scoringErr }) => {
-      if (scoringErr) {
-        console.error('[form-config] Failed to save auto-generated scoring model', scoringErr);
-      } else {
-        console.info('[form-config] Auto-generated scoring model saved', { spaceId: space.id, leadType });
-      }
-    })
-    .catch((err) => {
-      console.warn('[form-config] Scoring model generation failed (non-blocking)', err);
-    });
 
   return NextResponse.json({ [column]: formConfig, formConfigSource: 'custom' as const, leadType });
 }

@@ -6,7 +6,6 @@ import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import { getFormConfigs } from '@/lib/form-builder';
 import { formConfigSchema, type IntakeFormConfig } from '@/lib/form-config-schema';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import type { ApplicationData } from '@/lib/types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -91,25 +90,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve scoring model
-    let scoringModel: ScoringModel | null = null;
-    try {
-      const scoringColumn =
-        resolvedLeadType === 'buyer' ? 'buyerScoringModel' : 'rentalScoringModel';
-      const { data: settingRow } = await supabase
-        .from('SpaceSetting')
-        .select(scoringColumn)
-        .eq('spaceId', contact.spaceId)
-        .maybeSingle();
-      if (settingRow) {
-        scoringModel = (settingRow as Record<string, unknown>)[scoringColumn] as
-          | ScoringModel
-          | null;
-      }
-    } catch (err) {
-      console.warn('[retry-scoring] scoring model fetch failed', { err });
-    }
-
     const applicationData = (contact.applicationData ?? {}) as Record<string, unknown>;
 
     let scoring: LeadScoringResult;
@@ -119,7 +99,6 @@ export async function POST(req: NextRequest) {
         formConfig,
         answers: applicationData as Record<string, string | string[] | number | boolean>,
         leadType: resolvedLeadType,
-        scoringModel,
       });
     } catch (err) {
       console.error('[retry-scoring] scoring threw', { contactId: contact.id, err });

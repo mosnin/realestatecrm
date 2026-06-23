@@ -151,11 +151,10 @@ function makeReq(body: unknown): NextRequest {
 }
 
 // Queue the supabase terminals for a full successful insert flow. Order matches
-// the route: SpaceSetting(scoring) → SpaceSetting(settings) → Contact(insert) →
-// ApplicationStatusUpdate(insert) → Contact(update scoring). Contact dedupe
-// selects also pull from the Contact queue (we keep them empty → no dupe).
+// the route: SpaceSetting(settings) → Contact(insert) → ApplicationStatusUpdate(insert)
+// → Contact(update scoring). Contact dedupe selects also pull from the Contact
+// queue (we keep them empty → no dupe).
 function queueSuccessfulInsert() {
-  queueFor('SpaceSetting').push({ data: { rentalScoringModel: null }, error: null });
   // Contact: [emailDedupe(empty), recentDupe(empty), insert(row)]
   queueFor('Contact').push({ data: [], error: null });
   queueFor('Contact').push({ data: [], error: null });

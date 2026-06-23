@@ -11,5 +11,3 @@ export { OptimizationPanel } from './optimization-panel';
 export type { OptimizationPanelProps } from './optimization-panel';
 export { ScoringPreview } from './scoring-preview';
 export type { ScoringPreviewProps } from './scoring-preview';
-export { ScoringTab } from './scoring-tab';
-export type { ScoringTabProps } from './scoring-tab';

@@ -13,7 +13,6 @@
 import { scoreDynamicApplication } from '@/lib/dynamic-lead-scoring';
 import { getDefaultFormConfig } from '@/lib/form-builder';
 import type { IntakeFormConfig, LeadScoreDetails } from '@/lib/types';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 export type LeadScoringResult = {
   scoringStatus: 'scored' | 'failed' | 'pending';
@@ -35,7 +34,6 @@ export async function scoreLeadApplicationDynamic(input: {
   formConfig: IntakeFormConfig | null;
   answers?: Record<string, string | string[] | number | boolean>;
   leadType?: 'rental' | 'buyer' | 'general';
-  scoringModel?: ScoringModel | null;
 }): Promise<LeadScoringResult> {
   const normalizedLeadType: 'rental' | 'buyer' =
     input.leadType === 'buyer'
@@ -57,6 +55,5 @@ export async function scoreLeadApplicationDynamic(input: {
     formConfig,
     answers,
     leadType: normalizedLeadType,
-    scoringModel: input.scoringModel ?? undefined,
   });
 }

@@ -6,7 +6,6 @@ import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 export async function POST(
   _req: NextRequest,
@@ -69,38 +68,12 @@ export async function POST(
     .eq('id', id)
     .eq('spaceId', space.id);
 
-  // Fetch the form config snapshot and scoring model for dynamic scoring.
-  // The formConfigSnapshot is stored on the contact at submission time.
-  // The scoringModel is stored on SpaceSetting.
+  // Score against the form-config snapshot stored on the contact at submission.
   const formConfig: IntakeFormConfig | null =
     (contact as Record<string, unknown>).formConfigSnapshot as IntakeFormConfig | null ?? null;
 
-  let scoringModel: ScoringModel | null = null;
   const resolvedLeadType = contact.leadType || (contact as any).formLeadType || 'rental';
-  if (formConfig) {
-    try {
-      const scoringColumn = resolvedLeadType === 'buyer'
-        ? 'buyerScoringModel'
-        : 'rentalScoringModel';
-      const { data: scoringSettings } = await supabase
-        .from('SpaceSetting')
-        .select(scoringColumn)
-        .eq('spaceId', space.id)
-        .maybeSingle();
-      if (scoringSettings) {
-        scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
-      }
-    } catch (err) {
-      console.warn('[rescore] scoring model fetch failed (non-fatal)', {
-        contactId: id,
-        spaceId: space.id,
-        err,
-      });
-    }
-  }
 
-  // Use dynamic scoring when a formConfig snapshot exists on the contact,
-  // otherwise fall back to legacy scoring via the same entry point.
   const applicationData = contact.applicationData as Record<string, unknown> | null;
 
   let result;
@@ -111,7 +84,6 @@ export async function POST(
       answers: applicationData
         ? (applicationData as Record<string, string | string[] | number | boolean>)
         : undefined,
-      scoringModel,
       leadType: resolvedLeadType as 'rental' | 'buyer',
     });
   } catch (scoringErr) {
