@@ -1806,10 +1806,13 @@ function RealtorSidebarShell({
           currentIcon={Briefcase}
           slug={slug}
           spaceName={spaceName}
-          // The realtor sidebar stays a realtor surface — no brokerage rows
-          // here. Switching to the brokerage lives on the header ("Switch to
-          // {brokerage}") so the workspace identity here reads clean.
-          brokerageMemberships={[]}
+          // List the realtor's brokerage(s) in the switcher so a brokerage
+          // owner/member can jump to the brokerage dashboard straight from the
+          // dropdown. Previously this was hard-coded to [] and the only path
+          // was the header "Switch to {brokerage}" link — owners opened the
+          // dropdown to pick their brokerage, didn't find it, and reported the
+          // switcher as broken. The header link stays as a second affordance.
+          brokerageMemberships={brokerageMemberships}
           isOnBrokerPage={isOnBrokerPage}
           collapsed={collapsed}
           showQuickCreate
