@@ -1,17 +1,27 @@
 /**
  * `/careers`, the join-us page (the Careers target in the Company nav menu).
- * Server component (exports metadata). Same cinematic layout as the rest of the
- * redesign: a sub-hero, then how-we-work and where-we-are-looking sections, and
- * a get-in-touch close, all in a forced-dark wrapper.
+ * Server component (exports metadata).
  *
- * Honest framing: we are a small team and do not list fabricated openings. We
- * describe how we work and the areas we are always looking in, and invite
- * people to reach out.
+ * Aesthetic: matches the homepage / company / research pages — a full-bleed
+ * photographic hero under dark scrims (NOT the SubHero dashboard window, which
+ * read as out-of-place product chrome on a hiring page), then how-we-work and
+ * open-positions sections, and a get-in-touch close, all in a forced-dark
+ * wrapper.
+ *
+ * Honest framing: we are a small team. The roles below are the areas we are
+ * actively hiring in; apply by email.
  */
 
-import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { ArrowRight } from 'lucide-react';
-import { Band, BlurRise, Eyebrow, Serif } from '@/components/marketing/giga/primitives';
+import {
+  Band,
+  BlurRise,
+  Eyebrow,
+  EyebrowPill,
+  Serif,
+  PillPrimary,
+  PillGhost,
+} from '@/components/marketing/giga/primitives';
 
 export const metadata = {
   title: 'Careers · Chippi',
@@ -73,23 +83,41 @@ export default function CareersPage() {
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
-        <SubHero
-          label="Careers"
-          labelIcon="Users"
-          headline={
-            <>
-              Help build the future
-              <br className="hidden sm:block" /> of real estate.
-            </>
-          }
-          description="We are a small team building the operating system real estate has been missing. The surface is huge, the bar is high, and the work goes straight to people who feel it the same day."
-          features={[
-            { icon: 'Workflow', title: 'Small team, big surface', desc: 'Own whole areas, not tickets, from day one.' },
-            { icon: 'ShieldCheck', title: 'Ship with taste', desc: 'Craft and trust are the product, not a polish pass.' },
-            { icon: 'TrendingUp', title: 'Own real outcomes', desc: 'Your work reaches agents the week you ship it.' },
-          ]}
-          image="/marketing/careers-hero.jpg"
-        />
+        {/* Hero — full-bleed photo under dark scrims, matching the homepage /
+            company / research pages. */}
+        <section className="relative isolate overflow-hidden">
+          <div aria-hidden className="absolute inset-0 -z-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/marketing/careers-hero.jpg" alt="" className="h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/82 via-[#0a0a0a]/48 to-[#0a0a0a]" />
+            <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
+          </div>
+          <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
+            <BlurRise trigger="load">
+              <EyebrowPill>Careers</EyebrowPill>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.08}>
+              <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
+                Help build the future of real estate.
+              </Serif>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.16}>
+              <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
+                We are a small team building the operating system real estate has been missing. The
+                surface is huge, the bar is high, and the work goes straight to people who feel it the
+                same day.
+              </p>
+            </BlurRise>
+            <BlurRise trigger="load" delay={0.24}>
+              <div className="mt-9 flex flex-wrap justify-center gap-3">
+                <PillPrimary href="#open-positions" withArrow>
+                  See open roles
+                </PillPrimary>
+                <PillGhost href="/company">Our story</PillGhost>
+              </div>
+            </BlurRise>
+          </Band>
+        </section>
 
         {/* How we work */}
         <Band className="py-24 sm:py-28">
@@ -114,7 +142,7 @@ export default function CareersPage() {
         </Band>
 
         {/* Open positions */}
-        <Band className="py-24 sm:py-28">
+        <Band id="open-positions" className="scroll-mt-24 py-24 sm:py-28">
           <BlurRise className="mx-auto max-w-2xl text-center">
             <Eyebrow className="justify-center">Open positions</Eyebrow>
             <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">

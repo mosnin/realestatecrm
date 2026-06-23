@@ -1,0 +1,86 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1206 >>
+stream
+BT
+/F2 20 Tf
+1 0 0 1 72 760 Tm
+18 TL
+(Lead Scoring in the Wild: Why Most Models Bury) Tj
+T*
+(Good Buyers) Tj
+T*
+ET
+BT
+/F3 10 Tf
+0.45 0.45 0.45 rg
+1 0 0 1 72 714 Tm
+(Chippi Research ∑ April 2026 ∑ 15 pages) Tj
+ET
+0 0 0 rg
+BT
+/F1 11 Tf
+1 0 0 1 72 680 Tm
+16 TL
+(Many lead-scoring systems score on the wrong signals, or worse, score on signals that do) Tj
+T*
+(not survive contact with a real intake form. We document a common failure mode: a) Tj
+T*
+(deterministic model keyed on question identifiers that never match the answers a) Tj
+T*
+(rendered form actually submits, so every lead is scored as cold.) Tj
+T*
+T*
+(We argue for scoring that reads the substance of what a lead says, financing readiness,) Tj
+T*
+(timeline, specificity of need, against the agent's live pipeline, rather than brittle) Tj
+T*
+(field matching. We show how an AI-read score, held to a transparent rubric, ranks intent) Tj
+T*
+(more faithfully than weighted-checkbox approaches.) Tj
+T*
+T*
+(The report includes a before/after on a real workspace whose strongest buyers were) Tj
+T*
+(sitting at the bottom of the list, and the rubric we now use to keep a score defensible) Tj
+T*
+(and explainable to the agent who relies on it.) Tj
+T*
+T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000267 00000 n 
+0000001525 00000 n 
+0000001595 00000 n 
+0000001670 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1748
+%%EOF
