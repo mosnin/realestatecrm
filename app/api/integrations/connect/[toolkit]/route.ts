@@ -44,10 +44,20 @@ export async function POST(
     );
   }
 
-  // Some catalog entries (Follow-up Boss, Compass, BoomTown, kvCORE, Real
-  // Geeks) are real-estate apps Composio doesn't have a toolkit for yet.
-  // The UI renders them with a disabled "Coming soon" pill, so reaching
-  // this path means a stale client. Refuse cleanly and name the app.
+  // Native (API-key) integrations — Follow-up Boss, kvCORE — don't use
+  // Composio OAuth. The UI posts the key to their own native route; reaching
+  // this OAuth path means a stale client. Refuse cleanly and point the way.
+  if (app.nativeAuth) {
+    return NextResponse.json(
+      { error: `${app.name} connects with an ${app.nativeAuth.keyLabel.toLowerCase()} — add it from the ${app.name} card.` },
+      { status: 400 },
+    );
+  }
+
+  // Some catalog entries (Compass, BoomTown, Real Geeks) are real-estate apps
+  // we don't have a connector for yet. The UI renders them with a disabled
+  // "Coming soon" pill, so reaching this path means a stale client. Refuse
+  // cleanly and name the app.
   if (COMING_SOON_TOOLKITS.has(toolkit)) {
     return NextResponse.json(
       { error: `${app.name} support is in progress. We will let you know when it lands.` },
