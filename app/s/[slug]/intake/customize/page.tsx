@@ -7,10 +7,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
-import { ScoringTab } from '@/components/form-builder/scoring-tab';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
-import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import {
   H1,
   TITLE_FONT,
@@ -30,7 +28,6 @@ type LeadType = 'rental' | 'buyer';
 const SUB_TABS: { value: string; label: string }[] = [
   { value: 'builder', label: 'Questions' },
   { value: 'preview', label: 'Preview' },
-  { value: 'scoring', label: 'What makes a good lead' },
 ];
 
 export default function IntakeCustomizePage() {
@@ -51,7 +48,6 @@ export default function IntakeCustomizePage() {
   const buyerSavedRef = useRef<string>('');
 
   const [saving, setSaving] = useState(false);
-  const [savingPhase, setSavingPhase] = useState<'form' | 'scoring' | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
@@ -61,10 +57,6 @@ export default function IntakeCustomizePage() {
   // appear on the realtor's keystroke (CSS-driven properties) instead of
   // waiting for Save.
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Scoring model state (separate from form config)
-  const [rentalScoringModel, setRentalScoringModel] = useState<ScoringModel | null>(null);
-  const [buyerScoringModel, setBuyerScoringModel] = useState<ScoringModel | null>(null);
 
   // Load existing configs from the API
   useEffect(() => {
@@ -78,15 +70,9 @@ export default function IntakeCustomizePage() {
         rentalFormConfig: IntakeFormConfig | null;
         buyerFormConfig: IntakeFormConfig | null;
         formConfigSource: FormConfigSource;
-        rentalScoringModel: ScoringModel | null;
-        buyerScoringModel: ScoringModel | null;
       }) => {
         const source = data.formConfigSource ?? 'legacy';
         setConfigSource(source);
-
-        // Scoring models
-        if (data.rentalScoringModel) setRentalScoringModel(data.rentalScoringModel);
-        if (data.buyerScoringModel) setBuyerScoringModel(data.buyerScoringModel);
 
         // Rental config
         if (data.rentalFormConfig?.sections) {
@@ -127,7 +113,6 @@ export default function IntakeCustomizePage() {
   const config = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
   const hasChanges = activeLeadType === 'rental' ? rentalHasChanges : buyerHasChanges;
   const hasSavedConfig = activeLeadType === 'rental' ? rentalHasSavedConfig : buyerHasSavedConfig;
-  const activeScoringModel = activeLeadType === 'rental' ? rentalScoringModel : buyerScoringModel;
 
   // ── Live preview bridge ────────────────────────────────────────────────────
   // Post the draft customization to the iframe on every edit so CSS-driven
@@ -147,14 +132,6 @@ export default function IntakeCustomizePage() {
     return () => clearTimeout(t);
   }, [config, loading]);
 
-  const handleScoringModelChange = useCallback((model: ScoringModel) => {
-    if (activeLeadType === 'rental') {
-      setRentalScoringModel(model);
-    } else {
-      setBuyerScoringModel(model);
-    }
-  }, [activeLeadType]);
-
   const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
     if (activeLeadType === 'rental') {
       setRentalConfig(newConfig);
@@ -172,7 +149,6 @@ export default function IntakeCustomizePage() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setSavingPhase('form');
     const currentConfig = activeLeadType === 'rental' ? rentalConfigRef.current : buyerConfigRef.current;
     try {
       // Phase 1: Save the form config
@@ -198,31 +174,6 @@ export default function IntakeCustomizePage() {
         buyerSavedRef.current = JSON.stringify(currentConfig);
       }
 
-      // Phase 2: Generate scoring model in background
-      setSavingPhase('scoring');
-      try {
-        const scoringRes = await fetch('/api/form-config/generate-scoring', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            slug,
-            leadType: activeLeadType,
-            formConfig: currentConfig,
-          }),
-        });
-        if (scoringRes.ok) {
-          const { scoringModel: newModel } = await scoringRes.json();
-          if (activeLeadType === 'rental') {
-            setRentalScoringModel(newModel);
-          } else {
-            setBuyerScoringModel(newModel);
-          }
-        }
-      } catch {
-        // Scoring generation is non-blocking -- form save already succeeded
-        console.warn('[intake-customize] Scoring model generation failed (non-blocking)');
-      }
-
       // Refresh the live preview iframe to reflect the saved changes.
       setPreviewVersion((v) => v + 1);
 
@@ -231,7 +182,6 @@ export default function IntakeCustomizePage() {
       toast.error(err instanceof Error ? err.message : "That tripped me up. Try again.");
     } finally {
       setSaving(false);
-      setSavingPhase(null);
     }
   }, [slug, activeLeadType]);
 
@@ -328,11 +278,7 @@ export default function IntakeCustomizePage() {
               )}
             >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {saving
-                ? savingPhase === 'scoring'
-                  ? 'Generating scoring…'
-                  : 'Saving…'
-                : 'Save'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
@@ -400,26 +346,6 @@ export default function IntakeCustomizePage() {
             <FormBuilder config={config} onChange={handleConfigChange} />
           )}
           {activeSubTab === 'preview' && <FormPreview config={config} />}
-          {activeSubTab === 'scoring' && (
-            <ScoringTab
-              config={config}
-              slug={slug}
-              leadType={activeLeadType}
-              scoringModel={activeScoringModel}
-              onScoringModelChange={handleScoringModelChange}
-              onSave={async (model) => {
-                const res = await fetch('/api/form-config/save-scoring', {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ slug, leadType: activeLeadType, scoringModel: model }),
-                });
-                if (!res.ok) {
-                  const d = await res.json().catch(() => ({}));
-                  throw new Error(d.error || 'Failed to save scoring model');
-                }
-              }}
-            />
-          )}
         </div>
       </div>
 

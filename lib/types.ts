@@ -33,8 +33,6 @@ export type Brokerage = {
   brokerageFormConfig: IntakeFormConfig | null;
   brokerageRentalFormConfig: IntakeFormConfig | null;
   brokerageBuyerFormConfig: IntakeFormConfig | null;
-  brokerageRentalScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
-  brokerageBuyerScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   /**
    * Plan tier (V2 — lib/plans.ts). 'team' → 5 seats, 'team_plus' → 10. A
    * brokerage that hasn't subscribed may still carry a legacy/unset value in
@@ -175,9 +173,6 @@ export type SpaceSetting = {
   formConfigSource: FormConfigSource;
   rentalFormConfig: IntakeFormConfig | null;
   buyerFormConfig: IntakeFormConfig | null;
-  // AI-generated scoring models (stored separately from form config)
-  rentalScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
-  buyerScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   // Tracking pixels
   trackingPixels: TrackingPixels | null;
 };
