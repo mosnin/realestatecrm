@@ -37,6 +37,8 @@ export default function AgentsPage() {
           ]}
           image="/marketing/agents-hero.jpg"
           variant="inbox"
+          mockupSrc="/marketing/hero/agents-dashboard.svg"
+          mockupAlt="The Chippi agent dashboard — inbox, pipeline, and tours"
         />
         <AgentInboxShowcase />
         <ContentShowcase />

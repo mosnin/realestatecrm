@@ -42,6 +42,8 @@ export default function MeetChippiPage() {
           ]}
           image="/marketing/chippi-hero.jpg"
           variant="chippi"
+          mockupSrc="/marketing/hero/chippi-dashboard.svg"
+          mockupAlt="The Chippi workspace — Chippi at work on the book"
         />
         <ChippiReadsShowcase />
         <ChippiDecidesShowcase />
