@@ -57,6 +57,5 @@ export async function scoreLeadApplicationDynamic(input: {
     formConfig,
     answers,
     leadType: normalizedLeadType,
-    scoringModel: input.scoringModel ?? undefined,
   });
 }
