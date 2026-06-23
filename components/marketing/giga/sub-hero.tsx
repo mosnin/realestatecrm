@@ -188,17 +188,18 @@ export function SubHero({
 }
 
 /* ── Real dashboard screenshot ──────────────────────────────────────────────
- * Same window treatment as the facsimile below (rounded top, hairline border,
- * deep shadow, slow float), but it shows a captured screenshot instead of the
- * hand-built panels. The image keeps its own aspect ratio so the window height
- * tracks the asset. */
+ * A captured screenshot instead of the hand-built facsimile below. The asset
+ * already carries its own window chrome (rounded corners + light fill) on a
+ * TRANSPARENT canvas, so we add no dark panel/border/shadow of our own — that
+ * would box the shot in a black card. The transparent margins fall straight
+ * onto the page, and the section's bottom gradient fades the shot into it.
+ * Just the slow float; the image keeps its own aspect ratio. */
 
 function HeroScreenshot({ reduce, src, alt }: { reduce: boolean; src: string; alt: string }) {
   return (
     <motion.div
       animate={reduce ? undefined : { y: [0, -8, 0] }}
       transition={reduce ? undefined : { duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      className="overflow-hidden rounded-t-2xl border border-white/10 bg-[#0c0c0d] shadow-2xl shadow-black/70"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={alt} className="block h-auto w-full select-none" draggable={false} />
