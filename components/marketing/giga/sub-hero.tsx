@@ -70,6 +70,15 @@ export interface SubHeroProps {
   image?: string;
   /** Which dashboard surface the hero window shows. @default 'deals' */
   variant?: DashVariant;
+  /**
+   * Real dashboard screenshot to show in the hero window instead of the
+   * hand-built `AppMockup` facsimile. When set, `variant` is ignored. Used by
+   * the pages that have a captured screenshot (agents, brokerages, chippi); the
+   * remaining SubHero pages keep the live facsimile.
+   */
+  mockupSrc?: string;
+  /** Accessible label for `mockupSrc`. */
+  mockupAlt?: string;
   /** Deprecated. Kept so existing callers keep type-checking; no longer used. */
   workflow?: string;
 }
@@ -88,6 +97,8 @@ export function SubHero({
   features,
   image = '/marketing/home-hero.jpg',
   variant = 'deals',
+  mockupSrc,
+  mockupAlt = 'The Chippi dashboard',
 }: SubHeroProps) {
   const reduce = useReducedMotion();
   const LabelIcon = FEATURE_ICONS[labelIcon];
@@ -163,12 +174,36 @@ export function SubHero({
           className="mx-auto w-full max-w-[1400px] px-0 sm:px-8 lg:px-10"
         >
           <div className="mx-auto min-w-[820px] max-w-[1400px] sm:min-w-0">
-            <AppMockup reduce={!!reduce} variant={variant} />
+            {mockupSrc ? (
+              <HeroScreenshot reduce={!!reduce} src={mockupSrc} alt={mockupAlt} />
+            ) : (
+              <AppMockup reduce={!!reduce} variant={variant} />
+            )}
           </div>
         </motion.div>
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
       </div>
     </section>
+  );
+}
+
+/* ── Real dashboard screenshot ──────────────────────────────────────────────
+ * A captured screenshot instead of the hand-built facsimile below. The asset
+ * already carries its own window chrome (rounded corners + light fill) on a
+ * TRANSPARENT canvas, so we add no dark panel/border/shadow of our own — that
+ * would box the shot in a black card. The transparent margins fall straight
+ * onto the page, and the section's bottom gradient fades the shot into it.
+ * Just the slow float; the image keeps its own aspect ratio. */
+
+function HeroScreenshot({ reduce, src, alt }: { reduce: boolean; src: string; alt: string }) {
+  return (
+    <motion.div
+      animate={reduce ? undefined : { y: [0, -8, 0] }}
+      transition={reduce ? undefined : { duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} className="block h-auto w-full select-none" draggable={false} />
+    </motion.div>
   );
 }
 

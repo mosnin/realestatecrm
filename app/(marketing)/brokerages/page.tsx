@@ -40,6 +40,8 @@ export default function BrokeragesPage() {
           ]}
           image="/marketing/brokerages-hero.jpg"
           variant="floor"
+          mockupSrc="/marketing/hero/brokerage-dashboard.svg"
+          mockupAlt="The Chippi brokerage dashboard — the floor, live"
         />
         <BrokerageRoutingShowcase />
         <BrokerageFloorShowcase />
