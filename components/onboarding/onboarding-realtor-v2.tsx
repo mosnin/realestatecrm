@@ -34,6 +34,7 @@ import { cn, rootDomain } from '@/lib/utils';
 import { brandOrange } from '@/lib/colors';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { CHIPPI_PILL } from '@/lib/typography';
+import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
 import { BrandLogo } from '@/components/brand-logo';
 import { composeOnboardingDraft } from '@/lib/onboarding-draft';
 import { readSignupPlan } from '@/lib/signup-plan';
@@ -274,6 +275,8 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
             body: JSON.stringify({ slug, brokerageId: newBrokerageId }),
           }).catch(() => undefined);
         }
+        trackSignUp();
+        trackOnboardingComplete({ accountType: 'both' });
         redirectRef.current = '/broker';
         setPhase('ready');
         return;
@@ -285,6 +288,8 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       });
       if (!completeRes.ok) throw new Error('complete');
 
+      trackSignUp();
+      trackOnboardingComplete({ accountType: 'realtor' });
       redirectRef.current = `/s/${slug}/chippi`;
       setPhase('ready');
     } catch {

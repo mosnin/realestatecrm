@@ -1,5 +1,7 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
+import { PurchasePixel } from '@/components/analytics/purchase-pixel';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { BillingPage } from '@/components/billing/billing-page';
@@ -209,6 +211,10 @@ export default async function BrokerBillingPage() {
 function BillingHeader({ status }: { status: string }) {
   return (
     <header className="space-y-1.5">
+      {/* Fires a Meta Pixel Purchase when returning from a completed checkout. */}
+      <Suspense fallback={null}>
+        <PurchasePixel />
+      </Suspense>
       <p className="text-sm text-muted-foreground">Billing.</p>
       <h1
         className="text-3xl tracking-tight text-foreground"
