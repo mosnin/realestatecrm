@@ -115,11 +115,10 @@ function makeRequest(toolkit: string) {
 }
 
 describe('POST /api/integrations/connect/[toolkit] — coming-soon slugs', () => {
-  // Real-estate-niche apps without a working Composio toolkit yet. Follow-up
-  // Boss is gated here defensively — Composio lists the toolkit but the
-  // endpoints aren't wired through, so a routine using FUB would error
-  // silently. Keep it on the list until the FUB path is end-to-end live.
-  const PLACEHOLDERS = ['follow_up_boss', 'compass', 'boomtown', 'kvcore', 'real_geeks'];
+  // Real-estate-niche apps without a working connector yet. Follow Up Boss and
+  // kvCORE are NOT here anymore — they're native API-key integrations now (see
+  // the native-auth block below).
+  const PLACEHOLDERS = ['compass', 'boomtown', 'real_geeks'];
 
   it('the COMING_SOON_TOOLKITS set covers every placeholder slug we promise', () => {
     for (const slug of PLACEHOLDERS) {
@@ -143,6 +142,40 @@ describe('POST /api/integrations/connect/[toolkit] — coming-soon slugs', () =>
   });
 
   it.each(PLACEHOLDERS)('does not call Composio initiate for %s', async (slug) => {
+    const { req, params } = makeRequest(slug);
+    await POST(req, { params });
+    expect(initiateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/integrations/connect/[toolkit] — native API-key slugs', () => {
+  // Follow Up Boss and kvCORE authenticate with a user-pasted API key, not
+  // OAuth. The Composio connect route must refuse them (the UI posts the key
+  // to their own native route instead) — 400, name the app, mention the key,
+  // and never touch Composio.
+  const NATIVE = ['follow_up_boss', 'kvcore'];
+
+  it('these slugs are NOT in COMING_SOON_TOOLKITS (they are live, native)', () => {
+    for (const slug of NATIVE) {
+      expect(COMING_SOON_TOOLKITS.has(slug)).toBe(false);
+    }
+  });
+
+  it.each(NATIVE)('returns 400 for %s and points to the API-key form', async (slug) => {
+    const app = findIntegration(slug);
+    expect(app).toBeDefined();
+    expect(app!.nativeAuth).toBeDefined();
+
+    const { req, params } = makeRequest(slug);
+    const res = await POST(req, { params });
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain(app!.name);
+    expect(body.error.toLowerCase()).toContain('api');
+  });
+
+  it.each(NATIVE)('does not call Composio initiate for %s', async (slug) => {
     const { req, params } = makeRequest(slug);
     await POST(req, { params });
     expect(initiateMock).not.toHaveBeenCalled();

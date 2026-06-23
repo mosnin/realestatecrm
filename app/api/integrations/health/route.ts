@@ -123,6 +123,28 @@ export async function GET() {
     const integration = findIntegration(row.toolkit);
     const name = integration?.name ?? row.toolkit;
 
+    // Native (API-key) connections have a 'native:*' sentinel id and never
+    // appear in Composio's connected-account list. Derive their health purely
+    // from the DB row — without this they'd fall into the "active in DB but
+    // Composio didn't list it" drift branch below and show a false red error.
+    if (row.composioConnectionId.startsWith('native:')) {
+      const nativeStatus: HealthStatus =
+        row.status === 'active'
+          ? 'healthy'
+          : row.status === 'expired'
+            ? 'expired'
+            : row.status === 'failed'
+              ? 'error'
+              : 'disconnected';
+      return {
+        toolkit: row.toolkit,
+        name,
+        status: nativeStatus,
+        lastCheckedAt: checkedAt,
+        ...(nativeStatus !== 'healthy' && row.lastError ? { error: row.lastError } : {}),
+      };
+    }
+
     // If Composio returned a status for this account, use it.
     const composioStatus = composioByConnectionId.get(row.composioConnectionId);
 

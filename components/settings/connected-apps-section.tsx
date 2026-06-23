@@ -242,10 +242,18 @@ export function ConnectedAppsSection({
   callbackResult,
   showSetupHealth = false,
   endpoints = REALTOR_ENDPOINTS,
+  slug,
 }: {
   callbackResult?: CallbackResult | null;
   showSetupHealth?: boolean;
   endpoints?: ConnectedAppsEndpoints;
+  /**
+   * Workspace slug. Required for native (API-key) integrations — Follow Up
+   * Boss, kvCORE — whose connect/disconnect routes are scoped by
+   * requireSpaceOwner(slug). When omitted (e.g. the brokerage surface),
+   * native integrations are hidden since they're realtor/space-scoped.
+   */
+  slug?: string;
 } = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [connections, setConnections] = useState<ConnectionRow[]>([]);
@@ -534,7 +542,12 @@ export function ConnectedAppsSection({
         // (the connect route uses COMING_SOON_TOOLKITS as its defense-in-
         // depth 501 list) but the realtor never sees a row they can't act
         // on.
-        const apps = (grouped[cat] ?? []).filter((a) => !a.comingSoon);
+        // Native (API-key) integrations are realtor/space-scoped — their
+        // connect routes require a slug. Hide them where we have no slug
+        // (e.g. the brokerage surface) rather than render a dead Connect.
+        const apps = (grouped[cat] ?? []).filter(
+          (a) => !a.comingSoon && (slug || !a.nativeAuth),
+        );
         if (apps.length === 0) return null;
         return (
           <section key={cat} className="space-y-3">
@@ -548,10 +561,15 @@ export function ConnectedAppsSection({
                     key={app.toolkit}
                     app={app}
                     connection={connection}
+                    slug={slug}
                     busy={busyToolkit === app.toolkit || busyToolkit === byToolkit.get(app.toolkit)?.id}
                     health={showHealth ? (healthByToolkit.get(app.toolkit) ?? null) : null}
                     healthLoading={showHealth && healthLoading}
                     onConnect={() => handleConnect(app.toolkit)}
+                    onChanged={() => {
+                      void fetchConnections();
+                      void fetchHealth();
+                    }}
                     onDisconnect={() => {
                       const c = byToolkit.get(app.toolkit);
                       if (c) void handleDisconnect(c.id);
@@ -637,23 +655,89 @@ function StatusPill({
 function IntegrationRow({
   app,
   connection,
+  slug,
   busy,
   health,
   healthLoading,
   onConnect,
   onDisconnect,
   onTogglePause,
+  onChanged,
 }: {
   app: IntegrationApp;
   connection: ConnectionRow | null;
+  slug?: string;
   busy: boolean;
   health: ConnectionHealth | null;
   healthLoading: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
   onTogglePause: () => void;
+  onChanged: () => void;
 }) {
   const status = connection?.status ?? null;
+  const isNative = Boolean(app.nativeAuth);
+
+  // ── Native (API-key) integration state — Follow Up Boss, kvCORE. ──────────
+  const [formOpen, setFormOpen] = useState(false);
+  const [keyValue, setKeyValue] = useState('');
+  const [nativeBusy, setNativeBusy] = useState(false);
+  const [nativeError, setNativeError] = useState<string | null>(null);
+
+  async function submitNativeKey() {
+    if (!app.nativeAuth || !slug) return;
+    const apiKey = keyValue.trim();
+    if (!apiKey) {
+      setNativeError(`Enter your ${app.name} ${app.nativeAuth.keyLabel.toLowerCase()}.`);
+      return;
+    }
+    setNativeBusy(true);
+    setNativeError(null);
+    try {
+      const res = await fetch(app.nativeAuth.route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, apiKey }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || data.ok === false) {
+        setNativeError(data.error ?? 'That key was rejected. Check it and try again.');
+        setNativeBusy(false);
+        return;
+      }
+      setFormOpen(false);
+      setKeyValue('');
+      setNativeBusy(false);
+      onChanged();
+    } catch {
+      setNativeError('Could not reach the service. Try again.');
+      setNativeBusy(false);
+    }
+  }
+
+  async function disconnectNative() {
+    if (!app.nativeAuth || !slug) return;
+    setNativeBusy(true);
+    setNativeError(null);
+    try {
+      const res = await fetch(app.nativeAuth.route, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      if (!res.ok) {
+        setNativeError('Could not disconnect.');
+        setNativeBusy(false);
+        return;
+      }
+      setNativeBusy(false);
+      onChanged();
+    } catch {
+      setNativeError('Could not disconnect.');
+      setNativeBusy(false);
+    }
+  }
+
   const action = pickRowAction({ comingSoon: app.comingSoon, status, busy });
   const errorLine = connection?.lastError && status !== 'active'
     ? explainCallbackReason(connection.lastError, app.toolkit)
@@ -671,49 +755,170 @@ function IntegrationRow({
   const isConnected = status === 'active';
 
   return (
-    <li className="group/row flex items-center gap-3 py-3 first:pt-0">
-      <AppIcon app={app} muted={!isConnected} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p
-            className={cn(
-              'text-sm truncate',
-              isConnected ? 'text-foreground font-medium' : 'text-muted-foreground',
+    <li className="group/row flex flex-col py-3 first:pt-0">
+      <div className="flex items-center gap-3">
+        <AppIcon app={app} muted={!isConnected} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p
+              className={cn(
+                'text-sm truncate',
+                isConnected ? 'text-foreground font-medium' : 'text-muted-foreground',
+              )}
+            >
+              {app.name}
+            </p>
+            {(health !== null || healthLoading) ? (
+              <IntegrationHealthBadge health={health} loading={healthLoading} />
+            ) : (
+              <StatusPill status={status} />
             )}
-          >
-            {app.name}
-          </p>
-          {(health !== null || healthLoading) ? (
-            <IntegrationHealthBadge health={health} loading={healthLoading} />
-          ) : (
-            <StatusPill status={status} />
+          </div>
+          {errorLine && (
+            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-2">
+              {errorLine}
+            </p>
+          )}
+          {showWatch && isFailed && (
+            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+              Chippi couldn&apos;t tune in to this app. Try reconnecting.
+            </p>
+          )}
+          {showWatch && !isFailed && (
+            <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+              {isPaused ? 'Quiet here.' : 'Chippi is listening.'}{' '}
+              <button
+                type="button"
+                onClick={onTogglePause}
+                className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
+              >
+                {isPaused ? 'Turn on' : 'Pause'}
+              </button>
+            </p>
           )}
         </div>
-        {errorLine && (
-          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed line-clamp-2">
-            {errorLine}
-          </p>
-        )}
-        {showWatch && isFailed && (
-          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
-            Chippi couldn&apos;t tune in to this app. Try reconnecting.
-          </p>
-        )}
-        {showWatch && !isFailed && (
-          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-            {isPaused ? 'Quiet here.' : 'Chippi is listening.'}{' '}
-            <button
-              type="button"
-              onClick={onTogglePause}
-              className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
-            >
-              {isPaused ? 'Turn on' : 'Pause'}
-            </button>
-          </p>
+        {isNative ? (
+          <NativeAction
+            connected={isConnected}
+            busy={nativeBusy}
+            formOpen={formOpen}
+            onConnect={() => {
+              setNativeError(null);
+              setFormOpen(true);
+            }}
+            onDisconnect={disconnectNative}
+          />
+        ) : (
+          <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
         )}
       </div>
-      <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
+
+      {/* Native API-key entry — expands inline beneath the row. */}
+      {isNative && app.nativeAuth && formOpen && !isConnected && (
+        <div className="mt-3 ml-11 space-y-2">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
+            {app.nativeAuth.helpText}{' '}
+            {app.nativeAuth.helpUrl && (
+              <a
+                href={app.nativeAuth.helpUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground/70 hover:text-foreground underline underline-offset-2"
+              >
+                Where do I find this?
+              </a>
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              autoComplete="off"
+              value={keyValue}
+              onChange={(e) => setKeyValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitNativeKey();
+                if (e.key === 'Escape') {
+                  setFormOpen(false);
+                  setNativeError(null);
+                }
+              }}
+              placeholder={app.nativeAuth.placeholder}
+              aria-label={`${app.name} ${app.nativeAuth.keyLabel}`}
+              disabled={nativeBusy}
+              className="flex-1 min-w-0 h-8 px-3 rounded-md border border-border/70 bg-background text-sm outline-none focus:border-foreground/40 disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => void submitNativeKey()}
+              disabled={nativeBusy}
+              className="inline-flex items-center h-8 px-3 rounded-full text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-60"
+            >
+              {nativeBusy ? <Loader2 size={14} className="animate-spin" /> : 'Connect'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormOpen(false);
+                setNativeError(null);
+                setKeyValue('');
+              }}
+              disabled={nativeBusy}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {isNative && nativeError && (
+        <p className="mt-2 ml-11 text-[12px] text-destructive leading-relaxed">{nativeError}</p>
+      )}
     </li>
+  );
+}
+
+/**
+ * Action cluster for a native (API-key) integration. No OAuth redirect — the
+ * Connect button opens the inline key form; Disconnect calls the native route.
+ */
+function NativeAction({
+  connected,
+  busy,
+  formOpen,
+  onConnect,
+  onDisconnect,
+}: {
+  connected: boolean;
+  busy: boolean;
+  formOpen: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
+  if (busy) {
+    return <Loader2 size={14} className="animate-spin text-muted-foreground" />;
+  }
+  if (connected) {
+    return (
+      <button
+        type="button"
+        onClick={onDisconnect}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Disconnect
+      </button>
+    );
+  }
+  // Not connected: when the form is open the inline Connect button drives the
+  // submit, so the row-level affordance recedes to a quiet "Cancel"-less hint.
+  if (formOpen) return null;
+  return (
+    <button
+      type="button"
+      onClick={onConnect}
+      className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+    >
+      Connect
+    </button>
   );
 }
 

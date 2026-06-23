@@ -66,6 +66,35 @@ export interface IntegrationApp {
    * No iconUrl → the card renders a letter-circle fallback.
    */
   iconUrl?: string;
+  /**
+   * Set for native (non-Composio) integrations that authenticate with a
+   * user-pasted API key/token rather than OAuth. The settings panel renders
+   * an inline key form instead of a Connect-via-OAuth button, and posts the
+   * key to `route` (which validates it, encrypts it at rest, and stores it on
+   * an IntegrationConnection row). The Composio connect route refuses these
+   * slugs — there is no OAuth path for them.
+   */
+  nativeAuth?: NativeAuthSpec;
+}
+
+/**
+ * Connection metadata for a native API-key integration (Follow Up Boss,
+ * kvCORE). The UI reads this to render the key-entry form; the route named
+ * here owns validation + encrypted storage. Pure data — safe to import on
+ * both server and client.
+ */
+export interface NativeAuthSpec {
+  kind: 'api_key';
+  /** API route that accepts { slug, apiKey } and validates + stores the key. */
+  route: string;
+  /** Field label, e.g. "API key" (FUB) or "API token" (kvCORE). */
+  keyLabel: string;
+  /** Input placeholder hint. */
+  placeholder: string;
+  /** One line telling the realtor where to find/generate the key. */
+  helpText: string;
+  /** Optional deep link to the provider's key page or our help doc. */
+  helpUrl?: string;
 }
 
 /**
@@ -75,10 +104,8 @@ export interface IntegrationApp {
  * route and the catalog can't drift.
  */
 export const COMING_SOON_TOOLKITS = new Set<string>([
-  'follow_up_boss',
   'compass',
   'boomtown',
-  'kvcore',
   'real_geeks',
 ]);
 
@@ -148,10 +175,38 @@ export const INTEGRATIONS: IntegrationApp[] = [
 
   // ── Real estate ──────────────────────────────────────────────────────
   // Slugs are snake_case to match Composio's catalog convention.
-  { toolkit: 'follow_up_boss', name: 'Follow-up Boss', blurb: 'Sync your Follow-up Boss pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
+  {
+    toolkit: 'follow_up_boss',
+    name: 'Follow-up Boss',
+    blurb: 'Sync your Follow-up Boss pipeline.',
+    category: 'real-estate',
+    promoted: true,
+    nativeAuth: {
+      kind: 'api_key',
+      route: '/api/integrations/follow-up-boss',
+      keyLabel: 'API key',
+      placeholder: 'Paste your Follow Up Boss API key',
+      helpText: 'Find it in Follow Up Boss under Admin → API.',
+      helpUrl: 'https://help.followupboss.com/hc/en-us/articles/360014289393-API-Key',
+    },
+  },
   { toolkit: 'compass', name: 'Compass', blurb: 'Sync your Compass pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
   { toolkit: 'boomtown', name: 'BoomTown', blurb: 'Pull BoomTown leads into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },
-  { toolkit: 'kvcore', name: 'kvCORE', blurb: 'Pull kvCORE leads and tasks into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },
+  {
+    toolkit: 'kvcore',
+    name: 'kvCORE',
+    blurb: 'Pull kvCORE leads and tasks into Chippi.',
+    category: 'real-estate',
+    promoted: true,
+    nativeAuth: {
+      kind: 'api_key',
+      route: '/api/integrations/kvcore',
+      keyLabel: 'API token',
+      placeholder: 'Paste your kvCORE / BoldTrail API token',
+      helpText: 'In kvCORE: Lead Engine → Lead Dropbox → My API Tokens → generate a "Contacts" token.',
+      helpUrl: 'https://help.insiderealestate.com/en/articles/4263959-boldtrail-api-tokens',
+    },
+  },
   { toolkit: 'real_geeks', name: 'Real Geeks', blurb: 'Pull Real Geeks leads into Chippi.', category: 'real-estate', comingSoon: true },
 
   // ── Documents + signing ──────────────────────────────────────────────
@@ -178,6 +233,11 @@ export const INTEGRATIONS: IntegrationApp[] = [
 /** Look up by slug. Returns undefined for unknown toolkits. */
 export function findIntegration(toolkit: string): IntegrationApp | undefined {
   return INTEGRATIONS.find((a) => a.toolkit === toolkit);
+}
+
+/** True for native (API-key) integrations — no Composio OAuth path. */
+export function isNativeToolkit(toolkit: string): boolean {
+  return Boolean(findIntegration(toolkit)?.nativeAuth);
 }
 
 /** All toolkit slugs Composio knows about for our app. */

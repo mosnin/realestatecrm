@@ -298,6 +298,7 @@ export default async function SettingsPage({
             </p>
             <p className={BODY_MUTED}>Chippi never sends without your tap.</p>
             <ConnectedAppsSection
+              slug={slug}
               callbackResult={
                 sp.integration === 'connected' || sp.integration === 'failed'
                   ? {

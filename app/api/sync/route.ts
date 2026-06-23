@@ -6,13 +6,17 @@
  * Unified contract:
  *   { connected: boolean, source: string | null, records: SyncRecord[] }
  *
- * Live toolkits (general CRM — hubspot, salesforce, pipedrive, zoho):
+ * Native CRMs (follow_up_boss, kvcore):
+ *   Read straight from the provider's REST API with the encrypted API key/token
+ *   stored on connect — no Composio. These take priority over Composio CRMs.
+ *
+ * Live Composio toolkits (general CRM — hubspot, salesforce, pipedrive, zoho):
  *   Pulls contacts/leads via Composio tools and maps them to the unified
  *   SyncRecord shape.
  *
- * Coming-soon toolkits (follow_up_boss, compass, boomtown, kvcore, real_geeks):
- *   No Composio toolkit exists yet. These never produce records here — the
- *   page renders them as "Coming soon" affordances, not live data.
+ * Coming-soon toolkits (compass, boomtown, real_geeks):
+ *   No connector exists yet. These never produce records here — the page
+ *   renders them as "Coming soon" affordances, not live data.
  *
  * Auth: requireSpaceOwner(slug) — caller must own the workspace.
  */
@@ -23,6 +27,7 @@ import { findActive } from '@/lib/integrations/connections';
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { decrypt } from '@/lib/crypto';
 import { listPeople as fubListPeople } from '@/lib/integrations/follow-up-boss';
+import { listContacts as kvcoreListContacts } from '@/lib/integrations/kvcore';
 import { logger } from '@/lib/logger';
 import { withObservability } from '@/lib/with-observability';
 
@@ -174,6 +179,30 @@ async function GETHandler(req: NextRequest) {
       return NextResponse.json<SyncResponse>({
         connected: true,
         source: 'follow_up_boss',
+        records: [],
+      });
+    }
+  }
+
+  // kvCORE / BoldTrail — also native, reads contacts via the V2 API with the
+  // encrypted Bearer token stored on connect.
+  const kvcore = await findActive({ spaceId: space.id, userId, toolkit: 'kvcore' });
+  if (kvcore?.secretCiphertext) {
+    try {
+      const { ok, records } = await kvcoreListContacts(decrypt(kvcore.secretCiphertext), 50);
+      return NextResponse.json<SyncResponse>({
+        connected: true,
+        source: 'kvcore',
+        records: ok ? records : [],
+      });
+    } catch (err) {
+      logger.error('[sync] kvcore read failed', {
+        spaceId: space.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json<SyncResponse>({
+        connected: true,
+        source: 'kvcore',
         records: [],
       });
     }
