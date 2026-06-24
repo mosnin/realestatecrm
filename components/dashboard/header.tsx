@@ -52,6 +52,8 @@ interface HeaderProps {
   spaceId?: string;
   spaceName: string;
   title: string;
+  /** Chippi profile name (DB User.name) — preferred over the Clerk/Gmail name. */
+  accountName?: string | null;
   isBroker?: boolean;
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
@@ -85,7 +87,7 @@ function isMobileChildActive(child: NavChild, pathname: string, base: string): b
   return pathname === fullHref || pathname.startsWith(`${fullHref}/`);
 }
 
-export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null, isPlatformAdmin = false }: HeaderProps) {
+export function Header({ slug, spaceId, spaceName, title, accountName = null, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null, isPlatformAdmin = false }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
@@ -99,9 +101,12 @@ export function Header({ slug, spaceId, spaceName, title, isBroker = false, isBr
   const showAdminLink =
     isPlatformAdmin ||
     (user?.publicMetadata as { role?: string } | undefined)?.role === 'admin';
-  const drawerDisplayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
-    : 'My Account';
+  // Prefer the Chippi profile name (chosen at onboarding) over the Clerk/Gmail
+  // identity; fall back to Clerk, then a neutral label.
+  const clerkName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ')
+    : '';
+  const drawerDisplayName = (accountName ?? '').trim() || clerkName || 'My Account';
   const drawerEmail = user?.primaryEmailAddress?.emailAddress ?? null;
 
   // Accordion expansion state for the mobile drawer — same contract as the
