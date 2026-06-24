@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
 import {
   Briefcase,
   Building2,
@@ -300,6 +301,8 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         });
         if (!brokerRes.ok) throw await errorFrom(brokerRes);
 
+        trackSignUp();
+        trackOnboardingComplete({ accountType: 'broker_only' });
         redirectRef.current = '/broker';
         setPhase('ready');
         return;
@@ -385,6 +388,8 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         }
       }
 
+      trackSignUp();
+      trackOnboardingComplete({ accountType });
       redirectRef.current = role === 'broker'
         ? '/broker'
         : `/s/${(spaceData.slug as string) ?? values.slug}`;

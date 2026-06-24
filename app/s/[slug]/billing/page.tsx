@@ -1,5 +1,7 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
+import { PurchasePixel } from '@/components/analytics/purchase-pixel';
 import { getSpaceFromSlug } from '@/lib/space';
 import { BillingPage } from '@/components/billing/billing-page';
 import { CreditsSummary } from '@/components/billing/credits-summary';
@@ -79,6 +81,10 @@ export default async function Billing({
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-12">
+      {/* Fires a Meta Pixel Purchase when returning from a completed checkout. */}
+      <Suspense fallback={null}>
+        <PurchasePixel />
+      </Suspense>
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Billing.</p>
         <h1 className={H1} style={TITLE_FONT}>
