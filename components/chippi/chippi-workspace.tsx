@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
-import { ChippiOpener } from '@/components/chippi/chippi-opener';
 import {
   ChippiPromptBox,
   type MentionItem,
@@ -1362,16 +1361,6 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
-                  {/* Chippi speaks first — realtor only. Instead of a passive
-                      "Try me" line over an empty box, Chippi opens with what
-                      actually needs the realtor this morning (from the same
-                      brief summary) plus tappable moves. One quiet line above
-                      the composer, which stays the focal element. The broker
-                      chat goes straight from greeting to composer per the
-                      brokerage design. */}
-                  {!isBroker && (
-                    <ChippiOpener onAction={(prompt) => void handleSend(prompt, [])} />
-                  )}
                   {renderInput()}
                 </div>
               </motion.div>
