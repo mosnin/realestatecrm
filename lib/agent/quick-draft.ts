@@ -25,6 +25,7 @@ import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
 import { logger } from '@/lib/logger';
 import { enrichContext, type EnrichedContext } from '@/lib/ai-tools/context-enrichment';
 import { getRecentVoiceSamples, type VoiceSample } from '@/lib/draft-voice';
+import { detectSlop, summarizeSlop } from '@/lib/voice/slop';
 
 const TIMEOUT_MS = 5_000;
 const MODEL = 'gpt-5-mini';
@@ -35,11 +36,85 @@ export type Channel = 'email' | 'sms' | 'note';
 
 const SYSTEM_PROMPT =
   "You are Chippi, an AI assistant for a real-estate CRM. Compose ONE short outbound message the realtor can send right now. " +
-  "Voice: warm, direct, human. No marketing fluff. Skip stale email openers and corporate filler. No subject lines longer than 8 words. " +
+  "Voice: warm, direct, human. Write like a sharp colleague, not a chatbot. Lead with the actual reason for the message. " +
+  "BANNED (these mark a message as machine-written): stock openers ('I hope this email finds you well', 'I wanted to reach out', 'I'm reaching out'); " +
+  "assistant filler ('Great question', \"I'd be happy to\", 'Happy to help', 'Certainly', 'Absolutely!'); " +
+  "hollow sign-offs ('Let me know if you have any questions', 'Please don't hesitate to reach out', 'Feel free to reach out', 'Looking forward to hearing from you'); " +
+  "buzzword padding ('in today's fast-paced market', 'at the end of the day'); and em dashes anywhere. " +
+  "No subject lines longer than 8 words. " +
   "Email body: 2-4 sentences, plain text, no markdown, no signature (the realtor's name is appended downstream). " +
-  "Note body (when channel is 'note'): a single line summarizing what was discussed on a call — past tense, factual. " +
+  "Note body (when channel is 'note'): a single line summarizing what was discussed on a call, past tense, factual. " +
   "Output strict JSON with this shape and nothing else: {\"subject\": string|null, \"body\": string}. " +
   "Subject is a non-empty string for emails, null for notes.";
+
+/** How long the optional one-shot voice revision pass is allowed to take. */
+const REVISE_TIMEOUT_MS = 4_000;
+
+/**
+ * Self-critique pass. A freshly composed email is run through the deterministic
+ * slop detector; if it trips, we fire ONE revision call asking the model to
+ * strip exactly those tells while keeping the facts, length, and the realtor's
+ * voice intact. Returns the revised draft only when it is genuinely cleaner
+ * (strictly fewer tells AND a non-empty body); otherwise the original stands.
+ *
+ * Best-effort and bounded: any failure, timeout, or non-improvement returns the
+ * original untouched. This never blocks or fails a draft, it only upgrades one.
+ */
+async function reviseAwaySlop(
+  client: ReturnType<typeof getLLMClient>,
+  draft: { subject: string | null; body: string },
+): Promise<{ subject: string | null; body: string }> {
+  const findings = detectSlop(draft.body);
+  if (findings.length === 0) return draft;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REVISE_TIMEOUT_MS);
+  try {
+    const response = await client.chat.completions.create(
+      {
+        model: openaiModel(MODEL),
+        temperature: 0.3,
+        max_tokens: 220,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You revise a short real-estate email to sound like a sharp human colleague, not an AI assistant. ' +
+              'Keep every fact, the recipient, the length, and the realtor voice. Change ONLY the phrasing that reads as machine-written. ' +
+              'Remove these specific tells: ' +
+              summarizeSlop(findings) +
+              '. Do not add new claims or pleasantries. Never use an em dash. ' +
+              'Output strict JSON: {"subject": string|null, "body": string}.',
+          },
+          { role: 'user', content: JSON.stringify(draft) },
+        ],
+      },
+      { signal: controller.signal },
+    );
+    const raw = response.choices?.[0]?.message?.content?.trim();
+    if (!raw) return draft;
+    const parsed = JSON.parse(raw) as { subject?: unknown; body?: unknown };
+    const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
+    if (!body) return draft;
+    // Only accept the rewrite when it actually reduced the slop. A revision
+    // that introduces a different tell, or none fewer, is not an upgrade.
+    if (detectSlop(body).length >= findings.length) return draft;
+    const subject =
+      typeof parsed.subject === 'string' && parsed.subject.trim().length > 0
+        ? parsed.subject.trim()
+        : draft.subject;
+    logger.info('[quick-draft] revised away slop', { before: findings.length });
+    return { subject, body };
+  } catch (err) {
+    logger.warn('[quick-draft] voice revision failed', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return draft;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Build the optional voice-reference system message. Empty string if there
@@ -130,6 +205,14 @@ export async function composeDraftWithOpenAI(args: {
       typeof parsed.subject === 'string' && parsed.subject.trim().length > 0
         ? parsed.subject.trim()
         : null;
+
+    // Self-critique: for client-facing emails, evaluate the draft against the
+    // slop detector and revise once if it reads like a bot. Notes are terse
+    // internal call logs, not voice-sensitive, so they skip this. Best-effort:
+    // a clean draft (the common case) does no extra work.
+    if (args.channel === 'email') {
+      return await reviseAwaySlop(client, { subject, body });
+    }
     return { subject, body };
   } catch (err) {
     logger.warn('[quick-draft] compose failed', { err: err instanceof Error ? err.message : String(err) });
