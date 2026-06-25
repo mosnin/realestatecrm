@@ -1107,7 +1107,7 @@ export function ChippiWorkspace({
   const renderInput = () => (
     <div>
       <ChippiPromptBox
-        placeholder="Message Chippi, or press / for skills…"
+        placeholder="Tell me what you need, or press / for skills…"
         onSend={handleSend}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
