@@ -180,6 +180,7 @@ describe('renderSnapshot', () => {
       actor: string | null;
       ago: string;
     }>,
+    voice: { tone: null as string | null, style: null as string | null, note: null as string | null },
   };
 
   it('returns empty string when there is nothing useful to say', () => {
@@ -235,6 +236,20 @@ describe('renderSnapshot', () => {
     expect(out).toContain('Recent connected-app activity:');
     expect(out).toContain('• Gmail — "Re: 1421 Maple" — from jane@… · 2h ago');
     expect(out).toContain('• Google Calendar — "Tour confirmed" · 5h ago');
+  });
+
+  it('renders the realtor voice when present, and omits it when unset', () => {
+    const withVoice = renderSnapshot({
+      ...empty,
+      firstName: 'Sam',
+      voice: { tone: 'warm and direct', style: 'texts more than emails', note: null },
+    });
+    expect(withVoice).toContain('Their voice (match it in everything you write for them):');
+    expect(withVoice).toContain('tone warm and direct');
+    expect(withVoice).toContain('working style: texts more than emails');
+
+    // No voice fields → no voice line, and a bare name still yields no snapshot noise.
+    expect(renderSnapshot({ ...empty, firstName: 'Sam' })).not.toContain('Their voice');
   });
 
   it('caps the recent-activity section line count', () => {
