@@ -493,6 +493,81 @@ export interface PropertyAnalysis {
   analyzedAt: string;
 }
 
+// ── Property IQ — Area intelligence shapes (plain data; client-safe) ────────
+// The canonical pipeline lives in lib/area-analysis.ts (server-only). Unlike
+// PropertyAnalysis (facts about ONE address), area intelligence describes the
+// neighborhood / market the property sits in and is reusable across every
+// property in the same area. Persisted in the AreaReport table.
+
+/** Direction of the local housing market. */
+export type AreaMarketTrend = 'rising' | 'steady' | 'cooling';
+
+/**
+ * The grounded area facts. Flat (one *Source sibling per attributable field,
+ * exactly like AnalyzedFields) so the strict-JSON structuring step stays simple
+ * and provenance is 1:1.
+ */
+export interface AreaFields {
+  /** Schools: a short readable summary + a headline rating string. */
+  schoolsSummary: string | null;
+  schoolRating: string | null; // e.g. "8/10 (GreatSchools)" or "Above average"
+  /** Safety: a summary + a relative crime level phrase. */
+  safetySummary: string | null;
+  crimeLevel: string | null; // e.g. "Lower than the national average"
+  /** Walkability / transit (0-100 scores when published). */
+  walkScore: number | null;
+  transitScore: number | null;
+  bikeScore: number | null;
+  walkabilitySummary: string | null;
+  /** Local housing market. */
+  marketSummary: string | null;
+  medianListPrice: number | null;
+  medianSalePrice: number | null;
+  marketTrend: AreaMarketTrend | null;
+  medianDaysOnMarket: number | null;
+  /** As-of date of the market figures as shown in the evidence (e.g. "Apr 2026"). */
+  marketAsOf: string | null;
+  /** Amenities + lifestyle + commute. */
+  amenitiesSummary: string | null;
+  highlights: string[]; // notable nearby places/features (parks, dining, transit)
+  lifestyleSummary: string | null;
+  commuteSummary: string | null;
+}
+
+/** Per-field provenance for the area facts. */
+export type AreaFieldSources = Partial<Record<keyof AreaFields, string>>;
+
+/** The structured area-intelligence blob persisted in AreaReport.intelligence. */
+export interface AreaIntelligence {
+  fields: AreaFields;
+  fieldSources: AreaFieldSources;
+  /**
+   * The judgment line — the "so what" a realtor leads with. One grounded
+   * sentence of opinion (who the area suits, the standout pro, the honest
+   * caveat), not a recap. This is the headline; `summary` is the supporting
+   * paragraph.
+   */
+  verdict: string;
+  summary: string;
+  sources: AnalysisSource[];
+  stats: { searchResults: number; scraped: number };
+  generatedAt: string;
+}
+
+/** A persisted AreaReport row (client-safe projection). */
+export interface AreaReport {
+  id: string;
+  spaceId: string;
+  areaKey: string;
+  label: string;
+  city: string | null;
+  stateRegion: string | null;
+  postalCode: string | null;
+  intelligence: AreaIntelligence;
+  generatedAt: string;
+  expiresAt: string | null;
+}
+
 export type DealActivity = {
   id: string;
   dealId: string;

@@ -4,7 +4,9 @@ import { ChevronRight } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { formatPropertyAddress } from '@/lib/properties';
-import type { Property } from '@/lib/types';
+import { normalizeArea } from '@/lib/areas';
+import { getAreaReport } from '@/lib/area-report-store';
+import type { Property, AreaReport } from '@/lib/types';
 import { PropertyDetailClient } from '@/components/properties/property-detail-client';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +46,25 @@ export default async function PropertyDetailPage({
 
   const addr = formatPropertyAddress(property as Property);
 
+  // Property IQ "already there": if this property's area has already been
+  // researched (by auto-enrich, a sibling listing, or a prior run), load the
+  // report server-side so the Area IQ brief renders instantly with no click and
+  // no wait. The common case after the first listing in a ZIP.
+  const prop = property as Property;
+  const area = normalizeArea({
+    city: prop.city,
+    stateRegion: prop.stateRegion,
+    postalCode: prop.postalCode,
+  });
+  let initialAreaReport: AreaReport | null = null;
+  if (area) {
+    try {
+      initialAreaReport = await getAreaReport(space.id, area.areaKey);
+    } catch {
+      initialAreaReport = null;
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Breadcrumb — the detail page is no longer an orphan child of /deals.
@@ -66,6 +87,7 @@ export default async function PropertyDetailPage({
       <PropertyDetailClient
         slug={slug}
         initial={property as Property}
+        initialAreaReport={initialAreaReport}
         linkedDeals={(deals ?? []) as { id: string; title: string; status: string; value: number | null; closeDate: string | null }[]}
         linkedTours={(tours ?? []) as { id: string; guestName: string; startsAt: string; status: string }[]}
       />

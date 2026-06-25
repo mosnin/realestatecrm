@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
@@ -9,6 +9,8 @@ import {
   missingResearchKeys,
   type PropertyRecord,
 } from '@/lib/property-analysis';
+import { normalizeArea } from '@/lib/areas';
+import { getOrCreateAreaReport } from '@/lib/area-report-store';
 
 /**
  * POST /api/properties/[id]/analyze
@@ -101,6 +103,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   });
   if (!updated) {
     return NextResponse.json({ status: 'error', error: 'Failed to save analysis' }, { status: 500 });
+  }
+
+  // Property IQ auto-enrich: warm the area report for this property's
+  // neighborhood in the background so it's ready the moment the realtor opens
+  // Area IQ. Non-blocking and best-effort — the property analysis already
+  // succeeded; a failed area warm-up never affects this response. Reuses the
+  // cache, so analyzing several listings in one ZIP only researches it once.
+  const area = normalizeArea({
+    city: ctx.property.city,
+    stateRegion: ctx.property.stateRegion,
+    postalCode: ctx.property.postalCode,
+  });
+  if (area) {
+    const ownerSpaceId = ctx.property.spaceId;
+    after(async () => {
+      try {
+        await getOrCreateAreaReport(ownerSpaceId, area);
+      } catch (err) {
+        logger.warn('[properties/analyze] area auto-enrich failed', { propertyId: id }, err);
+      }
+    });
   }
 
   return NextResponse.json({

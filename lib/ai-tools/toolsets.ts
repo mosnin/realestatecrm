@@ -84,6 +84,7 @@ export const TOOLSETS: Record<string, readonly string[]> = {
   tours: ['schedule_tour', 'reschedule_tour', 'cancel_tour', 'delete_tour', 'find_tours', 'get_weather'],
   properties: [
     'find_property',
+    'research_area',
     'find_comparable_properties',
     'add_property',
     'update_property_status',
@@ -103,7 +104,7 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['people', /\b(person|people|contact|lead|buyer|seller|prospect|client|merge|archive|delete|remove|hot|cold|warm|follow|meeting|call|note)\b/i],
   ['deals', /\b(deal|stage|won|lost|clos(?:e|ing)|offer|checklist|value|price|probability|stuck|stalled|escrow|delete|remove)\b/i],
   ['tours', /\b(tour|showing|visit|walk-?through|open house|weather|forecast|rain|temperature|delete|remove)\b/i],
-  ['properties', /\b(propert\w*|listing\w*|home|house|unit|comp|comparable|address|mls|delete|remove)\b/i],
+  ['properties', /\b(propert\w*|listing\w*|home|house|unit|comp|comparable|address|mls|delete|remove|area|neighbo\w*|zip|district|school\w*|walkab\w*|walk score|safety|crime|amenit\w*|market|commute)\b/i],
   ['calendar', /\b(calendar|availab\w*|book|slot|appointment|busy|free|block|agenda)\b/i],
   ['comms', /\b(send|email|sms|text|message|packet|reply|forward|reach|outreach|blast)\b/i],
   ['pipeline', /\b(pipeline|quiet|overdue|stuck|stalled|at[\s-]?risk|priority|leak|stats|statistics|numbers|metrics|kpis?|dashboard|snapshot|how am i doing|how'?s business)\b/i],

@@ -8,6 +8,7 @@ import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX, PRIMARY_PILL } from '@/lib/typogr
 import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { PropertyListGrid } from '@/components/properties/property-list-grid';
+import { AreaIqLauncher } from '@/components/properties/area-iq-launcher';
 
 export default async function PropertiesPage({
   params,
@@ -82,13 +83,16 @@ export default async function PropertiesPage({
           </h1>
           <p className={cn(BODY_MUTED)}>{subtitle}</p>
         </div>
-        <Link
-          href={`/s/${slug}/properties/new`}
-          className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5 flex-shrink-0')}
-        >
-          <Plus size={14} aria-hidden />
-          Add property
-        </Link>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <AreaIqLauncher />
+          <Link
+            href={`/s/${slug}/properties/new`}
+            className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5')}
+          >
+            <Plus size={14} aria-hidden />
+            Add property
+          </Link>
+        </div>
       </header>
 
       {/* Empty state — calm fact, not a directive. */}

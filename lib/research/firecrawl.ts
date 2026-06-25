@@ -189,12 +189,19 @@ function hasSignal(p: ScrapedProperty): boolean {
   );
 }
 
-/** Scrape + extract one URL. Returns null on failure or empty result (fail-soft). */
-async function scrapeOne(
+/**
+ * The shared scrape-and-extract core: POST one URL to Firecrawl in EXTRACT mode
+ * with the given schema + prompt and return the raw extract object (or null on
+ * any failure). Both the property scraper and the area scraper use this so the
+ * fetch / timeout / abort / non-200 handling lives in exactly one place.
+ */
+async function firecrawlExtract(
   apiKey: string,
   url: string,
+  schema: Record<string, unknown>,
+  prompt: string,
   signal?: AbortSignal,
-): Promise<ScrapedProperty | null> {
+): Promise<Record<string, unknown> | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PER_SCRAPE_TIMEOUT_MS);
   const onAbort = () => ctrl.abort();
@@ -211,7 +218,7 @@ async function scrapeOne(
         url,
         formats: ['extract'],
         onlyMainContent: true,
-        extract: { schema: EXTRACT_SCHEMA, prompt: EXTRACT_PROMPT },
+        extract: { schema, prompt },
       }),
     });
     if (!res.ok) {
@@ -220,12 +227,11 @@ async function scrapeOne(
     }
     const json = (await res.json()) as {
       success?: boolean;
-      data?: { extract?: FirecrawlExtractItem };
+      data?: { extract?: unknown };
     };
     const extract = json.data?.extract;
     if (!extract || typeof extract !== 'object') return null;
-    const shaped = coerce(extract, url);
-    return hasSignal(shaped) ? shaped : null;
+    return extract as Record<string, unknown>;
   } catch (err) {
     logger.warn('[firecrawl] scrape failed', {
       err: err instanceof Error ? err.message : 'unknown',
@@ -235,6 +241,18 @@ async function scrapeOne(
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
+}
+
+/** Scrape + extract one URL's property facts. Returns null on empty (fail-soft). */
+async function scrapeOne(
+  apiKey: string,
+  url: string,
+  signal?: AbortSignal,
+): Promise<ScrapedProperty | null> {
+  const extract = await firecrawlExtract(apiKey, url, EXTRACT_SCHEMA, EXTRACT_PROMPT, signal);
+  if (!extract) return null;
+  const shaped = coerce(extract as FirecrawlExtractItem, url);
+  return hasSignal(shaped) ? shaped : null;
 }
 
 /**
@@ -252,4 +270,138 @@ export async function scrapeProperty(
   const targets = [...new Set(urls)].slice(0, MAX_SCRAPES);
   const results = await Promise.all(targets.map((u) => scrapeOne(apiKey, u, signal)));
   return results.filter((r): r is ScrapedProperty => r !== null);
+}
+
+// ── Property IQ: area / neighborhood extraction ──────────────────────────────
+
+/**
+ * Extraction schema for an AREA page (Niche, GreatSchools, Walk Score, market
+ * reports). Every field optional — a schools page fills the school fields, a
+ * Walk Score page fills the scores, a market report fills the medians. The LLM
+ * structuring step reconciles across pages.
+ */
+const AREA_EXTRACT_SCHEMA = {
+  type: 'object',
+  properties: {
+    areaName: { type: 'string', description: 'The neighborhood / city / ZIP this page is about.' },
+    schoolsSummary: { type: 'string', description: 'Summary of the schools serving this area.' },
+    schoolRating: { type: 'string', description: 'Headline school rating as shown (e.g. "8/10", "A-").' },
+    safetySummary: { type: 'string', description: 'Summary of crime / safety for this area.' },
+    crimeLevel: { type: 'string', description: 'Relative crime level (e.g. "Lower than national average").' },
+    walkScore: { type: 'number', description: 'Walk Score (0-100) if shown.' },
+    transitScore: { type: 'number', description: 'Transit Score (0-100) if shown.' },
+    bikeScore: { type: 'number', description: 'Bike Score (0-100) if shown.' },
+    walkabilitySummary: { type: 'string', description: 'How walkable / transit-friendly the area is.' },
+    marketSummary: { type: 'string', description: 'Local housing market summary.' },
+    medianListPrice: { type: 'number', description: 'Median list price in USD, if shown.' },
+    medianSalePrice: { type: 'number', description: 'Median sale price in USD, if shown.' },
+    medianDaysOnMarket: { type: 'number', description: 'Median days on market, if shown.' },
+    amenitiesSummary: { type: 'string', description: 'Dining, parks, shopping, transit nearby.' },
+    highlights: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Notable nearby places or features (e.g. "Zilker Park", "tech employers").',
+    },
+    lifestyleSummary: { type: 'string', description: 'Who the area suits and its general vibe.' },
+    commuteSummary: { type: 'string', description: 'Commute / transit access summary.' },
+  },
+};
+
+const AREA_EXTRACT_PROMPT =
+  'Extract facts about the AREA (neighborhood / city / ZIP) this page is about: the schools and ' +
+  'their ratings, crime / safety, Walk Score / Transit Score / Bike Score, the local housing ' +
+  'market (median list price, median sale price, median days on market), nearby amenities, notable ' +
+  'highlights, lifestyle / vibe, and commute access. Only capture values actually shown on this ' +
+  'page; never infer or invent. Leave anything not present unset.';
+
+/** Structured facts extracted from one scraped AREA page. */
+export interface ScrapedArea {
+  sourceUrl: string;
+  areaName: string | null;
+  schoolsSummary: string | null;
+  schoolRating: string | null;
+  safetySummary: string | null;
+  crimeLevel: string | null;
+  walkScore: number | null;
+  transitScore: number | null;
+  bikeScore: number | null;
+  walkabilitySummary: string | null;
+  marketSummary: string | null;
+  medianListPrice: number | null;
+  medianSalePrice: number | null;
+  medianDaysOnMarket: number | null;
+  amenitiesSummary: string | null;
+  highlights: string[];
+  lifestyleSummary: string | null;
+  commuteSummary: string | null;
+}
+
+/** Shape the raw area extract into a typed, length-bounded ScrapedArea. */
+function coerceArea(raw: Record<string, unknown>, sourceUrl: string): ScrapedArea {
+  return {
+    sourceUrl,
+    areaName: str(raw.areaName, 160),
+    schoolsSummary: str(raw.schoolsSummary, 1200),
+    schoolRating: str(raw.schoolRating, 80),
+    safetySummary: str(raw.safetySummary, 1200),
+    crimeLevel: str(raw.crimeLevel, 120),
+    walkScore: num(raw.walkScore),
+    transitScore: num(raw.transitScore),
+    bikeScore: num(raw.bikeScore),
+    walkabilitySummary: str(raw.walkabilitySummary, 1200),
+    marketSummary: str(raw.marketSummary, 1200),
+    medianListPrice: num(raw.medianListPrice),
+    medianSalePrice: num(raw.medianSalePrice),
+    medianDaysOnMarket: num(raw.medianDaysOnMarket),
+    amenitiesSummary: str(raw.amenitiesSummary, 1200),
+    highlights: strArr(raw.highlights, 160, 20),
+    lifestyleSummary: str(raw.lifestyleSummary, 1200),
+    commuteSummary: str(raw.commuteSummary, 1200),
+  };
+}
+
+/** True if an area scrape produced at least one usable signal beyond the URL. */
+function hasAreaSignal(p: ScrapedArea): boolean {
+  return Boolean(
+    p.schoolsSummary ||
+      p.schoolRating ||
+      p.safetySummary ||
+      p.crimeLevel ||
+      p.walkScore != null ||
+      p.transitScore != null ||
+      p.bikeScore != null ||
+      p.walkabilitySummary ||
+      p.marketSummary ||
+      p.medianListPrice != null ||
+      p.medianSalePrice != null ||
+      p.medianDaysOnMarket != null ||
+      p.amenitiesSummary ||
+      p.highlights.length > 0 ||
+      p.lifestyleSummary ||
+      p.commuteSummary,
+  );
+}
+
+/**
+ * Scrape the given AREA URLs (capped to MAX_SCRAPES) in parallel and return the
+ * per-page structured facts. Same posture as scrapeProperty: throws only on a
+ * missing key; per-page failures degrade to fewer evidence pages.
+ */
+export async function scrapeArea(
+  urls: string[],
+  signal?: AbortSignal,
+): Promise<ScrapedArea[]> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) throw new Error('FIRECRAWL_API_KEY not configured');
+
+  const targets = [...new Set(urls)].slice(0, MAX_SCRAPES);
+  const results = await Promise.all(
+    targets.map(async (u) => {
+      const extract = await firecrawlExtract(apiKey, u, AREA_EXTRACT_SCHEMA, AREA_EXTRACT_PROMPT, signal);
+      if (!extract) return null;
+      const shaped = coerceArea(extract, u);
+      return hasAreaSignal(shaped) ? shaped : null;
+    }),
+  );
+  return results.filter((r): r is ScrapedArea => r !== null);
 }

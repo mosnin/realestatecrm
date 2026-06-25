@@ -124,14 +124,19 @@ interface TavilyApiResult {
   score?: number;
 }
 
-/** Boost results on the richest single-property domains so they scrape first. */
-function rankBoost(url: string): number {
+/** Boost results on a preferred-domain list so they scrape first. */
+function rankBoostFor(url: string, domains: readonly string[]): number {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
-    return PREFERRED_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`)) ? 0.25 : 0;
+    return domains.some((d) => host === d || host.endsWith(`.${d}`)) ? 0.25 : 0;
   } catch {
     return 0;
   }
+}
+
+/** Boost results on the richest single-property domains so they scrape first. */
+function rankBoost(url: string): number {
+  return rankBoostFor(url, PREFERRED_DOMAINS);
 }
 
 /** POST one query to Tavily. Returns [] on any failure (fail-soft). */
@@ -212,5 +217,75 @@ export async function searchProperty(
   }
   return [...byUrl.values()].sort(
     (a, b) => (b.score ?? 0) + rankBoost(b.url) - ((a.score ?? 0) + rankBoost(a.url)),
+  );
+}
+
+// ── Property IQ: area / neighborhood search ──────────────────────────────────
+
+/** A normalized area to research — just the label + parts that shape queries. */
+export interface AreaSubject {
+  label: string;
+  city?: string | null;
+  stateRegion?: string | null;
+  postalCode?: string | null;
+}
+
+/** Domains that carry the richest area / neighborhood / market data. */
+const AREA_PREFERRED_DOMAINS = [
+  'niche.com',
+  'greatschools.org',
+  'walkscore.com',
+  'areavibes.com',
+  'neighborhoodscout.com',
+  'redfin.com',
+  'realtor.com',
+  'zillow.com',
+];
+
+/**
+ * Build the (capped) area query set. Each query targets a different facet of the
+ * SAME place: an overall neighborhood profile, schools, safety, and the local
+ * housing market. Exposed for unit tests + orchestrator logging.
+ */
+export function buildAreaQueries(subject: AreaSubject): string[] {
+  const where = subject.label.trim();
+  const queries = [
+    `${where} neighborhood overview livability walkability`,
+    `${where} school ratings GreatSchools district`,
+    `${where} crime rate safety statistics`,
+    `${where} housing market median home price trends days on market`,
+  ];
+  return [...new Set(queries.map((q) => q.replace(/\s+/g, ' ').trim()).filter(Boolean))].slice(
+    0,
+    MAX_QUERIES,
+  );
+}
+
+/**
+ * Run the capped area query set and return de-duplicated results ranked by
+ * Tavily score + an area-domain boost. Mirrors searchProperty's posture: throws
+ * only on a missing key (the orchestrator gates with tavilyConfigured first);
+ * any per-query failure degrades to fewer results.
+ */
+export async function searchArea(
+  subject: AreaSubject,
+  signal?: AbortSignal,
+): Promise<SearchResult[]> {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) throw new Error('TAVILY_API_KEY not configured');
+
+  const queries = buildAreaQueries(subject);
+  const batches = await Promise.all(queries.map((q) => runQuery(apiKey, q, signal)));
+
+  const byUrl = new Map<string, SearchResult>();
+  for (const r of batches.flat()) {
+    const existing = byUrl.get(r.url);
+    if (!existing || (r.score ?? 0) > (existing.score ?? 0)) byUrl.set(r.url, r);
+  }
+  return [...byUrl.values()].sort(
+    (a, b) =>
+      (b.score ?? 0) +
+      rankBoostFor(b.url, AREA_PREFERRED_DOMAINS) -
+      ((a.score ?? 0) + rankBoostFor(a.url, AREA_PREFERRED_DOMAINS)),
   );
 }
