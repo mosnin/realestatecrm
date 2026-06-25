@@ -290,7 +290,6 @@ const AREA_EXTRACT_SCHEMA = {
     crimeLevel: { type: 'string', description: 'Relative crime level (e.g. "Lower than national average").' },
     walkScore: { type: 'number', description: 'Walk Score (0-100) if shown.' },
     transitScore: { type: 'number', description: 'Transit Score (0-100) if shown.' },
-    bikeScore: { type: 'number', description: 'Bike Score (0-100) if shown.' },
     walkabilitySummary: { type: 'string', description: 'How walkable / transit-friendly the area is.' },
     marketSummary: { type: 'string', description: 'Local housing market summary.' },
     medianListPrice: { type: 'number', description: 'Median list price in USD, if shown.' },
@@ -309,7 +308,7 @@ const AREA_EXTRACT_SCHEMA = {
 
 const AREA_EXTRACT_PROMPT =
   'Extract facts about the AREA (neighborhood / city / ZIP) this page is about: the schools and ' +
-  'their ratings, crime / safety, Walk Score / Transit Score / Bike Score, the local housing ' +
+  'their ratings, crime / safety, Walk Score and Transit Score, the local housing ' +
   'market (median list price, median sale price, median days on market), nearby amenities, notable ' +
   'highlights, lifestyle / vibe, and commute access. Only capture values actually shown on this ' +
   'page; never infer or invent. Leave anything not present unset.';
@@ -324,7 +323,6 @@ export interface ScrapedArea {
   crimeLevel: string | null;
   walkScore: number | null;
   transitScore: number | null;
-  bikeScore: number | null;
   walkabilitySummary: string | null;
   marketSummary: string | null;
   medianListPrice: number | null;
@@ -347,7 +345,6 @@ function coerceArea(raw: Record<string, unknown>, sourceUrl: string): ScrapedAre
     crimeLevel: str(raw.crimeLevel, 120),
     walkScore: num(raw.walkScore),
     transitScore: num(raw.transitScore),
-    bikeScore: num(raw.bikeScore),
     walkabilitySummary: str(raw.walkabilitySummary, 1200),
     marketSummary: str(raw.marketSummary, 1200),
     medianListPrice: num(raw.medianListPrice),
@@ -369,7 +366,6 @@ function hasAreaSignal(p: ScrapedArea): boolean {
       p.crimeLevel ||
       p.walkScore != null ||
       p.transitScore != null ||
-      p.bikeScore != null ||
       p.walkabilitySummary ||
       p.marketSummary ||
       p.medianListPrice != null ||

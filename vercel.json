@@ -29,6 +29,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/area-precompute",
+      "schedule": "17 3 * * *"
+    },
+    {
       "path": "/api/cron/routines",
       "schedule": "0 * * * *"
     },

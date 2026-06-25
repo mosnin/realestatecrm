@@ -116,10 +116,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     postalCode: ctx.property.postalCode,
   });
   if (area) {
-    const ownerSpaceId = ctx.property.spaceId;
     after(async () => {
       try {
-        await getOrCreateAreaReport(ownerSpaceId, area);
+        await getOrCreateAreaReport(area);
       } catch (err) {
         logger.warn('[properties/analyze] area auto-enrich failed', { propertyId: id }, err);
       }

@@ -27,6 +27,7 @@ import type {
   AreaFieldSources,
   AreaIntelligence,
   AreaMarketTrend,
+  AreaConfidence,
   AnalysisSource,
 } from '@/lib/types';
 import {
@@ -106,8 +107,6 @@ export const AREA_ANALYSIS_JSON_SCHEMA = {
       walkScoreSource: strOrNull,
       transitScore: numOrNull,
       transitScoreSource: strOrNull,
-      bikeScore: numOrNull,
-      bikeScoreSource: strOrNull,
       walkabilitySummary: strOrNull,
       walkabilitySummarySource: strOrNull,
       marketSummary: strOrNull,
@@ -161,7 +160,6 @@ export const AREA_ANALYSIS_JSON_SCHEMA = {
       'crimeLevel', 'crimeLevelSource',
       'walkScore', 'walkScoreSource',
       'transitScore', 'transitScoreSource',
-      'bikeScore', 'bikeScoreSource',
       'walkabilitySummary', 'walkabilitySummarySource',
       'marketSummary', 'marketSummarySource',
       'medianListPrice', 'medianListPriceSource',
@@ -187,7 +185,6 @@ export interface RawAreaResponse {
   crimeLevel: string | null; crimeLevelSource: string | null;
   walkScore: number | null; walkScoreSource: string | null;
   transitScore: number | null; transitScoreSource: string | null;
-  bikeScore: number | null; bikeScoreSource: string | null;
   walkabilitySummary: string | null; walkabilitySummarySource: string | null;
   marketSummary: string | null; marketSummarySource: string | null;
   medianListPrice: number | null; medianListPriceSource: string | null;
@@ -211,6 +208,20 @@ const POSITIVE_NUM = (v: number | null): number | null =>
 /** 0-100 score or null. */
 const SCORE_0_100 = (v: number | null): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null;
+
+/**
+ * Plausibility-bounded number or null. A median home price of $40 or $4B, or a
+ * 5-year days-on-market, is an extraction error, not a data point — reject it
+ * rather than let a wrong number reach the verdict. (Physics first: a value that
+ * violates reality is a bug.)
+ */
+const BOUNDED = (v: number | null, min: number, max: number): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : null;
+
+/** A US residential median sits well within this band; anything outside is junk. */
+const MEDIAN_PRICE = (v: number | null): number | null => BOUNDED(v, 10_000, 100_000_000);
+/** Days on market: 0 to two years. */
+const DOM = (v: number | null): number | null => BOUNDED(v, 0, 730);
 
 function cleanSource(v: string | null): string | undefined {
   if (typeof v !== 'string') return undefined;
@@ -261,13 +272,12 @@ export function parseAreaResponse(raw: RawAreaResponse): {
     crimeLevel: cleanStr(raw.crimeLevel, 120),
     walkScore: SCORE_0_100(raw.walkScore),
     transitScore: SCORE_0_100(raw.transitScore),
-    bikeScore: SCORE_0_100(raw.bikeScore),
     walkabilitySummary: cleanStr(raw.walkabilitySummary, 1200),
     marketSummary: cleanStr(raw.marketSummary, 1200),
-    medianListPrice: POSITIVE_NUM(raw.medianListPrice),
-    medianSalePrice: POSITIVE_NUM(raw.medianSalePrice),
+    medianListPrice: MEDIAN_PRICE(raw.medianListPrice),
+    medianSalePrice: MEDIAN_PRICE(raw.medianSalePrice),
     marketTrend,
-    medianDaysOnMarket: POSITIVE_NUM(raw.medianDaysOnMarket),
+    medianDaysOnMarket: DOM(raw.medianDaysOnMarket),
     marketAsOf: cleanStr(raw.marketAsOf, 40),
     amenitiesSummary: cleanStr(raw.amenitiesSummary, 1200),
     highlights,
@@ -281,7 +291,6 @@ export function parseAreaResponse(raw: RawAreaResponse): {
   setSource('crimeLevel', fields.crimeLevel, raw.crimeLevelSource);
   setSource('walkScore', fields.walkScore, raw.walkScoreSource);
   setSource('transitScore', fields.transitScore, raw.transitScoreSource);
-  setSource('bikeScore', fields.bikeScore, raw.bikeScoreSource);
   setSource('walkabilitySummary', fields.walkabilitySummary, raw.walkabilitySummarySource);
   setSource('marketSummary', fields.marketSummary, raw.marketSummarySource);
   setSource('medianListPrice', fields.medianListPrice, raw.medianListPriceSource);
@@ -297,6 +306,33 @@ export function parseAreaResponse(raw: RawAreaResponse): {
   const verdict = typeof raw.verdict === 'string' ? raw.verdict.trim().slice(0, 400) : '';
 
   return { fields, fieldSources, summary, verdict };
+}
+
+/**
+ * How much to trust a report, from how much grounded evidence backed it. Pure +
+ * unit-tested. A realtor about to repeat this to a client needs to know whether
+ * it's solid or thin — one wrong verdict kills the feature, so we surface the
+ * thinness instead of hiding it.
+ *
+ *   high   — several pages scraped AND the key dimensions are populated
+ *   low    — nothing scraped, or barely any field came back
+ *   medium — everything in between
+ */
+export function computeConfidence(
+  fields: AreaFields,
+  stats: { scraped: number; searchResults: number },
+): AreaConfidence {
+  const keySignals = [
+    fields.schoolRating || fields.schoolsSummary,
+    fields.crimeLevel || fields.safetySummary,
+    fields.walkScore != null || fields.walkabilitySummary,
+    fields.marketSummary || fields.medianListPrice != null || fields.medianSalePrice != null,
+    fields.lifestyleSummary || fields.amenitiesSummary,
+  ].filter(Boolean).length;
+
+  if (stats.scraped === 0 || keySignals <= 1) return 'low';
+  if (stats.scraped >= 3 && keySignals >= 4) return 'high';
+  return 'medium';
 }
 
 // ── LLM structuring step ─────────────────────────────────────────────────────
@@ -436,13 +472,15 @@ export async function analyzeArea(subject: AreaSubject): Promise<AreaAnalyzeOutc
     const { fields, fieldSources, summary, verdict } = await structureAreaEvidence(evidence);
 
     const sources: AnalysisSource[] = dedupeSources(results, pages);
+    const stats = { searchResults: results.length, scraped: pages.length };
     const intelligence: AreaIntelligence = {
       fields,
       fieldSources,
       verdict,
       summary,
+      confidence: computeConfidence(fields, stats),
       sources,
-      stats: { searchResults: results.length, scraped: pages.length },
+      stats,
       generatedAt,
     };
 

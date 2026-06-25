@@ -502,6 +502,9 @@ export interface PropertyAnalysis {
 /** Direction of the local housing market. */
 export type AreaMarketTrend = 'rising' | 'steady' | 'cooling';
 
+/** How much to trust an area report, from how much grounded evidence backed it. */
+export type AreaConfidence = 'high' | 'medium' | 'low';
+
 /**
  * The grounded area facts. Flat (one *Source sibling per attributable field,
  * exactly like AnalyzedFields) so the strict-JSON structuring step stays simple
@@ -517,7 +520,6 @@ export interface AreaFields {
   /** Walkability / transit (0-100 scores when published). */
   walkScore: number | null;
   transitScore: number | null;
-  bikeScore: number | null;
   walkabilitySummary: string | null;
   /** Local housing market. */
   marketSummary: string | null;
@@ -549,6 +551,8 @@ export interface AreaIntelligence {
    */
   verdict: string;
   summary: string;
+  /** How much grounded evidence backed this report (drives the card's trust cue). */
+  confidence: AreaConfidence;
   sources: AnalysisSource[];
   stats: { searchResults: number; scraped: number };
   generatedAt: string;
@@ -557,7 +561,8 @@ export interface AreaIntelligence {
 /** A persisted AreaReport row (client-safe projection). */
 export interface AreaReport {
   id: string;
-  spaceId: string;
+  /** Provenance only — the global cache row is not owned by a workspace. */
+  spaceId: string | null;
   areaKey: string;
   label: string;
   city: string | null;

@@ -16,6 +16,7 @@ vi.mock('@/lib/logger', () => ({
 
 import {
   parseAreaResponse,
+  computeConfidence,
   AREA_ANALYSIS_JSON_SCHEMA,
   type RawAreaResponse,
 } from '@/lib/area-analysis';
@@ -28,7 +29,6 @@ function rawBase(): RawAreaResponse {
     crimeLevel: null, crimeLevelSource: null,
     walkScore: null, walkScoreSource: null,
     transitScore: null, transitScoreSource: null,
-    bikeScore: null, bikeScoreSource: null,
     walkabilitySummary: null, walkabilitySummarySource: null,
     marketSummary: null, marketSummarySource: null,
     medianListPrice: null, medianListPriceSource: null,
@@ -72,18 +72,35 @@ describe('parseAreaResponse', () => {
     expect(verdict).toBe('Strong for young professionals: very walkable, but prices are climbing.');
   });
 
-  it('clamps scores to 0-100 and drops out-of-range / negative numbers', () => {
+  it('clamps scores to 0-100 and drops out-of-range numbers', () => {
     const { fields } = parseAreaResponse({
       ...rawBase(),
       walkScore: 142, // out of range → null
       transitScore: -5, // negative → null
-      bikeScore: 64.7, // rounds to 65
       medianListPrice: -1, // negative → null
     });
     expect(fields.walkScore).toBeNull();
     expect(fields.transitScore).toBeNull();
-    expect(fields.bikeScore).toBe(65);
     expect(fields.medianListPrice).toBeNull();
+  });
+
+  it('rejects implausible market figures (physics-first guard)', () => {
+    const tooSmall = parseAreaResponse({ ...rawBase(), medianListPrice: 40 }).fields;
+    const tooBig = parseAreaResponse({ ...rawBase(), medianSalePrice: 4_000_000_000 }).fields;
+    const absurdDom = parseAreaResponse({ ...rawBase(), medianDaysOnMarket: 5000 }).fields;
+    expect(tooSmall.medianListPrice).toBeNull();
+    expect(tooBig.medianSalePrice).toBeNull();
+    expect(absurdDom.medianDaysOnMarket).toBeNull();
+
+    const ok = parseAreaResponse({
+      ...rawBase(),
+      medianListPrice: 625_000,
+      medianSalePrice: 610_000,
+      medianDaysOnMarket: 28,
+    }).fields;
+    expect(ok.medianListPrice).toBe(625_000);
+    expect(ok.medianSalePrice).toBe(610_000);
+    expect(ok.medianDaysOnMarket).toBe(28);
   });
 
   it('rejects an invalid marketTrend', () => {
@@ -108,6 +125,34 @@ describe('parseAreaResponse', () => {
     const { fields } = parseAreaResponse({ ...rawBase(), highlights: [...many, '', '  '] as string[] });
     expect(fields.highlights).toHaveLength(20);
     expect(fields.highlights.every((h) => h.trim().length > 0)).toBe(true);
+  });
+});
+
+describe('computeConfidence', () => {
+  const rich = parseAreaResponse({
+    ...rawBase(),
+    schoolRating: '8/10',
+    crimeLevel: 'Low',
+    walkScore: 80,
+    marketSummary: 'Hot market.',
+    lifestyleSummary: 'Lively.',
+  }).fields;
+
+  it('is high when several pages were scraped and key dimensions are populated', () => {
+    expect(computeConfidence(rich, { scraped: 4, searchResults: 5 })).toBe('high');
+  });
+
+  it('is low when nothing was scraped', () => {
+    expect(computeConfidence(rich, { scraped: 0, searchResults: 3 })).toBe('low');
+  });
+
+  it('is low when barely any field came back', () => {
+    const thin = parseAreaResponse({ ...rawBase(), walkScore: 50 }).fields;
+    expect(computeConfidence(thin, { scraped: 2, searchResults: 3 })).toBe('low');
+  });
+
+  it('is medium in between', () => {
+    expect(computeConfidence(rich, { scraped: 1, searchResults: 3 })).toBe('medium');
   });
 });
 

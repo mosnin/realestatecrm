@@ -96,7 +96,7 @@ export const researchAreaTool = defineTool<typeof parameters, ResearchAreaData>(
       };
     }
 
-    const outcome = await getOrCreateAreaReport(ctx.space.id, area);
+    const outcome = await getOrCreateAreaReport(area);
 
     if (outcome.status === 'not_configured') {
       return {

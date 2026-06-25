@@ -67,7 +67,9 @@ function intel() {
   return {
     fields: { highlights: [] },
     fieldSources: {},
+    verdict: 'A great area.',
     summary: 'A great area.',
+    confidence: 'high',
     sources: [],
     stats: { searchResults: 4, scraped: 3 },
     generatedAt: new Date(NOW).toISOString(),
@@ -93,7 +95,7 @@ describe('getOrCreateAreaReport', () => {
       generatedAt: new Date(NOW).toISOString(),
       expiresAt: new Date(NOW + 5 * 86_400_000).toISOString(), // 5 days out → fresh
     };
-    const out = await getOrCreateAreaReport('sp1', AREA, { now: NOW });
+    const out = await getOrCreateAreaReport(AREA, { now: NOW });
     expect(out.status).toBe('ok');
     if (out.status === 'ok') expect(out.cached).toBe(true);
     expect(analyzeAreaMock).not.toHaveBeenCalled();
@@ -110,7 +112,7 @@ describe('getOrCreateAreaReport', () => {
       expiresAt: new Date(NOW - 1 * 86_400_000).toISOString(), // expired yesterday
     };
     analyzeAreaMock.mockResolvedValue({ status: 'ok', intelligence: intel() });
-    const out = await getOrCreateAreaReport('sp1', AREA, { now: NOW });
+    const out = await getOrCreateAreaReport(AREA, { now: NOW });
     expect(analyzeAreaMock).toHaveBeenCalledOnce();
     expect(state.upsertCalls).toBe(1);
     // Reuses the existing row id across refresh so links don't break.
@@ -129,14 +131,14 @@ describe('getOrCreateAreaReport', () => {
       expiresAt: new Date(NOW + 5 * 86_400_000).toISOString(),
     };
     analyzeAreaMock.mockResolvedValue({ status: 'ok', intelligence: intel() });
-    await getOrCreateAreaReport('sp1', AREA, { now: NOW, forceRefresh: true });
+    await getOrCreateAreaReport(AREA, { now: NOW, forceRefresh: true });
     expect(analyzeAreaMock).toHaveBeenCalledOnce();
     expect(state.upsertCalls).toBe(1);
   });
 
   it('passes through not_configured without researching', async () => {
     missingKeysMock.mockReturnValue(['TAVILY_API_KEY']);
-    const out = await getOrCreateAreaReport('sp1', AREA, { now: NOW });
+    const out = await getOrCreateAreaReport(AREA, { now: NOW });
     expect(out.status).toBe('not_configured');
     expect(analyzeAreaMock).not.toHaveBeenCalled();
     expect(state.upsertCalls).toBe(0);
@@ -144,7 +146,7 @@ describe('getOrCreateAreaReport', () => {
 
   it('passes through no_evidence and does not upsert', async () => {
     analyzeAreaMock.mockResolvedValue({ status: 'no_evidence', generatedAt: new Date(NOW).toISOString() });
-    const out = await getOrCreateAreaReport('sp1', AREA, { now: NOW });
+    const out = await getOrCreateAreaReport(AREA, { now: NOW });
     expect(out.status).toBe('no_evidence');
     expect(state.upsertCalls).toBe(0);
   });

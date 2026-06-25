@@ -15,6 +15,23 @@ import { useState } from 'react';
 import { MapPin, ExternalLink, ChevronDown } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
 import type { AreaCardData } from '@/lib/area-card';
+import type { AreaConfidence } from '@/lib/types';
+
+/** A small colored dot + label conveying how much to trust the report. */
+function ConfidenceBadge({ level, label }: { level: AreaConfidence; label: string }) {
+  const dot =
+    level === 'high'
+      ? 'bg-emerald-500'
+      : level === 'low'
+        ? 'bg-amber-500'
+        : 'bg-foreground/40';
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
+      {label}
+    </span>
+  );
+}
 
 function isAreaCard(data: unknown): data is { ok: true; area: AreaCardData } {
   if (!data || typeof data !== 'object') return false;
@@ -51,12 +68,15 @@ export function AreaResult({ data }: { data: unknown }) {
             Area IQ
           </div>
           <div className="truncate text-[15px] font-semibold text-foreground">{area.label}</div>
-          {area.generatedAt && (
-            <div className="mt-0.5 text-[11px] text-foreground/45">
-              researched {timeAgo(area.generatedAt)}
-              {area.cached ? ' · from cache' : ''}
-            </div>
-          )}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-foreground/45">
+            <ConfidenceBadge level={area.confidence} label={area.confidenceLabel} />
+            {area.generatedAt && (
+              <span>
+                · researched {timeAgo(area.generatedAt)}
+                {area.cached ? ' · cached' : ''}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

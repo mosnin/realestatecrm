@@ -101,7 +101,6 @@ async def research_area(
     push("Safety", fields.get("crimeLevel"))
     push("Walk Score", fields.get("walkScore"))
     push("Transit", fields.get("transitScore"))
-    push("Bike Score", fields.get("bikeScore"))
     if fields.get("medianListPrice") is not None:
         push("Median list", f"${int(fields['medianListPrice']):,}")
     if fields.get("medianSalePrice") is not None:
@@ -127,17 +126,27 @@ async def research_area(
 
     verdict = intel.get("verdict", "")
     label = report.get("label", where)
+    sources = intel.get("sources") or []
+    confidence = intel.get("confidence", "medium")
+    n = len(sources)
+    src_suffix = f" · {n} source{'' if n == 1 else 's'}" if n > 0 else ""
+    confidence_label = {
+        "high": f"Confident{src_suffix}",
+        "low": f"Limited data{src_suffix}",
+    }.get(confidence, f"Moderate{src_suffix}")
     area_card = {
         "label": label,
         "verdict": verdict,
         "summary": intel.get("summary", ""),
+        "confidence": confidence,
+        "confidenceLabel": confidence_label,
         "marketAsOf": fields.get("marketAsOf"),
         "generatedAt": report.get("generatedAt", ""),
         "cached": bool(body.get("cached")),
         "metrics": metrics,
         "sections": sections,
         "highlights": fields.get("highlights") or [],
-        "sources": intel.get("sources") or [],
+        "sources": sources,
     }
 
     # Lead the transcript line with the verdict (the judgment), not a label.

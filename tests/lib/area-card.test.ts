@@ -16,7 +16,6 @@ function fields(over: Partial<AreaFields> = {}): AreaFields {
     crimeLevel: null,
     walkScore: null,
     transitScore: null,
-    bikeScore: null,
     walkabilitySummary: null,
     marketSummary: null,
     medianListPrice: null,
@@ -48,6 +47,7 @@ function report(over: Partial<AreaFields> = {}): AreaReport {
       fieldSources: { safetySummary: 'https://niche.com/x', schoolsSummary: 'https://greatschools.org/y' },
       verdict: 'A solid all-rounder.',
       summary: 'A solid area.',
+      confidence: 'high',
       sources: [{ url: 'https://niche.com/x', title: 'Niche' }],
       stats: { searchResults: 4, scraped: 3 },
       generatedAt: '2026-06-25T00:00:00Z',
@@ -93,6 +93,12 @@ describe('toAreaCardData — sections + passthrough', () => {
     const card = toAreaCardData(report({ marketAsOf: 'Apr 2026' }), false);
     expect(card.verdict).toBe('A solid all-rounder.');
     expect(card.marketAsOf).toBe('Apr 2026');
+  });
+
+  it('surfaces a confidence cue with the source count', () => {
+    const card = toAreaCardData(report(), false);
+    expect(card.confidence).toBe('high');
+    expect(card.confidenceLabel).toBe('Confident · 1 source');
   });
 
   it('swaps in a buyer-tailored verdict override without touching the report', () => {

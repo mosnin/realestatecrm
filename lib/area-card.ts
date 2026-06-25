@@ -7,7 +7,13 @@
  * the React cards consume it.
  */
 
-import type { AreaReport, AreaIntelligence, AreaFields, AnalysisSource } from '@/lib/types';
+import type {
+  AreaReport,
+  AreaIntelligence,
+  AreaFields,
+  AreaConfidence,
+  AnalysisSource,
+} from '@/lib/types';
 
 /** One labeled metric chip (schools rating, walk score, median price, ...). */
 export interface AreaMetric {
@@ -28,6 +34,9 @@ export interface AreaCardData {
   /** The judgment line the card leads with (buyer-tailored when available). */
   verdict: string;
   summary: string;
+  /** Trust cue: how much grounded evidence backed this report + a short label. */
+  confidence: AreaConfidence;
+  confidenceLabel: string;
   /** As-of date of the market figures, when the evidence showed one. */
   marketAsOf: string | null;
   generatedAt: string;
@@ -36,6 +45,14 @@ export interface AreaCardData {
   sections: AreaSection[];
   highlights: string[];
   sources: AnalysisSource[];
+}
+
+/** Human label for a confidence level, factoring how many sources backed it. */
+function confidenceLabel(level: AreaConfidence, sourceCount: number): string {
+  const n = sourceCount > 0 ? ` · ${sourceCount} source${sourceCount === 1 ? '' : 's'}` : '';
+  if (level === 'high') return `Confident${n}`;
+  if (level === 'low') return `Limited data${n}`;
+  return `Moderate${n}`;
 }
 
 function usd(n: number | null): string | null {
@@ -66,7 +83,6 @@ function buildMetrics(f: AreaFields): AreaMetric[] {
   if (f.crimeLevel && short(f.crimeLevel)) m.push({ label: 'Safety', value: f.crimeLevel });
   if (f.walkScore != null) m.push({ label: 'Walk Score', value: String(f.walkScore) });
   if (f.transitScore != null) m.push({ label: 'Transit', value: String(f.transitScore) });
-  if (f.bikeScore != null) m.push({ label: 'Bike Score', value: String(f.bikeScore) });
   const medList = usd(f.medianListPrice);
   if (medList) m.push({ label: 'Median list', value: medList });
   const medSale = usd(f.medianSalePrice);
@@ -108,17 +124,21 @@ export function toAreaCardData(
   verdictOverride?: string,
 ): AreaCardData {
   const intel = report.intelligence;
+  const sources = intel.sources ?? [];
+  const confidence = intel.confidence ?? 'medium';
   return {
     label: report.label,
     verdict: (verdictOverride && verdictOverride.trim()) || intel.verdict || '',
     summary: intel.summary,
+    confidence,
+    confidenceLabel: confidenceLabel(confidence, sources.length),
     marketAsOf: intel.fields.marketAsOf ?? null,
     generatedAt: report.generatedAt,
     cached,
     metrics: buildMetrics(intel.fields),
     sections: buildSections(intel),
     highlights: intel.fields.highlights ?? [],
-    sources: intel.sources ?? [],
+    sources,
   };
 }
 

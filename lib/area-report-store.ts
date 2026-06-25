@@ -1,15 +1,16 @@
 /**
- * AreaReport store — the cache + persistence layer for Property IQ.
+ * AreaReport store — the GLOBAL cache + persistence layer for Property IQ.
  *
- * Researching an area is expensive (4 searches + 4 scrapes + an LLM call) and
- * the result is shared by every property in that area. So we persist one report
- * per (space, areaKey) and reuse it until it goes stale. A property in a freshly
- * researched ZIP gets its area intelligence for free.
+ * Area intelligence is PUBLIC data: schools, prices, safety, and walkability for
+ * a ZIP are identical for every workspace. So the cache is keyed on `areaKey`
+ * ALONE (not per-space) — research an area once for the whole platform and every
+ * space reads it. That removes the per-tenant redundancy that would have had
+ * 10,000 realtors each pay to research the same ZIP.
  *
  * `getOrCreateAreaReport` is the single entry point every surface uses (the API
- * route, the agent tool, the auto-enrich hook): it returns a fresh cached report
- * when one exists, otherwise runs the pipeline and upserts the result. NEVER
- * throws — every outcome is the discriminated `AreaReportOutcome`.
+ * route, the agent tool, the auto-enrich hook, the precompute cron): it returns a
+ * fresh cached report when one exists, otherwise runs the pipeline and upserts
+ * the result. NEVER throws — every outcome is the discriminated `AreaReportOutcome`.
  */
 
 import 'server-only';
@@ -40,19 +41,15 @@ function isFresh(row: AreaReport, now: number): boolean {
   return new Date(row.expiresAt).getTime() > now;
 }
 
-/** Read the existing report for an area, or null. Tenant-scoped. */
-export async function getAreaReport(
-  spaceId: string,
-  areaKey: string,
-): Promise<AreaReport | null> {
+/** Read the global report for an area, or null. */
+export async function getAreaReport(areaKey: string): Promise<AreaReport | null> {
   const { data, error } = await supabase
     .from('AreaReport')
     .select(SELECT)
-    .eq('spaceId', spaceId)
     .eq('areaKey', areaKey)
     .maybeSingle();
   if (error) {
-    logger.warn('[area-store] read failed', { spaceId, areaKey }, error);
+    logger.warn('[area-store] read failed', { areaKey }, error);
     return null;
   }
   return (data as AreaReport | null) ?? null;
@@ -67,9 +64,8 @@ export async function getAreaReport(
  *   through without writing.
  */
 export async function getOrCreateAreaReport(
-  spaceId: string,
   area: NormalizedArea,
-  opts: { forceRefresh?: boolean; now?: number; signal?: AbortSignal } = {},
+  opts: { forceRefresh?: boolean; now?: number } = {},
 ): Promise<AreaReportOutcome> {
   const now = opts.now ?? Date.now();
 
@@ -79,7 +75,7 @@ export async function getOrCreateAreaReport(
 
   // 1) Reuse a fresh cached report.
   if (!opts.forceRefresh) {
-    const existing = await getAreaReport(spaceId, area.areaKey);
+    const existing = await getAreaReport(area.areaKey);
     if (existing && isFresh(existing, now)) {
       return { status: 'ok', report: existing, cached: true };
     }
@@ -94,15 +90,14 @@ export async function getOrCreateAreaReport(
   });
   if (outcome.status !== 'ok') return outcome;
 
-  // 3) Persist (upsert on the unique (spaceId, areaKey) index).
-  const report = await upsertReport(spaceId, area, outcome.intelligence, now);
+  // 3) Persist (upsert on the unique areaKey index).
+  const report = await upsertReport(area, outcome.intelligence, now);
   if (!report) return { status: 'error', message: 'Failed to save the area report.' };
   return { status: 'ok', report, cached: false };
 }
 
 /** Upsert the researched intelligence. Returns the persisted projection or null. */
 async function upsertReport(
-  spaceId: string,
   area: NormalizedArea,
   intelligence: AreaIntelligence,
   now: number,
@@ -112,12 +107,14 @@ async function upsertReport(
 
   // Preserve a stable id across refreshes so links don't break: reuse the
   // existing row's id when present, else mint one.
-  const existing = await getAreaReport(spaceId, area.areaKey);
+  const existing = await getAreaReport(area.areaKey);
   const id = existing?.id ?? crypto.randomUUID();
 
   const row = {
     id,
-    spaceId,
+    // Global cache row — not owned by any workspace (so a deleted space can't
+    // cascade-delete shared area data).
+    spaceId: null,
     areaKey: area.areaKey,
     label: area.label,
     city: area.city,
@@ -131,12 +128,12 @@ async function upsertReport(
 
   const { data, error } = await supabase
     .from('AreaReport')
-    .upsert(row, { onConflict: 'spaceId,areaKey' })
+    .upsert(row, { onConflict: 'areaKey' })
     .select(SELECT)
     .single();
 
   if (error) {
-    logger.error('[area-store] upsert failed', { spaceId, areaKey: area.areaKey }, error);
+    logger.error('[area-store] upsert failed', { areaKey: area.areaKey }, error);
     return null;
   }
   return data as unknown as AreaReport;

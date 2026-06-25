@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const outcome = await getOrCreateAreaReport(space.id, area, {
+  const outcome = await getOrCreateAreaReport(area, {
     forceRefresh: Boolean(body.forceRefresh),
   });
 

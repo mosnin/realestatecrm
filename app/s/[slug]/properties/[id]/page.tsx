@@ -59,7 +59,7 @@ export default async function PropertyDetailPage({
   let initialAreaReport: AreaReport | null = null;
   if (area) {
     try {
-      initialAreaReport = await getAreaReport(space.id, area.areaKey);
+      initialAreaReport = await getAreaReport(area.areaKey);
     } catch {
       initialAreaReport = null;
     }
