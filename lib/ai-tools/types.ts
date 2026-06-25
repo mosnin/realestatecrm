@@ -95,6 +95,7 @@ export interface ToolResult<TData = unknown> {
     | 'tours'
     | 'notes'
     | 'properties'
+    | 'area'
     | 'stats'
     | 'weather'
     | 'availability-picker'

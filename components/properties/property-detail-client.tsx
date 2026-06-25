@@ -22,6 +22,7 @@ import { PropertyShareDialog } from './property-share-dialog';
 import { PropertyStatusBadge } from './property-status-badge';
 import { PropertyGallery } from './property-gallery';
 import { PropertyAnalysisPanel } from './property-analysis-panel';
+import { PropertyAreaPanel } from './property-area-panel';
 
 interface Props {
   slug: string;
@@ -251,6 +252,9 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
         initialAnalyzedAt={property.analyzedAt ?? null}
         onApplied={(updated) => setProperty((prev) => ({ ...prev, ...updated }))}
       />
+
+      {/* ── Property IQ: area / neighborhood research ─────────────────────── */}
+      <PropertyAreaPanel propertyId={property.id} />
 
       {sharing && (
         <PropertyShareDialog

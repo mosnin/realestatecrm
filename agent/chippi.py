@@ -73,6 +73,7 @@ from tools.portfolio import analyze_portfolio
 from tools.priority import generate_priority_list
 from tools.weather import get_weather
 from tools.properties import add_property, delete_property, send_property_packet
+from tools.research import research_area
 from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour, delete_tour
@@ -358,6 +359,8 @@ def make_chippi_agent(
         generate_priority_list,
         # Tour prep — keyless weather forecast for a showing
         get_weather,
+        # Property IQ — neighborhood / market research for an area or property
+        research_area,
         # I/O
         process_inbound_message,
         read_attachment,

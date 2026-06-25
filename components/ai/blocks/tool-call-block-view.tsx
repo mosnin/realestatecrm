@@ -29,6 +29,7 @@ import { DealsTableResult } from './tool-results/deals-table-result';
 import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
 import { StatsResult } from './tool-results/stats-result';
 import { WeatherResult } from './tool-results/weather-result';
+import { AreaResult } from './tool-results/area-result';
 import { OptionListResult } from './tool-results/option-list-result';
 import { QuestionFlowResult } from './tool-results/question-flow-result';
 import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
@@ -306,6 +307,9 @@ export function ToolCallBlockView({
     }
     if (block.display === 'weather') {
       return <WeatherResult data={data} />;
+    }
+    if (block.display === 'area') {
+      return <AreaResult data={data} />;
     }
     if (
       block.display === 'availability-picker' &&

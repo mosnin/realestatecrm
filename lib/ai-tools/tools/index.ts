@@ -70,6 +70,7 @@ import { findToursTool } from './find-tours';
 
 // Properties
 import { findPropertyTool } from './find-property';
+import { researchAreaTool } from './research-area';
 import { findComparablePropertiesTool } from './find-comparable-properties';
 import { addPropertyTool } from './add-property';
 import { updatePropertyStatusTool } from './update-property-status';
@@ -175,6 +176,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Properties ─────────────────────────────────────────────────────────
   findPropertyTool as ToolDefinition,
+  researchAreaTool as ToolDefinition,
   findComparablePropertiesTool as ToolDefinition,
   addPropertyTool as ToolDefinition,
   updatePropertyStatusTool as ToolDefinition,
