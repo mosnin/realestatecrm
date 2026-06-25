@@ -18,20 +18,24 @@ vi.mock('@/lib/agent-memory/embed', () => ({
   EMBED_DIMS: 1536,
 }));
 
-const { supabaseMock, rpcResp, contactResp, dealResp, propertyResp } = vi.hoisted(() => {
+const { supabaseMock, rpcResp, docsRpcResp, contactResp, dealResp, propertyResp } = vi.hoisted(() => {
+  // match_agent_memory rows.
   const rpcResp = { data: [] as Array<Record<string, unknown>>, error: null as { message: string } | null };
+  // match_documents_hybrid rows (the semantic CRM leg).
+  const docsRpcResp = { data: [] as Array<Record<string, unknown>>, error: null as { message: string } | null };
   const contactResp = { data: [] as Array<Record<string, unknown>>, error: null as { message: string } | null };
   const dealResp = { data: [] as Array<Record<string, unknown>>, error: null as { message: string } | null };
   const propertyResp = { data: [] as Array<Record<string, unknown>>, error: null as { message: string } | null };
 
-  // Track which table the current chain is for so the limit() resolver
-  // returns the right canned response.
+  // Track which table the current chain is for so the resolver returns the
+  // right canned response.
   let activeTable: string = '';
 
   const tableChain = () => ({
     select() { return this; },
     eq() { return this; },
     or() { return this; },
+    in() { return this; },
     limit() {
       if (activeTable === 'Contact') return Promise.resolve(contactResp);
       if (activeTable === 'Deal') return Promise.resolve(dealResp);
@@ -45,9 +49,12 @@ const { supabaseMock, rpcResp, contactResp, dealResp, propertyResp } = vi.hoiste
       activeTable = t;
       return tableChain();
     },
-    rpc: vi.fn(() => Promise.resolve(rpcResp)),
+    // Route by RPC name: memory recall vs the hybrid document search.
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(fn === 'match_agent_memory' ? rpcResp : docsRpcResp),
+    ),
   };
-  return { supabaseMock, rpcResp, contactResp, dealResp, propertyResp };
+  return { supabaseMock, rpcResp, docsRpcResp, contactResp, dealResp, propertyResp };
 });
 
 vi.mock('@/lib/supabase', () => ({ supabase: supabaseMock }));
@@ -64,6 +71,8 @@ beforeEach(() => {
   supabaseMock.rpc.mockClear();
   rpcResp.data = [];
   rpcResp.error = null;
+  docsRpcResp.data = [];
+  docsRpcResp.error = null;
   contactResp.data = [];
   contactResp.error = null;
   dealResp.data = [];
@@ -135,6 +144,43 @@ describe('retrieveContext — happy path', () => {
     expect(r.block).toMatch(/456 Oak Ave/);
   });
 
+  it('runs the hybrid CRM search tenant-scoped, and surfaces semantic hits', async () => {
+    // A conceptual query that names no entity literally — the substring pass
+    // finds nothing; the hybrid search returns the relevant contact by meaning.
+    docsRpcResp.data = [
+      { entity_type: 'contact', entity_id: 'c2', content: 'buyer, Austin, pre-approved', score: 0.5 },
+    ];
+    contactResp.data = [{ id: 'c2', name: 'Dana Lee', leadType: 'buyer', leadScore: 80 }];
+
+    const r = await retrieveContext({
+      spaceId: 'sp1',
+      userMessage: 'who is my most interested buyer looking in austin right now?',
+    });
+
+    // Hybrid search ran, scoped to this space (tenant isolation).
+    expect(supabaseMock.rpc).toHaveBeenCalledWith(
+      'match_documents_hybrid',
+      expect.objectContaining({ match_space_id: 'sp1' }),
+    );
+    // The semantically-relevant contact was resolved into the block.
+    expect(r.contacts.some((c) => c.id === 'c2' && c.label === 'Dana Lee')).toBe(true);
+    expect(r.block).toMatch(/Relevant contacts/);
+    expect(r.block).toMatch(/Dana Lee/);
+  });
+
+  it('dedupes a contact that is both named and a semantic hit', async () => {
+    // Same id from the literal pass and the hybrid pass → one entry, not two.
+    contactResp.data = [{ id: 'c1', name: 'Preston Wilms', leadType: 'buyer', leadScore: 72 }];
+    docsRpcResp.data = [
+      { entity_type: 'contact', entity_id: 'c1', content: 'buyer', score: 0.4 },
+    ];
+    const r = await retrieveContext({
+      spaceId: 'sp1',
+      userMessage: 'Tell me everything about Preston Wilms and his search.',
+    });
+    expect(r.contacts.filter((c) => c.id === 'c1')).toHaveLength(1);
+  });
+
   it('returns an empty block when nothing relevant comes back', async () => {
     const r = await retrieveContext({
       spaceId: 'sp1',
@@ -153,9 +199,10 @@ describe('retrieveContext — caching', () => {
     const r1 = await retrieveContext({ spaceId: 'sp1', userMessage: m });
     const r2 = await retrieveContext({ spaceId: 'sp1', userMessage: m });
     expect(r1).toBe(r2);
-    // embed + rpc are called exactly once across both retrievals
+    // The cached second call does no work: one embed and two rpcs (memory +
+    // hybrid CRM search) total across BOTH retrievals, not doubled.
     expect(embedMock).toHaveBeenCalledTimes(1);
-    expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
+    expect(supabaseMock.rpc).toHaveBeenCalledTimes(2);
   });
 
   it('separates cache entries by spaceId', async () => {

@@ -36,6 +36,7 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { embed } from '@/lib/agent-memory/embed';
+import { searchVectors } from '@/lib/zilliz';
 
 const MIN_MESSAGE_CHARS = 10;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
@@ -119,6 +120,34 @@ function extractCandidateTokens(message: string): string[] {
   return out;
 }
 
+type ContactRow = { id: string; name: string; leadType: string | null; leadScore: number | null };
+type DealRow = {
+  id: string;
+  title: string;
+  value: number | null;
+  status: string | null;
+  address: string | null;
+};
+
+const CONTACT_COLS = 'id, name, leadType, "leadScore"';
+const DEAL_COLS = 'id, title, value, status, address';
+
+function contactRowToEntity(r: ContactRow): ContextEntity {
+  return {
+    id: r.id,
+    label: r.name,
+    hint: r.leadScore != null ? `${r.leadType ?? 'lead'}, score ${r.leadScore}` : (r.leadType ?? 'contact'),
+  };
+}
+
+function dealRowToEntity(r: DealRow): ContextEntity {
+  const parts: string[] = [];
+  if (r.value != null) parts.push(`$${Math.round(r.value).toLocaleString()}`);
+  if (r.status) parts.push(r.status);
+  if (r.address) parts.push(r.address);
+  return { id: r.id, label: r.title, hint: parts.join(' · ') || 'deal' };
+}
+
 async function matchContactsByName(
   spaceId: string,
   tokens: string[],
@@ -129,7 +158,7 @@ async function matchContactsByName(
   const orSpec = tokens.map((t) => `name.ilike.%${escapeIlike(t)}%`).join(',');
   const { data, error } = await supabase
     .from('Contact')
-    .select('id, name, leadType, "leadScore"')
+    .select(CONTACT_COLS)
     .eq('spaceId', spaceId)
     .or(orSpec)
     .limit(MAX_NAME_MATCHES);
@@ -137,12 +166,7 @@ async function matchContactsByName(
     logger.warn('[vector-context] contact name match failed', { spaceId }, error);
     return [];
   }
-  type Row = { id: string; name: string; leadType: string | null; leadScore: number | null };
-  return ((data ?? []) as Row[]).map((r) => ({
-    id: r.id,
-    label: r.name,
-    hint: r.leadScore != null ? `${r.leadType ?? 'lead'}, score ${r.leadScore}` : (r.leadType ?? 'contact'),
-  }));
+  return ((data ?? []) as ContactRow[]).map(contactRowToEntity);
 }
 
 async function matchDealsByTitle(
@@ -153,7 +177,7 @@ async function matchDealsByTitle(
   const orSpec = tokens.map((t) => `title.ilike.%${escapeIlike(t)}%`).join(',');
   const { data, error } = await supabase
     .from('Deal')
-    .select('id, title, value, status, address')
+    .select(DEAL_COLS)
     .eq('spaceId', spaceId)
     .or(orSpec)
     .limit(MAX_NAME_MATCHES);
@@ -161,20 +185,112 @@ async function matchDealsByTitle(
     logger.warn('[vector-context] deal title match failed', { spaceId }, error);
     return [];
   }
-  type Row = {
-    id: string;
-    title: string;
-    value: number | null;
-    status: string | null;
-    address: string | null;
+  return ((data ?? []) as DealRow[]).map(dealRowToEntity);
+}
+
+/**
+ * Semantic CRM retrieval — the leg that was missing. Contacts and deals are
+ * embedded on every write (lib/vectorize.ts) into DocumentEmbedding, but until
+ * now NOTHING read them back: the chat fell to literal substring matching, so a
+ * conceptual query ("who's my most interested Austin buyer", "the deal where
+ * financing fell through") retrieved nothing. This runs the hybrid BM25+cosine
+ * search (lib/zilliz.searchVectors, tenant-scoped by spaceId) and resolves the
+ * hits to clean live-row hints, preserving search rank order.
+ *
+ * Tenant-safe twice over: the RPC filters on match_space_id, and the resolve
+ * queries filter on spaceId. Degrades to empty on any failure (e.g. the hybrid
+ * migration not yet applied, or no embeddings backfilled) — never a regression
+ * over the substring path.
+ */
+async function semanticEntitySearch(
+  spaceId: string,
+  embedding: number[],
+  message: string,
+  k: number,
+): Promise<{ contacts: ContextEntity[]; deals: ContextEntity[] }> {
+  let hits: Array<{ entity_type: string; entity_id: string; text: string; score: number }>;
+  try {
+    hits = await searchVectors(spaceId, embedding, k, message);
+  } catch (err) {
+    logger.warn('[vector-context] semantic entity search failed', { spaceId }, err);
+    return { contacts: [], deals: [] };
+  }
+
+  const contactIds = hits.filter((h) => h.entity_type === 'contact').map((h) => h.entity_id);
+  const dealIds = hits.filter((h) => h.entity_type === 'deal').map((h) => h.entity_id);
+
+  const [contacts, deals] = await Promise.all([
+    resolveContactsByIds(spaceId, contactIds),
+    resolveDealsByIds(spaceId, dealIds),
+  ]);
+
+  // Preserve the hybrid-search ranking (the resolve query returns rows in
+  // arbitrary order); the best-matching entity should lead.
+  return {
+    contacts: orderByIds(contacts, contactIds),
+    deals: orderByIds(deals, dealIds),
   };
-  return ((data ?? []) as Row[]).map((r) => {
-    const parts: string[] = [];
-    if (r.value != null) parts.push(`$${Math.round(r.value).toLocaleString()}`);
-    if (r.status) parts.push(r.status);
-    if (r.address) parts.push(r.address);
-    return { id: r.id, label: r.title, hint: parts.join(' · ') || 'deal' };
-  });
+}
+
+function orderByIds(entities: ContextEntity[], ids: string[]): ContextEntity[] {
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const out: ContextEntity[] = [];
+  for (const id of ids) {
+    const e = byId.get(id);
+    if (e) out.push(e);
+  }
+  return out;
+}
+
+async function resolveContactsByIds(spaceId: string, ids: string[]): Promise<ContextEntity[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('Contact')
+    .select(CONTACT_COLS)
+    .eq('spaceId', spaceId)
+    .in('id', ids)
+    .limit(MAX_NAME_MATCHES);
+  if (error) {
+    logger.warn('[vector-context] contact resolve failed', { spaceId }, error);
+    return [];
+  }
+  return ((data ?? []) as ContactRow[]).map(contactRowToEntity);
+}
+
+async function resolveDealsByIds(spaceId: string, ids: string[]): Promise<ContextEntity[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('Deal')
+    .select(DEAL_COLS)
+    .eq('spaceId', spaceId)
+    .in('id', ids)
+    .limit(MAX_NAME_MATCHES);
+  if (error) {
+    logger.warn('[vector-context] deal resolve failed', { spaceId }, error);
+    return [];
+  }
+  return ((data ?? []) as DealRow[]).map(dealRowToEntity);
+}
+
+/**
+ * Merge explicitly-named hits (primary) with semantic hits (secondary),
+ * de-duped by id, capped. Named entities lead because the realtor said their
+ * name out loud — that's the strongest possible relevance signal.
+ */
+function mergeEntities(
+  primary: ContextEntity[],
+  secondary: ContextEntity[],
+  cap: number,
+): ContextEntity[] {
+  const seen = new Set(primary.map((e) => e.id));
+  const out = [...primary];
+  for (const e of secondary) {
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push(e);
+    if (out.length >= cap) break;
+  }
+  return out.slice(0, cap);
 }
 
 async function matchPropertiesByAddress(
@@ -217,16 +333,9 @@ function escapeIlike(t: string): string {
 
 async function vectorMemorySearch(
   spaceId: string,
-  message: string,
+  embedding: number[],
   k: number,
 ): Promise<ContextMemory[]> {
-  let embedding: number[];
-  try {
-    embedding = await embed(message);
-  } catch (err) {
-    logger.warn('[vector-context] embed failed — skipping memory retrieval', { spaceId }, err);
-    return [];
-  }
   const { data, error } = await supabase.rpc('match_agent_memory', {
     query_embedding: vectorLiteral(embedding),
     match_space_id: spaceId,
@@ -256,15 +365,15 @@ async function vectorMemorySearch(
 function formatBlock(result: Omit<RetrieveContextResult, 'block'>): string {
   const lines: string[] = [];
   if (result.contacts.length > 0) {
-    lines.push('### Mentioned contacts');
+    lines.push('### Relevant contacts');
     for (const c of result.contacts) lines.push(`- ${c.label} (${c.hint})`);
   }
   if (result.deals.length > 0) {
-    lines.push('### Mentioned deals');
+    lines.push('### Relevant deals');
     for (const d of result.deals) lines.push(`- ${d.label} (${d.hint})`);
   }
   if (result.properties.length > 0) {
-    lines.push('### Mentioned properties');
+    lines.push('### Relevant properties');
     for (const p of result.properties) lines.push(`- ${p.label} (${p.hint})`);
   }
   if (result.memories.length > 0) {
@@ -310,13 +419,26 @@ export async function retrieveContext(
   const k = Math.max(1, Math.min(20, input.k ?? 5));
   const tokens = extractCandidateTokens(message);
 
-  // Fan out — vector search + entity matches in parallel. Any single
+  // Embed the message ONCE and share the vector across both semantic legs
+  // (memory recall + CRM entity search) instead of paying for two identical
+  // embeddings per turn. A failed embed just skips the semantic legs; the
+  // literal substring matches still run.
+  let embedding: number[] | null = null;
+  try {
+    embedding = await embed(message);
+  } catch (err) {
+    logger.warn('[vector-context] embed failed — skipping semantic retrieval', { spaceId: input.spaceId }, err);
+  }
+
+  // Fan out — semantic search + literal entity matches in parallel. Any single
   // failure is logged and swallowed; the others still contribute.
-  const [memories, contacts, deals, properties] = await Promise.all([
-    vectorMemorySearch(input.spaceId, message, k).catch((err) => {
-      logger.warn('[vector-context] vector search threw', { spaceId: input.spaceId }, err);
-      return [] as ContextMemory[];
-    }),
+  const [memories, namedContacts, namedDeals, properties, semantic] = await Promise.all([
+    embedding
+      ? vectorMemorySearch(input.spaceId, embedding, k).catch((err) => {
+          logger.warn('[vector-context] memory search threw', { spaceId: input.spaceId }, err);
+          return [] as ContextMemory[];
+        })
+      : Promise.resolve([] as ContextMemory[]),
     matchContactsByName(input.spaceId, tokens).catch((err) => {
       logger.warn('[vector-context] contact match threw', { spaceId: input.spaceId }, err);
       return [] as ContextEntity[];
@@ -329,7 +451,18 @@ export async function retrieveContext(
       logger.warn('[vector-context] property match threw', { spaceId: input.spaceId }, err);
       return [] as ContextEntity[];
     }),
+    embedding
+      ? semanticEntitySearch(input.spaceId, embedding, message, k).catch((err) => {
+          logger.warn('[vector-context] semantic entity search threw', { spaceId: input.spaceId }, err);
+          return { contacts: [] as ContextEntity[], deals: [] as ContextEntity[] };
+        })
+      : Promise.resolve({ contacts: [] as ContextEntity[], deals: [] as ContextEntity[] }),
   ]);
+
+  // Named hits (the realtor said it out loud) lead; semantic hits fill in the
+  // entities they were clearly asking about without naming.
+  const contacts = mergeEntities(namedContacts, semantic.contacts, MAX_NAME_MATCHES);
+  const deals = mergeEntities(namedDeals, semantic.deals, MAX_NAME_MATCHES);
 
   const result: RetrieveContextResult = {
     memories,
