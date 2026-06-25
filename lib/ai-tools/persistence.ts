@@ -16,8 +16,10 @@
  */
 
 import crypto from 'crypto';
+import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { extractConversationMemories } from '@/lib/agent-memory/extract';
 import { coalesceTextBlocks, type MessageBlock } from './blocks';
 
 export interface SaveUserMessageInput {
@@ -150,5 +152,22 @@ export async function saveAssistantMessage(
     logger.error('[tools.persistence] saveAssistantMessage failed', { spaceId: input.spaceId }, error);
     throw new Error(`Failed to save assistant message: ${error.message}`);
   }
+
+  // After the reply is sent, distill durable memories from this exchange so
+  // Chippi remembers the realtor next time. Non-blocking (after()) and
+  // best-effort. Skip pure tool-only turns — there's no substance to learn
+  // from, and it saves an LLM call. after() needs a request context (the chat
+  // routes always have one); guarded so a non-request caller just skips.
+  const conversationId = input.conversationId;
+  if (conversationId && content && content !== '(tool-only turn)') {
+    try {
+      after(() =>
+        extractConversationMemories({ spaceId: input.spaceId, conversationId }),
+      );
+    } catch {
+      /* no request context (script/test) — skip background extraction */
+    }
+  }
+
   return { messageId: id };
 }
