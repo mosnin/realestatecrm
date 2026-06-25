@@ -282,10 +282,10 @@ export default async function DashboardLayout({
       {/* Collapse state is shared between the sidebar and the header's panel
           toggle, so the provider wraps both. */}
       <SidebarCollapseProvider>
-        <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
+        <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <PlatformBanner />
-          <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} isPlatformAdmin={dbUser.isPlatformAdmin} />
+          <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} accountName={dbUser.name} isBroker={isBroker} brokerageName={brokerageName} isPlatformAdmin={dbUser.isPlatformAdmin} />
           <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>
             {children}
           </LayoutShell>

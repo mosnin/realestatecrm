@@ -74,6 +74,10 @@ interface ChippiWorkspaceProps {
   showConnectBanner?: boolean;
   /** Skills offered in the chat's `/` menu. From loadUserInvocableSkills(). */
   skills?: SkillItem[];
+  /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
+   *  Preferred over the Clerk identity for the greeting so it doesn't fall back
+   *  to the Google/Gmail name on the account. */
+  accountName?: string | null;
   /**
    * Which Chippi variant this surface is rendering.
    *
@@ -177,6 +181,7 @@ export function ChippiWorkspace({
   initialPrefill,
   showConnectBanner = false,
   skills = [],
+  accountName = null,
   variant = 'realtor',
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
@@ -767,7 +772,9 @@ export function ChippiWorkspace({
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
   const isEmpty = messages.length === 0 && !isLoadingConversation;
-  const firstName = user?.firstName ?? '';
+  // Prefer the Chippi profile name (chosen at onboarding) over the Clerk
+  // identity, which Google OAuth seeds from the user's Gmail account.
+  const firstName = (accountName ?? '').trim().split(/\s+/)[0] || (user?.firstName ?? '');
 
   // Time-of-day greeting for the empty-state hero. Computed client-side
   // (the server doesn't know the realtor's local hour); we render an

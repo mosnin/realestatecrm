@@ -81,6 +81,10 @@ import {
 interface SidebarProps {
   slug: string;
   spaceName: string;
+  /** The realtor's name from their Chippi profile (DB User.name), set during
+   *  onboarding. Preferred over the Clerk identity for display so it doesn't
+   *  fall back to the Google/Gmail name on the account. */
+  accountName?: string | null;
   unreadLeadCount: number;
   pendingDraftCount?: number;
   overdueFollowUpCount?: number;
@@ -1374,6 +1378,7 @@ function RealtorNav({
 export function Sidebar({
   slug,
   spaceName,
+  accountName = null,
   unreadLeadCount,
   pendingDraftCount = 0,
   overdueFollowUpCount = 0,
@@ -1450,9 +1455,13 @@ export function Sidebar({
     isPlatformAdmin ||
     (user?.publicMetadata as { role?: string } | undefined)?.role === 'admin';
 
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
-    : 'My Account';
+  // Prefer the Chippi profile name (DB, chosen at onboarding) over the Clerk
+  // identity, which is seeded from the Google/Gmail account and isn't what the
+  // realtor picked. Fall back to Clerk, then to a neutral label.
+  const clerkName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ')
+    : '';
+  const displayName = (accountName ?? '').trim() || clerkName || 'My Account';
   // Primary email — used as the muted subtitle in the user footer chip.
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? null;
 
