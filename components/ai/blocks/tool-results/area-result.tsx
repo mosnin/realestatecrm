@@ -11,6 +11,7 @@
  */
 
 import { MapPin, ExternalLink } from 'lucide-react';
+import { timeAgo } from '@/lib/formatting';
 import type { AreaCardData } from '@/lib/area-card';
 
 function isAreaCard(data: unknown): data is { ok: true; area: AreaCardData } {
@@ -45,6 +46,12 @@ export function AreaResult({ data }: { data: unknown }) {
             Area IQ
           </div>
           <div className="truncate text-[15px] font-semibold text-foreground">{area.label}</div>
+          {area.generatedAt && (
+            <div className="mt-0.5 text-[11px] text-foreground/45">
+              researched {timeAgo(area.generatedAt)}
+              {area.cached ? ' · from cache' : ''}
+            </div>
+          )}
         </div>
       </div>
 
@@ -82,6 +89,7 @@ export function AreaResult({ data }: { data: unknown }) {
                     rel="noopener noreferrer"
                     className="text-foreground/35 transition-colors hover:text-foreground/70"
                     title={hostOf(s.source)}
+                    aria-label={`Source for ${s.title}: ${hostOf(s.source)}`}
                   >
                     <ExternalLink className="h-3 w-3" />
                   </a>

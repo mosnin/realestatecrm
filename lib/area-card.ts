@@ -44,11 +44,22 @@ const TREND_LABEL: Record<string, string> = {
   cooling: 'Cooling',
 };
 
+/**
+ * Max length of a metric-chip value. Chips hold short, scannable facts (a
+ * rating, a score, a price). Anything longer is prose and belongs in a section,
+ * where it already renders, so we drop it from the chip row rather than let a
+ * sentence stretch a chip across the card.
+ */
+const MAX_CHIP_VALUE = 22;
+const short = (v: string): boolean => v.trim().length <= MAX_CHIP_VALUE;
+
 /** Build the headline metric chips from the grounded fields (skip the unknowns). */
 function buildMetrics(f: AreaFields): AreaMetric[] {
   const m: AreaMetric[] = [];
-  if (f.schoolRating) m.push({ label: 'Schools', value: f.schoolRating });
-  if (f.crimeLevel) m.push({ label: 'Safety', value: f.crimeLevel });
+  // Schools / safety go in chips only when the value is short enough to scan;
+  // the longer phrasing is carried by the Schools / Safety sections below.
+  if (f.schoolRating && short(f.schoolRating)) m.push({ label: 'Schools', value: f.schoolRating });
+  if (f.crimeLevel && short(f.crimeLevel)) m.push({ label: 'Safety', value: f.crimeLevel });
   if (f.walkScore != null) m.push({ label: 'Walk Score', value: String(f.walkScore) });
   if (f.transitScore != null) m.push({ label: 'Transit', value: String(f.transitScore) });
   if (f.bikeScore != null) m.push({ label: 'Bike Score', value: String(f.bikeScore) });

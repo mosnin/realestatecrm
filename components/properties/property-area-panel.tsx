@@ -4,20 +4,25 @@
  * Property IQ panel on the property detail page — researches the neighborhood /
  * local market for THIS property's address and renders the Area IQ card.
  *
- * Mirrors PropertyAnalysisPanel's posture (button → POST → states) but hits
- * /api/areas/analyze with the propertyId. The report is cached per area, so
- * opening Area IQ on a second listing in the same ZIP is instant.
+ * Deliberately matches PropertyAnalysisPanel's anatomy (section divider, header
+ * row with timestamp, animated progress strip, not-configured / no-evidence
+ * states) so the two research blocks read as one family. The report is cached
+ * per area, so opening Area IQ on a second listing in the same ZIP is instant.
  */
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { MapPinned, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { MapPinned, Loader2, RefreshCw, AlertTriangle, Info } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { SECTION_LABEL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
+import { Button } from '@/components/ui/button';
 import { toAreaCardData, type AreaCardData } from '@/lib/area-card';
 import type { AreaReport } from '@/lib/types';
 import { AreaResult } from '@/components/ai/blocks/tool-results/area-result';
+
+const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 type AreaResponse =
   | { status: 'ok'; cached: boolean; report: AreaReport }
@@ -62,58 +67,121 @@ export function PropertyAreaPanel({ propertyId }: { propertyId: string }) {
       }
       setCard(toAreaCardData(data.report, data.cached));
       setGeneratedAt(data.report.generatedAt);
+      toast.success(data.cached ? 'Loaded the area brief.' : 'Area research complete.');
     } catch {
-      toast.error("Couldn't research this area. Try again.");
+      toast.error('Network error. Try again.');
     } finally {
       setLoading(false);
     }
   }
 
+  const hasResult = card !== null;
+
   return (
-    <div className="mt-6 rounded-2xl border border-border/70 bg-card p-4">
-      <div className="flex items-center justify-between gap-3">
+    <section className="space-y-4 border-t border-border/60 pt-6">
+      {/* ── Header row ─────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <MapPinned className="h-4 w-4 text-foreground/60" />
-          <span className={SECTION_LABEL}>Area IQ</span>
+          <MapPinned size={12} className="text-muted-foreground" aria-hidden />
+          <h2 className={cn(SECTION_LABEL)}>Area IQ</h2>
           {generatedAt && (
-            <span className="text-[12px] text-foreground/45">researched {timeAgo(generatedAt)}</span>
+            <span className="text-[11px] text-muted-foreground">researched {timeAgo(generatedAt)}</span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={() => research(Boolean(card))} disabled={loading}>
+        <Button
+          size="sm"
+          variant={hasResult ? 'outline' : 'default'}
+          onClick={() => research(hasResult)}
+          disabled={loading}
+        >
           {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : card ? (
-            <RefreshCw className="h-3.5 w-3.5" />
+            <>
+              <Loader2 className="animate-spin" /> Researching…
+            </>
+          ) : hasResult ? (
+            <>
+              <RefreshCw /> Refresh
+            </>
           ) : (
-            <MapPinned className="h-3.5 w-3.5" />
+            <>
+              <MapPinned /> Research area
+            </>
           )}
-          <span className="ml-1.5">{card ? 'Refresh' : 'Research area'}</span>
         </Button>
       </div>
 
-      {!card && !loading && !notConfigured && !noEvidence && (
-        <p className="mt-2 text-[13px] text-foreground/55">
-          Research the neighborhood for this address: schools, safety, walkability, the local
-          market, and lifestyle, with sources.
+      {/* ── Intro / empty hint (only before the first run) ─────────── */}
+      {!hasResult && !loading && !notConfigured && !noEvidence && (
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Research the neighborhood around this address — schools, safety, walkability, the local
+          market, and lifestyle — pulled from the open web with sources. Reused across every listing
+          in the same area.
         </p>
       )}
 
+      {/* ── Progress (this can run ~a minute) ──────────────────────── */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: EASE_APPLE }}
+            className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3"
+          >
+            <Loader2 size={16} className="animate-spin text-muted-foreground" aria-hidden />
+            <div className="text-sm text-muted-foreground">
+              Searching the web, reading neighborhood &amp; market pages, and structuring the
+              findings. This can take up to a minute.
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Not configured ─────────────────────────────────────────── */}
       {notConfigured && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-3 text-[13px] text-foreground/75">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-          <span>
-            Area research is not configured on this workspace yet ({notConfigured.join(', ')}).
-          </span>
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+          <AlertTriangle size={16} className="mt-0.5 text-amber-600 dark:text-amber-500" aria-hidden />
+          <div className="text-sm">
+            <p className="font-medium text-foreground">Web research isn&apos;t configured</p>
+            <p className="text-muted-foreground mt-0.5">
+              Area research needs{' '}
+              {notConfigured.map((k, i) => (
+                <span key={k}>
+                  {i > 0 && (i === notConfigured.length - 1 ? ' and ' : ', ')}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">{k}</code>
+                </span>
+              ))}{' '}
+              set on the server. Ask your administrator to add{' '}
+              {notConfigured.length === 1 ? 'this key' : 'these keys'}.
+            </p>
+          </div>
         </div>
       )}
 
-      {noEvidence && (
-        <p className="mt-3 text-[13px] text-foreground/60">
-          Researched, but there wasn&apos;t enough public data to brief this area.
-        </p>
+      {/* ── No evidence found ──────────────────────────────────────── */}
+      {noEvidence && !loading && (
+        <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+          <Info size={16} className="mt-0.5 text-muted-foreground" aria-hidden />
+          <div className="text-sm text-muted-foreground">
+            We couldn&apos;t find enough public data to brief this area. Make sure the property has a
+            city &amp; state (or ZIP) set, then try again.
+          </div>
+        </div>
       )}
 
-      {card && <AreaResult data={{ ok: true, area: card }} />}
-    </div>
+      {/* ── Result card ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {hasResult && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: EASE_APPLE }}
+          >
+            <AreaResult data={{ ok: true, area: card }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
