@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
+import { ChippiOpener } from '@/components/chippi/chippi-opener';
 import {
   ChippiPromptBox,
   type MentionItem,
@@ -843,17 +844,6 @@ export function ChippiWorkspace({
     return () => controller.abort();
   }, [isEmpty, isBroker]);
 
-  // Day-one signal: zero of everything. The realtor has truly never engaged.
-  // We wait for `countsLoaded` so we don't flash the welcome before we know
-  // whether there's pending work. `messages.length === 0` is implied by
-  // `isEmpty`; checking it twice is cheap and explicit.
-  const isFresh =
-    isEmpty &&
-    countsLoaded &&
-    messages.length === 0 &&
-    counts.drafts === 0 &&
-    counts.questions === 0 &&
-    conversations.length === 0;
 
   // Run Now — kicks off a background sweep and tells the user via toast.
   const [running, setRunning] = useState(false);
@@ -1372,21 +1362,15 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
-                  {/* Day-one guidance — realtor only, and only for users with
-                      zero history. The broker chat goes straight from greeting
-                      to composer (no subtext) per the brokerage design. */}
-                  {!isBroker && isFresh && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -2 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-                      className="text-center text-sm text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto"
-                    >
-                      Try me. Or browse the{' '}
-                      <span className="text-foreground/70">Brief</span>,{' '}
-                      <span className="text-foreground/70">Outbox</span>, and{' '}
-                      <span className="text-foreground/70">Log</span> from the sidebar.
-                    </motion.p>
+                  {/* Chippi speaks first — realtor only. Instead of a passive
+                      "Try me" line over an empty box, Chippi opens with what
+                      actually needs the realtor this morning (from the same
+                      brief summary) plus tappable moves. One quiet line above
+                      the composer, which stays the focal element. The broker
+                      chat goes straight from greeting to composer per the
+                      brokerage design. */}
+                  {!isBroker && (
+                    <ChippiOpener onAction={(prompt) => void handleSend(prompt, [])} />
                   )}
                   {renderInput()}
                 </div>

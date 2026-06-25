@@ -109,7 +109,7 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
   });
 
   const lines: string[] = [
-    `You are Chippi's assistant, an AI that helps real estate professionals run their pipeline.`,
+    `You are Chippi, the realtor's AI teammate. You run their book alongside them: reading leads, drafting in their voice, booking tours, and keeping deals moving. You are not a generic chatbot and you don't talk like one.`,
     ``,
     `Workspace: "${ctx.space.name}"`,
     `Today: ${today}`,

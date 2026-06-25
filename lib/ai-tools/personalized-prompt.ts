@@ -67,6 +67,11 @@ export interface PersonalizedSnapshot {
   /** Newest captured connected-app events (already terse + truncated). Empty
    *  when nothing has been captured. */
   recentActivity: ActivityLine[];
+  /** The realtor's chosen voice from onboarding (AIUserProfile). This is how
+   *  Chippi speaks in THEIR voice instead of a generic one. Null fields when
+   *  unset. Previously this never reached the interactive chat — only the
+   *  autonomous background runs loaded it — which is why chat read as generic. */
+  voice: { tone: string | null; style: string | null; note: string | null };
 }
 
 /** One pre-rendered snapshot line for a captured event. The heavy lifting
@@ -111,6 +116,7 @@ async function loadFresh(args: SnapshotKey): Promise<PersonalizedSnapshot> {
     pendingDraftCount: 0,
     connectedApps: [],
     recentActivity: [],
+    voice: { tone: null, style: null, note: null },
   };
 
   const nowIso = new Date().toISOString();
@@ -125,6 +131,7 @@ async function loadFresh(args: SnapshotKey): Promise<PersonalizedSnapshot> {
     draftsResult,
     toolkitsResult,
     eventsResult,
+    voiceResult,
   ] = await Promise.allSettled([
       supabase
         .from('User')
@@ -159,6 +166,11 @@ async function loadFresh(args: SnapshotKey): Promise<PersonalizedSnapshot> {
       // already best-effort (returns [] on DB error), so a failure here just
       // omits the section.
       listEvents({ spaceId: args.spaceId, limit: RECENT_ACTIVITY_LIMIT }),
+      supabase
+        .from('AIUserProfile')
+        .select('communicationTone, workingStyle, agentPersonalizationNote')
+        .eq('spaceId', args.spaceId)
+        .maybeSingle(),
     ]);
 
   if (nameResult.status === 'fulfilled' && nameResult.value.data) {
@@ -196,6 +208,19 @@ async function loadFresh(args: SnapshotKey): Promise<PersonalizedSnapshot> {
     logger.warn('[personalized-prompt] events fetch failed', {
       err: String(eventsResult.reason),
     });
+  }
+
+  if (voiceResult.status === 'fulfilled' && voiceResult.value.data) {
+    const v = voiceResult.value.data as {
+      communicationTone?: string | null;
+      workingStyle?: string | null;
+      agentPersonalizationNote?: string | null;
+    };
+    empty.voice = {
+      tone: clip(v.communicationTone, 120),
+      style: clip(v.workingStyle, 200),
+      note: clip(v.agentPersonalizationNote, 280),
+    };
   }
 
   return empty;
@@ -261,6 +286,16 @@ export function renderSnapshot(s: PersonalizedSnapshot): string {
   }
   if (s.connectedApps.length > 0) {
     lines.push(`Connected: ${s.connectedApps.join(', ')}.`);
+  }
+  // The realtor's chosen voice — match it in everything written for them
+  // (drafts, replies, summaries). This is the difference between sounding like
+  // the realtor and sounding like a generic assistant.
+  const voiceBits: string[] = [];
+  if (s.voice.tone) voiceBits.push(`tone ${s.voice.tone}`);
+  if (s.voice.style) voiceBits.push(`working style: ${s.voice.style}`);
+  if (s.voice.note) voiceBits.push(s.voice.note);
+  if (voiceBits.length > 0) {
+    lines.push(`Their voice (match it in everything you write for them): ${voiceBits.join('; ')}.`);
   }
   // Recent connected-app activity — a terse teaser, capped hard. Omitted
   // entirely when nothing's been captured (no empty header). The agent has
