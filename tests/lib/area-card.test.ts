@@ -23,6 +23,7 @@ function fields(over: Partial<AreaFields> = {}): AreaFields {
     medianSalePrice: null,
     marketTrend: null,
     medianDaysOnMarket: null,
+    marketAsOf: null,
     amenitiesSummary: null,
     highlights: [],
     lifestyleSummary: null,
@@ -45,6 +46,7 @@ function report(over: Partial<AreaFields> = {}): AreaReport {
     intelligence: {
       fields: fields(over),
       fieldSources: { safetySummary: 'https://niche.com/x', schoolsSummary: 'https://greatschools.org/y' },
+      verdict: 'A solid all-rounder.',
       summary: 'A solid area.',
       sources: [{ url: 'https://niche.com/x', title: 'Niche' }],
       stats: { searchResults: 4, scraped: 3 },
@@ -86,12 +88,38 @@ describe('toAreaCardData — sections + passthrough', () => {
     expect(card.cached).toBe(true);
     expect(card.generatedAt).toBe('2026-06-25T00:00:00Z');
   });
+
+  it('carries the neutral verdict and the market as-of date', () => {
+    const card = toAreaCardData(report({ marketAsOf: 'Apr 2026' }), false);
+    expect(card.verdict).toBe('A solid all-rounder.');
+    expect(card.marketAsOf).toBe('Apr 2026');
+  });
+
+  it('swaps in a buyer-tailored verdict override without touching the report', () => {
+    const r = report();
+    const card = toAreaCardData(r, false, 'Great for the Chens: top schools, but over budget.');
+    expect(card.verdict).toBe('Great for the Chens: top schools, but over budget.');
+    // The shared report is untouched.
+    expect(r.intelligence.verdict).toBe('A solid all-rounder.');
+  });
 });
 
 describe('summariseArea', () => {
-  it('renders a one-line transcript summary with the headline facts', () => {
-    const s = summariseArea(report({ schoolRating: '8/10', walkScore: 90, marketTrend: 'rising' }));
+  it('leads with the verdict when present', () => {
+    const s = summariseArea(report({ schoolRating: '8/10' }));
     expect(s).toContain('Austin, TX 78704');
+    expect(s).toContain('A solid all-rounder.');
+  });
+
+  it('uses a buyer-tailored verdict override when given', () => {
+    const s = summariseArea(report(), 'Perfect for the Chens.');
+    expect(s).toContain('Perfect for the Chens.');
+  });
+
+  it('falls back to headline facts when there is no verdict', () => {
+    const r = report({ schoolRating: '8/10', walkScore: 90, marketTrend: 'rising' });
+    r.intelligence.verdict = '';
+    const s = summariseArea(r);
     expect(s).toMatch(/schools 8\/10/);
     expect(s).toMatch(/Walk Score 90/);
     expect(s).toMatch(/Rising market/);

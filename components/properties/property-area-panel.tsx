@@ -30,9 +30,20 @@ type AreaResponse =
   | { status: 'not_configured'; missing: string[] }
   | { status: 'error'; error: string };
 
-export function PropertyAreaPanel({ propertyId }: { propertyId: string }) {
-  const [card, setCard] = useState<AreaCardData | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+export function PropertyAreaPanel({
+  propertyId,
+  initialReport = null,
+}: {
+  propertyId: string;
+  /** A pre-loaded report (from the server) so the brief is there on arrival. */
+  initialReport?: AreaReport | null;
+}) {
+  const [card, setCard] = useState<AreaCardData | null>(
+    initialReport ? toAreaCardData(initialReport, true) : null,
+  );
+  const [generatedAt, setGeneratedAt] = useState<string | null>(
+    initialReport?.generatedAt ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const [notConfigured, setNotConfigured] = useState<string[] | null>(null);
   const [noEvidence, setNoEvidence] = useState(false);

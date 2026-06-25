@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
 import { normalizeArea, parseAreaQuery, type NormalizedArea } from '@/lib/areas';
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
+import { tailorVerdict } from '@/lib/area-analysis';
 import { toAreaCardData, summariseArea, type AreaCardData } from '@/lib/area-card';
 
 const parameters = z
@@ -31,11 +32,20 @@ const parameters = z
       .max(60)
       .optional()
       .describe("A property's id — researches the area around that property's address."),
+    forBuyer: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .optional()
+      .describe(
+        "Who the area is for, so the verdict is tailored to them. A short description of the buyer and what they care about, e.g. \"family with two kids, budget 600k, wants good schools\". Pass this whenever you know the buyer.",
+      ),
   })
   .refine((v) => v.location || v.propertyId, {
     message: 'Provide a location or a propertyId.',
   })
-  .describe('Research the neighborhood and local market for an area or a property.');
+  .describe('Research the neighborhood and local market for an area or a property, tailored to a buyer when known.');
 
 type ResearchAreaData =
   | { ok: true; area: AreaCardData }
@@ -107,9 +117,15 @@ export const researchAreaTool = defineTool<typeof parameters, ResearchAreaData>(
       return { summary: outcome.message, display: 'error', data: { ok: false } };
     }
 
-    const card = toAreaCardData(outcome.report, outcome.cached);
+    // Tailor the verdict to the buyer when we know who it's for, using the
+    // already-researched data (no extra web work; the cached report stays neutral).
+    const verdict = args.forBuyer
+      ? await tailorVerdict(outcome.report.intelligence, args.forBuyer)
+      : outcome.report.intelligence.verdict;
+
+    const card = toAreaCardData(outcome.report, outcome.cached, verdict);
     return {
-      summary: summariseArea(outcome.report),
+      summary: summariseArea(outcome.report, verdict),
       data: { ok: true, area: card },
       display: 'area',
     };

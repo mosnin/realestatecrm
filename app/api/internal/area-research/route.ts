@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeArea, parseAreaQuery, type NormalizedArea } from '@/lib/areas';
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
+import { tailorVerdict } from '@/lib/area-analysis';
 
 /**
  * POST /api/internal/area-research — Property IQ research for the Modal agent.
@@ -25,6 +26,8 @@ interface Body {
   stateRegion?: string | null;
   postalCode?: string | null;
   forceRefresh?: boolean;
+  /** Optional buyer description — tailors the verdict to them. */
+  forBuyer?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -63,6 +66,17 @@ export async function POST(req: NextRequest) {
   });
 
   if (outcome.status === 'ok') {
+    // Tailor the verdict to the buyer when the agent passed one, using the
+    // already-researched data. The shared cached report stays neutral; we only
+    // override the verdict on the response.
+    if (typeof body.forBuyer === 'string' && body.forBuyer.trim()) {
+      const tailored = await tailorVerdict(outcome.report.intelligence, body.forBuyer);
+      const report = {
+        ...outcome.report,
+        intelligence: { ...outcome.report.intelligence, verdict: tailored },
+      };
+      return NextResponse.json({ status: 'ok', cached: outcome.cached, report });
+    }
     return NextResponse.json({ status: 'ok', cached: outcome.cached, report: outcome.report });
   }
   if (outcome.status === 'not_configured') {

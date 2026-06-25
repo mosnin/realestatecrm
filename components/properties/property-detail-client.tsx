@@ -10,7 +10,7 @@ import {
   BedDouble, Bath, Ruler, Tag, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Property } from '@/lib/types';
+import type { Property, AreaReport } from '@/lib/types';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { SECTION_LABEL, TITLE_FONT, H3 } from '@/lib/typography';
@@ -27,11 +27,13 @@ import { PropertyAreaPanel } from './property-area-panel';
 interface Props {
   slug: string;
   initial: Property;
+  /** Pre-loaded area report for this property's neighborhood, when one exists. */
+  initialAreaReport?: AreaReport | null;
   linkedDeals: { id: string; title: string; status: string; value: number | null; closeDate: string | null }[];
   linkedTours: { id: string; guestName: string; startsAt: string; status: string }[];
 }
 
-export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }: Props) {
+export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedDeals, linkedTours }: Props) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const [property, setProperty] = useState(initial);
@@ -254,7 +256,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
       />
 
       {/* ── Property IQ: area / neighborhood research ─────────────────────── */}
-      <PropertyAreaPanel propertyId={property.id} />
+      <PropertyAreaPanel propertyId={property.id} initialReport={initialAreaReport ?? null} />
 
       {sharing && (
         <PropertyShareDialog

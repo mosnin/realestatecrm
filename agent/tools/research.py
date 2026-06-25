@@ -27,9 +27,13 @@ _TIMEOUT = 70.0
 async def research_area(
     ctx: RunContextWrapper[AgentContext],
     location: str,
+    for_buyer: str | None = None,
 ) -> dict[str, Any]:
     """Research a neighborhood/area (ZIP, "City, ST", or address): schools, safety,
-    walkability, local market, lifestyle. Returns a grounded Area IQ card with sources."""
+    walkability, local market, lifestyle. Returns a grounded Area IQ card with sources.
+    Pass for_buyer (a short description of the buyer and what they care about, e.g.
+    "family with two kids, budget 600k, wants good schools") whenever you know who it's
+    for, so the verdict is tailored to them."""
     where = (location or "").strip()
     if not where:
         return {"error": "location is required (a ZIP, city + state, or address)"}
@@ -40,12 +44,16 @@ async def research_area(
             "display": "warning",
         }
 
-    space_id = ctx.context.space_id
+    payload: dict[str, Any] = {"spaceId": ctx.context.space_id, "query": where}
+    buyer = (for_buyer or "").strip()
+    if buyer:
+        payload["forBuyer"] = buyer
+
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
             res = await client.post(
                 f"{settings.app_url}/api/internal/area-research",
-                json={"spaceId": space_id, "query": where},
+                json=payload,
                 headers={"Authorization": f"Bearer {settings.agent_internal_secret}"},
             )
     except Exception as exc:  # network/timeout — fail soft
@@ -117,9 +125,13 @@ async def research_area(
         if fields.get(key)
     ]
 
+    verdict = intel.get("verdict", "")
+    label = report.get("label", where)
     area_card = {
-        "label": report.get("label", where),
+        "label": label,
+        "verdict": verdict,
         "summary": intel.get("summary", ""),
+        "marketAsOf": fields.get("marketAsOf"),
         "generatedAt": report.get("generatedAt", ""),
         "cached": bool(body.get("cached")),
         "metrics": metrics,
@@ -128,8 +140,10 @@ async def research_area(
         "sources": intel.get("sources") or [],
     }
 
+    # Lead the transcript line with the verdict (the judgment), not a label.
+    summary_line = f"Area IQ for {label}: {verdict}" if verdict else f"Area IQ for {label}."
     return {
-        "summary": f"Area IQ for {report.get('label', where)}.",
+        "summary": summary_line,
         "display": "area",
         "data": {"ok": True, "area": area_card},
     }

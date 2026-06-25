@@ -126,6 +126,8 @@ export const AREA_ANALYSIS_JSON_SCHEMA = {
       marketTrendSource: strOrNull,
       medianDaysOnMarket: numOrNull,
       medianDaysOnMarketSource: strOrNull,
+      marketAsOf: { ...strOrNull, description: 'As-of date of the market figures as shown (e.g. "Apr 2026"). Null if undated.' },
+      marketAsOfSource: strOrNull,
       amenitiesSummary: strOrNull,
       amenitiesSummarySource: strOrNull,
       highlights: {
@@ -137,11 +139,19 @@ export const AREA_ANALYSIS_JSON_SCHEMA = {
       lifestyleSummarySource: strOrNull,
       commuteSummary: strOrNull,
       commuteSummarySource: strOrNull,
+      verdict: {
+        type: 'string' as const,
+        description:
+          'ONE punchy sentence of judgment a realtor would lead with: who this area suits, the ' +
+          'standout strength, and the honest catch. Lead with the opinion, not a recap. ' +
+          'Example: "Strong for families: top-rated schools and quiet streets, but you will pay ' +
+          'above the metro median." Grounded in the evidence; no em dash.',
+      },
       summary: {
         type: 'string' as const,
         description:
-          'A 3-5 sentence grounded brief for the realtor: what this area is like for a buyer ' +
-          '(schools, safety, walkability, market, lifestyle). Only state what the evidence supports.',
+          'A 3-5 sentence grounded brief that BACKS the verdict: schools, safety, walkability, ' +
+          'market, lifestyle. Only state what the evidence supports. Do not repeat the verdict verbatim.',
       },
     },
     required: [
@@ -158,10 +168,12 @@ export const AREA_ANALYSIS_JSON_SCHEMA = {
       'medianSalePrice', 'medianSalePriceSource',
       'marketTrend', 'marketTrendSource',
       'medianDaysOnMarket', 'medianDaysOnMarketSource',
+      'marketAsOf', 'marketAsOfSource',
       'amenitiesSummary', 'amenitiesSummarySource',
       'highlights',
       'lifestyleSummary', 'lifestyleSummarySource',
       'commuteSummary', 'commuteSummarySource',
+      'verdict',
       'summary',
     ],
   },
@@ -182,10 +194,12 @@ export interface RawAreaResponse {
   medianSalePrice: number | null; medianSalePriceSource: string | null;
   marketTrend: string | null; marketTrendSource: string | null;
   medianDaysOnMarket: number | null; medianDaysOnMarketSource: string | null;
+  marketAsOf: string | null; marketAsOfSource: string | null;
   amenitiesSummary: string | null; amenitiesSummarySource: string | null;
   highlights: string[];
   lifestyleSummary: string | null; lifestyleSummarySource: string | null;
   commuteSummary: string | null; commuteSummarySource: string | null;
+  verdict: string;
   summary: string;
 }
 
@@ -219,6 +233,7 @@ export function parseAreaResponse(raw: RawAreaResponse): {
   fields: AreaFields;
   fieldSources: AreaFieldSources;
   summary: string;
+  verdict: string;
 } {
   const fieldSources: AreaFieldSources = {};
   const setSource = (key: keyof AreaFields, val: unknown, src: string | null) => {
@@ -253,6 +268,7 @@ export function parseAreaResponse(raw: RawAreaResponse): {
     medianSalePrice: POSITIVE_NUM(raw.medianSalePrice),
     marketTrend,
     medianDaysOnMarket: POSITIVE_NUM(raw.medianDaysOnMarket),
+    marketAsOf: cleanStr(raw.marketAsOf, 40),
     amenitiesSummary: cleanStr(raw.amenitiesSummary, 1200),
     highlights,
     lifestyleSummary: cleanStr(raw.lifestyleSummary, 1200),
@@ -272,13 +288,15 @@ export function parseAreaResponse(raw: RawAreaResponse): {
   setSource('medianSalePrice', fields.medianSalePrice, raw.medianSalePriceSource);
   setSource('marketTrend', fields.marketTrend, raw.marketTrendSource);
   setSource('medianDaysOnMarket', fields.medianDaysOnMarket, raw.medianDaysOnMarketSource);
+  setSource('marketAsOf', fields.marketAsOf, raw.marketAsOfSource);
   setSource('amenitiesSummary', fields.amenitiesSummary, raw.amenitiesSummarySource);
   setSource('lifestyleSummary', fields.lifestyleSummary, raw.lifestyleSummarySource);
   setSource('commuteSummary', fields.commuteSummary, raw.commuteSummarySource);
 
   const summary = typeof raw.summary === 'string' ? raw.summary.trim().slice(0, 2000) : '';
+  const verdict = typeof raw.verdict === 'string' ? raw.verdict.trim().slice(0, 400) : '';
 
-  return { fields, fieldSources, summary };
+  return { fields, fieldSources, summary, verdict };
 }
 
 // ── LLM structuring step ─────────────────────────────────────────────────────
@@ -291,12 +309,15 @@ GROUNDING RULES — follow exactly:
 - If a fact is not present in the evidence, leave that field null (or an empty array). Never guess.
 - Make sure the data describes the TARGET area, not a different city that may also appear on a page. If unsure, leave it null.
 - Map the market direction to one of: rising, steady, cooling. If it doesn't map cleanly, use null.
-- "summary" must be 3-5 sentences and state only things supported by the evidence. If the evidence is thin, say so briefly.`;
+- "marketAsOf": if the market figures show an as-of date, capture it (e.g. "Apr 2026"); otherwise null. Never invent a date.
+- "verdict" is the ONE sentence the realtor leads with: who the area suits, the standout strength, and the honest catch. Lead with the judgment, grounded in the evidence. No em dash.
+- "summary" must be 3-5 sentences that BACK the verdict and state only things supported by the evidence. If the evidence is thin, say so briefly.`;
 
 export async function structureAreaEvidence(evidence: AreaEvidence): Promise<{
   fields: AreaFields;
   fieldSources: AreaFieldSources;
   summary: string;
+  verdict: string;
 }> {
   const client = getLLMClient();
   const model = openaiModel(ANALYSIS_MODEL);
@@ -324,6 +345,57 @@ export async function structureAreaEvidence(evidence: AreaEvidence): Promise<{
   if (!content) throw new Error('LLM returned an empty response');
   const raw = JSON.parse(content) as RawAreaResponse;
   return parseAreaResponse(raw);
+}
+
+// ── Buyer-aware verdict (fast, no web calls) ─────────────────────────────────
+
+const VERDICT_MODEL = 'gpt-5-mini';
+
+/**
+ * Re-cast the area verdict for a SPECIFIC buyer, using ONLY the already-
+ * researched intelligence (no web calls, so it's fast and the shared cache stays
+ * neutral). "Strong for the Chens: top schools and quiet streets for two kids,
+ * but ~8% over their metro budget." Best-effort: any failure returns the neutral
+ * verdict unchanged.
+ */
+export async function tailorVerdict(
+  intelligence: AreaIntelligence,
+  buyer: string,
+): Promise<string> {
+  const who = (buyer ?? '').trim().slice(0, 300);
+  if (!who) return intelligence.verdict;
+  try {
+    const client = getLLMClient();
+    const facts = JSON.stringify({
+      verdict: intelligence.verdict,
+      summary: intelligence.summary,
+      fields: intelligence.fields,
+    }).slice(0, 4000);
+    const res = await client.chat.completions.create(
+      {
+        model: openaiModel(VERDICT_MODEL),
+        temperature: 0.3,
+        max_tokens: 120,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Write ONE sentence: a realtor\'s verdict on whether this area fits THIS buyer, ' +
+              'grounded ONLY in the AREA FACTS given. Lead with the judgment (good fit, mixed, or weak) ' +
+              'and the single reason that matters most to this buyer, then the honest catch. Introduce ' +
+              'no facts beyond those given. No em dash.',
+          },
+          { role: 'user', content: `BUYER: ${who}\n\nAREA FACTS:\n${facts}` },
+        ],
+      },
+      { timeout: 12_000 },
+    );
+    const out = res.choices?.[0]?.message?.content?.trim();
+    return out && out.length > 0 ? out.slice(0, 400) : intelligence.verdict;
+  } catch (err) {
+    logger.warn('[area-analysis] verdict tailoring failed', undefined, err);
+    return intelligence.verdict;
+  }
 }
 
 // ── Orchestrator ─────────────────────────────────────────────────────────────
@@ -361,12 +433,13 @@ export async function analyzeArea(subject: AreaSubject): Promise<AreaAnalyzeOutc
     const pages = await scrapeArea(urls, controller.signal);
 
     const evidence = buildAreaEvidence(subject, results, pages);
-    const { fields, fieldSources, summary } = await structureAreaEvidence(evidence);
+    const { fields, fieldSources, summary, verdict } = await structureAreaEvidence(evidence);
 
     const sources: AnalysisSource[] = dedupeSources(results, pages);
     const intelligence: AreaIntelligence = {
       fields,
       fieldSources,
+      verdict,
       summary,
       sources,
       stats: { searchResults: results.length, scraped: pages.length },

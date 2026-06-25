@@ -35,10 +35,12 @@ function rawBase(): RawAreaResponse {
     medianSalePrice: null, medianSalePriceSource: null,
     marketTrend: null, marketTrendSource: null,
     medianDaysOnMarket: null, medianDaysOnMarketSource: null,
+    marketAsOf: null, marketAsOfSource: null,
     amenitiesSummary: null, amenitiesSummarySource: null,
     highlights: [],
     lifestyleSummary: null, lifestyleSummarySource: null,
     commuteSummary: null, commuteSummarySource: null,
+    verdict: '',
     summary: '',
   };
 }
@@ -53,15 +55,21 @@ describe('parseAreaResponse', () => {
       walkScoreSource: 'https://walkscore.com/x',
       marketTrend: 'rising',
       marketTrendSource: 'https://redfin.com/x',
+      marketAsOf: 'Apr 2026',
+      marketAsOfSource: 'https://redfin.com/x',
+      verdict: 'Strong for young professionals: very walkable, but prices are climbing.',
       summary: 'A walkable, well-rated area.',
     };
-    const { fields, fieldSources, summary } = parseAreaResponse(raw);
+    const { fields, fieldSources, summary, verdict } = parseAreaResponse(raw);
     expect(fields.schoolRating).toBe('8/10');
     expect(fields.walkScore).toBe(87);
     expect(fields.marketTrend).toBe('rising');
+    expect(fields.marketAsOf).toBe('Apr 2026');
     expect(fieldSources.schoolRating).toBe('https://greatschools.org/x');
     expect(fieldSources.walkScore).toBe('https://walkscore.com/x');
+    expect(fieldSources.marketAsOf).toBe('https://redfin.com/x');
     expect(summary).toBe('A walkable, well-rated area.');
+    expect(verdict).toBe('Strong for young professionals: very walkable, but prices are climbing.');
   });
 
   it('clamps scores to 0-100 and drops out-of-range / negative numbers', () => {

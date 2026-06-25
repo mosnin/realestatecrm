@@ -25,7 +25,11 @@ export interface AreaSection {
 /** Fully render-ready card payload. Primitives + flat arrays only. */
 export interface AreaCardData {
   label: string;
+  /** The judgment line the card leads with (buyer-tailored when available). */
+  verdict: string;
   summary: string;
+  /** As-of date of the market figures, when the evidence showed one. */
+  marketAsOf: string | null;
   generatedAt: string;
   cached: boolean;
   metrics: AreaMetric[];
@@ -92,12 +96,23 @@ function buildSections(intel: AreaIntelligence): AreaSection[] {
   return out;
 }
 
-/** Flatten a persisted report into the render-ready card payload. */
-export function toAreaCardData(report: AreaReport, cached: boolean): AreaCardData {
+/**
+ * Flatten a persisted report into the render-ready card payload.
+ *
+ * `verdictOverride` lets a caller swap in a buyer-tailored verdict (from
+ * tailorVerdict) without mutating the shared cached report.
+ */
+export function toAreaCardData(
+  report: AreaReport,
+  cached: boolean,
+  verdictOverride?: string,
+): AreaCardData {
   const intel = report.intelligence;
   return {
     label: report.label,
+    verdict: (verdictOverride && verdictOverride.trim()) || intel.verdict || '',
     summary: intel.summary,
+    marketAsOf: intel.fields.marketAsOf ?? null,
     generatedAt: report.generatedAt,
     cached,
     metrics: buildMetrics(intel.fields),
@@ -107,8 +122,15 @@ export function toAreaCardData(report: AreaReport, cached: boolean): AreaCardDat
   };
 }
 
-/** A one-line summary of the area for the chat transcript / tool result. */
-export function summariseArea(report: AreaReport): string {
+/**
+ * A one-line summary of the area for the chat transcript / tool result. Leads
+ * with the verdict (the judgment) when present, falling back to the headline
+ * facts. `verdictOverride` carries a buyer-tailored verdict when available.
+ */
+export function summariseArea(report: AreaReport, verdictOverride?: string): string {
+  const verdict = (verdictOverride && verdictOverride.trim()) || report.intelligence.verdict;
+  if (verdict) return `Area IQ — ${report.label}: ${verdict}`;
+
   const f = report.intelligence.fields;
   const bits: string[] = [];
   if (f.schoolRating) bits.push(`schools ${f.schoolRating}`);

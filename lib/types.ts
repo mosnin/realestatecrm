@@ -525,6 +525,8 @@ export interface AreaFields {
   medianSalePrice: number | null;
   marketTrend: AreaMarketTrend | null;
   medianDaysOnMarket: number | null;
+  /** As-of date of the market figures as shown in the evidence (e.g. "Apr 2026"). */
+  marketAsOf: string | null;
   /** Amenities + lifestyle + commute. */
   amenitiesSummary: string | null;
   highlights: string[]; // notable nearby places/features (parks, dining, transit)
@@ -539,6 +541,13 @@ export type AreaFieldSources = Partial<Record<keyof AreaFields, string>>;
 export interface AreaIntelligence {
   fields: AreaFields;
   fieldSources: AreaFieldSources;
+  /**
+   * The judgment line — the "so what" a realtor leads with. One grounded
+   * sentence of opinion (who the area suits, the standout pro, the honest
+   * caveat), not a recap. This is the headline; `summary` is the supporting
+   * paragraph.
+   */
+  verdict: string;
   summary: string;
   sources: AnalysisSource[];
   stats: { searchResults: number; scraped: number };
