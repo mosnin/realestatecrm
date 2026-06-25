@@ -43,7 +43,7 @@ export default async function ChippiPage({
   // Verify the authenticated user owns this space.
   const { data: spaceOwner } = await supabase
     .from('User')
-    .select('id')
+    .select('id, name')
     .eq('clerkId', userId)
     .eq('id', space.ownerId)
     .maybeSingle();
@@ -144,6 +144,7 @@ export default async function ChippiPage({
         initialPrefill={initialPrefill}
         showConnectBanner={showConnectBanner}
         skills={skills}
+        accountName={(spaceOwner.name as string | null) ?? null}
       />
     </div>
   );
