@@ -4,7 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ArrowRight } from 'lucide-react';
 import { computeCommission, type CommissionSplit } from '@/lib/commissions';
-import { formatCurrency, formatCompact } from '@/lib/formatting';
+import { formatCurrency, formatCompact, pluralize } from '@/lib/formatting';
 import {
   H1,
   H3,
@@ -131,7 +131,7 @@ export default async function PropertiesCommissionsPage({
           value={closedNet}
           format={formatCompact}
           label="Closed net YTD"
-          sub={`${closedYtd.length} won deal${closedYtd.length === 1 ? '' : 's'}`}
+          sub={`${closedYtd.length} won ${pluralize(closedYtd.length, 'deal')}`}
         />
         <CommissionStatCell
           value={closedGci}
@@ -143,7 +143,7 @@ export default async function PropertiesCommissionsPage({
           value={expectedNet}
           format={formatCompact}
           label="Expected net"
-          sub={`${inFlight.length} active deal${inFlight.length === 1 ? '' : 's'}`}
+          sub={`${inFlight.length} active ${pluralize(inFlight.length, 'deal')}`}
         />
         <CommissionStatCell
           value={stillOwedOut}
