@@ -35,6 +35,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { PLANS, type PlanId } from '@/lib/plans';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -337,7 +338,7 @@ export function BillingPage({
             <div className="flex items-center gap-2.5">
               <Clock size={16} className="text-blue-600 dark:text-blue-400" />
               <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                {trialInfo.daysLeft} {trialInfo.daysLeft === 1 ? 'day' : 'days'} left in your trial
+                {countLabel(trialInfo.daysLeft, 'day')} left in your trial
               </p>
             </div>
             <p className="text-xs text-blue-600/70 dark:text-blue-400/70 flex-shrink-0">

@@ -23,6 +23,22 @@ export type LeadScoringResult = {
 };
 
 /**
+ * Resolve the scoring lead type. An explicit `buyer`/`rental` request always
+ * wins; a `general` or absent request defers to the form config's own
+ * `leadType`; everything else falls back to `rental` (the historical default).
+ * Pure + exported so the precedence is pinned independently of the LLM call.
+ */
+export function resolveScoredLeadType(
+  leadType: 'rental' | 'buyer' | 'general' | undefined,
+  formConfig: IntakeFormConfig | null,
+): 'rental' | 'buyer' {
+  if (leadType === 'buyer') return 'buyer';
+  if (leadType === 'rental') return 'rental';
+  if (formConfig?.leadType === 'buyer') return 'buyer';
+  return 'rental';
+}
+
+/**
  * Score a lead against a dynamic intake form.
  *
  * `formConfig` should be the config the submission was captured with. If it is
@@ -35,14 +51,7 @@ export async function scoreLeadApplicationDynamic(input: {
   answers?: Record<string, string | string[] | number | boolean>;
   leadType?: 'rental' | 'buyer' | 'general';
 }): Promise<LeadScoringResult> {
-  const normalizedLeadType: 'rental' | 'buyer' =
-    input.leadType === 'buyer'
-      ? 'buyer'
-      : input.leadType === 'rental'
-        ? 'rental'
-        : input.formConfig?.leadType === 'buyer'
-          ? 'buyer'
-          : 'rental';
+  const normalizedLeadType = resolveScoredLeadType(input.leadType, input.formConfig);
 
   // Always score against a real intake form config. When a submission has no
   // stored config, use the default template the public intake renders so the

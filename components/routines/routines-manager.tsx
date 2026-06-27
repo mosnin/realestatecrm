@@ -593,7 +593,7 @@ function RoutineComposer({
   function submit() {
     const text = instruction.trim();
     if (text.length < MIN_INSTRUCTION) {
-      setError('Write a full sentence — what should Chippi do?');
+      setError('Write a full sentence. What should Chippi do?');
       return;
     }
     if (cadence === 'custom' && daysOfWeek.length === 0) {

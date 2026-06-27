@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { countLabel } from '@/lib/formatting';
 import {
   MessageCircle,
   User,
@@ -108,7 +109,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
                 <p className="flex items-center gap-1.5"><Mail size={11} className="text-muted-foreground" /> {prep.guestEmail}</p>
                 {prep.guestPhone && <p className="flex items-center gap-1.5"><Phone size={11} className="text-muted-foreground" /> {prep.guestPhone}</p>}
                 {prep.propertyAddress && <p className="flex items-center gap-1.5"><MapPin size={11} className="text-muted-foreground" /> {prep.propertyAddress}</p>}
-                {prep.previousTours > 0 && <p className="text-[10px] text-muted-foreground">{prep.previousTours} previous tour{prep.previousTours > 1 ? 's' : ''}</p>}
+                {prep.previousTours > 0 && <p className="text-[10px] text-muted-foreground">{countLabel(prep.previousTours, 'previous tour')}</p>}
               </div>
             </div>
 

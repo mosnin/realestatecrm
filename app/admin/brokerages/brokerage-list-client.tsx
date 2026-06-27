@@ -9,6 +9,7 @@ import { Search, Building2, X, CheckCircle2, XCircle, ChevronRight } from 'lucid
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL } from '@/lib/typography';
+import { pluralize } from '@/lib/formatting';
 
 type BrokerageRow = {
   id: string;
@@ -112,7 +113,7 @@ export function BrokerageListClient({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>
           <strong className="text-foreground font-semibold">{resultCount}</strong>{' '}
-          {resultCount === 1 ? 'brokerage' : 'brokerages'}
+          {pluralize(resultCount, 'brokerage')}
         </span>
         {isPending && <span className="text-xs animate-pulse">Loading…</span>}
       </div>

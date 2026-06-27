@@ -84,7 +84,7 @@ export function ClickToCallButton({
       }
 
       setState('connected');
-      toastSuccess('Calling — pick up your phone.');
+      toastSuccess('Calling. Pick up your phone.');
       // Settle back so the button is reusable for the next call.
       setTimeout(() => setState('idle'), 4000);
     } catch {

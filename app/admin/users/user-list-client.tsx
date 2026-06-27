@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Search, Users, X, ShieldBan, ShieldCheck, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { timeAgo } from '@/lib/formatting';
+import { timeAgo, pluralize } from '@/lib/formatting';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL } from '@/lib/typography';
@@ -257,7 +257,7 @@ export function UserListClient({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>
           <strong className="text-foreground font-semibold">{resultCount}</strong>{' '}
-          {resultCount === 1 ? 'user' : 'users'}
+          {pluralize(resultCount, 'user')}
         </span>
         {isPending && (
           <span className="text-xs animate-pulse">Loading…</span>

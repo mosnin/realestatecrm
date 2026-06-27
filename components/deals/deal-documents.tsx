@@ -15,6 +15,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import {
   Dialog,
   DialogContent,
@@ -383,7 +384,7 @@ function AttachFromFilesDialog({
       const attached: DealDocument[] = await res.json();
       onAttached(attached);
       toast.success(
-        attached.length === 1 ? 'Attached 1 file.' : `Attached ${attached.length} files.`,
+        `Attached ${attached.length} ${pluralize(attached.length, 'file')}.`,
       );
       onOpenChange(false);
     } catch {

@@ -62,7 +62,7 @@ import {
   BODY_MUTED,
   H1,
 } from '@/lib/typography';
-import { formatCompact } from '@/lib/formatting';
+import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 import { BriefCell, useBriefMotionEnabled } from './brief-motion';
@@ -263,21 +263,21 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
   }[] = [
     {
       n: needsYou.newLeads,
-      label: needsYou.newLeads === 1 ? 'New lead' : 'New leads',
+      label: pluralize(needsYou.newLeads, 'New lead', 'New leads'),
       sub: 'not yet contacted',
       href: `/s/${slug}/leads`,
       icon: Users,
     },
     {
       n: needsYou.followUpsDue,
-      label: needsYou.followUpsDue === 1 ? 'Follow-up due' : 'Follow-ups due',
+      label: pluralize(needsYou.followUpsDue, 'Follow-up due', 'Follow-ups due'),
       sub: 'today or overdue',
       href: `/s/${slug}/follow-ups`,
       icon: CalendarClock,
     },
     {
       n: needsYou.pendingDrafts,
-      label: needsYou.pendingDrafts === 1 ? 'Draft ready' : 'Drafts ready',
+      label: pluralize(needsYou.pendingDrafts, 'Draft ready', 'Drafts ready'),
       sub: 'approve or edit',
       href: `/s/${slug}/chippi/inbox`,
       icon: FileText,
@@ -493,7 +493,7 @@ function PipelineCell({ slug, pipeline }: { slug: string; pipeline: NonNullable<
       <div className="mt-3 grid grid-cols-2 gap-y-4 gap-x-3">
         <Stat
           value={<AnimatedNumber value={pipeline.active} />}
-          label={pipeline.active === 1 ? 'active deal' : 'active deals'}
+          label={pluralize(pipeline.active, 'active deal')}
         />
         <Stat
           value={

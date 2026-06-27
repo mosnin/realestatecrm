@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { EASE_APPLE, EASE_OUT } from '@/lib/motion';
 import { BODY_MUTED, PRIMARY_PILL, TITLE_FONT } from '@/lib/typography';
 
@@ -20,7 +21,7 @@ const RATING_COPY: Record<number, string> = {
   2: 'Thanks for the honest read.',
   3: 'Good to know.',
   4: 'Glad it went well.',
-  5: 'Wonderful — thank you.',
+  5: 'Wonderful, thank you.',
 };
 
 // Paper-flat field — identical family to the booking form's inputs so the
@@ -52,10 +53,10 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
         setSubmitted(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "That didn't go through — usually temporary.");
+        setError(data.error || "That didn't go through. Usually temporary.");
       }
     } catch {
-      setError("Couldn't reach the server — usually temporary.");
+      setError("Couldn't reach the server. Usually temporary.");
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +112,7 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
               type="button"
               role="radio"
               aria-checked={rating === n}
-              aria-label={`${n} star${n > 1 ? 's' : ''}`}
+              aria-label={countLabel(n, 'star')}
               onClick={() => setRating(n)}
               onMouseEnter={() => setHoveredRating(n)}
               onFocus={() => setHoveredRating(n)}

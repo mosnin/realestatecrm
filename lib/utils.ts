@@ -46,6 +46,10 @@ export function safeHref(url: string | null | undefined): string {
   if (!url) return '#';
   const trimmed = url.trim();
   if (!trimmed) return '#';
+  // Protocol-relative ("//evil.com") resolves to an off-origin absolute URL
+  // when parsed against an https base, so it would otherwise slip through the
+  // http(s) check below. Block it up front, matching the relative-only intent.
+  if (trimmed.startsWith('//')) return '#';
   try {
     const parsed = new URL(trimmed, 'https://placeholder.invalid');
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -76,6 +80,9 @@ export function safeImageSrc(url: string | null | undefined): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
+  // Same protocol-relative guard as safeHref: "//evil.com" is an off-origin
+  // absolute URL in disguise, not a same-origin relative path.
+  if (trimmed.startsWith('//')) return null;
   try {
     const parsed = new URL(trimmed, 'https://placeholder.invalid');
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -106,4 +113,25 @@ export function formatPhoneAsTyped(raw: string): string {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
   return `+${digits.slice(0, 1)} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+}
+
+/**
+ * Format a STORED phone number for display. Prettifies US 10- and 11-digit
+ * numbers as "(415) 555-0123" / "+1 (415) 555-0123"; ANY other shape
+ * (international, an extension, something already formatted, a partial) is
+ * returned trimmed but otherwise untouched, so we never mangle a non-US number
+ * the way the as-typed formatter would (it slices to 11 digits). Null/blank →
+ * empty string. Presentation only, not validation.
+ */
+export function formatPhoneDisplay(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const trimmed = String(raw).trim();
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return trimmed;
 }

@@ -36,9 +36,19 @@ export function formatPropertyAddress(p: {
   city: string | null;
   stateRegion: string | null;
 }): string {
-  const unit = p.unitNumber ? ` #${p.unitNumber}` : '';
-  const cityState = [p.city, p.stateRegion].filter(Boolean).join(', ');
-  return cityState ? `${p.address}${unit}, ${cityState}` : `${p.address}${unit}`;
+  // Trim every part so stray whitespace can't produce a leading comma or a
+  // dangling unit. When the street line is blank, fall back to city/state
+  // alone instead of rendering ", Austin, TX".
+  const address = (p.address ?? '').trim();
+  const unitRaw = (p.unitNumber ?? '').trim();
+  const unit = address && unitRaw ? ` #${unitRaw}` : '';
+  const cityState = [p.city, p.stateRegion]
+    .map((x) => (x ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
+  const street = address ? `${address}${unit}` : '';
+  if (street && cityState) return `${street}, ${cityState}`;
+  return street || cityState;
 }
 
 /** Short chips like "3bd · 2ba · 1,450 sqft". */

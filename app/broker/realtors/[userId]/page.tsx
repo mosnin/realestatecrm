@@ -1,7 +1,7 @@
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
-import { formatCompact } from '@/lib/formatting';
+import { formatCompact, pluralize } from '@/lib/formatting';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -149,9 +149,9 @@ export default async function RealtorDrilldownPage({ params }: Params) {
   // mirroring the Realtors-list "Coach" affordance so the two surfaces agree.
   const coachSummary = (() => {
     const bits: string[] = [];
-    if (overdueFollowUps > 0) bits.push(`${overdueFollowUps} overdue follow-up${overdueFollowUps === 1 ? '' : 's'}`);
-    if (newLeads > 0) bits.push(`${newLeads} new lead${newLeads === 1 ? '' : 's'}`);
-    if (activeDeals > 0) bits.push(`${activeDeals} active deal${activeDeals === 1 ? '' : 's'} worth ${formatCompact(pipelineValue)}`);
+    if (overdueFollowUps > 0) bits.push(`${overdueFollowUps} overdue ${pluralize(overdueFollowUps, 'follow-up')}`);
+    if (newLeads > 0) bits.push(`${newLeads} new ${pluralize(newLeads, 'lead')}`);
+    if (activeDeals > 0) bits.push(`${activeDeals} active ${pluralize(activeDeals, 'deal')} worth ${formatCompact(pipelineValue)}`);
     if (wonDeals > 0) bits.push(`${wonDeals} won`);
     return bits.length > 0 ? bits.join(', ') : 'quiet, nothing notable yet';
   })();
@@ -256,7 +256,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
             {formatCompact(pipelineValue)}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-            {activeDeals} active deal{activeDeals === 1 ? '' : 's'}
+            {activeDeals} active {pluralize(activeDeals, 'deal')}
           </p>
         </div>
         <div className="bg-background px-4 py-4">
@@ -265,7 +265,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
             {formatCompact(wonValue)}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-            {wonDeals} deal{wonDeals === 1 ? '' : 's'} won
+            {wonDeals} {pluralize(wonDeals, 'deal')} won
           </p>
         </div>
       </section>

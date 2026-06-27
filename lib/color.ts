@@ -2,9 +2,13 @@
  * Decide between white or near-black text for a given background hex color.
  * Uses the W3C relative luminance formula. Returns the higher-contrast option.
  */
-export function pickContrastColor(bgHex: string): '#ffffff' | '#0c0c0d' {
-  const hex = bgHex.replace('#', '');
-  if (hex.length !== 6 && hex.length !== 3) return '#ffffff';
+export function pickContrastColor(bgHex: string | null | undefined): '#ffffff' | '#0c0c0d' {
+  // Accept a nullable accent color without throwing, and reject anything that
+  // isn't a valid 3/6-digit hex (a stray char would otherwise parse to NaN and
+  // silently pick the wrong contrast). Both fall back to white.
+  if (typeof bgHex !== 'string') return '#ffffff';
+  const hex = bgHex.trim().replace(/^#/, '');
+  if ((hex.length !== 6 && hex.length !== 3) || /[^0-9a-fA-F]/.test(hex)) return '#ffffff';
   const full = hex.length === 3
     ? hex.split('').map((c) => c + c).join('')
     : hex;

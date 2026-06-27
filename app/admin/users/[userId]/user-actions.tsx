@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { toastCopied } from '@/lib/toast-helpers';
+import { pluralize } from '@/lib/formatting';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
 import {
@@ -767,7 +768,7 @@ export function UserActions({
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {sessions.length === 0
                     ? 'No active sessions for this user.'
-                    : `${sessions.length} active session${sessions.length === 1 ? '' : 's'}.`}
+                    : `${sessions.length} active ${pluralize(sessions.length, 'session')}.`}
                 </p>
               </div>
               {sessions.length > 0 && (

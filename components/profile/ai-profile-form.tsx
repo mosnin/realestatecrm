@@ -357,7 +357,7 @@ export function AIProfileForm({ slug: _slug, spaceId }: AIProfileFormProps) {
             value={profile.agentPersonalizationNote ?? ''}
             onChange={(e) => setField('agentPersonalizationNote', e.target.value || null)}
             onBlur={() => saveOnBlur(profile)}
-            placeholder="Any specific way you want Chippi to behave — tone, format, topics to avoid..."
+            placeholder="Any specific way you want Chippi to behave: tone, format, topics to avoid..."
           />
           <p className={cn(BODY_MUTED, 'text-xs')}>
             This is fed directly into Chippi&apos;s context.

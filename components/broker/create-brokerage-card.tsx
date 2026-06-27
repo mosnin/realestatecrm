@@ -61,7 +61,7 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
         setError(data.error ?? 'Failed to create brokerage.');
       }
     } catch {
-      setError("Couldn't reach the server — usually temporary.");
+      setError("Couldn't reach the server. Usually temporary.");
     } finally {
       setLoading(false);
     }

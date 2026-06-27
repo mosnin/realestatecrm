@@ -313,7 +313,7 @@ export function PermissionPromptView({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
-            {isSendEmail ? 'Email draft — review and send' : isSendSms ? 'SMS draft — review and send' : 'Approve before running'}
+            {isSendEmail ? 'Email draft: review and send' : isSendSms ? 'SMS draft: review and send' : 'Approve before running'}
           </p>
           <p className="text-sm font-semibold text-foreground">{prompt.summary}</p>
 

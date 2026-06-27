@@ -44,7 +44,7 @@ export function SwarmLaunchForm({ slug, spaceId, availableAgents }: SwarmLaunchF
 
     const trimmed = goal.trim();
     if (trimmed.length < 10) {
-      setError('Describe what you want to accomplish — at least 10 characters.');
+      setError('Describe what you want to accomplish. At least 10 characters.');
       return;
     }
 

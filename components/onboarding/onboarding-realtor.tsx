@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { rootDomain, cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { readSignupPlan } from '@/lib/signup-plan';
 import { OnboardingShell } from './onboarding-shell';
 
@@ -228,7 +229,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       if (!spaceRes.ok) {
         if (spaceRes.status === 409) {
           setSlugState({ kind: 'taken' });
-          setError('That URL was just taken — pick another.');
+          setError('That URL was just taken. Pick another.');
           setSubmitting(false);
           return;
         }
@@ -252,7 +253,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       setSubmitting(false);
       goNext();
     } catch {
-      setError("Couldn't save that — usually temporary.");
+      setError("Couldn't save that. Usually temporary.");
       setSubmitting(false);
     }
   }, [role, tenure, zipCode, businessName, slug, slugState, name, goNext]);
@@ -320,7 +321,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       toast.success("You're in. Chippi is ready.");
       router.push(`/s/${slug}/chippi`);
     } catch {
-      setError("Couldn't finish setup — usually temporary.");
+      setError("Couldn't finish setup. Usually temporary.");
       setSubmitting(false);
     }
   }, [saveProfilePartial, slug, router, role, businessName]);
@@ -822,7 +823,7 @@ function StagePlan({
         />
         <PlanCard
           eyebrow="Watching"
-          title={sourceCount > 0 ? `${sourceCount} lead ${sourceCount === 1 ? 'source' : 'sources'} on my radar` : 'Inbox and intake link'}
+          title={sourceCount > 0 ? `${sourceCount} lead ${pluralize(sourceCount, 'source')} on my radar` : 'Inbox and intake link'}
           body={sourceCount > 0
             ? "Connect them in Settings → Integrations and I'll start pulling leads in."
             : "Connect more sources in Settings → Integrations whenever you're ready."}

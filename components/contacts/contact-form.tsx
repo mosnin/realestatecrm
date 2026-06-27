@@ -327,7 +327,7 @@ export function ContactForm({
 
       if (!res.ok) {
         if (res.status === 429 || (payload as { code?: ParseErrorCode })?.code === 'rate_limited') {
-          toast.message("I'm slow today — try the form instead.");
+          toast.message("I'm slow today. Try the form instead.");
           flipToFillFromError(text);
           return;
         }

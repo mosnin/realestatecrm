@@ -129,7 +129,7 @@ function statusLine(s: CardState): string {
       return 'Planning the work…';
     case 'running':
       if (s.agentCount != null) {
-        return s.activity ?? `Working — ${s.completed}/${s.agentCount} done`;
+        return s.activity ?? `Working: ${s.completed}/${s.agentCount} done`;
       }
       return s.activity ?? 'Working…';
     case 'auditing':

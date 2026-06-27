@@ -6,6 +6,7 @@ import {
   type StageMetricRow,
 } from '@/lib/deal-metrics';
 import { SECTION_LABEL } from '@/lib/typography';
+import { countLabel } from '@/lib/formatting';
 
 /**
  * Realtor performance strip — the three pipeline numbers that move output:
@@ -67,7 +68,7 @@ export function PerformanceStrip({
               {bottleneck.stageName}
             </p>
             <p className="text-xs text-muted-foreground tabular-nums">
-              {bottleneck.count} {bottleneck.count === 1 ? 'deal' : 'deals'} ·{' '}
+              {countLabel(bottleneck.count, 'deal')} ·{' '}
               {Math.round(bottleneck.avgAgeDays)} day avg
             </p>
           </div>

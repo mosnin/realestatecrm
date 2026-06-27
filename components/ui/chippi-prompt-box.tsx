@@ -1407,7 +1407,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                         <FileText size={13} strokeWidth={1.85} />
                       </span>
                       <span className="flex-1">
-                        {mode === 'draft' ? 'Draft mode — on' : 'Draft mode'}
+                        {mode === 'draft' ? 'Draft mode: on' : 'Draft mode'}
                       </span>
                     </button>
                   </div>

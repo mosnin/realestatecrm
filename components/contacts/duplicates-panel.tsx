@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Users, Mail, Phone, Loader2, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { toast } from 'sonner';
 
 type DedupConfidence = 'high' | 'medium' | 'low';
@@ -159,7 +160,7 @@ export function DuplicatesPanel({
       const mergedCount = Array.isArray(data?.merged) ? data.merged.length : 0;
       toast.success(
         mergedCount > 0
-          ? `Merged ${mergedCount} duplicate${mergedCount === 1 ? '' : 's'}.`
+          ? `Merged ${countLabel(mergedCount, 'duplicate')}.`
           : 'Already merged.',
       );
       // Drop the group from the list; keep the dialog open for the rest.
@@ -284,7 +285,7 @@ export function DuplicatesPanel({
                       </div>
                       {refTotal > 0 && (
                         <p className="mt-1.5 text-muted-foreground">
-                          {refTotal} linked record{refTotal === 1 ? '' : 's'} (deals, activity, tours,
+                          {countLabel(refTotal, 'linked record')} (deals, activity, tours,
                           documents…) will move to the kept contact.
                         </p>
                       )}

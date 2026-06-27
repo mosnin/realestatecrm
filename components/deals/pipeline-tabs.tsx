@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { toast } from 'sonner';
 import { MoreHorizontal, Plus, Check, X, Pencil, Palette, Trash2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -446,8 +447,8 @@ export function PipelineTabs({
             <DialogHeader>
               <DialogTitle>Delete &ldquo;{deleteState.pipeline.name}&rdquo;?</DialogTitle>
               <DialogDescription>
-                This board has {deleteState.dealCount} deal{deleteState.dealCount === 1 ? '' : 's'} across{' '}
-                {deleteState.stageCount} stage{deleteState.stageCount === 1 ? '' : 's'}. Choose a board to move them to before deleting.
+                This board has {deleteState.dealCount} {pluralize(deleteState.dealCount, 'deal')} across{' '}
+                {deleteState.stageCount} {pluralize(deleteState.stageCount, 'stage')}. Choose a board to move them to before deleting.
               </DialogDescription>
             </DialogHeader>
             <Select

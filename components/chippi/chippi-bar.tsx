@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Send, Square, Loader2, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
@@ -307,7 +308,7 @@ export function ChippiBar({ slug }: Props) {
                   href={chippiHref}
                   className="block text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  + {hiddenCount} earlier message{hiddenCount === 1 ? '' : 's'} — see all
+                  + {countLabel(hiddenCount, 'earlier message')} · see all
                 </Link>
               )}
 
@@ -424,7 +425,7 @@ export function ChippiBar({ slug }: Props) {
             onPointerLeave={() => { if (dictation.listening) stopDictation(); }}
             onPointerCancel={() => { if (dictation.listening) stopDictation(); }}
             disabled={!!pendingApproval}
-            aria-label={dictation.listening ? 'Listening — release to send' : 'Hold to talk'}
+            aria-label={dictation.listening ? 'Listening. Release to send' : 'Hold to talk'}
             title="Hold to talk"
             className={cn(
               'w-8 h-8 flex items-center justify-center rounded-full transition-all',

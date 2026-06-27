@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property, AreaReport } from '@/lib/types';
-import { formatCurrency, formatCompact } from '@/lib/formatting';
+import { formatCurrency, formatCompact, pluralize } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { SECTION_LABEL, TITLE_FONT, H3 } from '@/lib/typography';
 import { EASE_OUT, DURATION_BASE } from '@/lib/motion';
@@ -92,10 +92,10 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
 
   const numericStats = [
     property.beds != null
-      ? { icon: BedDouble, value: property.beds, label: property.beds === 1 ? 'Bed' : 'Beds' }
+      ? { icon: BedDouble, value: property.beds, label: pluralize(property.beds, 'Bed', 'Beds') }
       : null,
     property.baths != null
-      ? { icon: Bath, value: property.baths, label: property.baths === 1 ? 'Bath' : 'Baths' }
+      ? { icon: Bath, value: property.baths, label: pluralize(property.baths, 'Bath', 'Baths') }
       : null,
     property.squareFeet != null
       ? { icon: Ruler, value: property.squareFeet, label: 'Sq ft', fmt: (n: number) => Math.round(n).toLocaleString() }

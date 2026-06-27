@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { timeAgo } from '@/lib/formatting';
+import { timeAgo, countLabel, pluralize } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
@@ -259,7 +259,7 @@ function DraftRow({
     } catch {
       if (mountedRef.current) {
         setActioning(null);
-        setDismissError('Could not dismiss — please try again.');
+        setDismissError('Could not dismiss. Please try again.');
       }
     }
   }
@@ -989,7 +989,7 @@ export function AgentDraftInbox({ slug }: Props) {
       {!loading && drafts.length > 0 && (
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
           <span className="text-xs text-muted-foreground tabular-nums">
-            {drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'}
+            {countLabel(drafts.length, 'draft')}
           </span>
           <div className="ml-auto flex items-center gap-2">
             {drafts.length > 1 && (
@@ -1093,7 +1093,7 @@ export function AgentDraftInbox({ slug }: Props) {
             ) : (
               <Send size={12} />
             )}
-            Approve {selectedIds.size} draft{selectedIds.size === 1 ? '' : 's'}
+            Approve {selectedIds.size} {pluralize(selectedIds.size, 'draft')}
           </Button>
           <Button
             variant="ghost"

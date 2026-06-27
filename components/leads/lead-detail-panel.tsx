@@ -31,6 +31,7 @@ import {
   toDateInputValue,
   getInitials,
   timeAgo,
+  countLabel,
 } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 
@@ -212,6 +213,7 @@ export function LeadDetailPanel({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 mt-0.5"
           >
             <X size={16} />
@@ -405,15 +407,15 @@ export function LeadDetailPanel({
                     {app?.numberOfOccupants != null && (
                       <DetailChip
                         icon={Users}
-                        label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`}
+                        label={countLabel(app.numberOfOccupants, 'occupant')}
                       />
                     )}
                     {app?.numberOfOccupants == null && app?.adultsOnApplication != null && (
                       <DetailChip
                         icon={Users}
-                        label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${
+                        label={`${countLabel(app.adultsOnApplication, 'adult')}${
                           (app.childrenOrDependents ?? 0) > 0
-                            ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}`
+                            ? ` · ${countLabel(app.childrenOrDependents ?? 0, 'child', 'children')}`
                             : ''
                         }`}
                       />

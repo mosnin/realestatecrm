@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils';
 import { ConvertLeadDialog } from './convert-lead-dialog';
 import type { Contact, ApplicationData, LeadScoreDetails, SavedView } from '@/lib/types';
 import { downloadCSV, downloadLeadsCSV } from '@/lib/csv';
-import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
+import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue, countLabel } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { EASE_APPLE } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
@@ -439,7 +439,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
   async function handleBulkDelete() {
     const ids = [...selectedIds];
     const confirmed = await confirm({
-      title: `Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`,
+      title: `Delete ${countLabel(ids.length, 'lead')}?`,
       description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
@@ -452,7 +452,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
       if (failed > 0) {
         toast.error(`Couldn't delete ${failed} of ${ids.length} leads. Try those again.`);
       } else {
-        toast.success(`Deleted ${ids.length} lead${ids.length !== 1 ? 's' : ''}.`);
+        toast.success(`Deleted ${countLabel(ids.length, 'lead')}.`);
       }
       setLeads((prev) => prev.filter((l) => !successIds.includes(l.id)));
     } catch {
@@ -902,10 +902,10 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                       {incomeDisplay && <QChip icon={DollarSign} label={incomeDisplay} />}
                       {app?.targetMoveInDate && <QChip icon={Calendar} label={app.targetMoveInDate} />}
                       {(app?.numberOfOccupants != null) && (
-                        <QChip icon={Users} label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`} />
+                        <QChip icon={Users} label={countLabel(app.numberOfOccupants, 'occupant')} />
                       )}
                       {(app?.numberOfOccupants == null && app?.adultsOnApplication != null) && (
-                        <QChip icon={Users} label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${(app.childrenOrDependents ?? 0) > 0 ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}` : ''}`} />
+                        <QChip icon={Users} label={`${countLabel(app.adultsOnApplication, 'adult')}${(app.childrenOrDependents ?? 0) > 0 ? ` · ${countLabel(app.childrenOrDependents ?? 0, 'child', 'children')}` : ''}`} />
                       )}
                       {app?.hasPets && <QChip icon={PawPrint} label={app.petDetails ?? 'Has pets'} />}
                     </>

@@ -172,10 +172,10 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
         onImported(data.created);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Import didn't go through — usually temporary.");
+        setError(data.error ?? "Import didn't go through. Usually temporary.");
       }
     } catch {
-      setError("Import didn't go through — usually temporary.");
+      setError("Import didn't go through. Usually temporary.");
     } finally {
       setImporting(false);
     }
@@ -401,7 +401,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
                 disabled={!hasNameMapping || importRows.length === 0}
                 onClick={() => setStep('confirm')}
               >
-                Next — {importRows.length} rows
+                Next · {importRows.length} rows
               </Button>
             )}
             {step === 'confirm' && (

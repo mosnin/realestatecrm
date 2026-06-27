@@ -26,7 +26,17 @@ export function downloadCSV(filename: string, rows: Record<string, unknown>[]): 
   URL.revokeObjectURL(url);
 }
 
-function escapeCsvCell(val: unknown): string {
+/**
+ * Escape one CSV cell. Exported so the security-critical behavior (formula-
+ * injection neutralization + quoting) can be unit-tested directly.
+ *
+ * - Cells starting with a formula trigger (= + - @ tab CR) are prefixed with a
+ *   single quote inside quotes so a spreadsheet treats them as text, never as a
+ *   formula (the `=cmd|...` class of attack via an exported contact field).
+ * - Cells containing a comma, newline, or quote are quoted; embedded quotes are
+ *   doubled per RFC 4180.
+ */
+export function escapeCsvCell(val: unknown): string {
   if (val == null) return '';
   const str = String(val).replace(/"/g, '""');
   // Prevent CSV formula injection: always quote cells starting with =, +, -, @, tab

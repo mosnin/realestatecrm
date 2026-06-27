@@ -2,7 +2,7 @@
 
 import { Phone, Mail, Clock, ExternalLink, ChevronRight, ChevronDown } from 'lucide-react';
 import { useState, useRef, useCallback } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhoneDisplay } from '@/lib/utils';
 import { timeAgo, formatFollowUpDate, formatMoney } from '@/lib/formatting';
 import { EntityCard } from '../entity-card';
 import { CardSkeleton } from '../card-skeleton';
@@ -103,7 +103,7 @@ function CollapsedRow({
             <span className="truncate">{contact.email}</span>
           )}
           {contact.phone && (
-            <span className="truncate">{contact.phone}</span>
+            <span className="truncate">{formatPhoneDisplay(contact.phone)}</span>
           )}
           {overdue && (
             <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">
@@ -167,7 +167,7 @@ function ExpandedDetail({
             className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-border/70 bg-background hover:bg-muted/30 transition-colors"
           >
             <Phone size={11} />
-            {detail.phone}
+            {formatPhoneDisplay(detail.phone)}
           </a>
         )}
         {detail.email && (

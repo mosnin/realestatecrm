@@ -47,7 +47,7 @@ export function SubscriptionGate({
         setLoading(false);
       }
     } catch {
-      alert("That didn't go through — usually temporary.");
+      alert("That didn't go through. Usually temporary.");
       setLoading(false);
     }
   }

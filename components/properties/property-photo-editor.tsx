@@ -22,6 +22,7 @@ import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Star, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 
 /** Apple ease-out cubic — entrances, reorders. */
 const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -71,7 +72,7 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
     // Truncate to `remaining` so we don't silently lose extras to the cap.
     const toUpload = picked.slice(0, remaining);
     if (picked.length > toUpload.length) {
-      setError(`Only ${toUpload.length} more photo${toUpload.length === 1 ? '' : 's'} fit.`);
+      setError(`Only ${countLabel(toUpload.length, 'more photo')} fit.`);
     }
 
     try {
