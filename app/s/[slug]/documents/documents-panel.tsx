@@ -31,6 +31,7 @@ import DOMPurify from 'isomorphic-dompurify';
 import { motion } from 'framer-motion';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 // next/dynamic with ssr:false — TipTap reaches for browser APIs (window,
@@ -277,7 +278,7 @@ export function DocumentsPanel() {
         <p className="text-[13px] text-muted-foreground">
           {loading
             ? 'Loading…'
-            : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
+            : `${docs.length} ${pluralize(docs.length, 'document')}`}
         </p>
         <button
           type="button"
