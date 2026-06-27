@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import {
   H1,
   TITLE_FONT,
@@ -204,7 +205,7 @@ export default function RulesClient({
   const subtitle =
     sortedRules.length === 0
       ? `No rules yet. Falling back to ${METHOD_LABEL[fallbackMethod].toLowerCase()}.`
-      : `${sortedRules.length} rule${sortedRules.length === 1 ? '' : 's'}. ${METHOD_LABEL[fallbackMethod]} handles the rest.`;
+      : `${sortedRules.length} ${pluralize(sortedRules.length, 'rule')}. ${METHOD_LABEL[fallbackMethod]} handles the rest.`;
 
   return (
     <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
