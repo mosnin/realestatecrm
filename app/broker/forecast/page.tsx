@@ -12,7 +12,7 @@ import {
   type DealStatus,
   type StageMetricRow,
 } from '@/lib/deal-metrics';
-import { formatCurrency, formatCompact } from '@/lib/formatting';
+import { formatCurrency, formatCompact, pluralize } from '@/lib/formatting';
 import {
   H1,
   TITLE_FONT,
@@ -509,7 +509,7 @@ export default async function BrokerForecastPage() {
               <AnimatedNumber value={totalForecast} format={formatCurrency} />
             </p>
             <p className={cn(CAPTION, 'tabular-nums')}>
-              {activeCount} active deal{activeCount === 1 ? '' : 's'} in the model
+              {activeCount} active {pluralize(activeCount, 'deal')} in the model
               {defaultBrokerRate != null && (
                 <> &middot; default rate {Math.round(defaultBrokerRate * 100)}%</>
               )}
@@ -528,7 +528,7 @@ export default async function BrokerForecastPage() {
               <p className={cn(CAPTION, 'mt-1')}>
                 Won so far
                 {wonCount > 0 && (
-                  <> &middot; {wonCount} deal{wonCount === 1 ? '' : 's'}</>
+                  <> &middot; {wonCount} {pluralize(wonCount, 'deal')}</>
                 )}
               </p>
             </div>
@@ -671,7 +671,7 @@ export default async function BrokerForecastPage() {
                           </p>
                           <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5">
                             <span className={META}>
-                              {r.activeCount} active deal{r.activeCount === 1 ? '' : 's'}
+                              {r.activeCount} active {pluralize(r.activeCount, 'deal')}
                             </span>
                             <span className={META}>
                               {r.conversion !== null
@@ -734,8 +734,8 @@ export default async function BrokerForecastPage() {
                       {bottleneckReport.worstStage.stageName}
                     </span>
                     {' '}&middot; {Math.round(bottleneckReport.worstStage.avgAgeDays)}d on
-                    average across {bottleneckReport.worstStage.count} active deal
-                    {bottleneckReport.worstStage.count === 1 ? '' : 's'}.
+                    average across {bottleneckReport.worstStage.count} active{' '}
+                    {pluralize(bottleneckReport.worstStage.count, 'deal')}.
                   </p>
                 )}
                 <ul className="divide-y divide-border/60 mt-4">
@@ -749,7 +749,7 @@ export default async function BrokerForecastPage() {
                       </span>
                       <div className="flex-shrink-0 flex items-center gap-3">
                         <span className={cn(META, 'tabular-nums')}>
-                          {s.count} deal{s.count === 1 ? '' : 's'}
+                          {s.count} {pluralize(s.count, 'deal')}
                         </span>
                         <span
                           className="text-[15px] leading-none tabular-nums text-foreground"
