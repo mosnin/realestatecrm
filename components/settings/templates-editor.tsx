@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, MessageSquare, Mail, FileText, Loader2, Check, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import {
   TEMPLATE_VARIABLES,
   type MessageChannel,
@@ -110,7 +111,7 @@ export function TemplatesEditor({ initial }: Props) {
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {items.length} {items.length === 1 ? 'template' : 'templates'}
+            {countLabel(items.length, 'template')}
           </p>
           <button
             type="button"

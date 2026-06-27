@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 
 export type SeatPlan = 'team' | 'team_plus';
 
@@ -123,7 +124,7 @@ export function SeatUsagePill({
           className="h-1.5 w-1.5 rounded-full bg-emerald-500"
         />
         <span>
-          {safeUsed} {safeUsed === 1 ? 'member' : 'members'}
+          {countLabel(safeUsed, 'member')}
           <span className="opacity-50"> &middot; </span>
           Unlimited
         </span>
