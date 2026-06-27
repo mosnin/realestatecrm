@@ -16,6 +16,7 @@
  */
 
 import { useMemo } from 'react';
+import { countLabel } from '@/lib/formatting';
 import { ToolGroup, type NestedTool, type NestedToolCategory } from '@/components/ui/tool-group';
 import { Steps } from '@/components/ai/prompt-kit';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
@@ -195,7 +196,7 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
       ? blocks.length === 1
         ? 'Task failed'
         : 'Tasks failed'
-      : `Task completed with ${failures.length} ${failures.length === 1 ? 'failure' : 'failures'}`;
+      : `Task completed with ${countLabel(failures.length, 'failure')}`;
 
   // First failure's error string is the most useful breadcrumb — surface it
   // truncated so the realtor sees WHY without expanding. Empty result.error
