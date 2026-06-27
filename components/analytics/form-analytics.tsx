@@ -11,6 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { ArrowDownRight } from 'lucide-react';
 import {
   ChartContainer,
@@ -410,7 +411,7 @@ export function FormAnalytics({
           value={totalAvgTime > 0 ? fmtDuration(totalAvgTime) : '--'}
           sub={
             data.funnel.length > 0
-              ? `Across ${data.funnel.length} step${data.funnel.length !== 1 ? 's' : ''}`
+              ? `Across ${countLabel(data.funnel.length, 'step')}`
               : 'No timing data'
           }
         />
