@@ -16,6 +16,7 @@ import {
 } from '@/lib/sentry-api';
 import { ObservabilityClient } from './observability-client';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export default async function ObservabilityPage() {
     ? 'Sentry is not connected — set the three env vars to enable this view.'
     : unresolvedCount === 0
     ? 'No unresolved issues. All clear.'
-    : `${unresolvedCount} unresolved ${unresolvedCount === 1 ? 'issue' : 'issues'} in the last 14 days.`;
+    : `${unresolvedCount} unresolved ${pluralize(unresolvedCount, 'issue')} in the last 14 days.`;
 
   return (
     <div className="space-y-8 pb-12">
