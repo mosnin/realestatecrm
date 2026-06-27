@@ -314,15 +314,19 @@ async def run_swarm_endpoint(payload: dict) -> dict:
 # (none of these tools shell out or write outside postgres) and cost 5–15s
 # of cold-start on every turn. Inline run, same security boundary, no tax.
 #
-# scaledown_window=150: keep the warm container alive for 150s after the last
-# request instead of Modal's default 60s. A realtor reading Chippi's reply and
-# typing the next message almost always lands inside that window, so follow-up
-# turns reuse the warm container and skip the cold start. The container still
-# scales to zero when truly idle, so this only adds warmth AFTER activity, at
-# negligible cost. (The first message after a long gap still pays spin-up;
-# killing that needs min_containers>=1, a separate always-on cost decision.)
+# min_containers=1: keep ONE container always running so the FIRST message after
+# any idle gap skips the 5–15s cold start — the realtor never waits on spin-up.
+# This is an always-on cost (one CPU container billed 24/7 even with zero
+# traffic), chosen deliberately so interactive chat feels instant. Only the
+# interactive chat endpoint gets this; the autonomous run_now_webhook (cron /
+# triggers) does not, because no one is waiting on those.
+#
+# scaledown_window=150: on top of the always-warm floor, keep ADDITIONAL
+# containers (spun up under concurrent load) alive for 150s after their last
+# request instead of Modal's default 60s, so a burst of turns reuses warm
+# capacity before scaling back down to the min_containers=1 floor.
 
-@app.function(secrets=secrets, timeout=600, scaledown_window=150)
+@app.function(secrets=secrets, timeout=600, scaledown_window=150, min_containers=1)
 @modal.fastapi_endpoint(method="POST")
 async def chat_turn(item: dict):
     """Run one chat turn for the realtor and stream SDK events as SSE."""
