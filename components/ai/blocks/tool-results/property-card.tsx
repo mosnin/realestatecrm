@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Building2, ChevronRight, ChevronDown, MapPin, ImageOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { CardSkeleton } from '../card-skeleton';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 
@@ -277,8 +278,7 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
                           Deals
                         </span>
                         <span className="text-foreground">
-                          {detail.dealCount} active{' '}
-                          {detail.dealCount === 1 ? 'deal' : 'deals'}
+                          {detail.dealCount} active {pluralize(detail.dealCount, 'deal')}
                         </span>
                       </div>
                     )}

@@ -212,6 +212,7 @@ export function LeadDetailPanel({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 mt-0.5"
           >
             <X size={16} />
