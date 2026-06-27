@@ -1,6 +1,7 @@
 'use client';
 
 import { toast } from 'sonner';
+import { countLabel } from '@/lib/formatting';
 import { DealInlineField } from './deal-inline-field';
 
 interface Props {
@@ -29,7 +30,7 @@ export function DealCloseDateField({ dealId, initial }: Props) {
       }
       const data = await res.json();
       if (data.updated > 0) {
-        toast.success(`Shifted ${data.updated} checklist item${data.updated === 1 ? '' : 's'}.`);
+        toast.success(`Shifted ${countLabel(data.updated, 'checklist item')}.`);
       } else {
         toast.message('Nothing to shift. All items are either done or dateless.');
       }
