@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { countLabel } from '@/lib/formatting';
+import { countLabel, pluralize } from '@/lib/formatting';
 import {
   SeatUsagePill,
   normalizeSeatUsage,
@@ -201,7 +201,7 @@ export function BulkInviteForm({ seatUsage }: BulkInviteFormProps = {}) {
 
         {exceedsCap && remainingLabel !== null && (
           <p className="text-xs text-rose-600 dark:text-rose-400">
-            Only {remainingLabel} seat{remainingLabel === 1 ? '' : 's'} available.{' '}
+            Only {remainingLabel} {pluralize(remainingLabel, 'seat')} available.{' '}
             <Link href="/broker/billing" className="underline underline-offset-2">
               Upgrade plan
             </Link>{' '}

@@ -13,6 +13,7 @@
 
 import Link from 'next/link';
 import { PLANS, WORKFLOW_CREDIT_COST, TOPUPS, isAnnualAvailable } from '@/lib/plans';
+import { pluralize } from '@/lib/formatting';
 import { PricingPlans } from '@/components/marketing/giga/pricing-plans';
 import {
   Band,
@@ -163,7 +164,7 @@ export default function PricingPage() {
                   <li key={k} className="flex items-center justify-between px-5 py-3.5">
                     <span className="text-[13.5px] text-white/80">{WORKFLOW_LABELS[k]}</span>
                     <span className="text-[13px] tabular-nums text-white/45">
-                      {WORKFLOW_CREDIT_COST[k]} {WORKFLOW_CREDIT_COST[k] === 1 ? 'credit' : 'credits'}
+                      {WORKFLOW_CREDIT_COST[k]} {pluralize(WORKFLOW_CREDIT_COST[k], 'credit')}
                     </span>
                   </li>
                 ))}
