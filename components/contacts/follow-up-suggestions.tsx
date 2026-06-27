@@ -31,19 +31,19 @@ function getSuggestions(props: FollowUpSuggestionsProps): Suggestion[] {
   if (scoreLabel === 'hot') {
     suggestions.push({
       label: 'Same-day follow-up',
-      description: 'Hot lead — reach out today while interest is high',
+      description: 'Hot lead. Reach out today while interest is high',
       delayHours: 2,
     });
   } else if (scoreLabel === 'warm') {
     suggestions.push({
       label: 'Follow up tomorrow',
-      description: 'Warm lead — follow up within 24 hours',
+      description: 'Warm lead. Follow up within 24 hours',
       delayHours: 24,
     });
   } else if (scoreLabel === 'cold') {
     suggestions.push({
       label: 'Weekly check-in',
-      description: 'Cold lead — set a reminder for next week',
+      description: 'Cold lead. Set a reminder for next week',
       delayHours: 168,
     });
   }
@@ -52,7 +52,7 @@ function getSuggestions(props: FollowUpSuggestionsProps): Suggestion[] {
   if (hasTours && contactType === 'TOUR' && !hasDeals) {
     suggestions.push({
       label: 'Post-tour follow-up',
-      description: 'Tour completed — check in on their interest level',
+      description: 'Tour completed. Check in on their interest level',
       delayHours: 24,
     });
   }
