@@ -128,7 +128,7 @@ export function FlagForReviewButton({
 
       if (res.status === 409) {
         if (errMsg.includes('already has an open review')) {
-          toast.message('Already flagged — your broker is reviewing.');
+          toast.message('Already flagged. Your broker is reviewing.');
         } else {
           toast.error(errMsg);
         }

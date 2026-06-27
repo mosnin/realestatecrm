@@ -31,7 +31,7 @@ export function DealCloseDateField({ dealId, initial }: Props) {
       if (data.updated > 0) {
         toast.success(`Shifted ${data.updated} checklist item${data.updated === 1 ? '' : 's'}.`);
       } else {
-        toast.message('Nothing to shift — all items are either done or dateless.');
+        toast.message('Nothing to shift. All items are either done or dateless.');
       }
     } catch {
       toast.error("Couldn't shift the checklist.");
