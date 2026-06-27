@@ -32,6 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
   H1,
@@ -129,7 +130,7 @@ export function SyncView({ slug }: SyncViewProps) {
     if (!data) return 'Connect a CRM to see your contacts here.';
     if (!data.connected) return 'Connect a CRM to bring your contacts in.';
     if (data.records.length === 0) return `Connected to ${sourceLabel(data.source)}. Nothing to show yet.`;
-    return `${data.records.length} contact${data.records.length === 1 ? '' : 's'} from ${sourceLabel(data.source)}.`;
+    return `${data.records.length} ${pluralize(data.records.length, 'contact')} from ${sourceLabel(data.source)}.`;
   }
 
   return (
