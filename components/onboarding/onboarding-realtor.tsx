@@ -229,7 +229,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       if (!spaceRes.ok) {
         if (spaceRes.status === 409) {
           setSlugState({ kind: 'taken' });
-          setError('That URL was just taken — pick another.');
+          setError('That URL was just taken. Pick another.');
           setSubmitting(false);
           return;
         }
@@ -253,7 +253,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       setSubmitting(false);
       goNext();
     } catch {
-      setError("Couldn't save that — usually temporary.");
+      setError("Couldn't save that. Usually temporary.");
       setSubmitting(false);
     }
   }, [role, tenure, zipCode, businessName, slug, slugState, name, goNext]);
@@ -321,7 +321,7 @@ export function OnboardingRealtor({ defaultName }: Props) {
       toast.success("You're in. Chippi is ready.");
       router.push(`/s/${slug}/chippi`);
     } catch {
-      setError("Couldn't finish setup — usually temporary.");
+      setError("Couldn't finish setup. Usually temporary.");
       setSubmitting(false);
     }
   }, [saveProfilePartial, slug, router, role, businessName]);

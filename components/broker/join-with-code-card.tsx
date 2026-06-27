@@ -31,7 +31,7 @@ export function JoinWithCodeCard() {
         setError(data.error ?? 'Failed to join brokerage.');
       }
     } catch {
-      setError("Couldn't reach the server — usually temporary.");
+      setError("Couldn't reach the server. Usually temporary.");
     } finally {
       setLoading(false);
     }
