@@ -36,6 +36,7 @@ import { TITLE_FONT } from '@/lib/typography';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
 import { toast } from 'sonner';
@@ -843,7 +844,7 @@ export function KanbanBoard({
         return;
       }
       toast.success(
-        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted the stage.`,
+        `Moved ${countLabel(stageDelete.dealCount, 'deal')} and deleted the stage.`,
       );
       setStageDelete(null);
       fetchData();

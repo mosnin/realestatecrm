@@ -50,7 +50,7 @@ export function DealCloseDateField({ dealId, initial }: Props) {
     if (days === 0) return;
 
     const direction = days > 0 ? 'later' : 'earlier';
-    toast(`Close date moved ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ${direction}.`, {
+    toast(`Close date moved ${countLabel(Math.abs(days), 'day')} ${direction}.`, {
       description: 'Shift unchecked checklist items by the same amount?',
       action: { label: 'Shift', onClick: () => runShift(days) },
       cancel: { label: 'Keep', onClick: () => undefined },
