@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { pluralize } from '@/lib/formatting';
 
 type WizardState = 'choose' | 'preview' | 'done';
 
@@ -275,17 +276,17 @@ export function OffboardMemberDialog({
               <div className="rounded-lg border border-border bg-card p-4 space-y-2">
                 <p className="text-sm">
                   <span className="font-semibold tabular-nums">{preview.contactCount}</span>{' '}
-                  brokerage {preview.contactCount === 1 ? 'contact' : 'contacts'} will move
+                  brokerage {pluralize(preview.contactCount, 'contact')} will move
                   to{' '}
                   <span className="font-medium">{preview.destinationUserName}</span>
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold tabular-nums">{preview.dealCount}</span>{' '}
-                  {preview.dealCount === 1 ? 'deal' : 'deals'} will follow them
+                  {pluralize(preview.dealCount, 'deal')} will follow them
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold tabular-nums">{preview.openTourCount}</span>{' '}
-                  open {preview.openTourCount === 1 ? 'tour' : 'tours'} will be reassigned
+                  open {pluralize(preview.openTourCount, 'tour')} will be reassigned
                 </p>
               </div>
             )}
@@ -335,15 +336,15 @@ export function OffboardMemberDialog({
                 <span className="tabular-nums font-medium text-foreground">
                   {result.contactsMoved}
                 </span>{' '}
-                {result.contactsMoved === 1 ? 'contact' : 'contacts'},{' '}
+                {pluralize(result.contactsMoved, 'contact')},{' '}
                 <span className="tabular-nums font-medium text-foreground">
                   {result.dealsMoved}
                 </span>{' '}
-                {result.dealsMoved === 1 ? 'deal' : 'deals'},{' '}
+                {pluralize(result.dealsMoved, 'deal')},{' '}
                 <span className="tabular-nums font-medium text-foreground">
                   {result.toursMoved}
                 </span>{' '}
-                {result.toursMoved === 1 ? 'tour' : 'tours'} moved to{' '}
+                {pluralize(result.toursMoved, 'tour')} moved to{' '}
                 <span className="font-medium text-foreground">
                   {destinationDisplayName}
                 </span>
