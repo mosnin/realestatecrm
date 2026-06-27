@@ -5,6 +5,7 @@ import { getClientUser } from '@/lib/client-auth';
 import { getClientPortalData } from '@/lib/client-portal-data';
 import { getClientDeals } from '@/lib/client-deals';
 import { TITLE_FONT } from '@/lib/typography';
+import { pluralize } from '@/lib/formatting';
 import { LogoutButton } from '../portal-actions';
 import { PortalFadeIn, PortalStagger, PortalStaggerItem } from '../portal-motion';
 import {
@@ -34,11 +35,11 @@ export default async function DashboardPage() {
     total === 0
       ? 'nothing in flight yet — it lands here the moment you apply or book.'
       : [
-          deals.length > 0 ? `${deals.length} deal${deals.length === 1 ? '' : 's'}` : null,
+          deals.length > 0 ? `${deals.length} ${pluralize(deals.length, 'deal')}` : null,
           applications.length > 0
-            ? `${applications.length} application${applications.length === 1 ? '' : 's'}`
+            ? `${applications.length} ${pluralize(applications.length, 'application')}`
             : null,
-          tours.length > 0 ? `${tours.length} tour${tours.length === 1 ? '' : 's'}` : null,
+          tours.length > 0 ? `${tours.length} ${pluralize(tours.length, 'tour')}` : null,
         ]
           .filter(Boolean)
           .join(' · ') + ' in motion.';
