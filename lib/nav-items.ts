@@ -55,8 +55,14 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/chippi/brief', label: 'Brief' },
       { href: '/chippi/inbox', label: 'Inbox' },
-      { href: '/chippi/history', label: 'Activity' },
-      { href: '/chippi/triggers', label: 'Integrations' },
+      // Activity = the live cross-app event feed (/chippi/triggers). History =
+      // Chippi's own action log (/chippi/history). Integrations = the
+      // connect/disconnect management surface. These three were previously
+      // mislabeled (Activity↔Integrations crossed, no dedicated Integrations
+      // page), which is what made the dropdown feel broken.
+      { href: '/chippi/triggers', label: 'Activity' },
+      { href: '/chippi/history', label: 'History' },
+      { href: '/chippi/integrations', label: 'Integrations' },
       { href: '/routines', label: 'Routines' },
     ],
   },

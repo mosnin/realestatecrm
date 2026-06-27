@@ -1,0 +1,68 @@
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
+import { getSpaceFromSlug } from '@/lib/space';
+import { supabase } from '@/lib/supabase';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
+import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+
+export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Integrations — Chippi' };
+
+/**
+ * /chippi/integrations — connect/disconnect the third-party apps Chippi acts
+ * through (Gmail, Slack, Calendar, CRM, …). This is the MANAGEMENT surface
+ * (the connect buttons + health), distinct from /chippi/triggers, which is
+ * the live ACTIVITY feed of what those connections fired. Previously the nav
+ * conflated the two — "Integrations" pointed at the activity feed. This page
+ * gives integrations their own home.
+ *
+ * Mirrors the realtor Settings → Connections mount: `ConnectedAppsSection`
+ * with just `slug` resolves to the realtor `/api/integrations` endpoints.
+ */
+export default async function ChippiIntegrationsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{
+    integration?: string;
+    reason?: string;
+    toolkit?: string;
+  }>;
+}) {
+  const { slug } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect('/login/realtor');
+
+  const space = await getSpaceFromSlug(slug);
+  if (!space) notFound();
+
+  // Ownership gate — mirror the other /chippi/* sub-pages.
+  const { data: spaceOwner } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', userId)
+    .eq('id', space.ownerId)
+    .maybeSingle();
+  if (!spaceOwner) notFound();
+
+  const sp = await searchParams;
+  const callbackResult =
+    sp.integration === 'connected' || sp.integration === 'failed'
+      ? {
+          ok: sp.integration === 'connected',
+          reason: sp.reason ?? null,
+          toolkit: sp.toolkit ?? null,
+        }
+      : null;
+
+  return (
+    <ChippiPageShell
+      greeting="Integrations."
+      title="The apps I act through."
+      subtitle="Connect your tools so I can work across them. I never send without your tap."
+    >
+      <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
+    </ChippiPageShell>
+  );
+}
