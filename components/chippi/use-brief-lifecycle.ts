@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { pluralize } from '@/lib/formatting';
 
 export type BriefLifecycleState = 'live' | 'settled' | 'carried';
 
@@ -83,8 +84,8 @@ export function formatProgress(
   // Pre-B5: we know handled-or-not but not which/how-many cards. The
   // honest summary is "handled" or just the count.
   // Post-B5: replace with actual tap-count from cardTaps[].length.
-  if (actedAt) return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'} · handled`;
-  return `${totalCards} ${totalCards === 1 ? 'card' : 'cards'}`;
+  if (actedAt) return `${totalCards} ${pluralize(totalCards, 'card')} · handled`;
+  return `${totalCards} ${pluralize(totalCards, 'card')}`;
 }
 
 /** Format "last opened 7:11a" in short local time. */
