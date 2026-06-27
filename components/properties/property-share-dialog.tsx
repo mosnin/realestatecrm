@@ -6,6 +6,7 @@ import { Copy, Check, Loader2, Share2, Trash2, RefreshCw, X } from 'lucide-react
 import type { PropertyPacket } from '@/lib/types';
 import type { DealDocument } from '@/lib/deals/documents';
 import { documentKindLabel } from '@/lib/deals/documents';
+import { pluralize } from '@/lib/formatting';
 
 interface Props {
   propertyId: string;
@@ -214,7 +215,7 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>
-                        {p.viewCount} view{p.viewCount === 1 ? '' : 's'}
+                        {p.viewCount} {pluralize(p.viewCount, 'view')}
                         {p.lastViewedAt && ` · last ${new Date(p.lastViewedAt).toLocaleDateString()}`}
                       </span>
                       {!dead && (
