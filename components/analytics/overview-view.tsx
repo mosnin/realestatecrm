@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
+import { countLabel, pluralize } from '@/lib/formatting';
 import {
   StatCell,
   StatStrip,
@@ -36,8 +37,8 @@ const dealsConfig = {
 export function OverviewView({ data }: { data: OverviewData }) {
   const reduce = useReducedMotion();
   const statusSentence = data.totalContacts > 0
-    ? `${data.totalContacts} ${data.totalContacts === 1 ? 'person' : 'people'} in your book, ${data.totalDeals} active ${data.totalDeals === 1 ? 'deal' : 'deals'}.`
-    : 'No data yet — start by adding your first contact.';
+    ? `${countLabel(data.totalContacts, 'person', 'people')} in your book, ${data.totalDeals} active ${pluralize(data.totalDeals, 'deal')}.`
+    : 'No data yet. Start by adding your first contact.';
 
   return (
     <div className={SECTION_RHYTHM}>
