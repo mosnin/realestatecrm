@@ -31,6 +31,7 @@ import {
   toDateInputValue,
   getInitials,
   timeAgo,
+  countLabel,
 } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 
@@ -406,15 +407,15 @@ export function LeadDetailPanel({
                     {app?.numberOfOccupants != null && (
                       <DetailChip
                         icon={Users}
-                        label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`}
+                        label={countLabel(app.numberOfOccupants, 'occupant')}
                       />
                     )}
                     {app?.numberOfOccupants == null && app?.adultsOnApplication != null && (
                       <DetailChip
                         icon={Users}
-                        label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${
+                        label={`${countLabel(app.adultsOnApplication, 'adult')}${
                           (app.childrenOrDependents ?? 0) > 0
-                            ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}`
+                            ? ` · ${countLabel(app.childrenOrDependents ?? 0, 'child', 'children')}`
                             : ''
                         }`}
                       />
