@@ -12,6 +12,8 @@ import {
   getInitials,
   formatFollowUpDate,
   toDateInputValue,
+  pluralize,
+  countLabel,
 } from '@/lib/formatting';
 
 describe('timeAgo', () => {
@@ -58,6 +60,27 @@ describe('formatCompact', () => {
 
   it('guards non-finite values', () => {
     expect(formatCompact(NaN)).toBe('$0');
+  });
+});
+
+describe('pluralize / countLabel', () => {
+  it('picks singular only for exactly one', () => {
+    expect(pluralize(1, 'deal')).toBe('deal');
+    expect(pluralize(0, 'deal')).toBe('deals');
+    expect(pluralize(3, 'deal')).toBe('deals');
+    expect(pluralize(-1, 'deal')).toBe('deal'); // "-1 deal"
+  });
+
+  it('honors an irregular plural', () => {
+    expect(pluralize(2, 'property', 'properties')).toBe('properties');
+    expect(pluralize(1, 'property', 'properties')).toBe('property');
+  });
+
+  it('countLabel joins count + noun with thousands separators', () => {
+    expect(countLabel(1, 'deal')).toBe('1 deal');
+    expect(countLabel(0, 'deal')).toBe('0 deals');
+    expect(countLabel(1500, 'lead')).toBe('1,500 leads');
+    expect(countLabel(2, 'property', 'properties')).toBe('2 properties');
   });
 });
 

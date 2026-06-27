@@ -43,6 +43,27 @@ export function formatCurrency(n: number): string {
 export const formatMoney = formatCurrency;
 
 /**
+ * Pick singular vs plural for a count. Defaults the plural to `${singular}s`.
+ * e.g. pluralize(1, 'deal') → 'deal', pluralize(3, 'deal') → 'deals',
+ *      pluralize(2, 'property', 'properties') → 'properties'.
+ *
+ * Single source of truth for the ~85 hand-rolled `n === 1 ? 'x' : 'xs'` ternaries
+ * scattered across the UI.
+ */
+export function pluralize(count: number, singular: string, plural?: string): string {
+  return Math.abs(count) === 1 ? singular : (plural ?? `${singular}s`);
+}
+
+/**
+ * A count plus its correctly-pluralized noun, with thousands separators.
+ * e.g. countLabel(1, 'deal') → '1 deal', countLabel(1500, 'lead') → '1,500 leads'.
+ */
+export function countLabel(count: number, singular: string, plural?: string): string {
+  const n = Number.isFinite(count) ? count : 0;
+  return `${n.toLocaleString('en-US')} ${pluralize(n, singular, plural)}`;
+}
+
+/**
  * Formats a number as compact USD for chart axes and tooltips.
  * e.g. 1500000 → "$1.5M", 15000 → "$15K", -2000000 → "-$2.0M".
  * Non-finite input renders as "$0" rather than "$NaN".

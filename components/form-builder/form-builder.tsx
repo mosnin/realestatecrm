@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { countLabel } from '@/lib/formatting';
 import {
   DndContext,
   DragOverlay,
@@ -317,7 +318,7 @@ function SortableSection({
           )}
         </div>
         <span className="text-xs text-muted-foreground flex-shrink-0 mt-0.5 tabular-nums">
-          {section.questions.length} {section.questions.length === 1 ? 'question' : 'questions'}
+          {countLabel(section.questions.length, 'question')}
         </span>
       </div>
 
