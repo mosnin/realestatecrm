@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, X, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getInitials } from '@/lib/formatting';
+import { getInitials, pluralize } from '@/lib/formatting';
 import { BODY_MUTED } from '@/lib/typography';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
@@ -60,9 +60,9 @@ export function MembersClient({
   const subtitle = (() => {
     if (members.length === 0) return `Nobody on the team at ${brokerageName} yet.`;
     if (pendingCount > 0) {
-      return `${activeCount} active · ${pendingCount} pending invite${pendingCount === 1 ? '' : 's'}.`;
+      return `${activeCount} active · ${pendingCount} pending ${pluralize(pendingCount, 'invite')}.`;
     }
-    return `${activeCount} ${activeCount === 1 ? 'person' : 'people'} on the team.`;
+    return `${activeCount} ${pluralize(activeCount, 'person', 'people')} on the team.`;
   })();
 
   return (
