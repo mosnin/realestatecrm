@@ -308,7 +308,7 @@ export function ChippiBar({ slug }: Props) {
                   href={chippiHref}
                   className="block text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  + {countLabel(hiddenCount, 'earlier message')} — see all
+                  + {countLabel(hiddenCount, 'earlier message')} · see all
                 </Link>
               )}
 
@@ -425,7 +425,7 @@ export function ChippiBar({ slug }: Props) {
             onPointerLeave={() => { if (dictation.listening) stopDictation(); }}
             onPointerCancel={() => { if (dictation.listening) stopDictation(); }}
             disabled={!!pendingApproval}
-            aria-label={dictation.listening ? 'Listening — release to send' : 'Hold to talk'}
+            aria-label={dictation.listening ? 'Listening. Release to send' : 'Hold to talk'}
             title="Hold to talk"
             className={cn(
               'w-8 h-8 flex items-center justify-center rounded-full transition-all',

@@ -89,7 +89,7 @@ export function ChippiPowerToggle() {
         type="button"
         onClick={handleClick}
         disabled={saving}
-        title={enabled ? 'Chippi is running — click to pause' : 'Chippi is paused — click to resume'}
+        title={enabled ? 'Chippi is running. Click to pause' : 'Chippi is paused. Click to resume'}
         aria-label={enabled ? 'Pause Chippi' : 'Resume Chippi'}
         className={cn(
           'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-border/70 text-xs font-medium transition-colors disabled:opacity-50',

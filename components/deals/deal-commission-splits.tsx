@@ -146,7 +146,7 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
                       ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                       : 'border border-border text-muted-foreground hover:border-foreground',
                   )}
-                  title={paid ? 'Paid — tap to unmark' : 'Unpaid — tap to mark paid'}
+                  title={paid ? 'Paid. Tap to unmark' : 'Unpaid. Tap to mark paid'}
                 >
                   {paid && <Check size={11} />}
                 </button>

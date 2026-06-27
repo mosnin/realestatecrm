@@ -401,7 +401,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
                 disabled={!hasNameMapping || importRows.length === 0}
                 onClick={() => setStep('confirm')}
               >
-                Next — {importRows.length} rows
+                Next · {importRows.length} rows
               </Button>
             )}
             {step === 'confirm' && (
