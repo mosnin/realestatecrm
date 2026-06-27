@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { countLabel } from '@/lib/formatting';
 import { EASE_APPLE, EASE_OUT } from '@/lib/motion';
 import { BODY_MUTED, PRIMARY_PILL, TITLE_FONT } from '@/lib/typography';
 
@@ -111,7 +112,7 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
               type="button"
               role="radio"
               aria-checked={rating === n}
-              aria-label={`${n} star${n > 1 ? 's' : ''}`}
+              aria-label={countLabel(n, 'star')}
               onClick={() => setRating(n)}
               onMouseEnter={() => setHoveredRating(n)}
               onFocus={() => setHoveredRating(n)}
