@@ -127,7 +127,7 @@ export function AgentSettingsPanel({ slug: _slug }: Props) {
           setRunResult(data.method === 'modal' ? 'On it.' : (data.note ?? 'Queued for the next sweep.'));
           setTimeout(() => void load(), 3000);
         } else {
-          setRunResult("Couldn't kick myself off — check the Modal deployment.");
+          setRunResult("Couldn't kick myself off. Check the Modal deployment.");
         }
       }
     } catch {

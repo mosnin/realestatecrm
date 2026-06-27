@@ -259,7 +259,7 @@ function DraftRow({
     } catch {
       if (mountedRef.current) {
         setActioning(null);
-        setDismissError('Could not dismiss — please try again.');
+        setDismissError('Could not dismiss. Please try again.');
       }
     }
   }
