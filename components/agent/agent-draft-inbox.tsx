@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { timeAgo, countLabel } from '@/lib/formatting';
+import { timeAgo, countLabel, pluralize } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
@@ -1093,7 +1093,7 @@ export function AgentDraftInbox({ slug }: Props) {
             ) : (
               <Send size={12} />
             )}
-            Approve {selectedIds.size} draft{selectedIds.size === 1 ? '' : 's'}
+            Approve {selectedIds.size} {pluralize(selectedIds.size, 'draft')}
           </Button>
           <Button
             variant="ghost"
