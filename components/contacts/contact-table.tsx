@@ -55,7 +55,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
-import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
+import { formatCurrency as _formatCurrency, getInitials, countLabel } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { DuplicatesPanel } from './duplicates-panel';
@@ -428,7 +428,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   async function handleBulkDelete() {
     const ids = [...selectedIds];
     const confirmed = await confirm({
-      title: `Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`,
+      title: `Delete ${countLabel(ids.length, 'client')}?`,
       description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
@@ -520,7 +520,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       return;
     }
     const verb = mode === 'add' ? 'Tagged' : 'Untagged';
-    if (result.applied > 0) toast.success(`${verb} ${result.applied} contact${result.applied !== 1 ? 's' : ''}.`);
+    if (result.applied > 0) toast.success(`${verb} ${countLabel(result.applied, 'contact')}.`);
     const failures = result.results.length - result.applied;
     if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
     if (result.applied === 0 && failures === 0) toast.success(`No change for ${count}.`);
@@ -534,7 +534,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       return;
     }
     if (result.applied > 0) {
-      toast.success(`Archived ${result.applied} contact${result.applied !== 1 ? 's' : ''}.`);
+      toast.success(`Archived ${countLabel(result.applied, 'contact')}.`);
     }
     const failures = result.results.length - result.applied;
     if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
@@ -649,11 +649,11 @@ export function ContactTable({ slug }: ContactTableProps) {
   const subtitle = (() => {
     if (loading || error) return null;
     if (contacts.length === 0) return null;
-    const noun = contacts.length === 1 ? 'contact' : 'contacts';
+    const label = countLabel(contacts.length, 'contact');
     if (newThisWeekCount > 0) {
-      return `${contacts.length} ${noun} · ${newThisWeekCount} new this week.`;
+      return `${label} · ${newThisWeekCount} new this week.`;
     }
-    return `${contacts.length} ${noun}.`;
+    return `${label}.`;
   })();
 
   return (
