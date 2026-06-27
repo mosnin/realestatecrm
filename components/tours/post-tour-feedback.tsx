@@ -20,7 +20,7 @@ const RATING_COPY: Record<number, string> = {
   2: 'Thanks for the honest read.',
   3: 'Good to know.',
   4: 'Glad it went well.',
-  5: 'Wonderful — thank you.',
+  5: 'Wonderful, thank you.',
 };
 
 // Paper-flat field — identical family to the booking form's inputs so the
@@ -52,10 +52,10 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
         setSubmitted(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "That didn't go through — usually temporary.");
+        setError(data.error || "That didn't go through. Usually temporary.");
       }
     } catch {
-      setError("Couldn't reach the server — usually temporary.");
+      setError("Couldn't reach the server. Usually temporary.");
     } finally {
       setSubmitting(false);
     }
