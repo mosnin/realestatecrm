@@ -46,6 +46,10 @@ export function safeHref(url: string | null | undefined): string {
   if (!url) return '#';
   const trimmed = url.trim();
   if (!trimmed) return '#';
+  // Protocol-relative ("//evil.com") resolves to an off-origin absolute URL
+  // when parsed against an https base, so it would otherwise slip through the
+  // http(s) check below. Block it up front, matching the relative-only intent.
+  if (trimmed.startsWith('//')) return '#';
   try {
     const parsed = new URL(trimmed, 'https://placeholder.invalid');
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -76,6 +80,9 @@ export function safeImageSrc(url: string | null | undefined): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
+  // Same protocol-relative guard as safeHref: "//evil.com" is an off-origin
+  // absolute URL in disguise, not a same-origin relative path.
+  if (trimmed.startsWith('//')) return null;
   try {
     const parsed = new URL(trimmed, 'https://placeholder.invalid');
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
