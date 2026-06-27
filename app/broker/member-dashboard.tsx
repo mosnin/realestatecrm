@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { HOT_LEAD_THRESHOLD, WARM_LEAD_THRESHOLD } from '@/lib/constants';
+import { pluralize } from '@/lib/formatting';
 import {
   PhoneIncoming,
   PhoneOutgoing,
@@ -225,14 +226,14 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   const statusSentence = (() => {
     const parts: string[] = [];
     if (assignedCount > 0) {
-      parts.push(`${assignedCount} assigned lead${assignedCount === 1 ? '' : 's'}`);
+      parts.push(`${assignedCount} assigned ${pluralize(assignedCount, 'lead')}`);
     }
     if (activeDealsCount > 0) {
-      parts.push(`${activeDealsCount} active deal${activeDealsCount === 1 ? '' : 's'}`);
+      parts.push(`${activeDealsCount} active ${pluralize(activeDealsCount, 'deal')}`);
     }
     if (overdueFollowUps.length > 0) {
       parts.push(
-        `${overdueFollowUps.length} follow-up${overdueFollowUps.length === 1 ? '' : 's'} due`,
+        `${overdueFollowUps.length} ${pluralize(overdueFollowUps.length, 'follow-up')} due`,
       );
     }
     if (parts.length === 0) {
