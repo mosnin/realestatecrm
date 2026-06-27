@@ -58,9 +58,14 @@ export function formatCompact(n: number): string {
 
 /**
  * Returns up to 2 uppercase initials from a display name.
- * e.g. "Jane Doe" → "JD", "Alice" → "AL"
+ * e.g. "Jane Doe" → "JD", "Alice" → "AL".
+ *
+ * Accepts null/undefined (User.name and Contact.name are nullable) and any
+ * non-string without throwing — an avatar should always have a fallback glyph,
+ * never crash the row it's in.
  */
-export function getInitials(name: string): string {
+export function getInitials(name: string | null | undefined): string {
+  if (typeof name !== 'string') return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length >= 2) {

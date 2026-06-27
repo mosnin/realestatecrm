@@ -64,8 +64,16 @@ describe('formatCompact', () => {
 describe('getInitials', () => {
   it('takes first + last initials, or first two letters', () => {
     expect(getInitials('Jane Doe')).toBe('JD');
+    expect(getInitials('Mary Jane Watson')).toBe('MW');
     expect(getInitials('Alice')).toBe('AL');
     expect(getInitials('  ')).toBe('?');
+  });
+
+  it('never throws on null/undefined/non-string (nullable names)', () => {
+    expect(getInitials(null)).toBe('?');
+    expect(getInitials(undefined)).toBe('?');
+    // @ts-expect-error — defend against a non-string slipping through at runtime
+    expect(getInitials(42)).toBe('?');
   });
 });
 
