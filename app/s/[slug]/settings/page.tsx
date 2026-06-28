@@ -9,6 +9,7 @@ import { NotificationsSection } from './notifications-section';
 import { BriefSection } from './brief-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
+import { TrackingPixelsForm } from './tracking-pixels-form';
 import { YourDataSection } from './your-data-section';
 import { McpSection, TemplatesSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
@@ -394,6 +395,20 @@ export default async function SettingsPage({
               licenseNumber={settings?.intakeLicenseNumber ?? ''}
               fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
               showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
+            />
+          </section>
+          <section
+            id="tracking-pixels"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Tracking &amp; analytics</p>
+            <p className={BODY_MUTED}>
+              Optional. Add your own ad-platform pixels to the public intake form
+              so you can measure and retarget the leads you send there.
+            </p>
+            <TrackingPixelsForm
+              slug={space.slug}
+              initialPixels={settings?.trackingPixels ?? null}
             />
           </section>
           <section
