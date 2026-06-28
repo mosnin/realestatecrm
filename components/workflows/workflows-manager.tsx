@@ -38,6 +38,12 @@ import {
   Home,
   GitBranch,
   Search,
+  MessageCircle,
+  TrendingUp,
+  Clock,
+  UserPlus,
+  Target,
+  Plug,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -541,6 +547,18 @@ export function WorkflowsManager() {
   );
 }
 
+// ── Trigger type → icon + accent ─────────────────────────────────────────────
+
+const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  lead_score_threshold: { icon: Target, cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  inbound_message: { icon: MessageCircle, cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
+  integration_event: { icon: Plug, cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  deal_stage_changed: { icon: TrendingUp, cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  schedule: { icon: Clock, cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  lead_created: { icon: UserPlus, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
+};
+
 // ── Trigger type → human-readable label ──────────────────────────────────────
 
 function triggerLabel(trigger: WorkflowTrigger): string {
@@ -658,9 +676,19 @@ function WorkflowRow({
           )}
         </div>
 
-        {/* Col 2 — Trigger label */}
-        <div className="min-w-0 pr-2">
-          <span className="text-[13px] text-muted-foreground">
+        {/* Col 2 — Trigger label + icon */}
+        <div className="flex min-w-0 items-center gap-1.5 pr-2">
+          {(() => {
+            const ti = TRIGGER_ICON_MAP[workflow.trigger.type];
+            if (!ti) return null;
+            const TIcon = ti.icon;
+            return (
+              <span className={cn('flex h-5 w-5 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
+                <TIcon size={11} aria-hidden />
+              </span>
+            );
+          })()}
+          <span className="truncate text-[13px] text-muted-foreground">
             {triggerLabel(workflow.trigger)}
           </span>
         </div>
