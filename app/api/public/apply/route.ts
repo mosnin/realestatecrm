@@ -735,30 +735,38 @@ export async function POST(req: NextRequest) {
       scoreLabel: scoring.scoreLabel,
       scoringStatus: scoring.scoringStatus,
     };
-    after(async () => {
-      try {
-        await runWorkflowsForEvent({
-          spaceId: space.id,
-          triggerType: 'lead_created',
-          context: { event: { type: 'lead_created' }, lead: leadRow, contact: leadRow },
-          triggerEvent: { type: 'lead_created', contactId: contact.id },
-        });
-      } catch (workflowErr) {
-        logger.error('[apply] lead_created workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
-      }
-      if (typeof finalScore === 'number') {
+    // `after()` itself throws when called outside a request scope (e.g. unit
+    // tests that invoke POST directly), so the scheduling call is wrapped too —
+    // the same idiom as lib/ai-tools/persistence.ts. The dispatch is
+    // best-effort; a missing request context must never turn a 201 into a 500.
+    try {
+      after(async () => {
         try {
           await runWorkflowsForEvent({
             spaceId: space.id,
-            triggerType: 'lead_score_threshold',
-            context: { event: { type: 'lead_score_threshold', score: finalScore }, lead: leadRow, contact: leadRow },
-            triggerEvent: { type: 'lead_score_threshold', contactId: contact.id, score: finalScore },
+            triggerType: 'lead_created',
+            context: { event: { type: 'lead_created' }, lead: leadRow, contact: leadRow },
+            triggerEvent: { type: 'lead_created', contactId: contact.id },
           });
         } catch (workflowErr) {
-          logger.error('[apply] lead_score_threshold workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
+          logger.error('[apply] lead_created workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
         }
-      }
-    });
+        if (typeof finalScore === 'number') {
+          try {
+            await runWorkflowsForEvent({
+              spaceId: space.id,
+              triggerType: 'lead_score_threshold',
+              context: { event: { type: 'lead_score_threshold', score: finalScore }, lead: leadRow, contact: leadRow },
+              triggerEvent: { type: 'lead_score_threshold', contactId: contact.id, score: finalScore },
+            });
+          } catch (workflowErr) {
+            logger.error('[apply] lead_score_threshold workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
+          }
+        }
+      });
+    } catch (afterErr) {
+      logger.error('[apply] workflow after() scheduling skipped (no request scope)', { contactId: contact.id }, afterErr);
+    }
 
     return NextResponse.json(
       {
