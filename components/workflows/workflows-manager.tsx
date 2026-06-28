@@ -32,6 +32,11 @@ import {
   Sparkles,
   History,
   ChevronRight,
+  Zap,
+  Mail,
+  Sun,
+  Home,
+  GitBranch,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -273,13 +278,13 @@ export function WorkflowsManager() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setActionError(data.error || 'Couldn’t create the workflow.');
+        setActionError(data.error || "Couldn't create the workflow.");
         return;
       }
       setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
       closeComposer();
     } catch {
-      setActionError('Network hiccup. Try again.');
+      setActionError("Network hiccup. Try again.");
     } finally {
       setBusyId(null);
     }
@@ -299,13 +304,13 @@ export function WorkflowsManager() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setActionError(data.error || 'Couldn’t save the workflow.');
+        setActionError(data.error || "Couldn't save the workflow.");
         return;
       }
       setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
       setEditingId(null);
     } catch {
-      setActionError('Network hiccup. Try again.');
+      setActionError("Network hiccup. Try again.");
     } finally {
       setBusyId(null);
     }
@@ -329,7 +334,7 @@ export function WorkflowsManager() {
       setWorkflows((ws) =>
         ws.map((w) => (w.id === workflow.id ? { ...w, enabled: workflow.enabled } : w)),
       );
-      setActionError('Couldn’t update the workflow.');
+      setActionError("Couldn't update the workflow.");
     }
   }
 
@@ -342,7 +347,7 @@ export function WorkflowsManager() {
       setWorkflows((ws) => ws.filter((w) => w.id !== id));
       if (editingId === id) setEditingId(null);
     } catch {
-      setActionError('Couldn’t delete the workflow.');
+      setActionError("Couldn't delete the workflow.");
     } finally {
       setBusyId(null);
     }
@@ -364,7 +369,7 @@ export function WorkflowsManager() {
       }
       setTestResults((r) => ({ ...r, [id]: data as TestResult }));
     } catch {
-      setActionError('Couldn’t start the test run.');
+      setActionError("Couldn't start the test run.");
     } finally {
       setTestingId(null);
     }
@@ -383,7 +388,7 @@ export function WorkflowsManager() {
   if (loadError) {
     return (
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">Couldn’t load your workflows.</p>
+        <p className="text-sm text-foreground">Couldn't load your workflows.</p>
         <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
       </div>
     );
@@ -742,7 +747,7 @@ function RunHistoryPanel({
           Loading runs…
         </div>
       ) : error ? (
-        <p className={CAPTION}>Couldn’t load the run history — try again in a moment.</p>
+        <p className={CAPTION}>Couldn't load the run history — try again in a moment.</p>
       ) : !runs || runs.length === 0 ? (
         <p className={CAPTION}>No runs yet.</p>
       ) : (
@@ -1074,12 +1079,45 @@ function RowAction({
 
 // ── Template gallery (zero-state front door) ─────────────────────────────────
 
+/** Icon + accent color per template — gives each card a visual identity. */
+const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: string }> = {
+  'hot-lead-instant-draft': {
+    icon: Zap,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'gmail-client-reply': {
+    icon: Mail,
+    accent: 'bg-red-100 dark:bg-red-950/40',
+    dot: 'text-red-500 dark:text-red-400',
+  },
+  'morning-follow-ups': {
+    icon: Sun,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-500 dark:text-amber-400',
+  },
+  'tour-completed-thanks': {
+    icon: Home,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-500 dark:text-blue-400',
+  },
+  'hot-vs-warm-branch': {
+    icon: GitBranch,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-500 dark:text-violet-400',
+  },
+};
+
+const TEMPLATE_META_DEFAULT = {
+  icon: WorkflowIcon,
+  accent: 'bg-muted',
+  dot: 'text-muted-foreground',
+};
+
 /**
- * The first thing a realtor sees before they have any automations. Instead of a
- * dead "nothing yet" box, it leads with the outcomes Chippi can take off their
- * plate — every template card reads as a plain-English result, one tap drops
- * them into a pre-filled builder, and a quiet "start from scratch" stays for the
- * realtor who'd rather compose their own. Show the value, then invite the tap.
+ * Zero-state front door — large visual template cards that look like Zapier's
+ * template gallery. Each card shows what gets automated in plain language so
+ * the realtor picks based on outcome, not on technical detail.
  */
 function TemplateGallery({
   onPick,
@@ -1090,59 +1128,70 @@ function TemplateGallery({
 }) {
   const reduce = useReducedMotion();
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="space-y-1">
         <p className="text-[15px] font-medium text-foreground">
-          What should I take off your plate?
+          What should Chippi handle for you?
         </p>
         <p className={CAPTION}>
-          Pick one to start — you’ll see exactly what it does before it turns on.
+          Pick a template — you see exactly what it does before anything turns on.
         </p>
       </div>
 
       <motion.ul
-        className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
         variants={reduce ? undefined : STAGGER_CONTAINER}
         initial={reduce ? undefined : 'initial'}
         animate={reduce ? undefined : 'enter'}
       >
-        {WORKFLOW_TEMPLATES.map((template) => (
-          <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM}>
-            <button
-              type="button"
-              onClick={() => onPick(cloneTemplateState(template))}
-              className="group/card flex h-full w-full items-start gap-3 rounded-xl border border-border/60 bg-card p-4 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
-            >
-              <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-foreground/[0.05] text-muted-foreground transition-colors group-hover/card:bg-foreground group-hover/card:text-background">
-                <WorkflowIcon size={15} aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium leading-snug text-foreground">
-                  {template.name}
-                </span>
-                <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
-                  {template.description}
-                </span>
-              </span>
-              <ChevronRight
-                size={15}
-                aria-hidden
-                className="mt-0.5 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/card:text-foreground"
-              />
-            </button>
-          </motion.li>
-        ))}
+        {WORKFLOW_TEMPLATES.map((template) => {
+          const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+          const Icon = meta.icon;
+          return (
+            <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM} className="flex">
+              <button
+                type="button"
+                onClick={() => onPick(cloneTemplateState(template))}
+                className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+              >
+                {/* Icon area */}
+                <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
+                  <Icon size={32} className={meta.dot} aria-hidden />
+                </div>
+                {/* Text area */}
+                <div className="flex flex-1 flex-col gap-1.5 p-4">
+                  <span className="block text-sm font-semibold leading-snug text-foreground">
+                    {template.name}
+                  </span>
+                  <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                    {template.description}
+                  </span>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+                      {template.state.trigger.type.replace(/_/g, ' ')}
+                    </span>
+                    <ChevronRight
+                      size={14}
+                      aria-hidden
+                      className="text-muted-foreground/30 transition-colors group-hover/card:text-foreground/60"
+                    />
+                  </div>
+                </div>
+              </button>
+            </motion.li>
+          );
+        })}
       </motion.ul>
 
       <div className="flex items-center gap-2 pt-1">
-        <span className={CAPTION}>Prefer to build your own?</span>
+        <span className={CAPTION}>Prefer to start blank?</span>
         <button
           type="button"
           onClick={onScratch}
           className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
         >
           <Plus size={13} aria-hidden />
-          Start from scratch
+          Build from scratch
         </button>
       </div>
     </div>

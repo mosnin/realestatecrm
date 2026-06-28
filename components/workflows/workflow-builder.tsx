@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,7 +71,7 @@ import { summarizeFormState } from './form-summary';
 
 const TRIGGER_LABELS: Record<TriggerType, string> = {
   lead_created: 'A new lead is created',
-  lead_score_threshold: 'A lead’s score crosses a threshold',
+  lead_score_threshold: "A lead's score crosses a threshold",
   inbound_message: 'An inbound message arrives',
   tour_completed: 'A tour is completed',
   deal_stage_changed: 'A deal changes stage',
@@ -416,7 +416,7 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
               <span className="text-foreground">{summary.conditions}</span>
             </>
           )}
-          <span className="text-muted-foreground/80">, I’ll </span>
+          <span className="text-muted-foreground/80">, I'll </span>
           <span className="font-medium text-foreground">{summary.then}</span>
           <span className="text-muted-foreground/80">.</span>
         </p>
@@ -434,17 +434,126 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
 }
 
 /**
- * A numbered step label (When / If / Then read as 1 → 2 → 3). The small index
- * badge turns the three sections into one ordered flow rather than three
- * disconnected boxes — the realtor reads them as a sequence.
+ * Zapier-style large step card: colored left border, numbered badge, icon, and a
+ * header / body split. Each step in the builder is one of these.
  */
-function StepLabel({ index, children }: { index: number; children: React.ReactNode }) {
+function ZapCard({
+  step,
+  accent,
+  title,
+  icon: Icon,
+  headerRight,
+  children,
+}: {
+  step: number;
+  accent: 'orange' | 'blue' | 'violet';
+  title: string;
+  icon: LucideIcon;
+  headerRight?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const cl = {
+    orange: {
+      border: 'border-l-orange-400 dark:border-l-orange-500/70',
+      badge: 'bg-orange-500',
+      icon: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
+    },
+    blue: {
+      border: 'border-l-blue-400 dark:border-l-blue-500/70',
+      badge: 'bg-blue-500',
+      icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+    },
+    violet: {
+      border: 'border-l-violet-400 dark:border-l-violet-500/70',
+      badge: 'bg-violet-500',
+      icon: 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
+    },
+  }[accent];
   return (
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-foreground/[0.07] text-[10px] font-semibold tabular-nums text-muted-foreground">
-        {index}
-      </span>
-      <p className={SECTION_LABEL}>{children}</p>
+    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
+      <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
+        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white', cl.badge)}>
+          {step}
+        </span>
+        <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
+          <Icon size={14} aria-hidden />
+        </span>
+        <span className="flex-1 text-sm font-semibold text-foreground">{title}</span>
+        {headerRight}
+      </div>
+      <div className="px-4 py-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Vertical connector between step cards — mirrors Zapier's thin grey line. */
+function StepConnector() {
+  return (
+    <div className="flex flex-col items-center py-1">
+      <div className="h-5 w-px bg-border/50" />
+    </div>
+  );
+}
+
+/**
+ * One action step card. The action type selector lives in the card header so
+ * the realtor sees at a glance what each step does — identical to how Zapier
+ * shows each action as its own titled card.
+ */
+function ActionZapCard({
+  step,
+  row,
+  canRemove,
+  onChange,
+  onRemove,
+  connectedApps,
+}: {
+  step: number;
+  row: ActionRowState;
+  canRemove: boolean;
+  onChange: (next: Partial<ActionRowState>) => void;
+  onRemove: () => void;
+  connectedApps: ConnectedAppsState;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/60 border-l-4 border-l-violet-400 bg-card dark:border-l-violet-500/70">
+      <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-500 text-[11px] font-bold text-white">
+          {step}
+        </span>
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
+          <Sparkles size={14} aria-hidden />
+        </span>
+        <div className="flex-1">
+          <Label htmlFor={`act-type-${row.id}`} className="sr-only">
+            Action type
+          </Label>
+          <Select
+            value={row.type}
+            onValueChange={(v) => onChange({ type: v as WorkflowActionType })}
+          >
+            <SelectTrigger
+              id={`act-type-${row.id}`}
+              className="h-8 border-border/40 bg-transparent text-sm font-semibold"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ACTION_ORDER.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {ACTION_LABELS[a]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
+      </div>
+      <div className="px-4 py-4">
+        <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
+      </div>
     </div>
   );
 }
@@ -570,227 +679,235 @@ export function WorkflowBuilder({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Live preview — the sentence assembling as you build. ──────────────── */}
+    <div className="space-y-4">
+      {/* Live preview */}
       <WorkflowPreview state={state} />
 
-      {/* Name ─────────────────────────────────────────────────────────────── */}
-      <div className="space-y-1.5">
-        <Label htmlFor="wf-name" className="text-[12.5px] font-medium text-foreground">
-          Name
-        </Label>
-        <Input
-          id="wf-name"
-          value={state.name}
-          onChange={(e) => patch({ name: e.target.value })}
-          placeholder="Hot lead → instant draft"
-          maxLength={120}
-          autoFocus
-        />
-        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-      </div>
-
-      {/* Mode — Simple (linear) vs Advanced (visual canvas). ──────────────────
-          The graph owns If/Then in Advanced; Simple keeps the When/If/Then form. */}
-      <div className="space-y-1.5">
-        <div
-          className="inline-flex rounded-md border border-border/60 p-0.5"
-          role="group"
-          aria-label="Builder mode"
-        >
-          <button
-            type="button"
-            onClick={() => {
-              if (mode === 'simple') return;
-              if (graphIsLinear) exitAdvanced();
-            }}
-            aria-pressed={mode === 'simple'}
-            disabled={mode === 'advanced' && !graphIsLinear}
-            className={cn(
-              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-              mode === 'simple'
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:text-foreground',
-              mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
-            )}
-          >
-            Simple
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (mode === 'advanced') return;
-              enterAdvanced();
-            }}
-            aria-pressed={mode === 'advanced'}
-            className={cn(
-              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-              mode === 'advanced'
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Advanced
-          </button>
+      {/* Name + Mode — side by side */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[180px] flex-1 space-y-1.5">
+          <Label htmlFor="wf-name" className="text-[12.5px] font-medium text-foreground">
+            Name
+          </Label>
+          <Input
+            id="wf-name"
+            value={state.name}
+            onChange={(e) => patch({ name: e.target.value })}
+            placeholder="Hot lead → instant draft"
+            maxLength={120}
+            autoFocus
+          />
+          {nameError && <p className="text-xs text-destructive">{nameError}</p>}
         </div>
-        {mode === 'advanced' && !graphIsLinear && (
-          <p className={CAPTION}>This automation branches — edit it on the canvas.</p>
-        )}
+        <div className="flex-shrink-0 space-y-1.5">
+          <div
+            className="inline-flex rounded-md border border-border/60 p-0.5"
+            role="group"
+            aria-label="Builder mode"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (mode === 'simple') return;
+                if (graphIsLinear) exitAdvanced();
+              }}
+              aria-pressed={mode === 'simple'}
+              disabled={mode === 'advanced' && !graphIsLinear}
+              className={cn(
+                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+                mode === 'simple'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground',
+                mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+              )}
+            >
+              Simple
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (mode === 'advanced') return;
+                enterAdvanced();
+              }}
+              aria-pressed={mode === 'advanced'}
+              className={cn(
+                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+                mode === 'advanced'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Advanced
+            </button>
+          </div>
+          {mode === 'advanced' && !graphIsLinear && (
+            <p className={CAPTION}>This automation branches — edit on the canvas.</p>
+          )}
+        </div>
       </div>
 
-      {/* When ─────────────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <StepLabel index={1}>When</StepLabel>
-        <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="wf-trigger" className="sr-only">
-              Trigger
-            </Label>
-            <Select
-              value={state.trigger.type}
-              onValueChange={(v) => patchTrigger({ type: v as TriggerType })}
-            >
-              <SelectTrigger id="wf-trigger" className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRIGGER_ORDER.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {TRIGGER_LABELS[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* 1. Trigger step card */}
+      <ZapCard step={1} accent="orange" title="Trigger — when this happens" icon={Zap}>
+        <div className="space-y-3">
+          <Label htmlFor="wf-trigger" className="sr-only">
+            Trigger
+          </Label>
+          <Select
+            value={state.trigger.type}
+            onValueChange={(v) => patchTrigger({ type: v as TriggerType })}
+          >
+            <SelectTrigger id="wf-trigger" className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRIGGER_ORDER.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {TRIGGER_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <TriggerConfig
             state={state}
             patchTrigger={patchTrigger}
             triggerOptions={triggerOptions}
           />
         </div>
-      </section>
+      </ZapCard>
 
-      {/* ADVANCED — the visual canvas owns the If/Then logic. The trigger above
-          drives the canvas's trigger node; the linear If/Then sections below are
-          hidden because the graph carries them. ────────────────────────────── */}
+      <StepConnector />
+
+      {/* 2. Advanced mode — visual canvas */}
       {mode === 'advanced' && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className={SECTION_LABEL}>Flow</p>
-            {isNarrow && (
-              <p className={cn(CAPTION, 'text-amber-600 dark:text-amber-500')}>
-                View only — open on a larger screen to edit.
-              </p>
-            )}
-          </div>
+        <ZapCard step={2} accent="violet" title="Flow — visual canvas" icon={GitBranch}>
+          {isNarrow && (
+            <p className={cn(CAPTION, 'mb-3 text-amber-600 dark:text-amber-500')}>
+              View only — open on a larger screen to edit.
+            </p>
+          )}
           <WorkflowCanvasLazy
             graph={state.graph ?? emptyGraph}
             trigger={buildDefinition({ ...state, graph: null }).trigger}
             onChange={(g) => patch({ graph: g })}
             readOnly={isNarrow}
           />
-        </section>
+        </ZapCard>
       )}
 
-      {/* If / Then — SIMPLE mode only (the graph owns them in Advanced). ────── */}
+      {/* Simple mode: 2. Filter + 3+. Actions */}
       {mode === 'simple' && (
         <>
-      {/* If ───────────────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <StepLabel index={2}>If</StepLabel>
-          {state.conditions.length > 1 && (
-            <div
-              className="inline-flex rounded-md border border-border/60 p-0.5"
-              role="group"
-              aria-label="Combine conditions with AND or OR"
-            >
-              {(['and', 'or'] as const).map((op) => (
-                <button
-                  key={op}
-                  type="button"
-                  onClick={() => patch({ conditionOp: op })}
-                  aria-pressed={state.conditionOp === op}
-                  className={cn(
-                    'rounded-[5px] px-2.5 py-1 text-xs font-medium uppercase tracking-wide transition-colors',
-                    state.conditionOp === op
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
+          <ZapCard
+            step={2}
+            accent="blue"
+            title="Filter — only continue if…"
+            icon={Filter}
+            headerRight={
+              state.conditions.length > 1 ? (
+                <div
+                  className="inline-flex rounded-md border border-border/60 p-0.5"
+                  role="group"
+                  aria-label="Combine conditions with AND or OR"
                 >
-                  {op}
+                  {(['and', 'or'] as const).map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => patch({ conditionOp: op })}
+                      aria-pressed={state.conditionOp === op}
+                      className={cn(
+                        'rounded-[5px] px-2.5 py-1 text-xs font-medium uppercase tracking-wide transition-colors',
+                        state.conditionOp === op
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {op}
+                    </button>
+                  ))}
+                </div>
+              ) : undefined
+            }
+          >
+            {state.conditions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
+                <p className={CAPTION}>No conditions — runs every time the trigger fires.</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    patch({
+                      conditions: [...state.conditions, newConditionRow(state.trigger.type)],
+                    })
+                  }
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
+                >
+                  <Plus size={12} aria-hidden />
+                  Add a condition
                 </button>
-              ))}
+              </div>
+            ) : (
+              <>
+                <ul className="space-y-2">
+                  {state.conditions.map((row) => (
+                    <ConditionRowEditor
+                      key={row.id}
+                      row={row}
+                      triggerType={state.trigger.type}
+                      onChange={(next) => updateCondition(row.id, next)}
+                      onRemove={() =>
+                        patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
+                      }
+                    />
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() =>
+                    patch({
+                      conditions: [...state.conditions, newConditionRow(state.trigger.type)],
+                    })
+                  }
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Plus size={13} aria-hidden />
+                  Add condition
+                </button>
+              </>
+            )}
+          </ZapCard>
+
+          <StepConnector />
+
+          {/* Action cards — each step gets its own card, numbered sequentially */}
+          {state.actions.map((row, i) => (
+            <div key={row.id}>
+              {i > 0 && <StepConnector />}
+              <ActionZapCard
+                step={3 + i}
+                row={row}
+                canRemove={state.actions.length > 1}
+                onChange={(next) => updateAction(row.id, next)}
+                onRemove={() =>
+                  patch({ actions: state.actions.filter((a) => a.id !== row.id) })
+                }
+                connectedApps={connectedApps}
+              />
+            </div>
+          ))}
+
+          {state.actions.length < MAX_ACTIONS && (
+            <div className="flex flex-col items-center pt-1">
+              <div className="h-4 w-px bg-border/50" />
+              <button
+                type="button"
+                onClick={() => patch({ actions: [...state.actions, newActionRow()] })}
+                className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-border/60 px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-foreground/[0.02] hover:text-foreground"
+              >
+                <Plus size={13} aria-hidden />
+                Add an action
+              </button>
             </div>
           )}
-        </div>
-
-        {state.conditions.length === 0 ? (
-          <p className={cn(CAPTION, 'rounded-lg border border-dashed border-border/60 px-3 py-2.5')}>
-            No conditions — the workflow runs every time it’s triggered.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {state.conditions.map((row) => (
-              <ConditionRowEditor
-                key={row.id}
-                row={row}
-                triggerType={state.trigger.type}
-                onChange={(next) => updateCondition(row.id, next)}
-                onRemove={() =>
-                  patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
-                }
-              />
-            ))}
-          </ul>
-        )}
-
-        <button
-          type="button"
-          onClick={() =>
-            patch({
-              conditions: [
-                ...state.conditions,
-                newConditionRow(state.trigger.type),
-              ],
-            })
-          }
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Plus size={13} />
-          Add condition
-        </button>
-      </section>
-
-      {/* Then ─────────────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <StepLabel index={3}>Then</StepLabel>
-        <ul className="space-y-2">
-          {state.actions.map((row, i) => (
-            <ActionRowEditor
-              key={row.id}
-              index={i}
-              row={row}
-              canRemove={state.actions.length > 1}
-              onChange={(next) => updateAction(row.id, next)}
-              onRemove={() =>
-                patch({ actions: state.actions.filter((a) => a.id !== row.id) })
-              }
-              connectedApps={connectedApps}
-            />
-          ))}
-        </ul>
-        {state.actions.length < MAX_ACTIONS && (
-          <button
-            type="button"
-            onClick={() => patch({ actions: [...state.actions, newActionRow()] })}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Plus size={13} />
-            Add action
-          </button>
-        )}
-      </section>
         </>
       )}
 
