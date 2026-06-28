@@ -431,32 +431,100 @@ export function WorkflowsManager() {
       {workflows.length === 0 && composer === null ? (
         <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
       ) : workflows.length === 0 ? null : (
-        <ul className="divide-y divide-border/60">
-          {workflows.map((workflow) => (
-            <WorkflowRow
-              key={workflow.id}
-              workflow={workflow}
-              highlighted={highlightedAnchor === `workflow-${workflow.id}`}
-              editing={editingId === workflow.id}
-              busy={busyId === workflow.id}
-              testing={testingId === workflow.id}
-              testResult={testResults[workflow.id]}
-              onEdit={() => {
-                setEditingId(workflow.id);
-                setComposer(null);
-                setActionError('');
-              }}
-              onCancelEdit={() => setEditingId(null)}
-              onSave={(payload) => saveEdit(workflow.id, payload)}
-              onToggle={() => toggleWorkflow(workflow)}
-              onTest={() => testWorkflow(workflow.id)}
-              onDelete={() => deleteWorkflow(workflow.id)}
-            />
-          ))}
-        </ul>
+        <>
+          {/* Editing builder — floats above the table so the table layout stays intact */}
+          {editingId && (() => {
+            const editing = workflows.find((w) => w.id === editingId);
+            return editing ? (
+              <div
+                id={`workflow-${editingId}`}
+                className="rounded-xl border border-border/60 bg-card p-4 scroll-mt-24"
+              >
+                <WorkflowBuilder
+                  initial={recordToFormState(editing)}
+                  saving={busyId === editingId}
+                  onSave={(payload) => saveEdit(editingId, payload)}
+                  onCancel={() => setEditingId(null)}
+                />
+              </div>
+            ) : null;
+          })()}
+
+          {/* Table container */}
+          <div className="rounded-xl border border-border/60 overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_160px_140px_60px_100px] border-b border-border/60 bg-muted/40 px-3 py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Workflow
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Trigger
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Last run
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-center">
+                On/Off
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
+                Actions
+              </span>
+            </div>
+
+            {/* Table rows */}
+            <div className="divide-y divide-border/60">
+              {workflows.map((workflow) => (
+                <WorkflowRow
+                  key={workflow.id}
+                  workflow={workflow}
+                  highlighted={highlightedAnchor === `workflow-${workflow.id}`}
+                  editing={editingId === workflow.id}
+                  busy={busyId === workflow.id}
+                  testing={testingId === workflow.id}
+                  testResult={testResults[workflow.id]}
+                  onEdit={() => {
+                    setEditingId(workflow.id);
+                    setComposer(null);
+                    setActionError('');
+                  }}
+                  onCancelEdit={() => setEditingId(null)}
+                  onSave={(payload) => saveEdit(workflow.id, payload)}
+                  onToggle={() => toggleWorkflow(workflow)}
+                  onTest={() => testWorkflow(workflow.id)}
+                  onDelete={() => deleteWorkflow(workflow.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
+}
+
+// ── Trigger type → human-readable label ──────────────────────────────────────
+
+function triggerLabel(trigger: WorkflowTrigger): string {
+  switch (trigger.type) {
+    case 'lead_score_threshold':
+      return 'Score threshold';
+    case 'inbound_message':
+      return 'Inbound message';
+    case 'integration_event':
+      return trigger.config.toolkit ? `${trigger.config.toolkit} event` : 'Integration event';
+    case 'deal_stage_changed':
+      return 'Deal stage change';
+    case 'schedule':
+      return 'Schedule';
+    case 'lead_created':
+      return 'New lead';
+    case 'tour_completed':
+      return 'Tour completed';
+    default:
+      // Exhaustive narrowing fallback — if a new trigger type is added, show it
+      // kebab-cased rather than an empty cell.
+      return (trigger as { type: string }).type.replace(/_/g, ' ');
+  }
 }
 
 // ── One workflow ─────────────────────────────────────────────────────────────
@@ -469,8 +537,8 @@ function WorkflowRow({
   testing,
   testResult,
   onEdit,
-  onCancelEdit,
-  onSave,
+  onCancelEdit: _onCancelEdit,
+  onSave: _onSave,
   onToggle,
   onTest,
   onDelete,
@@ -518,88 +586,93 @@ function WorkflowRow({
     if (next && runs === null && !runsLoading) void loadHistory();
   }
 
-  if (editing) {
-    return (
-      <li id={`workflow-${workflow.id}`} className="scroll-mt-24 py-3 first:pt-0">
-        <div className="rounded-xl border border-border/60 bg-card p-4">
-          <WorkflowBuilder
-            initial={recordToFormState(workflow)}
-            saving={busy}
-            onSave={onSave}
-            onCancel={onCancelEdit}
-          />
-        </div>
-      </li>
-    );
-  }
-
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
+  const hasExpansion = !!(testResult || showHistory);
 
   return (
-    <li
+    // Wrapper div — not a <li> anymore; the parent is a plain <div> container.
+    <div
       id={`workflow-${workflow.id}`}
       className={cn(
-        'group/row flex flex-col gap-2 py-3 first:pt-0 transition-all scroll-mt-24',
+        'group/row transition-colors scroll-mt-24',
         !workflow.enabled && 'opacity-60',
-        // Deep-link flash: a feed link to this workflow scrolls it here and
-        // rings it for a couple of seconds so the jump is legible. ring-inset +
-        // a rounded bg keep the flash WITHIN the row box so the divide-y divider
-        // stays aligned and nothing clips under an overflow-hidden ancestor.
-        highlighted &&
-          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
+        highlighted && 'bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
+        // Highlight the row if it is being edited (builder is above the table).
+        editing && 'bg-muted/30',
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug text-foreground">{workflow.name}</p>
-          <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{summary}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            <RunHealthChip status={workflow.lastRunStatus} />
-            {workflow.lastRunAt && (
-              <span className="tabular-nums text-muted-foreground/70">
-                {timeAgo(workflow.lastRunAt)}
-              </span>
-            )}
-            <span className="text-muted-foreground/40">·</span>
-            <AutonomyPill autonomy={workflow.autonomy} />
-            {!workflow.enabled && (
-              <>
-                <span className="text-muted-foreground/40">·</span>
-                <span>Paused</span>
-              </>
-            )}
-          </div>
+      {/* Main grid row */}
+      <div className="grid grid-cols-[1fr_160px_140px_60px_100px] items-center gap-0 px-3 py-2.5">
+
+        {/* Col 1 — Name + summary */}
+        <div className="min-w-0 pr-3">
+          <p className="truncate text-sm font-medium leading-snug text-foreground">
+            {workflow.name}
+          </p>
+          <p className="mt-0.5 truncate text-[12px] leading-snug text-muted-foreground">
+            {summary}
+          </p>
+          {!workflow.enabled && (
+            <span className="mt-0.5 inline-block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              Paused
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Col 2 — Trigger label */}
+        <div className="min-w-0 pr-2">
+          <span className="text-[13px] text-muted-foreground">
+            {triggerLabel(workflow.trigger)}
+          </span>
+        </div>
+
+        {/* Col 3 — Run health + time */}
+        <div className="flex items-center gap-1.5 pr-2">
+          <RunHealthChip status={workflow.lastRunStatus} />
+          {workflow.lastRunAt ? (
+            <span className="tabular-nums text-[11px] text-muted-foreground/70">
+              {timeAgo(workflow.lastRunAt)}
+            </span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/40">Never</span>
+          )}
+        </div>
+
+        {/* Col 4 — Toggle */}
+        <div className="flex justify-center">
+          <Switch
+            checked={workflow.enabled}
+            onCheckedChange={onToggle}
+            aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
+          />
+        </div>
+
+        {/* Col 5 — Actions */}
+        <div className="flex items-center justify-end gap-0.5">
           {confirmingDelete ? (
-            <>
-              <span className="px-1 text-xs text-muted-foreground">Delete?</span>
+            // Inline delete confirmation — stays within the row so layout stays clean.
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">Delete?</span>
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(false)}
                 disabled={busy}
-                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
+                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
               >
-                Keep
+                No
               </button>
               <button
                 type="button"
                 onClick={onDelete}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
               >
-                {busy && <Loader2 size={13} className="animate-spin" />}
-                Delete
+                {busy && <Loader2 size={11} className="animate-spin" />}
+                Yes
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <Switch
-                checked={workflow.enabled}
-                onCheckedChange={onToggle}
-                aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
-              />
               <RowAction
                 icon={History}
                 label="History"
@@ -607,8 +680,20 @@ function WorkflowRow({
                 disabled={busy || testing}
                 active={showHistory}
               />
-              <RowAction icon={Play} label="Test" onClick={onTest} loading={testing} disabled={busy} />
-              <RowAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || testing} />
+              <RowAction
+                icon={Play}
+                label="Test"
+                onClick={onTest}
+                loading={testing}
+                disabled={busy}
+              />
+              <RowAction
+                icon={Pencil}
+                label="Edit"
+                onClick={onEdit}
+                disabled={busy || testing}
+                active={editing}
+              />
               <RowAction
                 icon={Trash2}
                 label="Delete"
@@ -621,14 +706,19 @@ function WorkflowRow({
         </div>
       </div>
 
-      {/* Test-run result — the "prove it works" panel. */}
-      {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
+      {/* Full-width expansion panels — span all columns below the grid row */}
+      {hasExpansion && (
+        <div className="border-t border-border/40 px-3 pb-3 pt-2 space-y-2">
+          {/* Test-run result — the "prove it works" panel. */}
+          {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
 
-      {/* Run history (audit trail) — what fired, when, and what each step did. */}
-      {showHistory && (
-        <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} />
+          {/* Run history (audit trail) — what fired, when, and what each step did. */}
+          {showHistory && (
+            <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} />
+          )}
+        </div>
       )}
-    </li>
+    </div>
   );
 }
 

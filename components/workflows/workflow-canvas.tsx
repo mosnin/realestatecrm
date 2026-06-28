@@ -95,6 +95,38 @@ import {
 } from './field-catalog';
 import type { NodeRunStatus } from './run-highlights';
 
+// ── Connected apps hook ───────────────────────────────────────────────────────
+
+interface ConnectedApp {
+  toolkit: string;
+  label: string;
+  actions: { value: string; label: string }[];
+}
+
+interface ConnectedAppsState {
+  status: 'loading' | 'ready' | 'error';
+  apps: ConnectedApp[];
+}
+
+function useConnectedApps(): ConnectedAppsState {
+  const [state, setState] = useState<ConnectedAppsState>({ status: 'loading', apps: [] });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/workflows/connected-apps')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { apps?: ConnectedApp[] }) => {
+        if (!cancelled) setState({ status: 'ready', apps: data.apps ?? [] });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error', apps: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
+
 // React-Flow's Node/Edge generics, specialised to our adapter's data shapes so
 // the custom node components and the change handlers stay type-safe. React
 // Flow's Node<T> constrains T to Record<string, unknown>, so the node data is
@@ -591,7 +623,7 @@ function CanvasInner({
     if (!selectedId) return;
     const target = nodes.find((n) => n.id === selectedId);
     if (!target || target.data.kind === 'trigger') {
-      if (target?.data.kind === 'trigger') flash('The trigger node can’t be removed.');
+      if (target?.data.kind === 'trigger') flash("The trigger node can't be removed.");
       return;
     }
     setNodes((curNodes) => {
@@ -793,6 +825,11 @@ function Inspector({
   onUpdate: (id: string, patch: Partial<FlowNodeData>) => void;
   onClose: () => void;
 }) {
+  // Fetch connected apps once — only needed when an action node is selected
+  // and only when call_integration is chosen, but loading eagerly keeps the
+  // picker instant once the user clicks. A failed load degrades to text inputs.
+  const connectedApps = useConnectedApps();
+
   return (
     <aside className="w-full flex-shrink-0 rounded-xl border border-border/60 bg-card p-4 lg:w-[300px]">
       {!node ? (
@@ -822,7 +859,7 @@ function Inspector({
 
           {node.data.kind === 'trigger' && (
             <p className={cn(CAPTION, 'leading-relaxed')}>
-              This is where it starts. The trigger’s settings live on the workflow
+              This is where it starts. The trigger's settings live on the workflow
               itself — this node just anchors the graph.
             </p>
           )}
@@ -831,6 +868,7 @@ function Inspector({
             <ActionInspector
               action={node.data.action ?? defaultAction()}
               onChange={(action) => onUpdate(node.id, { action })}
+              connectedApps={connectedApps}
             />
           )}
 
@@ -852,9 +890,11 @@ function Inspector({
 function ActionInspector({
   action,
   onChange,
+  connectedApps,
 }: {
   action: WorkflowAction;
   onChange: (action: WorkflowAction) => void;
+  connectedApps: ConnectedAppsState;
 }) {
   // Switching type resets to that type's minimal default config.
   function setType(type: WorkflowActionType) {
@@ -1018,36 +1058,121 @@ function ActionInspector({
       )}
 
       {action.type === 'call_integration' && (
-        <>
-          <FieldBlock label="App / toolkit">
-            <Input
-              value={action.config.toolkit}
-              onChange={(e) =>
+        <IntegrationActionPicker
+          action={action}
+          onChange={onChange}
+          connectedApps={connectedApps}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Integration action picker ─────────────────────────────────────────────────
+
+/**
+ * Connected-app + action picker for the `call_integration` action type.
+ *
+ * When connected apps are available (fetched from /api/workflows/connected-apps),
+ * shows two selects: one for the toolkit (your connected apps), one for the
+ * action (curated list per toolkit). Falls back to text inputs if the fetch
+ * failed or returned no apps (e.g. nothing connected yet).
+ */
+function IntegrationActionPicker({
+  action,
+  onChange,
+  connectedApps,
+}: {
+  action: Extract<WorkflowAction, { type: 'call_integration' }>;
+  onChange: (action: WorkflowAction) => void;
+  connectedApps: ConnectedAppsState;
+}) {
+  const hasApps = connectedApps.status === 'ready' && connectedApps.apps.length > 0;
+  const selectedApp = connectedApps.apps.find((a) => a.toolkit === action.config.toolkit);
+  const availableActions = selectedApp?.actions ?? [];
+
+  function setToolkit(toolkit: string) {
+    // Changing the toolkit resets the action — the old action slug belongs to
+    // the old toolkit and would silently never fire.
+    onChange({ type: 'call_integration', config: { toolkit, action: '' } });
+  }
+
+  if (!hasApps) {
+    // No connected apps yet — fall back to free text so the realtor can still
+    // author the node even if they haven't connected an app.
+    return (
+      <>
+        {connectedApps.status === 'ready' && connectedApps.apps.length === 0 && (
+          <p className={cn(CAPTION, 'rounded-lg border border-dashed border-border/60 px-3 py-2 text-center')}>
+            No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.
+          </p>
+        )}
+        <FieldBlock label="App / toolkit">
+          <Input
+            value={action.config.toolkit}
+            onChange={(e) =>
+              onChange({ ...action, config: { ...action.config, toolkit: e.target.value } })
+            }
+            placeholder="slack"
+            className="h-8"
+          />
+        </FieldBlock>
+        <FieldBlock label="Action slug">
+          <Input
+            value={action.config.action}
+            onChange={(e) =>
+              onChange({ ...action, config: { ...action.config, action: e.target.value } })
+            }
+            placeholder="SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL"
+            className="h-8"
+          />
+        </FieldBlock>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <FieldBlock label="Connected app">
+        <MiniSelect
+          value={action.config.toolkit || '__none__'}
+          onValueChange={(v) => setToolkit(v === '__none__' ? '' : v)}
+          options={[
+            { value: '__none__', label: 'Pick an app…' },
+            ...connectedApps.apps.map((a) => ({ value: a.toolkit, label: a.label })),
+          ]}
+        />
+      </FieldBlock>
+
+      {action.config.toolkit && (
+        <FieldBlock label="Action">
+          {availableActions.length > 0 ? (
+            <MiniSelect
+              value={action.config.action || '__none__'}
+              onValueChange={(v) =>
                 onChange({
                   ...action,
-                  config: { ...action.config, toolkit: e.target.value },
+                  config: { ...action.config, action: v === '__none__' ? '' : v },
                 })
               }
-              placeholder="slack"
-              className="h-8"
+              options={[
+                { value: '__none__', label: 'Pick an action…' },
+                ...availableActions,
+              ]}
             />
-          </FieldBlock>
-          <FieldBlock label="Action">
+          ) : (
             <Input
               value={action.config.action}
               onChange={(e) =>
-                onChange({
-                  ...action,
-                  config: { ...action.config, action: e.target.value },
-                })
+                onChange({ ...action, config: { ...action.config, action: e.target.value } })
               }
-              placeholder="send_message"
+              placeholder="Action slug"
               className="h-8"
             />
-          </FieldBlock>
-        </>
+          )}
+        </FieldBlock>
       )}
-    </div>
+    </>
   );
 }
 

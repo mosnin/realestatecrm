@@ -204,6 +204,38 @@ function useTriggerOptions(): TriggerOptionsState {
   return state;
 }
 
+// ── Connected-app action options (for the call_integration action picker) ────
+
+interface ConnectedActionApp {
+  toolkit: string;
+  label: string;
+  actions: { value: string; label: string }[];
+}
+
+type ConnectedAppsState =
+  | { status: 'loading' }
+  | { status: 'ready'; apps: ConnectedActionApp[] }
+  | { status: 'error' };
+
+function useConnectedApps(): ConnectedAppsState {
+  const [state, setState] = useState<ConnectedAppsState>({ status: 'loading' });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/workflows/connected-apps')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { apps?: ConnectedActionApp[] }) => {
+        if (!cancelled) setState({ status: 'ready', apps: data.apps ?? [] });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
+
 /**
  * True on a narrow (touch-ish) viewport. The node canvas is a precision drag-and-
  * connect surface — miserable to EDIT on a phone — so advanced mode goes
@@ -447,6 +479,8 @@ export function WorkflowBuilder({
   const [nameError, setNameError] = useState('');
   /** Connected-app trigger options for the integration_event picker. */
   const triggerOptions = useTriggerOptions();
+  /** Connected apps for the call_integration action picker. */
+  const connectedApps = useConnectedApps();
   /** Narrow viewport → the advanced canvas is view-only (edit on a bigger screen). */
   const isNarrow = useIsNarrow();
 
@@ -742,6 +776,7 @@ export function WorkflowBuilder({
               onRemove={() =>
                 patch({ actions: state.actions.filter((a) => a.id !== row.id) })
               }
+              connectedApps={connectedApps}
             />
           ))}
         </ul>
@@ -1218,12 +1253,14 @@ function ActionRowEditor({
   canRemove,
   onChange,
   onRemove,
+  connectedApps,
 }: {
   index: number;
   row: ActionRowState;
   canRemove: boolean;
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
+  connectedApps: ConnectedAppsState;
 }) {
   return (
     <li className="space-y-2.5 rounded-lg border border-border/60 bg-card p-3">
@@ -1243,7 +1280,7 @@ function ActionRowEditor({
         />
         {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
       </div>
-      <ActionConfig row={row} onChange={onChange} />
+      <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
     </li>
   );
 }
@@ -1251,9 +1288,11 @@ function ActionRowEditor({
 function ActionConfig({
   row,
   onChange,
+  connectedApps,
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
+  connectedApps: ConnectedAppsState;
 }) {
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
@@ -1323,27 +1362,74 @@ function ActionConfig({
     );
   }
 
-  // call_integration — app + action lead; the raw JSON params are tucked into an
-  // Advanced disclosure so the common case isn't dominated by a code box.
+  // call_integration — app + action lead; show connected apps picker when apps
+  // are available, else fall back to free-text so authoring is never blocked.
+  const hasApps =
+    connectedApps.status === 'ready' && connectedApps.apps.length > 0;
+  const selectedApp =
+    hasApps && connectedApps.status === 'ready'
+      ? connectedApps.apps.find((a) => a.toolkit === row.toolkit)
+      : null;
+  const availableActions = selectedApp?.actions ?? [];
+
   return (
     <div className="space-y-2.5">
-      <FieldRow label="App" htmlFor={`act-tk-${row.id}`}>
-        <Input
-          id={`act-tk-${row.id}`}
-          value={row.toolkit}
-          onChange={(e) => onChange({ toolkit: e.target.value })}
-          placeholder="slack"
-          className="h-8"
-        />
+      {connectedApps.status === 'ready' && !hasApps && (
+        <p className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[12px] text-muted-foreground text-center">
+          No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.
+        </p>
+      )}
+
+      <FieldRow label="Connected app" htmlFor={`act-tk-${row.id}`}>
+        {hasApps && connectedApps.status === 'ready' ? (
+          <MiniSelect
+            id={`act-tk-${row.id}`}
+            value={row.toolkit || '__none__'}
+            onValueChange={(v) => {
+              const next = v === '__none__' ? '' : v;
+              const app = connectedApps.apps.find((a) => a.toolkit === next);
+              onChange({
+                toolkit: next,
+                // Reset action when toolkit changes
+                action: app?.actions[0]?.value ?? '',
+              });
+            }}
+            options={[
+              { value: '__none__', label: 'Pick an app…' },
+              ...connectedApps.apps.map((a) => ({ value: a.toolkit, label: a.label })),
+            ]}
+          />
+        ) : (
+          <Input
+            id={`act-tk-${row.id}`}
+            value={row.toolkit}
+            onChange={(e) => onChange({ toolkit: e.target.value })}
+            placeholder="slack"
+            className="h-8"
+          />
+        )}
       </FieldRow>
+
       <FieldRow label="Action" htmlFor={`act-action-${row.id}`}>
-        <Input
-          id={`act-action-${row.id}`}
-          value={row.action}
-          onChange={(e) => onChange({ action: e.target.value })}
-          placeholder="send_message"
-          className="h-8"
-        />
+        {availableActions.length > 0 ? (
+          <MiniSelect
+            id={`act-action-${row.id}`}
+            value={row.action || '__none__'}
+            onValueChange={(v) => onChange({ action: v === '__none__' ? '' : v })}
+            options={[
+              { value: '__none__', label: 'Pick an action…' },
+              ...availableActions,
+            ]}
+          />
+        ) : (
+          <Input
+            id={`act-action-${row.id}`}
+            value={row.action}
+            onChange={(e) => onChange({ action: e.target.value })}
+            placeholder="SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL"
+            className="h-8"
+          />
+        )}
       </FieldRow>
       <details className="group/adv">
         <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
