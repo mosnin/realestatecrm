@@ -76,8 +76,10 @@ export interface ActionRowState {
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
   instruction: string;
-  /** schedule_message delay (string off a number input). */
+  /** schedule_message / delay: numeric amount (string off a number input). */
   delayMinutes: string;
+  /** delay: the display unit. Converted to minutes by buildAction. */
+  delayUnit: 'minutes' | 'hours' | 'days';
   /** create_task. */
   title: string;
   dueInDays: string;
@@ -86,6 +88,12 @@ export interface ActionRowState {
   action: string;
   /** call_integration params as a JSON string; blank = omit. */
   paramsJson: string;
+  /** filter: field path (e.g. 'lead.score'). */
+  filterField: string;
+  /** filter: comparison operator. */
+  filterOperator: Operator;
+  /** filter: comparison value (string; coerced on build). */
+  filterValue: string;
 }
 
 export interface WorkflowFormState {
@@ -237,6 +245,22 @@ function buildAction(row: ActionRowState): WorkflowAction {
       };
     case 'run_chippi':
       return { type: 'run_chippi', config: { instruction: row.instruction.trim() } };
+    case 'delay': {
+      const multiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
+      return {
+        type: 'delay',
+        config: { delayMinutes: toNumber(row.delayMinutes) * multiplier },
+      };
+    }
+    case 'filter': {
+      const base = { field: row.filterField.trim(), operator: row.filterOperator };
+      return {
+        type: 'filter',
+        config: VALUELESS_OPERATORS.has(row.filterOperator)
+          ? base
+          : { ...base, value: coerceConditionValue(row.filterValue) },
+      };
+    }
     default: {
       const _never: never = row.type;
       return { type: _never, config: {} } as unknown as WorkflowAction;

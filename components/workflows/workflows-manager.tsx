@@ -192,7 +192,12 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
           ? a.config.instruction
           : '',
       delayMinutes:
-        a.type === 'schedule_message' ? String(a.config.delayMinutes) : '',
+        a.type === 'schedule_message'
+          ? String(a.config.delayMinutes)
+          : a.type === 'delay'
+            ? String(a.config.delayMinutes)
+            : '',
+      delayUnit: 'minutes' as const,
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -204,6 +209,10 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         a.type === 'call_integration' && a.config.params
           ? JSON.stringify(a.config.params, null, 2)
           : '',
+      filterField: a.type === 'filter' ? a.config.field : '',
+      filterOperator: a.type === 'filter' ? a.config.operator : 'eq' as const,
+      filterValue:
+        a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow

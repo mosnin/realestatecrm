@@ -185,7 +185,9 @@ export type WorkflowActionType =
   | 'schedule_message'
   | 'create_task'
   | 'call_integration'
-  | 'run_chippi';
+  | 'run_chippi'
+  | 'delay'
+  | 'filter';
 
 const channelSchema = z.enum(['sms', 'email']);
 const instructionField = z.string().trim().min(1).max(LONG_TEXT);
@@ -229,6 +231,22 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('run_chippi'),
     config: z.object({ instruction: instructionField }).strict(),
+  }),
+  // delay: pause execution before the next step.
+  z.object({
+    type: z.literal('delay'),
+    config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
+  }),
+  // filter: stop the run if the field condition is not met.
+  z.object({
+    type: z.literal('filter'),
+    config: z
+      .object({
+        field: z.string().trim().min(1).max(SHORT_TEXT),
+        operator: operatorSchema,
+        value: z.unknown().optional(),
+      })
+      .strict(),
   }),
 ]);
 

@@ -237,6 +237,8 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         status: result.status,
         detail: result.detail,
       });
+      // filter gate: when stop is true (filter condition not met), halt remaining actions.
+      if (result.stop) break;
     }
 
     // 4. Terminal status.

@@ -115,6 +115,16 @@ function actionPhrase(a: ActionRowState): string {
     }
     case 'run_chippi':
       return 'ask Chippi to handle it';
+    case 'delay': {
+      const amt = a.delayMinutes.trim();
+      const unit = a.delayUnit ?? 'minutes';
+      if (!amt) return 'wait a moment';
+      return `wait ${amt} ${unit}`;
+    }
+    case 'filter': {
+      const f = a.filterField.trim();
+      return f ? `filter on ${f}` : 'check a filter condition';
+    }
     default:
       return 'take an action';
   }

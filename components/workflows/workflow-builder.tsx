@@ -116,6 +116,8 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   create_task: 'Create a task',
   call_integration: 'Call a connected app',
   run_chippi: 'Ask Chippi to do something',
+  delay: 'Wait / Delay',
+  filter: 'Filter — only continue if…',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -123,6 +125,8 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'run_chippi',
   'create_task',
   'schedule_message',
+  'filter',
+  'delay',
   'call_integration',
 ];
 
@@ -132,6 +136,8 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   create_task: CheckSquare,
   call_integration: Plug,
   run_chippi: Sparkles,
+  delay: Clock,
+  filter: Filter,
 };
 
 const AUTONOMY_OPTIONS: { value: WorkflowAutonomy; label: string }[] = [
@@ -316,11 +322,15 @@ function newActionRow(): ActionRowState {
     channel: 'sms',
     instruction: '',
     delayMinutes: '',
+    delayUnit: 'minutes',
     title: '',
     dueInDays: '',
     toolkit: '',
     action: '',
     paramsJson: '',
+    filterField: '',
+    filterOperator: 'eq',
+    filterValue: '',
   };
 }
 
@@ -351,29 +361,49 @@ function conditionsToRows(group: ConditionGroup): ConditionRowState[] {
 
 /** Map stored WorkflowActions back into the builder's action ROWS (mirrors
  *  recordToFormState's action mapping). */
+/** Convert stored delayMinutes back to a user-friendly amount + unit. */
+function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours' | 'days' } {
+  if (m % 1440 === 0) return { amount: String(m / 1440), unit: 'days' };
+  if (m % 60 === 0) return { amount: String(m / 60), unit: 'hours' };
+  return { amount: String(m), unit: 'minutes' };
+}
+
 function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
-  return actions.map((a) => ({
-    id: nextRowId('act'),
-    type: a.type,
-    channel:
-      a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
-    instruction:
-      a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
-        ? a.config.instruction
-        : '',
-    delayMinutes: a.type === 'schedule_message' ? String(a.config.delayMinutes) : '',
-    title: a.type === 'create_task' ? a.config.title : '',
-    dueInDays:
-      a.type === 'create_task' && typeof a.config.dueInDays === 'number'
-        ? String(a.config.dueInDays)
-        : '',
-    toolkit: a.type === 'call_integration' ? a.config.toolkit : '',
-    action: a.type === 'call_integration' ? a.config.action : '',
-    paramsJson:
-      a.type === 'call_integration' && a.config.params
-        ? JSON.stringify(a.config.params, null, 2)
-        : '',
-  }));
+  return actions.map((a) => {
+    const delayDisplay = a.type === 'delay' ? minutesToDisplay(a.config.delayMinutes) : null;
+    return {
+      id: nextRowId('act'),
+      type: a.type,
+      channel:
+        a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
+      instruction:
+        a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
+          ? a.config.instruction
+          : '',
+      delayMinutes:
+        a.type === 'schedule_message'
+          ? String(a.config.delayMinutes)
+          : a.type === 'delay'
+            ? (delayDisplay?.amount ?? '')
+            : '',
+      delayUnit: delayDisplay?.unit ?? 'minutes',
+      title: a.type === 'create_task' ? a.config.title : '',
+      dueInDays:
+        a.type === 'create_task' && typeof a.config.dueInDays === 'number'
+          ? String(a.config.dueInDays)
+          : '',
+      toolkit: a.type === 'call_integration' ? a.config.toolkit : '',
+      action: a.type === 'call_integration' ? a.config.action : '',
+      paramsJson:
+        a.type === 'call_integration' && a.config.params
+          ? JSON.stringify(a.config.params, null, 2)
+          : '',
+      filterField: a.type === 'filter' ? a.config.field : '',
+      filterOperator: a.type === 'filter' ? a.config.operator : 'eq',
+      filterValue:
+        a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
+    };
+  });
 }
 
 /** Count condition + action nodes in a graph, for the advanced-mode preview. */
@@ -515,6 +545,29 @@ function StepConnector() {
   );
 }
 
+/** Per-action-type accent colors: delay = amber, filter = sky, else violet. */
+function actionAccent(type: WorkflowActionType) {
+  if (type === 'delay') {
+    return {
+      border: 'border-l-amber-400 dark:border-l-amber-500/70',
+      badge: 'bg-amber-500',
+      icon: 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+    };
+  }
+  if (type === 'filter') {
+    return {
+      border: 'border-l-sky-400 dark:border-l-sky-500/70',
+      badge: 'bg-sky-500',
+      icon: 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400',
+    };
+  }
+  return {
+    border: 'border-l-violet-400 dark:border-l-violet-500/70',
+    badge: 'bg-violet-500',
+    icon: 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
+  };
+}
+
 /**
  * One action step card. The action type selector lives in the card header so
  * the realtor sees at a glance what each step does — identical to how Zapier
@@ -540,8 +593,9 @@ function ActionZapCard({
   connectedApps: ConnectedAppsState;
 }) {
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
+  const cl = actionAccent(row.type);
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 border-l-4 border-l-violet-400 bg-card dark:border-l-violet-500/70">
+    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
       <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
         {showDragHandle && (
           <GripVertical
@@ -550,10 +604,10 @@ function ActionZapCard({
             className="flex-shrink-0 cursor-grab text-muted-foreground/40 active:cursor-grabbing"
           />
         )}
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-500 text-[11px] font-bold text-white">
+        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white', cl.badge)}>
           {step}
         </span>
-        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
+        <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
           <Icon size={14} aria-hidden />
         </span>
         <div className="flex-1">
@@ -707,6 +761,8 @@ export function WorkflowBuilder({
       return !row.instruction.trim();
     if (row.type === 'create_task') return !row.title.trim();
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
+    if (row.type === 'delay') return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
+    if (row.type === 'filter') return !row.filterField.trim();
     return false;
   }
 
@@ -1636,6 +1692,75 @@ function ActionConfig({
             className="h-8 w-24"
           />
         </FieldRow>
+      </div>
+    );
+  }
+
+  if (row.type === 'delay') {
+    return (
+      <div className="space-y-2.5">
+        <p className={CAPTION}>
+          Pause the automation before the next step runs.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor={`act-delay-amt-${row.id}`} className="text-[12px] text-muted-foreground">
+            Wait for
+          </Label>
+          <Input
+            id={`act-delay-amt-${row.id}`}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={row.delayMinutes}
+            onChange={(e) => onChange({ delayMinutes: e.target.value })}
+            placeholder="2"
+            className="h-8 w-20"
+          />
+          <MiniSelect
+            value={row.delayUnit ?? 'minutes'}
+            onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
+            options={[
+              { value: 'minutes', label: 'minutes' },
+              { value: 'hours', label: 'hours' },
+              { value: 'days', label: 'days' },
+            ]}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (row.type === 'filter') {
+    return (
+      <div className="space-y-2.5">
+        <p className={CAPTION}>
+          Only continue if this condition is true — otherwise the automation stops here.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={row.filterField}
+            onChange={(e) => onChange({ filterField: e.target.value })}
+            placeholder="lead.score"
+            className="h-8 w-32"
+            aria-label="Field"
+          />
+          <MiniSelect
+            value={row.filterOperator}
+            onValueChange={(v) => onChange({ filterOperator: v as Operator })}
+            options={OPERATORS.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+            className="min-w-[8rem]"
+            aria-label="Operator"
+          />
+          {!VALUELESS_OPERATORS.has(row.filterOperator) && (
+            <Input
+              value={row.filterValue}
+              onChange={(e) => onChange({ filterValue: e.target.value })}
+              placeholder="80"
+              className="h-8 w-24"
+              aria-label="Value"
+            />
+          )}
+        </div>
       </div>
     );
   }

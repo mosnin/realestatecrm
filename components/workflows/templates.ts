@@ -65,11 +65,15 @@ function blankAction(): WorkflowFormState['actions'][number] {
     channel: 'sms',
     instruction: '',
     delayMinutes: '',
+    delayUnit: 'minutes',
     title: '',
     dueInDays: '',
     toolkit: '',
     action: '',
     paramsJson: '',
+    filterField: '',
+    filterOperator: 'eq',
+    filterValue: '',
   };
 }
 

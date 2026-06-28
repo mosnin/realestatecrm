@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
+import { evaluateConditions } from './conditions';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 
 /**
@@ -48,6 +49,11 @@ export interface WorkflowContext {
 export interface ActionStepResult {
   status: 'ok' | 'failed' | 'skipped';
   detail: Record<string, unknown>;
+  /**
+   * When true the executor stops running remaining actions (used by the
+   * 'filter' action type when its condition is not met).
+   */
+  stop?: boolean;
 }
 
 /** Per-action options threaded from the executor. */
@@ -322,6 +328,48 @@ async function runCallIntegration(
 }
 
 /**
+ * delay — records the intended pause in the run ledger. In serverless execution
+ * the delay cannot actually block; the run note makes the intent observable in
+ * the audit trail. A future scheduler (DelayedResume table + cron) can honour
+ * long delays by replaying remaining actions after the specified interval.
+ */
+function runDelay(
+  action: Extract<WorkflowAction, { type: 'delay' }>,
+): ActionStepResult {
+  return {
+    status: 'ok',
+    detail: {
+      delayMinutes: action.config.delayMinutes,
+      note: 'Delay recorded. Async resumption is not yet active — subsequent steps ran immediately.',
+    },
+  };
+}
+
+/**
+ * filter — evaluates a single field condition. When the condition is not met
+ * the run is halted (stop = true) with status 'skipped'; subsequent actions are
+ * not executed. This mirrors Zapier's "Filter by Zapier" step.
+ */
+function runFilter(
+  action: Extract<WorkflowAction, { type: 'filter' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { field, operator, value } = action.config;
+  const passed = evaluateConditions(
+    { op: 'and', rules: [{ field, operator, value }] },
+    context as Record<string, unknown>,
+  );
+  if (!passed) {
+    return {
+      status: 'skipped',
+      stop: true,
+      detail: { filtered: true, field, operator, value, reason: 'filter condition not met' },
+    };
+  }
+  return { status: 'ok', detail: { filtered: false, field, operator, passed: true } };
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -342,6 +390,10 @@ export async function executeAction(
         return await runScheduleMessage(action, context, opts);
       case 'call_integration':
         return await runCallIntegration(action, opts.spaceId, opts.autonomy);
+      case 'delay':
+        return runDelay(action);
+      case 'filter':
+        return runFilter(action, context);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

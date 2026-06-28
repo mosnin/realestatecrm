@@ -58,6 +58,14 @@ function actionPhrase(action: WorkflowAction): string {
       return `call ${action.config.toolkit}`;
     case 'run_chippi':
       return 'ask Chippi to take it from there';
+    case 'delay': {
+      const m = action.config.delayMinutes;
+      if (m % 1440 === 0) return `wait ${m / 1440} ${m / 1440 === 1 ? 'day' : 'days'}`;
+      if (m % 60 === 0) return `wait ${m / 60} ${m / 60 === 1 ? 'hour' : 'hours'}`;
+      return `wait ${m} minutes`;
+    }
+    case 'filter':
+      return `check a filter condition (${action.config.field} ${action.config.operator})`;
     default:
       return 'run an action';
   }
