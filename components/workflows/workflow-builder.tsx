@@ -204,6 +204,24 @@ function useTriggerOptions(): TriggerOptionsState {
   return state;
 }
 
+/**
+ * True on a narrow (touch-ish) viewport. The node canvas is a precision drag-and-
+ * connect surface — miserable to EDIT on a phone — so advanced mode goes
+ * read-only there and the realtor edits on a larger screen. SSR-safe (starts
+ * false, resolves after mount).
+ */
+function useIsNarrow(maxWidth = 768): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth - 1}px)`);
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, [maxWidth]);
+  return narrow;
+}
+
 // ── Empty form state + row factories ─────────────────────────────────────────
 
 let rowSeq = 0;
@@ -425,6 +443,8 @@ export function WorkflowBuilder({
   const [nameError, setNameError] = useState('');
   /** Connected-app trigger options for the integration_event picker. */
   const triggerOptions = useTriggerOptions();
+  /** Narrow viewport → the advanced canvas is view-only (edit on a bigger screen). */
+  const isNarrow = useIsNarrow();
 
   function patch(next: Partial<WorkflowFormState>) {
     setState((s) => ({ ...s, ...next }));
@@ -617,11 +637,19 @@ export function WorkflowBuilder({
           hidden because the graph carries them. ────────────────────────────── */}
       {mode === 'advanced' && (
         <section className="space-y-3">
-          <p className={SECTION_LABEL}>Flow</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className={SECTION_LABEL}>Flow</p>
+            {isNarrow && (
+              <p className={cn(CAPTION, 'text-amber-600 dark:text-amber-500')}>
+                View only — open on a larger screen to edit.
+              </p>
+            )}
+          </div>
           <WorkflowCanvasLazy
             graph={state.graph ?? emptyGraph}
             trigger={buildDefinition({ ...state, graph: null }).trigger}
             onChange={(g) => patch({ graph: g })}
+            readOnly={isNarrow}
           />
         </section>
       )}
