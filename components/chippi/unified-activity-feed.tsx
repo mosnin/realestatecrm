@@ -78,17 +78,18 @@ export function resolveLink(
     case 'deal':
       return link.id ? `${base}/deals/${link.id}` : null;
     case 'workflow':
-      // Deep-link to the specific workflow via a hash anchor when we know which
-      // one fired; the manager scrolls it into view and flashes it. Without an
-      // id (legacy run with no workflowId) fall back to the list.
-      return link.id ? `${base}/workflows#workflow-${link.id}` : `${base}/workflows`;
+      // Workflows + Routines live on the unified /automations hub now. Deep-link
+      // to the specific workflow via a hash anchor when we know which one fired;
+      // the hub scrolls it into view and flashes it. Without an id (legacy run
+      // with no workflowId) fall back to the hub.
+      return link.id ? `${base}/automations#workflow-${link.id}` : `${base}/automations`;
     case 'inbox':
       return `${base}/chippi/inbox`;
     case 'integrations':
       return `${base}/chippi/integrations`;
     case 'routines':
-      // Same deep-link treatment for routines.
-      return link.id ? `${base}/routines#routine-${link.id}` : `${base}/routines`;
+      // Same deep-link treatment for routines, on the same unified hub.
+      return link.id ? `${base}/automations#routine-${link.id}` : `${base}/automations`;
     default:
       return null;
   }

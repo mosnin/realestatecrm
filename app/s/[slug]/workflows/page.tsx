@@ -1,49 +1,19 @@
-import { notFound, redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSlug } from '@/lib/space';
-import { supabase } from '@/lib/supabase';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
-import { WorkflowsManager } from '@/components/workflows/workflows-manager';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Workflows — Chippi' };
 
 /**
- * /workflows — the realtor's standing automations: a When → If → Then composer
- * that turns an event into a draft. Read/write through /api/workflows; the
- * engine fires the live triggers. A test-run proves a workflow works (watch the
- * draft get created) before it goes live, and autonomy stays 'draft' by default
- * so nothing goes out without the realtor's tap.
+ * /workflows → /automations. Workflows and Routines were unified into one
+ * "Automations" hub (the realtor holds one concept, not two). This redirect
+ * keeps old bookmarks and the activity feed's #workflow-<id> deep-links working
+ * — the browser re-applies the fragment to the redirect target, and the hub
+ * renders the same workflow rows (so the anchor still resolves there).
  */
-export default async function WorkflowsPage({
+export default async function WorkflowsRedirect({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
-  if (!userId) redirect('/login/realtor');
-
-  const space = await getSpaceFromSlug(slug);
-  if (!space) notFound();
-
-  // Ownership gate — mirror the other /chippi/* sub-pages: the signed-in
-  // Clerk user must own this space.
-  const { data: spaceOwner } = await supabase
-    .from('User')
-    .select('id')
-    .eq('clerkId', userId)
-    .eq('id', space.ownerId)
-    .maybeSingle();
-  if (!spaceOwner) notFound();
-
-  return (
-    <ChippiPageShell
-      greeting="Workflows."
-      title="Automations that run themselves."
-      subtitle="Pick a trigger, set the conditions, and let me draft the next step. Test one to watch the draft appear — then turn it on."
-    >
-      <WorkflowsManager />
-    </ChippiPageShell>
-  );
+  redirect(`/s/${slug}/automations`);
 }

@@ -26,14 +26,14 @@ describe('resolveLink', () => {
     expect(resolveLink({ kind: 'deal', id: 'd1' }, SLUG)).toBe('/s/acme/deals/d1');
   });
 
-  it('workflow with an id → deep-link to that workflow via hash anchor', () => {
+  it('workflow with an id → deep-link to that workflow on the automations hub', () => {
     expect(resolveLink({ kind: 'workflow', id: 'w1' }, SLUG)).toBe(
-      '/s/acme/workflows#workflow-w1',
+      '/s/acme/automations#workflow-w1',
     );
   });
 
-  it('workflow without an id → workflows index (legacy run, no workflowId)', () => {
-    expect(resolveLink({ kind: 'workflow' }, SLUG)).toBe('/s/acme/workflows');
+  it('workflow without an id → automations hub (legacy run, no workflowId)', () => {
+    expect(resolveLink({ kind: 'workflow' }, SLUG)).toBe('/s/acme/automations');
   });
 
   it('inbox → chippi inbox', () => {
@@ -46,14 +46,14 @@ describe('resolveLink', () => {
     );
   });
 
-  it('routines with an id → deep-link to that routine via hash anchor', () => {
+  it('routines with an id → deep-link to that routine on the automations hub', () => {
     expect(resolveLink({ kind: 'routines', id: 'r1' }, SLUG)).toBe(
-      '/s/acme/routines#routine-r1',
+      '/s/acme/automations#routine-r1',
     );
   });
 
-  it('routines without an id → routines index', () => {
-    expect(resolveLink({ kind: 'routines' }, SLUG)).toBe('/s/acme/routines');
+  it('routines without an id → automations hub', () => {
+    expect(resolveLink({ kind: 'routines' }, SLUG)).toBe('/s/acme/automations');
   });
 
   it('contact without an id → null (no broken href)', () => {

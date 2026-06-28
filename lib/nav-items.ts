@@ -64,8 +64,9 @@ export const realtorNavItems: NavItem[] = [
       // Integrations = the connect/disconnect management surface.
       { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/integrations', label: 'Integrations' },
-      { href: '/routines', label: 'Routines' },
-      { href: '/workflows', label: 'Workflows' },
+      // Workflows (when something happens) + Routines (on a schedule) unified
+      // into one concept: standing orders Chippi runs on its own.
+      { href: '/automations', label: 'Automations' },
     ],
   },
   {
