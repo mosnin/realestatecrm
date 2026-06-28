@@ -50,6 +50,7 @@ import {
   CheckSquare,
   ArrowRight,
   Webhook,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -232,6 +233,15 @@ export function WorkflowsManager() {
   const [actionError, setActionError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off' | 'failed'>('all');
+  const [triggerFilter, setTriggerFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun'>('created');
+
+  /** Unique trigger types present in the current workflow list for the filter dropdown. */
+  const triggerTypes = useMemo(() => {
+    const seen = new Set<string>();
+    workflows.forEach((w) => seen.add(w.trigger.type));
+    return Array.from(seen);
+  }, [workflows]);
 
   const filteredWorkflows = useMemo(() => {
     let list = workflows;
@@ -240,8 +250,20 @@ export function WorkflowsManager() {
     if (statusFilter === 'on') list = list.filter((w) => w.enabled);
     else if (statusFilter === 'off') list = list.filter((w) => !w.enabled);
     else if (statusFilter === 'failed') list = list.filter((w) => w.lastRunStatus === 'error');
+    if (triggerFilter !== 'all') list = list.filter((w) => w.trigger.type === triggerFilter);
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'lastRun') {
+        if (!a.lastRunAt && !b.lastRunAt) return 0;
+        if (!a.lastRunAt) return 1;
+        if (!b.lastRunAt) return -1;
+        return b.lastRunAt.localeCompare(a.lastRunAt);
+      }
+      // created: newest first (default — the API already returns this order)
+      return b.createdAt.localeCompare(a.createdAt);
+    });
     return list;
-  }, [workflows, searchQuery, statusFilter]);
+  }, [workflows, searchQuery, statusFilter, triggerFilter, sortBy]);
 
   // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
   const highlightedAnchor = useHashHighlight();
@@ -318,7 +340,10 @@ export function WorkflowsManager() {
       }
       setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
       closeComposer();
-      toast.success('Workflow created', { description: `"${payload.name}" is ready to go.` });
+      toast.success('Workflow is live!', {
+        description: `"${payload.name}" will run on its trigger.`,
+        duration: 5000,
+      });
     } catch {
       setActionError("Network hiccup. Try again.");
     } finally {
@@ -492,32 +517,62 @@ export function WorkflowsManager() {
               New workflow
             </Button>
           </div>
-          {/* Row 2: status filter pills */}
-          <div className="flex gap-1.5">
-            {(
-              [
-                { value: 'all', label: 'All' },
-                { value: 'on', label: 'On' },
-                { value: 'off', label: 'Off' },
-                { value: 'failed', label: 'Failed' },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setStatusFilter(f.value)}
-                className={cn(
-                  'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
-                  statusFilter === f.value
-                    ? f.value === 'failed'
-                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                      : 'bg-foreground text-background'
-                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
-                )}
+          {/* Row 2: status filter pills + sort */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1.5">
+              {(
+                [
+                  { value: 'all', label: 'All' },
+                  { value: 'on', label: 'On' },
+                  { value: 'off', label: 'Off' },
+                  { value: 'failed', label: 'Failed' },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setStatusFilter(f.value)}
+                  className={cn(
+                    'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                    statusFilter === f.value
+                      ? f.value === 'failed'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                        : 'bg-foreground text-background'
+                      : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* Trigger type filter — only shown when 2+ types exist */}
+            {triggerTypes.length > 1 && (
+              <select
+                value={triggerFilter}
+                onChange={(e) => setTriggerFilter(e.target.value)}
+                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
               >
-                {f.label}
-              </button>
-            ))}
+                <option value="all">All triggers</option>
+                {triggerTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* Sort */}
+            <div className="ml-auto flex items-center gap-1.5">
+              <ArrowUpDown size={12} className="text-muted-foreground/60" aria-hidden />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+              >
+                <option value="created">Newest first</option>
+                <option value="name">Name A–Z</option>
+                <option value="lastRun">Last run</option>
+              </select>
+            </div>
           </div>
         </div>
       ) : null}
@@ -831,6 +886,11 @@ function WorkflowRow({
             {!workflow.enabled && (
               <span className="inline-flex items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
                 Paused
+              </span>
+            )}
+            {workflow.actions.length > 0 && (
+              <span className="inline-flex flex-shrink-0 items-center rounded-full bg-muted/60 px-1.5 py-px text-[10px] tabular-nums text-muted-foreground/60">
+                {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
               </span>
             )}
           </div>
