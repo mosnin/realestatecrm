@@ -25,6 +25,7 @@ import {
   Workflow as WorkflowIcon,
   Play,
   Pencil,
+  PencilLine,
   Trash2,
   AlertTriangle,
   Check,
@@ -45,6 +46,8 @@ import {
   Target,
   Plug,
   Copy,
+  CheckSquare,
+  ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -605,6 +608,61 @@ const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
 };
 
+// ── Action type → icon ───────────────────────────────────────────────────────
+
+const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+};
+
+/**
+ * Compact visual flow row: trigger icon → action icon(s) — mirrors the
+ * Zapier list's app-icon row that lets you scan a workflow's shape at a glance.
+ */
+function WorkflowFlowLine({
+  trigger,
+  actions,
+}: {
+  trigger: WorkflowTrigger;
+  actions: WorkflowAction[];
+}) {
+  const ti = TRIGGER_ICON_MAP[trigger.type];
+  const visibleActions = actions.slice(0, 5);
+  const overflow = actions.length - visibleActions.length;
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      {ti && (
+        <>
+          <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
+            <ti.icon size={9} aria-hidden />
+          </span>
+          <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
+        </>
+      )}
+      {visibleActions.map((a, i) => {
+        const ai = ACTION_ICON_MAP[a.type];
+        if (!ai) return null;
+        return (
+          <div key={i} className="flex items-center gap-1">
+            <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai.cls)}>
+              <ai.icon size={9} aria-hidden />
+            </span>
+            {i < visibleActions.length - 1 && (
+              <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
+            )}
+          </div>
+        );
+      })}
+      {overflow > 0 && (
+        <span className="text-[10px] text-muted-foreground/60">+{overflow}</span>
+      )}
+    </div>
+  );
+}
+
 // ── Trigger type → human-readable label ──────────────────────────────────────
 
 function triggerLabel(trigger: WorkflowTrigger): string {
@@ -709,7 +767,7 @@ function WorkflowRow({
       {/* Main grid row */}
       <div className="grid grid-cols-[1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
 
-        {/* Col 1 — Name + summary */}
+        {/* Col 1 — Name + visual flow */}
         <div className="min-w-0 pr-3">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-medium leading-snug text-foreground">
@@ -718,15 +776,16 @@ function WorkflowRow({
             {workflow.enabled && (
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
             )}
+            {!workflow.enabled && (
+              <span className="inline-flex items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
+                Paused
+              </span>
+            )}
           </div>
-          <p className="mt-0.5 truncate text-[12px] leading-snug text-muted-foreground">
+          <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
             {summary}
           </p>
-          {!workflow.enabled && (
-            <span className="mt-0.5 inline-block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-              Paused
-            </span>
-          )}
         </div>
 
         {/* Col 2 — Trigger label + icon */}

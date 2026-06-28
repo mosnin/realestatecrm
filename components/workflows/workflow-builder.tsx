@@ -19,9 +19,9 @@
  * are add/remove only (no drag reorder) — both deliberately deferred for v1.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -451,6 +451,7 @@ function ZapCard({
   title,
   icon: Icon,
   headerRight,
+  incomplete,
   children,
 }: {
   step: number;
@@ -458,6 +459,7 @@ function ZapCard({
   title: string;
   icon: LucideIcon;
   headerRight?: React.ReactNode;
+  incomplete?: boolean;
   children: React.ReactNode;
 }) {
   const cl = {
@@ -487,6 +489,12 @@ function ZapCard({
           <Icon size={14} aria-hidden />
         </span>
         <span className="flex-1 text-sm font-semibold text-foreground">{title}</span>
+        {incomplete && (
+          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+            <AlertCircle size={11} aria-hidden />
+            Incomplete
+          </span>
+        )}
         {headerRight}
       </div>
       <div className="px-4 py-4">
@@ -514,6 +522,8 @@ function ActionZapCard({
   step,
   row,
   canRemove,
+  incomplete,
+  showDragHandle,
   onChange,
   onRemove,
   connectedApps,
@@ -521,6 +531,8 @@ function ActionZapCard({
   step: number;
   row: ActionRowState;
   canRemove: boolean;
+  incomplete?: boolean;
+  showDragHandle?: boolean;
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
   connectedApps: ConnectedAppsState;
@@ -529,6 +541,13 @@ function ActionZapCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 border-l-4 border-l-violet-400 bg-card dark:border-l-violet-500/70">
       <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
+        {showDragHandle && (
+          <GripVertical
+            size={14}
+            aria-hidden
+            className="flex-shrink-0 cursor-grab text-muted-foreground/40 active:cursor-grabbing"
+          />
+        )}
         <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-500 text-[11px] font-bold text-white">
           {step}
         </span>
@@ -558,6 +577,12 @@ function ActionZapCard({
             </SelectContent>
           </Select>
         </div>
+        {incomplete && (
+          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+            <AlertCircle size={11} aria-hidden />
+            Incomplete
+          </span>
+        )}
         {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
       </div>
       <div className="px-4 py-4">
@@ -595,6 +620,9 @@ export function WorkflowBuilder({
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');
+  /** Turns true after the user makes any edit — gates incomplete badges so a
+   *  blank form doesn't open covered in warnings. */
+  const [dirty, setDirty] = useState(false);
   /** Connected-app trigger options for the integration_event picker. */
   const triggerOptions = useTriggerOptions();
   /** Connected apps for the call_integration action picker. */
@@ -603,23 +631,63 @@ export function WorkflowBuilder({
   const isNarrow = useIsNarrow();
 
   function patch(next: Partial<WorkflowFormState>) {
+    setDirty(true);
     setState((s) => ({ ...s, ...next }));
   }
   function patchTrigger(next: Partial<WorkflowFormState['trigger']>) {
+    setDirty(true);
     setState((s) => ({ ...s, trigger: { ...s.trigger, ...next } }));
   }
 
   function updateCondition(id: string, next: Partial<ConditionRowState>) {
+    setDirty(true);
     setState((s) => ({
       ...s,
       conditions: s.conditions.map((c) => (c.id === id ? { ...c, ...next } : c)),
     }));
   }
   function updateAction(id: string, next: Partial<ActionRowState>) {
+    setDirty(true);
     setState((s) => ({
       ...s,
       actions: s.actions.map((a) => (a.id === id ? { ...a, ...next } : a)),
     }));
+  }
+
+  // ── Action drag-to-reorder ─────────────────────────────────────────────────
+
+  const dragSrcRef = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  function moveAction(from: number, to: number) {
+    if (from === to) return;
+    setDirty(true);
+    setState((s) => {
+      const next = [...s.actions];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return { ...s, actions: next };
+    });
+  }
+
+  // ── Per-step incompleteness (only shown after first edit) ──────────────────
+
+  const triggerIncomplete = useMemo(() => {
+    if (!dirty) return false;
+    const t = state.trigger;
+    if (t.type === 'integration_event') return !t.toolkit || !t.event;
+    if (t.type === 'deal_stage_changed') return !t.toStage;
+    if (t.type === 'schedule') return !t.hour;
+    return false;
+  }, [dirty, state.trigger]);
+
+  function actionIncomplete(row: ActionRowState): boolean {
+    if (!dirty) return false;
+    if (row.type === 'draft_message' || row.type === 'schedule_message' || row.type === 'run_chippi')
+      return !row.instruction.trim();
+    if (row.type === 'create_task') return !row.title.trim();
+    if (row.type === 'call_integration') return !row.toolkit || !row.action;
+    return false;
   }
 
   // ── Mode switching ──────────────────────────────────────────────────────────
@@ -756,7 +824,7 @@ export function WorkflowBuilder({
       </div>
 
       {/* 1. Trigger step card */}
-      <ZapCard step={1} accent="orange" title="Trigger — when this happens" icon={Zap}>
+      <ZapCard step={1} accent="orange" title="Trigger — when this happens" icon={Zap} incomplete={triggerIncomplete}>
         <div className="space-y-3">
           <Label htmlFor="wf-trigger" className="sr-only">
             Trigger
@@ -887,14 +955,58 @@ export function WorkflowBuilder({
 
           <StepConnector />
 
-          {/* Action cards — each step gets its own card, numbered sequentially */}
+          {/* Action cards — each step gets its own card; draggable to reorder. */}
           {state.actions.map((row, i) => (
-            <div key={row.id}>
-              {i > 0 && <StepConnector />}
+            <div
+              key={row.id}
+              draggable={state.actions.length > 1}
+              onDragStart={(e) => {
+                dragSrcRef.current = i;
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOver !== i) setDragOver(i);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const src = dragSrcRef.current;
+                if (src !== null && src !== i) moveAction(src, i);
+                dragSrcRef.current = null;
+                setDragOver(null);
+              }}
+              onDragEnd={() => {
+                dragSrcRef.current = null;
+                setDragOver(null);
+              }}
+              className={cn(
+                'transition-opacity',
+                dragSrcRef.current === i && 'opacity-30',
+              )}
+            >
+              {i > 0 && (
+                <div
+                  className={cn(
+                    'flex flex-col items-center py-1',
+                    dragOver === i && dragSrcRef.current !== null && dragSrcRef.current !== i
+                      ? 'py-0'
+                      : '',
+                  )}
+                >
+                  {dragOver === i && dragSrcRef.current !== null && dragSrcRef.current !== i ? (
+                    <div className="h-0.5 w-full rounded-full bg-orange-400" />
+                  ) : (
+                    <div className="h-5 w-px bg-border/50" />
+                  )}
+                </div>
+              )}
               <ActionZapCard
                 step={3 + i}
                 row={row}
                 canRemove={state.actions.length > 1}
+                incomplete={actionIncomplete(row)}
+                showDragHandle={state.actions.length > 1}
                 onChange={(next) => updateAction(row.id, next)}
                 onRemove={() =>
                   patch({ actions: state.actions.filter((a) => a.id !== row.id) })
