@@ -93,6 +93,7 @@ import {
   findAttributeByField,
   type ConditionAttribute,
 } from './field-catalog';
+import type { NodeRunStatus } from './run-highlights';
 
 // React-Flow's Node/Edge generics, specialised to our adapter's data shapes so
 // the custom node components and the change handlers stay type-safe. React
@@ -110,6 +111,12 @@ export interface WorkflowCanvasProps {
   onChange: (graph: WorkflowGraph) => void;
   /** Touch / mobile → view-only: no drag, connect, select, toolbar or inspector. */
   readOnly?: boolean;
+  /**
+   * Per-node run outcome from a test-run — lights up the executed path: ran-ok
+   * nodes get an emerald ring, failed get rose, and the untaken nodes dim. Only
+   * meaningful with readOnly (the result-panel preview); applied at mount.
+   */
+  highlights?: Record<string, NodeRunStatus>;
 }
 
 // ── Friendly labels (mirrors the linear builder's vocabulary) ────────────────
@@ -196,6 +203,20 @@ const NODE_SHELL =
   'rounded-xl border bg-card px-3 py-2.5 shadow-sm transition-colors min-w-[168px] max-w-[208px]';
 const HANDLE_CLASS = '!h-2.5 !w-2.5 !border !border-border !bg-muted-foreground/40';
 
+/**
+ * Run-highlight classes for a node, from its seeded data (set when the canvas is
+ * mounted with `highlights`): ran-ok → emerald ring, failed → rose ring,
+ * skipped → amber, and a node that did NOT run while a run exists dims back.
+ */
+function runClasses(data: CanvasNodeData): string {
+  const h = data.highlight as NodeRunStatus | undefined;
+  if (h === 'ok') return 'ring-2 ring-emerald-500/60 border-emerald-500/50';
+  if (h === 'failed') return 'ring-2 ring-rose-500/60 border-rose-500/50';
+  if (h === 'skipped') return 'ring-1 ring-amber-400/50';
+  if (data.dimmed) return 'opacity-40';
+  return '';
+}
+
 function NodeIcon({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-muted-foreground">
@@ -204,12 +225,13 @@ function NodeIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TriggerNodeView({ selected }: NodeProps<CanvasNode>) {
+function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
   return (
     <div
       className={cn(
         NODE_SHELL,
         selected ? 'border-foreground/40' : 'border-border/60',
+        runClasses(data),
       )}
     >
       <div className="flex items-center gap-2">
@@ -232,6 +254,7 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
       className={cn(
         NODE_SHELL,
         selected ? 'border-foreground/40' : 'border-border/60',
+        runClasses(data),
       )}
     >
       <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
@@ -278,6 +301,7 @@ function ActionNodeView({ data, selected }: NodeProps<CanvasNode>) {
       className={cn(
         NODE_SHELL,
         selected ? 'border-foreground/40' : 'border-border/60',
+        runClasses(data),
       )}
     >
       <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
@@ -320,11 +344,29 @@ function nextNodeId(prefix: string): string {
 
 // ── Inner canvas (inside ReactFlowProvider so hooks resolve) ──────────────────
 
-function CanvasInner({ graph, trigger, onChange, readOnly = false }: WorkflowCanvasProps) {
+function CanvasInner({
+  graph,
+  trigger,
+  onChange,
+  readOnly = false,
+  highlights,
+}: WorkflowCanvasProps) {
   // Seed React-Flow state ONCE from the adapter; the graph prop is the initial
   // value, not a controlled mirror (re-seeding on every render would fight the
-  // user's in-progress edits and drags).
-  const initial = useMemo(() => graphToFlow(graph), [graph]);
+  // user's in-progress edits and drags). When `highlights` is present (a
+  // test-run preview), fold the per-node run outcome into the seeded node data —
+  // ran nodes carry their status, the rest dim — so the executed path lights up.
+  const initial = useMemo(() => {
+    const flow = graphToFlow(graph);
+    if (!highlights || Object.keys(highlights).length === 0) return flow;
+    return {
+      ...flow,
+      nodes: flow.nodes.map((n) => ({
+        ...n,
+        data: { ...n.data, highlight: highlights[n.id], dimmed: !highlights[n.id] },
+      })),
+    };
+  }, [graph, highlights]);
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(
     initial.nodes as CanvasNode[],
   );
