@@ -224,12 +224,17 @@ export function WorkflowsManager() {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [actionError, setActionError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off' | 'failed'>('all');
 
   const filteredWorkflows = useMemo(() => {
+    let list = workflows;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return workflows;
-    return workflows.filter((w) => w.name.toLowerCase().includes(q));
-  }, [workflows, searchQuery]);
+    if (q) list = list.filter((w) => w.name.toLowerCase().includes(q));
+    if (statusFilter === 'on') list = list.filter((w) => w.enabled);
+    else if (statusFilter === 'off') list = list.filter((w) => !w.enabled);
+    else if (statusFilter === 'failed') list = list.filter((w) => w.lastRunStatus === 'error');
+    return list;
+  }, [workflows, searchQuery, statusFilter]);
 
   // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
   const highlightedAnchor = useHashHighlight();
@@ -428,40 +433,70 @@ export function WorkflowsManager() {
           <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
         </div>
       ) : workflows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search
-              size={14}
-              aria-hidden
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}...`}
-              className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
-            />
+        <div className="space-y-2">
+          {/* Row 1: search + buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search
+                size={14}
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}...`}
+                className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setComposer('templates');
+                setActionError('');
+              }}
+            >
+              <Sparkles size={14} />
+              Templates
+            </Button>
+            <Button
+              size="sm"
+              onClick={openBlank}
+              className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
+            >
+              <Plus size={14} />
+              New workflow
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setComposer('templates');
-              setActionError('');
-            }}
-          >
-            <Sparkles size={14} />
-            Templates
-          </Button>
-          <Button
-            size="sm"
-            onClick={openBlank}
-            className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
-          >
-            <Plus size={14} />
-            New workflow
-          </Button>
+          {/* Row 2: status filter pills */}
+          <div className="flex gap-1.5">
+            {(
+              [
+                { value: 'all', label: 'All' },
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' },
+                { value: 'failed', label: 'Failed' },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setStatusFilter(f.value)}
+                className={cn(
+                  'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                  statusFilter === f.value
+                    ? f.value === 'failed'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                      : 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -663,9 +698,14 @@ function WorkflowRow({
 
         {/* Col 1 — Name + summary */}
         <div className="min-w-0 pr-3">
-          <p className="truncate text-sm font-medium leading-snug text-foreground">
-            {workflow.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-medium leading-snug text-foreground">
+              {workflow.name}
+            </p>
+            {workflow.enabled && (
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
+            )}
+          </div>
           <p className="mt-0.5 truncate text-[12px] leading-snug text-muted-foreground">
             {summary}
           </p>
