@@ -630,6 +630,20 @@ export function WorkflowBuilder({
   /** Narrow viewport → the advanced canvas is view-only (edit on a bigger screen). */
   const isNarrow = useIsNarrow();
 
+  // Cmd/Ctrl+S saves the workflow.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saving) submit();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // submit is stable within a render so the reference is fine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving, state]);
+
   function patch(next: Partial<WorkflowFormState>) {
     setDirty(true);
     setState((s) => ({ ...s, ...next }));
@@ -1117,6 +1131,7 @@ export function WorkflowBuilder({
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {saving ? 'Saving…' : 'Save workflow'}
         </button>
+        <span className="text-[11px] text-muted-foreground/50 select-none">⌘S</span>
         <button
           type="button"
           onClick={onCancel}

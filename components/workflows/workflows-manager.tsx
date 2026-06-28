@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
@@ -315,6 +316,7 @@ export function WorkflowsManager() {
       }
       setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
       closeComposer();
+      toast.success('Workflow created', { description: `"${payload.name}" is ready to go.` });
     } catch {
       setActionError("Network hiccup. Try again.");
     } finally {
@@ -341,6 +343,7 @@ export function WorkflowsManager() {
       }
       setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
       setEditingId(null);
+      toast.success('Workflow saved');
     } catch {
       setActionError("Network hiccup. Try again.");
     } finally {
@@ -362,6 +365,9 @@ export function WorkflowsManager() {
       if (!res.ok) throw new Error('toggle failed');
       const data = (await res.json()) as WorkflowRecord;
       setWorkflows((ws) => ws.map((w) => (w.id === workflow.id ? data : w)));
+      toast.success(next ? 'Workflow is on' : 'Workflow paused', {
+        description: `"${workflow.name}" ${next ? 'will run on its trigger.' : 'will not run until you turn it on.'}`,
+      });
     } catch {
       setWorkflows((ws) =>
         ws.map((w) => (w.id === workflow.id ? { ...w, enabled: workflow.enabled } : w)),
@@ -378,6 +384,7 @@ export function WorkflowsManager() {
       if (!res.ok) throw new Error('delete failed');
       setWorkflows((ws) => ws.filter((w) => w.id !== id));
       if (editingId === id) setEditingId(null);
+      toast.success('Workflow deleted');
     } catch {
       setActionError("Couldn't delete the workflow.");
     } finally {
