@@ -519,15 +519,6 @@ function WorkflowRow({
   }
 
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
-  const failed = workflow.lastRunStatus === 'error';
-  const runLabel =
-    workflow.lastRunStatus === 'ok'
-      ? 'ran'
-      : workflow.lastRunStatus === 'error'
-        ? 'failed'
-        : workflow.lastRunStatus === 'skipped'
-          ? 'skipped'
-          : '—';
 
   return (
     <li
@@ -540,21 +531,13 @@ function WorkflowRow({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-snug text-foreground">{workflow.name}</p>
           <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{summary}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1',
-                failed && 'text-amber-600 dark:text-amber-500',
-              )}
-            >
-              {failed && <AlertTriangle size={11} />}
-              {runLabel}
-              {workflow.lastRunAt && (
-                <span className="tabular-nums text-muted-foreground/70">
-                  {timeAgo(workflow.lastRunAt)}
-                </span>
-              )}
-            </span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <RunHealthChip status={workflow.lastRunStatus} />
+            {workflow.lastRunAt && (
+              <span className="tabular-nums text-muted-foreground/70">
+                {timeAgo(workflow.lastRunAt)}
+              </span>
+            )}
             <span className="text-muted-foreground/40">·</span>
             <AutonomyPill autonomy={workflow.autonomy} />
             {!workflow.enabled && (
@@ -871,6 +854,44 @@ function StepStatusDot({ status }: { status: string }) {
   return <span className={cn('mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full', cls)} aria-hidden />;
 }
 
+/**
+ * The workflow's run health at a glance. Four states, each legible on its own
+ * (no reliance on a neighbouring word):
+ *   - null  → "New" — never run yet. Reads as fresh/expected, NOT broken (the
+ *             old bare "—" looked like an error or missing data).
+ *   - ok    → "Ran" — last run completed.
+ *   - error → "Failed" — last run errored (carries the warning icon + color).
+ *   - skipped → "Skipped" — conditions didn't match; benign.
+ */
+function RunHealthChip({ status }: { status: WorkflowRecord['lastRunStatus'] }) {
+  const map = {
+    ok: { label: 'Ran', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400', icon: null },
+    error: {
+      label: 'Failed',
+      cls: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+      icon: AlertTriangle,
+    },
+    skipped: { label: 'Skipped', cls: 'bg-muted text-muted-foreground', icon: null },
+    new: {
+      label: 'New',
+      cls: 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400',
+      icon: null,
+    },
+  } as const;
+  const { label, cls, icon: Icon } = map[status ?? 'new'];
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+        cls,
+      )}
+    >
+      {Icon && <Icon size={10} aria-hidden />}
+      {label}
+    </span>
+  );
+}
+
 function AutonomyPill({ autonomy }: { autonomy: WorkflowAutonomy }) {
   const label =
     autonomy === 'draft' ? 'Drafts' : autonomy === 'notify' ? 'Auto + notify' : 'Autonomous';
@@ -917,10 +938,13 @@ function RowAction({
       aria-pressed={active}
       className={cn(
         'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
-        // An active (toggled-on) action stays visible; others reveal on row hover.
+        // Actions are ALWAYS visible — hover-only reveal hid them entirely on
+        // touch/mobile (no hover state), so a realtor couldn't find Test/Edit.
+        // An active (toggled-on) action reads stronger; the rest sit at a quiet
+        // baseline and brighten on hover for the pointer case.
         active
           ? 'text-foreground bg-foreground/[0.06]'
-          : 'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+          : 'text-muted-foreground/60 group-hover/row:text-muted-foreground/80',
         'transition-colors disabled:opacity-50',
         destructive
           ? 'hover:text-destructive hover:bg-destructive/10'
