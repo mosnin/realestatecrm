@@ -51,6 +51,7 @@ import {
   ArrowRight,
   Webhook,
   ArrowUpDown,
+  Filter,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ import { WorkflowBuilder } from './workflow-builder';
 import type { WorkflowFormState } from './build-definition';
 import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
+import type { TemplateCategory } from './templates';
 import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
 import { highlightsFromSteps } from './run-highlights';
 import { useHashHighlight } from '@/hooks/use-hash-highlight';
@@ -691,6 +693,8 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
   call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
   run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
 };
 
 /**
@@ -1444,6 +1448,21 @@ const TEMPLATE_META_DEFAULT = {
  * template gallery. Each card shows what gets automated in plain language so
  * the realtor picks based on outcome, not on technical detail.
  */
+const CATEGORY_PILLS: Array<{ value: 'all' | TemplateCategory; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'New leads', label: 'New leads' },
+  { value: 'Follow-up', label: 'Follow-up' },
+  { value: 'Scheduling', label: 'Scheduling' },
+  { value: 'Integrations', label: 'Integrations' },
+];
+
+const CATEGORY_BADGE_CLS: Record<TemplateCategory, string> = {
+  'New leads': 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400',
+  'Follow-up': 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400',
+  'Scheduling': 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
+  'Integrations': 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400',
+};
+
 function TemplateGallery({
   onPick,
   onScratch,
@@ -1453,15 +1472,19 @@ function TemplateGallery({
 }) {
   const reduce = useReducedMotion();
   const [q, setQ] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return WORKFLOW_TEMPLATES;
-    return WORKFLOW_TEMPLATES.filter(
-      (t) =>
+    return WORKFLOW_TEMPLATES.filter((t) => {
+      const matchesSearch =
+        !query ||
         t.name.toLowerCase().includes(query) ||
-        t.description.toLowerCase().includes(query),
-    );
-  }, [q]);
+        t.description.toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [q, categoryFilter]);
 
   return (
     <div className="space-y-5">
@@ -1474,25 +1497,51 @@ function TemplateGallery({
         </p>
       </div>
 
-      {/* Template search */}
-      <div className="relative max-w-sm">
-        <Search
-          size={14}
-          aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search templates…"
-          className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
-        />
+      {/* Search + category filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search
+            size={14}
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search templates…"
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_PILLS.map((pill) => {
+            const count =
+              pill.value === 'all'
+                ? WORKFLOW_TEMPLATES.length
+                : WORKFLOW_TEMPLATES.filter((t) => t.category === pill.value).length;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                onClick={() => setCategoryFilter(pill.value)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  categoryFilter === pill.value
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                )}
+              >
+                {pill.label}
+                <span className="ml-1 opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {visibleTemplates.length === 0 ? (
         <p className={cn(CAPTION, 'py-4 text-center')}>
-          No templates match <span className="font-medium text-foreground">{q}</span> — try a different search.
+          No templates match{q ? <> <span className="font-medium text-foreground">{q}</span></> : null}{categoryFilter !== 'all' ? <> in <span className="font-medium text-foreground">{categoryFilter}</span></> : null} — try adjusting your filters.
         </p>
       ) : (
         <>
@@ -1518,9 +1567,19 @@ function TemplateGallery({
                     </div>
                     {/* Text area */}
                     <div className="flex flex-1 flex-col gap-1.5 p-4">
-                      <span className="block text-sm font-semibold leading-snug text-foreground">
-                        {template.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                          {template.name}
+                        </span>
+                        <span
+                          className={cn(
+                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            CATEGORY_BADGE_CLS[template.category] ?? 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {template.category}
+                        </span>
+                      </div>
                       <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
                         {template.description}
                       </span>
@@ -1568,15 +1627,19 @@ function TemplatePicker({
   onCancel: () => void;
 }) {
   const [q, setQ] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return WORKFLOW_TEMPLATES;
-    return WORKFLOW_TEMPLATES.filter(
-      (t) =>
+    return WORKFLOW_TEMPLATES.filter((t) => {
+      const matchesSearch =
+        !query ||
         t.name.toLowerCase().includes(query) ||
-        t.description.toLowerCase().includes(query),
-    );
-  }, [q]);
+        t.description.toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [q, categoryFilter]);
 
   return (
     <div className="space-y-3">
@@ -1591,25 +1654,51 @@ function TemplatePicker({
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search
-          size={14}
-          aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search templates…"
-          className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
-        />
+      {/* Search + category pills */}
+      <div className="space-y-2">
+        <div className="relative max-w-sm">
+          <Search
+            size={14}
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search templates…"
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_PILLS.map((pill) => {
+            const count =
+              pill.value === 'all'
+                ? WORKFLOW_TEMPLATES.length
+                : WORKFLOW_TEMPLATES.filter((t) => t.category === pill.value).length;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                onClick={() => setCategoryFilter(pill.value)}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                  categoryFilter === pill.value
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                )}
+              >
+                {pill.label}
+                <span className="ml-1 opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {visibleTemplates.length === 0 ? (
         <p className={cn(CAPTION, 'py-4 text-center')}>
-          No templates match <span className="font-medium text-foreground">{q}</span> — try a different search.
+          No templates match{q ? <> <span className="font-medium text-foreground">{q}</span></> : null}{categoryFilter !== 'all' ? <> in <span className="font-medium text-foreground">{categoryFilter}</span></> : null} — try adjusting your filters.
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1627,9 +1716,21 @@ function TemplatePicker({
                     <Icon size={24} className={meta.dot} aria-hidden />
                   </div>
                   <div className="flex flex-1 flex-col gap-1 p-3">
-                    <span className="block text-sm font-semibold leading-snug text-foreground">
-                      {template.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                        {template.name}
+                      </span>
+                      {'category' in template && (
+                        <span
+                          className={cn(
+                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            CATEGORY_BADGE_CLS[template.category as TemplateCategory] ?? 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {template.category}
+                        </span>
+                      )}
+                    </div>
                     <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
                       {template.description}
                     </span>

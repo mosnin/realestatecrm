@@ -17,12 +17,20 @@
 import type { WorkflowFormState } from './build-definition';
 import type { WorkflowGraph } from '@/lib/workflows/schema';
 
+export type TemplateCategory =
+  | 'New leads'
+  | 'Follow-up'
+  | 'Scheduling'
+  | 'Integrations';
+
 export interface WorkflowTemplate {
   /** Stable id for the picker. */
   id: string;
   name: string;
   /** One-line human summary shown in the template picker. */
   description: string;
+  /** Category shown in the gallery filter pills. */
+  category: TemplateCategory;
   /** Pre-filled builder state. Cloned on pick so edits don't mutate the preset. */
   state: WorkflowFormState;
 }
@@ -82,6 +90,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'hot-lead-instant-draft',
     name: 'Hot lead → instant draft',
     description: 'When a new lead scores 80 or higher, draft a warm intro text.',
+    category: 'New leads',
     state: {
       name: 'Hot lead → instant draft',
       trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
@@ -103,6 +112,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'gmail-client-reply',
     name: 'New Gmail from a client → draft a reply',
     description: 'When an email lands from a known contact, draft a reply for me.',
+    category: 'Integrations',
     state: {
       name: 'New Gmail from a client → draft a reply',
       trigger: {
@@ -129,6 +139,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'morning-follow-ups',
     name: 'Every weekday 8am → draft my morning follow-ups',
     description: 'Each weekday morning, draft check-ins for leads that have gone quiet.',
+    category: 'Scheduling',
     state: {
       name: 'Every weekday 8am → draft my morning follow-ups',
       trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '8' },
@@ -149,6 +160,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'tour-completed-thanks',
     name: 'After a tour → thank-you + next step',
     description: 'When a tour wraps, draft a thank-you and set a follow-up task.',
+    category: 'Follow-up',
     state: {
       name: 'After a tour → thank-you + next step',
       trigger: { ...baseTrigger(), type: 'tour_completed' },
@@ -176,6 +188,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'new-lead-welcome',
     name: 'New lead → instant welcome',
     description: 'The moment a new lead comes in, draft a warm welcome text and create a follow-up task.',
+    category: 'New leads',
     state: {
       name: 'New lead → instant welcome',
       trigger: { ...baseTrigger(), type: 'lead_created' },
@@ -203,6 +216,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'deal-stage-changed-notify',
     name: 'Deal moves stage → Chippi updates CRM',
     description: 'When a deal advances, ask Chippi to log a note and draft a client update.',
+    category: 'Follow-up',
     state: {
       name: 'Deal moves stage → Chippi updates CRM',
       trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: '' },
@@ -223,6 +237,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'inbound-inquiry-multi-step',
     name: 'Inbound inquiry → draft reply + task',
     description: 'When a new message arrives, draft a reply and set a follow-up reminder.',
+    category: 'Follow-up',
     state: {
       name: 'Inbound inquiry → draft reply + task',
       trigger: { ...baseTrigger(), type: 'inbound_message', channel: 'any' },
@@ -250,6 +265,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'webhook-any-service',
     name: 'Webhook → Chippi takes action',
     description: 'Trigger from any external service via HTTP POST — Chippi handles the rest.',
+    category: 'Integrations',
     state: {
       name: 'Webhook → Chippi takes action',
       trigger: { ...baseTrigger(), type: 'webhook' },
@@ -270,6 +286,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     id: 'hot-vs-warm-branch',
     name: 'Hot vs warm → different play',
     description: 'If the lead is hot, text now; if not, schedule a follow-up.',
+    category: 'New leads',
     state: {
       name: 'Hot vs warm → different play',
       // ADVANCED template: the graph carries the branching logic; the linear
