@@ -1202,6 +1202,11 @@ function TriggerConfig({
   }
 
   if (t.type === 'schedule') {
+    const hourOptions = Array.from({ length: 24 }, (_, h) => {
+      const ampm = h < 12 ? 'AM' : 'PM';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return { value: String(h), label: `${h12}:00 ${ampm}` };
+    });
     return (
       <div className="space-y-2.5">
         <FieldRow label="Cadence" htmlFor="wf-cadence">
@@ -1212,24 +1217,20 @@ function TriggerConfig({
               patchTrigger({ cadence: v as 'hourly' | 'daily' | 'weekdays' })
             }
             options={[
-              { value: 'hourly', label: 'Hourly' },
-              { value: 'daily', label: 'Daily' },
-              { value: 'weekdays', label: 'Weekdays' },
+              { value: 'hourly', label: 'Every hour' },
+              { value: 'daily', label: 'Every day' },
+              { value: 'weekdays', label: 'Weekdays (Mon–Fri)' },
             ]}
           />
         </FieldRow>
         {t.cadence !== 'hourly' && (
-          <FieldRow label="Hour (0–23)" htmlFor="wf-hour">
-            <Input
+          <FieldRow label="Time" htmlFor="wf-hour">
+            <MiniSelect
               id="wf-hour"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={23}
-              value={t.hour}
-              onChange={(e) => patchTrigger({ hour: e.target.value })}
-              placeholder="8"
-              className="h-8 w-24"
+              value={t.hour || '9'}
+              onValueChange={(v) => patchTrigger({ hour: v })}
+              className="min-w-[8rem]"
+              options={hourOptions}
             />
           </FieldRow>
         )}
@@ -1479,46 +1480,6 @@ function ConditionRowEditor({
         ))}
 
       <RemoveButton label="Remove condition" onClick={onRemove} />
-    </li>
-  );
-}
-
-// ── Action row ───────────────────────────────────────────────────────────────
-
-function ActionRowEditor({
-  index,
-  row,
-  canRemove,
-  onChange,
-  onRemove,
-  connectedApps,
-}: {
-  index: number;
-  row: ActionRowState;
-  canRemove: boolean;
-  onChange: (next: Partial<ActionRowState>) => void;
-  onRemove: () => void;
-  connectedApps: ConnectedAppsState;
-}) {
-  return (
-    <li className="space-y-2.5 rounded-lg border border-border/60 bg-card p-3">
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold tabular-nums text-muted-foreground/70">
-          {index + 1}
-        </span>
-        <Label htmlFor={`act-type-${row.id}`} className="sr-only">
-          Action type
-        </Label>
-        <MiniSelect
-          id={`act-type-${row.id}`}
-          value={row.type}
-          onValueChange={(v) => onChange({ type: v as WorkflowActionType })}
-          className="flex-1"
-          options={ACTION_ORDER.map((a) => ({ value: a, label: ACTION_LABELS[a] }))}
-        />
-        {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
-      </div>
-      <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
     </li>
   );
 }

@@ -1281,6 +1281,21 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-blue-100 dark:bg-blue-950/40',
     dot: 'text-blue-500 dark:text-blue-400',
   },
+  'new-lead-welcome': {
+    icon: UserPlus,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'deal-stage-changed-notify': {
+    icon: TrendingUp,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'inbound-inquiry-multi-step': {
+    icon: MessageCircle,
+    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
+    dot: 'text-indigo-500 dark:text-indigo-400',
+  },
   'hot-vs-warm-branch': {
     icon: GitBranch,
     accent: 'bg-violet-100 dark:bg-violet-950/40',

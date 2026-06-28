@@ -169,6 +169,80 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
   },
   {
+    id: 'new-lead-welcome',
+    name: 'New lead → instant welcome',
+    description: 'The moment a new lead comes in, draft a warm welcome text and create a follow-up task.',
+    state: {
+      name: 'New lead → instant welcome',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a short, warm welcome to this brand-new lead. Make it personal, mention you saw their inquiry, and ask when they are available to chat.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Call new lead within 24 hours',
+          dueInDays: '1',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'deal-stage-changed-notify',
+    name: 'Deal moves stage → Chippi updates CRM',
+    description: 'When a deal advances, ask Chippi to log a note and draft a client update.',
+    state: {
+      name: 'Deal moves stage → Chippi updates CRM',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: '' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'The deal just moved to a new stage. Log a brief CRM note about the stage change and draft a short client update explaining what happens next.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'inbound-inquiry-multi-step',
+    name: 'Inbound inquiry → draft reply + task',
+    description: 'When a new message arrives, draft a reply and set a follow-up reminder.',
+    state: {
+      name: 'Inbound inquiry → draft reply + task',
+      trigger: { ...baseTrigger(), type: 'inbound_message', channel: 'any' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Read the inbound message and draft a prompt, helpful reply that addresses their question and invites a next step.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Follow up if no response in 48h',
+          dueInDays: '2',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
     id: 'hot-vs-warm-branch',
     name: 'Hot vs warm → different play',
     description: 'If the lead is hot, text now; if not, schedule a follow-up.',
