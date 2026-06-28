@@ -287,54 +287,112 @@ export interface RunWorkflowsForEventInput {
  * already bound themselves; sequential keeps the ordering deterministic and
  * avoids hammering the agent runner concurrently.
  */
-export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Promise<void> {
-  const { data: rows, error } = await supabase
-    .from('Workflow')
-    .select('id, spaceId, trigger, conditions, actions, autonomy, graph')
-    .eq('spaceId', input.spaceId)
-    .eq('enabled', true);
-  if (error) {
-    logger.error('[workflows.executor] workflow query failed', { spaceId: input.spaceId }, error);
-    return;
-  }
+/** Diagnostic for an integration_event that had candidate workflows but matched
+ *  none (so "why didn't it fire?" is answerable, not silent). */
+export interface UnmatchedEventDiagnostic {
+  candidates: number;
+  toolkit: unknown;
+  event: unknown;
+}
 
-  const workflows = (rows ?? []) as unknown as WorkflowRow[];
-  let matching = workflows.filter((w) => w.trigger?.type === input.triggerType);
+export interface WorkflowMatchResult {
+  matching: WorkflowRow[];
+  unmatched: UnmatchedEventDiagnostic | null;
+}
 
-  // Trigger-specific gate for lead_score_threshold: only run a workflow whose
-  // configured `min` is met by the event's score. The score rides on
-  // context.event.score (see app/api/public/apply/route.ts). This is the real
-  // enforcement of `min`; conditions are a further filter on top.
+/**
+ * PURE matching: from the space's enabled workflows, pick the ones this event
+ * should run — trigger-type equality plus the per-type gates (lead_score `min`,
+ * integration_event toolkit+event). For an integration_event that has candidate
+ * workflows (right trigger type) but matches none on the slug, returns an
+ * `unmatched` diagnostic so a wrong-slug miss is observable rather than silent.
+ * Extracted + exported so the gating is unit-tested without a DB.
+ */
+export function selectMatchingWorkflows(
+  workflows: WorkflowRow[],
+  input: Pick<RunWorkflowsForEventInput, 'triggerType' | 'context'>,
+): WorkflowMatchResult {
+  const candidates = workflows.filter((w) => w.trigger?.type === input.triggerType);
+  let matching = candidates;
+  let unmatched: UnmatchedEventDiagnostic | null = null;
+
+  // lead_score_threshold: only run when the event score meets `min`. Score
+  // unknown/non-numeric → fail closed (skip all) since this gates auto-sends.
   if (input.triggerType === 'lead_score_threshold') {
     const rawScore = (input.context.event as Record<string, unknown> | undefined)?.score;
     const score = typeof rawScore === 'number' ? rawScore : Number(rawScore);
-    // Score unknown / non-numeric → skip every threshold workflow: this gates
-    // auto-sends, so when we can't compare we fail closed rather than fire.
     if (!Number.isFinite(score)) {
       matching = [];
     } else {
-      matching = matching.filter((w) => {
+      matching = candidates.filter((w) => {
         const rawMin = (w.trigger?.config as Record<string, unknown> | undefined)?.min;
-        // A malformed/missing min coerces to 0 (treat as "any score qualifies"),
-        // so a well-formed event still runs rather than silently dropping.
         const min = typeof rawMin === 'number' ? rawMin : Number(rawMin) || 0;
         return score >= min;
       });
     }
   }
 
-  // Trigger-specific gate for integration_event: only run a workflow whose
-  // configured toolkit+event matches the delivery. The delivery's app/event
-  // ride on context.event.toolkit/event (set in dispatchTrigger). This replaces
-  // the old behavior of running EVERY integration_event workflow on EVERY
-  // Composio delivery; per-event narrowing now happens here, not in conditions.
+  // integration_event: narrow to the workflow keyed to this exact toolkit+event.
   if (input.triggerType === 'integration_event') {
     const ev = input.context.event as Record<string, unknown> | undefined;
     const eventToolkit = ev?.toolkit;
     const eventSlug = ev?.event;
-    matching = matching.filter((w) => {
+    matching = candidates.filter((w) => {
       const cfg = w.trigger?.config as Record<string, unknown> | undefined;
       return cfg?.toolkit === eventToolkit && cfg?.event === eventSlug;
+    });
+    if (candidates.length > 0 && matching.length === 0) {
+      unmatched = { candidates: candidates.length, toolkit: eventToolkit, event: eventSlug };
+    }
+  }
+
+  return { matching, unmatched };
+}
+
+/**
+ * Load the space's enabled workflows, retrying a transient query failure a few
+ * times before giving up. The SELECT is a READ (idempotent), so retrying is
+ * safe and turns a transient DB blip — which previously SILENTLY dropped every
+ * workflow firing for the event — into a recovery. A persistent failure logs
+ * loudly (the event's workflows genuinely couldn't be evaluated) and returns [].
+ */
+async function loadEnabledWorkflows(spaceId: string): Promise<WorkflowRow[]> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const { data, error } = await supabase
+      .from('Workflow')
+      .select('id, spaceId, trigger, conditions, actions, autonomy, graph')
+      .eq('spaceId', spaceId)
+      .eq('enabled', true);
+    if (!error) return (data ?? []) as unknown as WorkflowRow[];
+    logger.warn(
+      '[workflows.executor] workflow query failed; retrying',
+      { spaceId, attempt, maxAttempts: MAX_ATTEMPTS },
+      error,
+    );
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 150));
+    }
+  }
+  logger.error(
+    '[workflows.executor] workflow query failed after retries — workflows NOT evaluated for this event',
+    { spaceId },
+  );
+  return [];
+}
+
+export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Promise<void> {
+  const workflows = await loadEnabledWorkflows(input.spaceId);
+  const { matching, unmatched } = selectMatchingWorkflows(workflows, input);
+
+  // A delivery with candidate workflows but no slug match is the classic
+  // "my workflow won't fire" — surface it (wrong/typo'd slug, etc.).
+  if (unmatched) {
+    logger.warn('[workflows.executor] integration_event matched no workflow', {
+      spaceId: input.spaceId,
+      candidates: unmatched.candidates,
+      toolkit: unmatched.toolkit,
+      event: unmatched.event,
     });
   }
 
