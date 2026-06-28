@@ -10,7 +10,7 @@
  * version. Mirrors /api/routines/[id].
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
@@ -25,6 +25,7 @@ import {
   type UpdateWorkflowPatch,
 } from '@/lib/workflows/store';
 import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
+import { reconcileWorkflowTriggers } from '@/lib/integrations/reconcile-workflow-triggers';
 
 export const runtime = 'nodejs';
 
@@ -112,6 +113,19 @@ export async function PATCH(
   try {
     const workflow = await updateWorkflow(space.id, id, patch);
     if (!workflow) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    // Best-effort: when the saved definition's trigger is an integration_event,
+    // heal any missing Composio subscription it depends on. Runs AFTER the
+    // response via after() so it never adds latency or breaks the save. after()
+    // throws outside a request scope (script/test) — guarded.
+    if (patch.definition?.trigger.type === 'integration_event') {
+      try {
+        after(() => reconcileWorkflowTriggers(space.id));
+      } catch {
+        /* no request context — skip background reconcile */
+      }
+    }
+
     return NextResponse.json(workflow);
   } catch (error) {
     logger.error('[workflows] update failed', { spaceId: space.id, id }, error);

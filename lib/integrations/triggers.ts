@@ -813,6 +813,52 @@ function templateInstruction(
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 /**
+ * Subscribe ONE slug for a connection — the idempotent per-slug body that both
+ * connect-time registration and the workflow-trigger reconcile share. Creates
+ * the Composio trigger, then upserts the IntegrationTrigger row 'active'. A
+ * failure is logged and recorded as a 'failed' row (so a later reconcile sees we
+ * tried) and reported as 'failed' WITHOUT throwing — one bad slug never blocks
+ * the rest. The upsert is keyed on (connectionId, triggerSlug), so re-subscribing
+ * an already-active slug is a no-op-shaped overwrite.
+ */
+export async function subscribeSlug(
+  connection: IntegrationConnectionRow,
+  slug: string,
+): Promise<'ok' | 'failed'> {
+  try {
+    const { triggerId } = await createTrigger({
+      entityId: connection.userId,
+      slug,
+      connectedAccountId: connection.composioConnectionId,
+    });
+    const ok = await upsertTriggerRow({
+      connectionId: connection.id,
+      triggerSlug: slug,
+      composioTriggerId: triggerId,
+      status: 'active',
+    });
+    return ok ? 'ok' : 'failed';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('[integrations.triggers] registration failed', {
+      toolkit: connection.toolkit,
+      slug,
+      connectionId: connection.id,
+      err: message,
+    });
+    // Record the failure so a later reconcile can see we tried.
+    await upsertTriggerRow({
+      connectionId: connection.id,
+      triggerSlug: slug,
+      composioTriggerId: null,
+      status: 'failed',
+      lastError: message,
+    });
+    return 'failed';
+  }
+}
+
+/**
  * Register every curated trigger for a freshly-active connection.
  *
  * Called from the OAuth callback AFTER `upsertByComposioId` confirms the
@@ -838,38 +884,9 @@ export async function registerForConnection(args: {
   let failed = 0;
 
   for (const slug of slugs) {
-    try {
-      const { triggerId } = await createTrigger({
-        entityId: args.connection.userId,
-        slug,
-        connectedAccountId: args.connection.composioConnectionId,
-      });
-      const ok = await upsertTriggerRow({
-        connectionId: args.connection.id,
-        triggerSlug: slug,
-        composioTriggerId: triggerId,
-        status: 'active',
-      });
-      if (ok) registered++;
-      else failed++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.warn('[integrations.triggers] registration failed', {
-        toolkit: args.connection.toolkit,
-        slug,
-        connectionId: args.connection.id,
-        err: message,
-      });
-      // Record the failure so a later reconcile can see we tried.
-      await upsertTriggerRow({
-        connectionId: args.connection.id,
-        triggerSlug: slug,
-        composioTriggerId: null,
-        status: 'failed',
-        lastError: message,
-      });
-      failed++;
-    }
+    const outcome = await subscribeSlug(args.connection, slug);
+    if (outcome === 'ok') registered++;
+    else failed++;
   }
 
   if (registered > 0 || failed > 0) {

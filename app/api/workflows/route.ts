@@ -9,7 +9,7 @@
  * with those issues on a bad shape. A per-space count cap keeps the list sane.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
@@ -24,6 +24,7 @@ import {
   MAX_WORKFLOWS_PER_SPACE,
 } from '@/lib/workflows/store';
 import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
+import { reconcileWorkflowTriggers } from '@/lib/integrations/reconcile-workflow-triggers';
 
 export const runtime = 'nodejs';
 
@@ -99,6 +100,20 @@ export async function POST(req: NextRequest) {
     }
 
     const workflow = await createWorkflow(space.id, { name, definition });
+
+    // Best-effort: heal any missing Composio subscription this workflow's
+    // integration_event trigger depends on (drift if the slug was curated after
+    // connect, or a connect-time subscribe failed). Runs AFTER the response via
+    // after() so it never adds latency or breaks the save. after() throws if
+    // called outside a request scope (script/test) — guarded.
+    if (definition.trigger.type === 'integration_event') {
+      try {
+        after(() => reconcileWorkflowTriggers(space.id));
+      } catch {
+        /* no request context — skip background reconcile */
+      }
+    }
+
     return NextResponse.json(workflow, { status: 201 });
   } catch (error) {
     logger.error('[workflows] create failed', { spaceId: space.id }, error);
