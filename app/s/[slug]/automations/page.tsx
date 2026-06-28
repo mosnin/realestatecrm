@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { WorkflowsManager } from '@/components/workflows/workflows-manager';
 import { RoutinesManager } from '@/components/routines/routines-manager';
+import { TrustLadderBanner } from '@/components/workflows/trust-ladder-banner';
 import { SECTION_LABEL, CAPTION } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +50,10 @@ export default async function AutomationsPage({
       subtitle="Standing orders — every run drafts, nothing goes out without your tap. Set them to run when something happens, or on a schedule."
     >
       <div className="space-y-10">
+        {/* Earned-autonomy nudge — shows only when the realtor's real draft
+            track record has earned it; silent otherwise. */}
+        <TrustLadderBanner />
+
         <section className="space-y-3">
           <div className="space-y-1">
             <h2 className={SECTION_LABEL}>When something happens</h2>
