@@ -64,6 +64,7 @@ export const realtorNavItems: NavItem[] = [
       { href: '/chippi/history', label: 'History' },
       { href: '/chippi/integrations', label: 'Integrations' },
       { href: '/routines', label: 'Routines' },
+      { href: '/workflows', label: 'Workflows' },
     ],
   },
   {

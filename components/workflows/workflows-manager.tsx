@@ -1,0 +1,719 @@
+'use client';
+
+/**
+ * WorkflowsManager — the realtor's standing automations: When → If → Then.
+ *
+ * Reads and writes through /api/workflows. Each row is a workflow: its name, a
+ * one-line human summary, an enabled toggle (PATCH enabled, optimistic), a
+ * last-run status pill + relative time, and row actions (Edit, Test, Delete).
+ *
+ * "New workflow" opens the builder blank; the template picker opens it
+ * pre-filled. Test fires POST /api/workflows/[id]/test-run and shows each
+ * step's outcome inline — so the realtor SEES the draft get created before
+ * trusting a live trigger. Every mutating action mirrors routines-manager:
+ * optimistic-with-revert for the toggle, busy/error states everywhere,
+ * delete-with-confirm.
+ */
+
+import { useEffect, useState } from 'react';
+import {
+  Loader2,
+  Plus,
+  Workflow as WorkflowIcon,
+  Play,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Check,
+  X,
+  Sparkles,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { CAPTION, SECTION_LABEL } from '@/lib/typography';
+import { timeAgo } from '@/lib/formatting';
+import type {
+  ConditionGroup,
+  Operator,
+  WorkflowAction,
+  WorkflowAutonomy,
+  WorkflowDefinition,
+  WorkflowTrigger,
+} from '@/lib/workflows/schema';
+import { WorkflowBuilder } from './workflow-builder';
+import type { WorkflowFormState } from './build-definition';
+import { summarizeWorkflow } from './summary';
+import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
+
+// ── The record shape the API returns (subset we render) ──────────────────────
+
+interface WorkflowRecord {
+  id: string;
+  name: string;
+  enabled: boolean;
+  trigger: WorkflowTrigger;
+  conditions: ConditionGroup;
+  actions: WorkflowAction[];
+  autonomy: WorkflowAutonomy;
+  lastRunAt: string | null;
+  lastRunStatus: 'ok' | 'error' | 'skipped' | null;
+  createdAt: string;
+}
+
+interface TestStep {
+  stepIndex: number;
+  kind: string;
+  actionType: string | null;
+  status: string;
+  detail: string | null;
+}
+
+interface TestResult {
+  runId: string;
+  status: string;
+  steps: TestStep[];
+}
+
+const API_BASE = '/api/workflows';
+
+// ── Map a stored record back to editable form state ──────────────────────────
+
+let editSeq = 0;
+function editRowId(prefix: string): string {
+  editSeq += 1;
+  return `${prefix}-edit-${editSeq}`;
+}
+
+/**
+ * Convert a stored (validated) record into the loose form state the builder
+ * edits. Numbers become strings (inputs are strings), optional fields fall back
+ * to '', and value-less condition operators get an empty value field. The
+ * inverse of buildDefinition for the common cases.
+ */
+function recordToFormState(w: WorkflowRecord): WorkflowFormState {
+  const t = w.trigger;
+  return {
+    name: w.name,
+    trigger: {
+      type: t.type,
+      min: t.type === 'lead_score_threshold' ? String(t.config.min) : '',
+      channel: t.type === 'inbound_message' ? (t.config.channel ?? 'any') : 'any',
+      toolkit: t.type === 'integration_event' ? t.config.toolkit : '',
+      event: t.type === 'integration_event' ? t.config.event : '',
+      toStage: t.type === 'deal_stage_changed' ? (t.config.toStage ?? '') : '',
+      cadence: t.type === 'schedule' ? t.config.cadence : 'daily',
+      hour:
+        t.type === 'schedule' && typeof t.config.hour === 'number'
+          ? String(t.config.hour)
+          : '',
+    },
+    conditionOp: w.conditions.op,
+    conditions: w.conditions.rules.flatMap((r) => {
+      // Flat group only — skip any nested sub-groups (v1 doesn't author them).
+      if ('rules' in r) return [];
+      return [
+        {
+          id: editRowId('cond'),
+          field: r.field,
+          operator: r.operator as Operator,
+          value:
+            r.value === undefined || r.value === null ? '' : String(r.value),
+        },
+      ];
+    }),
+    actions: w.actions.map((a) => ({
+      id: editRowId('act'),
+      type: a.type,
+      channel:
+        a.type === 'draft_message' || a.type === 'schedule_message'
+          ? a.config.channel
+          : 'sms',
+      instruction:
+        a.type === 'draft_message' ||
+        a.type === 'schedule_message' ||
+        a.type === 'run_chippi'
+          ? a.config.instruction
+          : '',
+      delayMinutes:
+        a.type === 'schedule_message' ? String(a.config.delayMinutes) : '',
+      title: a.type === 'create_task' ? a.config.title : '',
+      dueInDays:
+        a.type === 'create_task' && typeof a.config.dueInDays === 'number'
+          ? String(a.config.dueInDays)
+          : '',
+      toolkit: a.type === 'call_integration' ? a.config.toolkit : '',
+      action: a.type === 'call_integration' ? a.config.action : '',
+      paramsJson:
+        a.type === 'call_integration' && a.config.params
+          ? JSON.stringify(a.config.params, null, 2)
+          : '',
+    })),
+    autonomy: w.autonomy,
+  };
+}
+
+// ── Manager ──────────────────────────────────────────────────────────────────
+
+export function WorkflowsManager() {
+  const [workflows, setWorkflows] = useState<WorkflowRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  /** 'new' | 'templates' | null — what the composer area shows. */
+  const [composer, setComposer] = useState<'new' | 'templates' | null>(null);
+  const [composerInitial, setComposerInitial] = useState<WorkflowFormState | undefined>(
+    undefined,
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [actionError, setActionError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(API_BASE);
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        if (!active) return;
+        setWorkflows(Array.isArray(data.workflows) ? data.workflows : []);
+      } catch {
+        if (active) setLoadError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function openBlank() {
+    setComposerInitial(undefined);
+    setEditingId(null);
+    setComposer('new');
+    setActionError('');
+  }
+
+  function pickTemplate(state: WorkflowFormState) {
+    setComposerInitial(state);
+    setEditingId(null);
+    setComposer('new');
+    setActionError('');
+  }
+
+  function closeComposer() {
+    setComposer(null);
+    setComposerInitial(undefined);
+    setEditingId(null);
+    setActionError('');
+  }
+
+  async function createWorkflow(payload: { name: string; definition: WorkflowDefinition }) {
+    setBusyId('new');
+    setActionError('');
+    try {
+      const res = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(data.error || 'Couldn’t create the workflow.');
+        return;
+      }
+      setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
+      closeComposer();
+    } catch {
+      setActionError('Network hiccup. Try again.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveEdit(
+    id: string,
+    payload: { name: string; definition: WorkflowDefinition },
+  ) {
+    setBusyId(id);
+    setActionError('');
+    try {
+      const res = await fetch(`${API_BASE}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(data.error || 'Couldn’t save the workflow.');
+        return;
+      }
+      setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
+      setEditingId(null);
+    } catch {
+      setActionError('Network hiccup. Try again.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleWorkflow(workflow: WorkflowRecord) {
+    const next = !workflow.enabled;
+    // Optimistic — the Switch should feel instant.
+    setWorkflows((ws) => ws.map((w) => (w.id === workflow.id ? { ...w, enabled: next } : w)));
+    setActionError('');
+    try {
+      const res = await fetch(`${API_BASE}/${workflow.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) throw new Error('toggle failed');
+      const data = (await res.json()) as WorkflowRecord;
+      setWorkflows((ws) => ws.map((w) => (w.id === workflow.id ? data : w)));
+    } catch {
+      setWorkflows((ws) =>
+        ws.map((w) => (w.id === workflow.id ? { ...w, enabled: workflow.enabled } : w)),
+      );
+      setActionError('Couldn’t update the workflow.');
+    }
+  }
+
+  async function deleteWorkflow(id: string) {
+    setBusyId(id);
+    setActionError('');
+    try {
+      const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+      setWorkflows((ws) => ws.filter((w) => w.id !== id));
+      if (editingId === id) setEditingId(null);
+    } catch {
+      setActionError('Couldn’t delete the workflow.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function testWorkflow(id: string) {
+    setTestingId(id);
+    setActionError('');
+    try {
+      const res = await fetch(`${API_BASE}/${id}/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(data.error || 'Test run failed.');
+        return;
+      }
+      setTestResults((r) => ({ ...r, [id]: data as TestResult }));
+    } catch {
+      setActionError('Couldn’t start the test run.');
+    } finally {
+      setTestingId(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-9 w-36 animate-pulse rounded-md bg-muted" />
+        <div className="h-24 animate-pulse rounded-xl bg-muted" />
+        <div className="h-24 animate-pulse rounded-xl bg-muted" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        <p className="text-sm text-foreground">Couldn’t load your workflows.</p>
+        <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+
+      {/* Composer area: the builder for a new workflow, the template picker, or
+          the New / From a template buttons. */}
+      {composer === 'new' ? (
+        <div className="rounded-xl border border-border/60 bg-card p-4">
+          <WorkflowBuilder
+            initial={composerInitial}
+            saving={busyId === 'new'}
+            onSave={createWorkflow}
+            onCancel={closeComposer}
+          />
+        </div>
+      ) : composer === 'templates' ? (
+        <div className="rounded-xl border border-border/60 bg-card p-4">
+          <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={openBlank}>
+            <Plus size={14} />
+            New workflow
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setComposer('templates');
+              setActionError('');
+            }}
+          >
+            <Sparkles size={14} />
+            Start from a template
+          </Button>
+        </div>
+      )}
+
+      {workflows.length === 0 && composer === null ? (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No automations yet. Build a When → If → Then, or start from a template.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border/60">
+          {workflows.map((workflow) => (
+            <WorkflowRow
+              key={workflow.id}
+              workflow={workflow}
+              editing={editingId === workflow.id}
+              busy={busyId === workflow.id}
+              testing={testingId === workflow.id}
+              testResult={testResults[workflow.id]}
+              onEdit={() => {
+                setEditingId(workflow.id);
+                setComposer(null);
+                setActionError('');
+              }}
+              onCancelEdit={() => setEditingId(null)}
+              onSave={(payload) => saveEdit(workflow.id, payload)}
+              onToggle={() => toggleWorkflow(workflow)}
+              onTest={() => testWorkflow(workflow.id)}
+              onDelete={() => deleteWorkflow(workflow.id)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── One workflow ─────────────────────────────────────────────────────────────
+
+function WorkflowRow({
+  workflow,
+  editing,
+  busy,
+  testing,
+  testResult,
+  onEdit,
+  onCancelEdit,
+  onSave,
+  onToggle,
+  onTest,
+  onDelete,
+}: {
+  workflow: WorkflowRecord;
+  editing: boolean;
+  busy: boolean;
+  testing: boolean;
+  testResult: TestResult | undefined;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: (payload: { name: string; definition: WorkflowDefinition }) => void;
+  onToggle: () => void;
+  onTest: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  if (editing) {
+    return (
+      <li className="py-3 first:pt-0">
+        <div className="rounded-xl border border-border/60 bg-card p-4">
+          <WorkflowBuilder
+            initial={recordToFormState(workflow)}
+            saving={busy}
+            onSave={onSave}
+            onCancel={onCancelEdit}
+          />
+        </div>
+      </li>
+    );
+  }
+
+  const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
+  const failed = workflow.lastRunStatus === 'error';
+  const runLabel =
+    workflow.lastRunStatus === 'ok'
+      ? 'ran'
+      : workflow.lastRunStatus === 'error'
+        ? 'failed'
+        : workflow.lastRunStatus === 'skipped'
+          ? 'skipped'
+          : '—';
+
+  return (
+    <li
+      className={cn(
+        'group/row flex flex-col gap-2 py-3 first:pt-0 transition-opacity',
+        !workflow.enabled && 'opacity-60',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium leading-snug text-foreground">{workflow.name}</p>
+          <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{summary}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1',
+                failed && 'text-amber-600 dark:text-amber-500',
+              )}
+            >
+              {failed && <AlertTriangle size={11} />}
+              {runLabel}
+              {workflow.lastRunAt && (
+                <span className="tabular-nums text-muted-foreground/70">
+                  {timeAgo(workflow.lastRunAt)}
+                </span>
+              )}
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <AutonomyPill autonomy={workflow.autonomy} />
+            {!workflow.enabled && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span>Paused</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {confirmingDelete ? (
+            <>
+              <span className="px-1 text-xs text-muted-foreground">Delete?</span>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={busy}
+                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
+              >
+                Keep
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+              >
+                {busy && <Loader2 size={13} className="animate-spin" />}
+                Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <Switch
+                checked={workflow.enabled}
+                onCheckedChange={onToggle}
+                aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
+              />
+              <RowAction icon={Play} label="Test" onClick={onTest} loading={testing} disabled={busy} />
+              <RowAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || testing} />
+              <RowAction
+                icon={Trash2}
+                label="Delete"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy || testing}
+                destructive
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Test-run result — the "prove it works" panel. */}
+      {testResult && <TestResultPanel result={testResult} />}
+    </li>
+  );
+}
+
+function TestResultPanel({ result }: { result: TestResult }) {
+  const ok = result.status === 'ok' || result.status === 'success';
+  return (
+    <div className="ml-0 rounded-lg border border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            'inline-flex h-4 w-4 items-center justify-center rounded-full',
+            ok
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+          )}
+          aria-hidden
+        >
+          {ok ? <Check size={11} /> : <X size={11} />}
+        </span>
+        <p className="text-xs font-medium text-foreground">
+          Test run {ok ? 'completed' : `finished — ${result.status}`}
+        </p>
+      </div>
+      {result.steps.length === 0 ? (
+        <p className={cn(CAPTION, 'mt-2')}>
+          No steps ran — conditions may not have matched the sample.
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-1.5">
+          {result.steps.map((step) => (
+            <li
+              key={step.stepIndex}
+              className="flex items-start gap-2 text-[12px] leading-snug"
+            >
+              <StepStatusDot status={step.status} />
+              <span className="font-medium text-foreground">
+                {step.actionType ?? step.kind}
+              </span>
+              <span className="text-muted-foreground">{step.status}</span>
+              {step.detail && (
+                <span className="min-w-0 flex-1 truncate text-muted-foreground/80">
+                  {step.detail}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function StepStatusDot({ status }: { status: string }) {
+  const cls =
+    status === 'ok' || status === 'success' || status === 'completed'
+      ? 'bg-emerald-500'
+      : status === 'skipped'
+        ? 'bg-muted-foreground/40'
+        : status === 'error' || status === 'failed'
+          ? 'bg-rose-500'
+          : 'bg-amber-500';
+  return <span className={cn('mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full', cls)} aria-hidden />;
+}
+
+function AutonomyPill({ autonomy }: { autonomy: WorkflowAutonomy }) {
+  const label =
+    autonomy === 'draft' ? 'Drafts' : autonomy === 'notify' ? 'Auto + notify' : 'Autonomous';
+  const cls =
+    autonomy === 'auto'
+      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'
+      : 'bg-muted text-muted-foreground';
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+        cls,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function RowAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  loading,
+  destructive,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
+        'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+        'transition-colors disabled:opacity-50',
+        destructive
+          ? 'hover:text-destructive hover:bg-destructive/10'
+          : 'hover:text-foreground hover:bg-foreground/[0.05]',
+      )}
+    >
+      {loading ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
+    </button>
+  );
+}
+
+// ── Template picker ──────────────────────────────────────────────────────────
+
+function TemplatePicker({
+  onPick,
+  onCancel,
+}: {
+  onPick: (state: WorkflowFormState) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className={SECTION_LABEL}>Start from a template</p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+      <ul className="space-y-2">
+        {WORKFLOW_TEMPLATES.map((template) => (
+          <li key={template.id}>
+            <button
+              type="button"
+              onClick={() => onPick(cloneTemplateState(template))}
+              className="group/tpl flex w-full items-start gap-3 rounded-lg border border-border/60 bg-card p-3 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
+            >
+              <WorkflowIcon
+                size={16}
+                className="mt-0.5 flex-shrink-0 text-muted-foreground group-hover/tpl:text-foreground"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">{template.name}</span>
+                <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
+                  {template.description}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
