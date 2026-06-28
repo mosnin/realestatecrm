@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
@@ -194,6 +195,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
 // ── Manager ──────────────────────────────────────────────────────────────────
 
 export function WorkflowsManager() {
+  const searchParams = useSearchParams();
   const [workflows, setWorkflows] = useState<WorkflowRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -239,6 +241,11 @@ export function WorkflowsManager() {
     setComposer('new');
     setActionError('');
   }
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') openBlank();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function pickTemplate(state: WorkflowFormState) {
     setComposerInitial(state);

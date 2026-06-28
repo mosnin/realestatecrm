@@ -10,6 +10,7 @@ import {
   Building2,
   FolderOpen,
   Aperture,
+  Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -64,9 +65,17 @@ export const realtorNavItems: NavItem[] = [
       // Integrations = the connect/disconnect management surface.
       { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/integrations', label: 'Integrations' },
-      // Workflows (when something happens) + Routines (on a schedule) unified
-      // into one concept: standing orders Chippi runs on its own.
-      { href: '/automations', label: 'Automations' },
+    ],
+  },
+  {
+    href: '/automations',
+    label: 'Automations',
+    icon: Zap,
+    children: [
+      { href: '/automations/workflows', label: 'Workflows' },
+      { href: '/automations/workflows?new=1', label: 'New workflow' },
+      { href: '/automations/routines', label: 'Routines' },
+      { href: '/automations/settings', label: 'Configuration' },
     ],
   },
   {
