@@ -24,6 +24,7 @@ import {
   deleteWorkflow,
   type UpdateWorkflowPatch,
 } from '@/lib/workflows/store';
+import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
 
 export const runtime = 'nodejs';
 
@@ -95,6 +96,12 @@ export async function PATCH(
         );
       }
       throw err;
+    }
+    // Same guard as create: an integration_event trigger must reference an
+    // app/event we actually subscribe, or the workflow could never fire.
+    const triggerErr = validateIntegrationTrigger(patch.definition);
+    if (triggerErr) {
+      return NextResponse.json({ error: triggerErr }, { status: 400 });
     }
   }
 

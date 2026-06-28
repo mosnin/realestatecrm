@@ -23,6 +23,7 @@ import {
   countWorkflows,
   MAX_WORKFLOWS_PER_SPACE,
 } from '@/lib/workflows/store';
+import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
 
 export const runtime = 'nodejs';
 
@@ -77,6 +78,14 @@ export async function POST(req: NextRequest) {
       );
     }
     throw err;
+  }
+
+  // Reject a workflow whose integration_event trigger references an app/event we
+  // don't actually subscribe — it could never fire (the engine matches the live
+  // delivery slug with an exact ===). Stops a silently-dead workflow at the door.
+  const triggerErr = validateIntegrationTrigger(definition);
+  if (triggerErr) {
+    return NextResponse.json({ error: triggerErr }, { status: 400 });
   }
 
   // Cap workflows per space — a wall of standing automations is its own mess.

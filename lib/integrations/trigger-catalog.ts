@@ -23,6 +23,35 @@
 
 import { listConnections } from './connections';
 import { CURATED_TRIGGERS, EXTRACTORS } from './triggers';
+import type { WorkflowDefinition } from '@/lib/workflows/schema';
+
+/**
+ * Is (toolkit, event) a trigger we actually register with Composio? The picker
+ * only ever offers curated slugs, but the free-text fallback (a disconnected /
+ * unconnected app) lets a realtor type anything — and the engine matches a live
+ * delivery with an EXACT `===` on the slug. A slug that isn't curated is one
+ * Composio never subscribes, so the workflow could never fire. This is the
+ * guard that stops a silently-dead workflow from ever being saved.
+ */
+export function isCuratedTriggerEvent(toolkit: string, event: string): boolean {
+  const slugs = CURATED_TRIGGERS[toolkit];
+  return Array.isArray(slugs) && slugs.includes(event);
+}
+
+/**
+ * Validate an `integration_event` workflow's trigger against the curated
+ * catalog. Returns a realtor-facing error message when the toolkit/event pair
+ * isn't one we subscribe (so the save can be rejected), or null when it's fine
+ * (or the trigger isn't an integration_event). Pure + unit-tested.
+ */
+export function validateIntegrationTrigger(def: WorkflowDefinition): string | null {
+  if (def.trigger.type !== 'integration_event') return null;
+  const { toolkit, event } = def.trigger.config;
+  if (!isCuratedTriggerEvent(toolkit, event)) {
+    return `“${event}” isn’t an event ${toolkit || 'that app'} delivers. Pick the app and event from the list so this workflow can actually fire.`;
+  }
+  return null;
+}
 
 /**
  * Fallback label for a trigger slug with no (usable) EXTRACTORS frame.
