@@ -8,7 +8,7 @@ export default function TermsPage() {
     <article className="space-y-10">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 2, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 24, 2026</p>
         <p className="text-sm text-muted-foreground">Effective: April 2, 2026</p>
       </header>
 
@@ -124,6 +124,7 @@ export default function TermsPage() {
           </ul>
           <p>8.2. Your use of these third-party services is subject to their respective terms of service and privacy policies.</p>
           <p>8.3. Chippi is not responsible for the practices or availability of third-party services.</p>
+          <p>8.4. <strong className="text-foreground">Analytics and Marketing.</strong> Chippi uses first-party and third-party analytics and advertising technologies&mdash;including Google Analytics and Google Ads, Meta (Facebook) Pixel, Microsoft Clarity and Microsoft Advertising, the LinkedIn Insight Tag, and the TikTok, Pinterest, and Reddit pixels&mdash;on its public marketing website and within the Service to measure traffic, signups, and purchases and to deliver and measure Chippi&apos;s own marketing campaigns. We also sync account contact details to our email marketing provider (Mailchimp). These technologies, the data they collect, and your choices regarding them are described in our <a href="/legal/privacy" className="underline hover:text-foreground">Privacy Policy</a> and <a href="/legal/cookies" className="underline hover:text-foreground">Cookie Policy</a>.</p>
         </div>
       </section>
 

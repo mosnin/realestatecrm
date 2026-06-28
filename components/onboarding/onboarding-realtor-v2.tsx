@@ -34,7 +34,7 @@ import { cn, rootDomain } from '@/lib/utils';
 import { brandOrange } from '@/lib/colors';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { CHIPPI_PILL } from '@/lib/typography';
-import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
+import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
 import { BrandLogo } from '@/components/brand-logo';
 import { composeOnboardingDraft } from '@/lib/onboarding-draft';
 import { readSignupPlan } from '@/lib/signup-plan';

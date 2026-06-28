@@ -8,7 +8,7 @@ export default function PrivacyPolicyPage() {
     <article className="space-y-10">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 2, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 24, 2026</p>
         <p className="text-sm text-muted-foreground">Effective: April 2, 2026</p>
       </header>
 
@@ -103,9 +103,14 @@ export default function PrivacyPolicyPage() {
             <li><strong className="text-foreground">OpenAI</strong> &mdash; AI-powered lead scoring, voice AI assistant, and analytical features.</li>
             <li><strong className="text-foreground">Resend</strong> &mdash; transactional email delivery (lead alerts, account notifications).</li>
             <li><strong className="text-foreground">Telnyx</strong> &mdash; SMS delivery and voice communications.</li>
+            <li><strong className="text-foreground">Vercel</strong> &mdash; application hosting and performance monitoring.</li>
+            <li><strong className="text-foreground">Sentry</strong> &mdash; error monitoring and diagnostics.</li>
+            <li><strong className="text-foreground">Amplitude</strong> &mdash; product analytics and session replay to understand and improve in-product usage.</li>
+            <li><strong className="text-foreground">Mailchimp</strong> &mdash; email marketing. We sync Subscriber account contact details (name and email) to maintain our marketing and lifecycle email lists.</li>
           </ul>
-          <p>7.2. Each third-party provider processes data in accordance with their own privacy policies and our data processing agreements with them.</p>
-          <p>7.3. We select providers that maintain appropriate security and privacy standards. However, we are not responsible for the independent practices of third-party services.</p>
+          <p>7.2. <strong className="text-foreground">Analytics and advertising partners.</strong> On our public marketing website and within the Service, we also use the following analytics and advertising technologies to measure traffic, signups, and purchases and to run and measure our own marketing campaigns: Google (Google Analytics and Google Ads), Meta Platforms (Meta/Facebook Pixel), Microsoft (Clarity analytics and Microsoft Advertising), LinkedIn (Insight Tag), TikTok, Pinterest, and Reddit. Section 14B describes what these collect and how to opt out.</p>
+          <p>7.3. Each third-party provider processes data in accordance with their own privacy policies and our data processing agreements with them.</p>
+          <p>7.4. We select providers that maintain appropriate security and privacy standards. However, we are not responsible for the independent practices of third-party services.</p>
         </div>
       </section>
 
@@ -202,6 +207,19 @@ export default function PrivacyPolicyPage() {
           <p>14A.2. These technologies may collect information such as IP addresses, browser type, device information, pages visited, and actions taken (such as form submissions). This data is sent directly from the Applicant&apos;s browser to the respective third-party platform.</p>
           <p>14A.3. <strong className="text-foreground">Chippi acts as a Data Processor</strong> with respect to Subscriber-configured tracking pixels. The Subscriber (Data Controller) is responsible for disclosing the use of these technologies in their own privacy policy and obtaining any required consents.</p>
           <p>14A.4. Applicants may opt out of third-party tracking by adjusting their browser settings, using browser extensions that block tracking scripts, or visiting the <a href="https://optout.aboutads.info/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance&apos;s opt-out page</a>.</p>
+        </div>
+      </section>
+
+      {/* 14B. Our Analytics and Advertising */}
+      <section>
+        <h2 className="text-xl font-semibold">14B. Our Analytics and Advertising</h2>
+        <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
+          <p>14B.1. This section is distinct from Section 14A. It describes the analytics and advertising technologies <strong className="text-foreground">Chippi itself</strong> uses on our public marketing website (usechippi.com) and within the Service (my.usechippi.com). With respect to these technologies, <strong className="text-foreground">Chippi acts as the Data Controller</strong>.</p>
+          <p>14B.2. <strong className="text-foreground">Technologies we use.</strong> Depending on the page and over time, we may load: Google Analytics 4 and Google Ads, the Meta (Facebook) Pixel, Microsoft Clarity and Microsoft Advertising (UET), the LinkedIn Insight Tag, and the TikTok, Pinterest, and Reddit pixels. Each is enabled independently and may be added or removed as our marketing changes.</p>
+          <p>14B.3. <strong className="text-foreground">What they collect.</strong> These technologies may collect your device and browser information, IP address, the pages you view and links you click, referring URLs, and conversion events such as page views, account signups, onboarding completion, and purchases, together with cookies and similar identifiers set by each provider. Microsoft Clarity and Amplitude may also record session replays (such as mouse movement, clicks, and scrolling); we configure these tools to mask sensitive input fields.</p>
+          <p>14B.4. <strong className="text-foreground">Why we use them.</strong> To measure website traffic and the performance of our marketing, understand our signup and purchase funnel, improve our site and product, and deliver and measure Chippi&apos;s own advertising (including retargeting our visitors) on these platforms. We do not use these technologies to make decisions about Applicants.</p>
+          <p>14B.5. <strong className="text-foreground">Your choices.</strong> You can opt out of interest-based advertising through the <a href="https://optout.aboutads.info/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance</a>, the <a href="https://optout.networkadvertising.org/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Network Advertising Initiative</a>, and (in Europe) <a href="https://www.youronlinechoices.eu/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Your Online Choices</a>. You can manage Google advertising via <a href="https://adssettings.google.com/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> and opt out of Google Analytics with Google&apos;s <a href="https://tools.google.com/dlpage/gaoptout" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">browser add-on</a>, and Meta advertising through your Meta ad preferences. You can also block or delete cookies in your browser and use privacy/ad-blocking extensions.</p>
+          <p>14B.6. <strong className="text-foreground">&quot;Do Not Sell or Share&quot; and Global Privacy Control.</strong> We do not sell your personal information for money. However, the advertising technologies described above may constitute a &quot;sale&quot; or &quot;sharing&quot; for cross-context behavioral advertising under certain U.S. state privacy laws (such as California&apos;s CCPA/CPRA). You may exercise your opt-out rights using the mechanisms in Section 14B.5, by emailing <a href="mailto:help@usechippi.com" className="underline hover:text-foreground">help@usechippi.com</a>, or by enabling a <a href="https://globalprivacycontrol.org/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Global Privacy Control (GPC)</a> signal in your browser, which we honor as a valid opt-out of sale/sharing where required by law.</p>
         </div>
       </section>
 

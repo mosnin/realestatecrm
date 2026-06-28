@@ -18,7 +18,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { trackPurchase } from '@/lib/analytics/meta-pixel';
+import { trackPurchase } from '@/lib/analytics/events';
 
 export function PurchasePixel() {
   const params = useSearchParams();
