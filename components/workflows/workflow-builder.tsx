@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -123,6 +123,14 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'schedule_message',
   'call_integration',
 ];
+
+const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
+  draft_message: PencilLine,
+  schedule_message: Clock,
+  create_task: CheckSquare,
+  call_integration: Plug,
+  run_chippi: Sparkles,
+};
 
 const AUTONOMY_OPTIONS: { value: WorkflowAutonomy; label: string }[] = [
   { value: 'draft', label: 'Draft only — I approve' },
@@ -517,6 +525,7 @@ function ActionZapCard({
   onRemove: () => void;
   connectedApps: ConnectedAppsState;
 }) {
+  const Icon = ACTION_ICONS[row.type] ?? Sparkles;
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 border-l-4 border-l-violet-400 bg-card dark:border-l-violet-500/70">
       <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
@@ -524,7 +533,7 @@ function ActionZapCard({
           {step}
         </span>
         <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
-          <Sparkles size={14} aria-hidden />
+          <Icon size={14} aria-hidden />
         </span>
         <div className="flex-1">
           <Label htmlFor={`act-type-${row.id}`} className="sr-only">
@@ -991,10 +1000,10 @@ export function WorkflowBuilder({
           type="button"
           onClick={submit}
           disabled={saving}
-          className={cn(PRIMARY_PILL, 'disabled:cursor-not-allowed disabled:opacity-60')}
+          className="inline-flex items-center gap-1.5 rounded-full h-9 px-5 text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {saving ? 'Saving' : 'Save workflow'}
+          {saving ? 'Saving…' : 'Save workflow'}
         </button>
         <button
           type="button"

@@ -37,6 +37,7 @@ import {
   Sun,
   Home,
   GitBranch,
+  Search,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -216,6 +217,13 @@ export function WorkflowsManager() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [actionError, setActionError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredWorkflows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return workflows;
+    return workflows.filter((w) => w.name.toLowerCase().includes(q));
+  }, [workflows, searchQuery]);
 
   // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
   const highlightedAnchor = useHashHighlight();
@@ -415,10 +423,20 @@ export function WorkflowsManager() {
         </div>
       ) : workflows.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={openBlank}>
-            <Plus size={14} />
-            New workflow
-          </Button>
+          <div className="relative flex-1 min-w-[180px]">
+            <Search
+              size={14}
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}...`}
+              className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+            />
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -428,7 +446,15 @@ export function WorkflowsManager() {
             }}
           >
             <Sparkles size={14} />
-            Start from a template
+            Templates
+          </Button>
+          <Button
+            size="sm"
+            onClick={openBlank}
+            className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
+          >
+            <Plus size={14} />
+            New workflow
           </Button>
         </div>
       ) : null}
@@ -477,29 +503,37 @@ export function WorkflowsManager() {
             </div>
 
             {/* Table rows */}
-            <div className="divide-y divide-border/60">
-              {workflows.map((workflow) => (
-                <WorkflowRow
-                  key={workflow.id}
-                  workflow={workflow}
-                  highlighted={highlightedAnchor === `workflow-${workflow.id}`}
-                  editing={editingId === workflow.id}
-                  busy={busyId === workflow.id}
-                  testing={testingId === workflow.id}
-                  testResult={testResults[workflow.id]}
-                  onEdit={() => {
-                    setEditingId(workflow.id);
-                    setComposer(null);
-                    setActionError('');
-                  }}
-                  onCancelEdit={() => setEditingId(null)}
-                  onSave={(payload) => saveEdit(workflow.id, payload)}
-                  onToggle={() => toggleWorkflow(workflow)}
-                  onTest={() => testWorkflow(workflow.id)}
-                  onDelete={() => deleteWorkflow(workflow.id)}
-                />
-              ))}
-            </div>
+            {filteredWorkflows.length > 0 ? (
+              <div className="divide-y divide-border/60">
+                {filteredWorkflows.map((workflow) => (
+                  <WorkflowRow
+                    key={workflow.id}
+                    workflow={workflow}
+                    highlighted={highlightedAnchor === `workflow-${workflow.id}`}
+                    editing={editingId === workflow.id}
+                    busy={busyId === workflow.id}
+                    testing={testingId === workflow.id}
+                    testResult={testResults[workflow.id]}
+                    onEdit={() => {
+                      setEditingId(workflow.id);
+                      setComposer(null);
+                      setActionError('');
+                    }}
+                    onCancelEdit={() => setEditingId(null)}
+                    onSave={(payload) => saveEdit(workflow.id, payload)}
+                    onToggle={() => toggleWorkflow(workflow)}
+                    onTest={() => testWorkflow(workflow.id)}
+                    onDelete={() => deleteWorkflow(workflow.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No workflows match <span className="font-medium text-foreground">{searchQuery}</span>
+                </p>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1219,27 +1253,32 @@ function TemplatePicker({
           Cancel
         </button>
       </div>
-      <ul className="space-y-2">
-        {WORKFLOW_TEMPLATES.map((template) => (
-          <li key={template.id}>
-            <button
-              type="button"
-              onClick={() => onPick(cloneTemplateState(template))}
-              className="group/tpl flex w-full items-start gap-3 rounded-lg border border-border/60 bg-card p-3 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
-            >
-              <WorkflowIcon
-                size={16}
-                className="mt-0.5 flex-shrink-0 text-muted-foreground group-hover/tpl:text-foreground"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">{template.name}</span>
-                <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
-                  {template.description}
-                </span>
-              </span>
-            </button>
-          </li>
-        ))}
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {WORKFLOW_TEMPLATES.map((template) => {
+          const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+          const Icon = meta.icon;
+          return (
+            <li key={template.id} className="flex">
+              <button
+                type="button"
+                onClick={() => onPick(cloneTemplateState(template))}
+                className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+              >
+                <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
+                  <Icon size={24} className={meta.dot} aria-hidden />
+                </div>
+                <div className="flex flex-1 flex-col gap-1 p-3">
+                  <span className="block text-sm font-semibold leading-snug text-foreground">
+                    {template.name}
+                  </span>
+                  <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
+                    {template.description}
+                  </span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
