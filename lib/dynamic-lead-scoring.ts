@@ -64,77 +64,120 @@ async function getScoringClient() {
 
 // ── AI scoring call ──────────────────────────────────────────────────────
 
+/**
+ * Pull the score object out of a model response and parse it. Tolerant of code
+ * fences and surrounding prose (the json_object retry can wrap the JSON), so a
+ * cosmetically-imperfect response still yields a score instead of throwing.
+ * Returns null only when there's no parseable object with a numeric leadScore.
+ *
+ * Exported for unit tests — the lenient extraction is the safety net that keeps
+ * a single finicky completion from sinking the whole re-score into 'failed'.
+ */
+export function extractScoreJson(raw: string): AIScoreResponse | null {
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    typeof (parsed as AIScoreResponse).leadScore !== 'number'
+  ) {
+    return null;
+  }
+  const result = parsed as AIScoreResponse;
+  // Clamp AI score to 0-100.
+  result.leadScore = Math.max(0, Math.min(100, Math.round(result.leadScore)));
+  return result;
+}
+
 async function getAIScore(input: {
   formConfig: IntakeFormConfig;
   answers: Record<string, string | string[] | number | boolean>;
   leadType: string;
   deterministicScore: number | null;
 }): Promise<AIScoreResponse | null> {
-  try {
-    const { client: openai, model } = await getScoringClient();
+  const { client: openai, model } = await getScoringClient();
 
-    const userPrompt = buildDynamicScoringPrompt({
-      formConfig: input.formConfig,
-      answers: input.answers,
-      deterministicScore: input.deterministicScore,
-    });
+  const userPrompt = buildDynamicScoringPrompt({
+    formConfig: input.formConfig,
+    answers: input.answers,
+    deterministicScore: input.deterministicScore,
+  });
 
-    const systemPrompt = buildDynamicSystemPrompt({
-      leadType: input.leadType,
-      hasDeterministicScore: input.deterministicScore !== null,
-    });
+  const systemPrompt = buildDynamicSystemPrompt({
+    leadType: input.leadType,
+    hasDeterministicScore: input.deterministicScore !== null,
+  });
 
-    const response = await openai.chat.completions.create({
-      model,
-      temperature: 0,
-      max_tokens: 400,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'dynamic_lead_score',
-          strict: true,
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              leadScore: { type: 'number' },
-              scoreLabel: { type: 'string', enum: ['hot', 'warm', 'cold'] },
-              scoreSummary: { type: 'string' },
-              scoreDetails: {
-                type: 'object',
-                additionalProperties: false,
-                properties: {
-                  tags: { type: 'array', items: { type: 'string' } },
-                  strengths: { type: 'array', items: { type: 'string' } },
-                  weaknesses: { type: 'array', items: { type: 'string' } },
-                  riskFlags: { type: 'array', items: { type: 'string' } },
+  // Two attempts. The strict json_schema is the happy path; if the active
+  // provider/model rejects strict structured output OR the response doesn't
+  // parse, fall back to plain json_object mode + a lenient extract. A single
+  // finicky completion must not collapse the whole re-score into a dead
+  // 'failed' with no score (the bug this guards against). max_tokens is 900 —
+  // 400 truncated the summary + four arrays mid-JSON, which then failed to
+  // parse and returned null.
+  for (const useSchema of [true, false] as const) {
+    try {
+      const response = await openai.chat.completions.create({
+        model,
+        temperature: 0,
+        max_tokens: 900,
+        response_format: useSchema
+          ? {
+              type: 'json_schema',
+              json_schema: {
+                name: 'dynamic_lead_score',
+                strict: true,
+                schema: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    leadScore: { type: 'number' },
+                    scoreLabel: { type: 'string', enum: ['hot', 'warm', 'cold'] },
+                    scoreSummary: { type: 'string' },
+                    scoreDetails: {
+                      type: 'object',
+                      additionalProperties: false,
+                      properties: {
+                        tags: { type: 'array', items: { type: 'string' } },
+                        strengths: { type: 'array', items: { type: 'string' } },
+                        weaknesses: { type: 'array', items: { type: 'string' } },
+                        riskFlags: { type: 'array', items: { type: 'string' } },
+                      },
+                      required: ['tags', 'strengths', 'weaknesses', 'riskFlags'],
+                    },
+                  },
+                  required: ['leadScore', 'scoreLabel', 'scoreSummary', 'scoreDetails'],
                 },
-                required: ['tags', 'strengths', 'weaknesses', 'riskFlags'],
               },
-            },
-            required: ['leadScore', 'scoreLabel', 'scoreSummary', 'scoreDetails'],
-          },
-        },
-      },
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-    });
+            }
+          : { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      });
 
-    const raw = response.choices?.[0]?.message?.content;
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as AIScoreResponse;
-
-    // Clamp AI score to 0-100
-    parsed.leadScore = Math.max(0, Math.min(100, Math.round(parsed.leadScore)));
-
-    return parsed;
-  } catch (error) {
-    console.warn('[dynamic-lead-scoring] AI scoring failed, using deterministic only', { error });
-    return null;
+      const raw = response.choices?.[0]?.message?.content;
+      if (!raw) continue;
+      const parsed = extractScoreJson(raw);
+      if (parsed) return parsed;
+    } catch (error) {
+      console.warn('[dynamic-lead-scoring] AI scoring attempt failed', {
+        useSchema,
+        error,
+      });
+    }
   }
+
+  console.warn('[dynamic-lead-scoring] AI scoring unavailable after retries');
+  return null;
 }
 
 // ── Data completeness from form config ───────────────────────────────────

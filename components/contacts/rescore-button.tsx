@@ -24,10 +24,18 @@ export function RescoreButton({ contactId, onComplete }: Props) {
       const res = await fetch(`/api/contacts/${contactId}/rescore`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        setDone(true);
-        toast.success('Re-scored.');
-        onComplete?.(data);
-        setTimeout(() => router.refresh(), 800);
+        // A 200 can still carry a failed score (the engine degrades to a
+        // 'failed' result rather than erroring). Don't claim success when no
+        // score landed — surface it so the realtor knows to retry.
+        if (data?.scoringStatus === 'failed' || data?.leadScore == null) {
+          toast.error("Couldn't score that. Try again.");
+          setError("Couldn't score that. Try again.");
+        } else {
+          setDone(true);
+          toast.success('Re-scored.');
+          onComplete?.(data);
+          setTimeout(() => router.refresh(), 800);
+        }
       } else {
         toast.error("Couldn't score that. Try again.");
         setError("Couldn't score that. Try again.");
