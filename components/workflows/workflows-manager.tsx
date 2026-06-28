@@ -383,7 +383,7 @@ export function WorkflowsManager() {
         <div className="rounded-xl border border-border/60 bg-card p-4">
           <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
         </div>
-      ) : (
+      ) : workflows.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={openBlank}>
             <Plus size={14} />
@@ -401,15 +401,11 @@ export function WorkflowsManager() {
             Start from a template
           </Button>
         </div>
-      )}
+      ) : null}
 
       {workflows.length === 0 && composer === null ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            No automations yet. Build a When → If → Then, or start from a template.
-          </p>
-        </div>
-      ) : (
+        <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
+      ) : workflows.length === 0 ? null : (
         <ul className="divide-y divide-border/60">
           {workflows.map((workflow) => (
             <WorkflowRow
@@ -892,6 +888,77 @@ function RowAction({
     >
       {loading ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
     </button>
+  );
+}
+
+// ── Template gallery (zero-state front door) ─────────────────────────────────
+
+/**
+ * The first thing a realtor sees before they have any automations. Instead of a
+ * dead "nothing yet" box, it leads with the outcomes Chippi can take off their
+ * plate — every template card reads as a plain-English result, one tap drops
+ * them into a pre-filled builder, and a quiet "start from scratch" stays for the
+ * realtor who'd rather compose their own. Show the value, then invite the tap.
+ */
+function TemplateGallery({
+  onPick,
+  onScratch,
+}: {
+  onPick: (state: WorkflowFormState) => void;
+  onScratch: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-[15px] font-medium text-foreground">
+          What should I take off your plate?
+        </p>
+        <p className={CAPTION}>
+          Pick one to start — you’ll see exactly what it does before it turns on.
+        </p>
+      </div>
+
+      <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {WORKFLOW_TEMPLATES.map((template) => (
+          <li key={template.id}>
+            <button
+              type="button"
+              onClick={() => onPick(cloneTemplateState(template))}
+              className="group/card flex h-full w-full items-start gap-3 rounded-xl border border-border/60 bg-card p-4 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
+            >
+              <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-foreground/[0.05] text-muted-foreground transition-colors group-hover/card:bg-foreground group-hover/card:text-background">
+                <WorkflowIcon size={15} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium leading-snug text-foreground">
+                  {template.name}
+                </span>
+                <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                  {template.description}
+                </span>
+              </span>
+              <ChevronRight
+                size={15}
+                aria-hidden
+                className="mt-0.5 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/card:text-foreground"
+              />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex items-center gap-2 pt-1">
+        <span className={CAPTION}>Prefer to build your own?</span>
+        <button
+          type="button"
+          onClick={onScratch}
+          className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
+        >
+          <Plus size={13} aria-hidden />
+          Start from scratch
+        </button>
+      </div>
+    </div>
   );
 }
 
