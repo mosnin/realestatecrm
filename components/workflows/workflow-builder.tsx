@@ -21,7 +21,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -124,6 +125,31 @@ const AUTONOMY_CAPTION: Record<WorkflowAutonomy, string> = {
   draft: 'Every action is drafted for your approval — nothing goes out on its own.',
   notify: 'Actions run automatically and you get a heads-up each time.',
   auto: 'Actions run without approval, including sends and connected-app calls. Use with care.',
+};
+
+/**
+ * Card metadata for the autonomy picker — the consequential trust decision.
+ * A 3-way segmented control (icon + short label + one-line consequence) makes
+ * the choice considered, not incidental: the realtor sees exactly how much
+ * Chippi is allowed to do on its own, and the 'auto' card wears an amber accent
+ * because it's the only one that sends without a human in the loop.
+ */
+const AUTONOMY_META: Record<WorkflowAutonomy, { label: string; consequence: string; icon: LucideIcon }> = {
+  draft: {
+    label: 'Draft only',
+    consequence: 'You approve each one before it sends.',
+    icon: PencilLine,
+  },
+  notify: {
+    label: 'Auto + notify',
+    consequence: 'Runs on its own; pings you each time.',
+    icon: BellRing,
+  },
+  auto: {
+    label: 'Fully autonomous',
+    consequence: 'Runs and sends with no approval.',
+    icon: Zap,
+  },
 };
 
 // ── Connected-app trigger options (for the integration_event picker) ─────────
@@ -510,29 +536,54 @@ export function WorkflowBuilder({
       </section>
 
       {/* Autonomy ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-1.5">
-        <Label htmlFor="wf-autonomy" className="text-[12.5px] font-medium text-foreground">
-          Autonomy
-        </Label>
-        <Select
-          value={state.autonomy}
-          onValueChange={(v) => patch({ autonomy: v as WorkflowAutonomy })}
-        >
-          <SelectTrigger id="wf-autonomy" className="h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {AUTONOMY_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <section className="space-y-2">
+        <p className={SECTION_LABEL}>Autonomy — how much can I do on my own?</p>
+        <div role="radiogroup" aria-label="Autonomy" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {AUTONOMY_OPTIONS.map((o) => {
+            const meta = AUTONOMY_META[o.value];
+            const selected = state.autonomy === o.value;
+            const isAuto = o.value === 'auto';
+            const Icon = meta.icon;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => patch({ autonomy: o.value })}
+                className={cn(
+                  'flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-colors',
+                  selected
+                    ? isAuto
+                      ? 'border-amber-400/70 bg-amber-50/60 dark:border-amber-500/50 dark:bg-amber-950/30'
+                      : 'border-foreground/40 bg-foreground/[0.04]'
+                    : 'border-border/60 hover:border-foreground/25 hover:bg-foreground/[0.02]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors',
+                    selected
+                      ? isAuto
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                        : 'bg-foreground text-background'
+                      : 'bg-foreground/[0.05] text-muted-foreground',
+                  )}
+                >
+                  <Icon size={14} aria-hidden />
+                </span>
+                <span className="text-[13px] font-medium text-foreground">{meta.label}</span>
+                <span className="text-[11px] leading-snug text-muted-foreground">
+                  {meta.consequence}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         <p
           className={cn(
             CAPTION,
-            state.autonomy === 'auto' && 'text-amber-600 dark:text-amber-500',
+            state.autonomy === 'auto' && 'font-medium text-amber-600 dark:text-amber-500',
           )}
         >
           {AUTONOMY_CAPTION[state.autonomy]}
@@ -1037,10 +1088,11 @@ function ActionConfig({
     );
   }
 
-  // call_integration
+  // call_integration — app + action lead; the raw JSON params are tucked into an
+  // Advanced disclosure so the common case isn't dominated by a code box.
   return (
     <div className="space-y-2.5">
-      <FieldRow label="Toolkit" htmlFor={`act-tk-${row.id}`}>
+      <FieldRow label="App" htmlFor={`act-tk-${row.id}`}>
         <Input
           id={`act-tk-${row.id}`}
           value={row.toolkit}
@@ -1058,19 +1110,29 @@ function ActionConfig({
           className="h-8"
         />
       </FieldRow>
-      <div className="space-y-1.5">
-        <Label htmlFor={`act-params-${row.id}`} className="text-[12px] text-muted-foreground">
-          Params (optional JSON)
-        </Label>
-        <Textarea
-          id={`act-params-${row.id}`}
-          value={row.paramsJson}
-          onChange={(e) => onChange({ paramsJson: e.target.value })}
-          placeholder='{ "channel": "#leads" }'
-          rows={2}
-          className="font-mono text-xs"
-        />
-      </div>
+      <details className="group/adv">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Plus
+            size={12}
+            aria-hidden
+            className="transition-transform group-open/adv:rotate-45"
+          />
+          Advanced — params (optional JSON)
+        </summary>
+        <div className="mt-2 space-y-1.5">
+          <Label htmlFor={`act-params-${row.id}`} className="sr-only">
+            Params (optional JSON)
+          </Label>
+          <Textarea
+            id={`act-params-${row.id}`}
+            value={row.paramsJson}
+            onChange={(e) => onChange({ paramsJson: e.target.value })}
+            placeholder='{ "channel": "#leads" }'
+            rows={2}
+            className="font-mono text-xs"
+          />
+        </div>
+      </details>
     </div>
   );
 }
