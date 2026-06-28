@@ -26,10 +26,13 @@ describe('resolveLink', () => {
     expect(resolveLink({ kind: 'deal', id: 'd1' }, SLUG)).toBe('/s/acme/deals/d1');
   });
 
-  it('workflow → workflows index (no id needed)', () => {
+  it('workflow with an id → deep-link to that workflow via hash anchor', () => {
     expect(resolveLink({ kind: 'workflow', id: 'w1' }, SLUG)).toBe(
-      '/s/acme/workflows',
+      '/s/acme/workflows#workflow-w1',
     );
+  });
+
+  it('workflow without an id → workflows index (legacy run, no workflowId)', () => {
     expect(resolveLink({ kind: 'workflow' }, SLUG)).toBe('/s/acme/workflows');
   });
 
@@ -43,7 +46,13 @@ describe('resolveLink', () => {
     );
   });
 
-  it('routines → routines index', () => {
+  it('routines with an id → deep-link to that routine via hash anchor', () => {
+    expect(resolveLink({ kind: 'routines', id: 'r1' }, SLUG)).toBe(
+      '/s/acme/routines#routine-r1',
+    );
+  });
+
+  it('routines without an id → routines index', () => {
     expect(resolveLink({ kind: 'routines' }, SLUG)).toBe('/s/acme/routines');
   });
 

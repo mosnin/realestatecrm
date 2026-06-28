@@ -30,6 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import { CAPTION, PRIMARY_PILL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
+import { useHashHighlight } from '@/hooks/use-hash-highlight';
 
 type Cadence = 'hourly' | 'daily' | 'weekdays' | 'monthly' | 'custom';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -170,6 +171,9 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
   const [busyId, setBusyId] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+
+  // Deep-link target: the activity feed links a routine_run to #routine-<id>.
+  const highlightedAnchor = useHashHighlight();
 
   useEffect(() => {
     let active = true;
@@ -349,6 +353,7 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
             <RoutineRow
               key={routine.id}
               routine={routine}
+              highlighted={highlightedAnchor === `routine-${routine.id}`}
               editing={editingId === routine.id}
               busy={busyId === routine.id}
               running={runningId === routine.id}
@@ -373,6 +378,7 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
 
 function RoutineRow({
   routine,
+  highlighted,
   editing,
   busy,
   running,
@@ -384,6 +390,7 @@ function RoutineRow({
   onDelete,
 }: {
   routine: Routine;
+  highlighted: boolean;
   editing: boolean;
   busy: boolean;
   running: boolean;
@@ -401,7 +408,7 @@ function RoutineRow({
     // chrome the realtor saw when they wrote it. The list rhythm picks
     // up again above and below.
     return (
-      <li className="py-3 first:pt-0">
+      <li id={`routine-${routine.id}`} className="scroll-mt-24 py-3 first:pt-0">
         <div className="rounded-xl border border-border/60 bg-card p-4">
           <RoutineComposer
             initial={{
@@ -420,18 +427,26 @@ function RoutineRow({
     );
   }
 
-  // Last-run outcome: a small status pill ('ran' / 'failed' / '—') plus the
-  // relative time it last fired. Null status (never run) reads as a quiet "—"
-  // rather than nothing, so a routine that hasn't fired yet is still legible.
+  // Last-run outcome: a small status word plus the relative time it last fired.
+  // Null status (never run) reads as "New" — fresh and expected — to match the
+  // workflow list's voice, rather than a bare "—" that looks broken.
   const failed = routine.lastRunStatus === 'error';
   const runLabel =
-    routine.lastRunStatus === 'ok' ? 'ran' : routine.lastRunStatus === 'error' ? 'failed' : '—';
+    routine.lastRunStatus === 'ok'
+      ? 'ran'
+      : routine.lastRunStatus === 'error'
+        ? 'failed'
+        : 'New';
 
   return (
     <li
+      id={`routine-${routine.id}`}
       className={cn(
-        'group/row flex items-start gap-3 py-3 first:pt-0 transition-opacity',
+        'group/row flex items-start gap-3 py-3 first:pt-0 transition-all scroll-mt-24',
         !routine.enabled && 'opacity-60',
+        // Deep-link flash from the activity feed.
+        highlighted &&
+          'rounded-xl bg-sky-50 ring-2 ring-sky-400/60 dark:bg-sky-950/30 -mx-2 px-2',
       )}
     >
       <div className="flex-1 min-w-0">

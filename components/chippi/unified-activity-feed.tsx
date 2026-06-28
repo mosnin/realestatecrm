@@ -78,13 +78,17 @@ export function resolveLink(
     case 'deal':
       return link.id ? `${base}/deals/${link.id}` : null;
     case 'workflow':
-      return `${base}/workflows`;
+      // Deep-link to the specific workflow via a hash anchor when we know which
+      // one fired; the manager scrolls it into view and flashes it. Without an
+      // id (legacy run with no workflowId) fall back to the list.
+      return link.id ? `${base}/workflows#workflow-${link.id}` : `${base}/workflows`;
     case 'inbox':
       return `${base}/chippi/inbox`;
     case 'integrations':
       return `${base}/chippi/integrations`;
     case 'routines':
-      return `${base}/routines`;
+      // Same deep-link treatment for routines.
+      return link.id ? `${base}/routines#routine-${link.id}` : `${base}/routines`;
     default:
       return null;
   }

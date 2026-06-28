@@ -1,0 +1,60 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+/**
+ * Deep-link target highlighting. When the page is navigated to with a URL hash
+ * (e.g. `#workflow-abc` from the activity feed), the element whose anchor id
+ * matches is scrolled into view and briefly flashed so the realtor SEES which
+ * row the link meant — a jump that lands silently in a long list is a jump that
+ * feels broken.
+ *
+ * Returns the currently-highlighted anchor id (or null). A row renders its
+ * highlight ring when `highlightedId === myAnchorId`. The flash auto-clears
+ * after `durationMs` and re-arms whenever the hash changes (so clicking two
+ * different feed items in a row both flash).
+ *
+ * Robust by contract: SSR-safe (no window access during render), no-ops without
+ * a hash, and only scrolls once the matching element actually exists in the DOM
+ * (handles a list that mounts after the hash is already set).
+ */
+export function useHashHighlight(durationMs = 2200): string | null {
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function activateFromHash() {
+      const raw = window.location.hash.replace(/^#/, '');
+      if (!raw) return;
+      setHighlightedId(raw);
+
+      // Scroll the target into view once it exists. The list may still be
+      // loading when the hash is already present, so retry a few frames.
+      let attempts = 0;
+      const tryScroll = () => {
+        const el = document.getElementById(raw);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        if (attempts++ < 20) requestAnimationFrame(tryScroll);
+      };
+      requestAnimationFrame(tryScroll);
+
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => setHighlightedId(null), durationMs);
+    }
+
+    activateFromHash();
+    window.addEventListener('hashchange', activateFromHash);
+    return () => {
+      window.removeEventListener('hashchange', activateFromHash);
+      if (clearTimer) clearTimeout(clearTimer);
+    };
+  }, [durationMs]);
+
+  return highlightedId;
+}

@@ -53,6 +53,7 @@ import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
 import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
 import { highlightsFromSteps } from './run-highlights';
+import { useHashHighlight } from '@/hooks/use-hash-highlight';
 
 // ── The record shape the API returns (subset we render) ──────────────────────
 
@@ -208,6 +209,9 @@ export function WorkflowsManager() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [actionError, setActionError] = useState('');
+
+  // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
+  const highlightedAnchor = useHashHighlight();
 
   useEffect(() => {
     let active = true;
@@ -424,6 +428,7 @@ export function WorkflowsManager() {
             <WorkflowRow
               key={workflow.id}
               workflow={workflow}
+              highlighted={highlightedAnchor === `workflow-${workflow.id}`}
               editing={editingId === workflow.id}
               busy={busyId === workflow.id}
               testing={testingId === workflow.id}
@@ -450,6 +455,7 @@ export function WorkflowsManager() {
 
 function WorkflowRow({
   workflow,
+  highlighted,
   editing,
   busy,
   testing,
@@ -462,6 +468,7 @@ function WorkflowRow({
   onDelete,
 }: {
   workflow: WorkflowRecord;
+  highlighted: boolean;
   editing: boolean;
   busy: boolean;
   testing: boolean;
@@ -505,7 +512,7 @@ function WorkflowRow({
 
   if (editing) {
     return (
-      <li className="py-3 first:pt-0">
+      <li id={`workflow-${workflow.id}`} className="scroll-mt-24 py-3 first:pt-0">
         <div className="rounded-xl border border-border/60 bg-card p-4">
           <WorkflowBuilder
             initial={recordToFormState(workflow)}
@@ -522,9 +529,14 @@ function WorkflowRow({
 
   return (
     <li
+      id={`workflow-${workflow.id}`}
       className={cn(
-        'group/row flex flex-col gap-2 py-3 first:pt-0 transition-opacity',
+        'group/row flex flex-col gap-2 py-3 first:pt-0 transition-all scroll-mt-24',
         !workflow.enabled && 'opacity-60',
+        // Deep-link flash: a feed link to this workflow scrolls it here and
+        // rings it for a couple of seconds so the jump is legible.
+        highlighted &&
+          'rounded-xl bg-sky-50 ring-2 ring-sky-400/60 dark:bg-sky-950/30 -mx-2 px-2',
       )}
     >
       <div className="flex items-start gap-3">
