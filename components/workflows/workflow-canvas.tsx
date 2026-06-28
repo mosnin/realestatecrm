@@ -227,9 +227,11 @@ function conditionSummary(condition: ConditionGroup | undefined): string {
 
 // ── Custom nodes ─────────────────────────────────────────────────────────────
 
+// Zapier-style: wider cards, vertical (top→bottom) connector handles.
 const NODE_SHELL =
-  'rounded-xl border bg-card px-3 py-2.5 shadow-sm transition-colors min-w-[168px] max-w-[208px]';
-const HANDLE_CLASS = '!h-2.5 !w-2.5 !border !border-border !bg-muted-foreground/40';
+  'rounded-xl border bg-card shadow-sm transition-colors w-[280px]';
+const HANDLE_CLASS =
+  '!h-3 !w-3 !rounded-full !border-2 !border-background !bg-muted-foreground/50 shadow-sm';
 
 /**
  * Run-highlight classes for a node, from its seeded data (set when the canvas is
@@ -258,20 +260,21 @@ function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
     <div
       className={cn(
         NODE_SHELL,
-        selected ? 'border-foreground/40' : 'border-border/60',
+        'border-orange-300/70 dark:border-orange-700/60',
+        selected && 'ring-2 ring-orange-400/50',
         runClasses(data),
       )}
     >
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <WorkflowIcon size={14} aria-hidden />
-        </NodeIcon>
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+          <Zap size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Trigger</p>
-          <p className="truncate text-[13px] font-medium text-foreground">Workflow starts</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-600/80 dark:text-orange-400/80">Trigger</p>
+          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">When this happens…</p>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
     </div>
   );
 }
@@ -285,45 +288,42 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
         runClasses(data),
       )}
     >
-      <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <GitBranch size={14} aria-hidden />
-        </NodeIcon>
+      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+          <GitBranch size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Condition</p>
-          {/* Full rule summary, clamped to two lines, with the complete string as
-              a hover tooltip — so a multi-rule condition reads as what it checks. */}
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">Filter / Branch</p>
           <p
-            className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground"
+            className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground"
             title={conditionSummary(data.condition)}
           >
             {conditionSummary(data.condition)}
           </p>
         </div>
       </div>
-      {/* Two SOURCE handles — the handle id ('true'/'false') becomes the edge
-          branch on connect, so a connection from here carries which branch. */}
+      {/* Two SOURCE handles on Bottom — True left, False right. */}
+      <div className="relative">
+        <div className="flex justify-between px-6 pb-1.5">
+          <span className="text-[10px] font-semibold text-emerald-600/90 dark:text-emerald-400/90">Yes</span>
+          <span className="text-[10px] font-semibold text-rose-600/90 dark:text-rose-400/90">No</span>
+        </div>
+      </div>
       <Handle
         id="true"
         type="source"
-        position={Position.Right}
-        style={{ top: '38%' }}
-        className={cn(HANDLE_CLASS, '!bg-emerald-500/60')}
+        position={Position.Bottom}
+        style={{ left: '30%' }}
+        className={cn(HANDLE_CLASS, '!bg-emerald-500/70 !border-emerald-300')}
       />
-      <span className="pointer-events-none absolute right-2 top-[30%] text-[9px] font-medium uppercase tracking-wide text-emerald-600/80 dark:text-emerald-500/80">
-        True
-      </span>
       <Handle
         id="false"
         type="source"
-        position={Position.Right}
-        style={{ top: '70%' }}
-        className={cn(HANDLE_CLASS, '!bg-rose-500/55')}
+        position={Position.Bottom}
+        style={{ left: '70%' }}
+        className={cn(HANDLE_CLASS, '!bg-rose-500/65 !border-rose-300')}
       />
-      <span className="pointer-events-none absolute bottom-1.5 right-2 text-[9px] font-medium uppercase tracking-wide text-rose-600/80 dark:text-rose-500/80">
-        False
-      </span>
     </div>
   );
 }
@@ -333,23 +333,23 @@ function ActionNodeView({ data, selected }: NodeProps<CanvasNode>) {
     <div
       className={cn(
         NODE_SHELL,
-        selected ? 'border-foreground/40' : 'border-border/60',
+        selected ? 'border-foreground/40 ring-2 ring-foreground/10' : 'border-border/60',
         runClasses(data),
       )}
     >
-      <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <Zap size={14} aria-hidden />
-        </NodeIcon>
+      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+          <WorkflowIcon size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Action</p>
-          <p className="truncate text-[13px] font-medium text-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">Action</p>
+          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">
             {actionFace(data.action)}
           </p>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
     </div>
   );
 }
