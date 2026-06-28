@@ -843,11 +843,15 @@ function TestResultPanel({
         <div className="mt-3 space-y-1.5">
           <p className={cn(SECTION_LABEL, 'text-[10px]')}>Path taken</p>
           <WorkflowCanvasLazy
+            // Re-mount per run so a fresh test seeds the new highlights (the
+            // canvas seeds its node state once at mount).
+            key={result.runId}
             graph={workflow.graph}
             trigger={workflow.trigger}
             onChange={() => {}}
             readOnly
             highlights={highlights}
+            heightClass="h-[320px]"
           />
         </div>
       )}

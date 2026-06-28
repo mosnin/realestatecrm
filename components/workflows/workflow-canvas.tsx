@@ -117,6 +117,9 @@ export interface WorkflowCanvasProps {
    * meaningful with readOnly (the result-panel preview); applied at mount.
    */
   highlights?: Record<string, NodeRunStatus>;
+  /** Canvas height utility class (default the full editing height). The
+   *  read-only result preview passes a shorter one so it doesn't dominate. */
+  heightClass?: string;
 }
 
 // ── Friendly labels (mirrors the linear builder's vocabulary) ────────────────
@@ -350,6 +353,7 @@ function CanvasInner({
   onChange,
   readOnly = false,
   highlights,
+  heightClass = 'h-[560px]',
 }: WorkflowCanvasProps) {
   // Seed React-Flow state ONCE from the adapter; the graph prop is the initial
   // value, not a controlled mirror (re-seeding on every render would fight the
@@ -639,7 +643,8 @@ function CanvasInner({
       <div className="relative flex flex-col gap-3 lg:flex-row">
         <div
           className={cn(
-            'relative h-[560px] flex-1 overflow-hidden rounded-xl border border-border/60 bg-muted/10',
+            'relative flex-1 overflow-hidden rounded-xl border border-border/60 bg-muted/10',
+            heightClass,
           )}
         >
           <ReactFlow<CanvasNode, CanvasEdge>
