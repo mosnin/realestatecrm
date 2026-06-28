@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
@@ -30,7 +31,9 @@ export default async function WorkflowsPage({
 
   return (
     <ChippiPageShell greeting="Workflows." title="Workflows" subtitle="When something happens — react to an event.">
-      <WorkflowsManager />
+      <Suspense fallback={null}>
+        <WorkflowsManager />
+      </Suspense>
     </ChippiPageShell>
   );
 }

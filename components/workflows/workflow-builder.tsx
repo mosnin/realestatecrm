@@ -437,7 +437,11 @@ export function WorkflowBuilder({
    * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
    * Open on the canvas when we're handed a graph-backed workflow (edit/template).
    */
-  const [mode, setMode] = useState<'simple' | 'advanced'>(initial?.graph ? 'advanced' : 'simple');
+  // Default new workflows to the canvas so it's immediately visible.
+  // Editing a linear workflow starts simple; editing a graph workflow starts advanced.
+  const [mode, setMode] = useState<'simple' | 'advanced'>(
+    initial ? (initial.graph ? 'advanced' : 'simple') : 'advanced',
+  );
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');

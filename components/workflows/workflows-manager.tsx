@@ -244,8 +244,9 @@ export function WorkflowsManager() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') openBlank();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Re-run when the ?new param changes so same-page nav from the sidebar works.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('new')]);
 
   function pickTemplate(state: WorkflowFormState) {
     setComposerInitial(state);
