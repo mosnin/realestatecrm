@@ -16,6 +16,8 @@
  */
 
 import { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
   Loader2,
   Plus,
@@ -907,6 +909,7 @@ function TemplateGallery({
   onPick: (state: WorkflowFormState) => void;
   onScratch: () => void;
 }) {
+  const reduce = useReducedMotion();
   return (
     <div className="space-y-4">
       <div className="space-y-1">
@@ -918,9 +921,14 @@ function TemplateGallery({
         </p>
       </div>
 
-      <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <motion.ul
+        className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+        variants={reduce ? undefined : STAGGER_CONTAINER}
+        initial={reduce ? undefined : 'initial'}
+        animate={reduce ? undefined : 'enter'}
+      >
         {WORKFLOW_TEMPLATES.map((template) => (
-          <li key={template.id}>
+          <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM}>
             <button
               type="button"
               onClick={() => onPick(cloneTemplateState(template))}
@@ -943,9 +951,9 @@ function TemplateGallery({
                 className="mt-0.5 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/card:text-foreground"
               />
             </button>
-          </li>
+          </motion.li>
         ))}
-      </ul>
+      </motion.ul>
 
       <div className="flex items-center gap-2 pt-1">
         <span className={CAPTION}>Prefer to build your own?</span>

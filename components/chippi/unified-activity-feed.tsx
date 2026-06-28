@@ -20,6 +20,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { DURATION_BASE, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import {
   Loader2,
   ChevronRight,
@@ -326,6 +328,7 @@ interface ApiResponse {
 export function UnifiedActivityFeed() {
   const params = useParams();
   const slug = (params?.slug as string | undefined) ?? '';
+  const reduce = useReducedMotion();
 
   // Filter state. Any change refetches from page 1.
   const [kind, setKind] = useState<ActivityKind | null>(null);
@@ -491,10 +494,19 @@ export function UnifiedActivityFeed() {
         </div>
 
         {/* Type + Status — tucked into a drawer, force-shown when one is active. */}
-        {filtersOpen && (
-          <div className="space-y-3 rounded-lg border border-border/50 bg-muted/10 p-3">
-            <div className="space-y-1.5">
-              <p className={SECTION_LABEL}>Type</p>
+        <AnimatePresence initial={false}>
+          {filtersOpen && (
+            <motion.div
+              key="facet-drawer"
+              initial={reduce ? undefined : { height: 0, opacity: 0 }}
+              animate={reduce ? undefined : { height: 'auto', opacity: 1 }}
+              exit={reduce ? undefined : { height: 0, opacity: 0 }}
+              transition={{ duration: DURATION_FAST, ease: EASE_OUT }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-3 rounded-lg border border-border/50 bg-muted/10 p-3">
+                <div className="space-y-1.5">
+                  <p className={SECTION_LABEL}>Type</p>
               <div
                 role="group"
                 aria-label="Filter by type"
@@ -534,8 +546,10 @@ export function UnifiedActivityFeed() {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Feed ───────────────────────────────────────────────────────── */}
@@ -579,7 +593,13 @@ export function UnifiedActivityFeed() {
           {/* Day-grouped timeline — Today / Yesterday / weekday headers. */}
           <div className="space-y-6">
             {groups.map((group) => (
-              <section key={group.key} className="space-y-1.5">
+              <motion.section
+                key={group.key}
+                className="space-y-1.5"
+                initial={reduce ? undefined : { opacity: 0, y: 4 }}
+                animate={reduce ? undefined : { opacity: 1, y: 0 }}
+                transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+              >
                 <div className="flex items-center gap-2">
                   <h3 className={SECTION_LABEL}>{group.label}</h3>
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">
@@ -591,7 +611,7 @@ export function UnifiedActivityFeed() {
                     <FeedRow key={item.id} item={item} slug={slug} />
                   ))}
                 </ul>
-              </section>
+              </motion.section>
             ))}
           </div>
 
