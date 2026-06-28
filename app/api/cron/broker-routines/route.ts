@@ -21,6 +21,9 @@ import { fireBrokerRoutineRun } from '@/lib/broker-routines';
 import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
+// Match the space-routine cron's budget: broker dispatch shares fireRoutineRun's
+// in-process fallback path, which blocks the route until the run finishes.
+export const maxDuration = 300;
 
 // Don't let one tick fire an unbounded number of webhooks — the overflow
 // is picked up on the next hourly tick.

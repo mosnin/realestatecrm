@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import { timeAgo } from '@/lib/formatting';
 
 type Cadence = 'hourly' | 'daily' | 'weekdays' | 'monthly' | 'custom';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -155,16 +156,6 @@ function hourOptions(): { value: number; label: string }[] {
   })
     .sort((a, b) => a.sortKey - b.sortKey)
     .map(({ value, label }) => ({ value, label }));
-}
-
-function formatRelative(iso: string): string {
-  const diffSec = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return diffSec >= 0 ? 'in a moment' : 'just now';
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute');
-  if (abs < 86_400) return rtf.format(Math.round(diffSec / 3600), 'hour');
-  return rtf.format(Math.round(diffSec / 86_400), 'day');
 }
 
 // ── Manager ──────────────────────────────────────────────────────────────────
@@ -429,10 +420,12 @@ function RoutineRow({
     );
   }
 
+  // Last-run outcome: a small status pill ('ran' / 'failed' / '—') plus the
+  // relative time it last fired. Null status (never run) reads as a quiet "—"
+  // rather than nothing, so a routine that hasn't fired yet is still legible.
   const failed = routine.lastRunStatus === 'error';
-  const lastRun = routine.lastRunAt
-    ? `${failed ? 'Last run failed' : 'Ran'} ${formatRelative(routine.lastRunAt)}`
-    : null;
+  const runLabel =
+    routine.lastRunStatus === 'ok' ? 'ran' : routine.lastRunStatus === 'error' ? 'failed' : '—';
 
   return (
     <li
@@ -448,20 +441,21 @@ function RoutineRow({
             <Repeat2 size={11} />
             {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
           </span>
-          {lastRun && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1',
-                  failed && 'text-amber-600 dark:text-amber-500',
-                )}
-              >
-                {failed && <AlertTriangle size={11} />}
-                {lastRun}
+          <span className="text-muted-foreground/40">·</span>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1',
+              failed && 'text-amber-600 dark:text-amber-500',
+            )}
+          >
+            {failed && <AlertTriangle size={11} />}
+            {runLabel}
+            {routine.lastRunAt && (
+              <span className="tabular-nums text-muted-foreground/70">
+                {timeAgo(routine.lastRunAt)}
               </span>
-            </>
-          )}
+            )}
+          </span>
           {!routine.enabled && (
             <>
               <span className="text-muted-foreground/40">·</span>

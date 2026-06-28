@@ -21,6 +21,11 @@ import { fireRoutineRun } from '@/lib/routines';
 import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
+// The Modal-free in-process fallback (lib/routines fireInProcessRun) blocks the
+// route until the headless run finishes (~120s budget), where the Modal path
+// returned fast. Raise the function budget so the run isn't cut off mid-flight —
+// mirrors /api/ai/task, which drives the same agent runtime.
+export const maxDuration = 300;
 
 // Don't let one tick fire an unbounded number of webhooks — the overflow
 // is picked up on the next hourly tick.
