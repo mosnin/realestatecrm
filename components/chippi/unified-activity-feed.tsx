@@ -37,11 +37,13 @@ import {
   CircleX,
   MinusCircle,
   Info,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { SECTION_LABEL } from '@/lib/typography';
+import { groupActivityByDay } from '@/lib/activity/group';
 import type {
   ActivityKind,
   ActivityStatus,
@@ -290,6 +292,30 @@ function Chip({
   );
 }
 
+// ── Digest ────────────────────────────────────────────────────────────────────
+
+/**
+ * A one-line, at-a-glance reading of what's currently loaded — total plus the
+ * few counts a realtor scans for (drafts waiting, messages sent, anything that
+ * failed). Reflects the loaded set; empty string when there's nothing to show.
+ */
+function summarizeFeed(items: UnifiedActivityItem[]): string {
+  if (items.length === 0) return '';
+  let drafts = 0;
+  let sent = 0;
+  let failed = 0;
+  for (const i of items) {
+    if (i.kind === 'draft') drafts += 1;
+    if (i.kind === 'outbound_message') sent += 1;
+    if (i.status === 'failed') failed += 1;
+  }
+  const parts = [`${items.length} ${items.length === 1 ? 'event' : 'events'}`];
+  if (drafts) parts.push(`${drafts} ${drafts === 1 ? 'draft' : 'drafts'}`);
+  if (sent) parts.push(`${sent} sent`);
+  if (failed) parts.push(`${failed} failed`);
+  return parts.join(' · ');
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface ApiResponse {
@@ -307,6 +333,7 @@ export function UnifiedActivityFeed() {
   const [range, setRange] = useState<RangePreset>('all');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState(''); // debounced value that drives fetches
+  const [showFilters, setShowFilters] = useState(false); // Type/Status drawer
 
   // Feed state.
   const [items, setItems] = useState<UnifiedActivityItem[]>([]);
@@ -391,90 +418,124 @@ export function UnifiedActivityFeed() {
     [kind, status, range, search],
   );
 
+  // Number of active Type/Status facets — drives the "Filters" button badge and
+  // forces the drawer open so an active facet is never hidden.
+  const activeFacetCount = useMemo(
+    () => (kind ? 1 : 0) + (status ? 1 : 0),
+    [kind, status],
+  );
+  const filtersOpen = showFilters || activeFacetCount > 0;
+
+  // Group the loaded feed into Today / Yesterday / weekday buckets so it reads
+  // as a story, and derive a one-line digest of what's on screen.
+  const groups = useMemo(() => groupActivityByDay(items), [items]);
+  const digest = useMemo(() => summarizeFeed(items), [items]);
+
   return (
     <div className="space-y-6">
       {/* ── Filter bar ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        {/* Search */}
-        <div className="relative">
-          <Search
-            size={14}
-            aria-hidden
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
-          />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search activity…"
-            aria-label="Search activity"
-            className="w-full h-9 pl-9 pr-3 rounded-lg bg-foreground/[0.04] text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:ring-1 focus:ring-foreground/20"
-          />
-        </div>
-
-        {/* Kind */}
-        <div className="space-y-1.5">
-          <p className={SECTION_LABEL}>Type</p>
-          <div
-            role="group"
-            aria-label="Filter by type"
-            className="flex items-center gap-1.5 flex-wrap"
+        {/* Search + a Filters toggle that hides the heavier facets until asked. */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              aria-hidden
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+            />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search activity…"
+              aria-label="Search activity"
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-foreground/[0.04] text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:ring-1 focus:ring-foreground/20"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={filtersOpen}
+            aria-label="Toggle type and status filters"
+            className={cn(
+              'inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors',
+              filtersOpen
+                ? 'bg-foreground/[0.07] text-foreground'
+                : 'bg-foreground/[0.04] text-muted-foreground hover:text-foreground',
+            )}
           >
-            <Chip label="All" selected={kind === null} onClick={() => setKind(null)} />
-            {KIND_ORDER.map((k) => (
-              <Chip
-                key={k}
-                label={KIND_META[k].label}
-                selected={kind === k}
-                onClick={() => setKind(k)}
-              />
-            ))}
-          </div>
+            <SlidersHorizontal size={13} aria-hidden />
+            Filters
+            {activeFacetCount > 0 && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-semibold text-background">
+                {activeFacetCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Status + date range */}
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
-          <div className="space-y-1.5">
-            <p className={SECTION_LABEL}>Status</p>
-            <div
-              role="group"
-              aria-label="Filter by status"
-              className="flex items-center gap-1.5 flex-wrap"
-            >
-              <Chip
-                label="All"
-                selected={status === null}
-                onClick={() => setStatus(null)}
-              />
-              {STATUS_FILTERS.map((s) => (
-                <Chip
-                  key={s}
-                  label={STATUS_LABEL[s]}
-                  selected={status === s}
-                  onClick={() => setStatus(s)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className={SECTION_LABEL}>When</p>
-            <div
-              role="group"
-              aria-label="Filter by date range"
-              className="flex items-center gap-1.5 flex-wrap"
-            >
-              {RANGE_OPTIONS.map((opt) => (
-                <Chip
-                  key={opt.value}
-                  label={opt.label}
-                  selected={range === opt.value}
-                  onClick={() => setRange(opt.value)}
-                />
-              ))}
-            </div>
-          </div>
+        {/* When — the most-used facet, always inline and compact. */}
+        <div
+          role="group"
+          aria-label="Filter by date range"
+          className="flex items-center gap-1.5 flex-wrap"
+        >
+          {RANGE_OPTIONS.map((opt) => (
+            <Chip
+              key={opt.value}
+              label={opt.label}
+              selected={range === opt.value}
+              onClick={() => setRange(opt.value)}
+            />
+          ))}
         </div>
+
+        {/* Type + Status — tucked into a drawer, force-shown when one is active. */}
+        {filtersOpen && (
+          <div className="space-y-3 rounded-lg border border-border/50 bg-muted/10 p-3">
+            <div className="space-y-1.5">
+              <p className={SECTION_LABEL}>Type</p>
+              <div
+                role="group"
+                aria-label="Filter by type"
+                className="flex items-center gap-1.5 flex-wrap"
+              >
+                <Chip label="All" selected={kind === null} onClick={() => setKind(null)} />
+                {KIND_ORDER.map((k) => (
+                  <Chip
+                    key={k}
+                    label={KIND_META[k].label}
+                    selected={kind === k}
+                    onClick={() => setKind(k)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className={SECTION_LABEL}>Status</p>
+              <div
+                role="group"
+                aria-label="Filter by status"
+                className="flex items-center gap-1.5 flex-wrap"
+              >
+                <Chip
+                  label="All"
+                  selected={status === null}
+                  onClick={() => setStatus(null)}
+                />
+                {STATUS_FILTERS.map((s) => (
+                  <Chip
+                    key={s}
+                    label={STATUS_LABEL[s]}
+                    selected={status === s}
+                    onClick={() => setStatus(s)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Feed ───────────────────────────────────────────────────────── */}
@@ -510,11 +571,29 @@ export function UnifiedActivityFeed() {
         </div>
       ) : (
         <>
-          <ul className="divide-y divide-border/60">
-            {items.map((item) => (
-              <FeedRow key={item.id} item={item} slug={slug} />
+          {/* At-a-glance digest of what's loaded. */}
+          {digest && (
+            <p className="text-[11px] tabular-nums text-muted-foreground/70">{digest}</p>
+          )}
+
+          {/* Day-grouped timeline — Today / Yesterday / weekday headers. */}
+          <div className="space-y-6">
+            {groups.map((group) => (
+              <section key={group.key} className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h3 className={SECTION_LABEL}>{group.label}</h3>
+                  <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                    {group.items.length}
+                  </span>
+                </div>
+                <ul className="divide-y divide-border/60">
+                  {group.items.map((item) => (
+                    <FeedRow key={item.id} item={item} slug={slug} />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
 
           {nextCursor && (
             <div className="flex justify-center pt-2">
