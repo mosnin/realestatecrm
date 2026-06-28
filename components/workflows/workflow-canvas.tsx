@@ -185,17 +185,28 @@ function actionFace(action: WorkflowAction | undefined): string {
   }
 }
 
+/** Render a rule's value cleanly: arrays (the in/not_in operators) as a spaced
+ *  list, primitives as-is, and anything object-shaped dropped (never the ugly
+ *  "[object Object]" String() would produce on raw stored JSON). */
+function formatRuleValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.filter((v) => v !== null && v !== undefined && v !== '').join(', ');
+  }
+  if (value !== null && typeof value === 'object') return '';
+  return String(value);
+}
+
 /** One rule rendered in plain language ("Lead score is at least 80"). */
 function rulePhrase(rule: { field: string; operator: Operator; value?: unknown }): string {
   const attr = findAttributeByField(rule.field);
   const label = attr?.label ?? rule.field;
   const op = OPERATOR_LABELS[rule.operator] ?? rule.operator;
   const valueless = VALUELESS_OPERATORS.has(rule.operator);
-  const value =
+  const formatted =
     valueless || rule.value === undefined || rule.value === null || rule.value === ''
       ? ''
-      : ` ${String(rule.value)}`;
-  return `${label} ${op}${value}`.trim();
+      : formatRuleValue(rule.value);
+  return `${label} ${op}${formatted ? ` ${formatted}` : ''}`.trim();
 }
 
 /**
@@ -403,10 +414,11 @@ function CanvasInner({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // A rejected connection PERSISTS until the realtor acts (a successful edit) or
-  // dismisses it — a 2.6s toast vanished before they finished dragging and
-  // looked back, leaving "why didn't that connect?" unanswered. The message is
-  // explicit and dismissible instead of timed.
+  // A rejected connection PERSISTS until the realtor moves on — a successful
+  // connection, adding or deleting a node, or an explicit dismiss all clear it.
+  // A 2.6s toast vanished before they finished dragging and looked back, leaving
+  // "why didn't that connect?" unanswered; the message is explicit and
+  // dismissible instead of timed.
   const flash = useCallback((msg: string) => setWarning(msg), []);
   const clearWarning = useCallback(() => setWarning(null), []);
 
@@ -569,8 +581,10 @@ function CanvasInner({
         emit(next, edges);
         return next;
       });
+      // Adding a node is the realtor moving on — resolve any lingering rejection.
+      clearWarning();
     },
-    [atNodeCap, nodes.length, edges, emit, setNodes],
+    [atNodeCap, nodes.length, edges, emit, clearWarning, setNodes],
   );
 
   const deleteSelected = useCallback(() => {
@@ -592,7 +606,8 @@ function CanvasInner({
       return nextNodes;
     });
     setSelectedId(null);
-  }, [selectedId, nodes, emit, flash, setNodes, setEdges]);
+    clearWarning();
+  }, [selectedId, nodes, emit, flash, clearWarning, setNodes, setEdges]);
 
   // Update the selected node's logic (action/condition) and re-emit.
   const updateNodeData = useCallback(
@@ -694,7 +709,11 @@ function CanvasInner({
 
           {warning && (
             <div
-              role="alert"
+              // Persistent (until acted on / dismissed), so a polite live region
+              // — not assertive role="alert", which would re-interrupt a screen
+              // reader on every rejected drag.
+              role="status"
+              aria-live="polite"
               className="absolute left-1/2 top-3 z-10 flex max-w-[90%] -translate-x-1/2 items-center gap-2 rounded-full border border-amber-400/60 bg-amber-50/95 py-1.5 pl-3 pr-1.5 text-xs font-medium text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-950/80 dark:text-amber-300"
             >
               <span className="min-w-0">{warning}</span>

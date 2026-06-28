@@ -382,9 +382,12 @@ async function loadEnabledWorkflows(spaceId: string): Promise<WorkflowRow[]> {
 }
 
 /** Summary of a runWorkflowsForEvent pass — `matched` workflows selected for the
- *  event, `ran` of them actually executed (didn't throw out of runWorkflow). A
- *  caller uses `ran > 0` to know the event drove real work even when no other
- *  dispatch kind fired (so e.g. a trigger's lastFiredAt can be stamped). */
+ *  event, and `ran` of them that actually ACTED (conditions held and the actions
+ *  ran: a 'completed' or 'failed' run). A run that was 'skipped' because its
+ *  conditions didn't match is NOT counted — it matched the trigger but did no
+ *  work, so it must not look like a fire. A caller uses `ran > 0` to know the
+ *  event drove real work even when no other dispatch kind fired (so e.g. a
+ *  trigger's lastFiredAt can be stamped). */
 export interface RunWorkflowsForEventResult {
   matched: number;
   ran: number;
@@ -410,8 +413,16 @@ export async function runWorkflowsForEvent(
   let ran = 0;
   for (const workflow of matching) {
     try {
-      await runWorkflow({ workflow, context: input.context, triggerEvent: input.triggerEvent });
-      ran++;
+      const result = await runWorkflow({
+        workflow,
+        context: input.context,
+        triggerEvent: input.triggerEvent,
+      });
+      // Count only runs that actually acted. A 'skipped' run (conditions didn't
+      // match) matched the trigger but did no work, so it must not register as a
+      // fire — otherwise an everyday event that fails a workflow's condition
+      // would wrongly stamp the trigger 'fired' and the event 'dispatched'.
+      if (result.status !== 'skipped') ran++;
     } catch (err) {
       // runWorkflow already swallows; this is belt-and-suspenders so one bad
       // workflow can't stop the rest of the batch.

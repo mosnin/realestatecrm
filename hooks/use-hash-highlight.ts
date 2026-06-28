@@ -25,24 +25,33 @@ export function useHashHighlight(durationMs = 2200): string | null {
     if (typeof window === 'undefined') return;
 
     let clearTimer: ReturnType<typeof setTimeout> | undefined;
+    let rafHandle: number | undefined;
+    // Token bumped on each activation; the in-flight rAF retry loop checks it so
+    // a previous loop can't scroll to its (now stale) target after a newer hash
+    // was requested — rapid successive deep-links would otherwise fight over
+    // scrollIntoView and yank the viewport back to the old row.
+    let activeToken = 0;
 
     function activateFromHash() {
       const raw = window.location.hash.replace(/^#/, '');
       if (!raw) return;
+      const token = ++activeToken;
       setHighlightedId(raw);
 
       // Scroll the target into view once it exists. The list may still be
-      // loading when the hash is already present, so retry a few frames.
+      // loading when the hash is already present, so retry a few frames — but
+      // bail the moment a newer activation supersedes this one.
       let attempts = 0;
       const tryScroll = () => {
+        if (token !== activeToken) return;
         const el = document.getElementById(raw);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
-        if (attempts++ < 20) requestAnimationFrame(tryScroll);
+        if (attempts++ < 20) rafHandle = requestAnimationFrame(tryScroll);
       };
-      requestAnimationFrame(tryScroll);
+      rafHandle = requestAnimationFrame(tryScroll);
 
       if (clearTimer) clearTimeout(clearTimer);
       clearTimer = setTimeout(() => setHighlightedId(null), durationMs);
@@ -53,6 +62,7 @@ export function useHashHighlight(durationMs = 2200): string | null {
     return () => {
       window.removeEventListener('hashchange', activateFromHash);
       if (clearTimer) clearTimeout(clearTimer);
+      if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
     };
   }, [durationMs]);
 

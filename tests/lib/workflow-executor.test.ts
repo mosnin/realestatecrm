@@ -488,6 +488,32 @@ describe('runWorkflowsForEvent — trigger + enabled matching', () => {
     expect(summary).toEqual({ matched: 1, ran: 1 });
   });
 
+  it('does NOT count a condition-skipped run as a fire (ran excludes skipped)', async () => {
+    // The workflow matches the trigger type but its condition fails, so the run
+    // is 'skipped' — it matched but did no work, so it must not register as a
+    // fire (otherwise lastFiredAt / event-status would wrongly light up).
+    workflowRows.value = [
+      {
+        id: 'wf-skip',
+        spaceId: 'space-1',
+        trigger: { type: 'lead_created', config: {} },
+        conditions: { op: 'and', rules: [{ field: 'lead.score', operator: 'gt', value: 100 }] },
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    const summary = await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'lead_created',
+      context: { event: { type: 'lead_created' }, lead: { id: 'l-1', score: 50 } },
+      triggerEvent: {},
+    });
+
+    // Matched the trigger, but the run skipped on conditions → not a fire.
+    expect(summary).toEqual({ matched: 1, ran: 0 });
+  });
+
   it('reports ran:0 when no workflow matches the event', async () => {
     workflowRows.value = [
       {

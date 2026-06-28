@@ -444,9 +444,10 @@ function RoutineRow({
       className={cn(
         'group/row flex items-start gap-3 py-3 first:pt-0 transition-all scroll-mt-24',
         !routine.enabled && 'opacity-60',
-        // Deep-link flash from the activity feed.
+        // Deep-link flash from the activity feed. ring-inset keeps the flash
+        // within the row box so the divide-y divider stays aligned.
         highlighted &&
-          'rounded-xl bg-sky-50 ring-2 ring-sky-400/60 dark:bg-sky-950/30 -mx-2 px-2',
+          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
       )}
     >
       <div className="flex-1 min-w-0">
@@ -543,10 +544,11 @@ function RowAction({
   loading?: boolean;
   destructive?: boolean;
 }) {
-  // Icon-only square button. Label lives in aria + title so screen readers
-  // and hovering pointers still get the verb. Color is invisible by
-  // default and fades in on row hover — same vocabulary as memory-list's
-  // delete affordance.
+  // Icon-only square button. Label lives in aria + title so screen readers and
+  // hovering pointers still get the verb. Actions are ALWAYS visible — a
+  // hover-only reveal hid them entirely on touch/mobile (no hover state), so the
+  // Run/Edit/Delete affordances simply couldn't be found there. They sit at a
+  // quiet baseline and brighten on pointer hover. (Mirrors the workflow list.)
   return (
     <button
       type="button"
@@ -556,7 +558,7 @@ function RowAction({
       title={label}
       className={cn(
         'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
-        'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+        'text-muted-foreground/60 group-hover/row:text-muted-foreground/80',
         'transition-colors disabled:opacity-50',
         destructive
           ? 'hover:text-destructive hover:bg-destructive/10'

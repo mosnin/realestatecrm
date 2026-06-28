@@ -114,11 +114,16 @@ export async function PATCH(
     const workflow = await updateWorkflow(space.id, id, patch);
     if (!workflow) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // Best-effort: when the saved definition's trigger is an integration_event,
-    // heal any missing Composio subscription it depends on. Runs AFTER the
-    // response via after() so it never adds latency or breaks the save. after()
-    // throws outside a request scope (script/test) — guarded.
-    if (patch.definition?.trigger.type === 'integration_event') {
+    // Best-effort: heal any missing Composio subscription the space's
+    // integration_event workflows depend on. Runs AFTER the response via after()
+    // so it never adds latency or breaks the save. after() throws outside a
+    // request scope (script/test) — guarded. Two triggers:
+    //   - a saved integration_event definition (the slug may be newly curated);
+    //   - RE-ENABLING a workflow (enabled:true) — a previously-disabled
+    //     integration_event workflow whose subscription drifted while off would
+    //     otherwise silently never fire, and an enable toggle carries no
+    //     definition, so gating on definition alone misses the most common path.
+    if (patch.definition?.trigger.type === 'integration_event' || patch.enabled === true) {
       try {
         after(() => reconcileWorkflowTriggers(space.id));
       } catch {

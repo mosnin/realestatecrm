@@ -534,9 +534,11 @@ function WorkflowRow({
         'group/row flex flex-col gap-2 py-3 first:pt-0 transition-all scroll-mt-24',
         !workflow.enabled && 'opacity-60',
         // Deep-link flash: a feed link to this workflow scrolls it here and
-        // rings it for a couple of seconds so the jump is legible.
+        // rings it for a couple of seconds so the jump is legible. ring-inset +
+        // a rounded bg keep the flash WITHIN the row box so the divide-y divider
+        // stays aligned and nothing clips under an overflow-hidden ancestor.
         highlighted &&
-          'rounded-xl bg-sky-50 ring-2 ring-sky-400/60 dark:bg-sky-950/30 -mx-2 px-2',
+          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
       )}
     >
       <div className="flex items-start gap-3">
@@ -892,7 +894,9 @@ function RunHealthChip({ status }: { status: WorkflowRecord['lastRunStatus'] }) 
       icon: null,
     },
   } as const;
-  const { label, cls, icon: Icon } = map[status ?? 'new'];
+  // `?? map.new` guards an out-of-contract status (e.g. a future 'running')
+  // from indexing to undefined and throwing on destructure.
+  const { label, cls, icon: Icon } = map[status ?? 'new'] ?? map.new;
   return (
     <span
       className={cn(
