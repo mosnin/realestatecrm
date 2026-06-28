@@ -29,7 +29,9 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MiniMap,
   Position,
@@ -38,11 +40,14 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  getBezierPath,
   useEdgesState,
   useNodesState,
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeProps,
+  type EdgeTypes,
   type Node,
   type NodeChange,
   type NodeProps,
@@ -287,7 +292,42 @@ function NodeIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Human-readable one-liner for a WorkflowTrigger. */
+function buildTriggerLabel(trigger: WorkflowTrigger): string {
+  switch (trigger.type) {
+    case 'lead_created':
+      return 'New lead created';
+    case 'lead_score_threshold':
+      return `Lead score reaches ${trigger.config.min}`;
+    case 'inbound_message': {
+      const ch = trigger.config.channel;
+      return ch && ch !== 'any' ? `Inbound ${ch}` : 'Inbound message';
+    }
+    case 'tour_completed':
+      return 'Tour completed';
+    case 'deal_stage_changed':
+      return trigger.config.toStage
+        ? `Deal moves to "${trigger.config.toStage}"`
+        : 'Deal stage changed';
+    case 'integration_event': {
+      const tk = trigger.config.toolkit;
+      const ev = trigger.config.event
+        ? trigger.config.event.split('_').slice(1).join(' ').toLowerCase()
+        : '';
+      return tk && ev ? `${tk}: ${ev}` : tk || 'Integration event';
+    }
+    case 'schedule': {
+      const { cadence, hour } = trigger.config;
+      const timeStr = typeof hour === 'number' ? ` at ${hour}:00` : '';
+      return `${cadence.charAt(0).toUpperCase() + cadence.slice(1)}${timeStr}`;
+    }
+    default:
+      return 'Trigger';
+  }
+}
+
 function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
+  const label = (data.triggerLabel as string | undefined) ?? 'When this happens…';
   return (
     <div
       className={cn(
@@ -303,7 +343,7 @@ function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
         </span>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-600/80 dark:text-orange-400/80">Trigger</p>
-          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">When this happens…</p>
+          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">{label}</p>
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
@@ -386,6 +426,85 @@ function ActionNodeView({ data, selected }: NodeProps<CanvasNode>) {
   );
 }
 
+// ── Custom edge with "Add action" button ─────────────────────────────────────
+
+/**
+ * A bezier edge that shows a small + button at the midpoint. Clicking it calls
+ * the `onAddBetween` callback stored on the edge's data — the canvas wires this
+ * to `addNode('action')` so a realtor can insert a step inline without dragging
+ * from the toolbar. Read-only edges (data.readOnly = true) skip the button.
+ */
+function AddStepEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+  label,
+}: EdgeProps<CanvasEdge>) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetPosition,
+    targetX,
+    targetY,
+  });
+
+  const isReadOnly = (data as Record<string, unknown> | undefined)?.readOnly as boolean | undefined;
+  const onAdd = (data as Record<string, unknown> | undefined)?.onAddBetween as
+    | (() => void)
+    | undefined;
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{ strokeWidth: 2, stroke: 'hsl(var(--border))' }}
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute pointer-events-none"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 22}px)`,
+            }}
+          >
+            <span className="rounded-full bg-muted border border-border/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {String(label)}
+            </span>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+      {!isReadOnly && onAdd && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute pointer-events-all"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onAdd}
+              title="Add action here"
+              className="group flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground/60 shadow-sm transition-all hover:border-foreground/25 hover:text-foreground hover:scale-110"
+            >
+              <Plus size={11} aria-hidden />
+            </button>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const EDGE_TYPES: EdgeTypes = { default: AddStepEdge };
+
 const NODE_TYPES: NodeTypes = {
   trigger: TriggerNodeView,
   condition: ConditionNodeView,
@@ -424,15 +543,24 @@ function CanvasInner({
   // ran nodes carry their status, the rest dim — so the executed path lights up.
   const initial = useMemo(() => {
     const flow = graphToFlow(graph);
-    if (!highlights || Object.keys(highlights).length === 0) return flow;
-    return {
+    const triggerLabelStr = buildTriggerLabel(trigger);
+    const withTriggerLabel = {
       ...flow,
-      nodes: flow.nodes.map((n) => ({
+      nodes: flow.nodes.map((n) =>
+        n.data.kind === 'trigger'
+          ? { ...n, data: { ...n.data, triggerLabel: triggerLabelStr } }
+          : n,
+      ),
+    };
+    if (!highlights || Object.keys(highlights).length === 0) return withTriggerLabel;
+    return {
+      ...withTriggerLabel,
+      nodes: withTriggerLabel.nodes.map((n) => ({
         ...n,
         data: { ...n.data, highlight: highlights[n.id], dimmed: !highlights[n.id] },
       })),
     };
-  }, [graph, highlights]);
+  }, [graph, trigger, highlights]);
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(
     initial.nodes as CanvasNode[],
   );
@@ -710,12 +838,20 @@ function CanvasInner({
         >
           <ReactFlow<CanvasNode, CanvasEdge>
             nodes={nodes}
-            edges={edges}
+            edges={readOnly
+              ? edges
+              // Inject onAddBetween + readOnly into edge data so the custom
+              // edge can call addNode without prop-drilling through React-Flow.
+              : edges.map((e) => ({
+                  ...e,
+                  data: { ...e.data, onAddBetween: () => addNode('action'), readOnly: false },
+                }))}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             fitView
             proOptions={{ hideAttribution: true }}
             nodesDraggable={!readOnly}
