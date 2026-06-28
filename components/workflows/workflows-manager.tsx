@@ -44,6 +44,7 @@ import {
   UserPlus,
   Target,
   Plug,
+  Copy,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -277,6 +278,15 @@ export function WorkflowsManager() {
     setEditingId(null);
     setComposer('new');
     setActionError('');
+  }
+
+  function duplicateWorkflow(workflow: WorkflowRecord) {
+    const formState = recordToFormState(workflow);
+    setComposerInitial({ ...formState, name: `${formState.name} (copy)` });
+    setEditingId(null);
+    setComposer('new');
+    setActionError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function closeComposer() {
@@ -525,7 +535,7 @@ export function WorkflowsManager() {
           {/* Table container */}
           <div className="rounded-xl border border-border/60 overflow-hidden">
             {/* Table header */}
-            <div className="grid grid-cols-[1fr_160px_140px_60px_100px] border-b border-border/60 bg-muted/40 px-3 py-2">
+            <div className="grid grid-cols-[1fr_160px_140px_60px_128px] border-b border-border/60 bg-muted/40 px-3 py-2">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Workflow
               </span>
@@ -564,6 +574,7 @@ export function WorkflowsManager() {
                     onSave={(payload) => saveEdit(workflow.id, payload)}
                     onToggle={() => toggleWorkflow(workflow)}
                     onTest={() => testWorkflow(workflow.id)}
+                    onDuplicate={() => duplicateWorkflow(workflow)}
                     onDelete={() => deleteWorkflow(workflow.id)}
                   />
                 ))}
@@ -633,6 +644,7 @@ function WorkflowRow({
   onSave: _onSave,
   onToggle,
   onTest,
+  onDuplicate,
   onDelete,
 }: {
   workflow: WorkflowRecord;
@@ -646,6 +658,7 @@ function WorkflowRow({
   onSave: (payload: { name: string; definition: WorkflowDefinition }) => void;
   onToggle: () => void;
   onTest: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -694,7 +707,7 @@ function WorkflowRow({
       )}
     >
       {/* Main grid row */}
-      <div className="grid grid-cols-[1fr_160px_140px_60px_100px] items-center gap-0 px-3 py-2.5">
+      <div className="grid grid-cols-[1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
 
         {/* Col 1 — Name + summary */}
         <div className="min-w-0 pr-3">
@@ -793,6 +806,12 @@ function WorkflowRow({
                 onClick={onTest}
                 loading={testing}
                 disabled={busy}
+              />
+              <RowAction
+                icon={Copy}
+                label="Duplicate"
+                onClick={onDuplicate}
+                disabled={busy || testing}
               />
               <RowAction
                 icon={Pencil}
