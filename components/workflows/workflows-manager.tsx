@@ -1435,6 +1435,26 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-teal-100 dark:bg-teal-950/40',
     dot: 'text-teal-600 dark:text-teal-400',
   },
+  'offer-received': {
+    icon: TrendingUp,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'contract-signed-checklist': {
+    icon: CheckSquare,
+    accent: 'bg-green-100 dark:bg-green-950/40',
+    dot: 'text-green-600 dark:text-green-400',
+  },
+  'weekly-pipeline-review': {
+    icon: Sun,
+    accent: 'bg-yellow-100 dark:bg-yellow-950/40',
+    dot: 'text-yellow-600 dark:text-yellow-400',
+  },
+  'lead-gone-cold': {
+    icon: Target,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-600 dark:text-blue-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {
@@ -1562,8 +1582,13 @@ function TemplateGallery({
                     className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
                   >
                     {/* Icon area */}
-                    <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
+                    <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
                       <Icon size={32} className={meta.dot} aria-hidden />
+                      {template.popular && (
+                        <span className="absolute right-2.5 top-2.5 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          Popular
+                        </span>
+                      )}
                     </div>
                     {/* Text area */}
                     <div className="flex flex-1 flex-col gap-1.5 p-4">
@@ -1712,8 +1737,13 @@ function TemplatePicker({
                   onClick={() => onPick(cloneTemplateState(template))}
                   className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
                 >
-                  <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
+                  <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
                     <Icon size={24} className={meta.dot} aria-hidden />
+                    {template.popular && (
+                      <span className="absolute right-2 top-2 rounded-full bg-orange-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">
+                        Popular
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-1 flex-col gap-1 p-3">
                     <div className="flex items-center gap-2">

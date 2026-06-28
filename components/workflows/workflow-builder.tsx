@@ -1065,16 +1065,32 @@ export function WorkflowBuilder({
               {i > 0 && (
                 <div
                   className={cn(
-                    'flex flex-col items-center py-1',
+                    'group/insert flex flex-col items-center',
                     dragOver === i && dragSrcRef.current !== null && dragSrcRef.current !== i
                       ? 'py-0'
-                      : '',
+                      : 'py-0.5',
                   )}
                 >
                   {dragOver === i && dragSrcRef.current !== null && dragSrcRef.current !== i ? (
                     <div className="h-0.5 w-full rounded-full bg-orange-400" />
                   ) : (
-                    <div className="h-5 w-px bg-border/50" />
+                    <>
+                      <div className="h-2 w-px bg-border/50" />
+                      <button
+                        type="button"
+                        title="Insert a step here"
+                        aria-label="Insert a step here"
+                        onClick={() => {
+                          const next = [...state.actions];
+                          next.splice(i, 0, newActionRow());
+                          patch({ actions: next });
+                        }}
+                        className="flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground/50 opacity-0 transition-all hover:border-orange-400 hover:bg-orange-50 hover:text-orange-500 hover:opacity-100 group-hover/insert:opacity-100 dark:hover:bg-orange-950/30"
+                      >
+                        <Plus size={10} aria-hidden />
+                      </button>
+                      <div className="h-2 w-px bg-border/50" />
+                    </>
                   )}
                 </div>
               )}

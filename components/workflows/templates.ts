@@ -31,6 +31,8 @@ export interface WorkflowTemplate {
   description: string;
   /** Category shown in the gallery filter pills. */
   category: TemplateCategory;
+  /** Most-used templates surfaced with a "Popular" badge in the gallery. */
+  popular?: boolean;
   /** Pre-filled builder state. Cloned on pick so edits don't mutate the preset. */
   state: WorkflowFormState;
 }
@@ -91,6 +93,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'Hot lead → instant draft',
     description: 'When a new lead scores 80 or higher, draft a warm intro text.',
     category: 'New leads',
+    popular: true,
     state: {
       name: 'Hot lead → instant draft',
       trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
@@ -140,6 +143,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'Every weekday 8am → draft my morning follow-ups',
     description: 'Each weekday morning, draft check-ins for leads that have gone quiet.',
     category: 'Scheduling',
+    popular: true,
     state: {
       name: 'Every weekday 8am → draft my morning follow-ups',
       trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '8' },
@@ -189,6 +193,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'New lead → instant welcome',
     description: 'The moment a new lead comes in, draft a warm welcome text and create a follow-up task.',
     category: 'New leads',
+    popular: true,
     state: {
       name: 'New lead → instant welcome',
       trigger: { ...baseTrigger(), type: 'lead_created' },
@@ -277,6 +282,117 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'run_chippi',
           instruction:
             'A webhook just fired with a payload. Review what arrived and decide the best next action for this real estate contact.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'offer-received',
+    name: 'Offer received → notify + draft client message',
+    description: 'When a deal stage hits "offer", log a CRM note and draft an excited client update.',
+    category: 'Follow-up',
+    popular: true,
+    state: {
+      name: 'Offer received → notify + draft client message',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'offer' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Log a brief CRM note that an offer was received. Then draft an excited, warm message to the client explaining the next steps in the offer process.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Review offer details with client',
+          dueInDays: '1',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'contract-signed-checklist',
+    name: 'Contract signed → next-steps task list',
+    description: 'When a deal closes, automatically create a closing checklist and draft a congrats message.',
+    category: 'Follow-up',
+    state: {
+      name: 'Contract signed → next-steps task list',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'closed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a heartfelt congratulations message to the client on closing their deal. Keep it warm and personal.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Schedule key handover',
+          dueInDays: '3',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Send closing gift',
+          dueInDays: '7',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'weekly-pipeline-review',
+    name: 'Every Monday morning → pipeline briefing',
+    description: 'Each Monday, Chippi reviews your pipeline and drafts a prioritized action plan for the week.',
+    category: 'Scheduling',
+    state: {
+      name: 'Every Monday morning → pipeline briefing',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '7' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Review my entire lead pipeline. Identify who is most likely to transact soon, who has gone quiet, and who needs a nudge. Draft a short prioritized action plan for today — no fluff, just the top 3–5 things to do.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'lead-gone-cold',
+    name: 'Lead score drops → re-engagement message',
+    description: 'When a lead\'s score falls below 40, draft a gentle re-engagement check-in.',
+    category: 'Follow-up',
+    state: {
+      name: 'Lead score drops → re-engagement message',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '40' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'lte', '40')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a gentle, no-pressure check-in for this lead who has gone quiet. Ask if their search criteria have changed or if there is anything I can help with. Keep it short and human.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Re-engage cold lead',
+          dueInDays: '3',
         },
       ],
       autonomy: 'draft',
