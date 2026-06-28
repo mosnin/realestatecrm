@@ -59,6 +59,22 @@ export interface ExecuteActionOptions {
 }
 
 /**
+ * Sanitize entity-derived display text before it's interpolated into the agent
+ * instruction. The recipient name comes from attacker-controlled input (the
+ * public apply form / inbound payloads), so we strip newlines + control chars
+ * (which could smuggle a second "instruction"), collapse whitespace, and cap the
+ * length — defusing prompt injection while leaving clean names untouched.
+ */
+function sanitizeRecipientText(name: string): string {
+  return name
+    // eslint-disable-next-line no-control-regex -- intentionally stripping control chars (incl. newlines)
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
+/**
  * Best-effort display name for the contact/lead an action addresses, for
  * building the model instruction. Prefers a human name, falls back to an id, so
  * the agent always has SOMETHING to resolve the recipient from.
@@ -67,7 +83,11 @@ function describeRecipient(context: WorkflowContext): string {
   const entity = context.contact ?? context.lead ?? context.deal;
   if (entity && typeof entity === 'object') {
     const name = (entity as Record<string, unknown>).name;
-    if (typeof name === 'string' && name.trim()) return name.trim();
+    if (typeof name === 'string' && name.trim()) {
+      // Untrusted text → sanitize before it reaches the composed instruction.
+      const safe = sanitizeRecipientText(name);
+      if (safe) return safe;
+    }
     const id = (entity as Record<string, unknown>).id;
     if (typeof id === 'string' && id.trim()) return `contact ${id.trim()}`;
   }
@@ -257,6 +277,9 @@ async function runCallIntegration(
   }
 
   const { toolkit, action: integrationAction, params } = action.config;
+
+  // FOLLOW-UP: gate toolkit/integrationAction against an allowlist so an 'auto'
+  // workflow can only dispatch vetted (toolkit, action) pairs, not any Composio slug.
 
   // The Composio entity is the space owner's identity — resolve it the same way
   // the headless agent runner does. No owner → can't dispatch.

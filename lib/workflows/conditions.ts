@@ -98,15 +98,22 @@ function applyOperator(
     case 'lte':
       return numericCompare(resolved, operand, (a, b) => a <= b);
     case 'contains':
-      // Array membership, or substring when the field is string-like.
+      // Array membership, or substring when the field is string-like. A missing
+      // field is NOT a match — guard before String() coerces null/undefined to
+      // "null"/"undefined" (mirrors the NaN guard on numeric ops).
       if (Array.isArray(resolved)) return resolved.includes(operand);
+      if (resolved === null || resolved === undefined) return false;
       return String(resolved).includes(String(operand));
     case 'not_contains':
       if (Array.isArray(resolved)) return !resolved.includes(operand);
+      // A missing field does not contain the operand → not_contains is true.
+      if (resolved === null || resolved === undefined) return true;
       return !String(resolved).includes(String(operand));
     case 'starts_with':
+      if (resolved === null || resolved === undefined) return false;
       return String(resolved).startsWith(String(operand));
     case 'ends_with':
+      if (resolved === null || resolved === undefined) return false;
       return String(resolved).endsWith(String(operand));
     case 'in':
       return arrayIncludes(operand, resolved);

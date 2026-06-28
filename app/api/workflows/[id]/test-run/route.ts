@@ -95,6 +95,32 @@ function sampleContextFor(triggerType: TriggerType): WorkflowContext {
   }
 }
 
+/**
+ * Scrub an untrusted sampleContext override against the synthetic context. Only
+ * a plain object override is accepted (anything else falls back to the synthetic
+ * context). The caller's values are layered ON TOP of the synthetic context, but
+ * the entity ids (contact/lead/deal `.id`) are ALWAYS forced back to the
+ * synthetic 'sample' ids — a caller can shape the run's data but can never point
+ * it at an id it doesn't own.
+ */
+export function scrubSampleContext(override: unknown, synthetic: WorkflowContext): WorkflowContext {
+  if (!override || typeof override !== 'object' || Array.isArray(override)) {
+    return synthetic;
+  }
+  const merged: WorkflowContext = { ...synthetic, ...(override as Record<string, unknown>) };
+
+  // Re-pin entity ids to the synthetic sample id (or drop the id if the synthetic
+  // context had no such entity), so a caller-supplied id never reaches a write.
+  for (const key of ['contact', 'lead', 'deal'] as const) {
+    const overrideEntity = (override as Record<string, unknown>)[key];
+    if (overrideEntity && typeof overrideEntity === 'object' && !Array.isArray(overrideEntity)) {
+      const syntheticEntity = synthetic[key] as Record<string, unknown> | undefined;
+      merged[key] = { ...(overrideEntity as Record<string, unknown>), id: syntheticEntity?.id };
+    }
+  }
+  return merged;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -119,11 +145,14 @@ export async function POST(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
   // The caller may hand a full context to exercise specific condition branches;
-  // otherwise we synthesise one from the trigger type.
-  const context =
-    body.sampleContext && typeof body.sampleContext === 'object'
-      ? (body.sampleContext as WorkflowContext)
-      : sampleContextFor(stored.trigger.type);
+  // otherwise we synthesise one from the trigger type. SECURITY: a sampleContext
+  // override is untrusted request JSON, so we scrub it — the caller may override
+  // non-id fields, but the entity ids ALWAYS come from the synthetic 'sample'
+  // context, never from the request. This prevents a caller from pointing a run
+  // at a contact/lead/deal id they don't own (defense-in-depth: the run is also
+  // forced to autonomy='draft' below).
+  const synthetic = sampleContextFor(stored.trigger.type);
+  const context = scrubSampleContext(body.sampleContext, synthetic);
 
   // SAFETY: force drafts-only for the test regardless of the stored autonomy, so
   // a test-run never fires a real call_integration send (the action engine only

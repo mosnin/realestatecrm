@@ -111,6 +111,9 @@ async function handler(req: NextRequest) {
   const scheduled = (rows ?? []) as unknown as ScheduleWorkflowRow[];
 
   // ── 2. Keep only the ones due THIS hour ────────────────────────────────
+  // FOLLOW-UP: due-ness is computed purely from the current UTC hour, so a missed
+  // tick (cron outage) drops that hour's schedules. Persist a per-workflow
+  // last-fired watermark and catch up missed hours instead of relying on "this hour".
   const due = scheduled.filter((w) => {
     const config = w.trigger?.config;
     if (!config || typeof config.cadence !== 'string') return false;

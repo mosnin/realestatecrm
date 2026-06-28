@@ -29,9 +29,12 @@
  *                   pre-send) simply never sends — the SAFE failure: a missed
  *                   send, never a DUPLICATE real message to a client. (A future
  *                   stale-'sending' reclaim cron is a follow-up.)
- *                1. RATE LIMIT — checkRateLimit caps autonomous sends per space
- *                   per hour (AUTO_SEND_MAX/AUTO_SEND_WINDOW). Over the cap →
- *                   the row is DEFERRED (left 'pending'), retried next tick.
+ *                1. RATE LIMIT — AFTER a successful claim, count the ACTUAL
+ *                   ScheduledMessage rows this space already SENT in the last
+ *                   hour. At/over AUTO_SEND_MAX → RELEASE the claim ('sending'→
+ *                   'pending') and DEFER, retried next tick. Counting real sends
+ *                   (not Redis tokens) means a lost claim or a deferred row never
+ *                   spends from the budget — only a row that actually went out does.
  *                2. AUDIT — every send writes a ContactActivity row + an inbox
  *                   transcript entry (recordOutboundMessageSafe), and stamps the
  *                   ScheduledMessage.detail with deliveredTo + a sentAt anchor.
@@ -57,7 +60,6 @@ import { logger } from '@/lib/logger';
 import { runAutonomousInstruction } from '@/lib/agent/run-instruction';
 import { sendSMS } from '@/lib/sms';
 import { sendEmailFromCRM } from '@/lib/email';
-import { checkRateLimit } from '@/lib/rate-limit';
 import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { notifyDraftReady, notifyAutoSend } from '@/lib/notify';
 import type { InboxChannel } from '@/lib/types';
@@ -75,7 +77,7 @@ const MAX_PER_TICK = 200;
  * not the transport. Bucketed by spaceId so one tenant can't starve another.
  */
 const AUTO_SEND_MAX = 20;
-const AUTO_SEND_WINDOW_SECONDS = 60 * 60;
+const AUTO_SEND_WINDOW_MS = 60 * 60 * 1000;
 
 /** A due ScheduledMessage row, as the dispatcher needs it. */
 export interface DueScheduledMessage {
@@ -143,6 +145,47 @@ async function claimForSend(id: string): Promise<boolean> {
 }
 
 /**
+ * Release a claim we won but decided NOT to use (rate-limited): flip the row back
+ * 'sending'→'pending' so the next tick re-evaluates it. Guarded on the current
+ * status so we only revert a row we still own. Best-effort: a failed release
+ * leaves the row 'sending' (it'll be picked up by the stale-'sending' reclaim
+ * follow-up), which is the safe direction — never a send.
+ */
+async function releaseClaim(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('ScheduledMessage')
+    .update({ status: 'pending', updatedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'sending');
+  if (error) {
+    logger.warn('[scheduled-dispatch] claim release failed', { id }, error);
+  }
+}
+
+/**
+ * Count the ACTUAL autonomous sends a space made in the trailing window — the
+ * ScheduledMessage rows now marked 'sent' with a recent updatedAt. This is the
+ * rate-limit denominator: only real sends count, so a lost claim or a deferred
+ * row never inflates the budget, and no Redis token is spent speculatively.
+ */
+async function recentAutoSendCount(spaceId: string, now: Date): Promise<number> {
+  const since = new Date(now.getTime() - AUTO_SEND_WINDOW_MS).toISOString();
+  const { count, error } = await supabase
+    .from('ScheduledMessage')
+    .select('id', { count: 'exact', head: true })
+    .eq('spaceId', spaceId)
+    .eq('status', 'sent')
+    .gte('updatedAt', since);
+  if (error) {
+    // Can't establish the count → fail closed (treat as at the cap) so we DEFER
+    // rather than risk an over-the-cap blast.
+    logger.warn('[scheduled-dispatch] recent-send count failed — deferring', { spaceId }, error);
+    return AUTO_SEND_MAX;
+  }
+  return count ?? 0;
+}
+
+/**
  * DRAFT path (autonomy 'draft' and 'notify'). Hands the instruction to the
  * headless agent, which drafts (AgentDraft rows) and NEVER sends. For 'notify'
  * we also fire the realtor nudge. Returns the resulting status.
@@ -178,29 +221,17 @@ async function processDraft(row: DueScheduledMessage): Promise<'drafted' | 'fail
 }
 
 /**
- * AUTO path (autonomy 'auto'). Enforces the rate limit, resolves the recipient
- * contact within the space, CLAIMS the row, SENDS via the existing transports,
- * audits, and notifies. Returns 'sent', 'deferred' (rate-limited — left pending
- * for the next tick), 'skipped' (lost/declined the claim — see claimForSend), or
- * 'failed'.
+ * AUTO path (autonomy 'auto'). Resolves the recipient contact within the space,
+ * CLAIMS the row, then enforces the rate limit by counting ACTUAL recent sends —
+ * over the cap RELEASES the claim and defers. Otherwise SENDS via the existing
+ * transports, audits, and notifies. Returns 'sent', 'deferred' (rate-limited —
+ * claim released back to pending for the next tick), 'skipped' (lost the claim —
+ * see claimForSend), or 'failed'.
  */
-async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred' | 'skipped' | 'failed'> {
-  // RAIL 1 — rate limit. Over the cap → DEFER: leave the row 'pending' (do NOT
-  // touch status) so the next tick retries once the window rolls. A deferred
-  // send is fine; an over-the-cap blast is not.
-  const { allowed } = await checkRateLimit(
-    `scheduled-auto-send:${row.spaceId}`,
-    AUTO_SEND_MAX,
-    AUTO_SEND_WINDOW_SECONDS,
-  );
-  if (!allowed) {
-    logger.warn('[scheduled-dispatch] auto-send rate limit hit — deferring', {
-      spaceId: row.spaceId,
-      id: row.id,
-    });
-    return 'deferred';
-  }
-
+async function processAuto(
+  row: DueScheduledMessage,
+  now: Date,
+): Promise<'sent' | 'deferred' | 'skipped' | 'failed'> {
   // We must have a resolvable recipient to send. No recipient → fail closed
   // (never invent one).
   if (!row.recipientContactId) {
@@ -240,8 +271,9 @@ async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred
   // 'pending'), the due query excludes it from future ticks — so a crash between
   // the send and the terminal setStatus below can never re-send. A row stuck in
   // 'sending' (claimed, then crashed pre-send) will simply never send: acceptable —
-  // a missed send is safe; a duplicate real client message is not. (A stale-
-  // 'sending' reclaim cron is a follow-up.)
+  // a missed send is safe; a duplicate real client message is not.
+  // FOLLOW-UP: a stale-'sending' reclaim cron should re-pend rows stuck in
+  // 'sending' past a grace window (claimed then crashed pre-send).
   const claimed = await claimForSend(row.id);
   if (!claimed) {
     logger.warn('[scheduled-dispatch] auto-send claim lost — skipping (row already sending/claimed)', {
@@ -249,6 +281,21 @@ async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred
       id: row.id,
     });
     return 'skipped';
+  }
+
+  // RAIL 1 — rate limit, evaluated AFTER the claim against ACTUAL recent sends.
+  // At/over the cap → RELEASE the claim ('sending'→'pending') and DEFER, so the
+  // row retries next tick WITHOUT having consumed any budget. Counting real sent
+  // rows (not Redis tokens) means lost/deferred rows never inflate the cap.
+  const sentInWindow = await recentAutoSendCount(row.spaceId, now);
+  if (sentInWindow >= AUTO_SEND_MAX) {
+    logger.warn('[scheduled-dispatch] auto-send rate limit hit — releasing claim + deferring', {
+      spaceId: row.spaceId,
+      id: row.id,
+      sentInWindow,
+    });
+    await releaseClaim(row.id);
+    return 'deferred';
   }
 
   if (row.channel === 'email') {
@@ -338,10 +385,13 @@ async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred
  * Process one due row. Wrapped so any throw becomes a 'failed' row — one bad row
  * never aborts the batch. Returns the outcome bucket for the summary.
  */
-async function processRow(row: DueScheduledMessage): Promise<'drafted' | 'sent' | 'deferred' | 'skipped' | 'failed'> {
+async function processRow(
+  row: DueScheduledMessage,
+  now: Date,
+): Promise<'drafted' | 'sent' | 'deferred' | 'skipped' | 'failed'> {
   try {
     if (row.autonomy === 'auto') {
-      return await processAuto(row);
+      return await processAuto(row, now);
     }
     // 'draft' and 'notify' both draft; only 'notify' also nudges.
     return await processDraft(row);
@@ -377,7 +427,7 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
   // Sequential: the volume per tick is small, the agent drafting path is heavy,
   // and a per-space rate limit is easier to reason about without concurrency.
   for (const row of due) {
-    const outcome = await processRow(row);
+    const outcome = await processRow(row, now);
     summary[outcome] += 1;
   }
 

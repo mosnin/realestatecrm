@@ -155,6 +155,32 @@ describe('missing field is falsy', () => {
   });
 });
 
+describe('string ops short-circuit on missing fields (no "undefined"/"null" match)', () => {
+  const ctx = { s: 'hello world' };
+
+  it('contains / starts_with / ends_with on a MISSING field → false', () => {
+    // Without the guard, String(undefined) === 'undefined' would match 'und'.
+    expect(check(rule('missing', 'contains', 'und'), ctx)).toBe(false);
+    expect(check(rule('missing', 'starts_with', 'und'), ctx)).toBe(false);
+    expect(check(rule('missing', 'ends_with', 'ined'), ctx)).toBe(false);
+    // Same for a null-valued field (String(null) === 'null').
+    expect(check(rule('nul', 'contains', 'nul'), { nul: null })).toBe(false);
+    expect(check(rule('nul', 'starts_with', 'n'), { nul: null })).toBe(false);
+  });
+
+  it('not_contains on a MISSING field → true (a missing field contains nothing)', () => {
+    expect(check(rule('missing', 'not_contains', 'und'), ctx)).toBe(true);
+    expect(check(rule('nul', 'not_contains', 'nul'), { nul: null })).toBe(true);
+  });
+
+  it('defined-value string behavior is unchanged', () => {
+    expect(check(rule('s', 'contains', 'world'), ctx)).toBe(true);
+    expect(check(rule('s', 'not_contains', 'xyz'), ctx)).toBe(true);
+    expect(check(rule('s', 'starts_with', 'hello'), ctx)).toBe(true);
+    expect(check(rule('s', 'ends_with', 'world'), ctx)).toBe(true);
+  });
+});
+
 describe('nested AND / OR groups', () => {
   const ctx = { lead: { score: 80, type: 'buyer' }, channel: 'sms' };
 

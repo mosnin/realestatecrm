@@ -228,13 +228,14 @@ export interface RunWorkflowsForEventInput {
  * Entry point for the trigger-wiring pass: run every enabled workflow in the
  * space whose trigger fires for `triggerType`.
  *
- * Matching is plain trigger.type equality for now. (A 'lead_score_threshold'
- * workflow keying off the same lead event as 'lead_created' is a later
- * refinement — that needs the score from the event compared against
- * trigger.config.min; this pass keeps it to type equality so the contract is
- * obvious.) Runs are sequential — the volume per event is small and a workflow's
- * actions already bound themselves; sequential keeps the ordering deterministic
- * and avoids hammering the agent runner concurrently.
+ * Matching is trigger.type equality, plus a trigger-specific gate: a
+ * 'lead_score_threshold' workflow only runs when the event score meets the
+ * workflow's `trigger.config.min`. This `min` gate is the REAL enforcement of
+ * the threshold (workflow conditions remain an additional, independent filter);
+ * without it a lead_score_threshold workflow would fire on every scored lead.
+ * Runs are sequential — the volume per event is small and a workflow's actions
+ * already bound themselves; sequential keeps the ordering deterministic and
+ * avoids hammering the agent runner concurrently.
  */
 export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Promise<void> {
   const { data: rows, error } = await supabase
@@ -248,7 +249,29 @@ export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Pr
   }
 
   const workflows = (rows ?? []) as unknown as WorkflowRow[];
-  const matching = workflows.filter((w) => w.trigger?.type === input.triggerType);
+  let matching = workflows.filter((w) => w.trigger?.type === input.triggerType);
+
+  // Trigger-specific gate for lead_score_threshold: only run a workflow whose
+  // configured `min` is met by the event's score. The score rides on
+  // context.event.score (see app/api/public/apply/route.ts). This is the real
+  // enforcement of `min`; conditions are a further filter on top.
+  if (input.triggerType === 'lead_score_threshold') {
+    const rawScore = (input.context.event as Record<string, unknown> | undefined)?.score;
+    const score = typeof rawScore === 'number' ? rawScore : Number(rawScore);
+    // Score unknown / non-numeric → skip every threshold workflow: this gates
+    // auto-sends, so when we can't compare we fail closed rather than fire.
+    if (!Number.isFinite(score)) {
+      matching = [];
+    } else {
+      matching = matching.filter((w) => {
+        const rawMin = (w.trigger?.config as Record<string, unknown> | undefined)?.min;
+        // A malformed/missing min coerces to 0 (treat as "any score qualifies"),
+        // so a well-formed event still runs rather than silently dropping.
+        const min = typeof rawMin === 'number' ? rawMin : Number(rawMin) || 0;
+        return score >= min;
+      });
+    }
+  }
 
   for (const workflow of matching) {
     try {

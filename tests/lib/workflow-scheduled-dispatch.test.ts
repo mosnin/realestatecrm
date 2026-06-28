@@ -28,14 +28,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // (select.eq.lte.order.limit) resolves to `dueRows.value`; the Contact lookup
 // (select.eq.eq.maybeSingle) resolves to `contactRow.value`; the SpaceSetting
 // lookup resolves to `spaceSettingRow.value`.
-const { calls, dueRows, contactRow, spaceSettingRow, claimRows } = vi.hoisted(() => ({
-  calls: [] as Array<{ table: string; op: 'insert' | 'update'; payload: unknown; filters?: Array<[string, unknown]> }>,
+const { calls, dueRows, contactRow, spaceSettingRow, claimRows, recentSentCount } = vi.hoisted(() => ({
+  calls: [] as Array<{ table: string; op: 'insert' | 'update' | 'count'; payload: unknown; filters?: Array<[string, unknown]> }>,
   dueRows: { value: [] as unknown[] },
   contactRow: { value: null as unknown },
   spaceSettingRow: { value: null as unknown },
   // Rows the guarded claim UPDATE … .select('id') resolves to. Non-empty = the
   // 'pending'→'sending' flip won (claimed); empty = lost the claim (skipped).
   claimRows: { value: [{ id: 'claimed' }] as unknown[] },
+  // The count the recent-sent-count query resolves to (RAIL 1 denominator).
+  recentSentCount: { value: 0 },
 }));
 
 vi.mock('@/lib/supabase', () => {
@@ -62,13 +64,26 @@ vi.mock('@/lib/supabase', () => {
         };
         return chain;
       },
-      select: () => {
+      select: (_cols?: unknown, opts?: { count?: string; head?: boolean }) => {
+        // The recent-sent-count query (RAIL 1): select('id', { count, head })
+        // .eq.eq.gte → resolves { count, error }. Distinguished by the count opt.
+        if (opts && typeof opts === 'object' && 'count' in opts) {
+          calls.push({ table, op: 'count', payload: opts });
+          const countChain: Record<string, unknown> = {
+            eq: () => countChain,
+            gte: () => countChain,
+            then: (resolve: (v: { count: number; error: null }) => unknown) =>
+              resolve({ count: recentSentCount.value, error: null }),
+          };
+          return countChain;
+        }
         // A chain that is both thenable (the due-row list query) and exposes
         // maybeSingle (the Contact / SpaceSetting single-row lookups). Which
         // single-row source it returns is decided by `table`.
         const chain: Record<string, unknown> = {
           eq: () => chain,
           lte: () => chain,
+          gte: () => chain,
           order: () => chain,
           limit: () => chain,
           maybeSingle: () =>
@@ -98,11 +113,10 @@ vi.mock('@/lib/agent/run-instruction', () => ({
 }));
 
 // ── transports + helpers ─────────────────────────────────────────────────────
-const { sendSMSMock, sendEmailFromCRMMock, checkRateLimitMock, recordOutboundMock, notifyDraftReadyMock, notifyAutoSendMock } =
+const { sendSMSMock, sendEmailFromCRMMock, recordOutboundMock, notifyDraftReadyMock, notifyAutoSendMock } =
   vi.hoisted(() => ({
     sendSMSMock: vi.fn(),
     sendEmailFromCRMMock: vi.fn(),
-    checkRateLimitMock: vi.fn(),
     recordOutboundMock: vi.fn(),
     notifyDraftReadyMock: vi.fn(),
     notifyAutoSendMock: vi.fn(),
@@ -110,7 +124,6 @@ const { sendSMSMock, sendEmailFromCRMMock, checkRateLimitMock, recordOutboundMoc
 
 vi.mock('@/lib/sms', () => ({ sendSMS: sendSMSMock }));
 vi.mock('@/lib/email', () => ({ sendEmailFromCRM: sendEmailFromCRMMock }));
-vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMock }));
 vi.mock('@/lib/notify', () => ({
   notifyDraftReady: notifyDraftReadyMock,
@@ -127,14 +140,13 @@ beforeEach(() => {
   contactRow.value = null;
   spaceSettingRow.value = null;
   claimRows.value = [{ id: 'claimed' }]; // default: the claim succeeds (one row flipped).
+  recentSentCount.value = 0; // default: under the cap.
   runAutonomousInstructionMock.mockReset();
   runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, summary: 'drafted' });
   sendSMSMock.mockReset();
   sendSMSMock.mockResolvedValue(true);
   sendEmailFromCRMMock.mockReset();
   sendEmailFromCRMMock.mockResolvedValue(undefined);
-  checkRateLimitMock.mockReset();
-  checkRateLimitMock.mockResolvedValue({ allowed: true });
   recordOutboundMock.mockReset();
   recordOutboundMock.mockResolvedValue(null);
   notifyDraftReadyMock.mockReset();
@@ -166,6 +178,22 @@ function claimUpdates() {
       (c.payload as Record<string, unknown>).status === 'sending' &&
       (c.filters ?? []).some(([col, val]) => col === 'status' && val === 'pending'),
   );
+}
+
+/** The claim RELEASE: a status→'pending' update filtered on .eq('status','sending'). */
+function releaseUpdates() {
+  return calls.filter(
+    (c) =>
+      c.table === 'ScheduledMessage' &&
+      c.op === 'update' &&
+      (c.payload as Record<string, unknown>).status === 'pending' &&
+      (c.filters ?? []).some(([col, val]) => col === 'status' && val === 'sending'),
+  );
+}
+
+/** The recent-sent-count query (RAIL 1 denominator). */
+function countQueries() {
+  return calls.filter((c) => c.table === 'ScheduledMessage' && c.op === 'count');
 }
 
 const CONTACT = { id: 'contact-1', name: 'Jane', email: 'jane@example.com', phone: '+15551234567' };
@@ -291,8 +319,8 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     expect(updatesAtSendTime[0].status).toBe('sending');
     // The claim was guarded on the prior status (.eq('status','pending')).
     expect(claimUpdates()).toHaveLength(1);
-    // RAIL 1: rate limit checked.
-    expect(checkRateLimitMock).toHaveBeenCalledWith('scheduled-auto-send:space-1', 20, 60 * 60);
+    // RAIL 1: rate limit checked AFTER the claim via a recent-sent-count query.
+    expect(countQueries()).toHaveLength(1);
     // REAL SEND happened.
     expect(sendSMSMock).toHaveBeenCalledWith({ to: CONTACT.phone, body: 'Your tour is confirmed' });
     // No drafting on the auto path.
@@ -312,8 +340,8 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     expect(summary).toMatchObject({ sent: 1, drafted: 0, deferred: 0, failed: 0, skipped: 0 });
   });
 
-  it("'auto' over the rate limit → NOT sent, status untouched (deferred)", async () => {
-    checkRateLimitMock.mockResolvedValue({ allowed: false });
+  it("'auto' at/over the recent-send cap → claim RELEASED back to 'pending', NOT sent (deferred)", async () => {
+    recentSentCount.value = 20; // at the cap (AUTO_SEND_MAX).
     contactRow.value = CONTACT;
     dueRows.value = [
       { id: 'sm-4', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'hi', autonomy: 'auto' },
@@ -321,11 +349,31 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
 
     const summary = await dispatchDueScheduledMessages();
 
+    // The claim was taken, then the count gate tripped → release it.
+    expect(claimUpdates()).toHaveLength(1);
+    expect(countQueries()).toHaveLength(1);
+    expect(releaseUpdates()).toHaveLength(1);
+
     expect(sendSMSMock).not.toHaveBeenCalled();
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
-    // Deferred = left pending: no status update written.
-    expect(statusUpdates()).toHaveLength(0);
+    // No terminal 'sent'/'failed' write — the row is back to 'pending'.
+    expect(statusUpdates().some((u) => u.status === 'sent' || u.status === 'failed')).toBe(false);
     expect(summary).toMatchObject({ deferred: 1, sent: 0, failed: 0 });
+  });
+
+  it("'auto' under the cap → sends (the count gate lets it through)", async () => {
+    recentSentCount.value = 19; // under AUTO_SEND_MAX.
+    contactRow.value = CONTACT;
+    dueRows.value = [
+      { id: 'sm-4b', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'hi', autonomy: 'auto' },
+    ];
+
+    const summary = await dispatchDueScheduledMessages();
+
+    expect(countQueries()).toHaveLength(1);
+    expect(releaseUpdates()).toHaveLength(0);
+    expect(sendSMSMock).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ sent: 1, deferred: 0 });
   });
 
   it("'auto' whose claim flips zero rows → NOT sent, status untouched (skipped)", async () => {
@@ -342,6 +390,8 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
 
     // The claim was attempted (guarded), but lost.
     expect(claimUpdates()).toHaveLength(1);
+    // A lost claim does no rate-limit work — the count query is NOT run.
+    expect(countQueries()).toHaveLength(0);
     // No real send, no audit, no notify.
     expect(sendSMSMock).not.toHaveBeenCalled();
     expect(sendEmailFromCRMMock).not.toHaveBeenCalled();

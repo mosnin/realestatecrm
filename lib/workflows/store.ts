@@ -133,6 +133,8 @@ export async function updateWorkflow(
     update.actions = patch.definition.actions;
     update.autonomy = patch.definition.autonomy;
     // The definition shape changed — bump version so a run records which ran.
+    // FOLLOW-UP: the read-then-write version bump is non-atomic (two concurrent
+    // updates can compute the same next version). Move to an atomic increment.
     update.version = await nextVersion(spaceId, id);
   }
 
