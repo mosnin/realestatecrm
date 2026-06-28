@@ -50,7 +50,11 @@ import {
   type ConditionRowState,
   type WorkflowFormState,
 } from './build-definition';
-import { fieldsForTrigger } from './field-catalog';
+import {
+  attributesForTrigger,
+  findAttributeByField,
+  type ConditionAttribute,
+} from './field-catalog';
 import { summarizeFormState } from './form-summary';
 
 // ── Friendly labels for the schema's enums ───────────────────────────────────
@@ -193,8 +197,21 @@ export function emptyFormState(): WorkflowFormState {
   };
 }
 
-function newConditionRow(field = ''): ConditionRowState {
-  return { id: nextRowId('cond'), field, operator: 'eq', value: '' };
+/**
+ * A fresh condition row. When a trigger is given, default the row to that
+ * trigger's first attribute (field + that attribute's first operator) so a
+ * brand-new row lands in the human picker fully usable with zero typing. With
+ * no trigger (or no attributes) it falls back to a blank field, which renders
+ * in Advanced/custom mode.
+ */
+function newConditionRow(triggerType?: TriggerType): ConditionRowState {
+  const first = triggerType ? attributesForTrigger(triggerType)[0] : undefined;
+  return {
+    id: nextRowId('cond'),
+    field: first?.field ?? '',
+    operator: first?.operators[0] ?? 'eq',
+    value: '',
+  };
 }
 
 function newActionRow(): ActionRowState {
@@ -293,12 +310,6 @@ export function WorkflowBuilder({
   const [nameError, setNameError] = useState('');
   /** Connected-app trigger options for the integration_event picker. */
   const triggerOptions = useTriggerOptions();
-
-  const suggestedFields = useMemo(
-    () => fieldsForTrigger(state.trigger.type),
-    [state.trigger.type],
-  );
-  const fieldDatalistId = useMemo(() => nextRowId('fields'), []);
 
   function patch(next: Partial<WorkflowFormState>) {
     setState((s) => ({ ...s, ...next }));
@@ -442,7 +453,7 @@ export function WorkflowBuilder({
               <ConditionRowEditor
                 key={row.id}
                 row={row}
-                datalistId={fieldDatalistId}
+                triggerType={state.trigger.type}
                 onChange={(next) => updateCondition(row.id, next)}
                 onRemove={() =>
                   patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
@@ -454,19 +465,19 @@ export function WorkflowBuilder({
 
         <button
           type="button"
-          onClick={() => patch({ conditions: [...state.conditions, newConditionRow()] })}
+          onClick={() =>
+            patch({
+              conditions: [
+                ...state.conditions,
+                newConditionRow(state.trigger.type),
+              ],
+            })
+          }
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <Plus size={13} />
           Add condition
         </button>
-
-        {/* Shared field suggestions for every condition row. */}
-        <datalist id={fieldDatalistId}>
-          {suggestedFields.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
       </section>
 
       {/* Then ─────────────────────────────────────────────────────────────── */}
@@ -787,44 +798,127 @@ function IntegrationEventConfig({
 
 // ── Condition row ────────────────────────────────────────────────────────────
 
+/** Sentinel option for the attribute picker's escape hatch to a raw path. */
+const CUSTOM_ATTRIBUTE = '__custom__';
+
+/**
+ * One condition row, humanised. The row's stored shape stays
+ * { field, operator, value } strings — this is a pure UI layer over it.
+ *
+ * Two modes, chosen by whether the stored `field` maps to a catalog attribute:
+ *  - Human: an Attribute picker (friendly labels for the trigger), an Operator
+ *    select narrowed to that attribute's type, and a Value input typed to match
+ *    (number / enum select / text). The common path needs zero raw-path typing.
+ *  - Advanced/custom: when the field is an unknown path OR the realtor picks
+ *    "Custom field…", the original raw `field` text input returns alongside the
+ *    full operator list — the escape hatch so arbitrary dotted paths are never
+ *    lost or made un-editable.
+ */
 function ConditionRowEditor({
   row,
-  datalistId,
+  triggerType,
   onChange,
   onRemove,
 }: {
   row: ConditionRowState;
-  datalistId: string;
+  triggerType: TriggerType;
   onChange: (next: Partial<ConditionRowState>) => void;
   onRemove: () => void;
 }) {
+  const attributes = useMemo(() => attributesForTrigger(triggerType), [triggerType]);
+  const activeAttr = findAttributeByField(row.field);
+  // Custom when the field is blank or an unrecognised path. A blank field on a
+  // brand-new row only happens when the trigger has no attributes; new rows
+  // normally default into an attribute (see newConditionRow).
+  const [forcedCustom, setForcedCustom] = useState(false);
+  const isCustom = forcedCustom || activeAttr === null;
+
   const needsValue = !VALUELESS_OPERATORS.has(row.operator);
+
+  /** Switch the row to a chosen attribute, keeping operator/value valid. */
+  function selectAttribute(attr: ConditionAttribute) {
+    setForcedCustom(false);
+    const operatorValid = attr.operators.includes(row.operator);
+    const nextOperator = operatorValid ? row.operator : attr.operators[0];
+    // Clear the value when the new type can't honour the old string (a number
+    // attribute can't keep arbitrary text; an enum needs one of its options).
+    const keepValue =
+      attr.valueType === 'text' ||
+      (attr.valueType === 'enum' && attr.options?.some((o) => o.value === row.value)) ||
+      (attr.valueType === 'number' && /^-?\d*\.?\d*$/.test(row.value));
+    onChange({
+      field: attr.field,
+      operator: nextOperator,
+      ...(keepValue ? {} : { value: '' }),
+    });
+  }
+
+  const attributeSelectValue = isCustom ? CUSTOM_ATTRIBUTE : (activeAttr?.key ?? CUSTOM_ATTRIBUTE);
+  const operatorOptions = isCustom
+    ? OPERATORS
+    : (activeAttr?.operators ?? OPERATORS);
+
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-card p-2">
-      <Input
-        aria-label="Field"
-        list={datalistId}
-        value={row.field}
-        onChange={(e) => onChange({ field: e.target.value })}
-        placeholder="lead.score"
-        className="h-8 flex-1 min-w-[8rem]"
+      <MiniSelect
+        aria-label="Attribute"
+        value={attributeSelectValue}
+        onValueChange={(v) => {
+          if (v === CUSTOM_ATTRIBUTE) {
+            // Enter the escape hatch; keep the current field so the realtor
+            // edits the raw path rather than losing it.
+            setForcedCustom(true);
+            return;
+          }
+          const attr = attributes.find((a) => a.key === v);
+          if (attr) selectAttribute(attr);
+        }}
+        className="w-[11rem]"
+        options={[
+          ...attributes.map((a) => ({ value: a.key, label: a.label })),
+          { value: CUSTOM_ATTRIBUTE, label: 'Custom field…' },
+        ]}
       />
+
+      {isCustom && (
+        <Input
+          aria-label="Field"
+          value={row.field}
+          onChange={(e) => onChange({ field: e.target.value })}
+          placeholder="lead.score"
+          className="h-8 flex-1 min-w-[8rem]"
+        />
+      )}
+
       <MiniSelect
         aria-label="Operator"
         value={row.operator}
         onValueChange={(v) => onChange({ operator: v as Operator })}
         className="w-[9.5rem]"
-        options={OPERATORS.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+        options={operatorOptions.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
       />
-      {needsValue && (
-        <Input
-          aria-label="Value"
-          value={row.value}
-          onChange={(e) => onChange({ value: e.target.value })}
-          placeholder="80"
-          className="h-8 flex-1 min-w-[6rem]"
-        />
-      )}
+
+      {needsValue &&
+        (!isCustom && activeAttr?.valueType === 'enum' && activeAttr.options ? (
+          <MiniSelect
+            aria-label="Value"
+            value={row.value}
+            onValueChange={(v) => onChange({ value: v })}
+            className="flex-1 min-w-[6rem]"
+            options={activeAttr.options}
+          />
+        ) : (
+          <Input
+            aria-label="Value"
+            type={!isCustom && activeAttr?.valueType === 'number' ? 'number' : 'text'}
+            inputMode={!isCustom && activeAttr?.valueType === 'number' ? 'numeric' : undefined}
+            value={row.value}
+            onChange={(e) => onChange({ value: e.target.value })}
+            placeholder="80"
+            className="h-8 flex-1 min-w-[6rem]"
+          />
+        ))}
+
       <RemoveButton label="Remove condition" onClick={onRemove} />
     </li>
   );
