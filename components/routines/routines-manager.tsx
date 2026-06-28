@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import { timeAgo } from '@/lib/formatting';
+import { useHashHighlight } from '@/hooks/use-hash-highlight';
 
 type Cadence = 'hourly' | 'daily' | 'weekdays' | 'monthly' | 'custom';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -157,16 +159,6 @@ function hourOptions(): { value: number; label: string }[] {
     .map(({ value, label }) => ({ value, label }));
 }
 
-function formatRelative(iso: string): string {
-  const diffSec = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return diffSec >= 0 ? 'in a moment' : 'just now';
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute');
-  if (abs < 86_400) return rtf.format(Math.round(diffSec / 3600), 'hour');
-  return rtf.format(Math.round(diffSec / 86_400), 'day');
-}
-
 // ── Manager ──────────────────────────────────────────────────────────────────
 
 export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: string } = {}) {
@@ -179,6 +171,9 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
   const [busyId, setBusyId] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+
+  // Deep-link target: the activity feed links a routine_run to #routine-<id>.
+  const highlightedAnchor = useHashHighlight();
 
   useEffect(() => {
     let active = true;
@@ -358,6 +353,7 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
             <RoutineRow
               key={routine.id}
               routine={routine}
+              highlighted={highlightedAnchor === `routine-${routine.id}`}
               editing={editingId === routine.id}
               busy={busyId === routine.id}
               running={runningId === routine.id}
@@ -382,6 +378,7 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
 
 function RoutineRow({
   routine,
+  highlighted,
   editing,
   busy,
   running,
@@ -393,6 +390,7 @@ function RoutineRow({
   onDelete,
 }: {
   routine: Routine;
+  highlighted: boolean;
   editing: boolean;
   busy: boolean;
   running: boolean;
@@ -410,7 +408,7 @@ function RoutineRow({
     // chrome the realtor saw when they wrote it. The list rhythm picks
     // up again above and below.
     return (
-      <li className="py-3 first:pt-0">
+      <li id={`routine-${routine.id}`} className="scroll-mt-24 py-3 first:pt-0">
         <div className="rounded-xl border border-border/60 bg-card p-4">
           <RoutineComposer
             initial={{
@@ -429,16 +427,27 @@ function RoutineRow({
     );
   }
 
+  // Last-run outcome: a small status word plus the relative time it last fired.
+  // Null status (never run) reads as "New" — fresh and expected — to match the
+  // workflow list's voice, rather than a bare "—" that looks broken.
   const failed = routine.lastRunStatus === 'error';
-  const lastRun = routine.lastRunAt
-    ? `${failed ? 'Last run failed' : 'Ran'} ${formatRelative(routine.lastRunAt)}`
-    : null;
+  const runLabel =
+    routine.lastRunStatus === 'ok'
+      ? 'ran'
+      : routine.lastRunStatus === 'error'
+        ? 'failed'
+        : 'New';
 
   return (
     <li
+      id={`routine-${routine.id}`}
       className={cn(
-        'group/row flex items-start gap-3 py-3 first:pt-0 transition-opacity',
+        'group/row flex items-start gap-3 py-3 first:pt-0 transition-all scroll-mt-24',
         !routine.enabled && 'opacity-60',
+        // Deep-link flash from the activity feed. ring-inset keeps the flash
+        // within the row box so the divide-y divider stays aligned.
+        highlighted &&
+          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
       )}
     >
       <div className="flex-1 min-w-0">
@@ -448,20 +457,21 @@ function RoutineRow({
             <Repeat2 size={11} />
             {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
           </span>
-          {lastRun && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1',
-                  failed && 'text-amber-600 dark:text-amber-500',
-                )}
-              >
-                {failed && <AlertTriangle size={11} />}
-                {lastRun}
+          <span className="text-muted-foreground/40">·</span>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1',
+              failed && 'text-amber-600 dark:text-amber-500',
+            )}
+          >
+            {failed && <AlertTriangle size={11} />}
+            {runLabel}
+            {routine.lastRunAt && (
+              <span className="tabular-nums text-muted-foreground/70">
+                {timeAgo(routine.lastRunAt)}
               </span>
-            </>
-          )}
+            )}
+          </span>
           {!routine.enabled && (
             <>
               <span className="text-muted-foreground/40">·</span>
@@ -534,10 +544,11 @@ function RowAction({
   loading?: boolean;
   destructive?: boolean;
 }) {
-  // Icon-only square button. Label lives in aria + title so screen readers
-  // and hovering pointers still get the verb. Color is invisible by
-  // default and fades in on row hover — same vocabulary as memory-list's
-  // delete affordance.
+  // Icon-only square button. Label lives in aria + title so screen readers and
+  // hovering pointers still get the verb. Actions are ALWAYS visible — a
+  // hover-only reveal hid them entirely on touch/mobile (no hover state), so the
+  // Run/Edit/Delete affordances simply couldn't be found there. They sit at a
+  // quiet baseline and brighten on pointer hover. (Mirrors the workflow list.)
   return (
     <button
       type="button"
@@ -547,7 +558,7 @@ function RowAction({
       title={label}
       className={cn(
         'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
-        'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+        'text-muted-foreground/60 group-hover/row:text-muted-foreground/80',
         'transition-colors disabled:opacity-50',
         destructive
           ? 'hover:text-destructive hover:bg-destructive/10'

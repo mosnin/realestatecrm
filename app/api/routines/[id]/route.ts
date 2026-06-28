@@ -21,6 +21,10 @@ import {
 } from '@/lib/routines';
 
 export const runtime = 'nodejs';
+// "Run now" can fall back to the in-process runner (lib/routines fireInProcessRun)
+// inside after(), which blocks until the headless run finishes (~120s budget).
+// Raise the function budget so the run isn't cut off — mirrors /api/ai/task.
+export const maxDuration = 300;
 
 const SELECT =
   'id, instruction, cadence, hour, dayOfMonth, daysOfWeek, enabled, lastRunAt, lastRunStatus, nextRunAt, createdAt';

@@ -21,6 +21,9 @@ import {
 } from '@/lib/routines';
 
 export const runtime = 'nodejs';
+// Match the space-routine "Run now" budget: broker dispatch shares the
+// in-process fallback path, which blocks until the run finishes (~120s budget).
+export const maxDuration = 300;
 
 const SELECT =
   'id, instruction, cadence, hour, dayOfMonth, daysOfWeek, enabled, lastRunAt, lastRunStatus, nextRunAt, createdAt';

@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
+
+export const dynamic = 'force-dynamic';
 
 /**
- * /routines — legacy URL. Routines are configuration (how Chippi works,
- * not what Chippi did today) so it moved into Settings. Kept as a redirect
- * for bookmark safety.
+ * /routines → /automations. Workflows and Routines were unified into one
+ * "Automations" hub (the realtor holds one concept, not two). This redirect
+ * keeps old bookmarks and the activity feed's #routine-<id> deep-links working
+ * — the browser re-applies the fragment to the redirect target, and the hub
+ * renders the same routine rows (so the anchor still resolves there).
  */
 export default async function RoutinesRedirect({
   params,
@@ -12,8 +15,5 @@ export default async function RoutinesRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
-  if (!userId) redirect('/login/realtor');
-
-  redirect(`/s/${slug}/settings?tab=routines`);
+  redirect(`/s/${slug}/automations`);
 }

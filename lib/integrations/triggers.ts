@@ -38,6 +38,7 @@ import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
 import { recordInboundMessage } from '@/lib/inbox';
 import { normalizeEmail } from '@/lib/contact-dedup';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { CalendarProvider } from '@/lib/calendar/mirror';
 import type { IntegrationConnectionRow } from './connections';
 
@@ -322,7 +323,7 @@ interface ExtractedEvent {
  * Voice rule (instruction `action`): describe a JUDGMENT to make, not a
  * rulebook. The model knows the realtor's CRM and history.
  */
-const EXTRACTORS: Record<string, (p: Record<string, unknown>) => ExtractedEvent | null> = {
+export const EXTRACTORS: Record<string, (p: Record<string, unknown>) => ExtractedEvent | null> = {
   GMAIL_NEW_GMAIL_MESSAGE: (p) => {
     const subject = pickString(p, 'subject', 'messageSubject', 'message.subject');
     const from = pickString(p, 'sender', 'from', 'fromEmail', 'message.from');
@@ -812,6 +813,52 @@ function templateInstruction(
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 /**
+ * Subscribe ONE slug for a connection — the idempotent per-slug body that both
+ * connect-time registration and the workflow-trigger reconcile share. Creates
+ * the Composio trigger, then upserts the IntegrationTrigger row 'active'. A
+ * failure is logged and recorded as a 'failed' row (so a later reconcile sees we
+ * tried) and reported as 'failed' WITHOUT throwing — one bad slug never blocks
+ * the rest. The upsert is keyed on (connectionId, triggerSlug), so re-subscribing
+ * an already-active slug is a no-op-shaped overwrite.
+ */
+export async function subscribeSlug(
+  connection: IntegrationConnectionRow,
+  slug: string,
+): Promise<'ok' | 'failed'> {
+  try {
+    const { triggerId } = await createTrigger({
+      entityId: connection.userId,
+      slug,
+      connectedAccountId: connection.composioConnectionId,
+    });
+    const ok = await upsertTriggerRow({
+      connectionId: connection.id,
+      triggerSlug: slug,
+      composioTriggerId: triggerId,
+      status: 'active',
+    });
+    return ok ? 'ok' : 'failed';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('[integrations.triggers] registration failed', {
+      toolkit: connection.toolkit,
+      slug,
+      connectionId: connection.id,
+      err: message,
+    });
+    // Record the failure so a later reconcile can see we tried.
+    await upsertTriggerRow({
+      connectionId: connection.id,
+      triggerSlug: slug,
+      composioTriggerId: null,
+      status: 'failed',
+      lastError: message,
+    });
+    return 'failed';
+  }
+}
+
+/**
  * Register every curated trigger for a freshly-active connection.
  *
  * Called from the OAuth callback AFTER `upsertByComposioId` confirms the
@@ -837,38 +884,9 @@ export async function registerForConnection(args: {
   let failed = 0;
 
   for (const slug of slugs) {
-    try {
-      const { triggerId } = await createTrigger({
-        entityId: args.connection.userId,
-        slug,
-        connectedAccountId: args.connection.composioConnectionId,
-      });
-      const ok = await upsertTriggerRow({
-        connectionId: args.connection.id,
-        triggerSlug: slug,
-        composioTriggerId: triggerId,
-        status: 'active',
-      });
-      if (ok) registered++;
-      else failed++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.warn('[integrations.triggers] registration failed', {
-        toolkit: args.connection.toolkit,
-        slug,
-        connectionId: args.connection.id,
-        err: message,
-      });
-      // Record the failure so a later reconcile can see we tried.
-      await upsertTriggerRow({
-        connectionId: args.connection.id,
-        triggerSlug: slug,
-        composioTriggerId: null,
-        status: 'failed',
-        lastError: message,
-      });
-      failed++;
-    }
+    const outcome = await subscribeSlug(args.connection, slug);
+    if (outcome === 'ok') registered++;
+    else failed++;
   }
 
   if (registered > 0 || failed > 0) {
@@ -1289,7 +1307,14 @@ export async function dispatchTrigger(args: {
   connection: IntegrationConnectionRow;
   payload: Record<string, unknown> | undefined;
   deliveryId?: string;
-}): Promise<{ dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop'; reason?: string }> {
+}): Promise<{
+  dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop';
+  reason?: string;
+  /** How many enabled workflows this delivery actually fired. A delivery can
+   *  drive a workflow even when its dispatch kind is a no-op (no DRAFT handler),
+   *  so callers stamp lastFiredAt on `dispatched !== 'noop' || workflowsRan > 0`. */
+  workflowsRan: number;
+}> {
   // Inbound calendar sync FIRST — correct the CRM Tour (cancel/move/RSVP) for
   // calendar event-change slugs before the kind-based routing drafts any
   // guest-facing follow-up. State-based idempotent + best-effort, so an
@@ -1316,13 +1341,53 @@ export async function dispatchTrigger(args: {
     });
   }
 
+  // Workflow dispatch — fire-and-forget, AFTER the inbound captures/sync above
+  // and BEFORE the kind-based routing returns so it runs for EVERY delivery
+  // regardless of dispatch kind. STRICTLY best-effort: any failure is logged
+  // and swallowed; this never throws out of dispatchTrigger and never changes
+  // the dispatch outcome the receiver depends on.
+  //
+  // runWorkflowsForEvent now narrows on toolkit + event slug (it reads
+  // context.event.toolkit/event below), so a workflow keyed to a specific event
+  // is only evaluated for that event's deliveries — no longer "every
+  // integration_event workflow on every delivery".
+  let workflowsRan = 0;
+  try {
+    const wfResult = await runWorkflowsForEvent({
+      spaceId: args.connection.spaceId,
+      triggerType: 'integration_event',
+      context: {
+        event: {
+          type: 'integration_event',
+          toolkit: args.connection.toolkit,
+          event: args.triggerSlug,
+          deliveryId: args.deliveryId ?? '',
+          payload: args.payload ?? {},
+        },
+      },
+      triggerEvent: {
+        slug: args.triggerSlug,
+        toolkit: args.connection.toolkit,
+        deliveryId: args.deliveryId ?? '',
+        payload: args.payload ?? {},
+      },
+    });
+    workflowsRan = wfResult.ran;
+  } catch (err) {
+    logger.error(
+      '[integrations.triggers] workflow dispatch failed (non-fatal)',
+      { slug: args.triggerSlug, connectionId: args.connection.id },
+      err,
+    );
+  }
+
   const kind: TriggerKind | undefined = TRIGGER_DISPATCH[args.triggerSlug];
   if (!kind) {
     logger.info('[integrations.triggers] no dispatch handler — dropping', {
       slug: args.triggerSlug,
       connectionId: args.connection.id,
     });
-    return { dispatched: 'noop', reason: 'no_dispatch' };
+    return { dispatched: 'noop', reason: 'no_dispatch', workflowsRan };
   }
 
   if (kind === 'DRAFT') {
@@ -1332,7 +1397,7 @@ export async function dispatchTrigger(args: {
         slug: args.triggerSlug,
         connectionId: args.connection.id,
       });
-      return { dispatched: 'noop', reason: 'thin_payload' };
+      return { dispatched: 'noop', reason: 'thin_payload', workflowsRan };
     }
     // Prepend a structured trigger tag so the Modal autonomous-mode
     // detector can tell this run from a chat turn. Without it, the
@@ -1355,7 +1420,7 @@ export async function dispatchTrigger(args: {
       args.connection.userId,
       triggerSource,
     );
-    return { dispatched: 'DRAFT' };
+    return { dispatched: 'DRAFT', workflowsRan };
   }
 
   // NOTICE and DATA_SYNC paths are wired to no-ops for v1 — the dispatch
@@ -1367,7 +1432,7 @@ export async function dispatchTrigger(args: {
     kind,
     connectionId: args.connection.id,
   });
-  return { dispatched: 'noop', reason: 'unwired_kind' };
+  return { dispatched: 'noop', reason: 'unwired_kind', workflowsRan };
 }
 
 // ─── DB helpers ──────────────────────────────────────────────────────────────

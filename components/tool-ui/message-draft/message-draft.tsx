@@ -9,7 +9,12 @@ import type {
 } from "./schema";
 import { ActionButtons } from "../shared/action-buttons";
 import type { Action } from "../shared/schema";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  checkFairHousing,
+  protectedClassLabel,
+  type FairHousingResult,
+} from "@/lib/fair-housing";
 
 type DraftState = "review" | "sending" | "sent" | "cancelled";
 type DraftOutcome = MessageDraftProps["outcome"];
@@ -239,6 +244,61 @@ function formatSentTime(date: Date): string {
   });
 }
 
+/**
+ * Visible fair-housing review on a draft, shown while the realtor is deciding
+ * whether to send. Turns the scariest part of automated outreach into a trust
+ * signal: a clean draft shows a quiet "✓ reviewed", a risky one teaches exactly
+ * what to change before it goes out. Advisory only — never blocks Send.
+ */
+function FairHousingNotice({ review }: { review: FairHousingResult }) {
+  const high = review.findings.filter((f) => f.severity === "high");
+  const medium = review.findings.filter((f) => f.severity === "medium");
+
+  if (review.findings.length === 0) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-500" aria-hidden />
+        Reviewed — no fair-housing concerns.
+      </div>
+    );
+  }
+
+  const tone = high.length > 0;
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2 text-xs",
+        tone
+          ? "border-amber-400/50 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-950/30"
+          : "border-border/60 bg-muted/30",
+      )}
+      role="status"
+    >
+      <div
+        className={cn(
+          "flex items-center gap-1.5 font-medium",
+          tone ? "text-amber-700 dark:text-amber-400" : "text-foreground/80",
+        )}
+      >
+        <ShieldAlert className="size-3.5" aria-hidden />
+        {tone
+          ? `Fair-housing check — ${high.length} to review before sending`
+          : "Fair-housing note"}
+      </div>
+      <ul className="mt-1.5 space-y-1.5">
+        {[...high, ...medium].map((f, i) => (
+          <li key={i} className="leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground/80">“{f.phrase}”</span>{" "}
+            <span className="text-muted-foreground/70">({protectedClassLabel(f.protectedClass)})</span>
+            <br />
+            {f.message}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function resolveStateFromOutcome(outcome: DraftOutcome): DraftState {
   if (outcome === "sent") return "sent";
   if (outcome === "cancelled") return "cancelled";
@@ -425,6 +485,18 @@ export function MessageDraft(props: MessageDraftProps) {
     },
   ];
 
+  // Fair-housing review of the draft's own words (subject + body for email,
+  // body for Slack). Memoized on the text so it only recomputes when the draft
+  // changes. Shown only while reviewing — once sent/cancelled it's moot.
+  const reviewText =
+    props.channel === "email"
+      ? `${props.subject ?? ""}\n${props.body ?? ""}`
+      : (props.body ?? "");
+  const fairHousing = React.useMemo(
+    () => checkFairHousing(reviewText),
+    [reviewText],
+  );
+
   const expandButton = needsExpansion ? (
     <Button
       variant="ghost"
@@ -504,6 +576,8 @@ export function MessageDraft(props: MessageDraftProps) {
 
         {expandButton}
       </div>
+
+      {state === "review" && <FairHousingNotice review={fairHousing} />}
 
       <div className="@container/actions">{renderActions()}</div>
     </article>

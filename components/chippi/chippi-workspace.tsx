@@ -224,6 +224,14 @@ export function ChippiWorkspace({
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
   const effectiveIsSplit = !isBroker && isSplit;
+  // True only while the divider is being dragged. The right panel is an iframe,
+  // which would otherwise swallow the mousemove events the drag listeners need —
+  // so during a drag we shield it with pointer-events:none and the handle keeps
+  // tracking the cursor instead of "getting stuck". The callbacks are stable so
+  // the handle's listener effect doesn't tear down/re-add on every drag frame.
+  const [isResizingSplit, setIsResizingSplit] = useState(false);
+  const handleSplitDragStart = useCallback(() => setIsResizingSplit(true), []);
+  const handleSplitDragEnd = useCallback(() => setIsResizingSplit(false), []);
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -1617,22 +1625,30 @@ export function ChippiWorkspace({
 
         </div>{/* end left panel */}
 
-        {/* Right panel — visible only when split */}
+        {/* Right panel — visible only when split. The divider renders instantly;
+            the panel is wrapped in AnimatePresence (with a stable key) so its
+            enter/exit actually run and a rapid toggle can't strand it mid-slide. */}
         {effectiveIsSplit && (
-          <>
-            <PanelResizeHandle
-              onResize={setLeftWidthPercent}
-              containerRef={containerRef}
-              currentLeftWidth={leftWidthPercent}
-            />
+          <PanelResizeHandle
+            onResize={setLeftWidthPercent}
+            containerRef={containerRef}
+            currentLeftWidth={leftWidthPercent}
+            onDragStart={handleSplitDragStart}
+            onDragEnd={handleSplitDragEnd}
+          />
+        )}
+        <AnimatePresence initial={false}>
+          {effectiveIsSplit && (
             <RightPanel
+              key="chippi-right-panel"
               slug={slug}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
+              isResizing={isResizingSplit}
             />
-          </>
-        )}
+          )}
+        </AnimatePresence>
       </div>{/* end split panel container */}
 
     </div>

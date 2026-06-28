@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Phone, Mail, ChevronRight, MessageCircle } from 'lucide-react';
+import { Phone, Mail, MessageCircle, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
@@ -95,41 +95,61 @@ export function TodayFocus({ slug }: { slug: string }) {
           initial="initial"
           animate="enter"
         >
-          {data.items.slice(0, 6).map((item) => (
-            <motion.div key={item.contactId} variants={STAGGER_ITEM}>
-              <Link
-                href={`/s/${slug}/contacts/${item.contactId}`}
-                className="group/row flex items-center gap-3 py-3 first:pt-4 last:pb-0 hover:bg-muted/20 -mx-3 px-3 rounded-lg transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400">
-                  {item.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
-                    {item.leadScore >= HOT_LEAD_THRESHOLD && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400">
-                        <MessageCircle size={10} />
-                        hot
-                      </span>
-                    )}
+          {data.items.slice(0, 6).map((item) => {
+            // One-tap action: prefill the composer with an outreach instruction
+            // for this person. `?prefill=` populates the box but NEVER auto-sends
+            // — the realtor still reads, tweaks, and approves. Turns "who to
+            // reach" from a list of links into the day's work, ready to act on.
+            const draftHref = `/s/${slug}/chippi?prefill=${encodeURIComponent(
+              `Draft a friendly outreach message to ${item.name}.`,
+            )}`;
+            return (
+              <motion.div key={item.contactId} variants={STAGGER_ITEM}>
+                <div className="group/row flex items-center gap-3 py-3 first:pt-4 last:pb-0 hover:bg-muted/20 -mx-3 px-3 rounded-lg transition-colors">
+                  <Link
+                    href={`/s/${slug}/contacts/${item.contactId}`}
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                      {item.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
+                        {item.leadScore >= HOT_LEAD_THRESHOLD && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400">
+                            <MessageCircle size={10} />
+                            hot
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{item.reason}</p>
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="hidden sm:flex items-center gap-1 text-muted-foreground/70">
+                      {item.hasPhone && <Phone size={11} />}
+                      {item.hasEmail && <Mail size={11} />}
+                    </span>
+                    {/* Always visible (no hover-only — the mobile realtor has no
+                        hover), so the day's first action is one tap away. */}
+                    <Link
+                      href={draftHref}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
+                        'text-[12px] font-medium transition-colors',
+                        'bg-foreground/[0.05] text-foreground/80 hover:bg-foreground/[0.08] hover:text-foreground',
+                      )}
+                      aria-label={`Draft a message to ${item.name}`}
+                    >
+                      <SquarePen size={12} aria-hidden />
+                      Draft
+                    </Link>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{item.reason}</p>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
-                  {item.hasPhone && <Phone size={11} />}
-                  {item.hasEmail && <Mail size={11} />}
-                  <ChevronRight
-                    size={13}
-                    className={cn(
-                      'transition-opacity ml-1',
-                      'opacity-0 group-hover/row:opacity-60',
-                    )}
-                  />
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </motion.div>
       )}
     </section>

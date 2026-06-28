@@ -232,6 +232,27 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     label: 'Agent↔Modal auth — agent callbacks 503 without AGENT_INTERNAL_SECRET',
     keys: ['AGENT_INTERNAL_SECRET'],
   },
+  // Background-execution prerequisites. Each is optional (CI/preview boot
+  // without them) but a real deploy that lacks them sees the feature fail
+  // SILENTLY: routines stamp 'error' with no dispatch, integration triggers
+  // never fire, chat never offloads to Modal. Warned individually so the gap
+  // is visible in the boot log instead of being discovered by "it doesn't work".
+  {
+    label: 'Autonomous runs (routines / triggers / sweeps) — inert without the Modal webhook URL',
+    keys: ['MODAL_WEBHOOK_URL'],
+  },
+  {
+    label: 'Background chat executor — chat stays in-process (no detached run) without MODAL_CHAT_URL',
+    keys: ['MODAL_CHAT_URL'],
+  },
+  {
+    label: 'Integration triggers (Composio → Inngest) — background app events never fire without the Inngest keys',
+    keys: ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'],
+  },
+  {
+    label: 'Composio integrations — connecting apps and receiving triggers needs COMPOSIO_API_KEY',
+    keys: ['COMPOSIO_API_KEY'],
+  },
 ];
 
 function validateEnv(): Env {

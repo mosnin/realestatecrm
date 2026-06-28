@@ -85,6 +85,36 @@ export async function POST(req: NextRequest) {
 
   const payload = verified.payload;
 
+  // ── Shape guard ───────────────────────────────────────────────────────
+  // The SDK Zod-parses the delivery during verifyWebhook, so a verified
+  // payload SHOULD carry every field below. But normalization across webhook
+  // versions (V1/V2/V3) is the SDK's, not ours — a version skew or a future
+  // SDK change could yield a payload missing a nested field, and the dispatch
+  // path reaches deep (payload.metadata.connectedAccount.id). Without this
+  // guard that surfaces as an opaque "Cannot read properties of undefined"
+  // 500 with no clue which field. Validate the fields we depend on up front
+  // and fail loud + diagnosable instead. Return 400 (not 500): a malformed
+  // shape won't fix itself on Composio's retry, so don't invite a retry storm.
+  const connectedAccountId = payload?.metadata?.connectedAccount?.id;
+  const missing: string[] = [];
+  if (!payload?.id) missing.push('id');
+  if (!payload?.triggerSlug) missing.push('triggerSlug');
+  if (!payload?.userId) missing.push('userId');
+  if (!payload?.metadata?.id) missing.push('metadata.id');
+  if (!connectedAccountId) missing.push('metadata.connectedAccount.id');
+  if (missing.length > 0) {
+    logger.error('[composio-webhook] verified payload missing required fields', {
+      webhookId,
+      version: verified.version,
+      missing,
+      triggerSlug: payload?.triggerSlug ?? null,
+    });
+    return NextResponse.json(
+      { error: 'malformed_payload', missing },
+      { status: 400 },
+    );
+  }
+
   // ── Dedupe ────────────────────────────────────────────────────────────
   // Composio retries on non-2xx. We also have Inngest's at-least-once
   // delivery inside the handler. The first hop's dedupe key uses Composio's
@@ -105,7 +135,7 @@ export async function POST(req: NextRequest) {
   // Per-(connectedAccount, slug) per-hour. A chatty source can't burn
   // through Modal. Above the cap we drop with a log — the dedupe key is
   // already claimed so a Composio retry won't bypass this either.
-  const connectedAccountId = payload.metadata.connectedAccount.id;
+  // connectedAccountId was validated non-empty by the shape guard above.
   const hourBucket = Math.floor(Date.now() / 1000 / RATE_WINDOW_SECONDS);
   const rateKey = `composio:trigger:rate:${connectedAccountId}:${payload.triggerSlug}:${hourBucket}`;
   const count = (await redis.incr(rateKey)) as number;

@@ -55,9 +55,18 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/chippi/brief', label: 'Brief' },
       { href: '/chippi/inbox', label: 'Inbox' },
-      { href: '/chippi/history', label: 'Activity' },
-      { href: '/chippi/triggers', label: 'Integrations' },
-      { href: '/routines', label: 'Routines' },
+      // Activity = the ONE unified, filterable timeline (/chippi/activity) that
+      // merges Chippi's own actions with the cross-app events it noticed —
+      // replacing the old split between /chippi/history (actions) and
+      // /chippi/triggers (events). Per-app trigger management still lives on
+      // /chippi/triggers (linked from the Activity page header), so the live
+      // feed is subsumed without losing the listen on/off toggles.
+      // Integrations = the connect/disconnect management surface.
+      { href: '/chippi/activity', label: 'Activity' },
+      { href: '/chippi/integrations', label: 'Integrations' },
+      // Workflows (when something happens) + Routines (on a schedule) unified
+      // into one concept: standing orders Chippi runs on its own.
+      { href: '/automations', label: 'Automations' },
     ],
   },
   {

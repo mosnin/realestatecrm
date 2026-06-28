@@ -9,11 +9,11 @@ import { NotificationsSection } from './notifications-section';
 import { BriefSection } from './brief-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntakeTrustSignalsForm } from './intake-trust-signals-form';
+import { TrackingPixelsForm } from './tracking-pixels-form';
 import { YourDataSection } from './your-data-section';
 import { McpSection, TemplatesSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { MemoryList } from '@/components/chippi/memory-list';
-import { RoutinesManager } from '@/components/routines/routines-manager';
 import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { UsageSection } from '@/components/settings/usage-section';
 import { cn } from '@/lib/utils';
@@ -39,9 +39,9 @@ import {
  *   Privacy      notifications + legal + compliance + fair-housing notice
  *   Developer    MCP + API keys + usage (per-tool cost breakdown)
  *
- * Memory and Routines moved here from the Chippi dropdown — they describe
- * how Chippi WORKS, not what Chippi did today. The daily dropdown is for
- * daily surfaces; configuration belongs in Settings.
+ * Memory lives here because it describes how Chippi WORKS, not what Chippi did
+ * today. (Routines used to live here too; they unified into the /automations
+ * hub alongside Workflows — one home for everything Chippi runs on its own.)
  *
  * Tab state lives in `?tab=...` so the URL stays shareable, sub-route
  * redirects resolve cleanly, and back-button history works. Each render
@@ -54,7 +54,6 @@ const TABS = [
   { id: 'you', label: 'You' },
   { id: 'connections', label: 'Connections' },
   { id: 'memory', label: 'Memory' },
-  { id: 'routines', label: 'Routines' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'developer', label: 'Developer' },
 ] as const;
@@ -87,6 +86,10 @@ function resolveLegacyTab(
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=privacy` };
     case 'usage':
       return { kind: 'redirect', to: `/s/${slug}/settings?tab=developer` };
+    case 'routines':
+      // Routines unified into the /automations hub — an old ?tab=routines
+      // bookmark lands there instead of a now-removed settings tab.
+      return { kind: 'redirect', to: `/s/${slug}/automations` };
     default:
       return null;
   }
@@ -338,22 +341,6 @@ export default async function SettingsPage({
         </div>
       )}
 
-      {/* Routines — the realtor's standing instructions for Chippi. Read
-          and write through /api/routines; the hourly cron at
-          /api/cron/routines fires them. Nothing goes out without the
-          realtor's tap. */}
-      {activeTab === 'routines' && (
-        <div className="space-y-12">
-          <section className="space-y-5">
-            <p className={SECTION_LABEL}>Routines</p>
-            <p className={BODY_MUTED}>
-              What I run on a schedule. Nothing goes out without your tap.
-            </p>
-            <RoutinesManager />
-          </section>
-        </div>
-      )}
-
       {/* Privacy — notifications, legal URL, license, fair-housing notice.
           Everything compliance-flavored and everything that determines what
           reaches the realtor. */}
@@ -394,6 +381,20 @@ export default async function SettingsPage({
               licenseNumber={settings?.intakeLicenseNumber ?? ''}
               fairHousingNotice={settings?.intakeFairHousingNotice ?? ''}
               showEqualHousingMark={settings?.intakeShowEqualHousingMark ?? false}
+            />
+          </section>
+          <section
+            id="tracking-pixels"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Tracking &amp; analytics</p>
+            <p className={BODY_MUTED}>
+              Optional. Add your own ad-platform pixels to the public intake form
+              so you can measure and retarget the leads you send there.
+            </p>
+            <TrackingPixelsForm
+              slug={space.slug}
+              initialPixels={settings?.trackingPixels ?? null}
             />
           </section>
           <section

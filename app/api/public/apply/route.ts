@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
@@ -13,6 +13,7 @@ import {
   normalizePhone,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
@@ -709,6 +710,62 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       logger.error('[apply] agent trigger failed (non-fatal)', { contactId: contact.id }, e);
+    }
+
+    // ── Workflow engine dispatch (fire-and-forget) ─────────────────────────
+    // Run AFTER the response so a workflow run never blocks, slows, or changes
+    // the outcome of lead creation. `after()` defers to post-response; the body
+    // is fully wrapped so a workflow error can NEVER surface to the applicant.
+    //
+    // We fire two trigger types off this one creation event:
+    //   - lead_created          — always.
+    //   - lead_score_threshold  — only when a numeric score is known.
+    // The persisted contact row carries the scored fields (leadScore etc.) so a
+    // workflow condition (e.g. score >= 80) has the value to gate on.
+    //
+    // FUTURE REFINEMENT: honor trigger.config.min directly in runWorkflowsForEvent
+    // so a lead_score_threshold workflow is only run when the score actually
+    // crosses its configured floor; today the workflow's conditions do that
+    // filtering.
+    const finalScore = scoring.leadScore;
+    const leadRow: Record<string, unknown> = {
+      ...(contact as unknown as Record<string, unknown>),
+      leadScore: finalScore,
+      score: finalScore,
+      scoreLabel: scoring.scoreLabel,
+      scoringStatus: scoring.scoringStatus,
+    };
+    // `after()` itself throws when called outside a request scope (e.g. unit
+    // tests that invoke POST directly), so the scheduling call is wrapped too —
+    // the same idiom as lib/ai-tools/persistence.ts. The dispatch is
+    // best-effort; a missing request context must never turn a 201 into a 500.
+    try {
+      after(async () => {
+        try {
+          await runWorkflowsForEvent({
+            spaceId: space.id,
+            triggerType: 'lead_created',
+            context: { event: { type: 'lead_created' }, lead: leadRow, contact: leadRow },
+            triggerEvent: { type: 'lead_created', contactId: contact.id },
+          });
+        } catch (workflowErr) {
+          logger.error('[apply] lead_created workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
+        }
+        if (typeof finalScore === 'number') {
+          try {
+            await runWorkflowsForEvent({
+              spaceId: space.id,
+              triggerType: 'lead_score_threshold',
+              context: { event: { type: 'lead_score_threshold', score: finalScore }, lead: leadRow, contact: leadRow },
+              triggerEvent: { type: 'lead_score_threshold', contactId: contact.id, score: finalScore },
+            });
+          } catch (workflowErr) {
+            logger.error('[apply] lead_score_threshold workflow dispatch failed (non-fatal)', { contactId: contact.id }, workflowErr);
+          }
+        }
+      });
+    } catch (afterErr) {
+      logger.error('[apply] workflow after() scheduling skipped (no request scope)', { contactId: contact.id }, afterErr);
     }
 
     return NextResponse.json(

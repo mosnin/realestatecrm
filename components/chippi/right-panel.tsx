@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+// Imported from 'framer-motion' (not 'motion/react') to share the same
+// PresenceContext instance as the AnimatePresence that now wraps this panel in
+// chippi-workspace — a cross-package context mismatch would silently drop the
+// exit animation.
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 import { RightPanelTabs } from './right-panel-tabs';
@@ -11,6 +15,9 @@ interface RightPanelProps {
   activeTab: 'people' | 'deals' | 'properties';
   onTabChange: (tab: 'people' | 'deals' | 'properties') => void;
   className?: string;
+  /** True while the divider is being dragged — the iframe is made
+   *  pointer-events:none so it stops swallowing the drag's mousemove events. */
+  isResizing?: boolean;
 }
 
 // `?embed=1` flips the dashboard layout into chrome-stripped mode so the
@@ -31,7 +38,7 @@ const TAB_LABELS: Record<RightPanelProps['activeTab'], string> = {
   properties: 'Properties dashboard panel',
 };
 
-export function RightPanel({ slug, activeTab, onTabChange, className }: RightPanelProps) {
+export function RightPanel({ slug, activeTab, onTabChange, className, isResizing }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,9 +51,13 @@ export function RightPanel({ slug, activeTab, onTabChange, className }: RightPan
         'flex flex-col h-full border-l border-border/70 bg-background overflow-hidden',
         className,
       )}
-      initial={{ x: '100%', opacity: 0 }}
+      // A subtle offset + fade rather than a full-width `x: 100%` translate: the
+      // panel shares a flex row whose widths change on open/close/drag, and a
+      // full-width transform fought that layout and read as a glitch. A small
+      // slide keeps the "comes in from the right" feel without the conflict.
+      initial={{ x: 24, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      exit={{ x: '100%', opacity: 0 }}
+      exit={{ x: 24, opacity: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_IN_OUT }}
     >
       <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} />
@@ -68,7 +79,7 @@ export function RightPanel({ slug, activeTab, onTabChange, className }: RightPan
         <iframe
           key={activeTab}
           src={TAB_PATHS[activeTab](slug)}
-          className="w-full h-full border-0"
+          className={cn('w-full h-full border-0', isResizing && 'pointer-events-none')}
           title={TAB_LABELS[activeTab]}
           aria-label={TAB_LABELS[activeTab]}
           onLoad={() => setIsLoading(false)}

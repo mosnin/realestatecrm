@@ -431,20 +431,23 @@ export const handleComposioTrigger = inngest.createFunction(
       throw err;
     }
 
-    // Stamp the captured event with the dispatch outcome: a real dispatch
-    // (DRAFT/etc.) → 'dispatched'; a no-op (thin payload / unwired kind) →
-    // 'skipped'. fireRoutineRun is fire-and-forget, so a non-noop result
-    // means dispatch was invoked.
+    // A delivery counts as a real fire when it ran a dispatch kind (DRAFT/etc.)
+    // OR drove at least one user workflow. The second case matters: a slug with
+    // no DRAFT handler (dispatched: 'noop') can still be the trigger a realtor's
+    // workflow is keyed to — that's a successful fire, not a skip.
+    const didFire = result.dispatched !== 'noop' || result.workflowsRan > 0;
+
+    // Stamp the captured event with the outcome: fired → 'dispatched';
+    // genuine no-op (thin payload / unwired kind AND no workflow ran) →
+    // 'skipped'. fireRoutineRun is fire-and-forget, so this reflects that
+    // dispatch/workflow execution was invoked, not that it finished.
     await step.run('mark-dispatch-outcome', () =>
-      setEventStatus(
-        data.deliveryId,
-        result.dispatched === 'noop' ? 'skipped' : 'dispatched',
-      ),
+      setEventStatus(data.deliveryId, didFire ? 'dispatched' : 'skipped'),
     );
 
-    // 6. Stamp lastFiredAt only on a real dispatch — a no-op shouldn't
-    //    look like a successful fire on the health endpoint.
-    if (result.dispatched !== 'noop') {
+    // 6. Stamp lastFiredAt on a real fire — a pure no-op shouldn't look like a
+    //    successful fire on the health endpoint, but a workflow firing should.
+    if (didFire) {
       await step.run('stamp-fired', () => stampFired(triggerRow.id));
     }
 
