@@ -242,14 +242,23 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  if (validationErrors.length > 0) {
-    return NextResponse.json({ error: 'Validation failed', details: validationErrors }, { status: 400 });
+  // Custom head script: a non-empty script that fails sanitization is REJECTED
+  // (not silently dropped), so the realtor never sees "Saved" while their
+  // tracking script was actually discarded. Empty/absent stays a no-op.
+  const rawScript = pixels.customHeadScript;
+  if (rawScript !== undefined && rawScript !== null && rawScript !== '') {
+    const customScript = sanitizeCustomScript(rawScript);
+    if (customScript === null) {
+      validationErrors.push(
+        'customHeadScript: only HTTPS <script src> tags from approved analytics domains are allowed (no inline scripts)',
+      );
+    } else {
+      sanitized.customHeadScript = customScript;
+    }
   }
 
-  // Handle custom head script
-  const customScript = sanitizeCustomScript(pixels.customHeadScript);
-  if (customScript) {
-    sanitized.customHeadScript = customScript;
+  if (validationErrors.length > 0) {
+    return NextResponse.json({ error: 'Validation failed', details: validationErrors }, { status: 400 });
   }
 
   const { error: updateError } = await supabase

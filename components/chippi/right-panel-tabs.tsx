@@ -1,7 +1,7 @@
 'use client';
 
 import { Users, Briefcase, Building2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 

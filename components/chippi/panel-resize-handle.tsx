@@ -74,12 +74,17 @@ export function PanelResizeHandle({
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('touchmove', handleTouchMove, { passive: true });
     document.addEventListener('touchend', handleTouchEnd);
+    // touchcancel (OS gesture interrupt, incoming call, scroll takeover) would
+    // otherwise leave isDragging stuck true → the iframe pinned pointer-events:
+    // none forever. Same teardown as touchend.
+    document.addEventListener('touchcancel', handleTouchEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [containerRef, onResize, onDragEnd]);
 
