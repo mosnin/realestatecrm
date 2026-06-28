@@ -21,11 +21,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -635,10 +636,14 @@ function ActionZapCard({
             </SelectContent>
           </Select>
         </div>
-        {incomplete && (
+        {incomplete ? (
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
             <AlertCircle size={11} aria-hidden />
             Incomplete
+          </span>
+        ) : (
+          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950/50 dark:text-green-400" aria-label="Step configured">
+            <CheckIcon size={11} strokeWidth={3} aria-hidden />
           </span>
         )}
         <button
@@ -663,21 +668,25 @@ function ActionZapCard({
 
 export function WorkflowBuilder({
   initial,
+  initialEnabled,
   saving,
   workflowId,
   onSave,
   onCancel,
 }: {
   initial?: WorkflowFormState;
+  /** Starting value for the "Turn on when saved" toggle. Defaults to true for new workflows. */
+  initialEnabled?: boolean;
   saving: boolean;
   /** The id of the workflow being edited (if editing an existing one). Used to
    *  display the webhook URL for webhook-triggered workflows. */
   workflowId?: string;
-  /** Receives the validated definition + name; the manager owns the fetch. */
-  onSave: (payload: { name: string; definition: ReturnType<typeof buildDefinition> }) => void;
+  /** Receives the validated definition + name + enabled; the manager owns the fetch. */
+  onSave: (payload: { name: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
   onCancel: () => void;
 }) {
   const [state, setState] = useState<WorkflowFormState>(() => initial ?? emptyFormState());
+  const [enabled, setEnabled] = useState(() => initialEnabled ?? true);
   /**
    * 'simple'  → the When / If / Then linear composer (state.graph stays null).
    * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
@@ -839,7 +848,7 @@ export function WorkflowBuilder({
       throw err;
     }
 
-    onSave({ name, definition });
+    onSave({ name, definition, enabled });
   }
 
   return (
@@ -1216,25 +1225,53 @@ export function WorkflowBuilder({
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={saving}
-          className="inline-flex items-center gap-1.5 rounded-full h-9 px-5 text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+      {/* Footer: Enable toggle + Save/Cancel — sticky so it's always reachable */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-3 border-t border-border/60 bg-card/95 px-4 py-3 backdrop-blur-sm">
+        {/* Zapier-style "Turn on" toggle */}
+        <label
+          htmlFor="wf-enabled-toggle"
+          className={cn(
+            'flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+            enabled
+              ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-700/50 dark:bg-green-950/30 dark:text-green-400'
+              : 'border-border/60 bg-muted/30 text-muted-foreground',
+          )}
         >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {saving ? 'Saving…' : 'Save workflow'}
-        </button>
-        <span className="text-[11px] text-muted-foreground/50 select-none">⌘S</span>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className="rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          Cancel
-        </button>
+          <Power
+            size={13}
+            className={enabled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/60'}
+            aria-hidden
+          />
+          <span>{workflowId ? (enabled ? 'On' : 'Paused') : (enabled ? 'Turn on when saved' : 'Save as draft')}</span>
+          <Switch
+            id="wf-enabled-toggle"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+            disabled={saving}
+            className="ml-0.5"
+          />
+        </label>
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-full h-9 px-5 text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving ? 'Saving…' : 'Save workflow'}
+          </button>
+          <span className="text-[11px] text-muted-foreground/50 select-none">⌘S</span>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );

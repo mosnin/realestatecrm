@@ -335,7 +335,7 @@ export function WorkflowsManager() {
     setActionError('');
   }
 
-  async function createWorkflow(payload: { name: string; definition: WorkflowDefinition }) {
+  async function createWorkflow(payload: { name: string; definition: WorkflowDefinition; enabled: boolean }) {
     setBusyId('new');
     setActionError('');
     try {
@@ -351,10 +351,17 @@ export function WorkflowsManager() {
       }
       setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
       closeComposer();
-      toast.success('Workflow is live!', {
-        description: `"${payload.name}" will run on its trigger.`,
-        duration: 5000,
-      });
+      if (payload.enabled) {
+        toast.success('Workflow is live!', {
+          description: `"${payload.name}" will run on its trigger.`,
+          duration: 5000,
+        });
+      } else {
+        toast.success('Workflow saved as draft', {
+          description: `"${payload.name}" is paused — turn it on when ready.`,
+          duration: 5000,
+        });
+      }
     } catch {
       setActionError("Network hiccup. Try again.");
     } finally {
@@ -364,7 +371,7 @@ export function WorkflowsManager() {
 
   async function saveEdit(
     id: string,
-    payload: { name: string; definition: WorkflowDefinition },
+    payload: { name: string; definition: WorkflowDefinition; enabled: boolean },
   ) {
     setBusyId(id);
     setActionError('');
@@ -602,6 +609,7 @@ export function WorkflowsManager() {
               >
                 <WorkflowBuilder
                   initial={recordToFormState(editing)}
+                  initialEnabled={editing.enabled}
                   saving={busyId === editingId}
                   workflowId={editingId}
                   onSave={(payload) => saveEdit(editingId, payload)}
@@ -833,7 +841,7 @@ function WorkflowRow({
   testResult: TestResult | undefined;
   onEdit: () => void;
   onCancelEdit: () => void;
-  onSave: (payload: { name: string; definition: WorkflowDefinition }) => void;
+  onSave: (payload: { name: string; definition: WorkflowDefinition; enabled: boolean }) => void;
   onToggle: () => void;
   onTest: () => void;
   onDuplicate: () => void;

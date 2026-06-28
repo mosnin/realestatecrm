@@ -85,15 +85,15 @@ export async function getWorkflow(
  */
 export async function createWorkflow(
   spaceId: string,
-  input: { name: string; definition: WorkflowDefinition },
+  input: { name: string; definition: WorkflowDefinition; enabled?: boolean },
 ): Promise<WorkflowRecord> {
-  const { name, definition } = input;
+  const { name, definition, enabled = true } = input;
   const { data, error } = await supabase
     .from('Workflow')
     .insert({
       spaceId,
       name,
-      enabled: true,
+      enabled,
       trigger: definition.trigger,
       conditions: definition.conditions,
       actions: definition.actions,
