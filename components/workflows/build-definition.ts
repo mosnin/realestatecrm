@@ -38,6 +38,7 @@ import type {
   WorkflowActionType,
   WorkflowAutonomy,
   WorkflowDefinition,
+  WorkflowGraph,
   WorkflowTrigger,
 } from '@/lib/workflows/schema';
 
@@ -94,6 +95,12 @@ export interface WorkflowFormState {
   conditions: ConditionRowState[];
   actions: ActionRowState[];
   autonomy: WorkflowAutonomy;
+  /**
+   * ADVANCED mode: when set, the workflow is authored as a branching graph on
+   * the canvas and this is what runs — the linear conditions/actions above are
+   * ignored (buildDefinition emits empty ones). null/undefined = linear mode.
+   */
+  graph?: WorkflowGraph | null;
 }
 
 // ── Operators that take no operand ───────────────────────────────────────────
@@ -259,6 +266,20 @@ function buildParams(json: string): { params?: Record<string, unknown> } {
  * signal back to the UI.
  */
 export function buildDefinition(state: WorkflowFormState): WorkflowDefinition {
+  // ADVANCED mode: the graph carries the whole logic. Emit empty linear
+  // conditions/actions (the schema accepts an empty action list) so a half-
+  // filled When/If/Then left behind in the form can't fail validation — the
+  // graph's own nodes are validated by workflowGraphSchema.
+  if (state.graph) {
+    return {
+      trigger: buildTrigger(state.trigger),
+      conditions: { op: 'and', rules: [] },
+      actions: [],
+      autonomy: state.autonomy,
+      graph: state.graph,
+    };
+  }
+
   const conditions: ConditionGroup = {
     op: state.conditionOp,
     rules: state.conditions.map(buildRule),

@@ -44,6 +44,7 @@ import type {
   WorkflowAction,
   WorkflowAutonomy,
   WorkflowDefinition,
+  WorkflowGraph,
   WorkflowTrigger,
 } from '@/lib/workflows/schema';
 import { WorkflowBuilder } from './workflow-builder';
@@ -61,6 +62,8 @@ interface WorkflowRecord {
   conditions: ConditionGroup;
   actions: WorkflowAction[];
   autonomy: WorkflowAutonomy;
+  /** Advanced-mode branching graph (null/absent for linear workflows). */
+  graph?: WorkflowGraph | null;
   lastRunAt: string | null;
   lastRunStatus: 'ok' | 'error' | 'skipped' | null;
   createdAt: string;
@@ -176,6 +179,9 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
           : '',
     })),
     autonomy: w.autonomy,
+    // Carry the stored graph through so the builder opens an advanced workflow
+    // straight onto the canvas.
+    graph: w.graph ?? null,
   };
 }
 
