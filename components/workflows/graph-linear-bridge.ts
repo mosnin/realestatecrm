@@ -99,6 +99,10 @@ export function graphToLinear(
     if (next.kind === 'condition') {
       conditionsSeen += 1;
       if (conditionsSeen > 1) return null; // more than one gate → not the linear shape
+      // A nested AND/OR sub-group can't be represented by the flat Simple
+      // composer — refuse, so the Simple toggle stays locked rather than
+      // silently flattening (dropping) the nested rules on conversion.
+      if (next.condition.rules.some((r) => 'rules' in r)) return null;
       conditions = next.condition;
     } else if (next.kind === 'action') {
       actions.push(next.action);

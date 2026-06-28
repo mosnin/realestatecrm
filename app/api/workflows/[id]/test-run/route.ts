@@ -164,6 +164,11 @@ export async function POST(
     conditions: stored.conditions,
     actions: stored.actions,
     autonomy: 'draft',
+    // Forward the branching graph so an ADVANCED workflow's test-run actually
+    // walks its conditions/actions (without it, runWorkflow fell through to the
+    // empty linear path and "proved" nothing). autonomy:'draft' above still
+    // reaches each graph action, so the test stays drafts-only — no real send.
+    graph: stored.graph ?? null,
   };
 
   let result;

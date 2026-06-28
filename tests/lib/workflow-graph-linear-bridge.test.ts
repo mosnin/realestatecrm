@@ -105,6 +105,32 @@ describe('graphToLinear rejects branching graphs', () => {
     expect(graphToLinear(graph)).toBeNull();
   });
 
+  it('returns null when a condition node carries a nested sub-group (no silent flatten)', () => {
+    const graph: WorkflowGraph = {
+      nodes: [
+        { id: 't', kind: 'trigger' },
+        {
+          id: 'c',
+          kind: 'condition',
+          condition: {
+            op: 'and',
+            rules: [
+              { field: 'lead.score', operator: 'gte', value: 80 },
+              { op: 'or', rules: [{ field: 'lead.source', operator: 'eq', value: 'zillow' }] },
+            ],
+          },
+        },
+        { id: 'a1', kind: 'action', action: draft() },
+      ],
+      edges: [
+        { from: 't', to: 'c' },
+        { from: 'c', to: 'a1', branch: 'true' },
+      ],
+    };
+    expect(graphToLinear(graph)).toBeNull();
+    expect(isLinearGraph(graph)).toBe(false);
+  });
+
   it('returns null with two condition gates in a row', () => {
     const graph: WorkflowGraph = {
       nodes: [
