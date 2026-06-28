@@ -538,7 +538,11 @@ export function WorkflowBuilder({
       {/* Autonomy ─────────────────────────────────────────────────────────── */}
       <section className="space-y-2">
         <p className={SECTION_LABEL}>Autonomy — how much can I do on my own?</p>
-        <div role="radiogroup" aria-label="Autonomy" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {/* Three independently-focusable toggle buttons (aria-pressed), not a
+            radiogroup — honest about the behavior, matching the AND/OR group and
+            the filter chips, rather than promising roving arrow-key focus we
+            don't implement. */}
+        <div role="group" aria-label="Autonomy" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {AUTONOMY_OPTIONS.map((o) => {
             const meta = AUTONOMY_META[o.value];
             const selected = state.autonomy === o.value;
@@ -548,8 +552,7 @@ export function WorkflowBuilder({
               <button
                 key={o.value}
                 type="button"
-                role="radio"
-                aria-checked={selected}
+                aria-pressed={selected}
                 onClick={() => patch({ autonomy: o.value })}
                 className={cn(
                   'flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-colors',
@@ -896,7 +899,10 @@ function ConditionRowEditor({
     const keepValue =
       attr.valueType === 'text' ||
       (attr.valueType === 'enum' && attr.options?.some((o) => o.value === row.value)) ||
-      (attr.valueType === 'number' && /^-?\d*\.?\d*$/.test(row.value));
+      // A number attribute only keeps a FULLY numeric literal — mirrors
+      // coerceConditionValue's own regex, so partials ('', '-', '.') clear
+      // rather than surviving into a NaN/dead condition with no inline error.
+      (attr.valueType === 'number' && /^-?\d+(\.\d+)?$/.test(row.value.trim()));
     onChange({
       field: attr.field,
       operator: nextOperator,

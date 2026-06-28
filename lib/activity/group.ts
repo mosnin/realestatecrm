@@ -59,7 +59,12 @@ export function groupActivityByDay(
   now: Date = new Date(),
 ): ActivityDayGroup[] {
   const groups: ActivityDayGroup[] = [];
-  let current: ActivityDayGroup | null = null;
+  // Index by day-key so a day that reappears NON-contiguously (e.g. a same-day
+  // item that arrives out of order across a load-more page boundary) merges
+  // into its existing bucket instead of spawning a second group with the same
+  // `key` — which would be a duplicate React key downstream. First-seen order
+  // is preserved (groups is pushed in encounter order).
+  const byKey = new Map<string, ActivityDayGroup>();
 
   for (const item of items) {
     const d = new Date(item.occurredAt);
@@ -68,15 +73,13 @@ export function groupActivityByDay(
     const valid = !Number.isNaN(d.getTime());
     const key = valid ? localDayKey(d) : 'unknown';
 
-    if (!current || current.key !== key) {
-      current = {
-        key,
-        label: valid ? dayLabel(d, now) : 'Earlier',
-        items: [],
-      };
-      groups.push(current);
+    let group = byKey.get(key);
+    if (!group) {
+      group = { key, label: valid ? dayLabel(d, now) : 'Earlier', items: [] };
+      byKey.set(key, group);
+      groups.push(group);
     }
-    current.items.push(item);
+    group.items.push(item);
   }
 
   return groups;

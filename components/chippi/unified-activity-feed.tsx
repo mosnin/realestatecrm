@@ -299,9 +299,11 @@ function Chip({
 /**
  * A one-line, at-a-glance reading of what's currently loaded — total plus the
  * few counts a realtor scans for (drafts waiting, messages sent, anything that
- * failed). Reflects the loaded set; empty string when there's nothing to show.
+ * failed). Reflects the LOADED set; when older pages remain (`hasMore`) the
+ * total carries a `+` so it never reads as a definitive tally it isn't. Empty
+ * string when there's nothing to show.
  */
-function summarizeFeed(items: UnifiedActivityItem[]): string {
+function summarizeFeed(items: UnifiedActivityItem[], hasMore: boolean): string {
   if (items.length === 0) return '';
   let drafts = 0;
   let sent = 0;
@@ -311,7 +313,8 @@ function summarizeFeed(items: UnifiedActivityItem[]): string {
     if (i.kind === 'outbound_message') sent += 1;
     if (i.status === 'failed') failed += 1;
   }
-  const parts = [`${items.length} ${items.length === 1 ? 'event' : 'events'}`];
+  const total = `${items.length}${hasMore ? '+' : ''}`;
+  const parts = [`${total} ${items.length === 1 ? 'event' : 'events'}`];
   if (drafts) parts.push(`${drafts} ${drafts === 1 ? 'draft' : 'drafts'}`);
   if (sent) parts.push(`${sent} sent`);
   if (failed) parts.push(`${failed} failed`);
@@ -432,7 +435,7 @@ export function UnifiedActivityFeed() {
   // Group the loaded feed into Today / Yesterday / weekday buckets so it reads
   // as a story, and derive a one-line digest of what's on screen.
   const groups = useMemo(() => groupActivityByDay(items), [items]);
-  const digest = useMemo(() => summarizeFeed(items), [items]);
+  const digest = useMemo(() => summarizeFeed(items, Boolean(nextCursor)), [items, nextCursor]);
 
   return (
     <div className="space-y-6">

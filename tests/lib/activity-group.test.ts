@@ -68,6 +68,21 @@ describe('groupActivityByDay', () => {
     expect(groups[0].items[0].id).toBe('x');
   });
 
+  it('merges a non-contiguous same-day item into its existing group (no dup key)', () => {
+    // A same-day item that arrives out of order (e.g. across a page boundary)
+    // must fold into the existing Today bucket, not spawn a second Today group.
+    const items = [
+      item('a', '2026-06-28T11:00:00'),
+      item('b', '2026-06-20T10:00:00'),
+      item('c', '2026-06-28T02:00:00'), // same day as 'a', but after an older item
+    ];
+    const groups = groupActivityByDay(items, NOW);
+    const keys = groups.map((g) => g.key);
+    expect(new Set(keys).size).toBe(keys.length); // all keys unique
+    expect(groups).toHaveLength(2);
+    expect(groups[0].items.map((i) => i.id)).toEqual(['a', 'c']);
+  });
+
   it('keeps same-day items together even across a new group boundary', () => {
     // Interleaved-looking but still descending: two today, one older, (no return to today)
     const items = [
