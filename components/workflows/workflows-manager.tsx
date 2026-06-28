@@ -246,7 +246,7 @@ export function WorkflowsManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off' | 'failed'>('all');
   const [triggerFilter, setTriggerFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun'>('created');
+  const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun' | 'modified'>('created');
 
   /** Unique trigger types present in the current workflow list for the filter dropdown. */
   const triggerTypes = useMemo(() => {
@@ -271,6 +271,7 @@ export function WorkflowsManager() {
         if (!b.lastRunAt) return -1;
         return b.lastRunAt.localeCompare(a.lastRunAt);
       }
+      if (sortBy === 'modified') return b.updatedAt.localeCompare(a.updatedAt);
       // created: newest first (default — the API already returns this order)
       return b.createdAt.localeCompare(a.createdAt);
     });
@@ -615,6 +616,7 @@ export function WorkflowsManager() {
                 <option value="created">Newest first</option>
                 <option value="name">Name A–Z</option>
                 <option value="lastRun">Last run</option>
+                <option value="modified">Last modified</option>
               </select>
             </div>
           </div>
@@ -643,6 +645,33 @@ export function WorkflowsManager() {
                 />
               </div>
             ) : null;
+          })()}
+
+          {/* Stats summary bar */}
+          {filteredWorkflows.length > 0 && (() => {
+            const onCount = filteredWorkflows.filter((w) => w.enabled).length;
+            const offCount = filteredWorkflows.filter((w) => !w.enabled).length;
+            const failedCount = filteredWorkflows.filter((w) => w.lastRunStatus === 'error').length;
+            return (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-0.5 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                  {onCount} on
+                </span>
+                {offCount > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" aria-hidden />
+                    {offCount} paused
+                  </span>
+                )}
+                {failedCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden />
+                    {failedCount} failing
+                  </span>
+                )}
+              </div>
+            );
           })()}
 
           {/* Table container */}
@@ -1007,15 +1036,22 @@ function WorkflowRow({
           </span>
         </div>
 
-        {/* Col 3 — Run health + time */}
-        <div className="flex items-center gap-1.5 pr-2">
-          <RunHealthChip status={workflow.lastRunStatus} />
-          {workflow.lastRunAt ? (
-            <span className="tabular-nums text-[11px] text-muted-foreground/70">
-              {timeAgo(workflow.lastRunAt)}
+        {/* Col 3 — Run health + time + modified */}
+        <div className="flex flex-col gap-0.5 pr-2">
+          <div className="flex items-center gap-1.5">
+            <RunHealthChip status={workflow.lastRunStatus} />
+            {workflow.lastRunAt ? (
+              <span className="tabular-nums text-[11px] text-muted-foreground/70">
+                {timeAgo(workflow.lastRunAt)}
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/40">Never</span>
+            )}
+          </div>
+          {workflow.updatedAt !== workflow.createdAt && (
+            <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
+              Edited {timeAgo(workflow.updatedAt)}
             </span>
-          ) : (
-            <span className="text-[11px] text-muted-foreground/40">Never</span>
           )}
         </div>
 
