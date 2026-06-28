@@ -8,9 +8,19 @@ interface PanelResizeHandleProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** Current left-panel width in percent (30–75). Used for keyboard resize steps. Defaults to 58. */
   currentLeftWidth?: number;
+  /** Fired when a pointer drag begins — lets the parent shield the iframe. */
+  onDragStart?: () => void;
+  /** Fired when a pointer drag ends. */
+  onDragEnd?: () => void;
 }
 
-export function PanelResizeHandle({ onResize, containerRef, currentLeftWidth = 58 }: PanelResizeHandleProps) {
+export function PanelResizeHandle({
+  onResize,
+  containerRef,
+  currentLeftWidth = 58,
+  onDragStart,
+  onDragEnd,
+}: PanelResizeHandleProps) {
   const isDragging = useRef(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -18,12 +28,14 @@ export function PanelResizeHandle({ onResize, containerRef, currentLeftWidth = 5
     isDragging.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-  }, []);
+    onDragStart?.();
+  }, [onDragStart]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     isDragging.current = true;
-  }, []);
+    onDragStart?.();
+  }, [onDragStart]);
 
   useEffect(() => {
     const clamp = (value: number) => Math.max(30, Math.min(75, value));
@@ -40,6 +52,7 @@ export function PanelResizeHandle({ onResize, containerRef, currentLeftWidth = 5
       isDragging.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      onDragEnd?.();
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -52,7 +65,9 @@ export function PanelResizeHandle({ onResize, containerRef, currentLeftWidth = 5
     };
 
     const handleTouchEnd = () => {
+      if (!isDragging.current) return;
       isDragging.current = false;
+      onDragEnd?.();
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -66,7 +81,7 @@ export function PanelResizeHandle({ onResize, containerRef, currentLeftWidth = 5
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [containerRef, onResize]);
+  }, [containerRef, onResize, onDragEnd]);
 
   return (
     <div
