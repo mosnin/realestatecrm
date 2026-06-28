@@ -95,6 +95,8 @@ function sampleContextFor(trigger: WorkflowTrigger): WorkflowContext {
       };
     case 'schedule':
       return { event: { type: 'schedule' } };
+    case 'webhook':
+      return { event: { type: 'webhook', payload: { sample: true } } };
     default: {
       // Exhaustiveness guard — an unknown trigger still gets a minimal context.
       const _never: never = trigger;

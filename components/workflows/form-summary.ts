@@ -67,6 +67,8 @@ function triggerPhrase(t: TriggerFormState): string {
       if (t.cadence === 'weekdays') return `every weekday${at}`;
       return `every day${at}`;
     }
+    case 'webhook':
+      return 'your webhook URL receives a POST';
     default:
       return 'something happens';
   }

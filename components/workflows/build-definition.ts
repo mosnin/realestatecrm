@@ -166,6 +166,8 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
             ? { cadence: t.cadence }
             : { cadence: t.cadence, hour: toNumber(t.hour) },
       };
+    case 'webhook':
+      return { type: 'webhook', config: {} };
     default: {
       // Exhaustiveness guard — an unknown type still produces SOMETHING the
       // schema will reject rather than throwing here.

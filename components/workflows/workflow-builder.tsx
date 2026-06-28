@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -77,6 +77,7 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
   deal_stage_changed: 'A deal changes stage',
   integration_event: 'A connected app fires an event',
   schedule: 'On a schedule',
+  webhook: 'Webhook — any HTTP POST',
 };
 
 const TRIGGER_ORDER: TriggerType[] = [
@@ -87,6 +88,7 @@ const TRIGGER_ORDER: TriggerType[] = [
   'deal_stage_changed',
   'integration_event',
   'schedule',
+  'webhook',
 ];
 
 const OPERATOR_LABELS: Record<Operator, string> = {
@@ -597,11 +599,15 @@ function ActionZapCard({
 export function WorkflowBuilder({
   initial,
   saving,
+  workflowId,
   onSave,
   onCancel,
 }: {
   initial?: WorkflowFormState;
   saving: boolean;
+  /** The id of the workflow being edited (if editing an existing one). Used to
+   *  display the webhook URL for webhook-triggered workflows. */
+  workflowId?: string;
   /** Receives the validated definition + name; the manager owns the fetch. */
   onSave: (payload: { name: string; definition: ReturnType<typeof buildDefinition> }) => void;
   onCancel: () => void;
@@ -862,6 +868,7 @@ export function WorkflowBuilder({
             state={state}
             patchTrigger={patchTrigger}
             triggerOptions={triggerOptions}
+            workflowId={workflowId}
           />
         </div>
       </ZapCard>
@@ -1145,16 +1152,69 @@ export function WorkflowBuilder({
   );
 }
 
+// ── Webhook trigger display ───────────────────────────────────────────────────
+
+/**
+ * Shows the unique webhook URL that fires this workflow. The URL is just the
+ * workflow's id routed through the webhook endpoint — the UUID randomness is
+ * the auth token (128 bits, same security posture as Zapier webhook URLs).
+ * For new (unsaved) workflows, a "save first" prompt.
+ */
+function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = workflowId
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/workflows/${workflowId}/webhook`
+    : null;
+
+  function copyUrl() {
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className={CAPTION}>
+        POST any JSON payload to this URL and the workflow fires immediately. The URL is your secret — keep it private.
+      </p>
+      {url ? (
+        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+          <Webhook size={13} className="flex-shrink-0 text-muted-foreground" aria-hidden />
+          <code className="flex-1 truncate text-[11px] font-mono text-foreground/80 select-all">
+            {url}
+          </code>
+          <button
+            type="button"
+            onClick={copyUrl}
+            aria-label={copied ? 'Copied' : 'Copy webhook URL'}
+            className="flex-shrink-0 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {copied ? <CheckIcon size={12} className="text-emerald-500" /> : <Copy size={12} />}
+          </button>
+        </div>
+      ) : (
+        <p className={CAPTION}>
+          <span className="font-medium text-foreground">Save this workflow first</span> — your unique webhook URL will appear here.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Trigger config — per-type fields ─────────────────────────────────────────
 
 function TriggerConfig({
   state,
   patchTrigger,
   triggerOptions,
+  workflowId,
 }: {
   state: WorkflowFormState;
   patchTrigger: (next: Partial<WorkflowFormState['trigger']>) => void;
   triggerOptions: TriggerOptionsState;
+  workflowId?: string;
 }) {
   const t = state.trigger;
 
@@ -1251,6 +1311,10 @@ function TriggerConfig({
         )}
       </div>
     );
+  }
+
+  if (t.type === 'webhook') {
+    return <WebhookTriggerDisplay workflowId={workflowId} />;
   }
 
   // lead_created, tour_completed — no config.

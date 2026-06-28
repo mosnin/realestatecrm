@@ -243,6 +243,26 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
   },
   {
+    id: 'webhook-any-service',
+    name: 'Webhook → Chippi takes action',
+    description: 'Trigger from any external service via HTTP POST — Chippi handles the rest.',
+    state: {
+      name: 'Webhook → Chippi takes action',
+      trigger: { ...baseTrigger(), type: 'webhook' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'A webhook just fired with a payload. Review what arrived and decide the best next action for this real estate contact.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
     id: 'hot-vs-warm-branch',
     name: 'Hot vs warm → different play',
     description: 'If the lead is hot, text now; if not, schedule a follow-up.',

@@ -45,7 +45,8 @@ export type TriggerType =
   | 'tour_completed'
   | 'deal_stage_changed'
   | 'integration_event'
-  | 'schedule';
+  | 'schedule'
+  | 'webhook';
 
 const shortText = z.string().trim().min(1).max(SHORT_TEXT);
 
@@ -80,6 +81,9 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
+  // config is empty — the URL is derived from the workflow id at display time.
+  z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),
 ]);
 
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;

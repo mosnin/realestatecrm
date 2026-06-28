@@ -39,6 +39,8 @@ function triggerPhrase(trigger: WorkflowTrigger): string {
       if (cadence === 'weekdays') return `every weekday${at}`;
       return `every day${at}`;
     }
+    case 'webhook':
+      return 'an HTTP POST arrives';
     default:
       return 'triggered';
   }

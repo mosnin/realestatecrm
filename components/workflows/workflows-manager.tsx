@@ -49,6 +49,7 @@ import {
   Copy,
   CheckSquare,
   ArrowRight,
+  Webhook,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,6 +161,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         t.type === 'schedule' && typeof t.config.hour === 'number'
           ? String(t.config.hour)
           : '',
+      // webhook trigger has no config fields
     },
     conditionOp: w.conditions.op,
     conditions: w.conditions.rules.flatMap((r) => {
@@ -535,6 +537,7 @@ export function WorkflowsManager() {
                 <WorkflowBuilder
                   initial={recordToFormState(editing)}
                   saving={busyId === editingId}
+                  workflowId={editingId}
                   onSave={(payload) => saveEdit(editingId, payload)}
                   onCancel={() => setEditingId(null)}
                 />
@@ -613,6 +616,7 @@ const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   schedule: { icon: Clock, cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
   lead_created: { icon: UserPlus, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
   tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
+  webhook: { icon: Webhook, cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
 };
 
 // ── Action type → icon ───────────────────────────────────────────────────────
@@ -670,6 +674,45 @@ function WorkflowFlowLine({
   );
 }
 
+// ── Webhook URL chip ─────────────────────────────────────────────────────────
+
+/**
+ * Compact inline chip showing the webhook URL with a one-click copy. Sits under
+ * the workflow name in the list row so the realtor can grab the URL without
+ * opening the editor.
+ */
+function WebhookUrlChip({ workflowId }: { workflowId: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = `/api/workflows/${workflowId}/webhook`;
+
+  function copyUrl() {
+    navigator.clipboard.writeText(`${window.location.origin}${url}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        copyUrl();
+      }}
+      aria-label={copied ? 'Copied!' : 'Copy webhook URL'}
+      className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-mono text-teal-700 transition-colors hover:bg-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:hover:bg-teal-950/50"
+    >
+      <Webhook size={9} aria-hidden className="flex-shrink-0" />
+      <span className="truncate">{url}</span>
+      {copied ? (
+        <Check size={9} className="flex-shrink-0 text-emerald-500" aria-hidden />
+      ) : (
+        <Copy size={9} className="flex-shrink-0 opacity-50" aria-hidden />
+      )}
+    </button>
+  );
+}
+
 // ── Trigger type → human-readable label ──────────────────────────────────────
 
 function triggerLabel(trigger: WorkflowTrigger): string {
@@ -688,6 +731,8 @@ function triggerLabel(trigger: WorkflowTrigger): string {
       return 'New lead';
     case 'tour_completed':
       return 'Tour completed';
+    case 'webhook':
+      return 'Webhook';
     default:
       // Exhaustive narrowing fallback — if a new trigger type is added, show it
       // kebab-cased rather than an empty cell.
@@ -790,9 +835,13 @@ function WorkflowRow({
             )}
           </div>
           <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
-          <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
-            {summary}
-          </p>
+          {workflow.trigger.type === 'webhook' ? (
+            <WebhookUrlChip workflowId={workflow.id} />
+          ) : (
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
+              {summary}
+            </p>
+          )}
         </div>
 
         {/* Col 2 — Trigger label + icon */}
@@ -1308,6 +1357,11 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-violet-100 dark:bg-violet-950/40',
     dot: 'text-violet-500 dark:text-violet-400',
   },
+  'webhook-any-service': {
+    icon: Webhook,
+    accent: 'bg-teal-100 dark:bg-teal-950/40',
+    dot: 'text-teal-600 dark:text-teal-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {
@@ -1329,6 +1383,17 @@ function TemplateGallery({
   onScratch: () => void;
 }) {
   const reduce = useReducedMotion();
+  const [q, setQ] = useState('');
+  const visibleTemplates = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return WORKFLOW_TEMPLATES;
+    return WORKFLOW_TEMPLATES.filter(
+      (t) =>
+        t.name.toLowerCase().includes(query) ||
+        t.description.toLowerCase().includes(query),
+    );
+  }, [q]);
+
   return (
     <div className="space-y-5">
       <div className="space-y-1">
@@ -1340,62 +1405,86 @@ function TemplateGallery({
         </p>
       </div>
 
-      <motion.ul
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        variants={reduce ? undefined : STAGGER_CONTAINER}
-        initial={reduce ? undefined : 'initial'}
-        animate={reduce ? undefined : 'enter'}
-      >
-        {WORKFLOW_TEMPLATES.map((template) => {
-          const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
-          const Icon = meta.icon;
-          return (
-            <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM} className="flex">
-              <button
-                type="button"
-                onClick={() => onPick(cloneTemplateState(template))}
-                className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
-              >
-                {/* Icon area */}
-                <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
-                  <Icon size={32} className={meta.dot} aria-hidden />
-                </div>
-                {/* Text area */}
-                <div className="flex flex-1 flex-col gap-1.5 p-4">
-                  <span className="block text-sm font-semibold leading-snug text-foreground">
-                    {template.name}
-                  </span>
-                  <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
-                    {template.description}
-                  </span>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
-                      {template.state.trigger.type.replace(/_/g, ' ')}
-                    </span>
-                    <ChevronRight
-                      size={14}
-                      aria-hidden
-                      className="text-muted-foreground/30 transition-colors group-hover/card:text-foreground/60"
-                    />
-                  </div>
-                </div>
-              </button>
-            </motion.li>
-          );
-        })}
-      </motion.ul>
-
-      <div className="flex items-center gap-2 pt-1">
-        <span className={CAPTION}>Prefer to start blank?</span>
-        <button
-          type="button"
-          onClick={onScratch}
-          className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
-        >
-          <Plus size={13} aria-hidden />
-          Build from scratch
-        </button>
+      {/* Template search */}
+      <div className="relative max-w-sm">
+        <Search
+          size={14}
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search templates…"
+          className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+        />
       </div>
+
+      {visibleTemplates.length === 0 ? (
+        <p className={cn(CAPTION, 'py-4 text-center')}>
+          No templates match <span className="font-medium text-foreground">{q}</span> — try a different search.
+        </p>
+      ) : (
+        <>
+          <motion.ul
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            variants={reduce ? undefined : STAGGER_CONTAINER}
+            initial={reduce ? undefined : 'initial'}
+            animate={reduce ? undefined : 'enter'}
+          >
+            {visibleTemplates.map((template) => {
+              const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+              const Icon = meta.icon;
+              return (
+                <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM} className="flex">
+                  <button
+                    type="button"
+                    onClick={() => onPick(cloneTemplateState(template))}
+                    className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                  >
+                    {/* Icon area */}
+                    <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
+                      <Icon size={32} className={meta.dot} aria-hidden />
+                    </div>
+                    {/* Text area */}
+                    <div className="flex flex-1 flex-col gap-1.5 p-4">
+                      <span className="block text-sm font-semibold leading-snug text-foreground">
+                        {template.name}
+                      </span>
+                      <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                        {template.description}
+                      </span>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+                          {template.state.trigger.type.replace(/_/g, ' ')}
+                        </span>
+                        <ChevronRight
+                          size={14}
+                          aria-hidden
+                          className="text-muted-foreground/30 transition-colors group-hover/card:text-foreground/60"
+                        />
+                      </div>
+                    </div>
+                  </button>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+
+          <div className="flex items-center gap-2 pt-1">
+            <span className={CAPTION}>Prefer to start blank?</span>
+            <button
+              type="button"
+              onClick={onScratch}
+              className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
+            >
+              <Plus size={13} aria-hidden />
+              Build from scratch
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1409,9 +1498,20 @@ function TemplatePicker({
   onPick: (state: WorkflowFormState) => void;
   onCancel: () => void;
 }) {
+  const [q, setQ] = useState('');
+  const visibleTemplates = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return WORKFLOW_TEMPLATES;
+    return WORKFLOW_TEMPLATES.filter(
+      (t) =>
+        t.name.toLowerCase().includes(query) ||
+        t.description.toLowerCase().includes(query),
+    );
+  }, [q]);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className={SECTION_LABEL}>Start from a template</p>
         <button
           type="button"
@@ -1421,33 +1521,56 @@ function TemplatePicker({
           Cancel
         </button>
       </div>
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {WORKFLOW_TEMPLATES.map((template) => {
-          const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
-          const Icon = meta.icon;
-          return (
-            <li key={template.id} className="flex">
-              <button
-                type="button"
-                onClick={() => onPick(cloneTemplateState(template))}
-                className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
-              >
-                <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
-                  <Icon size={24} className={meta.dot} aria-hidden />
-                </div>
-                <div className="flex flex-1 flex-col gap-1 p-3">
-                  <span className="block text-sm font-semibold leading-snug text-foreground">
-                    {template.name}
-                  </span>
-                  <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                    {template.description}
-                  </span>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search
+          size={14}
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search templates…"
+          className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+        />
+      </div>
+
+      {visibleTemplates.length === 0 ? (
+        <p className={cn(CAPTION, 'py-4 text-center')}>
+          No templates match <span className="font-medium text-foreground">{q}</span> — try a different search.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {visibleTemplates.map((template) => {
+            const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+            const Icon = meta.icon;
+            return (
+              <li key={template.id} className="flex">
+                <button
+                  type="button"
+                  onClick={() => onPick(cloneTemplateState(template))}
+                  className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                >
+                  <div className={cn('flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
+                    <Icon size={24} className={meta.dot} aria-hidden />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1 p-3">
+                    <span className="block text-sm font-semibold leading-snug text-foreground">
+                      {template.name}
+                    </span>
+                    <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
+                      {template.description}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
