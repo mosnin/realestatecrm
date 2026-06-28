@@ -231,6 +231,192 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
 
 // ───────────────────────────────────────────────────────────────────────────
+// Branching graph (ADVANCED mode) — an OPTIONAL directed acyclic graph the
+// advanced canvas authors. A linear workflow keeps using `actions[]`; a
+// workflow that needs to branch ("if hot → text, if warm → schedule, else →
+// task") stores a `graph` instead. The two are alternatives, never both: when
+// `graph` is present the engine walks it; otherwise it runs the linear
+// `actions[]` exactly as before. This keeps the existing model — and every test
+// that exercises it — untouched, and lets branching land additively.
+//
+// Node kinds:
+//   - trigger   : the single entry anchor (the real trigger config lives on the
+//                 definition's `trigger`; this node is where the graph starts).
+//   - condition : a gate carrying a ConditionGroup; its outgoing edges are
+//                 labeled `true` / `false` for the matched / unmatched branch.
+//   - action    : one WorkflowAction.
+// Edges are directed (`from` → `to`); a `branch` label is only meaningful on an
+// edge leaving a condition node. The whole graph must be acyclic.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Max nodes in a workflow graph (keeps a canvas — and the walk — bounded). */
+export const MAX_GRAPH_NODES = 40;
+/** Max edges in a workflow graph. */
+export const MAX_GRAPH_EDGES = 80;
+/** Stable node-id length bound (the canvas generates these). */
+const NODE_ID = 64;
+
+export type WorkflowNodeKind = 'trigger' | 'condition' | 'action';
+
+export interface TriggerNode {
+  id: string;
+  kind: 'trigger';
+}
+export interface ConditionNode {
+  id: string;
+  kind: 'condition';
+  condition: ConditionGroup;
+}
+export interface ActionNode {
+  id: string;
+  kind: 'action';
+  action: WorkflowAction;
+}
+export type WorkflowNode = TriggerNode | ConditionNode | ActionNode;
+
+export interface WorkflowEdge {
+  from: string;
+  to: string;
+  /** Only valid on an edge OUT of a condition node: which branch it represents. */
+  branch?: 'true' | 'false';
+}
+
+export interface WorkflowGraph {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+const nodeIdSchema = z.string().trim().min(1).max(NODE_ID);
+
+const workflowNodeSchema = z.discriminatedUnion('kind', [
+  z.object({ id: nodeIdSchema, kind: z.literal('trigger') }).strict(),
+  z
+    .object({ id: nodeIdSchema, kind: z.literal('condition'), condition: conditionGroupSchema })
+    .strict(),
+  z
+    .object({ id: nodeIdSchema, kind: z.literal('action'), action: workflowActionSchema })
+    .strict(),
+]);
+
+const workflowEdgeSchema = z
+  .object({
+    from: nodeIdSchema,
+    to: nodeIdSchema,
+    branch: z.enum(['true', 'false']).optional(),
+  })
+  .strict();
+
+/** Depth-first cycle check over the edge list. Returns true if a cycle exists. */
+function graphHasCycle(nodeIds: Set<string>, edges: WorkflowEdge[]): boolean {
+  const adj = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!nodeIds.has(e.from) || !nodeIds.has(e.to)) continue;
+    const list = adj.get(e.from);
+    if (list) list.push(e.to);
+    else adj.set(e.from, [e.to]);
+  }
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  let cycle = false;
+  // Iterative DFS with an explicit color map (recursion would be fine at N≤40,
+  // but an explicit walk avoids any stack-depth surprise and is easy to read).
+  const visit = (start: string) => {
+    const stack: string[] = [start];
+    while (stack.length) {
+      const u = stack[stack.length - 1];
+      const c = color.get(u) ?? WHITE;
+      if (c === WHITE) {
+        color.set(u, GRAY);
+        for (const v of adj.get(u) ?? []) {
+          const cv = color.get(v) ?? WHITE;
+          if (cv === GRAY) {
+            cycle = true;
+            return;
+          }
+          if (cv === WHITE) stack.push(v);
+        }
+      } else {
+        if (c === GRAY) color.set(u, BLACK);
+        stack.pop();
+      }
+    }
+  };
+  for (const id of nodeIds) {
+    if ((color.get(id) ?? WHITE) === WHITE) {
+      visit(id);
+      if (cycle) return true;
+    }
+  }
+  return false;
+}
+
+export const workflowGraphSchema: z.ZodType<WorkflowGraph> = z
+  .object({
+    nodes: z.array(workflowNodeSchema).min(1).max(MAX_GRAPH_NODES),
+    edges: z.array(workflowEdgeSchema).max(MAX_GRAPH_EDGES),
+  })
+  .strict()
+  .superRefine((graph, ctx) => {
+    // Unique ids.
+    const ids = new Set<string>();
+    for (const n of graph.nodes) {
+      if (ids.has(n.id)) {
+        ctx.addIssue({ code: 'custom', message: `duplicate node id: ${n.id}`, path: ['nodes'] });
+      }
+      ids.add(n.id);
+    }
+
+    // Exactly one trigger node (the entry point).
+    const triggerCount = graph.nodes.filter((n) => n.kind === 'trigger').length;
+    if (triggerCount !== 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `graph must have exactly one trigger node (found ${triggerCount})`,
+        path: ['nodes'],
+      });
+    }
+
+    const nodeById = new Map(graph.nodes.map((n) => [n.id, n] as const));
+
+    // Edge integrity + branch-label rules.
+    const branchSeen = new Map<string, Set<string>>();
+    graph.edges.forEach((e, i) => {
+      if (!ids.has(e.from)) {
+        ctx.addIssue({ code: 'custom', message: `edge.from references unknown node: ${e.from}`, path: ['edges', i, 'from'] });
+      }
+      if (!ids.has(e.to)) {
+        ctx.addIssue({ code: 'custom', message: `edge.to references unknown node: ${e.to}`, path: ['edges', i, 'to'] });
+      }
+      if (e.from === e.to) {
+        ctx.addIssue({ code: 'custom', message: 'an edge cannot loop a node to itself', path: ['edges', i] });
+      }
+      // Nothing may point AT the trigger (it's the entry).
+      if (nodeById.get(e.to)?.kind === 'trigger') {
+        ctx.addIssue({ code: 'custom', message: 'the trigger node cannot have incoming edges', path: ['edges', i, 'to'] });
+      }
+      if (e.branch !== undefined) {
+        const src = nodeById.get(e.from);
+        if (src && src.kind !== 'condition') {
+          ctx.addIssue({ code: 'custom', message: 'a branch label is only valid on an edge out of a condition node', path: ['edges', i, 'branch'] });
+        }
+        const seen = branchSeen.get(e.from) ?? new Set<string>();
+        if (seen.has(e.branch)) {
+          ctx.addIssue({ code: 'custom', message: `condition node ${e.from} already has a "${e.branch}" branch`, path: ['edges', i, 'branch'] });
+        }
+        seen.add(e.branch);
+        branchSeen.set(e.from, seen);
+      }
+    });
+
+    // Acyclic.
+    if (graphHasCycle(ids, graph.edges)) {
+      ctx.addIssue({ code: 'custom', message: 'the workflow graph must be acyclic (a cycle was detected)', path: ['edges'] });
+    }
+  }) as unknown as z.ZodType<WorkflowGraph>;
+
+// ───────────────────────────────────────────────────────────────────────────
 // Autonomy + the assembled definition.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -243,6 +429,12 @@ export interface WorkflowDefinition {
   conditions: ConditionGroup;
   actions: WorkflowAction[];
   autonomy: WorkflowAutonomy;
+  /**
+   * OPTIONAL advanced-mode branching graph. When present, the engine walks the
+   * graph instead of the linear `actions[]`. Absent for every linear workflow
+   * (the default), so the existing model is fully backward-compatible.
+   */
+  graph?: WorkflowGraph;
 }
 
 export const workflowDefinitionSchema = z
@@ -251,6 +443,7 @@ export const workflowDefinitionSchema = z
     conditions: conditionGroupSchema,
     actions: z.array(workflowActionSchema).max(MAX_ACTIONS),
     autonomy: workflowAutonomySchema,
+    graph: workflowGraphSchema.optional(),
   })
   .strict();
 
