@@ -38,6 +38,7 @@ import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
 import { recordInboundMessage } from '@/lib/inbox';
 import { normalizeEmail } from '@/lib/contact-dedup';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { CalendarProvider } from '@/lib/calendar/mirror';
 import type { IntegrationConnectionRow } from './connections';
 
@@ -1314,6 +1315,44 @@ export async function dispatchTrigger(args: {
       connection: args.connection,
       payload: args.payload,
     });
+  }
+
+  // Workflow dispatch — fire-and-forget, AFTER the inbound captures/sync above
+  // and BEFORE the kind-based routing returns so it runs for EVERY delivery
+  // regardless of dispatch kind. STRICTLY best-effort: any failure is logged
+  // and swallowed; this never throws out of dispatchTrigger and never changes
+  // the dispatch outcome the receiver depends on.
+  //
+  // The per-toolkit/event narrowing is left to each workflow's conditions for
+  // now (runWorkflowsForEvent matches on trigger.type === 'integration_event').
+  // FUTURE REFINEMENT: narrow on toolkit + event slug inside runWorkflowsForEvent
+  // so a workflow keyed to a specific event isn't evaluated for every delivery.
+  try {
+    await runWorkflowsForEvent({
+      spaceId: args.connection.spaceId,
+      triggerType: 'integration_event',
+      context: {
+        event: {
+          type: 'integration_event',
+          toolkit: args.connection.toolkit,
+          event: args.triggerSlug,
+          deliveryId: args.deliveryId ?? '',
+          payload: args.payload ?? {},
+        },
+      },
+      triggerEvent: {
+        slug: args.triggerSlug,
+        toolkit: args.connection.toolkit,
+        deliveryId: args.deliveryId ?? '',
+        payload: args.payload ?? {},
+      },
+    });
+  } catch (err) {
+    logger.error(
+      '[integrations.triggers] workflow dispatch failed (non-fatal)',
+      { slug: args.triggerSlug, connectionId: args.connection.id },
+      err,
+    );
   }
 
   const kind: TriggerKind | undefined = TRIGGER_DISPATCH[args.triggerSlug];
