@@ -55,13 +55,14 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/chippi/brief', label: 'Brief' },
       { href: '/chippi/inbox', label: 'Inbox' },
-      // Activity = the live cross-app event feed (/chippi/triggers). History =
-      // Chippi's own action log (/chippi/history). Integrations = the
-      // connect/disconnect management surface. These three were previously
-      // mislabeled (Activity↔Integrations crossed, no dedicated Integrations
-      // page), which is what made the dropdown feel broken.
-      { href: '/chippi/triggers', label: 'Activity' },
-      { href: '/chippi/history', label: 'History' },
+      // Activity = the ONE unified, filterable timeline (/chippi/activity) that
+      // merges Chippi's own actions with the cross-app events it noticed —
+      // replacing the old split between /chippi/history (actions) and
+      // /chippi/triggers (events). Per-app trigger management still lives on
+      // /chippi/triggers (linked from the Activity page header), so the live
+      // feed is subsumed without losing the listen on/off toggles.
+      // Integrations = the connect/disconnect management surface.
+      { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/integrations', label: 'Integrations' },
       { href: '/routines', label: 'Routines' },
       { href: '/workflows', label: 'Workflows' },
