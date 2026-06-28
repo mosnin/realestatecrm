@@ -15,7 +15,7 @@
  * delete-with-confirm.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -92,6 +92,7 @@ interface WorkflowRecord {
   lastRunAt: string | null;
   lastRunStatus: 'ok' | 'error' | 'skipped' | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface TestStep {
@@ -396,6 +397,31 @@ export function WorkflowsManager() {
     }
   }
 
+  async function renameWorkflow(id: string, name: string) {
+    // Optimistic rename — feels instant.
+    setWorkflows((ws) => ws.map((w) => (w.id === id ? { ...w, name } : w)));
+    try {
+      const res = await fetch(`${API_BASE}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        // Revert on failure.
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || "Couldn't rename the workflow.");
+        // Reload to get the true name back.
+        const reload = await fetch(API_BASE);
+        if (reload.ok) {
+          const d = await reload.json();
+          setWorkflows(Array.isArray(d.workflows) ? (d.workflows as WorkflowRecord[]) : []);
+        }
+      }
+    } catch {
+      setActionError("Network hiccup — rename didn't save.");
+    }
+  }
+
   async function toggleWorkflow(workflow: WorkflowRecord) {
     const next = !workflow.enabled;
     // Optimistic — the Switch should feel instant.
@@ -663,6 +689,7 @@ export function WorkflowsManager() {
                     onTest={() => testWorkflow(workflow.id)}
                     onDuplicate={() => duplicateWorkflow(workflow)}
                     onDelete={() => deleteWorkflow(workflow.id)}
+                    onRename={(name) => renameWorkflow(workflow.id, name)}
                   />
                 ))}
               </div>
@@ -832,6 +859,7 @@ function WorkflowRow({
   onTest,
   onDuplicate,
   onDelete,
+  onRename,
 }: {
   workflow: WorkflowRecord;
   highlighted: boolean;
@@ -846,8 +874,11 @@ function WorkflowRow({
   onTest: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onRename: (name: string) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [renamingName, setRenamingName] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Run history (audit trail) — lazy: fetched the first time the row is expanded.
   const [showHistory, setShowHistory] = useState(false);
@@ -877,6 +908,19 @@ function WorkflowRow({
     if (next && runs === null && !runsLoading) void loadHistory();
   }
 
+  function startRename() {
+    setRenamingName(workflow.name);
+    // Focus the input on the next paint.
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  function commitRename() {
+    const trimmed = renamingName?.trim() ?? '';
+    setRenamingName(null);
+    if (!trimmed || trimmed === workflow.name) return;
+    onRename(trimmed);
+  }
+
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
   const hasExpansion = !!(testResult || showHistory);
 
@@ -898,9 +942,30 @@ function WorkflowRow({
         {/* Col 1 — Name + visual flow */}
         <div className="min-w-0 pr-3">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium leading-snug text-foreground">
-              {workflow.name}
-            </p>
+            {renamingName !== null ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renamingName}
+                onChange={(e) => setRenamingName(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                  if (e.key === 'Escape') setRenamingName(null);
+                }}
+                maxLength={120}
+                className="min-w-0 flex-1 rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+                autoFocus
+              />
+            ) : (
+              <p
+                className="truncate text-sm font-medium leading-snug text-foreground cursor-text"
+                onDoubleClick={startRename}
+                title="Double-click to rename"
+              >
+                {workflow.name}
+              </p>
+            )}
             {workflow.enabled && (
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
             )}
