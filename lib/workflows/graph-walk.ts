@@ -32,6 +32,8 @@ export interface GraphActionResult {
 }
 
 export interface GraphWalkStep {
+  /** The graph node this step ran — lets the canvas highlight the executed path. */
+  nodeId: string;
   kind: 'condition' | 'action';
   status: GraphStepStatus;
   actionType?: string | null;
@@ -91,6 +93,7 @@ export async function walkGraph(
       const result = await handlers.runAction(node.action);
       if (result.status === 'failed') anyFailed = true;
       steps.push({
+        nodeId: node.id,
         kind: 'action',
         status: result.status,
         actionType: node.action.type,
@@ -103,6 +106,7 @@ export async function walkGraph(
     // condition
     const passed = handlers.evaluate(node.condition);
     steps.push({
+      nodeId: node.id,
       kind: 'condition',
       status: 'ok',
       detail: { passed, branch: passed ? 'true' : 'false' },

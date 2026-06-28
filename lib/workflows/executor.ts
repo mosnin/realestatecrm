@@ -185,7 +185,9 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
           kind: s.kind,
           actionType: s.actionType ?? null,
           status: s.status,
-          detail: s.detail ?? null,
+          // Carry the source nodeId in the step detail (no dedicated column) so
+          // the canvas can highlight which nodes ran on the executed path.
+          detail: { ...(s.detail ?? {}), nodeId: s.nodeId },
         });
       }
       if (walk.status === 'failed') {

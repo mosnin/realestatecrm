@@ -161,4 +161,10 @@ describe('walkGraph — branching', () => {
     await walkGraph(branchGraph, { evaluate, runAction: okAction });
     expect(evaluate).toHaveBeenCalledTimes(1);
   });
+
+  it('tags every step with the node id that ran (for canvas highlighting)', async () => {
+    const res = await walkGraph(branchGraph, { evaluate: () => true, runAction: okAction });
+    // condition 'c' then action 'hot' on the true branch.
+    expect(res.steps.map((s) => s.nodeId)).toEqual(['c', 'hot']);
+  });
 });
