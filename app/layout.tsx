@@ -7,7 +7,7 @@ import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { MotionProvider } from '@/components/motion/motion-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { SentryUser } from '@/components/observability/sentry-user';
-import { MetaPixel } from '@/components/analytics/meta-pixel';
+import { MarketingPixels } from '@/components/analytics/marketing-pixels';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -62,7 +62,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased bg-background text-foreground">
-        <MetaPixel />
+        <MarketingPixels />
         <ThemeProvider>
           <AmplitudeProvider>
             <MotionProvider>

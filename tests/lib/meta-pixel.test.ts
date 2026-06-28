@@ -7,12 +7,12 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { mpTrack } from '@/lib/analytics/meta-pixel';
 import {
-  mpTrack,
   trackSignUp,
   trackOnboardingComplete,
   trackPurchase,
-} from '@/lib/analytics/meta-pixel';
+} from '@/lib/analytics/events';
 
 declare global {
   // eslint-disable-next-line no-var

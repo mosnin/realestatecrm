@@ -1,9 +1,10 @@
 /**
- * Meta (Facebook) Pixel — client-side helpers.
+ * Meta (Facebook) Pixel — low-level client helpers.
  *
- * The base pixel is injected once by <MetaPixel> (see
- * components/analytics/meta-pixel.tsx); these helpers are the typed call sites
- * for the conversion events we care about: signup, onboarding, and purchase.
+ * The base pixel is injected once by <MarketingPixels>; these are the raw fbq
+ * senders. The cross-platform conversion helpers (trackSignUp / trackPurchase /
+ * …) live in lib/analytics/events.ts and fan out to Meta + every other
+ * configured provider — import those, not these, from product code.
  *
  * Everything here is browser-only and best-effort: if the pixel isn't
  * configured (no id) or `fbq` hasn't loaded yet, the calls no-op rather than
@@ -52,29 +53,4 @@ export function mpTrackCustom(event: string, params?: Record<string, unknown>): 
  *  client-side route changes in the App Router, which don't reload the page). */
 export function mpPageView(): void {
   mpTrack('PageView');
-}
-
-/** Signup — a Clerk account was created and onboarding finished activating it. */
-export function trackSignUp(params?: { method?: string }): void {
-  mpTrack('CompleteRegistration', { status: true, ...params });
-}
-
-/** Onboarding finished — the realtor/broker completed workspace setup. Custom
- *  event so it's distinguishable from the raw signup in Meta's funnel. */
-export function trackOnboardingComplete(params?: { accountType?: string }): void {
-  mpTrackCustom('CompleteOnboarding', params);
-}
-
-/** Purchase — a Stripe subscription/top-up checkout completed. */
-export function trackPurchase(params: {
-  value?: number;
-  currency?: string;
-  contentName?: string;
-}): void {
-  const { value, currency = 'USD', contentName } = params;
-  mpTrack('Purchase', {
-    currency,
-    ...(typeof value === 'number' ? { value } : {}),
-    ...(contentName ? { content_name: contentName } : {}),
-  });
 }

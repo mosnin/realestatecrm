@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
+import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
 import {
   Briefcase,
   Building2,

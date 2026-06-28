@@ -6,7 +6,7 @@
 declare global {
   interface Window {
     fbq?: (...args: unknown[]) => void;
-    ttq?: { track: (...args: unknown[]) => void };
+    ttq?: { track: (...args: unknown[]) => void; page?: () => void };
     gtag?: (...args: unknown[]) => void;
     twq?: (...args: unknown[]) => void;
     lintrk?: (action: string, data: Record<string, unknown>) => void;

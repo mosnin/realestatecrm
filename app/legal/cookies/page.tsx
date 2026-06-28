@@ -8,7 +8,7 @@ export default function CookiePolicyPage() {
     <article className="space-y-10">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Cookie Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 2, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 24, 2026</p>
         <p className="text-sm text-muted-foreground">Effective: April 2, 2026</p>
       </header>
 
@@ -68,7 +68,8 @@ export default function CookiePolicyPage() {
             <li>Identify performance issues and errors.</li>
             <li>Measure the effectiveness of product improvements.</li>
           </ul>
-          <p>4.3. Analytics data is collected in aggregate form and does not identify individual users for marketing purposes.</p>
+          <p>4.3. We use analytics cookies and similar technologies from <strong className="text-foreground">Google Analytics</strong>, <strong className="text-foreground">Microsoft Clarity</strong>, and <strong className="text-foreground">Amplitude</strong>. Microsoft Clarity and Amplitude may also record session replays (such as mouse movement, clicks, and scrolling) to help us diagnose usability issues; we configure these tools to mask sensitive input fields.</p>
+          <p>4.4. Analytics data is used to improve the performance and usability of the Service. Cookies used for marketing and advertising are described separately in Section 5A.</p>
         </div>
       </section>
 
@@ -80,9 +81,20 @@ export default function CookiePolicyPage() {
           <ul className="list-disc pl-5 space-y-2">
             <li><strong className="text-foreground">Clerk.</strong> Sets cookies for user authentication, session management, and security tokens. These are essential cookies required for login functionality.</li>
             <li><strong className="text-foreground">Stripe.</strong> Sets cookies for payment processing, fraud prevention, and billing session management. These cookies are set when you interact with payment forms or manage your subscription.</li>
+            <li><strong className="text-foreground">Google, Meta, Microsoft, LinkedIn, TikTok, Pinterest, and Reddit.</strong> Set analytics and advertising cookies when these technologies are active. See Section 5A.</li>
           </ul>
           <p>5.2. Third-party cookies are governed by the respective third party&apos;s cookie and privacy policies. We do not control the cookies set by third parties.</p>
-          <p>5.3. We do not use advertising or marketing cookies. We do not serve ads on the Service.</p>
+        </div>
+      </section>
+
+      {/* 5A. Advertising and Marketing Cookies */}
+      <section>
+        <h2 className="text-xl font-semibold">5A. Advertising and Marketing Cookies</h2>
+        <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
+          <p>5A.1. On our public marketing website, and to a limited extent within the Service, we use advertising and conversion-measurement cookies and pixels so we can measure the performance of our own marketing and reach people who have shown interest in Chippi. These may include the <strong className="text-foreground">Meta (Facebook) Pixel</strong>, <strong className="text-foreground">Google Ads</strong>, <strong className="text-foreground">Microsoft Advertising (UET)</strong>, the <strong className="text-foreground">LinkedIn Insight Tag</strong>, and the <strong className="text-foreground">TikTok</strong>, <strong className="text-foreground">Pinterest</strong>, and <strong className="text-foreground">Reddit</strong> pixels.</p>
+          <p>5A.2. These cookies record actions such as page views, account signups, onboarding completion, and purchases, and may be used by these platforms to attribute conversions and to show you Chippi ads on their services (including retargeting).</p>
+          <p>5A.3. <strong className="text-foreground">We do not display third-party advertisements inside the authenticated product</strong>, and we do not sell your personal information for money. Some of these cookies may nonetheless constitute &quot;sharing&quot; or a &quot;sale&quot; for cross-context behavioral advertising under certain U.S. state privacy laws; see Section 14B of our <a href="/legal/privacy" className="underline hover:text-foreground">Privacy Policy</a> for your opt-out rights, including Global Privacy Control.</p>
+          <p>5A.4. You can opt out of these cookies using your browser controls (Section 6) and the industry opt-out tools listed there.</p>
         </div>
       </section>
 
@@ -99,6 +111,7 @@ export default function CookiePolicyPage() {
           </ul>
           <p>6.2. Please note that disabling essential cookies will prevent you from logging in and using the Service. Disabling functional cookies may degrade your experience.</p>
           <p>6.3. For instructions on managing cookies in specific browsers, please visit your browser&apos;s help documentation.</p>
+          <p>6.4. <strong className="text-foreground">Opting out of advertising cookies.</strong> To opt out of interest-based advertising, you can use the <a href="https://optout.aboutads.info/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance</a>, the <a href="https://optout.networkadvertising.org/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Network Advertising Initiative</a>, and (in Europe) <a href="https://www.youronlinechoices.eu/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Your Online Choices</a>. You can manage Google advertising in <a href="https://adssettings.google.com/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> and opt out of Google Analytics with Google&apos;s <a href="https://tools.google.com/dlpage/gaoptout" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">opt-out browser add-on</a>. Many browsers also support a <a href="https://globalprivacycontrol.org/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Global Privacy Control</a> signal, which we honor as an opt-out of &quot;sale&quot;/&quot;sharing&quot; where required by law.</p>
         </div>
       </section>
 

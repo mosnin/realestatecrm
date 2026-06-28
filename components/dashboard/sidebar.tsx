@@ -969,6 +969,7 @@ function BrokerSidebarConversations() {
 //   • Settings → no header (bottom-pinned)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const AUTOMATION_HREFS = new Set<string>(['/automations']);
 const WORKSPACE_HREFS = new Set<string>([
   '/contacts',
   '/deals',
@@ -1116,6 +1117,11 @@ function RealtorNav({
 
   // AI-related items always sit at the top
   const aiItems = realtorNavItems.filter((item) => item.isAI);
+  // Automations — top-level, sits between Chippi and the workspace bucket.
+  // No section header: it's prominent enough to stand alone.
+  const automationItems = realtorNavItems.filter(
+    (item) => !item.isAI && AUTOMATION_HREFS.has(item.href),
+  );
   // Workspace bucket — daily work surfaces (gets the WORKSPACE small-caps
   // header above it). Filtered through the canonical realtorNavItems order
   // so route additions inherit the order without touching this file.
@@ -1148,6 +1154,7 @@ function RealtorNav({
     (item) =>
       !item.isAI &&
       item.href !== '/settings' &&
+      !AUTOMATION_HREFS.has(item.href) &&
       !WORKSPACE_HREFS.has(item.href) &&
       !SETUP_HREFS.has(item.href),
   );
@@ -1263,6 +1270,11 @@ function RealtorNav({
             No header above this bucket: Chippi is the brand mark; it
             doesn't need a category to belong to. */}
         {aiItems.map(renderItem)}
+
+        {/* Automations — sits immediately below Chippi, no section header.
+            Prominent enough to stand alone between the AI and workspace
+            buckets. */}
+        {automationItems.map(renderItem)}
 
         {/* RECORDS — daily work surfaces (the realtor's book of business:
             People, Deals, Properties, etc.). Labeled to match the

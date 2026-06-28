@@ -29,7 +29,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/meta-pixel';
+import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { rootDomain, cn } from '@/lib/utils';
 import { pluralize } from '@/lib/formatting';
