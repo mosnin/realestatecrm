@@ -1115,10 +1115,10 @@ export function WorkflowBuilder({
               <button
                 type="button"
                 onClick={() => patch({ actions: [...state.actions, newActionRow()] })}
-                className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-border/60 px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-foreground/[0.02] hover:text-foreground"
+                className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-orange-300/70 px-5 py-2.5 text-sm font-semibold text-orange-500 transition-all hover:border-orange-400 hover:bg-orange-50/60 hover:shadow-sm active:scale-[0.98] dark:border-orange-500/40 dark:text-orange-400 dark:hover:bg-orange-950/30"
               >
-                <Plus size={13} aria-hidden />
-                Add an action
+                <Plus size={15} aria-hidden />
+                Add step
               </button>
             </div>
           )}

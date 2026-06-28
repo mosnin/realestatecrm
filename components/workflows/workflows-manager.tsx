@@ -1496,7 +1496,7 @@ function TemplateGallery({
 
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
-    return WORKFLOW_TEMPLATES.filter((t) => {
+    const filtered = WORKFLOW_TEMPLATES.filter((t) => {
       const matchesSearch =
         !query ||
         t.name.toLowerCase().includes(query) ||
@@ -1504,6 +1504,8 @@ function TemplateGallery({
       const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
+    // Popular templates float to the top (stable sort — preserves relative order within each group)
+    return [...filtered].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
   }, [q, categoryFilter]);
 
   return (
@@ -1512,8 +1514,8 @@ function TemplateGallery({
         <p className="text-[15px] font-medium text-foreground">
           What should Chippi handle for you?
         </p>
-        <p className={CAPTION}>
-          Pick a template — you see exactly what it does before anything turns on.
+        <p className={cn(CAPTION, 'flex items-center gap-1.5')}>
+          <span>{WORKFLOW_TEMPLATES.length} ready-made automations — pick one, see exactly what it does, then turn it on.</span>
         </p>
       </div>
 
@@ -1625,14 +1627,14 @@ function TemplateGallery({
             })}
           </motion.ul>
 
-          <div className="flex items-center gap-2 pt-1">
-            <span className={CAPTION}>Prefer to start blank?</span>
+          <div className="flex items-center justify-center gap-3 pt-2 border-t border-border/40">
+            <span className={CAPTION}>Don't see what you need?</span>
             <button
               type="button"
               onClick={onScratch}
-              className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-foreground/30 hover:bg-foreground/[0.03]"
             >
-              <Plus size={13} aria-hidden />
+              <Plus size={12} aria-hidden />
               Build from scratch
             </button>
           </div>
@@ -1656,7 +1658,7 @@ function TemplatePicker({
 
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
-    return WORKFLOW_TEMPLATES.filter((t) => {
+    const filtered = WORKFLOW_TEMPLATES.filter((t) => {
       const matchesSearch =
         !query ||
         t.name.toLowerCase().includes(query) ||
@@ -1664,6 +1666,7 @@ function TemplatePicker({
       const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
+    return [...filtered].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
   }, [q, categoryFilter]);
 
   return (
