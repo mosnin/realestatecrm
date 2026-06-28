@@ -54,6 +54,8 @@ export interface ActionStepResult {
 export interface ExecuteActionOptions {
   spaceId: string;
   autonomy: WorkflowAutonomy;
+  /** The WorkflowRun id, threaded for audit correlation on scheduled rows. */
+  runId?: string;
 }
 
 /**
@@ -189,19 +191,50 @@ async function runCreateTask(
 }
 
 /**
- * schedule_message — record INTENT only. The actual delayed dispatch is a later
- * phase (Phase 4 wires a dispatcher that reads these intents and fires the send
- * after `delayMinutes`). Here we just return ok with the intent payload; nothing
- * leaves, so this is drafts-safe.
+ * schedule_message — persist a deferred outbound INTENT into "ScheduledMessage".
+ * Still no send at action time: we only write the row with a future `sendAt`
+ * (now + delayMinutes) and the workflow's autonomy. The scheduled-message cron
+ * (lib/workflows/scheduled-dispatch.ts) consumes due rows later and enforces the
+ * autonomy posture there — draft/notify never send; only 'auto' may send.
+ *
+ * The recipient is the contact (preferred) or lead id from context, captured as
+ * a plain text pointer the dispatcher resolves at send time. A row with no
+ * recipient is still scheduled — the dispatcher will draft/skip rather than
+ * mis-send.
  */
-function runScheduleMessage(
+async function runScheduleMessage(
   action: Extract<WorkflowAction, { type: 'schedule_message' }>,
-): ActionStepResult {
+  context: WorkflowContext,
+  opts: ExecuteActionOptions,
+): Promise<ActionStepResult> {
   const { channel, instruction, delayMinutes } = action.config;
-  // Phase 4 wires the dispatch that consumes this intent; for now it's a record.
+  const sendAt = new Date(Date.now() + delayMinutes * 60_000).toISOString();
+  const recipientContactId = resolveContactId(context);
+  const scheduledMessageId = crypto.randomUUID();
+  const nowIso = new Date().toISOString();
+
+  const { error } = await supabase.from('ScheduledMessage').insert({
+    id: scheduledMessageId,
+    spaceId: opts.spaceId,
+    workflowId: null,
+    runId: opts.runId ?? null,
+    channel,
+    recipientContactId,
+    instruction,
+    sendAt,
+    autonomy: opts.autonomy,
+    status: 'pending',
+    detail: null,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  });
+  if (error) {
+    return { status: 'failed', detail: { error: error.message, channel, sendAt } };
+  }
+
   return {
     status: 'ok',
-    detail: { scheduledForMinutes: delayMinutes, channel, instruction },
+    detail: { scheduledMessageId, sendAt, channel, autonomy: opts.autonomy, recipientContactId },
   };
 }
 
@@ -283,7 +316,7 @@ export async function executeAction(
       case 'create_task':
         return await runCreateTask(action, context, opts.spaceId);
       case 'schedule_message':
-        return runScheduleMessage(action);
+        return await runScheduleMessage(action, context, opts);
       case 'call_integration':
         return await runCallIntegration(action, opts.spaceId, opts.autonomy);
       default: {

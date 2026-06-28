@@ -946,6 +946,37 @@ export type AgentRunLedger = {
   updatedAt: string;
 };
 
+// ── Scheduled Message ──
+// One row per workflow `schedule_message` action: a deferred outbound intent the
+// scheduled-message dispatcher consumes per autonomy. Mirrors the
+// "ScheduledMessage" table (supabase/migrations/20260803000000_scheduled_messages.sql).
+// SAFETY: draft/notify never send; only 'auto' may. See lib/workflows/scheduled-dispatch.
+
+/** Lifecycle of one scheduled message. See the migration header. */
+export type ScheduledMessageStatus = 'pending' | 'drafted' | 'sent' | 'failed' | 'canceled';
+
+export type ScheduledMessage = {
+  id: string;
+  spaceId: string;
+  /** The workflow that scheduled this; null when scheduled outside a workflow. */
+  workflowId: string | null;
+  /** The WorkflowRun that scheduled this, for audit correlation. */
+  runId: string | null;
+  channel: 'sms' | 'email';
+  /** The Contact/Lead id the message addresses, resolved at send time. */
+  recipientContactId: string | null;
+  instruction: string;
+  /** When the dispatcher should act: schedule time + the action's delayMinutes. */
+  sendAt: string;
+  /** The leash inherited from the workflow at schedule time. */
+  autonomy: 'draft' | 'notify' | 'auto';
+  status: ScheduledMessageStatus;
+  /** Outcome record (draftId, deliveredTo, error, audit note…). */
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ── Agent profitability / ROI (broker analytics) ────────────────────────────
 // Additive types for the per-agent profitability rollup. The aggregation logic
 // lives in lib/agent-profitability.ts (pure, testable); these are the row

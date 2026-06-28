@@ -180,6 +180,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
       const result: ActionStepResult = await executeAction(action, context, {
         spaceId: workflow.spaceId,
         autonomy: workflow.autonomy,
+        runId,
       });
       if (result.status === 'failed') anyFailed = true;
       await writeStep({

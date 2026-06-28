@@ -257,14 +257,33 @@ describe('runWorkflow — a failing action', () => {
 });
 
 describe('executeAction — schedule_message + create_task', () => {
-  it('schedule_message records intent only (no send)', async () => {
+  it('schedule_message inserts a ScheduledMessage row (no send at action time)', async () => {
     const action: WorkflowAction = {
       type: 'schedule_message',
       config: { channel: 'sms', instruction: 'check in', delayMinutes: 60 },
     };
-    const result = await executeAction(action, {}, { spaceId: 'space-1', autonomy: 'auto' });
+    const result = await executeAction(
+      action,
+      { contact: { id: 'contact-7' } },
+      { spaceId: 'space-1', autonomy: 'auto', runId: 'run-9' },
+    );
     expect(result.status).toBe('ok');
-    expect(result.detail).toMatchObject({ scheduledForMinutes: 60, channel: 'sms', instruction: 'check in' });
+    // The action now PERSISTS a deferred intent; the actual dispatch is the
+    // scheduled-message cron's job. No send leaves at action time.
+    expect(result.detail).toMatchObject({ channel: 'sms', autonomy: 'auto', recipientContactId: 'contact-7' });
+    expect(result.detail.scheduledMessageId).toBeTruthy();
+    expect(result.detail.sendAt).toBeTruthy();
+
+    const inserted = calls.find((c) => c.table === 'ScheduledMessage' && c.op === 'insert')
+      ?.payload as Record<string, unknown> | undefined;
+    expect(inserted).toBeDefined();
+    expect(inserted!.spaceId).toBe('space-1');
+    expect(inserted!.channel).toBe('sms');
+    expect(inserted!.autonomy).toBe('auto');
+    expect(inserted!.status).toBe('pending');
+    expect(inserted!.recipientContactId).toBe('contact-7');
+    expect(inserted!.runId).toBe('run-9');
+
     expect(runAutonomousInstructionMock).not.toHaveBeenCalled();
   });
 

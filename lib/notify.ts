@@ -327,6 +327,87 @@ export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> 
   await Promise.allSettled(promises);
 }
 
+// ── Workflow scheduled-message dispatch (draft ready / auto-send) ─────────
+
+export interface NotifyWorkflowDispatchParams {
+  spaceId: string;
+  /** Channel of the scheduled message ('sms' | 'email'). */
+  channel: string;
+  /** Best-effort recipient display (name or id), for the notification body. */
+  recipient?: string | null;
+}
+
+/**
+ * Notify the space owner that the scheduled-message dispatcher created a DRAFT
+ * for them to review (the 'notify' autonomy posture, and the 'auto' safety
+ * fallback). This is the "Chippi drafted something — tap to send" nudge; nothing
+ * has left. Best-effort, never throws. Push + SMS are immediate (the realtor's
+ * own alert, not a client message); gated by the owner's channel toggles.
+ */
+export async function notifyDraftReady(params: NotifyWorkflowDispatchParams): Promise<void> {
+  const info = await getSpaceOwnerInfo(params.spaceId);
+  if (!info) return;
+
+  const who = params.recipient ? ` to ${params.recipient}` : '';
+  const promises: Promise<unknown>[] = [];
+
+  if (info.pushEnabled) {
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: 'Chippi drafted a message',
+        body: `A ${params.channel} draft${who} is ready to review and send.`,
+        url: `/s/${info.spaceSlug}`,
+      }).catch((err) => logger.error('[notify] draft-ready push failed', { spaceId: params.spaceId }, err)),
+    );
+  }
+
+  if (info.smsEnabled && info.ownerPhone) {
+    promises.push(
+      sendSMS({
+        to: info.ownerPhone,
+        body: `${info.spaceName}: Chippi drafted a ${params.channel}${who} — review & send in the app.`,
+      }).catch((err) => logger.error('[notify] draft-ready SMS failed', { spaceId: params.spaceId }, err)),
+    );
+  }
+
+  await Promise.allSettled(promises);
+}
+
+/**
+ * Notify the space owner that the dispatcher AUTONOMOUSLY SENT a message (the
+ * 'auto' autonomy posture). This is the audit-trail alert required for every
+ * autonomous send: the realtor must learn, after the fact, that Chippi sent
+ * without a tap. Best-effort, never throws.
+ */
+export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Promise<void> {
+  const info = await getSpaceOwnerInfo(params.spaceId);
+  if (!info) return;
+
+  const who = params.recipient ? ` to ${params.recipient}` : '';
+  const promises: Promise<unknown>[] = [];
+
+  if (info.pushEnabled) {
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: 'Chippi sent a message',
+        body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+        url: `/s/${info.spaceSlug}`,
+      }).catch((err) => logger.error('[notify] auto-send push failed', { spaceId: params.spaceId }, err)),
+    );
+  }
+
+  if (info.smsEnabled && info.ownerPhone) {
+    promises.push(
+      sendSMS({
+        to: info.ownerPhone,
+        body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}.`,
+      }).catch((err) => logger.error('[notify] auto-send SMS failed', { spaceId: params.spaceId }, err)),
+    );
+  }
+
+  await Promise.allSettled(promises);
+}
+
 // ── New Contact (manually added) ─────────────────────────────────────────
 
 export interface NotifyNewContactParams {
