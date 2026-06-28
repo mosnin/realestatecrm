@@ -323,7 +323,7 @@ interface ExtractedEvent {
  * Voice rule (instruction `action`): describe a JUDGMENT to make, not a
  * rulebook. The model knows the realtor's CRM and history.
  */
-const EXTRACTORS: Record<string, (p: Record<string, unknown>) => ExtractedEvent | null> = {
+export const EXTRACTORS: Record<string, (p: Record<string, unknown>) => ExtractedEvent | null> = {
   GMAIL_NEW_GMAIL_MESSAGE: (p) => {
     const subject = pickString(p, 'subject', 'messageSubject', 'message.subject');
     const from = pickString(p, 'sender', 'from', 'fromEmail', 'message.from');
@@ -1323,10 +1323,10 @@ export async function dispatchTrigger(args: {
   // and swallowed; this never throws out of dispatchTrigger and never changes
   // the dispatch outcome the receiver depends on.
   //
-  // The per-toolkit/event narrowing is left to each workflow's conditions for
-  // now (runWorkflowsForEvent matches on trigger.type === 'integration_event').
-  // FUTURE REFINEMENT: narrow on toolkit + event slug inside runWorkflowsForEvent
-  // so a workflow keyed to a specific event isn't evaluated for every delivery.
+  // runWorkflowsForEvent now narrows on toolkit + event slug (it reads
+  // context.event.toolkit/event below), so a workflow keyed to a specific event
+  // is only evaluated for that event's deliveries — no longer "every
+  // integration_event workflow on every delivery".
   try {
     await runWorkflowsForEvent({
       spaceId: args.connection.spaceId,

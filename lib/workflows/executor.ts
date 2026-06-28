@@ -233,6 +233,10 @@ export interface RunWorkflowsForEventInput {
  * workflow's `trigger.config.min`. This `min` gate is the REAL enforcement of
  * the threshold (workflow conditions remain an additional, independent filter);
  * without it a lead_score_threshold workflow would fire on every scored lead.
+ * An 'integration_event' workflow is likewise narrowed to its configured
+ * toolkit+event slug, so a Composio delivery only evaluates the workflows keyed
+ * to that exact app/event — replacing the old "every integration_event workflow
+ * on every delivery" behavior.
  * Runs are sequential — the volume per event is small and a workflow's actions
  * already bound themselves; sequential keeps the ordering deterministic and
  * avoids hammering the agent runner concurrently.
@@ -271,6 +275,21 @@ export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Pr
         return score >= min;
       });
     }
+  }
+
+  // Trigger-specific gate for integration_event: only run a workflow whose
+  // configured toolkit+event matches the delivery. The delivery's app/event
+  // ride on context.event.toolkit/event (set in dispatchTrigger). This replaces
+  // the old behavior of running EVERY integration_event workflow on EVERY
+  // Composio delivery; per-event narrowing now happens here, not in conditions.
+  if (input.triggerType === 'integration_event') {
+    const ev = input.context.event as Record<string, unknown> | undefined;
+    const eventToolkit = ev?.toolkit;
+    const eventSlug = ev?.event;
+    matching = matching.filter((w) => {
+      const cfg = w.trigger?.config as Record<string, unknown> | undefined;
+      return cfg?.toolkit === eventToolkit && cfg?.event === eventSlug;
+    });
   }
 
   for (const workflow of matching) {

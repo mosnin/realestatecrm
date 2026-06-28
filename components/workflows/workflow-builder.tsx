@@ -19,7 +19,8 @@
  * are add/remove only (no drag reorder) — both deliberately deferred for v1.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { Loader2, Plus, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -120,6 +121,49 @@ const AUTONOMY_CAPTION: Record<WorkflowAutonomy, string> = {
   auto: 'Actions run without approval, including sends and connected-app calls. Use with care.',
 };
 
+// ── Connected-app trigger options (for the integration_event picker) ─────────
+
+interface TriggerEventOption {
+  slug: string;
+  label: string;
+}
+interface TriggerAppOption {
+  toolkit: string;
+  label: string;
+  connectionId: string;
+  events: TriggerEventOption[];
+}
+
+type TriggerOptionsState =
+  | { status: 'loading' }
+  | { status: 'ready'; apps: TriggerAppOption[] }
+  | { status: 'error' };
+
+/**
+ * Fetch the space's connected apps + their available trigger events once on
+ * mount. The picker degrades gracefully on error/empty (the builder keeps a
+ * free-text fallback), so a failed load never hard-blocks authoring.
+ */
+function useTriggerOptions(): TriggerOptionsState {
+  const [state, setState] = useState<TriggerOptionsState>({ status: 'loading' });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/workflows/trigger-options')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { connections?: TriggerAppOption[] }) => {
+        if (cancelled) return;
+        setState({ status: 'ready', apps: data.connections ?? [] });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
+
 // ── Empty form state + row factories ─────────────────────────────────────────
 
 let rowSeq = 0;
@@ -185,6 +229,8 @@ export function WorkflowBuilder({
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');
+  /** Connected-app trigger options for the integration_event picker. */
+  const triggerOptions = useTriggerOptions();
 
   const suggestedFields = useMemo(
     () => fieldsForTrigger(state.trigger.type),
@@ -283,7 +329,11 @@ export function WorkflowBuilder({
               </SelectContent>
             </Select>
           </div>
-          <TriggerConfig state={state} patchTrigger={patchTrigger} />
+          <TriggerConfig
+            state={state}
+            patchTrigger={patchTrigger}
+            triggerOptions={triggerOptions}
+          />
         </div>
       </section>
 
@@ -453,9 +503,11 @@ export function WorkflowBuilder({
 function TriggerConfig({
   state,
   patchTrigger,
+  triggerOptions,
 }: {
   state: WorkflowFormState;
   patchTrigger: (next: Partial<WorkflowFormState['trigger']>) => void;
+  triggerOptions: TriggerOptionsState;
 }) {
   const t = state.trigger;
 
@@ -494,26 +546,12 @@ function TriggerConfig({
 
   if (t.type === 'integration_event') {
     return (
-      <div className="space-y-2.5">
-        <FieldRow label="Toolkit" htmlFor="wf-toolkit">
-          <Input
-            id="wf-toolkit"
-            value={t.toolkit}
-            onChange={(e) => patchTrigger({ toolkit: e.target.value })}
-            placeholder="gmail"
-            className="h-8"
-          />
-        </FieldRow>
-        <FieldRow label="Event" htmlFor="wf-event">
-          <Input
-            id="wf-event"
-            value={t.event}
-            onChange={(e) => patchTrigger({ event: e.target.value })}
-            placeholder="new_message"
-            className="h-8"
-          />
-        </FieldRow>
-      </div>
+      <IntegrationEventConfig
+        toolkit={t.toolkit}
+        event={t.event}
+        patchTrigger={patchTrigger}
+        triggerOptions={triggerOptions}
+      />
     );
   }
 
@@ -569,6 +607,117 @@ function TriggerConfig({
 
   // lead_created, tour_completed — no config.
   return <p className={CAPTION}>No extra settings — this trigger fires on its own.</p>;
+}
+
+// ── integration_event picker ─────────────────────────────────────────────────
+
+/**
+ * App → Event picker for the integration_event trigger. Drives the same
+ * toolkit/event form strings the schema expects (so build-definition and
+ * recordToFormState round-trip unchanged) — the picker just sets them from the
+ * realtor's connected apps instead of free text.
+ *
+ * Graceful states: while options load, a muted line; on error or no connected
+ * apps with triggers, a calm hint linking to integrations PLUS the free-text
+ * fallback, so the builder never hard-blocks. When an existing workflow's
+ * toolkit/event isn't among the connected apps (e.g. the app was disconnected),
+ * the free-text values still show via the fallback.
+ */
+function IntegrationEventConfig({
+  toolkit,
+  event,
+  patchTrigger,
+  triggerOptions,
+}: {
+  toolkit: string;
+  event: string;
+  patchTrigger: (next: Partial<WorkflowFormState['trigger']>) => void;
+  triggerOptions: TriggerOptionsState;
+}) {
+  // Routes are slug-scoped (/s/[slug]/…), so the integrations link has to carry
+  // the current space slug — a bare /chippi/integrations doesn't resolve.
+  const params = useParams();
+  const slug = params?.slug as string | undefined;
+  const integrationsHref = slug ? `/s/${slug}/chippi/integrations` : '/chippi/integrations';
+
+  if (triggerOptions.status === 'loading') {
+    return <p className={CAPTION}>Loading your connected apps…</p>;
+  }
+
+  const apps = triggerOptions.status === 'ready' ? triggerOptions.apps : [];
+  const selectedApp = apps.find((a) => a.toolkit === toolkit) ?? null;
+  // Show the picker only when there's at least one connected app to pick AND
+  // the current toolkit (if set) is one of them — otherwise fall back to
+  // free-text so a disconnected-app workflow stays editable.
+  const canPick = apps.length > 0 && (toolkit === '' || selectedApp !== null);
+
+  if (!canPick) {
+    return (
+      <div className="space-y-2.5">
+        <p className={CAPTION}>
+          Connect an app first to trigger on its events.{' '}
+          <a
+            href={integrationsHref}
+            className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+          >
+            Manage integrations
+          </a>
+        </p>
+        <FieldRow label="Toolkit" htmlFor="wf-toolkit">
+          <Input
+            id="wf-toolkit"
+            value={toolkit}
+            onChange={(e) => patchTrigger({ toolkit: e.target.value })}
+            placeholder="gmail"
+            className="h-8"
+          />
+        </FieldRow>
+        <FieldRow label="Event" htmlFor="wf-event">
+          <Input
+            id="wf-event"
+            value={event}
+            onChange={(e) => patchTrigger({ event: e.target.value })}
+            placeholder="GMAIL_NEW_GMAIL_MESSAGE"
+            className="h-8"
+          />
+        </FieldRow>
+      </div>
+    );
+  }
+
+  const events = selectedApp?.events ?? [];
+  const selectedEvent = events.find((e) => e.slug === event) ?? null;
+
+  return (
+    <div className="space-y-2.5">
+      <FieldRow label="App" htmlFor="wf-toolkit">
+        <MiniSelect
+          id="wf-toolkit"
+          value={toolkit}
+          onValueChange={(next) => {
+            // Switching app clears the event — its slug won't exist on the new
+            // app's list (so the schema never sees a stale toolkit/event pair).
+            const nextApp = apps.find((a) => a.toolkit === next);
+            patchTrigger({ toolkit: next, event: nextApp?.events[0]?.slug ?? '' });
+          }}
+          className="min-w-[12rem]"
+          options={apps.map((a) => ({ value: a.toolkit, label: a.label }))}
+        />
+      </FieldRow>
+      {selectedApp && (
+        <FieldRow label="Event" htmlFor="wf-event">
+          <MiniSelect
+            id="wf-event"
+            value={event}
+            onValueChange={(next) => patchTrigger({ event: next })}
+            className="min-w-[14rem]"
+            options={events.map((e) => ({ value: e.slug, label: e.label }))}
+          />
+        </FieldRow>
+      )}
+      {selectedEvent && <p className={CAPTION}>Triggers when: {selectedEvent.label}</p>}
+    </div>
+  );
 }
 
 // ── Condition row ────────────────────────────────────────────────────────────

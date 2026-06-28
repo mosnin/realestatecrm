@@ -480,6 +480,124 @@ describe('runWorkflowsForEvent — trigger + enabled matching', () => {
     expect(insertsTo('WorkflowRun')).toHaveLength(0);
   });
 
+  it('integration_event: RUNS a workflow matching the delivery toolkit+event', async () => {
+    workflowRows.value = [
+      {
+        id: 'wf-gmail',
+        spaceId: 'space-1',
+        trigger: {
+          type: 'integration_event',
+          config: { toolkit: 'gmail', event: 'GMAIL_NEW_GMAIL_MESSAGE' },
+        },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'integration_event',
+      context: {
+        event: {
+          type: 'integration_event',
+          toolkit: 'gmail',
+          event: 'GMAIL_NEW_GMAIL_MESSAGE',
+        },
+      },
+      triggerEvent: {},
+    });
+
+    const runInserts = insertsTo('WorkflowRun');
+    expect(runInserts).toHaveLength(1);
+    expect(runInserts[0]).toMatchObject({ workflowId: 'wf-gmail' });
+  });
+
+  it('integration_event: does NOT run for a different toolkit (slack) delivery', async () => {
+    workflowRows.value = [
+      {
+        id: 'wf-gmail',
+        spaceId: 'space-1',
+        trigger: {
+          type: 'integration_event',
+          config: { toolkit: 'gmail', event: 'GMAIL_NEW_GMAIL_MESSAGE' },
+        },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'integration_event',
+      context: {
+        event: {
+          type: 'integration_event',
+          toolkit: 'slack',
+          event: 'SLACK_DIRECT_MESSAGE_RECEIVED',
+        },
+      },
+      triggerEvent: {},
+    });
+
+    expect(insertsTo('WorkflowRun')).toHaveLength(0);
+  });
+
+  it('integration_event: does NOT run for a different gmail slug', async () => {
+    workflowRows.value = [
+      {
+        id: 'wf-gmail',
+        spaceId: 'space-1',
+        trigger: {
+          type: 'integration_event',
+          config: { toolkit: 'gmail', event: 'GMAIL_NEW_GMAIL_MESSAGE' },
+        },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'integration_event',
+      context: {
+        event: {
+          type: 'integration_event',
+          toolkit: 'gmail',
+          event: 'GMAIL_SOME_OTHER_EVENT',
+        },
+      },
+      triggerEvent: {},
+    });
+
+    expect(insertsTo('WorkflowRun')).toHaveLength(0);
+  });
+
+  it('the integration_event narrowing does NOT affect a non-integration_event workflow', async () => {
+    // A lead_created workflow runs regardless of any toolkit/event on the event.
+    workflowRows.value = [
+      {
+        id: 'wf-created',
+        spaceId: 'space-1',
+        trigger: { type: 'lead_created', config: {} },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'lead_created',
+      context: { event: { type: 'lead_created', toolkit: 'gmail', event: 'X' } },
+      triggerEvent: {},
+    });
+
+    expect(insertsTo('WorkflowRun')).toHaveLength(1);
+  });
+
   it('the enabled=true filter is applied in the query (no extra runs for matches)', async () => {
     // The mock query already reflects the enabled filter (only enabled rows are
     // returned). With no rows, nothing runs.
