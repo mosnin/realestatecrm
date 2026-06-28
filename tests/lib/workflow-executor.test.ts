@@ -457,6 +457,59 @@ describe('runWorkflowsForEvent — trigger + enabled matching', () => {
     expect(insertsTo('WorkflowRun')).toHaveLength(1);
   });
 
+  it('returns a {matched, ran} summary so a caller can tell the event drove work', async () => {
+    workflowRows.value = [
+      {
+        id: 'wf-created',
+        spaceId: 'space-1',
+        trigger: { type: 'lead_created', config: {} },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+      {
+        id: 'wf-other',
+        spaceId: 'space-1',
+        trigger: { type: 'tour_completed', config: {} },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    const summary = await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'lead_created',
+      context: {},
+      triggerEvent: {},
+    });
+
+    // One workflow matched the trigger type and ran; the other was filtered out.
+    expect(summary).toEqual({ matched: 1, ran: 1 });
+  });
+
+  it('reports ran:0 when no workflow matches the event', async () => {
+    workflowRows.value = [
+      {
+        id: 'wf-other',
+        spaceId: 'space-1',
+        trigger: { type: 'tour_completed', config: {} },
+        conditions: ALWAYS,
+        actions: [],
+        autonomy: 'draft',
+      },
+    ];
+
+    const summary = await runWorkflowsForEvent({
+      spaceId: 'space-1',
+      triggerType: 'lead_created',
+      context: {},
+      triggerEvent: {},
+    });
+
+    expect(summary).toEqual({ matched: 0, ran: 0 });
+  });
+
   it('lead_score_threshold: SKIPS when the event score is missing/non-numeric', async () => {
     workflowRows.value = [
       {

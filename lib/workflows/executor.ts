@@ -381,7 +381,18 @@ async function loadEnabledWorkflows(spaceId: string): Promise<WorkflowRow[]> {
   return [];
 }
 
-export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Promise<void> {
+/** Summary of a runWorkflowsForEvent pass — `matched` workflows selected for the
+ *  event, `ran` of them actually executed (didn't throw out of runWorkflow). A
+ *  caller uses `ran > 0` to know the event drove real work even when no other
+ *  dispatch kind fired (so e.g. a trigger's lastFiredAt can be stamped). */
+export interface RunWorkflowsForEventResult {
+  matched: number;
+  ran: number;
+}
+
+export async function runWorkflowsForEvent(
+  input: RunWorkflowsForEventInput,
+): Promise<RunWorkflowsForEventResult> {
   const workflows = await loadEnabledWorkflows(input.spaceId);
   const { matching, unmatched } = selectMatchingWorkflows(workflows, input);
 
@@ -396,13 +407,16 @@ export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Pr
     });
   }
 
+  let ran = 0;
   for (const workflow of matching) {
     try {
       await runWorkflow({ workflow, context: input.context, triggerEvent: input.triggerEvent });
+      ran++;
     } catch (err) {
       // runWorkflow already swallows; this is belt-and-suspenders so one bad
       // workflow can't stop the rest of the batch.
       logger.error('[workflows.executor] runWorkflow threw in batch', { workflowId: workflow.id }, err);
     }
   }
+  return { matched: matching.length, ran };
 }

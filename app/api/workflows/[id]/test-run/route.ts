@@ -26,7 +26,7 @@ import { logger } from '@/lib/logger';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { getWorkflow } from '@/lib/workflows/store';
 import type { WorkflowContext } from '@/lib/workflows/actions';
-import type { TriggerType } from '@/lib/workflows/schema';
+import type { WorkflowTrigger } from '@/lib/workflows/schema';
 
 export const runtime = 'nodejs';
 // The test executes the headless agent for draft_message / run_chippi actions,
@@ -40,7 +40,7 @@ export const maxDuration = 300;
  * The shape matches lib/workflows/actions.ts WorkflowContext (event + entity
  * rows). All synthetic entities use the 'sample' id sentinel.
  */
-function sampleContextFor(triggerType: TriggerType): WorkflowContext {
+function sampleContextFor(trigger: WorkflowTrigger): WorkflowContext {
   const sampleLead = {
     id: 'sample',
     name: 'Sample Lead',
@@ -49,11 +49,11 @@ function sampleContextFor(triggerType: TriggerType): WorkflowContext {
   };
   const sampleContact = { id: 'sample', name: 'Sample Lead' };
 
-  switch (triggerType) {
+  switch (trigger.type) {
     case 'lead_created':
     case 'lead_score_threshold':
       return {
-        event: { type: triggerType },
+        event: { type: trigger.type },
         lead: sampleLead,
         contact: sampleContact,
       };
@@ -81,16 +81,24 @@ function sampleContextFor(triggerType: TriggerType): WorkflowContext {
         deal: { id: 'sample', stage: 'offer' },
       };
     case 'integration_event':
+      // Mirror a real Composio delivery: the engine narrows on
+      // event.toolkit + event.event (the slug), so the synthetic context must
+      // carry the workflow's OWN configured toolkit/event — not a placeholder
+      // `name`, which no condition or matcher ever reads.
       return {
-        event: { type: 'integration_event', toolkit: 'gmail', name: 'sample_event' },
+        event: {
+          type: 'integration_event',
+          toolkit: trigger.config.toolkit,
+          event: trigger.config.event,
+        },
         contact: sampleContact,
       };
     case 'schedule':
       return { event: { type: 'schedule' } };
     default: {
       // Exhaustiveness guard — an unknown trigger still gets a minimal context.
-      const _never: never = triggerType;
-      return { event: { type: String(_never) } };
+      const _never: never = trigger;
+      return { event: { type: String((_never as { type: string }).type) } };
     }
   }
 }
@@ -151,7 +159,7 @@ export async function POST(
   // context, never from the request. This prevents a caller from pointing a run
   // at a contact/lead/deal id they don't own (defense-in-depth: the run is also
   // forced to autonomy='draft' below).
-  const synthetic = sampleContextFor(stored.trigger.type);
+  const synthetic = sampleContextFor(stored.trigger);
   const context = scrubSampleContext(body.sampleContext, synthetic);
 
   // SAFETY: force drafts-only for the test regardless of the stored autonomy, so

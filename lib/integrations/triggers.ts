@@ -1307,7 +1307,14 @@ export async function dispatchTrigger(args: {
   connection: IntegrationConnectionRow;
   payload: Record<string, unknown> | undefined;
   deliveryId?: string;
-}): Promise<{ dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop'; reason?: string }> {
+}): Promise<{
+  dispatched: 'DRAFT' | 'NOTICE' | 'DATA_SYNC' | 'noop';
+  reason?: string;
+  /** How many enabled workflows this delivery actually fired. A delivery can
+   *  drive a workflow even when its dispatch kind is a no-op (no DRAFT handler),
+   *  so callers stamp lastFiredAt on `dispatched !== 'noop' || workflowsRan > 0`. */
+  workflowsRan: number;
+}> {
   // Inbound calendar sync FIRST — correct the CRM Tour (cancel/move/RSVP) for
   // calendar event-change slugs before the kind-based routing drafts any
   // guest-facing follow-up. State-based idempotent + best-effort, so an
@@ -1344,8 +1351,9 @@ export async function dispatchTrigger(args: {
   // context.event.toolkit/event below), so a workflow keyed to a specific event
   // is only evaluated for that event's deliveries — no longer "every
   // integration_event workflow on every delivery".
+  let workflowsRan = 0;
   try {
-    await runWorkflowsForEvent({
+    const wfResult = await runWorkflowsForEvent({
       spaceId: args.connection.spaceId,
       triggerType: 'integration_event',
       context: {
@@ -1364,6 +1372,7 @@ export async function dispatchTrigger(args: {
         payload: args.payload ?? {},
       },
     });
+    workflowsRan = wfResult.ran;
   } catch (err) {
     logger.error(
       '[integrations.triggers] workflow dispatch failed (non-fatal)',
@@ -1378,7 +1387,7 @@ export async function dispatchTrigger(args: {
       slug: args.triggerSlug,
       connectionId: args.connection.id,
     });
-    return { dispatched: 'noop', reason: 'no_dispatch' };
+    return { dispatched: 'noop', reason: 'no_dispatch', workflowsRan };
   }
 
   if (kind === 'DRAFT') {
@@ -1388,7 +1397,7 @@ export async function dispatchTrigger(args: {
         slug: args.triggerSlug,
         connectionId: args.connection.id,
       });
-      return { dispatched: 'noop', reason: 'thin_payload' };
+      return { dispatched: 'noop', reason: 'thin_payload', workflowsRan };
     }
     // Prepend a structured trigger tag so the Modal autonomous-mode
     // detector can tell this run from a chat turn. Without it, the
@@ -1411,7 +1420,7 @@ export async function dispatchTrigger(args: {
       args.connection.userId,
       triggerSource,
     );
-    return { dispatched: 'DRAFT' };
+    return { dispatched: 'DRAFT', workflowsRan };
   }
 
   // NOTICE and DATA_SYNC paths are wired to no-ops for v1 — the dispatch
@@ -1423,7 +1432,7 @@ export async function dispatchTrigger(args: {
     kind,
     connectionId: args.connection.id,
   });
-  return { dispatched: 'noop', reason: 'unwired_kind' };
+  return { dispatched: 'noop', reason: 'unwired_kind', workflowsRan };
 }
 
 // ─── DB helpers ──────────────────────────────────────────────────────────────
