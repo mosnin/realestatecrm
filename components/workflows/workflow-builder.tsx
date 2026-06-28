@@ -581,6 +581,7 @@ function ActionZapCard({
   showDragHandle,
   onChange,
   onRemove,
+  onDuplicate,
   connectedApps,
 }: {
   step: number;
@@ -590,6 +591,7 @@ function ActionZapCard({
   showDragHandle?: boolean;
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
+  onDuplicate: () => void;
   connectedApps: ConnectedAppsState;
 }) {
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
@@ -639,6 +641,15 @@ function ActionZapCard({
             Incomplete
           </span>
         )}
+        <button
+          type="button"
+          onClick={onDuplicate}
+          aria-label="Duplicate step"
+          title="Duplicate step"
+          className="flex-shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          <Copy size={13} aria-hidden />
+        </button>
         {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
       </div>
       <div className="px-4 py-4">
@@ -1104,6 +1115,11 @@ export function WorkflowBuilder({
                 onRemove={() =>
                   patch({ actions: state.actions.filter((a) => a.id !== row.id) })
                 }
+                onDuplicate={() => {
+                  const next = [...state.actions];
+                  next.splice(i + 1, 0, { ...row, id: nextRowId('act') });
+                  patch({ actions: next });
+                }}
                 connectedApps={connectedApps}
               />
             </div>
