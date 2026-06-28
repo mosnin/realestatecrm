@@ -26,6 +26,7 @@ import {
   markFailed,
   type AgentRunTrigger,
 } from '@/lib/agent/run-ledger';
+import { runAutonomousInstruction } from '@/lib/agent/run-instruction';
 
 const DISPATCH_TIMEOUT_MS = 12_000;
 
@@ -94,8 +95,13 @@ export async function fireRoutineRun(
   const url = process.env.MODAL_WEBHOOK_URL ?? '';
   const secret = process.env.AGENT_INTERNAL_SECRET ?? '';
   if (!url || !secret) {
-    console.error('[routines] MODAL_WEBHOOK_URL or AGENT_INTERNAL_SECRET missing');
-    return 'error';
+    // Modal isn't configured — run the instruction IN-PROCESS instead of
+    // failing silently. The in-process runner drives the same TS agent the
+    // chat route uses; its draft tools create AgentDraft rows as side effects
+    // and gated sends stay pending (background runs DRAFT ONLY). We still write
+    // a ledger row so the run is visible after the fact, with the same
+    // in_flight/failed semantics the Modal path uses.
+    return fireInProcessRun(spaceId, instruction, trigger);
   }
 
   // Write the ledger row up front and forward the runId to Modal in the POST
@@ -168,6 +174,39 @@ export async function fireRoutineRun(
   // Every attempt was a genuine failure — the run never started. Record it.
   await markFailed(runId, lastFailure);
   return 'error';
+}
+
+/**
+ * Modal-free fallback. Writes a ledger row, runs the instruction in-process,
+ * and records the outcome with the same status vocabulary the Modal path uses:
+ *   - run completed (ok)            → ledger 'in_flight', return 'ok'.
+ *   - run failed / couldn't start   → ledger 'failed',    return 'error'.
+ *
+ * We mark 'in_flight' rather than a terminal 'confirmed' to stay consistent
+ * with the Modal path's vocabulary (reconcile owns the terminal transition);
+ * the run is done by the time we get here, but the ledger semantics match.
+ * Best-effort like the rest of this module — ledger bookkeeping never throws.
+ */
+async function fireInProcessRun(
+  spaceId: string,
+  instruction: string,
+  trigger: AgentRunTrigger,
+): Promise<RoutineRunStatus> {
+  const runId = await recordDispatch(spaceId, trigger);
+  try {
+    const result = await runAutonomousInstruction({ spaceId, instruction });
+    if (result.ok) {
+      await markInFlight(runId);
+      return 'ok';
+    }
+    await markFailed(runId, result.error ?? 'in-process run failed');
+    return 'error';
+  } catch (err) {
+    // runAutonomousInstruction is designed not to throw, but guard the ledger
+    // path anyway so a surprise never leaves the row stuck at 'dispatched'.
+    await markFailed(runId, err instanceof Error ? err.message : String(err));
+    return 'error';
+  }
 }
 
 function sleep(ms: number): Promise<void> {

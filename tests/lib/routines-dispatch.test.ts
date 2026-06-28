@@ -31,6 +31,19 @@ vi.mock('@/lib/agent/run-ledger', () => ({
   markFailed: markFailedMock,
 }));
 
+// ── in-process runner mock ────────────────────────────────────────────────────
+// The Modal-free fallback (fireInProcessRun) calls this when Modal env is
+// missing. Mocked so these tests stay focused on dispatch wiring, not the agent.
+const { runAutonomousInstructionMock } = vi.hoisted(() => ({
+  runAutonomousInstructionMock: vi.fn<
+    (input: { spaceId: string; instruction: string }) => Promise<{ ok: boolean; ran: boolean; error?: string }>
+  >(),
+}));
+
+vi.mock('@/lib/agent/run-instruction', () => ({
+  runAutonomousInstruction: runAutonomousInstructionMock,
+}));
+
 import { fireRoutineRun } from '@/lib/routines';
 
 // ── Fetch mock ────────────────────────────────────────────────────────────────
@@ -73,6 +86,7 @@ beforeEach(() => {
   recordDispatchMock.mockResolvedValue('run-test-id');
   markInFlightMock.mockResolvedValue(undefined);
   markFailedMock.mockResolvedValue(undefined);
+  runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true });
 
   vi.stubGlobal('fetch', buildFetchMock());
 });
@@ -156,12 +170,30 @@ describe('fireRoutineRun — dispatch reliability', () => {
     expect(markFailedMock.mock.calls[0][1]).toContain('ECONNRESET');
   });
 
-  it('missing Modal env → error, no dispatch row written', async () => {
+  it('missing Modal env → runs in-process, ledger in_flight, returns ok', async () => {
+    // Modal-free fallback: no POST is made; the instruction runs in-process and
+    // the ledger records the run honestly.
     delete process.env.MODAL_WEBHOOK_URL;
     const status = await fireRoutineRun('space_1', 'instr');
-    expect(status).toBe('error');
-    expect(recordDispatchMock).not.toHaveBeenCalled();
+    expect(status).toBe('ok');
     expect(modalCallCount).toBe(0);
+    expect(runAutonomousInstructionMock).toHaveBeenCalledWith({
+      spaceId: 'space_1',
+      instruction: 'instr',
+    });
+    expect(recordDispatchMock).toHaveBeenCalledWith('space_1', 'routine');
+    expect(markInFlightMock).toHaveBeenCalledWith('run-test-id');
+    expect(markFailedMock).not.toHaveBeenCalled();
+  });
+
+  it('missing Modal env + in-process run fails → ledger failed, returns error', async () => {
+    delete process.env.MODAL_WEBHOOK_URL;
+    runAutonomousInstructionMock.mockResolvedValue({ ok: false, ran: false, error: 'space not found' });
+    const status = await fireRoutineRun('space_1', 'instr');
+    expect(status).toBe('error');
+    expect(modalCallCount).toBe(0);
+    expect(markFailedMock).toHaveBeenCalledTimes(1);
+    expect(markFailedMock.mock.calls[0][1]).toContain('space not found');
   });
 
   it('passes a non-default trigger through to the ledger', async () => {
