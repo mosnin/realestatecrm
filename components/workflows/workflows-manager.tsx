@@ -833,9 +833,11 @@ function TestResultPanel({
       )}
 
       {/* Branching workflow → show the path that actually ran on a read-only
-          canvas: ran nodes light up, the untaken branch dims. */}
+          canvas: ran nodes light up, the untaken branch dims. Given its own
+          breathing room (top divider + taller frame) so the graph reads clearly
+          rather than cramped under the step list. */}
       {workflow.graph && (
-        <div className="mt-3 space-y-1.5">
+        <div className="mt-4 space-y-2 border-t border-border/50 pt-4">
           <p className={cn(SECTION_LABEL, 'text-[10px]')}>Path taken</p>
           <WorkflowCanvasLazy
             // Re-mount per run so a fresh test seeds the new highlights (the
@@ -846,7 +848,7 @@ function TestResultPanel({
             onChange={() => {}}
             readOnly
             highlights={highlights}
-            heightClass="h-[320px]"
+            heightClass="h-[400px]"
           />
         </div>
       )}

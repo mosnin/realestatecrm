@@ -755,9 +755,14 @@ export function WorkflowBuilder({
         </>
       )}
 
-      {/* Autonomy ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-2">
-        <p className={SECTION_LABEL}>Autonomy — how much can I do on my own?</p>
+      {/* Autonomy — the closing trust decision. Set apart with a divider + extra
+          top space so it lands as the climax of the flow (how much Chippi may do
+          on its own), not another item in the stack. ──────────────────────────*/}
+      <section className="space-y-2.5 border-t border-border/50 pt-5">
+        <div className="space-y-0.5">
+          <p className={SECTION_LABEL}>Autonomy — how much can I do on my own?</p>
+          <p className={CAPTION}>The one call that decides whether anything sends without you.</p>
+        </div>
         {/* Three independently-focusable toggle buttons (aria-pressed), not a
             radiogroup — honest about the behavior, matching the AND/OR group and
             the filter chips, rather than promising roving arrow-key focus we

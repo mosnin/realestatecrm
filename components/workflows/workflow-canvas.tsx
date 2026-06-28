@@ -185,19 +185,33 @@ function actionFace(action: WorkflowAction | undefined): string {
   }
 }
 
-/** A short, human face for a condition node ("If 2 rules" / the first rule). */
-function conditionFace(condition: ConditionGroup | undefined): string {
-  const rules = condition?.rules ?? [];
+/** One rule rendered in plain language ("Lead score is at least 80"). */
+function rulePhrase(rule: { field: string; operator: Operator; value?: unknown }): string {
+  const attr = findAttributeByField(rule.field);
+  const label = attr?.label ?? rule.field;
+  const op = OPERATOR_LABELS[rule.operator] ?? rule.operator;
+  const valueless = VALUELESS_OPERATORS.has(rule.operator);
+  const value =
+    valueless || rule.value === undefined || rule.value === null || rule.value === ''
+      ? ''
+      : ` ${String(rule.value)}`;
+  return `${label} ${op}${value}`.trim();
+}
+
+/**
+ * The FULL human summary of a condition's rules, joined by the group operator —
+ * "Lead score is at least 80 · and · Source is zillow". Every rule is shown (the
+ * node face line-clamps to two lines and carries this same string as a tooltip),
+ * so a multi-rule condition reads as what it actually checks rather than a
+ * cryptic "(+1)".
+ */
+function conditionSummary(condition: ConditionGroup | undefined): string {
+  const rules = (condition?.rules ?? []).filter(
+    (r): r is { field: string; operator: Operator; value?: unknown } => 'field' in r,
+  );
   if (rules.length === 0) return 'If — no rules yet';
-  const first = rules[0];
-  if (first && 'field' in first) {
-    const attr = findAttributeByField(first.field);
-    const label = attr?.label ?? first.field;
-    const op = OPERATOR_LABELS[first.operator] ?? first.operator;
-    const lead = `If ${label} ${op}`.trim();
-    return rules.length > 1 ? `${lead} (+${rules.length - 1})` : lead;
-  }
-  return `If ${rules.length} rule${rules.length === 1 ? '' : 's'}`;
+  const joiner = condition?.op === 'or' ? ' or ' : ' and ';
+  return `If ${rules.map(rulePhrase).join(joiner)}`;
 }
 
 // ── Custom nodes ─────────────────────────────────────────────────────────────
@@ -267,8 +281,13 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
         </NodeIcon>
         <div className="min-w-0">
           <p className={SECTION_LABEL}>Condition</p>
-          <p className="truncate text-[13px] font-medium text-foreground">
-            {conditionFace(data.condition)}
+          {/* Full rule summary, clamped to two lines, with the complete string as
+              a hover tooltip — so a multi-rule condition reads as what it checks. */}
+          <p
+            className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground"
+            title={conditionSummary(data.condition)}
+          >
+            {conditionSummary(data.condition)}
           </p>
         </div>
       </div>
@@ -379,24 +398,17 @@ function CanvasInner({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
-  const warnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep the latest onChange without resubscribing the emit effect each render.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  useEffect(
-    () => () => {
-      if (warnTimer.current) clearTimeout(warnTimer.current);
-    },
-    [],
-  );
-
-  const flash = useCallback((msg: string) => {
-    setWarning(msg);
-    if (warnTimer.current) clearTimeout(warnTimer.current);
-    warnTimer.current = setTimeout(() => setWarning(null), 2600);
-  }, []);
+  // A rejected connection PERSISTS until the realtor acts (a successful edit) or
+  // dismisses it — a 2.6s toast vanished before they finished dragging and
+  // looked back, leaving "why didn't that connect?" unanswered. The message is
+  // explicit and dismissible instead of timed.
+  const flash = useCallback((msg: string) => setWarning(msg), []);
+  const clearWarning = useCallback(() => setWarning(null), []);
 
   // Emit a fresh WorkflowGraph from the current flow arrays. Positions are NOT
   // part of the graph, so this is only called on STRUCTURAL edits — never from
@@ -521,8 +533,10 @@ function CanvasInner({
         });
         return next;
       });
+      // A successful connection resolves whatever the last rejection was.
+      clearWarning();
     },
-    [edges, nodes, emit, flash, setEdges, setNodes],
+    [edges, nodes, emit, flash, clearWarning, setEdges, setNodes],
   );
 
   const onSelectionChange = useCallback(
@@ -680,10 +694,18 @@ function CanvasInner({
 
           {warning && (
             <div
-              role="status"
-              className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full border border-amber-400/60 bg-amber-50/95 px-3 py-1.5 text-xs font-medium text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-950/80 dark:text-amber-300"
+              role="alert"
+              className="absolute left-1/2 top-3 z-10 flex max-w-[90%] -translate-x-1/2 items-center gap-2 rounded-full border border-amber-400/60 bg-amber-50/95 py-1.5 pl-3 pr-1.5 text-xs font-medium text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-950/80 dark:text-amber-300"
             >
-              {warning}
+              <span className="min-w-0">{warning}</span>
+              <button
+                type="button"
+                onClick={clearWarning}
+                aria-label="Dismiss"
+                className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-amber-500/15"
+              >
+                <X size={12} aria-hidden />
+              </button>
             </div>
           )}
         </div>
