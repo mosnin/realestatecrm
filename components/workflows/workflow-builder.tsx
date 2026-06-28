@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -51,6 +51,7 @@ import {
   type WorkflowFormState,
 } from './build-definition';
 import { fieldsForTrigger } from './field-catalog';
+import { summarizeFormState } from './form-summary';
 
 // ── Friendly labels for the schema's enums ───────────────────────────────────
 
@@ -211,6 +212,67 @@ function newActionRow(): ActionRowState {
   };
 }
 
+// ── Live preview — the sentence the realtor is composing ─────────────────────
+
+/**
+ * The always-on, plain-English reading of the workflow being built. It updates
+ * on every keystroke so the realtor watches the automation assemble as a
+ * sentence — the trigger and action phrases carry the weight (foreground), the
+ * connective words recede (muted), and the trust clause turns amber on 'auto'
+ * so the consequential choice never hides. This is the builder's anchor: you
+ * always know what you're about to turn on.
+ */
+function WorkflowPreview({ state }: { state: WorkflowFormState }) {
+  const summary = useMemo(() => summarizeFormState(state), [state]);
+  const isAuto = state.autonomy === 'auto';
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/15 px-4 py-3.5">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Sparkles size={12} className="text-muted-foreground" aria-hidden />
+        <p className={SECTION_LABEL}>In plain English</p>
+      </div>
+      <p className="text-[15px] leading-relaxed text-muted-foreground">
+        <span className="text-muted-foreground/80">When </span>
+        <span className="font-medium text-foreground">{summary.when}</span>
+        {summary.conditions && (
+          <>
+            <span className="text-muted-foreground/80">, </span>
+            <span className="text-foreground">{summary.conditions}</span>
+          </>
+        )}
+        <span className="text-muted-foreground/80">, I’ll </span>
+        <span className="font-medium text-foreground">{summary.then}</span>
+        <span className="text-muted-foreground/80">.</span>
+      </p>
+      <p
+        className={cn(
+          'mt-1.5 text-xs',
+          isAuto ? 'font-medium text-amber-600 dark:text-amber-500' : 'text-muted-foreground/80',
+        )}
+      >
+        {summary.autonomy}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A numbered step label (When / If / Then read as 1 → 2 → 3). The small index
+ * badge turns the three sections into one ordered flow rather than three
+ * disconnected boxes — the realtor reads them as a sequence.
+ */
+function StepLabel({ index, children }: { index: number; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-foreground/[0.07] text-[10px] font-semibold tabular-nums text-muted-foreground">
+        {index}
+      </span>
+      <p className={SECTION_LABEL}>{children}</p>
+    </div>
+  );
+}
+
 // ── The builder ──────────────────────────────────────────────────────────────
 
 export function WorkflowBuilder({
@@ -289,6 +351,9 @@ export function WorkflowBuilder({
 
   return (
     <div className="space-y-6">
+      {/* Live preview — the sentence assembling as you build. ──────────────── */}
+      <WorkflowPreview state={state} />
+
       {/* Name ─────────────────────────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <Label htmlFor="wf-name" className="text-[12.5px] font-medium text-foreground">
@@ -307,7 +372,7 @@ export function WorkflowBuilder({
 
       {/* When ─────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <p className={SECTION_LABEL}>When</p>
+        <StepLabel index={1}>When</StepLabel>
         <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-3">
           <div className="space-y-1.5">
             <Label htmlFor="wf-trigger" className="sr-only">
@@ -340,7 +405,7 @@ export function WorkflowBuilder({
       {/* If ───────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className={SECTION_LABEL}>If</p>
+          <StepLabel index={2}>If</StepLabel>
           {state.conditions.length > 1 && (
             <div
               className="inline-flex rounded-md border border-border/60 p-0.5"
@@ -406,7 +471,7 @@ export function WorkflowBuilder({
 
       {/* Then ─────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <p className={SECTION_LABEL}>Then</p>
+        <StepLabel index={3}>Then</StepLabel>
         <ul className="space-y-2">
           {state.actions.map((row, i) => (
             <ActionRowEditor
