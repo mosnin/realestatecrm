@@ -30,7 +30,7 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
 const SELECT =
-  'id, spaceId, name, enabled, trigger, conditions, actions, autonomy, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
+  'id, spaceId, name, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
 /**
  * The full persisted row as the routes surface it — the executor's WorkflowRow
@@ -98,6 +98,8 @@ export async function createWorkflow(
       conditions: definition.conditions,
       actions: definition.actions,
       autonomy: definition.autonomy,
+      // null (not undefined) so a linear workflow explicitly clears any graph.
+      graph: definition.graph ?? null,
     })
     .select(SELECT)
     .single();
@@ -132,6 +134,9 @@ export async function updateWorkflow(
     update.conditions = patch.definition.conditions;
     update.actions = patch.definition.actions;
     update.autonomy = patch.definition.autonomy;
+    // null (not undefined) so switching a branching workflow back to linear
+    // clears the stored graph rather than leaving a stale one behind.
+    update.graph = patch.definition.graph ?? null;
     // The definition shape changed — bump version so a run records which ran.
     // FOLLOW-UP: the read-then-write version bump is non-atomic (two concurrent
     // updates can compute the same next version). Move to an atomic increment.

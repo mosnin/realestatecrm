@@ -26,11 +26,13 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { evaluateConditions } from './conditions';
 import { executeAction, type WorkflowContext, type ActionStepResult } from './actions';
+import { walkGraph } from './graph-walk';
 import type {
   ConditionGroup,
   TriggerType,
   WorkflowAction,
   WorkflowAutonomy,
+  WorkflowGraph,
   WorkflowTrigger,
 } from './schema';
 
@@ -46,6 +48,12 @@ export interface WorkflowRow {
   conditions: ConditionGroup;
   actions: WorkflowAction[];
   autonomy: WorkflowAutonomy;
+  /**
+   * OPTIONAL advanced-mode branching graph. When present, runWorkflow walks the
+   * graph (condition nodes gate their branches, action nodes run) instead of the
+   * linear conditions→actions path. Absent/null for every linear workflow.
+   */
+  graph?: WorkflowGraph | null;
 }
 
 export interface RunWorkflowInput {
@@ -154,7 +162,43 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
   }
 
   try {
-    // 2. The IF gate.
+    // 2a. ADVANCED mode — when the workflow carries a branching graph, walk it
+    //     instead of the linear conditions→actions path. The graph's own
+    //     condition NODES are the gates (the definition-level `conditions` is
+    //     not used in graph mode); every action still runs through the same
+    //     executeAction + autonomy gating. Steps are persisted in walk order.
+    if (workflow.graph) {
+      const walk = await walkGraph(workflow.graph, {
+        evaluate: (cond) => evaluateConditions(cond, context as Record<string, unknown>),
+        runAction: (action) =>
+          executeAction(action, context, {
+            spaceId: workflow.spaceId,
+            autonomy: workflow.autonomy,
+            runId,
+          }),
+      });
+      for (let i = 0; i < walk.steps.length; i++) {
+        const s = walk.steps[i];
+        await writeStep({
+          runId,
+          stepIndex: i,
+          kind: s.kind,
+          actionType: s.actionType ?? null,
+          status: s.status,
+          detail: s.detail ?? null,
+        });
+      }
+      if (walk.status === 'failed') {
+        await finishRun({ runId, status: 'failed', summary: 'one or more actions failed' });
+        await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'error' });
+        return { runId, status: 'failed' };
+      }
+      await finishRun({ runId, status: 'completed', summary: 'graph run completed' });
+      await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'ok' });
+      return { runId, status: 'completed' };
+    }
+
+    // 2. The IF gate (linear mode).
     const passed = evaluateConditions(workflow.conditions, context as Record<string, unknown>);
     if (!passed) {
       await writeStep({
@@ -244,7 +288,7 @@ export interface RunWorkflowsForEventInput {
 export async function runWorkflowsForEvent(input: RunWorkflowsForEventInput): Promise<void> {
   const { data: rows, error } = await supabase
     .from('Workflow')
-    .select('id, spaceId, trigger, conditions, actions, autonomy')
+    .select('id, spaceId, trigger, conditions, actions, autonomy, graph')
     .eq('spaceId', input.spaceId)
     .eq('enabled', true);
   if (error) {
