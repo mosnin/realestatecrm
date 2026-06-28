@@ -181,3 +181,102 @@ export async function countWorkflows(spaceId: string): Promise<number> {
   if (error) throw error;
   return count ?? 0;
 }
+
+// ── Run history (read-only audit trail) ──────────────────────────────────────
+//
+// The executor writes WorkflowRun + WorkflowRunStep rows as it runs; these
+// helpers surface them so a realtor can see what fired, when, and what each step
+// did. Read-only: nothing here writes. Both reads carry a spaceId guard so a run
+// (or its steps) that isn't the caller's never matches — cross-tenant isolation
+// is enforced at the query, not just by trusting an upstream id.
+
+/** Cap on how many runs we ever surface per workflow — the audit trail is a
+ *  recent-history view, not an unbounded export. */
+export const MAX_WORKFLOW_RUNS = 20;
+
+/** Columns read back for a WorkflowRun row (the run-history list). */
+const RUN_SELECT =
+  'id, workflowId, spaceId, status, triggerEvent, summary, error, startedAt, finishedAt';
+
+/** Columns read back for a WorkflowRunStep row (a run's timeline). */
+const RUN_STEP_SELECT = 'id, runId, stepIndex, kind, actionType, status, detail, createdAt';
+
+/** One execution of a workflow, as the run-history surface presents it. */
+export interface WorkflowRunRecord {
+  id: string;
+  workflowId: string;
+  spaceId: string;
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  triggerEvent: unknown;
+  summary: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+/** One step within a run: a condition gate or an action. */
+export interface WorkflowRunStepRecord {
+  id: string;
+  runId: string;
+  stepIndex: number;
+  kind: 'condition' | 'action';
+  actionType: string | null;
+  status: 'ok' | 'failed' | 'skipped';
+  detail: unknown;
+  createdAt: string;
+}
+
+/**
+ * List a workflow's recent runs, newest first. We verify the workflow belongs to
+ * the space FIRST (getWorkflow is itself id + spaceId scoped) and return [] when
+ * it isn't owned — a caller can't probe another space's run history by guessing a
+ * workflow id. The WorkflowRun query is then doubly scoped by workflowId AND
+ * spaceId, so even a future cross-space workflowId can't leak rows.
+ */
+export async function listWorkflowRuns(
+  spaceId: string,
+  workflowId: string,
+  limit = MAX_WORKFLOW_RUNS,
+): Promise<WorkflowRunRecord[]> {
+  const owned = await getWorkflow(spaceId, workflowId);
+  if (!owned) return [];
+
+  const capped = Math.max(1, Math.min(limit, MAX_WORKFLOW_RUNS));
+  const { data, error } = await supabase
+    .from('WorkflowRun')
+    .select(RUN_SELECT)
+    .eq('workflowId', workflowId)
+    .eq('spaceId', spaceId)
+    .order('startedAt', { ascending: false })
+    .limit(capped);
+  if (error) throw error;
+  return (data ?? []) as unknown as WorkflowRunRecord[];
+}
+
+/**
+ * Fetch one run's steps, ordered by stepIndex. The run is loaded WITH a spaceId
+ * filter first, so a runId that belongs to another space resolves to nothing and
+ * we return [] — the steps are only ever read once the run's space is confirmed
+ * to be the caller's. No cross-tenant step leakage.
+ */
+export async function getWorkflowRunSteps(
+  spaceId: string,
+  runId: string,
+): Promise<WorkflowRunStepRecord[]> {
+  const { data: run, error: runErr } = await supabase
+    .from('WorkflowRun')
+    .select('id')
+    .eq('id', runId)
+    .eq('spaceId', spaceId)
+    .maybeSingle();
+  if (runErr) throw runErr;
+  if (!run) return [];
+
+  const { data, error } = await supabase
+    .from('WorkflowRunStep')
+    .select(RUN_STEP_SELECT)
+    .eq('runId', runId)
+    .order('stepIndex', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as WorkflowRunStepRecord[];
+}

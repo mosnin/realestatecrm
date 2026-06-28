@@ -27,6 +27,8 @@ import {
   Check,
   X,
   Sparkles,
+  History,
+  ChevronRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -74,6 +76,27 @@ interface TestResult {
   runId: string;
   status: string;
   steps: TestStep[];
+}
+
+// ── Run history (audit trail) ────────────────────────────────────────────────
+
+interface RunStep {
+  id: string;
+  stepIndex: number;
+  kind: string;
+  actionType: string | null;
+  status: string;
+  detail: unknown;
+}
+
+interface WorkflowRun {
+  id: string;
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  summary: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  steps: RunStep[];
 }
 
 const API_BASE = '/api/workflows';
@@ -443,6 +466,34 @@ function WorkflowRow({
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // Run history (audit trail) — lazy: fetched the first time the row is expanded.
+  const [showHistory, setShowHistory] = useState(false);
+  const [runs, setRuns] = useState<WorkflowRun[] | null>(null);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsError, setRunsError] = useState(false);
+
+  async function loadHistory() {
+    setRunsLoading(true);
+    setRunsError(false);
+    try {
+      const res = await fetch(`${API_BASE}/${workflow.id}/runs`);
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setRuns(Array.isArray(data.runs) ? (data.runs as WorkflowRun[]) : []);
+    } catch {
+      setRunsError(true);
+    } finally {
+      setRunsLoading(false);
+    }
+  }
+
+  function toggleHistory() {
+    const next = !showHistory;
+    setShowHistory(next);
+    // Fetch on first open; reuse the cache afterwards so the toggle is cheap.
+    if (next && runs === null && !runsLoading) void loadHistory();
+  }
+
   if (editing) {
     return (
       <li className="py-3 first:pt-0">
@@ -535,6 +586,13 @@ function WorkflowRow({
                 onCheckedChange={onToggle}
                 aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
               />
+              <RowAction
+                icon={History}
+                label="History"
+                onClick={toggleHistory}
+                disabled={busy || testing}
+                active={showHistory}
+              />
               <RowAction icon={Play} label="Test" onClick={onTest} loading={testing} disabled={busy} />
               <RowAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || testing} />
               <RowAction
@@ -551,7 +609,167 @@ function WorkflowRow({
 
       {/* Test-run result — the "prove it works" panel. */}
       {testResult && <TestResultPanel result={testResult} />}
+
+      {/* Run history (audit trail) — what fired, when, and what each step did. */}
+      {showHistory && (
+        <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} />
+      )}
     </li>
+  );
+}
+
+// ── Run history panel ────────────────────────────────────────────────────────
+
+function RunHistoryPanel({
+  runs,
+  loading,
+  error,
+}: {
+  runs: WorkflowRun[] | null;
+  loading: boolean;
+  error: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+      <p className={cn(SECTION_LABEL, 'mb-2')}>Run history</p>
+      {loading ? (
+        <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+          <Loader2 size={13} className="animate-spin" />
+          Loading runs…
+        </div>
+      ) : error ? (
+        <p className={CAPTION}>Couldn’t load the run history — try again in a moment.</p>
+      ) : !runs || runs.length === 0 ? (
+        <p className={CAPTION}>No runs yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {runs.map((run) => (
+            <RunHistoryItem key={run.id} run={run} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RunHistoryItem({ run }: { run: WorkflowRun }) {
+  const [open, setOpen] = useState(false);
+  const hasSteps = run.steps.length > 0;
+
+  return (
+    <li className="rounded-md border border-border/50 bg-card/40">
+      <button
+        type="button"
+        onClick={() => hasSteps && setOpen((o) => !o)}
+        disabled={!hasSteps}
+        className={cn(
+          'flex w-full items-start gap-2 px-2.5 py-2 text-left',
+          hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
+          !hasSteps && 'cursor-default',
+        )}
+      >
+        <ChevronRight
+          size={13}
+          aria-hidden
+          className={cn(
+            'mt-0.5 flex-shrink-0 text-muted-foreground/50 transition-transform',
+            !hasSteps && 'opacity-0',
+            open && 'rotate-90',
+          )}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <RunStatusPill status={run.status} />
+            <span className="tabular-nums text-[11px] text-muted-foreground/70">
+              {timeAgo(run.startedAt)}
+            </span>
+          </span>
+          {(run.summary || run.error) && (
+            <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
+              {run.error ?? run.summary}
+            </span>
+          )}
+        </span>
+      </button>
+
+      {open && hasSteps && (
+        <ul className="space-y-1.5 border-t border-border/50 px-3 py-2 pl-7">
+          {run.steps.map((step) => (
+            <li
+              key={step.id}
+              className="flex items-start gap-2 text-[12px] leading-snug"
+            >
+              <StepStatusDot status={step.status} />
+              <span className="tabular-nums text-muted-foreground/50">
+                {step.stepIndex + 1}.
+              </span>
+              <span className="font-medium text-foreground">
+                {step.actionType ?? step.kind}
+              </span>
+              <span className="text-muted-foreground">{step.status}</span>
+              {detailLine(step.detail) && (
+                <span className="min-w-0 flex-1 truncate text-muted-foreground/80">
+                  {detailLine(step.detail)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/**
+ * A short, human-readable line from a step's jsonb detail. detail shapes vary by
+ * action; we pick the first present string-ish field and otherwise fall back to a
+ * compact JSON string. Always returns a single trimmed line (the row truncates).
+ */
+function detailLine(detail: unknown): string {
+  if (detail == null) return '';
+  if (typeof detail === 'string') return detail;
+  if (typeof detail !== 'object') return String(detail);
+  const obj = detail as Record<string, unknown>;
+  for (const key of ['message', 'summary', 'reason', 'detail', 'result', 'error']) {
+    const v = obj[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return '';
+  }
+}
+
+function RunStatusPill({ status }: { status: WorkflowRun['status'] }) {
+  const map: Record<WorkflowRun['status'], { label: string; cls: string }> = {
+    completed: {
+      label: 'Completed',
+      cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+    },
+    failed: {
+      label: 'Failed',
+      cls: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+    },
+    skipped: {
+      label: 'Skipped',
+      cls: 'bg-muted text-muted-foreground',
+    },
+    running: {
+      label: 'Running',
+      cls: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400',
+    },
+  };
+  const { label, cls } = map[status] ?? map.skipped;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+        cls,
+      )}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -642,6 +860,7 @@ function RowAction({
   disabled,
   loading,
   destructive,
+  active,
 }: {
   icon: LucideIcon;
   label: string;
@@ -649,6 +868,7 @@ function RowAction({
   disabled?: boolean;
   loading?: boolean;
   destructive?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -657,9 +877,13 @@ function RowAction({
       disabled={disabled || loading}
       aria-label={label}
       title={label}
+      aria-pressed={active}
       className={cn(
         'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md',
-        'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
+        // An active (toggled-on) action stays visible; others reveal on row hover.
+        active
+          ? 'text-foreground bg-foreground/[0.06]'
+          : 'text-muted-foreground/0 group-hover/row:text-muted-foreground/70',
         'transition-colors disabled:opacity-50',
         destructive
           ? 'hover:text-destructive hover:bg-destructive/10'
