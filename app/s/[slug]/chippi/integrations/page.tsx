@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+import { BackgroundReadinessPanel } from '@/components/diagnostics/background-readiness-panel';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Integrations — Chippi' };
@@ -62,6 +63,7 @@ export default async function ChippiIntegrationsPage({
       title="The apps I act through."
       subtitle="Connect your tools so I can work across them. I never send without your tap."
     >
+      <BackgroundReadinessPanel />
       <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
     </ChippiPageShell>
   );
