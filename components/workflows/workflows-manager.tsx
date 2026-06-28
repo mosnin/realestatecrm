@@ -15,7 +15,7 @@
  * delete-with-confirm.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
@@ -51,6 +51,8 @@ import { WorkflowBuilder } from './workflow-builder';
 import type { WorkflowFormState } from './build-definition';
 import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
+import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
+import { highlightsFromSteps } from './run-highlights';
 
 // ── The record shape the API returns (subset we render) ──────────────────────
 
@@ -74,7 +76,10 @@ interface TestStep {
   kind: string;
   actionType: string | null;
   status: string;
-  detail: string | null;
+  // jsonb from the run ledger — an object ({ passed, branch, nodeId } for a
+  // condition, an action's result shape, …), NOT a string. Rendered via the
+  // safe detailLine() helper, never inlined as a React child.
+  detail: unknown;
 }
 
 interface TestResult {
@@ -612,7 +617,7 @@ function WorkflowRow({
       </div>
 
       {/* Test-run result — the "prove it works" panel. */}
-      {testResult && <TestResultPanel result={testResult} />}
+      {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
 
       {/* Run history (audit trail) — what fired, when, and what each step did. */}
       {showHistory && (
@@ -777,8 +782,17 @@ function RunStatusPill({ status }: { status: WorkflowRun['status'] }) {
   );
 }
 
-function TestResultPanel({ result }: { result: TestResult }) {
+function TestResultPanel({
+  result,
+  workflow,
+}: {
+  result: TestResult;
+  workflow: WorkflowRecord;
+}) {
   const ok = result.status === 'ok' || result.status === 'success';
+  // For a branching workflow, derive which nodes ran so the canvas can light up
+  // the executed path; linear workflows have no node ids → empty map → no canvas.
+  const highlights = useMemo(() => highlightsFromSteps(result.steps), [result.steps]);
   return (
     <div className="ml-0 rounded-lg border border-border/60 bg-muted/20 p-3">
       <div className="flex items-center gap-2">
@@ -813,14 +827,29 @@ function TestResultPanel({ result }: { result: TestResult }) {
                 {step.actionType ?? step.kind}
               </span>
               <span className="text-muted-foreground">{step.status}</span>
-              {step.detail && (
+              {detailLine(step.detail) && (
                 <span className="min-w-0 flex-1 truncate text-muted-foreground/80">
-                  {step.detail}
+                  {detailLine(step.detail)}
                 </span>
               )}
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Branching workflow → show the path that actually ran on a read-only
+          canvas: ran nodes light up, the untaken branch dims. */}
+      {workflow.graph && (
+        <div className="mt-3 space-y-1.5">
+          <p className={cn(SECTION_LABEL, 'text-[10px]')}>Path taken</p>
+          <WorkflowCanvasLazy
+            graph={workflow.graph}
+            trigger={workflow.trigger}
+            onChange={() => {}}
+            readOnly
+            highlights={highlights}
+          />
+        </div>
       )}
     </div>
   );
