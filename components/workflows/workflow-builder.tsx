@@ -40,10 +40,13 @@ import {
   OPERATORS,
   parseWorkflowDefinition,
   WorkflowDefinitionError,
+  type ConditionGroup,
   type Operator,
   type TriggerType,
+  type WorkflowAction,
   type WorkflowActionType,
   type WorkflowAutonomy,
+  type WorkflowGraph,
 } from '@/lib/workflows/schema';
 import {
   buildDefinition,
@@ -51,6 +54,12 @@ import {
   type ConditionRowState,
   type WorkflowFormState,
 } from './build-definition';
+import {
+  graphToLinear,
+  isLinearGraph,
+  linearToGraph,
+} from './graph-linear-bridge';
+import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
 import {
   attributesForTrigger,
   findAttributeByField,
@@ -255,6 +264,69 @@ function newActionRow(): ActionRowState {
   };
 }
 
+// ── Advanced (graph) mode helpers ────────────────────────────────────────────
+
+/** The starting canvas: a lone trigger node, ready for the realtor to extend. */
+const emptyGraph: WorkflowGraph = { nodes: [{ id: 't', kind: 'trigger' }], edges: [] };
+
+/**
+ * Map a stored ConditionGroup back into the builder's flat condition ROWS — the
+ * inverse used by the manager's recordToFormState. Flat group only: any nested
+ * sub-group is skipped (v1 doesn't author them). Reused when converting a LINEAR
+ * graph back to Simple mode so the realtor's branches-free work is preserved.
+ */
+function conditionsToRows(group: ConditionGroup): ConditionRowState[] {
+  return group.rules.flatMap((r) => {
+    if ('rules' in r) return [];
+    return [
+      {
+        id: nextRowId('cond'),
+        field: r.field,
+        operator: r.operator as Operator,
+        value: r.value === undefined || r.value === null ? '' : String(r.value),
+      },
+    ];
+  });
+}
+
+/** Map stored WorkflowActions back into the builder's action ROWS (mirrors
+ *  recordToFormState's action mapping). */
+function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
+  return actions.map((a) => ({
+    id: nextRowId('act'),
+    type: a.type,
+    channel:
+      a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
+    instruction:
+      a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
+        ? a.config.instruction
+        : '',
+    delayMinutes: a.type === 'schedule_message' ? String(a.config.delayMinutes) : '',
+    title: a.type === 'create_task' ? a.config.title : '',
+    dueInDays:
+      a.type === 'create_task' && typeof a.config.dueInDays === 'number'
+        ? String(a.config.dueInDays)
+        : '',
+    toolkit: a.type === 'call_integration' ? a.config.toolkit : '',
+    action: a.type === 'call_integration' ? a.config.action : '',
+    paramsJson:
+      a.type === 'call_integration' && a.config.params
+        ? JSON.stringify(a.config.params, null, 2)
+        : '',
+  }));
+}
+
+/** Count condition + action nodes in a graph, for the advanced-mode preview. */
+function graphCounts(graph: WorkflowGraph): { conditions: number; actions: number } {
+  let conditions = 0;
+  let actions = 0;
+  for (const n of graph.nodes) {
+    if (n.kind === 'condition') conditions += 1;
+    else if (n.kind === 'action') actions += 1;
+  }
+  return { conditions, actions };
+}
+
 // ── Live preview — the sentence the realtor is composing ─────────────────────
 
 /**
@@ -268,6 +340,13 @@ function newActionRow(): ActionRowState {
 function WorkflowPreview({ state }: { state: WorkflowFormState }) {
   const summary = useMemo(() => summarizeFormState(state), [state]);
   const isAuto = state.autonomy === 'auto';
+  // ADVANCED mode: the linear sentence is meaningless for a branching graph, so
+  // we read off node counts instead and keep only the autonomy clause.
+  const graphLine = useMemo(() => {
+    if (!state.graph) return null;
+    const { conditions, actions } = graphCounts(state.graph);
+    return `Branching automation — ${conditions} ${conditions === 1 ? 'condition' : 'conditions'}, ${actions} ${actions === 1 ? 'action' : 'actions'}.`;
+  }, [state.graph]);
 
   return (
     <div className="rounded-xl border border-border/60 bg-muted/15 px-4 py-3.5">
@@ -275,19 +354,23 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
         <Sparkles size={12} className="text-muted-foreground" aria-hidden />
         <p className={SECTION_LABEL}>In plain English</p>
       </div>
-      <p className="text-[15px] leading-relaxed text-muted-foreground">
-        <span className="text-muted-foreground/80">When </span>
-        <span className="font-medium text-foreground">{summary.when}</span>
-        {summary.conditions && (
-          <>
-            <span className="text-muted-foreground/80">, </span>
-            <span className="text-foreground">{summary.conditions}</span>
-          </>
-        )}
-        <span className="text-muted-foreground/80">, I’ll </span>
-        <span className="font-medium text-foreground">{summary.then}</span>
-        <span className="text-muted-foreground/80">.</span>
-      </p>
+      {graphLine ? (
+        <p className="text-[15px] leading-relaxed text-foreground">{graphLine}</p>
+      ) : (
+        <p className="text-[15px] leading-relaxed text-muted-foreground">
+          <span className="text-muted-foreground/80">When </span>
+          <span className="font-medium text-foreground">{summary.when}</span>
+          {summary.conditions && (
+            <>
+              <span className="text-muted-foreground/80">, </span>
+              <span className="text-foreground">{summary.conditions}</span>
+            </>
+          )}
+          <span className="text-muted-foreground/80">, I’ll </span>
+          <span className="font-medium text-foreground">{summary.then}</span>
+          <span className="text-muted-foreground/80">.</span>
+        </p>
+      )}
       <p
         className={cn(
           'mt-1.5 text-xs',
@@ -331,6 +414,12 @@ export function WorkflowBuilder({
   onCancel: () => void;
 }) {
   const [state, setState] = useState<WorkflowFormState>(() => initial ?? emptyFormState());
+  /**
+   * 'simple'  → the When / If / Then linear composer (state.graph stays null).
+   * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
+   * Open on the canvas when we're handed a graph-backed workflow (edit/template).
+   */
+  const [mode, setMode] = useState<'simple' | 'advanced'>(initial?.graph ? 'advanced' : 'simple');
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');
@@ -355,6 +444,42 @@ export function WorkflowBuilder({
       ...s,
       actions: s.actions.map((a) => (a.id === id ? { ...a, ...next } : a)),
     }));
+  }
+
+  // ── Mode switching ──────────────────────────────────────────────────────────
+
+  /** Whether the current graph round-trips to Simple (no branches). */
+  const graphIsLinear = state.graph ? isLinearGraph(state.graph) : true;
+
+  /**
+   * Simple → Advanced: synthesize the starting graph from the linear form so the
+   * realtor keeps their work as a chain on the canvas.
+   */
+  function enterAdvanced() {
+    const def = buildDefinition({ ...state, graph: null });
+    patch({ graph: linearToGraph({ conditions: def.conditions, actions: def.actions }) });
+    setMode('advanced');
+  }
+
+  /**
+   * Advanced → Simple: only reachable when the graph is linear. Convert the graph
+   * back into the form's condition/action rows (mirroring recordToFormState), drop
+   * the graph, and return to the linear composer.
+   */
+  function exitAdvanced() {
+    if (!state.graph) {
+      setMode('simple');
+      return;
+    }
+    const linear = graphToLinear(state.graph);
+    if (!linear) return; // branching — Simple isn't offered (button is disabled)
+    patch({
+      conditionOp: linear.conditions.op,
+      conditions: conditionsToRows(linear.conditions),
+      actions: actionsToRows(linear.actions),
+      graph: null,
+    });
+    setMode('simple');
   }
 
   function submit() {
@@ -407,6 +532,54 @@ export function WorkflowBuilder({
         {nameError && <p className="text-xs text-destructive">{nameError}</p>}
       </div>
 
+      {/* Mode — Simple (linear) vs Advanced (visual canvas). ──────────────────
+          The graph owns If/Then in Advanced; Simple keeps the When/If/Then form. */}
+      <div className="space-y-1.5">
+        <div
+          className="inline-flex rounded-md border border-border/60 p-0.5"
+          role="group"
+          aria-label="Builder mode"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'simple') return;
+              if (graphIsLinear) exitAdvanced();
+            }}
+            aria-pressed={mode === 'simple'}
+            disabled={mode === 'advanced' && !graphIsLinear}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'simple'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+              mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+            )}
+          >
+            Simple
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'advanced') return;
+              enterAdvanced();
+            }}
+            aria-pressed={mode === 'advanced'}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'advanced'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Advanced
+          </button>
+        </div>
+        {mode === 'advanced' && !graphIsLinear && (
+          <p className={CAPTION}>This automation branches — edit it on the canvas.</p>
+        )}
+      </div>
+
       {/* When ─────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <StepLabel index={1}>When</StepLabel>
@@ -439,6 +612,23 @@ export function WorkflowBuilder({
         </div>
       </section>
 
+      {/* ADVANCED — the visual canvas owns the If/Then logic. The trigger above
+          drives the canvas's trigger node; the linear If/Then sections below are
+          hidden because the graph carries them. ────────────────────────────── */}
+      {mode === 'advanced' && (
+        <section className="space-y-3">
+          <p className={SECTION_LABEL}>Flow</p>
+          <WorkflowCanvasLazy
+            graph={state.graph ?? emptyGraph}
+            trigger={buildDefinition({ ...state, graph: null }).trigger}
+            onChange={(g) => patch({ graph: g })}
+          />
+        </section>
+      )}
+
+      {/* If / Then — SIMPLE mode only (the graph owns them in Advanced). ────── */}
+      {mode === 'simple' && (
+        <>
       {/* If ───────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -534,6 +724,8 @@ export function WorkflowBuilder({
           </button>
         )}
       </section>
+        </>
+      )}
 
       {/* Autonomy ─────────────────────────────────────────────────────────── */}
       <section className="space-y-2">

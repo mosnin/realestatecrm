@@ -15,6 +15,7 @@
  */
 
 import type { WorkflowFormState } from './build-definition';
+import type { WorkflowGraph } from '@/lib/workflows/schema';
 
 export interface WorkflowTemplate {
   /** Stable id for the picker. */
@@ -167,12 +168,79 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'draft',
     },
   },
+  {
+    id: 'hot-vs-warm-branch',
+    name: 'Hot vs warm → different play',
+    description: 'If the lead is hot, text now; if not, schedule a follow-up.',
+    state: {
+      name: 'Hot vs warm → different play',
+      // ADVANCED template: the graph carries the branching logic; the linear
+      // conditions/actions stay empty (buildDefinition emits empty ones).
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [],
+      autonomy: 'draft',
+      graph: hotVsWarmGraph(),
+    },
+  },
 ];
+
+/**
+ * The branching graph for the "Hot vs warm" template:
+ *   trigger → condition(lead.score ≥ 80)
+ *     true  → draft an SMS now
+ *     false → schedule a follow-up message
+ */
+function hotVsWarmGraph(): WorkflowGraph {
+  return {
+    nodes: [
+      { id: 't', kind: 'trigger' },
+      {
+        id: 'c',
+        kind: 'condition',
+        condition: { op: 'and', rules: [{ field: 'lead.score', operator: 'gte', value: 80 }] },
+      },
+      {
+        id: 'hot',
+        kind: 'action',
+        action: {
+          type: 'draft_message',
+          config: {
+            channel: 'sms',
+            instruction:
+              'Draft a warm, personal intro to this hot lead and reference their interest — send it now.',
+          },
+        },
+      },
+      {
+        id: 'warm',
+        kind: 'action',
+        action: {
+          type: 'schedule_message',
+          config: {
+            channel: 'sms',
+            instruction:
+              'Draft a friendly check-in for this warm lead to go out in a couple of days.',
+            delayMinutes: 2880,
+          },
+        },
+      },
+    ],
+    edges: [
+      { from: 't', to: 'c' },
+      { from: 'c', to: 'hot', branch: 'true' },
+      { from: 'c', to: 'warm', branch: 'false' },
+    ],
+  };
+}
 
 /**
  * Deep-clone a template's form state so the builder mutates a copy, never the
  * shared preset. Re-keys every row id so two instances of the same template
- * don't collide React keys.
+ * don't collide React keys. The optional branching `graph` is structurally
+ * cloned so advanced templates open editable on the canvas without aliasing the
+ * preset.
  */
 export function cloneTemplateState(template: WorkflowTemplate): WorkflowFormState {
   const s = template.state;
@@ -183,5 +251,8 @@ export function cloneTemplateState(template: WorkflowTemplate): WorkflowFormStat
     conditions: s.conditions.map((c) => ({ ...c, id: rowId('cond') })),
     actions: s.actions.map((a) => ({ ...a, id: rowId('act') })),
     autonomy: s.autonomy,
+    graph: s.graph
+      ? (structuredClone(s.graph) as WorkflowGraph)
+      : s.graph,
   };
 }
