@@ -16,7 +16,19 @@
  *              status → 'drafted'. NEVER sends.
  *   'notify' → DRAFT + notify the realtor a draft is ready (notifyDraftReady);
  *              status → 'drafted'. NEVER sends.
- *   'auto'   → ACTUALLY SEND, but only behind THREE rails, all required:
+ *   'auto'   → ACTUALLY SEND, but only behind FOUR rails, all required:
+ *                0. CLAIM — claimForSend atomically flips the row 'pending'→
+ *                   'sending', GUARDED on the current status, IMMEDIATELY before
+ *                   the irreversible client send. Exactly one tick can win the
+ *                   flip; a loser (zero rows claimed) returns 'skipped' and never
+ *                   sends. This closes the duplicate-send hole: if the function is
+ *                   killed in the window between the send succeeding and the
+ *                   terminal-status write, the row is already 'sending' (not
+ *                   'pending'), so the due scan excludes it and the next tick will
+ *                   NOT re-send. A row stuck in 'sending' (claimed, then crashed
+ *                   pre-send) simply never sends — the SAFE failure: a missed
+ *                   send, never a DUPLICATE real message to a client. (A future
+ *                   stale-'sending' reclaim cron is a follow-up.)
  *                1. RATE LIMIT — checkRateLimit caps autonomous sends per space
  *                   per hour (AUTO_SEND_MAX/AUTO_SEND_WINDOW). Over the cap →
  *                   the row is DEFERRED (left 'pending'), retried next tick.
@@ -25,7 +37,7 @@
  *                   ScheduledMessage.detail with deliveredTo + a sentAt anchor.
  *                3. NOTIFY — notifyAutoSend tells the realtor, after the fact,
  *                   that Chippi sent without a tap.
- *              status → 'sent'.
+ *              status → 'sent' (transitioning 'sending'→'sent').
  *
  * The 'auto' send path is wired to the SAME transports the audited
  * /api/agent/send route uses — sendSMS (lib/sms) and sendEmailFromCRM
@@ -81,6 +93,11 @@ export interface DispatchSummary {
   sent: number;
   deferred: number;
   failed: number;
+  /** Auto-send rows the tick declined to send because the 'pending'→'sending'
+   *  claim flipped zero rows: another tick already owns the row, or a prior crash
+   *  left it stuck in 'sending'. A 'skipped' row's status is NOT touched here —
+   *  a missed send is the safe outcome; a duplicate send is not. */
+  skipped: number;
 }
 
 /** Patch a row's status + detail. Best-effort: a bookkeeping failure must not
@@ -97,6 +114,32 @@ async function setStatus(
   if (error) {
     logger.warn('[scheduled-dispatch] status update failed', { id, status }, error);
   }
+}
+
+/**
+ * RAIL 0 — CLAIM. Atomically take ownership of a row for an auto-send by flipping
+ * it 'pending'→'sending', GUARDED on the row STILL being 'pending'. The guarded
+ * UPDATE … WHERE status='pending' is the concurrency primitive: at most one tick
+ * can match-and-flip a given row, so at most one tick proceeds to the irreversible
+ * client send. Returns true iff exactly this caller won the claim (one row
+ * flipped). A zero-row result means another tick already claimed it, or a prior
+ * crash left it 'sending' — either way this caller must NOT send.
+ *
+ * On error we treat the row as NOT claimed (return false): skipping a send is the
+ * safe failure; risking a double-send to a real client is not.
+ */
+async function claimForSend(id: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('ScheduledMessage')
+    .update({ status: 'sending', updatedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select('id');
+  if (error) {
+    logger.warn('[scheduled-dispatch] claim-for-send failed — treating as not claimed', { id }, error);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
 }
 
 /**
@@ -136,11 +179,12 @@ async function processDraft(row: DueScheduledMessage): Promise<'drafted' | 'fail
 
 /**
  * AUTO path (autonomy 'auto'). Enforces the rate limit, resolves the recipient
- * contact within the space, SENDS via the existing transports, audits, and
- * notifies. Returns 'sent', 'deferred' (rate-limited — left pending for the next
- * tick), or 'failed'.
+ * contact within the space, CLAIMS the row, SENDS via the existing transports,
+ * audits, and notifies. Returns 'sent', 'deferred' (rate-limited — left pending
+ * for the next tick), 'skipped' (lost/declined the claim — see claimForSend), or
+ * 'failed'.
  */
-async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred' | 'failed'> {
+async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred' | 'skipped' | 'failed'> {
   // RAIL 1 — rate limit. Over the cap → DEFER: leave the row 'pending' (do NOT
   // touch status) so the next tick retries once the window rolls. A deferred
   // send is fine; an over-the-cap blast is not.
@@ -188,6 +232,24 @@ async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred
   // 'draft'/'notify' posture; 'auto' is the deliberate no-tap path.)
   const body = row.instruction;
   let deliveredTo: string | null = null;
+
+  // RAIL 0 — CLAIM, IMMEDIATELY before the irreversible send. Atomically flip
+  // 'pending'→'sending' guarded on the prior status. If we lose (zero rows: another
+  // tick owns it, or a prior crash left it 'sending'), bail WITHOUT sending and
+  // WITHOUT touching status → 'skipped'. Because the row is now 'sending' (not
+  // 'pending'), the due query excludes it from future ticks — so a crash between
+  // the send and the terminal setStatus below can never re-send. A row stuck in
+  // 'sending' (claimed, then crashed pre-send) will simply never send: acceptable —
+  // a missed send is safe; a duplicate real client message is not. (A stale-
+  // 'sending' reclaim cron is a follow-up.)
+  const claimed = await claimForSend(row.id);
+  if (!claimed) {
+    logger.warn('[scheduled-dispatch] auto-send claim lost — skipping (row already sending/claimed)', {
+      spaceId: row.spaceId,
+      id: row.id,
+    });
+    return 'skipped';
+  }
 
   if (row.channel === 'email') {
     if (!contact.email) {
@@ -276,7 +338,7 @@ async function processAuto(row: DueScheduledMessage): Promise<'sent' | 'deferred
  * Process one due row. Wrapped so any throw becomes a 'failed' row — one bad row
  * never aborts the batch. Returns the outcome bucket for the summary.
  */
-async function processRow(row: DueScheduledMessage): Promise<'drafted' | 'sent' | 'deferred' | 'failed'> {
+async function processRow(row: DueScheduledMessage): Promise<'drafted' | 'sent' | 'deferred' | 'skipped' | 'failed'> {
   try {
     if (row.autonomy === 'auto') {
       return await processAuto(row);
@@ -295,7 +357,7 @@ async function processRow(row: DueScheduledMessage): Promise<'drafted' | 'sent' 
  * each per its autonomy. Returns a summary of the batch. Never throws.
  */
 export async function dispatchDueScheduledMessages(now: Date = new Date()): Promise<DispatchSummary> {
-  const summary: DispatchSummary = { due: 0, drafted: 0, sent: 0, deferred: 0, failed: 0 };
+  const summary: DispatchSummary = { due: 0, drafted: 0, sent: 0, deferred: 0, failed: 0, skipped: 0 };
 
   const { data: rows, error } = await supabase
     .from('ScheduledMessage')

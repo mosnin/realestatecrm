@@ -44,12 +44,20 @@ CREATE TABLE IF NOT EXISTS "ScheduledMessage" (
   "autonomy"            text NOT NULL CHECK ("autonomy" IN ('draft', 'notify', 'auto')),
   -- Lifecycle:
   --   pending  — scheduled, not yet processed.
+  --   sending  — CLAIMED by a dispatcher tick for an auto-send: an atomic
+  --              'pending'→'sending' flip (guarded on the prior status) taken
+  --              IMMEDIATELY before the irreversible client send. Because the due
+  --              scan only sees 'pending' rows, a claimed row is excluded from
+  --              every future tick — that's what prevents a crash between send and
+  --              terminal-status write from re-sending a real message. A row left
+  --              stuck in 'sending' (claimed, then crashed pre-send) simply never
+  --              sends: the SAFE failure (a missed send, never a duplicate).
   --   drafted  — the dispatcher created a draft (draft/notify, or auto-fallback).
-  --   sent     — the dispatcher actually sent (auto only).
+  --   sent     — the dispatcher actually sent (auto only): 'sending'→'sent'.
   --   failed   — the dispatcher attempted and errored.
   --   canceled — the schedule was voided before dispatch.
   "status"              text NOT NULL DEFAULT 'pending'
-                          CHECK ("status" IN ('pending', 'drafted', 'sent', 'failed', 'canceled')),
+                          CHECK ("status" IN ('pending', 'sending', 'drafted', 'sent', 'failed', 'canceled')),
   -- Free-form record of the outcome (draftId, deliveredTo, error, audit note…).
   "detail"              jsonb,
   "createdAt"           timestamptz NOT NULL DEFAULT now(),

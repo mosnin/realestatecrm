@@ -28,11 +28,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // (select.eq.lte.order.limit) resolves to `dueRows.value`; the Contact lookup
 // (select.eq.eq.maybeSingle) resolves to `contactRow.value`; the SpaceSetting
 // lookup resolves to `spaceSettingRow.value`.
-const { calls, dueRows, contactRow, spaceSettingRow } = vi.hoisted(() => ({
-  calls: [] as Array<{ table: string; op: 'insert' | 'update'; payload: unknown }>,
+const { calls, dueRows, contactRow, spaceSettingRow, claimRows } = vi.hoisted(() => ({
+  calls: [] as Array<{ table: string; op: 'insert' | 'update'; payload: unknown; filters?: Array<[string, unknown]> }>,
   dueRows: { value: [] as unknown[] },
   contactRow: { value: null as unknown },
   spaceSettingRow: { value: null as unknown },
+  // Rows the guarded claim UPDATE … .select('id') resolves to. Non-empty = the
+  // 'pending'→'sending' flip won (claimed); empty = lost the claim (skipped).
+  claimRows: { value: [{ id: 'claimed' }] as unknown[] },
 }));
 
 vi.mock('@/lib/supabase', () => {
@@ -43,9 +46,18 @@ vi.mock('@/lib/supabase', () => {
         return Promise.resolve({ error: null });
       },
       update: (payload: unknown) => {
-        calls.push({ table, op: 'update', payload });
+        // Record the eq() filters on this update so tests can assert the claim's
+        // guard (.eq('status','pending')) distinguishes it from a terminal setStatus.
+        const filters: Array<[string, unknown]> = [];
+        calls.push({ table, op: 'update', payload, filters });
+        // The chain is both thenable (terminal setStatus: update.eq → { error })
+        // and exposes select (the claim: update.eq.eq.select('id') → { data }).
         const chain: Record<string, unknown> = {
-          eq: () => chain,
+          eq: (col: string, val: unknown) => {
+            filters.push([col, val]);
+            return chain;
+          },
+          select: () => Promise.resolve({ data: claimRows.value, error: null }),
           then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
         };
         return chain;
@@ -114,6 +126,7 @@ beforeEach(() => {
   dueRows.value = [];
   contactRow.value = null;
   spaceSettingRow.value = null;
+  claimRows.value = [{ id: 'claimed' }]; // default: the claim succeeds (one row flipped).
   runAutonomousInstructionMock.mockReset();
   runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, summary: 'drafted' });
   sendSMSMock.mockReset();
@@ -142,6 +155,17 @@ function statusUpdates() {
   return calls
     .filter((c) => c.table === 'ScheduledMessage' && c.op === 'update')
     .map((c) => c.payload as Record<string, unknown>);
+}
+
+/** The guarded claim: a status→'sending' update filtered on .eq('status','pending'). */
+function claimUpdates() {
+  return calls.filter(
+    (c) =>
+      c.table === 'ScheduledMessage' &&
+      c.op === 'update' &&
+      (c.payload as Record<string, unknown>).status === 'sending' &&
+      (c.filters ?? []).some(([col, val]) => col === 'status' && val === 'pending'),
+  );
 }
 
 const CONTACT = { id: 'contact-1', name: 'Jane', email: 'jane@example.com', phone: '+15551234567' };
@@ -250,8 +274,23 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
       { id: 'sm-3', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'Your tour is confirmed', autonomy: 'auto' },
     ];
 
+    // Capture the ScheduledMessage update snapshot the instant the send fires, to
+    // prove RAIL 0 (the claim) ran BEFORE the irreversible send.
+    let updatesAtSendTime: Record<string, unknown>[] = [];
+    sendSMSMock.mockImplementation(async () => {
+      updatesAtSendTime = statusUpdates();
+      return true;
+    });
+
     const summary = await dispatchDueScheduledMessages();
 
+    // RAIL 0: CLAIM — a guarded 'pending'→'sending' update ran BEFORE the send.
+    // At send time exactly the claim update was on record (status 'sending'); the
+    // terminal 'sent' update is written only AFTER the send returns.
+    expect(updatesAtSendTime).toHaveLength(1);
+    expect(updatesAtSendTime[0].status).toBe('sending');
+    // The claim was guarded on the prior status (.eq('status','pending')).
+    expect(claimUpdates()).toHaveLength(1);
     // RAIL 1: rate limit checked.
     expect(checkRateLimitMock).toHaveBeenCalledWith('scheduled-auto-send:space-1', 20, 60 * 60);
     // REAL SEND happened.
@@ -264,10 +303,13 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     // RAIL 3: realtor notified after the fact.
     expect(notifyAutoSendMock).toHaveBeenCalledTimes(1);
 
+    // Two updates now: the claim ('sending') then the terminal ('sent').
     const updates = statusUpdates();
-    expect(updates[0].status).toBe('sent');
-    expect((updates[0].detail as Record<string, unknown>).deliveredTo).toBe(CONTACT.phone);
-    expect(summary).toMatchObject({ sent: 1, drafted: 0, deferred: 0, failed: 0 });
+    expect(updates).toHaveLength(2);
+    expect(updates[0].status).toBe('sending');
+    expect(updates[1].status).toBe('sent');
+    expect((updates[1].detail as Record<string, unknown>).deliveredTo).toBe(CONTACT.phone);
+    expect(summary).toMatchObject({ sent: 1, drafted: 0, deferred: 0, failed: 0, skipped: 0 });
   });
 
   it("'auto' over the rate limit → NOT sent, status untouched (deferred)", async () => {
@@ -284,6 +326,31 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     // Deferred = left pending: no status update written.
     expect(statusUpdates()).toHaveLength(0);
     expect(summary).toMatchObject({ deferred: 1, sent: 0, failed: 0 });
+  });
+
+  it("'auto' whose claim flips zero rows → NOT sent, status untouched (skipped)", async () => {
+    // Another tick already owns this row (or a crash left it 'sending'): the
+    // guarded 'pending'→'sending' UPDATE matches nothing, so claimForSend returns
+    // false. We must NOT send and must NOT overwrite status.
+    claimRows.value = []; // claim flips zero rows.
+    contactRow.value = CONTACT;
+    dueRows.value = [
+      { id: 'sm-8', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'hi', autonomy: 'auto' },
+    ];
+
+    const summary = await dispatchDueScheduledMessages();
+
+    // The claim was attempted (guarded), but lost.
+    expect(claimUpdates()).toHaveLength(1);
+    // No real send, no audit, no notify.
+    expect(sendSMSMock).not.toHaveBeenCalled();
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(recordOutboundMock).not.toHaveBeenCalled();
+    expect(notifyAutoSendMock).not.toHaveBeenCalled();
+    // Status is NOT overwritten — only the claim update exists (the 'sending'
+    // flip itself matched nothing), no terminal 'sent'/'failed' write.
+    expect(statusUpdates().some((u) => u.status === 'sent' || u.status === 'failed')).toBe(false);
+    expect(summary).toMatchObject({ skipped: 1, sent: 0, deferred: 0, failed: 0 });
   });
 
   it('one failing row does not abort the batch', async () => {
@@ -318,7 +385,9 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     const summary = await dispatchDueScheduledMessages();
 
     expect(summary.failed).toBe(1);
-    expect(statusUpdates()[0].status).toBe('failed');
+    // The row was claimed ('sending') then the send threw → terminal 'failed'.
+    const updates = statusUpdates();
+    expect(updates.map((u) => u.status)).toEqual(['sending', 'failed']);
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
   });
 });
