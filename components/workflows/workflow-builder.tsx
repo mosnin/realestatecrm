@@ -595,6 +595,189 @@ function actionAccent(type: WorkflowActionType) {
   };
 }
 
+// ── Variable / token picker ──────────────────────────────────────────────────
+//
+// Zapier's killer feature: click "{}" in any instruction field to insert a
+// variable like {{lead.name}} at the cursor. The catalog is grouped by source
+// (Lead | Trigger) and filtered by the active trigger type so only relevant
+// tokens appear (e.g. {{trigger.message}} only shows for inbound_message).
+
+interface TokenDef {
+  label: string;
+  token: string;
+  hint: string;
+}
+interface TokenGroup {
+  label: string;
+  tokens: TokenDef[];
+}
+
+const LEAD_TOKEN_GROUP: TokenGroup = {
+  label: 'Lead',
+  tokens: [
+    { label: 'Full name', token: '{{lead.name}}', hint: 'e.g. Jane Smith' },
+    { label: 'Email', token: '{{lead.email}}', hint: 'e.g. jane@example.com' },
+    { label: 'Phone', token: '{{lead.phone}}', hint: 'e.g. +1 555 123 4567' },
+    { label: 'Lead score', token: '{{lead.score}}', hint: 'e.g. 82' },
+    { label: 'Source', token: '{{lead.source}}', hint: 'e.g. Zillow' },
+    { label: 'Assigned agent', token: '{{lead.assignedAgent}}', hint: 'e.g. Alex Johnson' },
+    { label: 'Property interest', token: '{{lead.propertyInterest}}', hint: 'e.g. 3BR in Austin' },
+  ],
+};
+
+const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
+  lead_score_threshold: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Current score', token: '{{trigger.score}}', hint: 'e.g. 85' },
+      { label: 'Threshold', token: '{{trigger.threshold}}', hint: 'e.g. 80' },
+    ],
+  },
+  inbound_message: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Message text', token: '{{trigger.message}}', hint: 'the raw message body' },
+      { label: 'Channel', token: '{{trigger.channel}}', hint: 'sms or email' },
+    ],
+  },
+  tour_completed: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Tour date', token: '{{trigger.tourDate}}', hint: 'e.g. June 28, 2026' },
+    ],
+  },
+  deal_stage_changed: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'New stage', token: '{{trigger.stage}}', hint: 'e.g. Under Contract' },
+      { label: 'Previous stage', token: '{{trigger.previousStage}}', hint: 'e.g. Active' },
+    ],
+  },
+  integration_event: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Event name', token: '{{trigger.event}}', hint: 'e.g. contact.updated' },
+      { label: 'App / toolkit', token: '{{trigger.toolkit}}', hint: 'e.g. hubspot' },
+    ],
+  },
+  schedule: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Run date', token: '{{trigger.date}}', hint: 'e.g. 2026-06-28' },
+      { label: 'Run time', token: '{{trigger.time}}', hint: 'e.g. 09:00' },
+    ],
+  },
+  webhook: {
+    label: 'Trigger',
+    tokens: [{ label: 'Payload JSON', token: '{{trigger.payload}}', hint: 'full JSON body' }],
+  },
+};
+
+function TokenPicker({
+  triggerType,
+  onInsert,
+}: {
+  triggerType: TriggerType;
+  onInsert: (token: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const triggerGroup = TRIGGER_TOKEN_GROUPS[triggerType];
+  const groups: TokenGroup[] = [
+    LEAD_TOKEN_GROUP,
+    ...(triggerGroup ? [triggerGroup] : []),
+  ];
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? groups
+        .map((g) => ({
+          ...g,
+          tokens: g.tokens.filter(
+            (t) =>
+              t.label.toLowerCase().includes(q) ||
+              t.token.toLowerCase().includes(q) ||
+              t.hint.toLowerCase().includes(q),
+          ),
+        }))
+        .filter((g) => g.tokens.length > 0)
+    : groups;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Insert variable"
+        title="Insert a variable like {{lead.name}}"
+        className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-background px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+      >
+        <span className="font-mono">{'{ }'}</span>
+        Insert variable
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setOpen(false);
+              setSearch('');
+            }}
+            aria-hidden
+          />
+          <div className="absolute left-0 top-full z-50 mt-1.5 w-60 rounded-xl border border-border/60 bg-popover shadow-xl">
+            <div className="border-b border-border/40 p-2">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search variables…"
+                autoFocus
+                className="w-full rounded-lg border border-border/40 bg-background px-2.5 py-1.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:border-foreground/30"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1.5">
+              {filtered.length === 0 && (
+                <p className="py-4 text-center text-[12px] text-muted-foreground">
+                  No variables match.
+                </p>
+              )}
+              {filtered.map((group) => (
+                <div key={group.label}>
+                  <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                    {group.label}
+                  </p>
+                  {group.tokens.map((t) => (
+                    <button
+                      key={t.token}
+                      type="button"
+                      onClick={() => {
+                        onInsert(t.token);
+                        setOpen(false);
+                        setSearch('');
+                      }}
+                      className="flex w-full flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                    >
+                      <span className="text-[12px] font-medium text-foreground">
+                        {t.label}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground/70">
+                        {t.token}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * One action step card. The action type selector lives in the card header so
  * the realtor sees at a glance what each step does — identical to how Zapier
@@ -610,6 +793,7 @@ function ActionZapCard({
   incomplete,
   collapsed,
   showDragHandle,
+  triggerType,
   onChange,
   onRemove,
   onDuplicate,
@@ -622,6 +806,7 @@ function ActionZapCard({
   incomplete?: boolean;
   collapsed?: boolean;
   showDragHandle?: boolean;
+  triggerType: TriggerType;
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -736,7 +921,7 @@ function ActionZapCard({
       </div>
       {!collapsed && (
         <div className="px-4 py-4">
-          <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
+          <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} triggerType={triggerType} />
         </div>
       )}
     </div>
@@ -1220,6 +1405,7 @@ export function WorkflowBuilder({
                 incomplete={actionIncomplete(row)}
                 collapsed={collapsedSteps.has(row.id)}
                 showDragHandle={state.actions.length > 1}
+                triggerType={state.trigger.type}
                 onChange={(next) => updateAction(row.id, next)}
                 onRemove={() =>
                   patch({ actions: state.actions.filter((a) => a.id !== row.id) })
@@ -1793,10 +1979,12 @@ function ActionConfig({
   row,
   onChange,
   connectedApps,
+  triggerType,
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
   connectedApps: ConnectedAppsState;
+  triggerType: TriggerType;
 }) {
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
@@ -1812,7 +2000,7 @@ function ActionConfig({
             ]}
           />
         </FieldRow>
-        <InstructionField row={row} onChange={onChange} />
+        <InstructionField row={row} onChange={onChange} triggerType={triggerType} />
         {row.type === 'schedule_message' && (
           <FieldRow label="Delay (minutes)" htmlFor={`act-delay-${row.id}`}>
             <Input
@@ -1832,7 +2020,7 @@ function ActionConfig({
   }
 
   if (row.type === 'run_chippi') {
-    return <InstructionField row={row} onChange={onChange} />;
+    return <InstructionField row={row} onChange={onChange} triggerType={triggerType} />;
   }
 
   if (row.type === 'create_task') {
@@ -2036,10 +2224,37 @@ const INSTRUCTION_MAX = 4000;
 function InstructionField({
   row,
   onChange,
+  triggerType,
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track the last cursor/selection position so token insertion lands at cursor.
+  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  function saveSelection() {
+    const el = textareaRef.current;
+    if (el) selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
+  }
+
+  function insertToken(token: string) {
+    const { start, end } = selectionRef.current;
+    const current = row.instruction;
+    const next = current.slice(0, start) + token + current.slice(end);
+    onChange({ instruction: next });
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+        selectionRef.current = { start: pos, end: pos };
+      }
+    });
+  }
+
   const len = row.instruction.length;
   const nearLimit = len > INSTRUCTION_MAX * 0.85;
   return (
@@ -2048,17 +2263,24 @@ function InstructionField({
         <Label htmlFor={`act-instr-${row.id}`} className="text-[12px] text-muted-foreground">
           Instruction
         </Label>
-        {nearLimit && (
-          <span className={cn('text-[11px] tabular-nums', len >= INSTRUCTION_MAX ? 'font-semibold text-destructive' : 'text-muted-foreground/60')}>
-            {len}/{INSTRUCTION_MAX}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {nearLimit && (
+            <span className={cn('text-[11px] tabular-nums', len >= INSTRUCTION_MAX ? 'font-semibold text-destructive' : 'text-muted-foreground/60')}>
+              {len}/{INSTRUCTION_MAX}
+            </span>
+          )}
+          <TokenPicker triggerType={triggerType} onInsert={insertToken} />
+        </div>
       </div>
       <Textarea
+        ref={textareaRef}
         id={`act-instr-${row.id}`}
         value={row.instruction}
         onChange={(e) => onChange({ instruction: e.target.value })}
-        placeholder="Draft a warm, personal intro and reference their interest."
+        onSelect={saveSelection}
+        onKeyUp={saveSelection}
+        onClick={saveSelection}
+        placeholder="Draft a warm, personal intro and reference {{lead.name}}'s interest."
         maxLength={INSTRUCTION_MAX}
         rows={3}
       />
