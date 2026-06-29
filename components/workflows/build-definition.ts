@@ -87,7 +87,7 @@ export interface ActionRowState {
   /** schedule_message / delay: numeric amount (string off a number input). */
   delayMinutes: string;
   /** delay: the display unit. Converted to minutes by buildAction. */
-  delayUnit: 'minutes' | 'hours' | 'days';
+  delayUnit: 'minutes' | 'hours' | 'days' | 'weeks';
   /** create_task. */
   title: string;
   dueInDays: string;
@@ -264,7 +264,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message': {
-      const smMultiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
+      const smMultiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
       return {
         type: 'schedule_message',
         ...(label ? { label } : {}),
@@ -309,7 +309,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
-      const multiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
+      const multiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
       return {
         type: 'delay',
         ...(label ? { label } : {}),

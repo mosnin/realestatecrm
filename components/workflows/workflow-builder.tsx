@@ -549,7 +549,8 @@ function conditionsToRows(group: ConditionGroup): ConditionRowState[] {
 /** Map stored WorkflowActions back into the builder's action ROWS (mirrors
  *  recordToFormState's action mapping). */
 /** Convert stored delayMinutes back to a user-friendly amount + unit. */
-function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours' | 'days' } {
+function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours' | 'days' | 'weeks' } {
+  if (m % 10080 === 0 && m >= 10080) return { amount: String(m / 10080), unit: 'weeks' };
   if (m % 1440 === 0) return { amount: String(m / 1440), unit: 'days' };
   if (m % 60 === 0) return { amount: String(m / 60), unit: 'hours' };
   return { amount: String(m), unit: 'minutes' };
@@ -4072,11 +4073,12 @@ function ActionConfig({
             />
             <MiniSelect
               value={row.delayUnit ?? 'hours'}
-              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
+              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
               options={[
                 { value: 'minutes', label: 'minutes' },
                 { value: 'hours', label: 'hours' },
                 { value: 'days', label: 'days' },
+                { value: 'weeks', label: 'weeks' },
               ]}
             />
           </div>
@@ -4124,6 +4126,7 @@ function ActionConfig({
     const n = parseFloat(row.delayMinutes);
     const unit = row.delayUnit ?? 'minutes';
     const delayHint = row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
+      if (unit === 'weeks') return `${n} week${n === 1 ? '' : 's'} (${n * 7} days)`;
       if (unit === 'minutes') {
         if (n < 60) return `${n} minute${n === 1 ? '' : 's'}`;
         const hrs = n / 60;
@@ -4157,11 +4160,12 @@ function ActionConfig({
           />
           <MiniSelect
             value={unit}
-            onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
+            onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
             options={[
               { value: 'minutes', label: 'minutes' },
               { value: 'hours', label: 'hours' },
               { value: 'days', label: 'days' },
+              { value: 'weeks', label: 'weeks' },
             ]}
           />
         </div>
