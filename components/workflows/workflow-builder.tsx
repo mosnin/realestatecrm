@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -547,6 +547,31 @@ function StepConnector() {
   );
 }
 
+/** One-line summary of a configured action step — shown in the collapsed card. */
+function actionSummary(row: ActionRowState): string {
+  const trunc = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n)}…` : s);
+  switch (row.type) {
+    case 'draft_message':
+      return `${row.channel.toUpperCase()} — ${trunc(row.instruction) || 'no instruction'}`;
+    case 'schedule_message':
+      return `${row.channel.toUpperCase()} in ${row.delayMinutes || '?'} ${row.delayUnit}${row.instruction ? ` — ${trunc(row.instruction, 40)}` : ''}`;
+    case 'create_task':
+      return row.title ? `Task: ${trunc(row.title)}` : 'No title set';
+    case 'run_chippi':
+      return trunc(row.instruction) || 'no instruction';
+    case 'delay':
+      return `Wait ${row.delayMinutes || '?'} ${row.delayUnit}`;
+    case 'filter':
+      return row.filterField
+        ? `${row.filterField} ${row.filterOperator}${row.filterValue ? ` ${row.filterValue}` : ''}`
+        : 'No filter set';
+    case 'call_integration':
+      return [row.toolkit, row.action].filter(Boolean).join(' / ') || 'No app selected';
+    default:
+      return '';
+  }
+}
+
 /** Per-action-type accent colors: delay = amber, filter = sky, else violet. */
 function actionAccent(type: WorkflowActionType) {
   if (type === 'delay') {
@@ -574,33 +599,41 @@ function actionAccent(type: WorkflowActionType) {
  * One action step card. The action type selector lives in the card header so
  * the realtor sees at a glance what each step does — identical to how Zapier
  * shows each action as its own titled card.
+ *
+ * Collapse/expand: a chevron button in the header toggles the body. When
+ * collapsed the card shows a one-line summary of the configured values.
  */
 function ActionZapCard({
   step,
   row,
   canRemove,
   incomplete,
+  collapsed,
   showDragHandle,
   onChange,
   onRemove,
   onDuplicate,
+  onToggleCollapse,
   connectedApps,
 }: {
   step: number;
   row: ActionRowState;
   canRemove: boolean;
   incomplete?: boolean;
+  collapsed?: boolean;
   showDragHandle?: boolean;
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
+  onToggleCollapse: () => void;
   connectedApps: ConnectedAppsState;
 }) {
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
   const cl = actionAccent(row.type);
+  const summary = collapsed ? actionSummary(row) : null;
   return (
     <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
-      <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
+      <div className={cn('flex items-center gap-3 bg-muted/20 px-4 py-3', !collapsed && 'border-b border-border/40')}>
         {showDragHandle && (
           <GripVertical
             size={14}
@@ -614,38 +647,57 @@ function ActionZapCard({
         <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
           <Icon size={14} aria-hidden />
         </span>
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <Label htmlFor={`act-type-${row.id}`} className="sr-only">
-            Action type
-          </Label>
-          <Select
-            value={row.type}
-            onValueChange={(v) => onChange({ type: v as WorkflowActionType })}
-          >
-            <SelectTrigger
-              id={`act-type-${row.id}`}
-              className="h-8 border-border/40 bg-transparent text-sm font-semibold"
+        <div className="flex-1 min-w-0">
+          {collapsed ? (
+            /* Collapsed: show step label/type + summary as read-only text */
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="w-full text-left"
+              aria-label="Expand step"
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ACTION_ORDER.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {ACTION_LABELS[a]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* Step name — optional Zapier-style label for this step */}
-          <input
-            type="text"
-            value={row.label ?? ''}
-            onChange={(e) => onChange({ label: e.target.value || undefined })}
-            placeholder="Add a step name…"
-            maxLength={100}
-            aria-label="Step name (optional)"
-            className="w-full bg-transparent px-0.5 text-[11px] text-muted-foreground/70 placeholder:text-muted-foreground/30 outline-none transition-colors hover:text-muted-foreground focus:text-foreground"
-          />
+              <p className="text-sm font-semibold text-foreground leading-tight">
+                {row.label || ACTION_LABELS[row.type]}
+              </p>
+              {summary && (
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{summary}</p>
+              )}
+            </button>
+          ) : (
+            <div className="space-y-0.5">
+              <Label htmlFor={`act-type-${row.id}`} className="sr-only">
+                Action type
+              </Label>
+              <Select
+                value={row.type}
+                onValueChange={(v) => onChange({ type: v as WorkflowActionType })}
+              >
+                <SelectTrigger
+                  id={`act-type-${row.id}`}
+                  className="h-8 border-border/40 bg-transparent text-sm font-semibold"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTION_ORDER.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {ACTION_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Step name — optional Zapier-style label for this step */}
+              <input
+                type="text"
+                value={row.label ?? ''}
+                onChange={(e) => onChange({ label: e.target.value || undefined })}
+                placeholder="Add a step name…"
+                maxLength={100}
+                aria-label="Step name (optional)"
+                className="w-full bg-transparent px-0.5 text-[11px] text-muted-foreground/70 placeholder:text-muted-foreground/30 outline-none transition-colors hover:text-muted-foreground focus:text-foreground"
+              />
+            </div>
+          )}
         </div>
         {incomplete ? (
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
@@ -657,6 +709,20 @@ function ActionZapCard({
             <CheckIcon size={11} strokeWidth={3} aria-hidden />
           </span>
         )}
+        {/* Collapse / expand toggle */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand step' : 'Collapse step'}
+          title={collapsed ? 'Expand' : 'Collapse'}
+          className="flex-shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className={cn('transition-transform', collapsed && '-rotate-90')}
+          />
+        </button>
         <button
           type="button"
           onClick={onDuplicate}
@@ -668,9 +734,11 @@ function ActionZapCard({
         </button>
         {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
       </div>
-      <div className="px-4 py-4">
-        <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
-      </div>
+      {!collapsed && (
+        <div className="px-4 py-4">
+          <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} />
+        </div>
+      )}
     </div>
   );
 }
@@ -720,6 +788,17 @@ export function WorkflowBuilder({
   const connectedApps = useConnectedApps();
   /** Narrow viewport → the advanced canvas is view-only (edit on a bigger screen). */
   const isNarrow = useIsNarrow();
+  /** Set of action row ids whose cards are collapsed (body hidden, summary shown). */
+  const [collapsedSteps, setCollapsedSteps] = useState<Set<string>>(() => new Set());
+
+  function toggleCollapse(id: string) {
+    setCollapsedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Cmd/Ctrl+S saves the workflow.
   useEffect(() => {
@@ -1139,6 +1218,7 @@ export function WorkflowBuilder({
                 row={row}
                 canRemove={state.actions.length > 1}
                 incomplete={actionIncomplete(row)}
+                collapsed={collapsedSteps.has(row.id)}
                 showDragHandle={state.actions.length > 1}
                 onChange={(next) => updateAction(row.id, next)}
                 onRemove={() =>
@@ -1149,6 +1229,7 @@ export function WorkflowBuilder({
                   next.splice(i + 1, 0, { ...row, id: nextRowId('act') });
                   patch({ actions: next });
                 }}
+                onToggleCollapse={() => toggleCollapse(row.id)}
                 connectedApps={connectedApps}
               />
             </div>
