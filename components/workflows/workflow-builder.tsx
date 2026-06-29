@@ -375,6 +375,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
     return {
       id: nextRowId('act'),
       type: a.type,
+      label: a.label,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
       instruction:
@@ -613,7 +614,7 @@ function ActionZapCard({
         <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
           <Icon size={14} aria-hidden />
         </span>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0 space-y-0.5">
           <Label htmlFor={`act-type-${row.id}`} className="sr-only">
             Action type
           </Label>
@@ -635,6 +636,16 @@ function ActionZapCard({
               ))}
             </SelectContent>
           </Select>
+          {/* Step name — optional Zapier-style label for this step */}
+          <input
+            type="text"
+            value={row.label ?? ''}
+            onChange={(e) => onChange({ label: e.target.value || undefined })}
+            placeholder="Add a step name…"
+            maxLength={100}
+            aria-label="Step name (optional)"
+            className="w-full bg-transparent px-0.5 text-[11px] text-muted-foreground/70 placeholder:text-muted-foreground/30 outline-none transition-colors hover:text-muted-foreground focus:text-foreground"
+          />
         </div>
         {incomplete ? (
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">

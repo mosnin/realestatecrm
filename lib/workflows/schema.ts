@@ -192,15 +192,20 @@ export type WorkflowActionType =
 const channelSchema = z.enum(['sms', 'email']);
 const instructionField = z.string().trim().min(1).max(LONG_TEXT);
 
+/** Optional step label — a custom name the realtor gives a step (like Zapier's "Step name"). */
+const stepLabel = z.string().trim().max(100).optional();
+
 export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
+    label: stepLabel,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
   }),
   z.object({
     type: z.literal('schedule_message'),
+    label: stepLabel,
     config: z
       .object({
         channel: channelSchema,
@@ -211,6 +216,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('create_task'),
+    label: stepLabel,
     config: z
       .object({
         title: shortText,
@@ -220,6 +226,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('call_integration'),
+    label: stepLabel,
     config: z
       .object({
         toolkit: shortText,
@@ -230,16 +237,19 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('run_chippi'),
+    label: stepLabel,
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
   z.object({
     type: z.literal('delay'),
+    label: stepLabel,
     config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
   }),
   // filter: stop the run if the field condition is not met.
   z.object({
     type: z.literal('filter'),
+    label: stepLabel,
     config: z
       .object({
         field: z.string().trim().min(1).max(SHORT_TEXT),

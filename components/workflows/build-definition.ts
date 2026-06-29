@@ -72,6 +72,8 @@ export interface ConditionRowState {
 export interface ActionRowState {
   id: string;
   type: WorkflowActionType;
+  /** Optional custom step name shown in the card header (Zapier-style). */
+  label?: string;
   /** draft_message / schedule_message. */
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
@@ -211,15 +213,18 @@ function coerceConditionValue(raw: string): unknown {
 
 /** Map one action row to a WorkflowAction by its type's config shape. */
 function buildAction(row: ActionRowState): WorkflowAction {
+  const label = row.label?.trim() || undefined;
   switch (row.type) {
     case 'draft_message':
       return {
         type: 'draft_message',
+        ...(label ? { label } : {}),
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message':
       return {
         type: 'schedule_message',
+        ...(label ? { label } : {}),
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
@@ -229,6 +234,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
     case 'create_task':
       return {
         type: 'create_task',
+        ...(label ? { label } : {}),
         config:
           row.dueInDays.trim() === ''
             ? { title: row.title.trim() }
@@ -237,6 +243,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
     case 'call_integration':
       return {
         type: 'call_integration',
+        ...(label ? { label } : {}),
         config: {
           toolkit: row.toolkit.trim(),
           action: row.action.trim(),
@@ -244,11 +251,16 @@ function buildAction(row: ActionRowState): WorkflowAction {
         },
       };
     case 'run_chippi':
-      return { type: 'run_chippi', config: { instruction: row.instruction.trim() } };
+      return {
+        type: 'run_chippi',
+        ...(label ? { label } : {}),
+        config: { instruction: row.instruction.trim() },
+      };
     case 'delay': {
       const multiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
       return {
         type: 'delay',
+        ...(label ? { label } : {}),
         config: { delayMinutes: toNumber(row.delayMinutes) * multiplier },
       };
     }
@@ -256,6 +268,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       const base = { field: row.filterField.trim(), operator: row.filterOperator };
       return {
         type: 'filter',
+        ...(label ? { label } : {}),
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },
