@@ -264,6 +264,55 @@ export async function listWorkflowRuns(
   return (data ?? []) as unknown as WorkflowRunRecord[];
 }
 
+/** A run record enriched with the parent workflow's name for the global history view. */
+export interface GlobalWorkflowRunRecord extends WorkflowRunRecord {
+  workflowName: string;
+}
+
+/**
+ * List recent runs across ALL workflows in a space, newest first. Used by the
+ * global History tab — the equivalent of Zapier's "Zap History" page.
+ *
+ * Security: scoped entirely by spaceId on the WorkflowRun row — no ownership
+ * check on individual workflows needed because the run's own spaceId is the
+ * authoritative guard. Workflow names are fetched separately and joined in code
+ * (avoids depending on PostgREST FK inference).
+ */
+export async function listAllWorkflowRuns(
+  spaceId: string,
+  limit = 50,
+): Promise<GlobalWorkflowRunRecord[]> {
+  const capped = Math.max(1, Math.min(limit, 100));
+  const { data: runs, error } = await supabase
+    .from('WorkflowRun')
+    .select(RUN_SELECT)
+    .eq('spaceId', spaceId)
+    .order('startedAt', { ascending: false })
+    .limit(capped);
+  if (error) throw error;
+  if (!runs || runs.length === 0) return [];
+
+  const workflowIds = [...new Set(runs.map((r) => (r as Record<string, unknown>).workflowId as string))];
+  const { data: wfs, error: wErr } = await supabase
+    .from('Workflow')
+    .select('id, name')
+    .eq('spaceId', spaceId)
+    .in('id', workflowIds);
+  if (wErr) throw wErr;
+
+  const nameMap = new Map<string, string>(
+    (wfs ?? []).map((w) => {
+      const row = w as { id: string; name: string };
+      return [row.id, row.name];
+    }),
+  );
+
+  return (runs as unknown as WorkflowRunRecord[]).map((r) => ({
+    ...r,
+    workflowName: nameMap.get(r.workflowId) ?? 'Unknown workflow',
+  }));
+}
+
 /**
  * Fetch one run's steps, ordered by stepIndex. The run is loaded WITH a spaceId
  * filter first, so a runId that belongs to another space resolves to nothing and

@@ -137,6 +137,17 @@ interface WorkflowRun {
   steps: RunStep[];
 }
 
+interface GlobalRun {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  summary: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
 const API_BASE = '/api/workflows';
 
 // ── Map a stored record back to editable form state ──────────────────────────
@@ -258,6 +269,12 @@ export function WorkflowsManager() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  const [activeTab, setActiveTab] = useState<'workflows' | 'history'>('workflows');
+  const [globalRuns, setGlobalRuns] = useState<GlobalRun[] | null>(null);
+  const [globalRunsLoading, setGlobalRunsLoading] = useState(false);
+  const [globalRunsError, setGlobalRunsError] = useState(false);
+  const [globalRunsStatusFilter, setGlobalRunsStatusFilter] = useState<'all' | 'completed' | 'failed'>('all');
 
   /** Unique trigger types present in the current workflow list for the filter dropdown. */
   const triggerTypes = useMemo(() => {
@@ -618,6 +635,28 @@ export function WorkflowsManager() {
     }
   }
 
+  async function loadGlobalHistory() {
+    setGlobalRunsLoading(true);
+    setGlobalRunsError(false);
+    try {
+      const res = await fetch(`${API_BASE}/runs`);
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setGlobalRuns(Array.isArray(data.runs) ? (data.runs as GlobalRun[]) : []);
+    } catch {
+      setGlobalRunsError(true);
+    } finally {
+      setGlobalRunsLoading(false);
+    }
+  }
+
+  function switchTab(tab: 'workflows' | 'history') {
+    setActiveTab(tab);
+    if (tab === 'history' && globalRuns === null && !globalRunsLoading) {
+      void loadGlobalHistory();
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -658,6 +697,42 @@ export function WorkflowsManager() {
         </div>
       ) : workflows.length > 0 ? (
         <div className="space-y-2">
+          {/* Tab bar — Workflows / History */}
+          <div className="flex items-center gap-0 border-b border-border/60">
+            {(
+              [
+                { value: 'workflows' as const, label: 'Workflows', count: workflows.length },
+                { value: 'history' as const, label: 'History', count: null },
+              ]
+            ).map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => {
+                  switchTab(tab.value);
+                  setActionError('');
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 border-b-2 pb-2 pr-4 text-sm font-medium transition-colors',
+                  activeTab === tab.value
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {tab.label}
+                {tab.count !== null && (
+                  <span className={cn(
+                    'rounded-full px-1.5 py-px text-[10px] tabular-nums font-medium',
+                    activeTab === tab.value ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground',
+                  )}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'workflows' && (<>
           {/* Row 1: search + buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[180px]">
@@ -772,12 +847,29 @@ export function WorkflowsManager() {
               </select>
             </div>
           </div>
+          </>)}
         </div>
       ) : null}
 
       {workflows.length === 0 && composer === null ? (
         <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
-      ) : workflows.length === 0 ? null : (
+      ) : workflows.length === 0 ? null : activeTab === 'history' ? (
+        <GlobalHistoryPanel
+          runs={globalRuns}
+          loading={globalRunsLoading}
+          error={globalRunsError}
+          statusFilter={globalRunsStatusFilter}
+          onStatusFilter={setGlobalRunsStatusFilter}
+          onRefresh={() => void loadGlobalHistory()}
+          onNavigate={(workflowId) => {
+            setActiveTab('workflows');
+            setActionError('');
+            setTimeout(() => {
+              document.getElementById(`workflow-${workflowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 50);
+          }}
+        />
+      ) : (
         <>
           {/* Editing builder — floats above the table so the table layout stays intact */}
           {editingId && (() => {
@@ -1653,6 +1745,208 @@ function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: str
         </div>
       )}
     </li>
+  );
+}
+
+// ── Global History Panel (cross-workflow activity feed) ──────────────────────
+
+function GlobalHistoryPanel({
+  runs,
+  loading,
+  error,
+  statusFilter,
+  onStatusFilter,
+  onRefresh,
+  onNavigate,
+}: {
+  runs: GlobalRun[] | null;
+  loading: boolean;
+  error: boolean;
+  statusFilter: 'all' | 'completed' | 'failed';
+  onStatusFilter: (f: 'all' | 'completed' | 'failed') => void;
+  onRefresh: () => void;
+  onNavigate: (workflowId: string) => void;
+}) {
+  const filtered = useMemo(() => {
+    if (!runs) return [];
+    if (statusFilter === 'all') return runs;
+    return runs.filter((r) => r.status === statusFilter);
+  }, [runs, statusFilter]);
+
+  return (
+    <div className="space-y-3">
+      {/* History toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1.5">
+          {(
+            [
+              { value: 'all' as const, label: 'All' },
+              { value: 'completed' as const, label: 'Completed' },
+              { value: 'failed' as const, label: 'Failed' },
+            ]
+          ).map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => onStatusFilter(f.value)}
+              className={cn(
+                'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                statusFilter === f.value
+                  ? f.value === 'failed'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                    : 'bg-foreground text-background'
+                  : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="ml-auto flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+          Refresh
+        </button>
+      </div>
+
+      {/* History table */}
+      <div className="rounded-xl border border-border/60 overflow-hidden">
+        {/* Table header */}
+        <div className="grid grid-cols-[auto_1fr_140px_120px] border-b border-border/60 bg-muted/40 px-4 py-2">
+          <div />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Workflow
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Status
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            When
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-[13px] text-muted-foreground">
+            <Loader2 size={16} className="animate-spin" />
+            Loading history…
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">Couldn&apos;t load history — try refreshing.</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <History size={30} className="mb-2 text-muted-foreground/20" />
+            <p className="text-sm text-muted-foreground">
+              {statusFilter === 'all' ? "No workflow runs yet." : `No ${statusFilter} runs.`}
+            </p>
+            {statusFilter === 'all' && (
+              <p className="mt-1 text-[12px] text-muted-foreground/60">
+                Runs appear here when a trigger fires or you test a workflow.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {filtered.map((run) => (
+              <GlobalRunRow key={run.id} run={run} onNavigate={onNavigate} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {runs && runs.length > 0 && (
+        <p className="text-right text-[11px] text-muted-foreground/50">
+          Showing last {runs.length} run{runs.length !== 1 ? 's' : ''} across all workflows
+        </p>
+      )}
+    </div>
+  );
+}
+
+function GlobalRunRow({
+  run,
+  onNavigate,
+}: {
+  run: GlobalRun;
+  onNavigate: (workflowId: string) => void;
+}) {
+  const durationMs =
+    run.finishedAt ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime() : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
+  return (
+    <div className="grid grid-cols-[auto_1fr_140px_120px] items-center gap-0 px-4 py-2.5 transition-colors hover:bg-muted/20">
+      {/* Status dot */}
+      <div className="pr-3">
+        <span
+          className={cn(
+            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+            run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+            run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+            run.status === 'skipped' && 'bg-muted text-muted-foreground',
+            run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+          )}
+          aria-hidden
+        >
+          {run.status === 'completed' && <Check size={10} strokeWidth={2.5} />}
+          {run.status === 'failed' && <X size={10} strokeWidth={2.5} />}
+          {run.status === 'skipped' && <span className="text-[9px]">–</span>}
+          {run.status === 'running' && <Loader2 size={9} className="animate-spin" />}
+        </span>
+      </div>
+
+      {/* Workflow name + summary */}
+      <div className="min-w-0 pr-3">
+        <button
+          type="button"
+          onClick={() => onNavigate(run.workflowId)}
+          className="group flex items-center gap-1 text-left"
+          title="Go to workflow"
+        >
+          <span className="truncate text-[13px] font-medium text-foreground group-hover:text-orange-600 transition-colors">
+            {run.workflowName}
+          </span>
+          <ArrowRight size={11} className="flex-shrink-0 text-muted-foreground/30 group-hover:text-orange-500 transition-colors" aria-hidden />
+        </button>
+        {(run.error || run.summary) && (
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
+            {run.error ?? run.summary}
+          </p>
+        )}
+      </div>
+
+      {/* Status + duration */}
+      <div className="flex items-center gap-1.5 pr-2">
+        <span className={cn(
+          'text-[12px] font-medium',
+          run.status === 'completed' && 'text-emerald-600 dark:text-emerald-400',
+          run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+          run.status === 'running' && 'text-amber-600 dark:text-amber-400',
+          run.status === 'skipped' && 'text-muted-foreground',
+        )}>
+          {run.status === 'completed' ? 'Completed'
+            : run.status === 'failed' ? 'Failed'
+            : run.status === 'running' ? 'Running'
+            : 'Skipped'}
+        </span>
+        {durationLabel && (
+          <span className="text-[11px] tabular-nums text-muted-foreground/50">· {durationLabel}</span>
+        )}
+      </div>
+
+      {/* Time */}
+      <span className="text-[12px] text-muted-foreground/70 tabular-nums">
+        {timeAgo(run.startedAt)}
+      </span>
+    </div>
   );
 }
 
