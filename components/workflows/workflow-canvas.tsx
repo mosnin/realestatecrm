@@ -209,20 +209,19 @@ const OPERATOR_LABELS: Record<Operator, string> = {
 const VALUELESS_OPERATORS = new Set<Operator>(['exists', 'not_exists']);
 
 const CHANNEL_OPTIONS = [
-  { value: 'sms', label: 'SMS' },
   { value: 'email', label: 'Email' },
 ];
 
 // ── Node-face phrasing (human labels — never raw field paths) ────────────────
 
-/** A short, human face for an action node ("Draft an SMS"). */
+/** A short, human face for an action node ("Draft an email"). */
 function actionFace(action: WorkflowAction | undefined): string {
   if (!action) return 'Action';
   switch (action.type) {
     case 'draft_message':
-      return `Draft ${action.config.channel === 'email' ? 'an email' : 'an SMS'}`;
+      return 'Draft an email';
     case 'schedule_message':
-      return `Schedule ${action.config.channel === 'email' ? 'an email' : 'an SMS'}`;
+      return 'Schedule an email';
     case 'create_task':
       return action.config.title ? `Task: ${action.config.title}` : 'Create a task';
     case 'call_integration':
@@ -526,7 +525,7 @@ const NODE_TYPES: NodeTypes = {
 // ── Defaults for new nodes ───────────────────────────────────────────────────
 
 function defaultAction(): WorkflowAction {
-  return { type: 'draft_message', config: { channel: 'sms', instruction: '' } };
+  return { type: 'draft_message', config: { channel: 'email', instruction: '' } };
 }
 function defaultCondition(): ConditionGroup {
   return { op: 'and', rules: [] };
@@ -1049,9 +1048,9 @@ function ActionInspector({
     if (type === action.type) return;
     const next: WorkflowAction =
       type === 'draft_message'
-        ? { type, config: { channel: 'sms', instruction: '' } }
+        ? { type, config: { channel: 'email', instruction: '' } }
         : type === 'schedule_message'
-          ? { type, config: { channel: 'sms', instruction: '', delayMinutes: 60 } }
+          ? { type, config: { channel: 'email', instruction: '', delayMinutes: 60 } }
           : type === 'create_task'
             ? { type, config: { title: '' } }
             : type === 'call_integration'
@@ -1091,7 +1090,7 @@ function ActionInspector({
               onValueChange={(v) =>
                 onChange({
                   type: 'draft_message',
-                  config: { ...action.config, channel: v as 'sms' | 'email' },
+                  config: { ...action.config, channel: v as 'email' },
                 })
               }
               options={CHANNEL_OPTIONS}
@@ -1121,7 +1120,7 @@ function ActionInspector({
               onValueChange={(v) =>
                 onChange({
                   type: 'schedule_message',
-                  config: { ...action.config, channel: v as 'sms' | 'email' },
+                  config: { ...action.config, channel: v as 'email' },
                 })
               }
               options={CHANNEL_OPTIONS}

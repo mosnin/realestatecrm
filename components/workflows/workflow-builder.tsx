@@ -123,7 +123,7 @@ const TRIGGER_SAMPLE_DATA: Record<TriggerType, Record<string, string | number>> 
     'lead.previousScore': 72,
   },
   inbound_message: {
-    'message.channel': 'sms',
+    'message.channel': 'email',
     'message.body': 'Hey, I saw the listing on Oak Ave — is it still available?',
     'message.from': '+1 512 555 0192',
     'lead.name': 'Priya Patel',
@@ -238,7 +238,7 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
-  draft_message: 'Compose an SMS or email for you to review before sending',
+  draft_message: 'Compose an email for you to review before sending',
   schedule_message: 'Auto-send a message after a delay',
   create_task: 'Create a follow-up task for you or your team',
   call_integration: 'Trigger an action in a connected app',
@@ -452,7 +452,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
   return {
     id: nextRowId('act'),
     type,
-    channel: 'sms',
+    channel: 'email',
     instruction: '',
     delayMinutes: '',
     delayUnit: 'minutes',
@@ -526,7 +526,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       label: a.label,
       note: a.note,
       channel:
-        a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
+        a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'email',
       instruction:
         a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
           ? a.config.instruction
@@ -931,7 +931,7 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     label: 'Trigger',
     tokens: [
       { label: 'Message text', token: '{{trigger.message}}', hint: 'the raw message body' },
-      { label: 'Channel', token: '{{trigger.channel}}', hint: 'sms or email' },
+      { label: 'Channel', token: '{{trigger.channel}}', hint: 'e.g. email' },
     ],
   },
   tour_completed: {
@@ -2417,10 +2417,9 @@ function TriggerConfig({
         <MiniSelect
           id="wf-channel"
           value={t.channel}
-          onValueChange={(v) => patchTrigger({ channel: v as 'sms' | 'email' | 'any' })}
+          onValueChange={(v) => patchTrigger({ channel: v as 'email' | 'any' })}
           options={[
             { value: 'any', label: 'Any channel' },
-            { value: 'sms', label: 'SMS' },
             { value: 'email', label: 'Email' },
           ]}
         />
@@ -3347,17 +3346,6 @@ function ActionConfig({
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
       <div className="space-y-2.5">
-        <FieldRow label="Channel" htmlFor={`act-ch-${row.id}`}>
-          <MiniSelect
-            id={`act-ch-${row.id}`}
-            value={row.channel}
-            onValueChange={(v) => onChange({ channel: v as 'sms' | 'email' })}
-            options={[
-              { value: 'sms', label: 'SMS' },
-              { value: 'email', label: 'Email' },
-            ]}
-          />
-        </FieldRow>
         <InstructionField row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />
         {row.type === 'schedule_message' && (
           <div className="flex flex-wrap items-center gap-2">

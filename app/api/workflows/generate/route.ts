@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = `You are a workflow automation assistant for a real estate
 AVAILABLE TRIGGERS (pick one):
 - lead_created — a new lead is created
 - lead_score_threshold — a lead's score crosses a minimum (config: { min: number 1-100 })
-- inbound_message — an inbound SMS or email arrives (config: { channel: "sms"|"email"|"any" })
+- inbound_message — an inbound email arrives (config: { channel: "email"|"any" })
 - tour_completed — a property tour is completed
 - deal_stage_changed — a deal changes pipeline stage (config: { toStage?: string })
 - schedule — runs on a schedule (config: { cadence: "daily"|"weekdays"|"hourly", hour?: 0-23 })
@@ -38,8 +38,8 @@ AVAILABLE TRIGGERS (pick one):
 - integration_event — a connected app fires an event
 
 AVAILABLE ACTIONS (ordered list, 1-5 actions):
-- draft_message: draft a personalized message (config: { channel: "sms"|"email", instruction: string })
-- schedule_message: schedule a message to send later (config: { channel: "sms"|"email", instruction: string, delayMinutes: number })
+- draft_message: draft a personalized email (config: { channel: "email", instruction: string })
+- schedule_message: schedule an email to send later (config: { channel: "email", instruction: string, delayMinutes: number })
 - create_task: create a follow-up task (config: { title: string, dueInDays?: number })
 - run_chippi: run an AI agent with instructions (config: { instruction: string })
 - delay: wait before the next step (config: { delayMinutes: number })
@@ -62,7 +62,7 @@ Return ONLY a JSON object with these exact fields:
   "trigger": {
     "type": "<trigger_type>",
     "min": "<number as string, only for lead_score_threshold>",
-    "channel": "<sms|email|any, only for inbound_message>",
+    "channel": "<email|any, only for inbound_message>",
     "toStage": "<stage name, only for deal_stage_changed>",
     "cadence": "<daily|weekdays|hourly, only for schedule>",
     "hour": "<0-23 as string, only for schedule with specific hour>"
@@ -72,7 +72,7 @@ Return ONLY a JSON object with these exact fields:
   "actions": [
     {
       "type": "<action_type>",
-      "channel": "<sms|email, for message actions>",
+      "channel": "<email, for message actions>",
       "instruction": "<AI instruction text, for draft_message/schedule_message/run_chippi>",
       "delayMinutes": "<number as string, for schedule_message/delay>",
       "title": "<task title, for create_task>",

@@ -113,7 +113,6 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'message.channel',
     valueType: 'enum',
     options: [
-      { value: 'sms', label: 'SMS' },
       { value: 'email', label: 'Email' },
     ],
     operators: ENUM_OPERATORS,

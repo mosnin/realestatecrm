@@ -9,7 +9,7 @@
  * had typed it.
  *
  * The marquee template — "Hot lead → instant draft" — is the demo: a lead
- * crosses score 80, Chippi drafts a warm SMS intro, and (draft autonomy) the
+ * crosses score 80, Chippi drafts a warm email intro, and (draft autonomy) the
  * realtor approves it. The others show the breadth: an inbound Gmail reply and
  * a scheduled morning follow-up sweep.
  */
@@ -72,7 +72,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
   return {
     id: rowId('act'),
     type: 'draft_message',
-    channel: 'sms',
+    channel: 'email',
     instruction: '',
     delayMinutes: '',
     delayUnit: 'minutes',
@@ -116,7 +116,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm, personal intro to this new high-intent lead and reference their interest.',
         },
@@ -187,7 +187,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm thank-you for the tour and ask for their honest take on the home.',
         },
@@ -216,7 +216,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a short, warm welcome to this brand-new lead. Make it personal, mention you saw their inquiry, and ask when they are available to chat.',
         },
@@ -265,7 +265,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Read the inbound message and draft a prompt, helpful reply that addresses their question and invites a next step.',
         },
@@ -342,7 +342,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a heartfelt congratulations message to the client on closing their deal. Keep it warm and personal.',
         },
@@ -397,7 +397,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a gentle, no-pressure check-in for this lead who has gone quiet. Ask if their search criteria have changed or if there is anything I can help with. Keep it short and human.',
         },
@@ -443,7 +443,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a short, warm welcome text to this brand-new lead. Mention you saw their inquiry, offer to help, and invite them to reply with what they are looking for.',
         },
@@ -456,7 +456,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Two days have passed since first contact. Draft a gentle check-in asking if they had a chance to browse listings and if they have any questions.',
         },
@@ -523,7 +523,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a short, friendly text to send while you try to reach this hot lead by phone. Mention you noticed they are very interested and would love to help — keep it under 3 sentences.',
         },
@@ -587,7 +587,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a friendly, conversational text to this warm lead asking if they are working with a lender or have pre-approval in hand. Phrase it naturally — like asking a practical next-step question, not a gating requirement. If they say yes, mention you can start sending listings right away.',
         },
@@ -680,7 +680,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a very brief welcome text — introduce yourself, say you are excited to help them find their perfect home, and let them know you will follow up shortly.',
         },
@@ -693,7 +693,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'It has been 24 hours since first contact. Draft a short follow-up asking this lead a few quick questions about what they are looking for: budget range, must-have features, desired neighbourhoods, and timeline. Keep it casual and easy to respond to.',
         },
@@ -722,7 +722,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'An hour has passed since the tour. Draft a friendly text asking for their honest gut-reaction: did they love it, was it missing something key, or just okay? Ask them to reply with a quick rating (1–5) or a few words. Keep it short and low pressure.',
         },
@@ -783,7 +783,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction: 'Draft a brief welcome text to the new lead saying you saw their enquiry and will be in touch shortly.',
         },
       ],
@@ -850,7 +850,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm thank-you for the tour and ask what they thought about the home. Keep it short and personal.',
         },
@@ -884,7 +884,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm, personal intro to this hot lead — mention you noticed their strong interest and invite them to connect today.',
         },
@@ -918,7 +918,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft heartfelt congratulations on the closing. Mention it was a pleasure working together and that you are here for any future real estate needs or referrals.',
         },
@@ -1005,7 +1005,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction: 'Draft a warm intro text to this hot lead while the CRM sync runs in the background.',
         },
       ],
@@ -1042,7 +1042,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'It has been 30 days since {{lead.name}} closed on their home. Draft a warm personal check-in asking how they are settling in, if everything is going smoothly, and whether they know anyone else who might be looking to buy or sell soon. Keep it short and genuinely warm — not salesy.',
         },
@@ -1070,7 +1070,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft an excited congratulations message to the client — their offer was just accepted! Acknowledge what a big moment this is, and let them know you will guide them through every step of the closing process.',
         },
@@ -1110,7 +1110,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a super-fast, personal welcome text to this Facebook lead. Mention you saw their inquiry just came through, you would love to help them find what they are looking for, and ask when they are free for a quick 5-minute call today. Speed is everything here.',
         },
@@ -1156,7 +1156,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
 /**
  * The branching graph for the "Hot vs warm" template:
  *   trigger → condition(lead.score ≥ 80)
- *     true  → draft an SMS now
+ *     true  → draft an email now
  *     false → schedule a follow-up message
  */
 function hotVsWarmGraph(): WorkflowGraph {
@@ -1174,7 +1174,7 @@ function hotVsWarmGraph(): WorkflowGraph {
         action: {
           type: 'draft_message',
           config: {
-            channel: 'sms',
+            channel: 'email',
             instruction:
               'Draft a warm, personal intro to this hot lead and reference their interest — send it now.',
           },
@@ -1186,7 +1186,7 @@ function hotVsWarmGraph(): WorkflowGraph {
         action: {
           type: 'schedule_message',
           config: {
-            channel: 'sms',
+            channel: 'email',
             instruction:
               'Draft a friendly check-in for this warm lead to go out in a couple of days.',
             delayMinutes: 2880,

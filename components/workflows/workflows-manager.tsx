@@ -211,7 +211,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel
-          : 'sms',
+          : 'email',
       instruction:
         a.type === 'draft_message' ||
         a.type === 'schedule_message' ||
@@ -2850,7 +2850,7 @@ function AIWorkflowGenerator({
           id: aiGenRowId(),
           type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
           label: typeof a.label === 'string' ? a.label : undefined,
-          channel: (typeof a.channel === 'string' ? a.channel : 'sms') as 'sms' | 'email',
+          channel: (typeof a.channel === 'string' ? a.channel : 'email') as 'sms' | 'email',
           instruction: typeof a.instruction === 'string' ? a.instruction : '',
           delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',
           delayUnit: 'minutes' as const,
@@ -2891,7 +2891,7 @@ function AIWorkflowGenerator({
   }
 
   const EXAMPLE_PROMPTS = [
-    'Send a welcome SMS when a new lead is created',
+    'Send a welcome email when a new lead is created',
     'Remind me to call when a lead score exceeds 80',
     'Follow up 2 days after a tour is completed',
     'Create a task when a deal moves to offer stage',

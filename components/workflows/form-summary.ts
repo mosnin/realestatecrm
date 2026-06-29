@@ -47,7 +47,6 @@ function triggerPhrase(t: TriggerFormState): string {
       return min ? `a lead's score reaches ${min}` : "a lead's score crosses your threshold";
     }
     case 'inbound_message':
-      if (t.channel === 'sms') return 'a lead texts you';
       if (t.channel === 'email') return 'a lead emails you';
       return 'a lead messages you';
     case 'tour_completed':
