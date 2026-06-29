@@ -228,17 +228,22 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         autonomy: workflow.autonomy,
         runId,
       });
+      const failedAndStop = result.status === 'failed' && action.onError !== 'skip';
       if (result.status === 'failed') anyFailed = true;
       await writeStep({
         runId,
         stepIndex: i + 1,
         kind: 'action',
         actionType: action.type,
-        status: result.status,
+        // When onError=skip and the step failed, record as 'skipped' so the
+        // run history makes clear the error was absorbed rather than fatal.
+        status: result.status === 'failed' && action.onError === 'skip' ? 'skipped' : result.status,
         detail: result.detail,
       });
       // filter gate: when stop is true (filter condition not met), halt remaining actions.
       if (result.stop) break;
+      // Error gate: stop on failure unless onError=skip.
+      if (failedAndStop) break;
     }
 
     // 4. Terminal status.

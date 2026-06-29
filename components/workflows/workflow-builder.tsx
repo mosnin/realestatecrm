@@ -1234,7 +1234,30 @@ function ActionZapCard({
       {!collapsed && (
         <div className="px-4 py-4 space-y-3">
           <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} triggerType={triggerType} />
-          <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
+          <div className="border-t border-border/30 pt-2 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] text-muted-foreground">On error:</span>
+              <div className="flex overflow-hidden rounded-md border border-border/50">
+                {(['stop', 'skip'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => onChange({ onError: opt === 'stop' ? undefined : opt })}
+                    aria-pressed={opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip'}
+                    className={cn(
+                      'px-2.5 py-1 text-[11px] font-medium capitalize transition-colors',
+                      (opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip')
+                        ? 'bg-foreground text-background'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {opt === 'stop' ? 'Stop workflow' : 'Skip & continue'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
+          </div>
         </div>
       )}
     </div>

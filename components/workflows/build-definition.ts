@@ -76,6 +76,8 @@ export interface ActionRowState {
   label?: string;
   /** Optional private note for internal documentation — not executed or sent. */
   note?: string;
+  /** What to do if this step errors: 'stop' (default) or 'skip' and continue. */
+  onError?: 'stop' | 'skip';
   /** draft_message / schedule_message. */
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
@@ -217,12 +219,14 @@ function coerceConditionValue(raw: string): unknown {
 function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
   const note = row.note?.trim() || undefined;
+  const onError = row.onError === 'skip' ? 'skip' : undefined;
   switch (row.type) {
     case 'draft_message':
       return {
         type: 'draft_message',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message': {
@@ -231,6 +235,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'schedule_message',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
@@ -243,6 +248,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'create_task',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config:
           row.dueInDays.trim() === ''
             ? { title: row.title.trim() }
@@ -253,6 +259,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'call_integration',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: {
           toolkit: row.toolkit.trim(),
           action: row.action.trim(),
@@ -264,6 +271,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'run_chippi',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
@@ -272,6 +280,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'delay',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: { delayMinutes: toNumber(row.delayMinutes) * multiplier },
       };
     }
@@ -281,6 +290,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
         type: 'filter',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },

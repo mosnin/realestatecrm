@@ -196,12 +196,20 @@ const instructionField = z.string().trim().min(1).max(LONG_TEXT);
 const stepLabel = z.string().trim().max(100).optional();
 /** Optional private note on a step — for internal documentation, not sent anywhere. */
 const stepNote = z.string().trim().max(500).optional();
+/**
+ * What to do if this step fails at runtime. Defaults to 'stop' (current
+ * behaviour), matching Zapier's default error handling. 'skip' logs the
+ * failure and continues with the next step — useful for non-critical side
+ * effects (Slack pings, CRM log notes) that shouldn't derail the whole run.
+ */
+const stepOnError = z.enum(['stop', 'skip']).optional();
 
 export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
@@ -210,6 +218,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('schedule_message'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         channel: channelSchema,
@@ -222,6 +231,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('create_task'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         title: shortText,
@@ -233,6 +243,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('call_integration'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         toolkit: shortText,
@@ -245,6 +256,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('run_chippi'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
@@ -252,6 +264,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('delay'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
   }),
   // filter: stop the run if the field condition is not met.
@@ -259,6 +272,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     type: z.literal('filter'),
     label: stepLabel,
     note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         field: z.string().trim().min(1).max(SHORT_TEXT),

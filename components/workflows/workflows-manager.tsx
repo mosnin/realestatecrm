@@ -186,6 +186,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       type: a.type,
       label: a.label,
       note: a.note,
+      onError: a.onError,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel
