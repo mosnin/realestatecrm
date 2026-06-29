@@ -51,6 +51,10 @@ function triggerPhrase(t: TriggerFormState): string {
       return 'a lead messages you';
     case 'tour_completed':
       return 'a tour wraps up';
+    case 'deal_created':
+      return 'a new deal is created';
+    case 'contact_updated':
+      return "a contact's record is updated";
     case 'deal_stage_changed': {
       const stage = t.toStage.trim();
       return stage ? `a deal moves to ${stage}` : 'a deal changes stage';

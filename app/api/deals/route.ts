@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { normalizeCloseReason } from '@/lib/close-reason';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -385,6 +386,21 @@ export async function POST(req: NextRequest) {
       dealPriority: priority || null,
     });
   } catch (e) { console.error('[deals] notification failed:', e); }
+
+  const createdDealSpaceId = space.id;
+  const createdDealId = dealRow.id;
+  after(async () => {
+    try {
+      await runWorkflowsForEvent({
+        spaceId: createdDealSpaceId,
+        triggerType: 'deal_created',
+        context: { event: { type: 'deal_created' }, deal: dealRow },
+        triggerEvent: { type: 'deal_created', dealId: createdDealId },
+      });
+    } catch (e) {
+      logger.error('[deals/POST] deal_created workflow dispatch failed (non-fatal)', { dealId: createdDealId }, e);
+    }
+  });
 
   return NextResponse.json(deal, { status: 201 });
   } catch (err) {

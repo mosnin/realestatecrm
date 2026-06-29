@@ -93,6 +93,19 @@ function sampleContextFor(trigger: WorkflowTrigger): WorkflowContext {
         },
         contact: sampleContact,
       };
+    case 'deal_created':
+      return {
+        event: { type: 'deal_created' },
+        deal: { id: 'sample', stage: 'prospect', amount: 650000 },
+        lead: sampleLead,
+        contact: sampleContact,
+      };
+    case 'contact_updated':
+      return {
+        event: { type: 'contact_updated' },
+        lead: sampleLead,
+        contact: sampleContact,
+      };
     case 'schedule':
       return { event: { type: 'schedule' } };
     case 'webhook':

@@ -192,6 +192,10 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
       };
     case 'tour_completed':
       return { type: 'tour_completed', config: {} };
+    case 'deal_created':
+      return { type: 'deal_created', config: {} };
+    case 'contact_updated':
+      return { type: 'contact_updated', config: {} };
     case 'deal_stage_changed':
       return {
         type: 'deal_stage_changed',

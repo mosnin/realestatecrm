@@ -47,7 +47,7 @@ async function loadSample(
   spaceId: string,
   type: TriggerType,
 ): Promise<Record<string, string | number>> {
-  if (type === 'lead_created' || type === 'lead_score_threshold' || type === 'inbound_message') {
+  if (type === 'lead_created' || type === 'lead_score_threshold' || type === 'inbound_message' || type === 'contact_updated') {
     const { data: contacts } = await supabase
       .from('Contact')
       .select('id, name, email, phone, leadScore, scoreLabel, sourceLabel, preferences, createdAt')
@@ -74,7 +74,7 @@ async function loadSample(
     return base;
   }
 
-  if (type === 'deal_stage_changed' || type === 'tour_completed') {
+  if (type === 'deal_stage_changed' || type === 'tour_completed' || type === 'deal_created') {
     const { data: deals } = await supabase
       .from('Deal')
       .select('id, stage, amount, contactId, updatedAt, Contact(name, email, phone)')

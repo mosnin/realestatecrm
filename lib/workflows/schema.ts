@@ -44,6 +44,8 @@ export type TriggerType =
   | 'inbound_message'
   | 'tour_completed'
   | 'deal_stage_changed'
+  | 'deal_created'
+  | 'contact_updated'
   | 'integration_event'
   | 'schedule'
   | 'webhook';
@@ -81,6 +83,10 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // deal_created: fires when a new deal is opened in the CRM.
+  z.object({ type: z.literal('deal_created'), config: z.object({}).strict() }),
+  // contact_updated: fires when an existing contact record is edited.
+  z.object({ type: z.literal('contact_updated'), config: z.object({}).strict() }),
   // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
   // config is empty — the URL is derived from the workflow id at display time.
   z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),

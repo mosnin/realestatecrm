@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { syncContact, deleteContactVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
@@ -6,6 +6,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { Contact } from '@/lib/types';
 
 export async function GET(
@@ -219,6 +220,21 @@ export async function PATCH(
 
     syncContact(contact as Contact).catch(console.error);
     void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Contact', resourceId: id, spaceId: space.id, req });
+
+    const spaceId = space.id;
+    const contactRow = contact as Contact;
+    after(async () => {
+      try {
+        await runWorkflowsForEvent({
+          spaceId,
+          triggerType: 'contact_updated',
+          context: { event: { type: 'contact_updated' }, lead: contactRow, contact: contactRow },
+          triggerEvent: { type: 'contact_updated', contactId: id },
+        });
+      } catch (e) {
+        logger.error('[contacts/PATCH] contact_updated workflow dispatch failed (non-fatal)', { contactId: id }, e);
+      }
+    });
 
     return NextResponse.json(contact);
   } catch (err) {
