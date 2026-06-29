@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog, Play, History, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -1607,6 +1607,335 @@ function ActionZapCard({
   );
 }
 
+// ── Builder run-history types + sub-components ───────────────────────────────
+
+interface BuilderRunStep {
+  id: string;
+  stepIndex: number;
+  kind: string;
+  actionType: string | null;
+  status: string;
+  detail: unknown;
+  createdAt: string;
+}
+
+interface BuilderRunRecord {
+  id: string;
+  status: string;
+  summary: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+  triggerEvent: unknown;
+  steps: BuilderRunStep[];
+}
+
+const BUILDER_ACTION_LABELS: Record<string, string> = {
+  draft_message: 'Draft message',
+  schedule_message: 'Schedule message',
+  create_task: 'Create task',
+  call_integration: 'Call integration',
+  run_chippi: 'Run Chippi',
+  formatter: 'Format data',
+  delay: 'Delay',
+  filter: 'Filter',
+  webhook_post: 'Webhook POST',
+  update_lead: 'Update lead',
+  notify_agent: 'Push alert',
+  condition: 'Condition check',
+};
+
+const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
+  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+};
+
+function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
+  if (detail == null || typeof detail !== 'object') return null;
+  const obj = detail as Record<string, unknown>;
+
+  type Row = { key: string; value: string };
+  const rows: Row[] = [];
+
+  function add(key: string, value: unknown) {
+    if (value === undefined || value === null) return;
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    if (str.trim()) rows.push({ key, value: str.trim() });
+  }
+
+  if (actionType === 'formatter') {
+    add('operation', obj.operation);
+    add('input', obj.inputResolved ?? obj.input);
+    add('output', obj.output);
+  } else if (actionType === 'draft_message' || actionType === 'schedule_message') {
+    add('channel', obj.channel);
+    add('recipient', obj.recipient);
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'create_task') {
+    add('title', obj.title);
+    add('due', obj.dueAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'run_chippi') {
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'call_integration') {
+    add('toolkit', obj.toolkit);
+    add('action', obj.action);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'delay') {
+    add('waited', obj.waited ?? obj.delayMinutes);
+  } else if (actionType === 'filter') {
+    add('field', obj.field);
+    add('result', obj.passed !== undefined ? (obj.passed ? 'passed' : 'blocked') : undefined);
+    if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'webhook_post') {
+    add('url', obj.url);
+    add('status', obj.statusCode);
+    add('response', obj.responseSnippet);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'update_lead') {
+    add('field', obj.field);
+    add('value', obj.value ?? obj.tag ?? obj.days);
+    if (obj.followUpAt) add('followUpAt', obj.followUpAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'notify_agent') {
+    add('title', obj.title);
+    if (obj.body) add('body', obj.body);
+    add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
+    if (obj.note) add('note', obj.note);
+  } else {
+    for (const [k, v] of Object.entries(obj).slice(0, 4)) {
+      if (typeof v !== 'object') add(k, v);
+    }
+  }
+
+  if (rows.length === 0) return null;
+  return (
+    <dl className="mt-1 flex flex-col gap-0.5">
+      {rows.map(({ key, value }) => (
+        <div key={key} className="flex items-start gap-1.5 text-[11px]">
+          <dt className="min-w-[52px] flex-shrink-0 capitalize font-medium text-muted-foreground/60">{key}</dt>
+          <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function BuilderRunItem({ run, workflowId }: { run: BuilderRunRecord; workflowId: string }) {
+  const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const hasSteps = run.steps.length > 0;
+
+  const durationMs = run.finishedAt
+    ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()
+    : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
+  async function retryRun(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        toast.success('Re-run triggered', { description: 'Check the test panel above for results.' });
+      } else {
+        toast.error('Re-run failed — try again.');
+      }
+    } catch {
+      toast.error('Re-run failed — try again.');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  return (
+    <li className="overflow-hidden rounded-lg border border-border/50 bg-card/40">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => hasSteps && setOpen((o) => !o)}
+          disabled={!hasSteps}
+          className={cn(
+            'flex flex-1 items-center gap-2.5 px-3 py-2.5 text-left',
+            hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
+            !hasSteps && 'cursor-default',
+          )}
+        >
+          {/* Status icon */}
+          <span
+            className={cn(
+              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+              run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+              run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+              run.status === 'skipped' && 'bg-muted text-muted-foreground',
+              run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+            )}
+            aria-hidden
+          >
+            {run.status === 'completed' && <CheckIcon size={11} strokeWidth={2.5} />}
+            {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
+            {run.status === 'skipped' && <ArrowUpDown size={9} />}
+            {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className={cn(
+                'text-[12.5px] font-medium',
+                run.status === 'completed' && 'text-foreground',
+                run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                run.status === 'running' && 'text-amber-700 dark:text-amber-400',
+                run.status === 'skipped' && 'text-muted-foreground',
+              )}>
+                {run.status === 'completed' ? 'Completed'
+                  : run.status === 'failed' ? 'Failed'
+                  : run.status === 'running' ? 'Running'
+                  : 'Skipped'}
+              </span>
+              <span className="text-[11px] text-muted-foreground/60">{timeAgo(run.startedAt)}</span>
+              {durationLabel && (
+                <span className="text-[11px] tabular-nums text-muted-foreground/50">· {durationLabel}</span>
+              )}
+              {hasSteps && (
+                <span className="ml-auto text-[11px] text-muted-foreground/50">
+                  {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </span>
+            {(run.error || run.summary) && (
+              <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
+                {run.error ?? run.summary}
+              </span>
+            )}
+          </span>
+
+          {hasSteps && (
+            <ChevronRight
+              size={13}
+              aria-hidden
+              className={cn('flex-shrink-0 text-muted-foreground/40 transition-transform', open && 'rotate-90')}
+            />
+          )}
+        </button>
+
+        {/* Retry button — only visible on failed runs */}
+        {run.status === 'failed' && (
+          <button
+            type="button"
+            onClick={retryRun}
+            disabled={retrying}
+            aria-label="Retry this run"
+            title="Re-run this workflow (test mode)"
+            className="flex flex-shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border/40 px-2.5 text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            {retrying ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+            <span className="text-[9px] font-medium">Retry</span>
+          </button>
+        )}
+      </div>
+
+      {/* Expanded detail — trigger event + step timeline */}
+      {open && hasSteps && (
+        <div className="border-t border-border/40 bg-muted/10 px-3 py-2.5">
+          {/* Trigger data */}
+          {((): React.ReactNode => {
+            if (!run.triggerEvent || typeof run.triggerEvent !== 'object' || Array.isArray(run.triggerEvent)) return null;
+            const ev = run.triggerEvent as Record<string, unknown>;
+            const entries = Object.entries(ev).filter(([, v]) => v !== undefined && v !== null).slice(0, 6);
+            if (entries.length === 0) return null;
+            return (
+              <div className="mb-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Trigger data</p>
+                <dl className="overflow-hidden rounded-md border border-border/40 bg-background/60 text-[11px]">
+                  {entries.map(([k, v], i) => (
+                    <div key={k} className={cn('flex items-start gap-2 px-2.5 py-1', i !== entries.length - 1 && 'border-b border-border/30')}>
+                      <dt className="w-24 flex-shrink-0 capitalize font-medium text-muted-foreground/70">{k.replace(/_/g, ' ')}</dt>
+                      <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">
+                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })()}
+          {/* Step timeline */}
+          <ul className="relative space-y-0">
+            {run.steps.map((step, idx) => {
+              const isLast = idx === run.steps.length - 1;
+              const ai = step.actionType ? BUILDER_ACTION_ICON_MAP[step.actionType] : null;
+              const AIcon = ai?.icon;
+              return (
+                <li key={step.id} className="relative flex gap-3 pb-3 last:pb-0">
+                  {!isLast && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[9px] top-5 w-px bg-border/50"
+                      style={{ height: 'calc(100% - 4px)' }}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      'relative z-10 mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px]',
+                      step.status === 'ok' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+                      step.status === 'failed' && 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+                      step.status === 'skipped' && 'bg-muted text-muted-foreground',
+                    )}
+                    aria-label={step.status}
+                  >
+                    {step.status === 'ok' && <CheckIcon size={9} strokeWidth={2.5} />}
+                    {step.status === 'failed' && <X size={9} strokeWidth={2.5} />}
+                    {step.status === 'skipped' && <span>–</span>}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {AIcon && (
+                        <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai!.cls)}>
+                          <AIcon size={9} aria-hidden />
+                        </span>
+                      )}
+                      <span className="text-[12px] font-medium text-foreground">
+                        {BUILDER_ACTION_LABELS[step.actionType ?? step.kind] ?? (step.actionType ?? step.kind)}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] font-medium uppercase tracking-wide',
+                        step.status === 'ok' && 'text-emerald-600 dark:text-emerald-400',
+                        step.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                        step.status === 'skipped' && 'text-muted-foreground',
+                      )}>
+                        {step.status === 'ok' ? 'OK' : step.status === 'failed' ? 'Error' : 'Skipped'}
+                      </span>
+                    </div>
+                    <BuilderStepDetailTable detail={step.detail} actionType={step.actionType} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </li>
+  );
+}
+
 // ── The builder ──────────────────────────────────────────────────────────────
 
 export function WorkflowBuilder({
@@ -1669,8 +1998,7 @@ export function WorkflowBuilder({
   const [stepTests, setStepTests] = useState<Record<string, { loading: boolean; status?: 'ok' | 'failed'; detail?: unknown; durationMs?: number; error?: string }>>({});
   /** Whether the run history panel is open (only available for saved workflows). */
   const [showHistory, setShowHistory] = useState(false);
-  type BuilderRun = { id: string; status: string; summary: string | null; startedAt: string; error: string | null };
-  const [historyRuns, setHistoryRuns] = useState<BuilderRun[]>([]);
+  const [historyRuns, setHistoryRuns] = useState<BuilderRunRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
@@ -1679,7 +2007,7 @@ export function WorkflowBuilder({
     setHistoryLoading(true);
     fetch(`/api/workflows/${workflowId}/runs`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: { runs: BuilderRun[] }) => { if (live) setHistoryRuns(d.runs); })
+      .then((d: { runs: BuilderRunRecord[] }) => { if (live) setHistoryRuns(d.runs); })
       .catch(() => {})
       .finally(() => { if (live) setHistoryLoading(false); });
     return () => { live = false; };
@@ -2354,7 +2682,7 @@ export function WorkflowBuilder({
                 setHistoryLoading(true);
                 fetch(`/api/workflows/${workflowId}/runs`)
                   .then((r) => (r.ok ? r.json() : Promise.reject()))
-                  .then((d: { runs: BuilderRun[] }) => setHistoryRuns(d.runs))
+                  .then((d: { runs: BuilderRunRecord[] }) => setHistoryRuns(d.runs))
                   .catch(() => {})
                   .finally(() => setHistoryLoading(false));
               }}
@@ -2372,28 +2700,16 @@ export function WorkflowBuilder({
                 <span className="text-[12px] text-muted-foreground">Loading…</span>
               </div>
             ) : historyRuns.length === 0 ? (
-              <p className="py-3 text-center text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {historyRuns.map((run) => (
-                  <div key={run.id} className="flex items-center gap-2.5 rounded-lg border border-border/40 bg-card px-3 py-2">
-                    <span
-                      className={cn(
-                        'h-2 w-2 flex-shrink-0 rounded-full',
-                        run.status === 'completed' ? 'bg-emerald-500' :
-                        run.status === 'failed' ? 'bg-rose-500' :
-                        run.status === 'skipped' ? 'bg-amber-400' : 'bg-muted-foreground/40',
-                      )}
-                      aria-hidden
-                    />
-                    <span className="flex-1 min-w-0 truncate text-[12px] text-foreground">
-                      {run.summary ?? (run.status === 'failed' ? (run.error ?? 'Failed') : 'Completed')}
-                    </span>
-                    <span className="flex-shrink-0 text-[11px] capitalize text-muted-foreground">{run.status}</span>
-                    <span className="flex-shrink-0 text-[11px] text-muted-foreground/60">{timeAgo(run.startedAt)}</span>
-                  </div>
-                ))}
+              <div className="flex flex-col items-center py-4 text-center">
+                <History size={22} className="mb-1.5 text-muted-foreground/30" />
+                <p className="text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
               </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {historyRuns.map((run) => (
+                  <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
+                ))}
+              </ul>
             )}
           </div>
         </div>
