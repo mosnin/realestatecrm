@@ -15,8 +15,9 @@
  * delete-with-confirm.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
 import {
@@ -25,6 +26,7 @@ import {
   Workflow as WorkflowIcon,
   Play,
   Pencil,
+  PencilLine,
   Trash2,
   AlertTriangle,
   Check,
@@ -32,6 +34,30 @@ import {
   Sparkles,
   History,
   ChevronRight,
+  Zap,
+  Mail,
+  Sun,
+  Home,
+  GitBranch,
+  Search,
+  MessageCircle,
+  TrendingUp,
+  Clock,
+  UserPlus,
+  Target,
+  Plug,
+  Copy,
+  CheckSquare,
+  ArrowRight,
+  Webhook,
+  ArrowUpDown,
+  Filter,
+  Download,
+  Upload,
+  RotateCcw,
+  Wand2,
+  Activity,
+  BellRing,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -52,6 +78,7 @@ import { WorkflowBuilder } from './workflow-builder';
 import type { WorkflowFormState } from './build-definition';
 import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
+import type { TemplateCategory } from './templates';
 import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
 import { highlightsFromSteps } from './run-highlights';
 import { useHashHighlight } from '@/hooks/use-hash-highlight';
@@ -61,6 +88,7 @@ import { useHashHighlight } from '@/hooks/use-hash-highlight';
 interface WorkflowRecord {
   id: string;
   name: string;
+  description: string | null;
   enabled: boolean;
   trigger: WorkflowTrigger;
   conditions: ConditionGroup;
@@ -71,6 +99,8 @@ interface WorkflowRecord {
   lastRunAt: string | null;
   lastRunStatus: 'ok' | 'error' | 'skipped' | null;
   createdAt: string;
+  updatedAt: string;
+  runCount?: number;
 }
 
 interface TestStep {
@@ -108,7 +138,19 @@ interface WorkflowRun {
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
+  triggerEvent: unknown;
   steps: RunStep[];
+}
+
+interface GlobalRun {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  summary: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
 }
 
 const API_BASE = '/api/workflows';
@@ -131,6 +173,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
   const t = w.trigger;
   return {
     name: w.name,
+    description: w.description ?? undefined,
     trigger: {
       type: t.type,
       min: t.type === 'lead_score_threshold' ? String(t.config.min) : '',
@@ -143,6 +186,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         t.type === 'schedule' && typeof t.config.hour === 'number'
           ? String(t.config.hour)
           : '',
+      // webhook trigger has no config fields
     },
     conditionOp: w.conditions.op,
     conditions: w.conditions.rules.flatMap((r) => {
@@ -161,6 +205,9 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
     actions: w.actions.map((a) => ({
       id: editRowId('act'),
       type: a.type,
+      label: a.label,
+      note: a.note,
+      onError: a.onError,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel
@@ -172,7 +219,12 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
           ? a.config.instruction
           : '',
       delayMinutes:
-        a.type === 'schedule_message' ? String(a.config.delayMinutes) : '',
+        a.type === 'schedule_message'
+          ? String(a.config.delayMinutes)
+          : a.type === 'delay'
+            ? String(a.config.delayMinutes)
+            : '',
+      delayUnit: 'minutes' as const,
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -184,6 +236,23 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         a.type === 'call_integration' && a.config.params
           ? JSON.stringify(a.config.params, null, 2)
           : '',
+      filterField: a.type === 'filter' ? a.config.field : '',
+      filterOperator: a.type === 'filter' ? a.config.operator : 'eq' as const,
+      filterValue:
+        a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
+      formatterInput: a.type === 'formatter' ? a.config.input : '',
+      formatterOperation: a.type === 'formatter' ? a.config.operation : 'uppercase' as const,
+      formatterFind: a.type === 'formatter' ? (a.config.find ?? '') : '',
+      formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
+      formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
+      formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
+      webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
+      webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
+      webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
+      updateField: a.type === 'update_lead' ? a.config.field : 'score_label' as const,
+      updateValue: a.type === 'update_lead' ? a.config.value : '',
+      notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
+      notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow
@@ -211,6 +280,53 @@ export function WorkflowsManager() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [actionError, setActionError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off' | 'failed'>('all');
+  const [triggerFilter, setTriggerFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun' | 'modified'>('created');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const [activeTab, setActiveTab] = useState<'workflows' | 'history'>('workflows');
+  const [globalRuns, setGlobalRuns] = useState<GlobalRun[] | null>(null);
+  const [globalRunsLoading, setGlobalRunsLoading] = useState(false);
+  const [globalRunsError, setGlobalRunsError] = useState(false);
+  const [globalRunsStatusFilter, setGlobalRunsStatusFilter] = useState<'all' | 'completed' | 'failed'>('all');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  /** Unique trigger types present in the current workflow list for the filter dropdown. */
+  const triggerTypes = useMemo(() => {
+    const seen = new Set<string>();
+    workflows.forEach((w) => seen.add(w.trigger.type));
+    return Array.from(seen);
+  }, [workflows]);
+
+  const filteredWorkflows = useMemo(() => {
+    let list = workflows;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) list = list.filter(
+      (w) => w.name.toLowerCase().includes(q) || (w.description ?? '').toLowerCase().includes(q),
+    );
+    if (statusFilter === 'on') list = list.filter((w) => w.enabled);
+    else if (statusFilter === 'off') list = list.filter((w) => !w.enabled);
+    else if (statusFilter === 'failed') list = list.filter((w) => w.lastRunStatus === 'error');
+    if (triggerFilter !== 'all') list = list.filter((w) => w.trigger.type === triggerFilter);
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'lastRun') {
+        if (!a.lastRunAt && !b.lastRunAt) return 0;
+        if (!a.lastRunAt) return 1;
+        if (!b.lastRunAt) return -1;
+        return b.lastRunAt.localeCompare(a.lastRunAt);
+      }
+      if (sortBy === 'modified') return b.updatedAt.localeCompare(a.updatedAt);
+      // created: newest first (default — the API already returns this order)
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+    return list;
+  }, [workflows, searchQuery, statusFilter, triggerFilter, sortBy]);
 
   // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
   const highlightedAnchor = useHashHighlight();
@@ -244,14 +360,91 @@ export function WorkflowsManager() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') openBlank();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Re-run when the ?new param changes so same-page nav from the sidebar works.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('new')]);
 
   function pickTemplate(state: WorkflowFormState) {
     setComposerInitial(state);
     setEditingId(null);
     setComposer('new');
     setActionError('');
+  }
+
+  function duplicateWorkflow(workflow: WorkflowRecord) {
+    const formState = recordToFormState(workflow);
+    setComposerInitial({ ...formState, name: `${formState.name} (copy)` });
+    setEditingId(null);
+    setComposer('new');
+    setActionError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function exportWorkflow(workflow: WorkflowRecord) {
+    const payload = {
+      name: workflow.name,
+      ...(workflow.description ? { description: workflow.description } : {}),
+      definition: {
+        trigger: workflow.trigger,
+        conditions: workflow.conditions,
+        actions: workflow.actions,
+        autonomy: workflow.autonomy,
+        ...(workflow.graph ? { graph: workflow.graph } : {}),
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function importWorkflowFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        name?: string;
+        description?: string;
+        definition?: {
+          trigger: WorkflowTrigger;
+          conditions: ConditionGroup;
+          actions: WorkflowAction[];
+          autonomy: WorkflowAutonomy;
+          graph?: WorkflowGraph | null;
+        };
+      };
+      if (!parsed.name || !parsed.definition) {
+        setActionError('Invalid workflow file — expected { name, definition }.');
+        return;
+      }
+      const fakeRecord: WorkflowRecord = {
+        id: '',
+        name: parsed.name,
+        description: parsed.description ?? null,
+        enabled: true,
+        trigger: parsed.definition.trigger,
+        conditions: parsed.definition.conditions ?? { op: 'and', rules: [] },
+        actions: parsed.definition.actions ?? [],
+        autonomy: parsed.definition.autonomy ?? 'draft',
+        graph: parsed.definition.graph ?? null,
+        lastRunAt: null,
+        lastRunStatus: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const formState = recordToFormState(fakeRecord);
+      setComposerInitial({ ...formState, name: `${formState.name} (imported)` });
+      setEditingId(null);
+      setComposer('new');
+      setActionError('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      setActionError("Couldn't read the file — make sure it's a valid JSON workflow export.");
+    }
   }
 
   function closeComposer() {
@@ -261,7 +454,7 @@ export function WorkflowsManager() {
     setActionError('');
   }
 
-  async function createWorkflow(payload: { name: string; definition: WorkflowDefinition }) {
+  async function createWorkflow(payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) {
     setBusyId('new');
     setActionError('');
     try {
@@ -272,13 +465,24 @@ export function WorkflowsManager() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setActionError(data.error || 'Couldn’t create the workflow.');
+        setActionError(data.error || "Couldn't create the workflow.");
         return;
       }
       setWorkflows((ws) => [data as WorkflowRecord, ...ws]);
       closeComposer();
+      if (payload.enabled) {
+        toast.success('Workflow is live!', {
+          description: `"${payload.name}" will run on its trigger.`,
+          duration: 5000,
+        });
+      } else {
+        toast.success('Workflow saved as draft', {
+          description: `"${payload.name}" is paused — turn it on when ready.`,
+          duration: 5000,
+        });
+      }
     } catch {
-      setActionError('Network hiccup. Try again.');
+      setActionError("Network hiccup. Try again.");
     } finally {
       setBusyId(null);
     }
@@ -286,7 +490,7 @@ export function WorkflowsManager() {
 
   async function saveEdit(
     id: string,
-    payload: { name: string; definition: WorkflowDefinition },
+    payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean },
   ) {
     setBusyId(id);
     setActionError('');
@@ -298,15 +502,41 @@ export function WorkflowsManager() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setActionError(data.error || 'Couldn’t save the workflow.');
+        setActionError(data.error || "Couldn't save the workflow.");
         return;
       }
       setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
       setEditingId(null);
+      toast.success('Workflow saved');
     } catch {
-      setActionError('Network hiccup. Try again.');
+      setActionError("Network hiccup. Try again.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function renameWorkflow(id: string, name: string) {
+    // Optimistic rename — feels instant.
+    setWorkflows((ws) => ws.map((w) => (w.id === id ? { ...w, name } : w)));
+    try {
+      const res = await fetch(`${API_BASE}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        // Revert on failure.
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || "Couldn't rename the workflow.");
+        // Reload to get the true name back.
+        const reload = await fetch(API_BASE);
+        if (reload.ok) {
+          const d = await reload.json();
+          setWorkflows(Array.isArray(d.workflows) ? (d.workflows as WorkflowRecord[]) : []);
+        }
+      }
+    } catch {
+      setActionError("Network hiccup — rename didn't save.");
     }
   }
 
@@ -324,11 +554,14 @@ export function WorkflowsManager() {
       if (!res.ok) throw new Error('toggle failed');
       const data = (await res.json()) as WorkflowRecord;
       setWorkflows((ws) => ws.map((w) => (w.id === workflow.id ? data : w)));
+      toast.success(next ? 'Workflow is on' : 'Workflow paused', {
+        description: `"${workflow.name}" ${next ? 'will run on its trigger.' : 'will not run until you turn it on.'}`,
+      });
     } catch {
       setWorkflows((ws) =>
         ws.map((w) => (w.id === workflow.id ? { ...w, enabled: workflow.enabled } : w)),
       );
-      setActionError('Couldn’t update the workflow.');
+      setActionError("Couldn't update the workflow.");
     }
   }
 
@@ -340,10 +573,63 @@ export function WorkflowsManager() {
       if (!res.ok) throw new Error('delete failed');
       setWorkflows((ws) => ws.filter((w) => w.id !== id));
       if (editingId === id) setEditingId(null);
+      toast.success('Workflow deleted');
     } catch {
-      setActionError('Couldn’t delete the workflow.');
+      setActionError("Couldn't delete the workflow.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function bulkSetEnabled(enabled: boolean) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${API_BASE}/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+          }).then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
+            }
+          }),
+        ),
+      );
+      setSelectedIds(new Set());
+      toast.success(enabled ? `${ids.length} workflow${ids.length > 1 ? 's' : ''} turned on` : `${ids.length} workflow${ids.length > 1 ? 's' : ''} paused`);
+    } catch {
+      setActionError('Bulk action failed. Try again.');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then((res) => {
+            if (res.ok) {
+              setWorkflows((ws) => ws.filter((w) => w.id !== id));
+              if (editingId === id) setEditingId(null);
+            }
+          }),
+        ),
+      );
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} workflow${ids.length > 1 ? 's' : ''} deleted`);
+    } catch {
+      setActionError('Bulk delete failed. Try again.');
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -363,11 +649,64 @@ export function WorkflowsManager() {
       }
       setTestResults((r) => ({ ...r, [id]: data as TestResult }));
     } catch {
-      setActionError('Couldn’t start the test run.');
+      setActionError("Couldn't start the test run.");
     } finally {
       setTestingId(null);
     }
   }
+
+  async function loadGlobalHistory() {
+    setGlobalRunsLoading(true);
+    setGlobalRunsError(false);
+    try {
+      const res = await fetch(`${API_BASE}/runs`);
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setGlobalRuns(Array.isArray(data.runs) ? (data.runs as GlobalRun[]) : []);
+    } catch {
+      setGlobalRunsError(true);
+    } finally {
+      setGlobalRunsLoading(false);
+    }
+  }
+
+  function switchTab(tab: 'workflows' | 'history') {
+    setActiveTab(tab);
+    if (tab === 'history' && globalRuns === null && !globalRunsLoading) {
+      void loadGlobalHistory();
+    }
+  }
+
+  // Global keyboard shortcuts — only fire when no input/textarea is focused.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const inInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+      if (inInput) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'n') {
+        e.preventDefault();
+        openBlank();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        switchTab('workflows');
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+      } else if (e.key === 'Escape') {
+        if (showShortcuts) setShowShortcuts(false);
+        else if (composer !== null) closeComposer();
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composer, showShortcuts]);
 
   if (loading) {
     return (
@@ -382,7 +721,7 @@ export function WorkflowsManager() {
   if (loadError) {
     return (
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">Couldn’t load your workflows.</p>
+        <p className="text-sm text-foreground">Couldn&apos;t load your workflows.</p>
         <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
       </div>
     );
@@ -408,54 +747,568 @@ export function WorkflowsManager() {
           <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
         </div>
       ) : workflows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={openBlank}>
-            <Plus size={14} />
-            New workflow
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setComposer('templates');
-              setActionError('');
-            }}
-          >
-            <Sparkles size={14} />
-            Start from a template
-          </Button>
+        <div className="space-y-2">
+          {/* Tab bar — Workflows / History */}
+          <div className="flex items-center gap-0 border-b border-border/60">
+            {(
+              [
+                { value: 'workflows' as const, label: 'Workflows', count: workflows.length },
+                { value: 'history' as const, label: 'History', count: null },
+              ]
+            ).map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => {
+                  switchTab(tab.value);
+                  setActionError('');
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 border-b-2 pb-2 pr-4 text-sm font-medium transition-colors',
+                  activeTab === tab.value
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {tab.label}
+                {tab.count !== null && (
+                  <span className={cn(
+                    'rounded-full px-1.5 py-px text-[10px] tabular-nums font-medium',
+                    activeTab === tab.value ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground',
+                  )}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(true)}
+              title="Keyboard shortcuts (?)"
+              className="ml-auto mb-1.5 flex h-5 w-5 items-center justify-center rounded border border-border/60 text-[10px] font-semibold text-muted-foreground/60 hover:border-border hover:text-foreground transition-colors"
+            >
+              ?
+            </button>
+          </div>
+
+          {activeTab === 'workflows' && (<>
+          {/* Row 1: search + buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search
+                size={14}
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}... (press / to focus)`}
+                className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setComposer('templates');
+                setActionError('');
+              }}
+            >
+              <Sparkles size={14} />
+              Templates
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => importFileRef.current?.click()}
+              title="Import a workflow from a JSON file"
+            >
+              <Upload size={14} />
+              Import
+            </Button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void importWorkflowFile(file);
+                e.target.value = '';
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={openBlank}
+              className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
+            >
+              <Plus size={14} />
+              New workflow
+            </Button>
+          </div>
+          {/* Row 2: status filter pills + sort */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1.5">
+              {(
+                [
+                  { value: 'all', label: 'All' },
+                  { value: 'on', label: 'On' },
+                  { value: 'off', label: 'Off' },
+                  { value: 'failed', label: 'Failed' },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setStatusFilter(f.value)}
+                  className={cn(
+                    'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                    statusFilter === f.value
+                      ? f.value === 'failed'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                        : 'bg-foreground text-background'
+                      : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* Trigger type filter — only shown when 2+ types exist */}
+            {triggerTypes.length > 1 && (
+              <select
+                value={triggerFilter}
+                onChange={(e) => setTriggerFilter(e.target.value)}
+                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+              >
+                <option value="all">All triggers</option>
+                {triggerTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* Sort */}
+            <div className="ml-auto flex items-center gap-1.5">
+              <ArrowUpDown size={12} className="text-muted-foreground/60" aria-hidden />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+              >
+                <option value="created">Newest first</option>
+                <option value="name">Name A–Z</option>
+                <option value="lastRun">Last run</option>
+                <option value="modified">Last modified</option>
+              </select>
+            </div>
+          </div>
+          </>)}
         </div>
       ) : null}
 
       {workflows.length === 0 && composer === null ? (
         <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
-      ) : workflows.length === 0 ? null : (
-        <ul className="divide-y divide-border/60">
-          {workflows.map((workflow) => (
-            <WorkflowRow
-              key={workflow.id}
-              workflow={workflow}
-              highlighted={highlightedAnchor === `workflow-${workflow.id}`}
-              editing={editingId === workflow.id}
-              busy={busyId === workflow.id}
-              testing={testingId === workflow.id}
-              testResult={testResults[workflow.id]}
-              onEdit={() => {
-                setEditingId(workflow.id);
-                setComposer(null);
-                setActionError('');
-              }}
-              onCancelEdit={() => setEditingId(null)}
-              onSave={(payload) => saveEdit(workflow.id, payload)}
-              onToggle={() => toggleWorkflow(workflow)}
-              onTest={() => testWorkflow(workflow.id)}
-              onDelete={() => deleteWorkflow(workflow.id)}
-            />
-          ))}
-        </ul>
+      ) : workflows.length === 0 ? null : activeTab === 'history' ? (
+        <GlobalHistoryPanel
+          runs={globalRuns}
+          loading={globalRunsLoading}
+          error={globalRunsError}
+          statusFilter={globalRunsStatusFilter}
+          onStatusFilter={setGlobalRunsStatusFilter}
+          onRefresh={() => void loadGlobalHistory()}
+          onNavigate={(workflowId) => {
+            setActiveTab('workflows');
+            setActionError('');
+            setTimeout(() => {
+              document.getElementById(`workflow-${workflowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 50);
+          }}
+        />
+      ) : (
+        <>
+          {/* Editing builder — floats above the table so the table layout stays intact */}
+          {editingId && (() => {
+            const editing = workflows.find((w) => w.id === editingId);
+            return editing ? (
+              <div
+                id={`workflow-${editingId}`}
+                className="rounded-xl border border-border/60 bg-card p-4 scroll-mt-24"
+              >
+                <WorkflowBuilder
+                  initial={recordToFormState(editing)}
+                  initialEnabled={editing.enabled}
+                  saving={busyId === editingId}
+                  workflowId={editingId}
+                  lastRunAt={editing.lastRunAt}
+                  lastRunStatus={editing.lastRunStatus}
+                  onSave={(payload) => saveEdit(editingId, payload)}
+                  onCancel={() => setEditingId(null)}
+                />
+              </div>
+            ) : null;
+          })()}
+
+          {/* Stats summary bar */}
+          {filteredWorkflows.length > 0 && (() => {
+            const onCount = filteredWorkflows.filter((w) => w.enabled).length;
+            const offCount = filteredWorkflows.filter((w) => !w.enabled).length;
+            const failedCount = filteredWorkflows.filter((w) => w.lastRunStatus === 'error').length;
+            return (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-0.5 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                  {onCount} on
+                </span>
+                {offCount > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" aria-hidden />
+                    {offCount} paused
+                  </span>
+                )}
+                {failedCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden />
+                    {failedCount} failing
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Table container */}
+          <div className="rounded-xl border border-border/60 overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] border-b border-border/60 bg-muted/40 px-3 py-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={filteredWorkflows.length > 0 && filteredWorkflows.every((w) => selectedIds.has(w.id))}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selectedIds.size > 0 && !filteredWorkflows.every((w) => selectedIds.has(w.id));
+                  }}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(new Set(filteredWorkflows.map((w) => w.id)));
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+                />
+              </div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Workflow
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Trigger
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Last run
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-center">
+                On/Off
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
+                Actions
+              </span>
+            </div>
+
+            {/* Table rows */}
+            {filteredWorkflows.length > 0 ? (
+              <div className="divide-y divide-border/60">
+                {filteredWorkflows.map((workflow) => (
+                  <WorkflowRow
+                    key={workflow.id}
+                    workflow={workflow}
+                    highlighted={highlightedAnchor === `workflow-${workflow.id}`}
+                    editing={editingId === workflow.id}
+                    busy={busyId === workflow.id}
+                    testing={testingId === workflow.id}
+                    testResult={testResults[workflow.id]}
+                    selected={selectedIds.has(workflow.id)}
+                    onSelect={(v) => setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (v) next.add(workflow.id);
+                      else next.delete(workflow.id);
+                      return next;
+                    })}
+                    onEdit={() => {
+                      setEditingId(workflow.id);
+                      setComposer(null);
+                      setActionError('');
+                    }}
+                    onCancelEdit={() => setEditingId(null)}
+                    onSave={(payload) => saveEdit(workflow.id, payload)}
+                    onToggle={() => toggleWorkflow(workflow)}
+                    onTest={() => testWorkflow(workflow.id)}
+                    onDuplicate={() => duplicateWorkflow(workflow)}
+                    onExport={() => exportWorkflow(workflow)}
+                    onDelete={() => deleteWorkflow(workflow.id)}
+                    onRename={(name) => renameWorkflow(workflow.id, name)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No workflows match <span className="font-medium text-foreground">{searchQuery}</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Bulk action bar — appears when items are selected */}
+          {selectedIds.size > 0 && (
+            <div className="sticky bottom-4 z-20 mt-3 flex items-center gap-2 rounded-xl border border-border/70 bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur-sm">
+              <span className="text-[12.5px] font-medium text-foreground">
+                {selectedIds.size} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear
+              </button>
+              <div className="mx-2 h-4 w-px bg-border/60" />
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSetEnabled(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
+              >
+                Turn on
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSetEnabled(false)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
+              >
+                Pause
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={bulkDelete}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-600 hover:bg-rose-100 disabled:opacity-50 transition-colors dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60"
+              >
+                Delete
+              </button>
+              {bulkBusy && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
     </div>
   );
+}
+
+// ── Keyboard shortcuts modal ──────────────────────────────────────────────────
+
+const SHORTCUTS = [
+  { key: 'n', description: 'New workflow' },
+  { key: '/', description: 'Focus search' },
+  { key: '?', description: 'Show / hide shortcuts' },
+  { key: 'Esc', description: 'Close builder / modal' },
+];
+
+function KeyboardShortcutsModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-72 rounded-xl border border-border/60 bg-card p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Keyboard shortcuts</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+            aria-label="Close"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <ul className="space-y-2">
+          {SHORTCUTS.map((s) => (
+            <li key={s.key} className="flex items-center justify-between gap-4">
+              <span className="text-[13px] text-muted-foreground">{s.description}</span>
+              <kbd className="flex-shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                {s.key}
+              </kbd>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-[11px] text-muted-foreground/50">
+          Shortcuts only fire when no text field is focused.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Trigger type → icon + accent ─────────────────────────────────────────────
+
+const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  lead_score_threshold: { icon: Target, cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  inbound_message: { icon: MessageCircle, cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
+  integration_event: { icon: Plug, cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  deal_stage_changed: { icon: TrendingUp, cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  schedule: { icon: Clock, cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  lead_created: { icon: UserPlus, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
+  webhook: { icon: Webhook, cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+};
+
+// ── Action type → icon ───────────────────────────────────────────────────────
+
+const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
+  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+};
+
+/**
+ * Compact visual flow row: trigger icon → action icon(s) — mirrors the
+ * Zapier list's app-icon row that lets you scan a workflow's shape at a glance.
+ */
+function WorkflowFlowLine({
+  trigger,
+  actions,
+}: {
+  trigger: WorkflowTrigger;
+  actions: WorkflowAction[];
+}) {
+  const ti = TRIGGER_ICON_MAP[trigger.type];
+  const visibleActions = actions.slice(0, 5);
+  const overflow = actions.length - visibleActions.length;
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      {ti && (
+        <>
+          <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
+            <ti.icon size={9} aria-hidden />
+          </span>
+          <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
+        </>
+      )}
+      {visibleActions.map((a, i) => {
+        const ai = ACTION_ICON_MAP[a.type];
+        if (!ai) return null;
+        return (
+          <div key={i} className="flex items-center gap-1">
+            <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai.cls)}>
+              <ai.icon size={9} aria-hidden />
+            </span>
+            {i < visibleActions.length - 1 && (
+              <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
+            )}
+          </div>
+        );
+      })}
+      {overflow > 0 && (
+        <span className="text-[10px] text-muted-foreground/60">+{overflow}</span>
+      )}
+    </div>
+  );
+}
+
+// ── Webhook URL chip ─────────────────────────────────────────────────────────
+
+/**
+ * Compact inline chip showing the webhook URL with a one-click copy. Sits under
+ * the workflow name in the list row so the realtor can grab the URL without
+ * opening the editor.
+ */
+function WebhookUrlChip({ workflowId }: { workflowId: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = `/api/workflows/${workflowId}/webhook`;
+
+  function copyUrl() {
+    navigator.clipboard.writeText(`${window.location.origin}${url}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        copyUrl();
+      }}
+      aria-label={copied ? 'Copied!' : 'Copy webhook URL'}
+      className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-mono text-teal-700 transition-colors hover:bg-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:hover:bg-teal-950/50"
+    >
+      <Webhook size={9} aria-hidden className="flex-shrink-0" />
+      <span className="truncate">{url}</span>
+      {copied ? (
+        <Check size={9} className="flex-shrink-0 text-emerald-500" aria-hidden />
+      ) : (
+        <Copy size={9} className="flex-shrink-0 opacity-50" aria-hidden />
+      )}
+    </button>
+  );
+}
+
+// ── Trigger type → human-readable label ──────────────────────────────────────
+
+function triggerLabel(trigger: WorkflowTrigger): string {
+  switch (trigger.type) {
+    case 'lead_score_threshold':
+      return 'Score threshold';
+    case 'inbound_message':
+      return 'Inbound message';
+    case 'integration_event':
+      return trigger.config.toolkit ? `${trigger.config.toolkit} event` : 'Integration event';
+    case 'deal_stage_changed':
+      return 'Deal stage change';
+    case 'schedule':
+      return 'Schedule';
+    case 'lead_created':
+      return 'New lead';
+    case 'tour_completed':
+      return 'Tour completed';
+    case 'webhook':
+      return 'Webhook';
+    default:
+      // Exhaustive narrowing fallback — if a new trigger type is added, show it
+      // kebab-cased rather than an empty cell.
+      return (trigger as { type: string }).type.replace(/_/g, ' ');
+  }
 }
 
 // ── One workflow ─────────────────────────────────────────────────────────────
@@ -467,12 +1320,17 @@ function WorkflowRow({
   busy,
   testing,
   testResult,
+  selected,
+  onSelect,
   onEdit,
-  onCancelEdit,
-  onSave,
+  onCancelEdit: _onCancelEdit,
+  onSave: _onSave,
   onToggle,
   onTest,
+  onDuplicate,
+  onExport,
   onDelete,
+  onRename,
 }: {
   workflow: WorkflowRecord;
   highlighted: boolean;
@@ -480,14 +1338,21 @@ function WorkflowRow({
   busy: boolean;
   testing: boolean;
   testResult: TestResult | undefined;
+  selected: boolean;
+  onSelect: (v: boolean) => void;
   onEdit: () => void;
   onCancelEdit: () => void;
-  onSave: (payload: { name: string; definition: WorkflowDefinition }) => void;
+  onSave: (payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) => void;
   onToggle: () => void;
   onTest: () => void;
+  onDuplicate: () => void;
+  onExport: () => void;
   onDelete: () => void;
+  onRename: (name: string) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [renamingName, setRenamingName] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Run history (audit trail) — lazy: fetched the first time the row is expanded.
   const [showHistory, setShowHistory] = useState(false);
@@ -517,88 +1382,196 @@ function WorkflowRow({
     if (next && runs === null && !runsLoading) void loadHistory();
   }
 
-  if (editing) {
-    return (
-      <li id={`workflow-${workflow.id}`} className="scroll-mt-24 py-3 first:pt-0">
-        <div className="rounded-xl border border-border/60 bg-card p-4">
-          <WorkflowBuilder
-            initial={recordToFormState(workflow)}
-            saving={busy}
-            onSave={onSave}
-            onCancel={onCancelEdit}
-          />
-        </div>
-      </li>
-    );
+  function startRename() {
+    setRenamingName(workflow.name);
+    // Focus the input on the next paint.
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  function commitRename() {
+    const trimmed = renamingName?.trim() ?? '';
+    setRenamingName(null);
+    if (!trimmed || trimmed === workflow.name) return;
+    onRename(trimmed);
   }
 
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
+  const hasExpansion = !!(testResult || showHistory);
 
   return (
-    <li
+    // Wrapper div — not a <li> anymore; the parent is a plain <div> container.
+    <div
       id={`workflow-${workflow.id}`}
       className={cn(
-        'group/row flex flex-col gap-2 py-3 first:pt-0 transition-all scroll-mt-24',
+        'group/row transition-colors scroll-mt-24',
         !workflow.enabled && 'opacity-60',
-        // Deep-link flash: a feed link to this workflow scrolls it here and
-        // rings it for a couple of seconds so the jump is legible. ring-inset +
-        // a rounded bg keep the flash WITHIN the row box so the divide-y divider
-        // stays aligned and nothing clips under an overflow-hidden ancestor.
-        highlighted &&
-          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
+        highlighted && 'bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
+        // Highlight the row if it is being edited (builder is above the table).
+        editing && 'bg-muted/30',
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug text-foreground">{workflow.name}</p>
-          <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{summary}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            <RunHealthChip status={workflow.lastRunStatus} />
-            {workflow.lastRunAt && (
-              <span className="tabular-nums text-muted-foreground/70">
-                {timeAgo(workflow.lastRunAt)}
+      {/* Main grid row */}
+      <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
+
+        {/* Col 0 — Checkbox */}
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            aria-label={`Select ${workflow.name}`}
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+          />
+        </div>
+
+        {/* Col 1 — Name + visual flow */}
+        <div className="min-w-0 pr-3">
+          <div className="flex items-center gap-2">
+            {renamingName !== null ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renamingName}
+                onChange={(e) => setRenamingName(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                  if (e.key === 'Escape') setRenamingName(null);
+                }}
+                maxLength={120}
+                className="min-w-0 flex-1 rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+                autoFocus
+              />
+            ) : (
+              <p
+                className="truncate text-sm font-medium leading-snug text-foreground cursor-text"
+                onDoubleClick={startRename}
+                title="Double-click to rename"
+              >
+                {workflow.name}
+              </p>
+            )}
+            {workflow.enabled && (
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
+            )}
+            {!workflow.enabled && (
+              <span className="inline-flex items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
+                Paused
               </span>
             )}
-            <span className="text-muted-foreground/40">·</span>
-            <AutonomyPill autonomy={workflow.autonomy} />
-            {!workflow.enabled && (
-              <>
-                <span className="text-muted-foreground/40">·</span>
-                <span>Paused</span>
-              </>
+            {workflow.actions.length > 0 && (
+              <span className="inline-flex flex-shrink-0 items-center rounded-full bg-muted/60 px-1.5 py-px text-[10px] tabular-nums text-muted-foreground/60">
+                {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
+              </span>
+            )}
+            {workflow.enabled &&
+              workflow.actions.length === 0 &&
+              (!workflow.graph || workflow.graph.nodes.every((n) => n.kind !== 'action')) && (
+              <span
+                title="Workflow is on but has no actions — add at least one step"
+                className="inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"
+              >
+                <AlertTriangle size={9} aria-hidden />
+                No steps
+              </span>
+            )}
+          </div>
+          <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
+          {workflow.description ? (
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/80 italic">
+              {workflow.description}
+            </p>
+          ) : workflow.trigger.type === 'webhook' ? (
+            <WebhookUrlChip workflowId={workflow.id} />
+          ) : (
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
+              {summary}
+            </p>
+          )}
+        </div>
+
+        {/* Col 2 — Trigger label + icon */}
+        <div className="flex min-w-0 items-center gap-1.5 pr-2">
+          {(() => {
+            const ti = TRIGGER_ICON_MAP[workflow.trigger.type];
+            if (!ti) return null;
+            const TIcon = ti.icon;
+            return (
+              <span className={cn('flex h-5 w-5 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
+                <TIcon size={11} aria-hidden />
+              </span>
+            );
+          })()}
+          <span className="truncate text-[13px] text-muted-foreground">
+            {triggerLabel(workflow.trigger)}
+          </span>
+        </div>
+
+        {/* Col 3 — Run health + time + total runs + modified */}
+        <div className="flex flex-col gap-0.5 pr-2">
+          <div className="flex items-center gap-1.5">
+            <RunHealthChip status={workflow.lastRunStatus} />
+            {workflow.lastRunAt ? (
+              <span className="tabular-nums text-[11px] text-muted-foreground/70">
+                {timeAgo(workflow.lastRunAt)}
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/40">Never</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {typeof workflow.runCount === 'number' && workflow.runCount > 0 && (
+              <span
+                title={`${workflow.runCount.toLocaleString()} total run${workflow.runCount === 1 ? '' : 's'}`}
+                className="inline-flex items-center gap-0.5 rounded bg-muted/70 px-1 py-px text-[10px] tabular-nums text-muted-foreground/70"
+              >
+                <Activity size={8} aria-hidden />
+                {workflow.runCount.toLocaleString()}
+              </span>
+            )}
+            {workflow.updatedAt !== workflow.createdAt && (
+              <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
+                Edited {timeAgo(workflow.updatedAt)}
+              </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Col 4 — Toggle */}
+        <div className="flex justify-center">
+          <Switch
+            checked={workflow.enabled}
+            onCheckedChange={onToggle}
+            aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
+          />
+        </div>
+
+        {/* Col 5 — Actions */}
+        <div className="flex items-center justify-end gap-0.5">
           {confirmingDelete ? (
-            <>
-              <span className="px-1 text-xs text-muted-foreground">Delete?</span>
+            // Inline delete confirmation — stays within the row so layout stays clean.
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">Delete?</span>
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(false)}
                 disabled={busy}
-                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
+                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
               >
-                Keep
+                No
               </button>
               <button
                 type="button"
                 onClick={onDelete}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
               >
-                {busy && <Loader2 size={13} className="animate-spin" />}
-                Delete
+                {busy && <Loader2 size={11} className="animate-spin" />}
+                Yes
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <Switch
-                checked={workflow.enabled}
-                onCheckedChange={onToggle}
-                aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
-              />
               <RowAction
                 icon={History}
                 label="History"
@@ -606,8 +1579,32 @@ function WorkflowRow({
                 disabled={busy || testing}
                 active={showHistory}
               />
-              <RowAction icon={Play} label="Test" onClick={onTest} loading={testing} disabled={busy} />
-              <RowAction icon={Pencil} label="Edit" onClick={onEdit} disabled={busy || testing} />
+              <RowAction
+                icon={Play}
+                label="Test"
+                onClick={onTest}
+                loading={testing}
+                disabled={busy}
+              />
+              <RowAction
+                icon={Copy}
+                label="Duplicate"
+                onClick={onDuplicate}
+                disabled={busy || testing}
+              />
+              <RowAction
+                icon={Download}
+                label="Export JSON"
+                onClick={onExport}
+                disabled={busy || testing}
+              />
+              <RowAction
+                icon={Pencil}
+                label="Edit"
+                onClick={onEdit}
+                disabled={busy || testing}
+                active={editing}
+              />
               <RowAction
                 icon={Trash2}
                 label="Delete"
@@ -620,14 +1617,19 @@ function WorkflowRow({
         </div>
       </div>
 
-      {/* Test-run result — the "prove it works" panel. */}
-      {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
+      {/* Full-width expansion panels — span all columns below the grid row */}
+      {hasExpansion && (
+        <div className="border-t border-border/40 px-3 pb-3 pt-2 space-y-2">
+          {/* Test-run result — the "prove it works" panel. */}
+          {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
 
-      {/* Run history (audit trail) — what fired, when, and what each step did. */}
-      {showHistory && (
-        <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} />
+          {/* Run history (audit trail) — what fired, when, and what each step did. */}
+          {showHistory && (
+            <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} workflowId={workflow.id} />
+          )}
+        </div>
       )}
-    </li>
+    </div>
   );
 }
 
@@ -637,27 +1639,39 @@ function RunHistoryPanel({
   runs,
   loading,
   error,
+  workflowId,
 }: {
   runs: WorkflowRun[] | null;
   loading: boolean;
   error: boolean;
+  workflowId: string;
 }) {
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-      <p className={cn(SECTION_LABEL, 'mb-2')}>Run history</p>
+      <div className="mb-2.5 flex items-center justify-between">
+        <p className={SECTION_LABEL}>Run history</p>
+        {runs && runs.length > 0 && (
+          <span className="text-[11px] text-muted-foreground/60">
+            Last {runs.length} run{runs.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
       {loading ? (
         <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
           <Loader2 size={13} className="animate-spin" />
           Loading runs…
         </div>
       ) : error ? (
-        <p className={CAPTION}>Couldn’t load the run history — try again in a moment.</p>
+        <p className={CAPTION}>Couldn&apos;t load the run history — try again in a moment.</p>
       ) : !runs || runs.length === 0 ? (
-        <p className={CAPTION}>No runs yet.</p>
+        <div className="flex flex-col items-center py-4 text-center">
+          <History size={22} className="mb-1.5 text-muted-foreground/30" />
+          <p className={CAPTION}>No runs yet — this workflow hasn&apos;t fired.</p>
+        </div>
       ) : (
         <ul className="space-y-1.5">
           {runs.map((run) => (
-            <RunHistoryItem key={run.id} run={run} />
+            <RunHistoryItem key={run.id} run={run} workflowId={workflowId} />
           ))}
         </ul>
       )}
@@ -665,71 +1679,527 @@ function RunHistoryPanel({
   );
 }
 
-function RunHistoryItem({ run }: { run: WorkflowRun }) {
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  draft_message: 'Draft message',
+  schedule_message: 'Schedule message',
+  create_task: 'Create task',
+  call_integration: 'Call integration',
+  run_chippi: 'Run Chippi',
+  formatter: 'Format data',
+  delay: 'Delay',
+  filter: 'Filter',
+  webhook_post: 'Webhook POST',
+  update_lead: 'Update lead',
+  notify_agent: 'Push alert',
+  condition: 'Condition check',
+};
+
+function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: string }) {
   const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const hasSteps = run.steps.length > 0;
 
-  return (
-    <li className="rounded-md border border-border/50 bg-card/40">
-      <button
-        type="button"
-        onClick={() => hasSteps && setOpen((o) => !o)}
-        disabled={!hasSteps}
-        className={cn(
-          'flex w-full items-start gap-2 px-2.5 py-2 text-left',
-          hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
-          !hasSteps && 'cursor-default',
-        )}
-      >
-        <ChevronRight
-          size={13}
-          aria-hidden
-          className={cn(
-            'mt-0.5 flex-shrink-0 text-muted-foreground/50 transition-transform',
-            !hasSteps && 'opacity-0',
-            open && 'rotate-90',
-          )}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <RunStatusPill status={run.status} />
-            <span className="tabular-nums text-[11px] text-muted-foreground/70">
-              {timeAgo(run.startedAt)}
-            </span>
-          </span>
-          {(run.summary || run.error) && (
-            <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
-              {run.error ?? run.summary}
-            </span>
-          )}
-        </span>
-      </button>
+  async function retryRun(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const res = await fetch(`${API_BASE}/${workflowId}/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        toast.success('Re-run triggered', { description: 'Check the test panel above for results.' });
+      } else {
+        toast.error('Re-run failed — try again.');
+      }
+    } catch {
+      toast.error('Re-run failed — try again.');
+    } finally {
+      setRetrying(false);
+    }
+  }
 
-      {open && hasSteps && (
-        <ul className="space-y-1.5 border-t border-border/50 px-3 py-2 pl-7">
-          {run.steps.map((step) => (
-            <li
-              key={step.id}
-              className="flex items-start gap-2 text-[12px] leading-snug"
-            >
-              <StepStatusDot status={step.status} />
-              <span className="tabular-nums text-muted-foreground/50">
-                {step.stepIndex + 1}.
+  const durationMs =
+    run.finishedAt ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime() : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
+  return (
+    <li className="overflow-hidden rounded-lg border border-border/50 bg-card/40">
+      {/* Run header row — flex wrapper so the retry button can sit outside the toggle */}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => hasSteps && setOpen((o) => !o)}
+          disabled={!hasSteps}
+          className={cn(
+            'flex flex-1 items-center gap-2.5 px-3 py-2.5 text-left',
+            hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
+            !hasSteps && 'cursor-default',
+          )}
+        >
+          {/* Status icon */}
+          <span
+            className={cn(
+              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+              run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+              run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+              run.status === 'skipped' && 'bg-muted text-muted-foreground',
+              run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+            )}
+            aria-hidden
+          >
+            {run.status === 'completed' && <Check size={11} strokeWidth={2.5} />}
+            {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
+            {run.status === 'skipped' && <ArrowUpDown size={9} />}
+            {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className={cn(
+                'text-[12.5px] font-medium',
+                run.status === 'completed' && 'text-foreground',
+                run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                run.status === 'running' && 'text-amber-700 dark:text-amber-400',
+                run.status === 'skipped' && 'text-muted-foreground',
+              )}>
+                {run.status === 'completed' ? 'Completed' : run.status === 'failed' ? 'Failed' : run.status === 'running' ? 'Running' : 'Skipped'}
               </span>
-              <span className="font-medium text-foreground">
-                {step.actionType ?? step.kind}
+              <span className="text-[11px] text-muted-foreground/60">
+                {timeAgo(run.startedAt)}
               </span>
-              <span className="text-muted-foreground">{step.status}</span>
-              {detailLine(step.detail) && (
-                <span className="min-w-0 flex-1 truncate text-muted-foreground/80">
-                  {detailLine(step.detail)}
+              {durationLabel && (
+                <span className="text-[11px] tabular-nums text-muted-foreground/50">
+                  · {durationLabel}
                 </span>
               )}
-            </li>
-          ))}
-        </ul>
+              {hasSteps && (
+                <span className="ml-auto text-[11px] text-muted-foreground/50">
+                  {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </span>
+            {(run.error || run.summary) && (
+              <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
+                {run.error ?? run.summary}
+              </span>
+            )}
+          </span>
+
+          {hasSteps && (
+            <ChevronRight
+              size={13}
+              aria-hidden
+              className={cn(
+                'flex-shrink-0 text-muted-foreground/40 transition-transform',
+                open && 'rotate-90',
+              )}
+            />
+          )}
+        </button>
+
+        {/* Retry button — only visible on failed runs */}
+        {run.status === 'failed' && (
+          <button
+            type="button"
+            onClick={retryRun}
+            disabled={retrying}
+            aria-label="Retry this run"
+            title="Re-run this workflow (test mode)"
+            className="flex flex-shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border/40 px-2.5 text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            {retrying
+              ? <Loader2 size={11} className="animate-spin" />
+              : <RotateCcw size={11} />
+            }
+            <span className="text-[9px] font-medium">Retry</span>
+          </button>
+        )}
+      </div>
+
+      {/* Expanded detail — trigger event + step timeline */}
+      {open && hasSteps && (
+        <div className="border-t border-border/40 bg-muted/10 px-3 py-2.5">
+          {/* Trigger data — "Data In" panel, mirrors Zapier's trigger step */}
+          {((): React.ReactNode => {
+            if (!run.triggerEvent || typeof run.triggerEvent !== 'object' || Array.isArray(run.triggerEvent)) return null;
+            const ev = run.triggerEvent as Record<string, unknown>;
+            const entries = Object.entries(ev).filter(([, v]) => v !== undefined && v !== null).slice(0, 6);
+            if (entries.length === 0) return null;
+            return (
+              <div className="mb-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Trigger data</p>
+                <dl className="overflow-hidden rounded-md border border-border/40 bg-background/60 text-[11px]">
+                  {entries.map(([k, v], i) => (
+                    <div key={k} className={cn('flex items-start gap-2 px-2.5 py-1', i !== entries.length - 1 && 'border-b border-border/30')}>
+                      <dt className="w-24 flex-shrink-0 font-medium capitalize text-muted-foreground/70">{k.replace(/_/g, ' ')}</dt>
+                      <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">
+                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })()}
+          <ul className="relative space-y-0">
+            {run.steps.map((step, idx) => {
+              const isLast = idx === run.steps.length - 1;
+              const ai = step.actionType ? ACTION_ICON_MAP[step.actionType] : null;
+              const AIcon = ai?.icon;
+              return (
+                <li key={step.id} className="relative flex gap-3 pb-3 last:pb-0">
+                  {/* Vertical connector line */}
+                  {!isLast && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[9px] top-5 w-px bg-border/50"
+                      style={{ height: 'calc(100% - 4px)' }}
+                    />
+                  )}
+                  {/* Step status dot */}
+                  <span
+                    className={cn(
+                      'relative z-10 mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px]',
+                      step.status === 'ok' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+                      step.status === 'failed' && 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+                      step.status === 'skipped' && 'bg-muted text-muted-foreground',
+                    )}
+                    aria-label={step.status}
+                  >
+                    {step.status === 'ok' && <Check size={9} strokeWidth={2.5} />}
+                    {step.status === 'failed' && <X size={9} strokeWidth={2.5} />}
+                    {step.status === 'skipped' && <span>–</span>}
+                  </span>
+                  {/* Step info */}
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {AIcon && (
+                        <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai!.cls)}>
+                          <AIcon size={9} aria-hidden />
+                        </span>
+                      )}
+                      <span className="text-[12px] font-medium text-foreground">
+                        {ACTION_TYPE_LABELS[step.actionType ?? step.kind] ?? (step.actionType ?? step.kind)}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] font-medium uppercase tracking-wide',
+                        step.status === 'ok' && 'text-emerald-600 dark:text-emerald-400',
+                        step.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                        step.status === 'skipped' && 'text-muted-foreground',
+                      )}>
+                        {step.status === 'ok' ? 'OK' : step.status === 'failed' ? 'Error' : 'Skipped'}
+                      </span>
+                    </div>
+                    <StepDetailTable detail={step.detail} actionType={step.actionType} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Rich key-value display for a step's output detail — mirrors Zapier's
+ * per-step data panel in Zap History. Shows the most relevant fields for
+ * each action type in a scannable pill-row layout.
+ */
+function StepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
+  if (detail == null || typeof detail !== 'object') return null;
+  const obj = detail as Record<string, unknown>;
+
+  type Row = { key: string; value: string };
+  const rows: Row[] = [];
+
+  function add(key: string, value: unknown) {
+    if (value === undefined || value === null) return;
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    if (str.trim()) rows.push({ key, value: str.trim() });
+  }
+
+  if (actionType === 'formatter') {
+    add('operation', obj.operation);
+    add('input', obj.inputResolved ?? obj.input);
+    add('output', obj.output);
+  } else if (actionType === 'draft_message' || actionType === 'schedule_message') {
+    add('channel', obj.channel);
+    add('recipient', obj.recipient);
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'create_task') {
+    add('title', obj.title);
+    add('due', obj.dueAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'run_chippi') {
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'call_integration') {
+    add('toolkit', obj.toolkit);
+    add('action', obj.action);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'delay') {
+    add('waited', obj.waited ?? obj.delayMinutes);
+  } else if (actionType === 'filter') {
+    add('field', obj.field);
+    add('result', obj.passed !== undefined ? (obj.passed ? 'passed' : 'blocked') : undefined);
+    if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'webhook_post') {
+    add('url', obj.url);
+    add('status', obj.statusCode);
+    add('response', obj.responseSnippet);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'update_lead') {
+    add('field', obj.field);
+    add('value', obj.value ?? obj.tag ?? obj.days);
+    if (obj.followUpAt) add('followUpAt', obj.followUpAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'notify_agent') {
+    add('title', obj.title);
+    if (obj.body) add('body', obj.body);
+    add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
+    if (obj.note) add('note', obj.note);
+  } else {
+    for (const [k, v] of Object.entries(obj).slice(0, 4)) {
+      if (typeof v !== 'object') add(k, v);
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <dl className="mt-1 flex flex-col gap-0.5">
+      {rows.map(({ key, value }) => (
+        <div key={key} className="flex items-start gap-1.5 text-[11px]">
+          <dt className="min-w-[52px] flex-shrink-0 font-medium text-muted-foreground/60 capitalize">{key}</dt>
+          <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// ── Global History Panel (cross-workflow activity feed) ──────────────────────
+
+function GlobalHistoryPanel({
+  runs,
+  loading,
+  error,
+  statusFilter,
+  onStatusFilter,
+  onRefresh,
+  onNavigate,
+}: {
+  runs: GlobalRun[] | null;
+  loading: boolean;
+  error: boolean;
+  statusFilter: 'all' | 'completed' | 'failed';
+  onStatusFilter: (f: 'all' | 'completed' | 'failed') => void;
+  onRefresh: () => void;
+  onNavigate: (workflowId: string) => void;
+}) {
+  const [historySearch, setHistorySearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!runs) return [];
+    let list = statusFilter === 'all' ? runs : runs.filter((r) => r.status === statusFilter);
+    const q = historySearch.trim().toLowerCase();
+    if (q) list = list.filter((r) => r.workflowName.toLowerCase().includes(q) || (r.error ?? r.summary ?? '').toLowerCase().includes(q));
+    return list;
+  }, [runs, statusFilter, historySearch]);
+
+  return (
+    <div className="space-y-3">
+      {/* History toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            placeholder="Search by workflow name..."
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
+        <div className="flex gap-1.5">
+          {(
+            [
+              { value: 'all' as const, label: 'All' },
+              { value: 'completed' as const, label: 'Completed' },
+              { value: 'failed' as const, label: 'Failed' },
+            ]
+          ).map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => onStatusFilter(f.value)}
+              className={cn(
+                'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
+                statusFilter === f.value
+                  ? f.value === 'failed'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                    : 'bg-foreground text-background'
+                  : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+          Refresh
+        </button>
+      </div>
+
+      {/* History table */}
+      <div className="rounded-xl border border-border/60 overflow-hidden">
+        {/* Table header */}
+        <div className="grid grid-cols-[auto_1fr_140px_120px] border-b border-border/60 bg-muted/40 px-4 py-2">
+          <div />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Workflow
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Status
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            When
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-[13px] text-muted-foreground">
+            <Loader2 size={16} className="animate-spin" />
+            Loading history…
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">Couldn&apos;t load history — try refreshing.</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <History size={30} className="mb-2 text-muted-foreground/20" />
+            <p className="text-sm text-muted-foreground">
+              {statusFilter === 'all' ? "No workflow runs yet." : `No ${statusFilter} runs.`}
+            </p>
+            {statusFilter === 'all' && (
+              <p className="mt-1 text-[12px] text-muted-foreground/60">
+                Runs appear here when a trigger fires or you test a workflow.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {filtered.map((run) => (
+              <GlobalRunRow key={run.id} run={run} onNavigate={onNavigate} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {runs && runs.length > 0 && (
+        <p className="text-right text-[11px] text-muted-foreground/50">
+          Showing last {runs.length} run{runs.length !== 1 ? 's' : ''} across all workflows
+        </p>
+      )}
+    </div>
+  );
+}
+
+function GlobalRunRow({
+  run,
+  onNavigate,
+}: {
+  run: GlobalRun;
+  onNavigate: (workflowId: string) => void;
+}) {
+  const durationMs =
+    run.finishedAt ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime() : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
+  return (
+    <div className="grid grid-cols-[auto_1fr_140px_120px] items-center gap-0 px-4 py-2.5 transition-colors hover:bg-muted/20">
+      {/* Status dot */}
+      <div className="pr-3">
+        <span
+          className={cn(
+            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+            run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+            run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+            run.status === 'skipped' && 'bg-muted text-muted-foreground',
+            run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+          )}
+          aria-hidden
+        >
+          {run.status === 'completed' && <Check size={10} strokeWidth={2.5} />}
+          {run.status === 'failed' && <X size={10} strokeWidth={2.5} />}
+          {run.status === 'skipped' && <span className="text-[9px]">–</span>}
+          {run.status === 'running' && <Loader2 size={9} className="animate-spin" />}
+        </span>
+      </div>
+
+      {/* Workflow name + summary */}
+      <div className="min-w-0 pr-3">
+        <button
+          type="button"
+          onClick={() => onNavigate(run.workflowId)}
+          className="group flex items-center gap-1 text-left"
+          title="Go to workflow"
+        >
+          <span className="truncate text-[13px] font-medium text-foreground group-hover:text-orange-600 transition-colors">
+            {run.workflowName}
+          </span>
+          <ArrowRight size={11} className="flex-shrink-0 text-muted-foreground/30 group-hover:text-orange-500 transition-colors" aria-hidden />
+        </button>
+        {(run.error || run.summary) && (
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
+            {run.error ?? run.summary}
+          </p>
+        )}
+      </div>
+
+      {/* Status + duration */}
+      <div className="flex items-center gap-1.5 pr-2">
+        <span className={cn(
+          'text-[12px] font-medium',
+          run.status === 'completed' && 'text-emerald-600 dark:text-emerald-400',
+          run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+          run.status === 'running' && 'text-amber-600 dark:text-amber-400',
+          run.status === 'skipped' && 'text-muted-foreground',
+        )}>
+          {run.status === 'completed' ? 'Completed'
+            : run.status === 'failed' ? 'Failed'
+            : run.status === 'running' ? 'Running'
+            : 'Skipped'}
+        </span>
+        {durationLabel && (
+          <span className="text-[11px] tabular-nums text-muted-foreground/50">· {durationLabel}</span>
+        )}
+      </div>
+
+      {/* Time */}
+      <span className="text-[12px] text-muted-foreground/70 tabular-nums">
+        {timeAgo(run.startedAt)}
+      </span>
+    </div>
   );
 }
 
@@ -752,38 +2222,6 @@ function detailLine(detail: unknown): string {
   } catch {
     return '';
   }
-}
-
-function RunStatusPill({ status }: { status: WorkflowRun['status'] }) {
-  const map: Record<WorkflowRun['status'], { label: string; cls: string }> = {
-    completed: {
-      label: 'Completed',
-      cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
-    },
-    failed: {
-      label: 'Failed',
-      cls: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
-    },
-    skipped: {
-      label: 'Skipped',
-      cls: 'bg-muted text-muted-foreground',
-    },
-    running: {
-      label: 'Running',
-      cls: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400',
-    },
-  };
-  const { label, cls } = map[status] ?? map.skipped;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-        cls,
-      )}
-    >
-      {label}
-    </span>
-  );
 }
 
 function TestResultPanel({
@@ -983,13 +2421,201 @@ function RowAction({
 
 // ── Template gallery (zero-state front door) ─────────────────────────────────
 
+/** Icon + accent color per template — gives each card a visual identity. */
+const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: string }> = {
+  'hot-lead-instant-draft': {
+    icon: Zap,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'gmail-client-reply': {
+    icon: Mail,
+    accent: 'bg-red-100 dark:bg-red-950/40',
+    dot: 'text-red-500 dark:text-red-400',
+  },
+  'morning-follow-ups': {
+    icon: Sun,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-500 dark:text-amber-400',
+  },
+  'tour-completed-thanks': {
+    icon: Home,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-500 dark:text-blue-400',
+  },
+  'new-lead-welcome': {
+    icon: UserPlus,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'deal-stage-changed-notify': {
+    icon: TrendingUp,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'inbound-inquiry-multi-step': {
+    icon: MessageCircle,
+    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
+    dot: 'text-indigo-500 dark:text-indigo-400',
+  },
+  'hot-vs-warm-branch': {
+    icon: GitBranch,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-500 dark:text-violet-400',
+  },
+  'webhook-any-service': {
+    icon: Webhook,
+    accent: 'bg-teal-100 dark:bg-teal-950/40',
+    dot: 'text-teal-600 dark:text-teal-400',
+  },
+  'offer-received': {
+    icon: TrendingUp,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'contract-signed-checklist': {
+    icon: CheckSquare,
+    accent: 'bg-green-100 dark:bg-green-950/40',
+    dot: 'text-green-600 dark:text-green-400',
+  },
+  'weekly-pipeline-review': {
+    icon: Sun,
+    accent: 'bg-yellow-100 dark:bg-yellow-950/40',
+    dot: 'text-yellow-600 dark:text-yellow-400',
+  },
+  'lead-gone-cold': {
+    icon: Target,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-600 dark:text-blue-400',
+  },
+  'first-contact-drip': {
+    icon: ArrowRight,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'price-drop-alert': {
+    icon: TrendingUp,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'high-intent-call-reminder': {
+    icon: Zap,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'saturday-open-house-prep': {
+    icon: Home,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-500 dark:text-violet-400',
+  },
+  'monthly-market-update': {
+    icon: Mail,
+    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
+    dot: 'text-indigo-500 dark:text-indigo-400',
+  },
+  'buyer-pre-approval-nudge': {
+    icon: Target,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'evening-task-wrap': {
+    icon: Clock,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'stale-leads-weekly-sweep': {
+    icon: RotateCcw,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-500 dark:text-blue-400',
+  },
+  'inspection-stage-update': {
+    icon: CheckSquare,
+    accent: 'bg-purple-100 dark:bg-purple-950/40',
+    dot: 'text-purple-600 dark:text-purple-400',
+  },
+  'new-lead-survey-drip': {
+    icon: MessageCircle,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'post-showing-feedback': {
+    icon: Home,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'referral-thank-you': {
+    icon: UserPlus,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'slack-new-lead-alert': {
+    icon: Plug,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-600 dark:text-violet-400',
+  },
+  'inbound-email-auto-ack': {
+    icon: Mail,
+    accent: 'bg-red-100 dark:bg-red-950/40',
+    dot: 'text-red-500 dark:text-red-400',
+  },
+  'hot-lead-push-alert': {
+    icon: BellRing,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'deal-stage-push-alert': {
+    icon: BellRing,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'post-close-30day-checkin': {
+    icon: Home,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'offer-accepted-celebration': {
+    icon: Sparkles,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'facebook-lead-funnel': {
+    icon: Target,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-600 dark:text-blue-400',
+  },
+  'end-of-month-pipeline-close': {
+    icon: TrendingUp,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-600 dark:text-violet-400',
+  },
+};
+
+const TEMPLATE_META_DEFAULT = {
+  icon: WorkflowIcon,
+  accent: 'bg-muted',
+  dot: 'text-muted-foreground',
+};
+
 /**
- * The first thing a realtor sees before they have any automations. Instead of a
- * dead "nothing yet" box, it leads with the outcomes Chippi can take off their
- * plate — every template card reads as a plain-English result, one tap drops
- * them into a pre-filled builder, and a quiet "start from scratch" stays for the
- * realtor who'd rather compose their own. Show the value, then invite the tap.
+ * Zero-state front door — large visual template cards that look like Zapier's
+ * template gallery. Each card shows what gets automated in plain language so
+ * the realtor picks based on outcome, not on technical detail.
  */
+const CATEGORY_PILLS: Array<{ value: 'all' | TemplateCategory; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'New leads', label: 'New leads' },
+  { value: 'Follow-up', label: 'Follow-up' },
+  { value: 'Scheduling', label: 'Scheduling' },
+  { value: 'Integrations', label: 'Integrations' },
+];
+
+const CATEGORY_BADGE_CLS: Record<TemplateCategory, string> = {
+  'New leads': 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400',
+  'Follow-up': 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400',
+  'Scheduling': 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
+  'Integrations': 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400',
+};
+
 function TemplateGallery({
   onPick,
   onScratch,
@@ -998,61 +2624,330 @@ function TemplateGallery({
   onScratch: () => void;
 }) {
   const reduce = useReducedMotion();
+  const [q, setQ] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+
+  const visibleTemplates = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const filtered = WORKFLOW_TEMPLATES.filter((t) => {
+      const matchesSearch =
+        !query ||
+        t.name.toLowerCase().includes(query) ||
+        t.description.toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+    // Popular templates float to the top (stable sort — preserves relative order within each group)
+    return [...filtered].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
+  }, [q, categoryFilter]);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="space-y-1">
         <p className="text-[15px] font-medium text-foreground">
-          What should I take off your plate?
+          What should Chippi handle for you?
         </p>
-        <p className={CAPTION}>
-          Pick one to start — you’ll see exactly what it does before it turns on.
+        <p className={cn(CAPTION, 'flex items-center gap-1.5')}>
+          <span>{WORKFLOW_TEMPLATES.length} ready-made automations — pick one, see exactly what it does, then turn it on.</span>
         </p>
       </div>
 
-      <motion.ul
-        className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
-        variants={reduce ? undefined : STAGGER_CONTAINER}
-        initial={reduce ? undefined : 'initial'}
-        animate={reduce ? undefined : 'enter'}
-      >
-        {WORKFLOW_TEMPLATES.map((template) => (
-          <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM}>
+      {/* Search + category filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search
+            size={14}
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search templates…"
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_PILLS.map((pill) => {
+            const count =
+              pill.value === 'all'
+                ? WORKFLOW_TEMPLATES.length
+                : WORKFLOW_TEMPLATES.filter((t) => t.category === pill.value).length;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                onClick={() => setCategoryFilter(pill.value)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  categoryFilter === pill.value
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                )}
+              >
+                {pill.label}
+                <span className="ml-1 opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {visibleTemplates.length === 0 ? (
+        <p className={cn(CAPTION, 'py-4 text-center')}>
+          No templates match{q ? <> <span className="font-medium text-foreground">{q}</span></> : null}{categoryFilter !== 'all' ? <> in <span className="font-medium text-foreground">{categoryFilter}</span></> : null} — try adjusting your filters.
+        </p>
+      ) : (
+        <>
+          <motion.ul
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            variants={reduce ? undefined : STAGGER_CONTAINER}
+            initial={reduce ? undefined : 'initial'}
+            animate={reduce ? undefined : 'enter'}
+          >
+            {visibleTemplates.map((template) => {
+              const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+              const Icon = meta.icon;
+              return (
+                <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM} className="flex">
+                  <button
+                    type="button"
+                    onClick={() => onPick(cloneTemplateState(template))}
+                    className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                  >
+                    {/* Icon area */}
+                    <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
+                      <Icon size={32} className={meta.dot} aria-hidden />
+                      {template.popular && (
+                        <span className="absolute right-2.5 top-2.5 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          Popular
+                        </span>
+                      )}
+                    </div>
+                    {/* Text area */}
+                    <div className="flex flex-1 flex-col gap-1.5 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                          {template.name}
+                        </span>
+                        <span
+                          className={cn(
+                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            CATEGORY_BADGE_CLS[template.category] ?? 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {template.category}
+                        </span>
+                      </div>
+                      <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                        {template.description}
+                      </span>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+                          {template.state.trigger.type.replace(/_/g, ' ')}
+                        </span>
+                        <ChevronRight
+                          size={14}
+                          aria-hidden
+                          className="text-muted-foreground/30 transition-colors group-hover/card:text-foreground/60"
+                        />
+                      </div>
+                    </div>
+                  </button>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+
+          <div className="flex items-center justify-center gap-3 pt-2 border-t border-border/40">
+            <span className={CAPTION}>Don&apos;t see what you need?</span>
             <button
               type="button"
-              onClick={() => onPick(cloneTemplateState(template))}
-              className="group/card flex h-full w-full items-start gap-3 rounded-xl border border-border/60 bg-card p-4 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
+              onClick={onScratch}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-foreground/30 hover:bg-foreground/[0.03]"
             >
-              <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-foreground/[0.05] text-muted-foreground transition-colors group-hover/card:bg-foreground group-hover/card:text-background">
-                <WorkflowIcon size={15} aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium leading-snug text-foreground">
-                  {template.name}
-                </span>
-                <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
-                  {template.description}
-                </span>
-              </span>
-              <ChevronRight
-                size={15}
-                aria-hidden
-                className="mt-0.5 flex-shrink-0 text-muted-foreground/40 transition-colors group-hover/card:text-foreground"
-              />
+              <Plus size={12} aria-hidden />
+              Build from scratch
             </button>
-          </motion.li>
-        ))}
-      </motion.ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
-      <div className="flex items-center gap-2 pt-1">
-        <span className={CAPTION}>Prefer to build your own?</span>
+// ── AI workflow generator ────────────────────────────────────────────────────
+
+let aiGenSeq = 0;
+function aiGenRowId(): string {
+  aiGenSeq += 1;
+  return `aigen-${aiGenSeq}`;
+}
+
+/**
+ * Zapier-style AI workflow generator: type what you want to automate in plain
+ * English, get a pre-filled builder. Calls POST /api/workflows/generate and maps
+ * the LLM response into a WorkflowFormState the builder can open with.
+ */
+function AIWorkflowGenerator({
+  onGenerate,
+}: {
+  onGenerate: (state: WorkflowFormState) => void;
+}) {
+  const [prompt, setPrompt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function generate() {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/workflows/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Generation failed — try again.');
+        return;
+      }
+      const raw = data.workflow as Record<string, unknown>;
+      if (!raw || typeof raw !== 'object') {
+        setError('Unexpected response — try again.');
+        return;
+      }
+
+      // Map the LLM response to a WorkflowFormState
+      const t = (raw.trigger ?? {}) as Record<string, unknown>;
+      const rawActions = Array.isArray(raw.actions) ? (raw.actions as Record<string, unknown>[]) : [];
+      const rawConditions = Array.isArray(raw.conditions) ? (raw.conditions as Record<string, unknown>[]) : [];
+
+      const formState: WorkflowFormState = {
+        name: typeof raw.name === 'string' ? raw.name : trimmed.slice(0, 60),
+        description: typeof raw.description === 'string' ? raw.description : undefined,
+        trigger: {
+          type: (typeof t.type === 'string' ? t.type : 'lead_created') as WorkflowFormState['trigger']['type'],
+          min: typeof t.min === 'string' ? t.min : typeof t.min === 'number' ? String(t.min) : '',
+          channel: (typeof t.channel === 'string' ? t.channel : 'any') as 'sms' | 'email' | 'any',
+          toolkit: typeof t.toolkit === 'string' ? t.toolkit : '',
+          event: typeof t.event === 'string' ? t.event : '',
+          toStage: typeof t.toStage === 'string' ? t.toStage : '',
+          cadence: (typeof t.cadence === 'string' ? t.cadence : 'daily') as 'hourly' | 'daily' | 'weekdays',
+          hour: typeof t.hour === 'string' ? t.hour : typeof t.hour === 'number' ? String(t.hour) : '',
+        },
+        conditionOp: raw.conditionOp === 'or' ? 'or' : 'and',
+        conditions: rawConditions.map((c) => ({
+          id: aiGenRowId(),
+          field: typeof c.field === 'string' ? c.field : '',
+          operator: (typeof c.operator === 'string' ? c.operator : 'eq') as WorkflowFormState['conditions'][number]['operator'],
+          value: typeof c.value === 'string' ? c.value : typeof c.value === 'number' ? String(c.value) : '',
+        })),
+        actions: rawActions.map((a) => ({
+          id: aiGenRowId(),
+          type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
+          label: typeof a.label === 'string' ? a.label : undefined,
+          channel: (typeof a.channel === 'string' ? a.channel : 'sms') as 'sms' | 'email',
+          instruction: typeof a.instruction === 'string' ? a.instruction : '',
+          delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',
+          delayUnit: 'minutes' as const,
+          title: typeof a.title === 'string' ? a.title : '',
+          dueInDays: typeof a.dueInDays === 'string' ? a.dueInDays : typeof a.dueInDays === 'number' ? String(a.dueInDays) : '',
+          toolkit: typeof a.toolkit === 'string' ? a.toolkit : '',
+          action: typeof a.action === 'string' ? a.action : '',
+          paramsJson: '',
+          filterField: typeof a.filterField === 'string' ? a.filterField : '',
+          filterOperator: (typeof a.filterOperator === 'string' ? a.filterOperator : 'eq') as WorkflowFormState['actions'][number]['filterOperator'],
+          filterValue: typeof a.filterValue === 'string' ? a.filterValue : '',
+          formatterInput: typeof a.input === 'string' ? a.input : '',
+          formatterOperation: (typeof a.operation === 'string' ? a.operation : 'uppercase') as WorkflowFormState['actions'][number]['formatterOperation'],
+          formatterFind: typeof a.find === 'string' ? a.find : '',
+          formatterReplace: typeof a.replacement === 'string' ? a.replacement : '',
+          formatterFormat: typeof a.format === 'string' ? a.format : 'MM/DD/YYYY',
+          formatterToFixed: typeof a.toFixed === 'string' ? a.toFixed : typeof a.toFixed === 'number' ? String(a.toFixed) : '',
+          webhookUrl: typeof a.webhookUrl === 'string' ? a.webhookUrl : '',
+          webhookBody: typeof a.webhookBody === 'string' ? a.webhookBody : '',
+          webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',
+          updateField: (typeof a.updateField === 'string' ? a.updateField : 'score_label') as WorkflowFormState['actions'][number]['updateField'],
+          updateValue: typeof a.updateValue === 'string' ? a.updateValue : '',
+          notifyTitle: typeof a.notifyTitle === 'string' ? a.notifyTitle : '',
+          notifyBody: typeof a.notifyBody === 'string' ? a.notifyBody : '',
+        })),
+        autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
+          ? (raw.autonomy as WorkflowAutonomy)
+          : 'draft',
+        graph: null,
+      };
+
+      onGenerate(formState);
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const EXAMPLE_PROMPTS = [
+    'Send a welcome SMS when a new lead is created',
+    'Remind me to call when a lead score exceeds 80',
+    'Follow up 2 days after a tour is completed',
+    'Create a task when a deal moves to offer stage',
+  ];
+
+  return (
+    <div className="rounded-xl border border-orange-200/60 bg-gradient-to-br from-orange-50/80 to-amber-50/60 p-4 dark:border-orange-800/30 dark:from-orange-950/20 dark:to-amber-950/20">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-500 text-white">
+          <Sparkles size={12} aria-hidden />
+        </span>
+        <p className="text-sm font-semibold text-foreground">Build with AI</p>
+        <span className="rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-orange-600 dark:bg-orange-950/40 dark:text-orange-400">
+          Beta
+        </span>
+      </div>
+      <p className={cn(CAPTION, 'mb-3')}>
+        Describe what you want to automate in plain English. Chippi will build the workflow for you to review and edit.
+      </p>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !busy) void generate(); }}
+          placeholder="e.g. Send a follow-up text 3 days after a tour…"
+          maxLength={400}
+          disabled={busy}
+          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-orange-400/40 disabled:opacity-60 dark:bg-input/30"
+        />
         <button
           type="button"
-          onClick={onScratch}
-          className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80"
+          onClick={() => void generate()}
+          disabled={busy || !prompt.trim()}
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Plus size={13} aria-hidden />
-          Start from scratch
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          {busy ? 'Generating…' : 'Generate'}
         </button>
+      </div>
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {EXAMPLE_PROMPTS.map((ex) => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => { setPrompt(ex); }}
+            disabled={busy}
+            className="rounded-full border border-orange-200/80 bg-white/80 px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-400/60 hover:text-foreground disabled:opacity-50 dark:border-orange-800/30 dark:bg-orange-950/20"
+          >
+            {ex}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1067,9 +2962,25 @@ function TemplatePicker({
   onPick: (state: WorkflowFormState) => void;
   onCancel: () => void;
 }) {
+  const [q, setQ] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+
+  const visibleTemplates = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const filtered = WORKFLOW_TEMPLATES.filter((t) => {
+      const matchesSearch =
+        !query ||
+        t.name.toLowerCase().includes(query) ||
+        t.description.toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+    return [...filtered].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
+  }, [q, categoryFilter]);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className={SECTION_LABEL}>Start from a template</p>
         <button
           type="button"
@@ -1079,28 +2990,111 @@ function TemplatePicker({
           Cancel
         </button>
       </div>
-      <ul className="space-y-2">
-        {WORKFLOW_TEMPLATES.map((template) => (
-          <li key={template.id}>
-            <button
-              type="button"
-              onClick={() => onPick(cloneTemplateState(template))}
-              className="group/tpl flex w-full items-start gap-3 rounded-lg border border-border/60 bg-card p-3 text-left transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
-            >
-              <WorkflowIcon
-                size={16}
-                className="mt-0.5 flex-shrink-0 text-muted-foreground group-hover/tpl:text-foreground"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">{template.name}</span>
-                <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
-                  {template.description}
-                </span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+
+      {/* AI generator — prominent hero above the template grid */}
+      <AIWorkflowGenerator onGenerate={onPick} />
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/40" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-3 text-[11px] text-muted-foreground/50">or start from a template</span>
+        </div>
+      </div>
+
+      {/* Search + category pills */}
+      <div className="space-y-2">
+        <div className="relative max-w-sm">
+          <Search
+            size={14}
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search templates…"
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_PILLS.map((pill) => {
+            const count =
+              pill.value === 'all'
+                ? WORKFLOW_TEMPLATES.length
+                : WORKFLOW_TEMPLATES.filter((t) => t.category === pill.value).length;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                onClick={() => setCategoryFilter(pill.value)}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                  categoryFilter === pill.value
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                )}
+              >
+                {pill.label}
+                <span className="ml-1 opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {visibleTemplates.length === 0 ? (
+        <p className={cn(CAPTION, 'py-4 text-center')}>
+          No templates match{q ? <> <span className="font-medium text-foreground">{q}</span></> : null}{categoryFilter !== 'all' ? <> in <span className="font-medium text-foreground">{categoryFilter}</span></> : null} — try adjusting your filters.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {visibleTemplates.map((template) => {
+            const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+            const Icon = meta.icon;
+            return (
+              <li key={template.id} className="flex">
+                <button
+                  type="button"
+                  onClick={() => onPick(cloneTemplateState(template))}
+                  className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                >
+                  <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
+                    <Icon size={24} className={meta.dot} aria-hidden />
+                    {template.popular && (
+                      <span className="absolute right-2 top-2 rounded-full bg-orange-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">
+                        Popular
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                        {template.name}
+                      </span>
+                      {'category' in template && (
+                        <span
+                          className={cn(
+                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            CATEGORY_BADGE_CLS[template.category as TemplateCategory] ?? 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {template.category}
+                        </span>
+                      )}
+                    </div>
+                    <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
+                      {template.description}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

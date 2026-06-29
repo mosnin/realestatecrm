@@ -45,7 +45,8 @@ export type TriggerType =
   | 'tour_completed'
   | 'deal_stage_changed'
   | 'integration_event'
-  | 'schedule';
+  | 'schedule'
+  | 'webhook';
 
 const shortText = z.string().trim().min(1).max(SHORT_TEXT);
 
@@ -80,6 +81,9 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
+  // config is empty — the URL is derived from the workflow id at display time.
+  z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),
 ]);
 
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
@@ -181,20 +185,87 @@ export type WorkflowActionType =
   | 'schedule_message'
   | 'create_task'
   | 'call_integration'
-  | 'run_chippi';
+  | 'run_chippi'
+  | 'delay'
+  | 'filter'
+  | 'formatter'
+  | 'webhook_post'
+  | 'update_lead'
+  | 'notify_agent';
+
+/**
+ * Whitelisted fields the update_lead action can write on the Contact row.
+ * Kept intentionally narrow — the executor validates against this list before
+ * touching Supabase, so a tampered definition can't write arbitrary columns.
+ */
+export type UpdateLeadField =
+  | 'score_label'     // set scoreLabel to hot/warm/cold
+  | 'follow_up_in_days' // set followUpAt to now + N days
+  | 'tag_add'         // append a tag to the tags array (idempotent)
+  | 'tag_remove';     // remove a tag from the tags array
+
+export const UPDATE_LEAD_FIELDS = [
+  'score_label',
+  'follow_up_in_days',
+  'tag_add',
+  'tag_remove',
+] as const satisfies readonly UpdateLeadField[];
+
+export type FormatterOperation =
+  | 'uppercase'
+  | 'lowercase'
+  | 'capitalize'
+  | 'trim'
+  | 'replace'
+  | 'number_format'
+  | 'date_format'
+  | 'extract_number'
+  | 'extract_email'
+  | 'extract_phone';
+
+export const FORMATTER_OPERATIONS = [
+  'uppercase',
+  'lowercase',
+  'capitalize',
+  'trim',
+  'replace',
+  'number_format',
+  'date_format',
+  'extract_number',
+  'extract_email',
+  'extract_phone',
+] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
 const instructionField = z.string().trim().min(1).max(LONG_TEXT);
 
+/** Optional step label — a custom name the realtor gives a step (like Zapier's "Step name"). */
+const stepLabel = z.string().trim().max(100).optional();
+/** Optional private note on a step — for internal documentation, not sent anywhere. */
+const stepNote = z.string().trim().max(500).optional();
+/**
+ * What to do if this step fails at runtime. Defaults to 'stop' (current
+ * behaviour), matching Zapier's default error handling. 'skip' logs the
+ * failure and continues with the next step — useful for non-critical side
+ * effects (Slack pings, CRM log notes) that shouldn't derail the whole run.
+ */
+const stepOnError = z.enum(['stop', 'skip']).optional();
+
 export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
   }),
   z.object({
     type: z.literal('schedule_message'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         channel: channelSchema,
@@ -205,6 +276,9 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('create_task'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         title: shortText,
@@ -214,6 +288,9 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('call_integration'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
     config: z
       .object({
         toolkit: shortText,
@@ -224,7 +301,93 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('run_chippi'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
     config: z.object({ instruction: instructionField }).strict(),
+  }),
+  // delay: pause execution before the next step.
+  z.object({
+    type: z.literal('delay'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
+  }),
+  // filter: stop the run if the field condition is not met.
+  z.object({
+    type: z.literal('filter'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        field: z.string().trim().min(1).max(SHORT_TEXT),
+        operator: operatorSchema,
+        value: z.unknown().optional(),
+      })
+      .strict(),
+  }),
+  // formatter: transform a value (text/number/date) before the next step uses it.
+  z.object({
+    type: z.literal('formatter'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        input: z.string().trim().min(1).max(SHORT_TEXT),
+        operation: z.enum(FORMATTER_OPERATIONS),
+        find: z.string().max(200).optional(),
+        replacement: z.string().max(200).optional(),
+        format: z.string().max(100).optional(),
+        toFixed: z.number().int().min(0).max(20).optional(),
+      })
+      .strict(),
+  }),
+  // webhook_post: POST to an external URL (HTTPS only, SSRF-guarded in the executor).
+  z.object({
+    type: z.literal('webhook_post'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        url: z.string().url().max(2000).refine((u) => u.startsWith('https://'), {
+          message: 'Webhook URL must use HTTPS.',
+        }),
+        bodyJson: z.string().max(4000).optional(),
+        headersJson: z.string().max(1000).optional(),
+      })
+      .strict(),
+  }),
+  // update_lead: write a whitelisted field back to the Contact row that triggered
+  // this workflow (score_label, follow_up_in_days, tag_add, tag_remove).
+  z.object({
+    type: z.literal('update_lead'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        field: z.enum(UPDATE_LEAD_FIELDS),
+        value: z.string().trim().min(1).max(SHORT_TEXT),
+      })
+      .strict(),
+  }),
+  // notify_agent: send a push notification to the realtor's subscribed device(s).
+  // Like Zapier's "Send yourself an email" — a lightweight personal alert step.
+  z.object({
+    type: z.literal('notify_agent'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        title: z.string().trim().min(1).max(SHORT_TEXT),
+        body: z.string().trim().max(500).optional(),
+      })
+      .strict(),
   }),
 ]);
 

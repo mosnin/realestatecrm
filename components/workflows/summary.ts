@@ -39,6 +39,8 @@ function triggerPhrase(trigger: WorkflowTrigger): string {
       if (cadence === 'weekdays') return `every weekday${at}`;
       return `every day${at}`;
     }
+    case 'webhook':
+      return 'an HTTP POST arrives';
     default:
       return 'triggered';
   }
@@ -56,6 +58,29 @@ function actionPhrase(action: WorkflowAction): string {
       return `call ${action.config.toolkit}`;
     case 'run_chippi':
       return 'ask Chippi to take it from there';
+    case 'delay': {
+      const m = action.config.delayMinutes;
+      if (m % 1440 === 0) return `wait ${m / 1440} ${m / 1440 === 1 ? 'day' : 'days'}`;
+      if (m % 60 === 0) return `wait ${m / 60} ${m / 60 === 1 ? 'hour' : 'hours'}`;
+      return `wait ${m} minutes`;
+    }
+    case 'filter':
+      return `check a filter condition (${action.config.field} ${action.config.operator})`;
+    case 'formatter':
+      return `${action.config.operation.replace(/_/g, ' ')} "${action.config.input}"`;
+    case 'webhook_post':
+      return `POST to ${action.config.url.replace(/^https?:\/\//, '').slice(0, 40)}`;
+    case 'update_lead': {
+      const fieldLabel: Record<string, string> = {
+        score_label: 'set score to',
+        follow_up_in_days: 'follow up in',
+        tag_add: 'add tag',
+        tag_remove: 'remove tag',
+      };
+      return `${fieldLabel[action.config.field] ?? action.config.field} ${action.config.value}`;
+    }
+    case 'notify_agent':
+      return `send a push alert: "${action.config.title.slice(0, 40)}"`;
     default:
       return 'run an action';
   }

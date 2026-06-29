@@ -21,6 +21,7 @@ import {
   listWorkflows,
   createWorkflow,
   countWorkflows,
+  countRunsPerWorkflow,
   MAX_WORKFLOWS_PER_SPACE,
 } from '@/lib/workflows/store';
 import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
@@ -38,8 +39,12 @@ export async function GET() {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
-    const workflows = await listWorkflows(space.id);
-    return NextResponse.json({ workflows });
+    const [workflows, runCounts] = await Promise.all([
+      listWorkflows(space.id),
+      countRunsPerWorkflow(space.id),
+    ]);
+    const result = workflows.map((w) => ({ ...w, runCount: runCounts.get(w.id) ?? 0 }));
+    return NextResponse.json({ workflows: result });
   } catch (error) {
     logger.error('[workflows] list failed', { spaceId: space.id }, error);
     return NextResponse.json({ error: 'Load failed' }, { status: 500 });
@@ -99,7 +104,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const workflow = await createWorkflow(space.id, { name, definition });
+    const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+    const description =
+      typeof body.description === 'string' ? body.description.trim() || undefined : undefined;
+    const workflow = await createWorkflow(space.id, { name, description, definition, enabled });
 
     // Best-effort: heal any missing Composio subscription this workflow's
     // integration_event trigger depends on (drift if the slug was curated after

@@ -67,6 +67,8 @@ function triggerPhrase(t: TriggerFormState): string {
       if (t.cadence === 'weekdays') return `every weekday${at}`;
       return `every day${at}`;
     }
+    case 'webhook':
+      return 'your webhook URL receives a POST';
     default:
       return 'something happens';
   }
@@ -113,6 +115,41 @@ function actionPhrase(a: ActionRowState): string {
     }
     case 'run_chippi':
       return 'ask Chippi to handle it';
+    case 'delay': {
+      const amt = a.delayMinutes.trim();
+      const unit = a.delayUnit ?? 'minutes';
+      if (!amt) return 'wait a moment';
+      return `wait ${amt} ${unit}`;
+    }
+    case 'filter': {
+      const f = a.filterField.trim();
+      return f ? `filter on ${f}` : 'check a filter condition';
+    }
+    case 'formatter': {
+      const input = a.formatterInput.trim();
+      const op = a.formatterOperation.replace(/_/g, ' ');
+      return input ? `${op} ${input}` : 'format a value';
+    }
+    case 'webhook_post': {
+      const url = a.webhookUrl.trim();
+      return url ? `POST to ${url.replace(/^https?:\/\//, '').slice(0, 40)}` : 'POST to a webhook URL';
+    }
+    case 'update_lead': {
+      const fieldLabel: Record<string, string> = {
+        score_label: 'set score to',
+        follow_up_in_days: 'follow up in',
+        tag_add: 'add tag',
+        tag_remove: 'remove tag',
+      };
+      const val = a.updateValue.trim();
+      return val
+        ? `${fieldLabel[a.updateField] ?? a.updateField} "${val}"`
+        : 'update this lead';
+    }
+    case 'notify_agent': {
+      const title = a.notifyTitle.trim();
+      return title ? `send push: "${title.slice(0, 40)}"` : 'send a push alert';
+    }
     default:
       return 'take an action';
   }

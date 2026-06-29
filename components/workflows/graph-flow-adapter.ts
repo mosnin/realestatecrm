@@ -45,8 +45,9 @@ export interface FlowEdge {
   data?: { branch?: 'true' | 'false' };
 }
 
-const COL_WIDTH = 240;
-const ROW_HEIGHT = 110;
+// Top-down layout constants (Zapier-style vertical flow).
+const NODE_HGAP = 340; // horizontal gap between branches at the same depth
+const NODE_VGAP = 150; // vertical gap between depth levels
 
 /** Edge id is deterministic from its endpoints + branch (stable across renders). */
 export function edgeId(e: { from: string; to: string; branch?: 'true' | 'false' }): string {
@@ -54,9 +55,9 @@ export function edgeId(e: { from: string; to: string; branch?: 'true' | 'false' 
 }
 
 /**
- * Layered left→right layout: depth = longest path from the trigger (so a node
- * sits to the right of every parent); nodes within a depth are stacked. Returns
- * a depth per node id; unreachable nodes land in a trailing column so they're
+ * Layered top-down layout: depth = longest path from the trigger (so a node
+ * sits below every parent); nodes within a depth are spread horizontally. Returns
+ * a depth per node id; unreachable nodes land in a trailing row so they're
  * still visible and draggable rather than stacked at the origin.
  */
 function computeDepths(graph: WorkflowGraph): Map<string, number> {
@@ -101,12 +102,14 @@ export function graphToFlow(graph: WorkflowGraph): { nodes: FlowNode[]; edges: F
 
   const nodes: FlowNode[] = graph.nodes.map((n) => {
     const d = depth.get(n.id) ?? 0;
-    const row = perColumn.get(d) ?? 0;
-    perColumn.set(d, row + 1);
+    const col = perColumn.get(d) ?? 0;
+    perColumn.set(d, col + 1);
+    // Top-down layout: depth → y axis, siblings at same depth → x axis.
+    // A linear workflow keeps all nodes at x=0; branches fan out horizontally.
     return {
       id: n.id,
       type: n.kind,
-      position: { x: d * COL_WIDTH, y: row * ROW_HEIGHT },
+      position: { x: col * NODE_HGAP, y: d * NODE_VGAP },
       data: {
         kind: n.kind,
         condition: n.kind === 'condition' ? n.condition : undefined,

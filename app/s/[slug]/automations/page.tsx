@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
@@ -61,7 +62,9 @@ export default async function AutomationsPage({
               React to an event — a new lead, a reply, a deal moving stage.
             </p>
           </div>
-          <WorkflowsManager />
+          <Suspense fallback={null}>
+            <WorkflowsManager />
+          </Suspense>
         </section>
 
         <section className="space-y-3">

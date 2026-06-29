@@ -30,7 +30,7 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
 const SELECT =
-  'id, spaceId, name, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
+  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
 /**
  * The full persisted row as the routes surface it — the executor's WorkflowRow
@@ -39,6 +39,7 @@ const SELECT =
  */
 export interface WorkflowRecord extends WorkflowRow {
   name: string;
+  description: string | null;
   enabled: boolean;
   version: number;
   lastRunAt: string | null;
@@ -85,15 +86,16 @@ export async function getWorkflow(
  */
 export async function createWorkflow(
   spaceId: string,
-  input: { name: string; definition: WorkflowDefinition },
+  input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean },
 ): Promise<WorkflowRecord> {
-  const { name, definition } = input;
+  const { name, description, definition, enabled = true } = input;
   const { data, error } = await supabase
     .from('Workflow')
     .insert({
       spaceId,
       name,
-      enabled: true,
+      ...(description ? { description } : {}),
+      enabled,
       trigger: definition.trigger,
       conditions: definition.conditions,
       actions: definition.actions,
@@ -111,6 +113,7 @@ export async function createWorkflow(
  *  columns and bumps version. */
 export interface UpdateWorkflowPatch {
   name?: string;
+  description?: string | null;
   enabled?: boolean;
   definition?: WorkflowDefinition;
 }
@@ -128,6 +131,7 @@ export async function updateWorkflow(
 ): Promise<WorkflowRecord | null> {
   const update: Record<string, unknown> = {};
   if (patch.name !== undefined) update.name = patch.name;
+  if (patch.description !== undefined) update.description = patch.description ?? null;
   if (patch.enabled !== undefined) update.enabled = patch.enabled;
   if (patch.definition) {
     update.trigger = patch.definition.trigger;
@@ -187,6 +191,21 @@ export async function countWorkflows(spaceId: string): Promise<number> {
     .eq('spaceId', spaceId);
   if (error) throw error;
   return count ?? 0;
+}
+
+/** Return a map of workflowId → total run count for the space's workflows. */
+export async function countRunsPerWorkflow(spaceId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('WorkflowRun')
+    .select('workflowId')
+    .eq('spaceId', spaceId);
+  if (error) throw error;
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const id = (row as { workflowId: string }).workflowId;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 // ── Run history (read-only audit trail) ──────────────────────────────────────
@@ -258,6 +277,55 @@ export async function listWorkflowRuns(
     .limit(capped);
   if (error) throw error;
   return (data ?? []) as unknown as WorkflowRunRecord[];
+}
+
+/** A run record enriched with the parent workflow's name for the global history view. */
+export interface GlobalWorkflowRunRecord extends WorkflowRunRecord {
+  workflowName: string;
+}
+
+/**
+ * List recent runs across ALL workflows in a space, newest first. Used by the
+ * global History tab — the equivalent of Zapier's "Zap History" page.
+ *
+ * Security: scoped entirely by spaceId on the WorkflowRun row — no ownership
+ * check on individual workflows needed because the run's own spaceId is the
+ * authoritative guard. Workflow names are fetched separately and joined in code
+ * (avoids depending on PostgREST FK inference).
+ */
+export async function listAllWorkflowRuns(
+  spaceId: string,
+  limit = 50,
+): Promise<GlobalWorkflowRunRecord[]> {
+  const capped = Math.max(1, Math.min(limit, 100));
+  const { data: runs, error } = await supabase
+    .from('WorkflowRun')
+    .select(RUN_SELECT)
+    .eq('spaceId', spaceId)
+    .order('startedAt', { ascending: false })
+    .limit(capped);
+  if (error) throw error;
+  if (!runs || runs.length === 0) return [];
+
+  const workflowIds = [...new Set(runs.map((r) => (r as Record<string, unknown>).workflowId as string))];
+  const { data: wfs, error: wErr } = await supabase
+    .from('Workflow')
+    .select('id, name')
+    .eq('spaceId', spaceId)
+    .in('id', workflowIds);
+  if (wErr) throw wErr;
+
+  const nameMap = new Map<string, string>(
+    (wfs ?? []).map((w) => {
+      const row = w as { id: string; name: string };
+      return [row.id, row.name];
+    }),
+  );
+
+  return (runs as unknown as WorkflowRunRecord[]).map((r) => ({
+    ...r,
+    workflowName: nameMap.get(r.workflowId) ?? 'Unknown workflow',
+  }));
 }
 
 /**

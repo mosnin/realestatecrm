@@ -29,7 +29,9 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MiniMap,
   Position,
@@ -38,11 +40,14 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  getBezierPath,
   useEdgesState,
   useNodesState,
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeProps,
+  type EdgeTypes,
   type Node,
   type NodeChange,
   type NodeProps,
@@ -95,6 +100,38 @@ import {
 } from './field-catalog';
 import type { NodeRunStatus } from './run-highlights';
 
+// ── Connected apps hook ───────────────────────────────────────────────────────
+
+interface ConnectedApp {
+  toolkit: string;
+  label: string;
+  actions: { value: string; label: string }[];
+}
+
+interface ConnectedAppsState {
+  status: 'loading' | 'ready' | 'error';
+  apps: ConnectedApp[];
+}
+
+function useConnectedApps(): ConnectedAppsState {
+  const [state, setState] = useState<ConnectedAppsState>({ status: 'loading', apps: [] });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/workflows/connected-apps')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { apps?: ConnectedApp[] }) => {
+        if (!cancelled) setState({ status: 'ready', apps: data.apps ?? [] });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error', apps: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
+
 // React-Flow's Node/Edge generics, specialised to our adapter's data shapes so
 // the custom node components and the change handlers stay type-safe. React
 // Flow's Node<T> constrains T to Record<string, unknown>, so the node data is
@@ -127,17 +164,29 @@ export interface WorkflowCanvasProps {
 const ACTION_LABELS: Record<WorkflowActionType, string> = {
   draft_message: 'Draft a message',
   schedule_message: 'Schedule a message',
+  notify_agent: 'Notify me',
   create_task: 'Create a task',
   call_integration: 'Call a connected app',
   run_chippi: 'Ask Chippi to do something',
+  delay: 'Wait / Delay',
+  filter: 'Filter — only continue if…',
+  formatter: 'Format data',
+  webhook_post: 'POST to a webhook URL',
+  update_lead: 'Update this lead',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
   'draft_message',
   'run_chippi',
   'create_task',
+  'update_lead',
+  'notify_agent',
   'schedule_message',
+  'filter',
+  'formatter',
+  'delay',
   'call_integration',
+  'webhook_post',
 ];
 
 const OPERATOR_LABELS: Record<Operator, string> = {
@@ -227,9 +276,11 @@ function conditionSummary(condition: ConditionGroup | undefined): string {
 
 // ── Custom nodes ─────────────────────────────────────────────────────────────
 
+// Zapier-style: wider cards, vertical (top→bottom) connector handles.
 const NODE_SHELL =
-  'rounded-xl border bg-card px-3 py-2.5 shadow-sm transition-colors min-w-[168px] max-w-[208px]';
-const HANDLE_CLASS = '!h-2.5 !w-2.5 !border !border-border !bg-muted-foreground/40';
+  'rounded-xl border bg-card shadow-sm transition-colors w-[280px]';
+const HANDLE_CLASS =
+  '!h-3 !w-3 !rounded-full !border-2 !border-background !bg-muted-foreground/50 shadow-sm';
 
 /**
  * Run-highlight classes for a node, from its seeded data (set when the canvas is
@@ -253,25 +304,61 @@ function NodeIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Human-readable one-liner for a WorkflowTrigger. */
+function buildTriggerLabel(trigger: WorkflowTrigger): string {
+  switch (trigger.type) {
+    case 'lead_created':
+      return 'New lead created';
+    case 'lead_score_threshold':
+      return `Lead score reaches ${trigger.config.min}`;
+    case 'inbound_message': {
+      const ch = trigger.config.channel;
+      return ch && ch !== 'any' ? `Inbound ${ch}` : 'Inbound message';
+    }
+    case 'tour_completed':
+      return 'Tour completed';
+    case 'deal_stage_changed':
+      return trigger.config.toStage
+        ? `Deal moves to "${trigger.config.toStage}"`
+        : 'Deal stage changed';
+    case 'integration_event': {
+      const tk = trigger.config.toolkit;
+      const ev = trigger.config.event
+        ? trigger.config.event.split('_').slice(1).join(' ').toLowerCase()
+        : '';
+      return tk && ev ? `${tk}: ${ev}` : tk || 'Integration event';
+    }
+    case 'schedule': {
+      const { cadence, hour } = trigger.config;
+      const timeStr = typeof hour === 'number' ? ` at ${hour}:00` : '';
+      return `${cadence.charAt(0).toUpperCase() + cadence.slice(1)}${timeStr}`;
+    }
+    default:
+      return 'Trigger';
+  }
+}
+
 function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
+  const label = (data.triggerLabel as string | undefined) ?? 'When this happens…';
   return (
     <div
       className={cn(
         NODE_SHELL,
-        selected ? 'border-foreground/40' : 'border-border/60',
+        'border-orange-300/70 dark:border-orange-700/60',
+        selected && 'ring-2 ring-orange-400/50',
         runClasses(data),
       )}
     >
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <WorkflowIcon size={14} aria-hidden />
-        </NodeIcon>
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+          <Zap size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Trigger</p>
-          <p className="truncate text-[13px] font-medium text-foreground">Workflow starts</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-600/80 dark:text-orange-400/80">Trigger</p>
+          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">{label}</p>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
     </div>
   );
 }
@@ -285,45 +372,42 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
         runClasses(data),
       )}
     >
-      <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <GitBranch size={14} aria-hidden />
-        </NodeIcon>
+      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+          <GitBranch size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Condition</p>
-          {/* Full rule summary, clamped to two lines, with the complete string as
-              a hover tooltip — so a multi-rule condition reads as what it checks. */}
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">Filter / Branch</p>
           <p
-            className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground"
+            className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground"
             title={conditionSummary(data.condition)}
           >
             {conditionSummary(data.condition)}
           </p>
         </div>
       </div>
-      {/* Two SOURCE handles — the handle id ('true'/'false') becomes the edge
-          branch on connect, so a connection from here carries which branch. */}
+      {/* Two SOURCE handles on Bottom — True left, False right. */}
+      <div className="relative">
+        <div className="flex justify-between px-6 pb-1.5">
+          <span className="text-[10px] font-semibold text-emerald-600/90 dark:text-emerald-400/90">Yes</span>
+          <span className="text-[10px] font-semibold text-rose-600/90 dark:text-rose-400/90">No</span>
+        </div>
+      </div>
       <Handle
         id="true"
         type="source"
-        position={Position.Right}
-        style={{ top: '38%' }}
-        className={cn(HANDLE_CLASS, '!bg-emerald-500/60')}
+        position={Position.Bottom}
+        style={{ left: '30%' }}
+        className={cn(HANDLE_CLASS, '!bg-emerald-500/70 !border-emerald-300')}
       />
-      <span className="pointer-events-none absolute right-2 top-[30%] text-[9px] font-medium uppercase tracking-wide text-emerald-600/80 dark:text-emerald-500/80">
-        True
-      </span>
       <Handle
         id="false"
         type="source"
-        position={Position.Right}
-        style={{ top: '70%' }}
-        className={cn(HANDLE_CLASS, '!bg-rose-500/55')}
+        position={Position.Bottom}
+        style={{ left: '70%' }}
+        className={cn(HANDLE_CLASS, '!bg-rose-500/65 !border-rose-300')}
       />
-      <span className="pointer-events-none absolute bottom-1.5 right-2 text-[9px] font-medium uppercase tracking-wide text-rose-600/80 dark:text-rose-500/80">
-        False
-      </span>
     </div>
   );
 }
@@ -333,26 +417,105 @@ function ActionNodeView({ data, selected }: NodeProps<CanvasNode>) {
     <div
       className={cn(
         NODE_SHELL,
-        selected ? 'border-foreground/40' : 'border-border/60',
+        selected ? 'border-foreground/40 ring-2 ring-foreground/10' : 'border-border/60',
         runClasses(data),
       )}
     >
-      <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
-      <div className="flex items-center gap-2">
-        <NodeIcon>
-          <Zap size={14} aria-hidden />
-        </NodeIcon>
+      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <div className="flex items-center gap-3 px-3 py-3">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+          <WorkflowIcon size={15} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className={SECTION_LABEL}>Action</p>
-          <p className="truncate text-[13px] font-medium text-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">Action</p>
+          <p className="truncate text-[13px] font-semibold text-foreground leading-snug">
             {actionFace(data.action)}
           </p>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
     </div>
   );
 }
+
+// ── Custom edge with "Add action" button ─────────────────────────────────────
+
+/**
+ * A bezier edge that shows a small + button at the midpoint. Clicking it calls
+ * the `onAddBetween` callback stored on the edge's data — the canvas wires this
+ * to `addNode('action')` so a realtor can insert a step inline without dragging
+ * from the toolbar. Read-only edges (data.readOnly = true) skip the button.
+ */
+function AddStepEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+  label,
+}: EdgeProps<CanvasEdge>) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetPosition,
+    targetX,
+    targetY,
+  });
+
+  const isReadOnly = (data as Record<string, unknown> | undefined)?.readOnly as boolean | undefined;
+  const onAdd = (data as Record<string, unknown> | undefined)?.onAddBetween as
+    | (() => void)
+    | undefined;
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{ strokeWidth: 2, stroke: 'hsl(var(--border))' }}
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute pointer-events-none"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 22}px)`,
+            }}
+          >
+            <span className="rounded-full bg-muted border border-border/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {String(label)}
+            </span>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+      {!isReadOnly && onAdd && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute pointer-events-all"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onAdd}
+              title="Add action here"
+              className="group flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground/60 shadow-sm transition-all hover:border-foreground/25 hover:text-foreground hover:scale-110"
+            >
+              <Plus size={11} aria-hidden />
+            </button>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const EDGE_TYPES: EdgeTypes = { default: AddStepEdge };
 
 const NODE_TYPES: NodeTypes = {
   trigger: TriggerNodeView,
@@ -392,15 +555,24 @@ function CanvasInner({
   // ran nodes carry their status, the rest dim — so the executed path lights up.
   const initial = useMemo(() => {
     const flow = graphToFlow(graph);
-    if (!highlights || Object.keys(highlights).length === 0) return flow;
-    return {
+    const triggerLabelStr = buildTriggerLabel(trigger);
+    const withTriggerLabel = {
       ...flow,
-      nodes: flow.nodes.map((n) => ({
+      nodes: flow.nodes.map((n) =>
+        n.data.kind === 'trigger'
+          ? { ...n, data: { ...n.data, triggerLabel: triggerLabelStr } }
+          : n,
+      ),
+    };
+    if (!highlights || Object.keys(highlights).length === 0) return withTriggerLabel;
+    return {
+      ...withTriggerLabel,
+      nodes: withTriggerLabel.nodes.map((n) => ({
         ...n,
         data: { ...n.data, highlight: highlights[n.id], dimmed: !highlights[n.id] },
       })),
     };
-  }, [graph, highlights]);
+  }, [graph, trigger, highlights]);
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(
     initial.nodes as CanvasNode[],
   );
@@ -591,7 +763,7 @@ function CanvasInner({
     if (!selectedId) return;
     const target = nodes.find((n) => n.id === selectedId);
     if (!target || target.data.kind === 'trigger') {
-      if (target?.data.kind === 'trigger') flash('The trigger node can’t be removed.');
+      if (target?.data.kind === 'trigger') flash("The trigger node can't be removed.");
       return;
     }
     setNodes((curNodes) => {
@@ -678,12 +850,20 @@ function CanvasInner({
         >
           <ReactFlow<CanvasNode, CanvasEdge>
             nodes={nodes}
-            edges={edges}
+            edges={readOnly
+              ? edges
+              // Inject onAddBetween + readOnly into edge data so the custom
+              // edge can call addNode without prop-drilling through React-Flow.
+              : edges.map((e) => ({
+                  ...e,
+                  data: { ...e.data, onAddBetween: () => addNode('action'), readOnly: false },
+                }))}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             fitView
             proOptions={{ hideAttribution: true }}
             nodesDraggable={!readOnly}
@@ -793,6 +973,11 @@ function Inspector({
   onUpdate: (id: string, patch: Partial<FlowNodeData>) => void;
   onClose: () => void;
 }) {
+  // Fetch connected apps once — only needed when an action node is selected
+  // and only when call_integration is chosen, but loading eagerly keeps the
+  // picker instant once the user clicks. A failed load degrades to text inputs.
+  const connectedApps = useConnectedApps();
+
   return (
     <aside className="w-full flex-shrink-0 rounded-xl border border-border/60 bg-card p-4 lg:w-[300px]">
       {!node ? (
@@ -822,7 +1007,7 @@ function Inspector({
 
           {node.data.kind === 'trigger' && (
             <p className={cn(CAPTION, 'leading-relaxed')}>
-              This is where it starts. The trigger’s settings live on the workflow
+              This is where it starts. The trigger&apos;s settings live on the workflow
               itself — this node just anchors the graph.
             </p>
           )}
@@ -831,6 +1016,7 @@ function Inspector({
             <ActionInspector
               action={node.data.action ?? defaultAction()}
               onChange={(action) => onUpdate(node.id, { action })}
+              connectedApps={connectedApps}
             />
           )}
 
@@ -852,9 +1038,11 @@ function Inspector({
 function ActionInspector({
   action,
   onChange,
+  connectedApps,
 }: {
   action: WorkflowAction;
   onChange: (action: WorkflowAction) => void;
+  connectedApps: ConnectedAppsState;
 }) {
   // Switching type resets to that type's minimal default config.
   function setType(type: WorkflowActionType) {
@@ -868,7 +1056,19 @@ function ActionInspector({
             ? { type, config: { title: '' } }
             : type === 'call_integration'
               ? { type, config: { toolkit: '', action: '' } }
-              : { type: 'run_chippi', config: { instruction: '' } };
+              : type === 'update_lead'
+                ? { type, config: { field: 'score_label' as const, value: '' } }
+                : type === 'webhook_post'
+                  ? { type, config: { url: '' } }
+                  : type === 'notify_agent'
+                    ? { type, config: { title: '' } }
+                    : type === 'delay'
+                      ? { type, config: { delayMinutes: 60 } }
+                      : type === 'filter'
+                        ? { type, config: { field: '', operator: 'eq' as const } }
+                        : type === 'formatter'
+                          ? { type, config: { input: '', operation: 'uppercase' as const } }
+                          : { type: 'run_chippi', config: { instruction: '' } };
     onChange(next);
   }
 
@@ -1018,36 +1218,149 @@ function ActionInspector({
       )}
 
       {action.type === 'call_integration' && (
+        <IntegrationActionPicker
+          action={action}
+          onChange={onChange}
+          connectedApps={connectedApps}
+        />
+      )}
+
+      {action.type === 'notify_agent' && (
         <>
-          <FieldBlock label="App / toolkit">
+          <FieldBlock label="Notification title">
             <Input
-              value={action.config.toolkit}
+              value={action.config.title}
               onChange={(e) =>
-                onChange({
-                  ...action,
-                  config: { ...action.config, toolkit: e.target.value },
-                })
+                onChange({ type: 'notify_agent', config: { ...action.config, title: e.target.value } })
               }
-              placeholder="slack"
+              placeholder="Hot lead: check their profile"
               className="h-8"
             />
           </FieldBlock>
-          <FieldBlock label="Action">
-            <Input
-              value={action.config.action}
+          <FieldBlock label="Body (optional)">
+            <Textarea
+              value={action.config.body ?? ''}
               onChange={(e) =>
                 onChange({
-                  ...action,
-                  config: { ...action.config, action: e.target.value },
+                  type: 'notify_agent',
+                  config: { ...action.config, body: e.target.value || undefined },
                 })
               }
-              placeholder="send_message"
-              className="h-8"
+              placeholder="Score hit threshold — tap to review."
+              rows={2}
             />
           </FieldBlock>
         </>
       )}
     </div>
+  );
+}
+
+// ── Integration action picker ─────────────────────────────────────────────────
+
+/**
+ * Connected-app + action picker for the `call_integration` action type.
+ *
+ * When connected apps are available (fetched from /api/workflows/connected-apps),
+ * shows two selects: one for the toolkit (your connected apps), one for the
+ * action (curated list per toolkit). Falls back to text inputs if the fetch
+ * failed or returned no apps (e.g. nothing connected yet).
+ */
+function IntegrationActionPicker({
+  action,
+  onChange,
+  connectedApps,
+}: {
+  action: Extract<WorkflowAction, { type: 'call_integration' }>;
+  onChange: (action: WorkflowAction) => void;
+  connectedApps: ConnectedAppsState;
+}) {
+  const hasApps = connectedApps.status === 'ready' && connectedApps.apps.length > 0;
+  const selectedApp = connectedApps.apps.find((a) => a.toolkit === action.config.toolkit);
+  const availableActions = selectedApp?.actions ?? [];
+
+  function setToolkit(toolkit: string) {
+    // Changing the toolkit resets the action — the old action slug belongs to
+    // the old toolkit and would silently never fire.
+    onChange({ type: 'call_integration', config: { toolkit, action: '' } });
+  }
+
+  if (!hasApps) {
+    // No connected apps yet — fall back to free text so the realtor can still
+    // author the node even if they haven't connected an app.
+    return (
+      <>
+        {connectedApps.status === 'ready' && connectedApps.apps.length === 0 && (
+          <p className={cn(CAPTION, 'rounded-lg border border-dashed border-border/60 px-3 py-2 text-center')}>
+            No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.
+          </p>
+        )}
+        <FieldBlock label="App / toolkit">
+          <Input
+            value={action.config.toolkit}
+            onChange={(e) =>
+              onChange({ ...action, config: { ...action.config, toolkit: e.target.value } })
+            }
+            placeholder="slack"
+            className="h-8"
+          />
+        </FieldBlock>
+        <FieldBlock label="Action slug">
+          <Input
+            value={action.config.action}
+            onChange={(e) =>
+              onChange({ ...action, config: { ...action.config, action: e.target.value } })
+            }
+            placeholder="SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL"
+            className="h-8"
+          />
+        </FieldBlock>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <FieldBlock label="Connected app">
+        <MiniSelect
+          value={action.config.toolkit || '__none__'}
+          onValueChange={(v) => setToolkit(v === '__none__' ? '' : v)}
+          options={[
+            { value: '__none__', label: 'Pick an app…' },
+            ...connectedApps.apps.map((a) => ({ value: a.toolkit, label: a.label })),
+          ]}
+        />
+      </FieldBlock>
+
+      {action.config.toolkit && (
+        <FieldBlock label="Action">
+          {availableActions.length > 0 ? (
+            <MiniSelect
+              value={action.config.action || '__none__'}
+              onValueChange={(v) =>
+                onChange({
+                  ...action,
+                  config: { ...action.config, action: v === '__none__' ? '' : v },
+                })
+              }
+              options={[
+                { value: '__none__', label: 'Pick an action…' },
+                ...availableActions,
+              ]}
+            />
+          ) : (
+            <Input
+              value={action.config.action}
+              onChange={(e) =>
+                onChange({ ...action, config: { ...action.config, action: e.target.value } })
+              }
+              placeholder="Action slug"
+              className="h-8"
+            />
+          )}
+        </FieldBlock>
+      )}
+    </>
   );
 }
 
