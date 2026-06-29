@@ -141,6 +141,16 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   filter: Filter,
 };
 
+const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
+  draft_message: 'Compose an SMS or email for you to review before sending',
+  schedule_message: 'Auto-send a message after a delay',
+  create_task: 'Create a follow-up task for you or your team',
+  call_integration: 'Trigger an action in a connected app',
+  run_chippi: 'Ask Chippi to research, summarize, or reason',
+  delay: 'Pause the workflow before the next step',
+  filter: 'Stop the run if a condition is not met',
+};
+
 const AUTONOMY_OPTIONS: { value: WorkflowAutonomy; label: string }[] = [
   { value: 'draft', label: 'Draft only — I approve' },
   { value: 'notify', label: 'Auto + notify me' },
@@ -316,10 +326,10 @@ function newConditionRow(triggerType?: TriggerType): ConditionRowState {
   };
 }
 
-function newActionRow(): ActionRowState {
+function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowState {
   return {
     id: nextRowId('act'),
-    type: 'draft_message',
+    type,
     channel: 'sms',
     instruction: '',
     delayMinutes: '',
@@ -780,6 +790,59 @@ function TokenPicker({
 }
 
 /**
+ * Zapier-style action type picker shown when clicking "Add step". Renders a
+ * 2-column grid of all action types with icon + name + description. Clicking a
+ * type calls onSelect and closes.
+ */
+function AddStepPicker({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (type: WorkflowActionType) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card shadow-md">
+      <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
+        <p className="text-[13px] font-semibold text-foreground">Choose an action</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          <X size={13} aria-hidden />
+        </button>
+      </div>
+      <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
+        {ACTION_ORDER.map((type) => {
+          const Icon = ACTION_ICONS[type];
+          const cl = actionAccent(type);
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => onSelect(type)}
+              className="flex items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-border/60 hover:bg-accent"
+            >
+              <span className={cn('mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
+                <Icon size={15} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[12.5px] font-semibold text-foreground">{ACTION_LABELS[type]}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                  {ACTION_DESCRIPTIONS[type]}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Private notes field for an action step (Zapier-style "Note on this step").
  * Collapsed by default; expands inline below the config body when clicked.
  */
@@ -1033,6 +1096,8 @@ export function WorkflowBuilder({
   const isNarrow = useIsNarrow();
   /** Set of action row ids whose cards are collapsed (body hidden, summary shown). */
   const [collapsedSteps, setCollapsedSteps] = useState<Set<string>>(() => new Set());
+  /** Whether the "Add step" type picker is open at the end of the list. */
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
 
   function toggleCollapse(id: string) {
     setCollapsedSteps((prev) => {
@@ -1480,16 +1545,30 @@ export function WorkflowBuilder({
           ))}
 
           {state.actions.length < MAX_ACTIONS && (
-            <div className="flex flex-col items-center pt-1">
-              <div className="h-4 w-px bg-border/50" />
-              <button
-                type="button"
-                onClick={() => patch({ actions: [...state.actions, newActionRow()] })}
-                className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-orange-300/70 px-5 py-2.5 text-sm font-semibold text-orange-500 transition-all hover:border-orange-400 hover:bg-orange-50/60 hover:shadow-sm active:scale-[0.98] dark:border-orange-500/40 dark:text-orange-400 dark:hover:bg-orange-950/30"
-              >
-                <Plus size={15} aria-hidden />
-                Add step
-              </button>
+            <div className="pt-1">
+              <div className="flex justify-center">
+                <div className="h-4 w-px bg-border/50" />
+              </div>
+              {addPickerOpen ? (
+                <AddStepPicker
+                  onSelect={(type) => {
+                    patch({ actions: [...state.actions, newActionRow(type)] });
+                    setAddPickerOpen(false);
+                  }}
+                  onClose={() => setAddPickerOpen(false)}
+                />
+              ) : (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setAddPickerOpen(true)}
+                    className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-orange-300/70 px-5 py-2.5 text-sm font-semibold text-orange-500 transition-all hover:border-orange-400 hover:bg-orange-50/60 hover:shadow-sm active:scale-[0.98] dark:border-orange-500/40 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                  >
+                    <Plus size={15} aria-hidden />
+                    Add step
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>
