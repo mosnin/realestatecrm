@@ -138,6 +138,7 @@ interface WorkflowRun {
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
+  triggerEvent: unknown;
   steps: RunStep[];
 }
 
@@ -1818,9 +1819,31 @@ function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: str
         )}
       </div>
 
-      {/* Step timeline */}
+      {/* Expanded detail — trigger event + step timeline */}
       {open && hasSteps && (
         <div className="border-t border-border/40 bg-muted/10 px-3 py-2.5">
+          {/* Trigger data — "Data In" panel, mirrors Zapier's trigger step */}
+          {((): React.ReactNode => {
+            if (!run.triggerEvent || typeof run.triggerEvent !== 'object' || Array.isArray(run.triggerEvent)) return null;
+            const ev = run.triggerEvent as Record<string, unknown>;
+            const entries = Object.entries(ev).filter(([, v]) => v !== undefined && v !== null).slice(0, 6);
+            if (entries.length === 0) return null;
+            return (
+              <div className="mb-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Trigger data</p>
+                <dl className="overflow-hidden rounded-md border border-border/40 bg-background/60 text-[11px]">
+                  {entries.map(([k, v], i) => (
+                    <div key={k} className={cn('flex items-start gap-2 px-2.5 py-1', i !== entries.length - 1 && 'border-b border-border/30')}>
+                      <dt className="w-24 flex-shrink-0 font-medium capitalize text-muted-foreground/70">{k.replace(/_/g, ' ')}</dt>
+                      <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">
+                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })()}
           <ul className="relative space-y-0">
             {run.steps.map((step, idx) => {
               const isLast = idx === run.steps.length - 1;
@@ -2532,6 +2555,16 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     icon: Mail,
     accent: 'bg-red-100 dark:bg-red-950/40',
     dot: 'text-red-500 dark:text-red-400',
+  },
+  'hot-lead-push-alert': {
+    icon: BellRing,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'deal-stage-push-alert': {
+    icon: BellRing,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
   },
 };
 
