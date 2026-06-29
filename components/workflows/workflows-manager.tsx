@@ -184,6 +184,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
     actions: w.actions.map((a) => ({
       id: editRowId('act'),
       type: a.type,
+      label: a.label,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel

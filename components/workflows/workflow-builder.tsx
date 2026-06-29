@@ -741,7 +741,16 @@ export function WorkflowBuilder({
   }
   function patchTrigger(next: Partial<WorkflowFormState['trigger']>) {
     setDirty(true);
-    setState((s) => ({ ...s, trigger: { ...s.trigger, ...next } }));
+    setState((s) => {
+      const updated = { ...s.trigger, ...next };
+      // Auto-suggest a name when the trigger TYPE changes and the name is still
+      // blank — same pattern Zapier uses ("New Gmail > Do this").
+      let name = s.name;
+      if (next.type && next.type !== s.trigger.type && !s.name.trim()) {
+        name = TRIGGER_LABELS[next.type] ?? '';
+      }
+      return { ...s, trigger: updated, name };
+    });
   }
 
   function updateCondition(id: string, next: Partial<ConditionRowState>) {
@@ -1941,6 +1950,8 @@ function ActionConfig({
   );
 }
 
+const INSTRUCTION_MAX = 4000;
+
 function InstructionField({
   row,
   onChange,
@@ -1948,16 +1959,26 @@ function InstructionField({
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
 }) {
+  const len = row.instruction.length;
+  const nearLimit = len > INSTRUCTION_MAX * 0.85;
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={`act-instr-${row.id}`} className="text-[12px] text-muted-foreground">
-        Instruction
-      </Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={`act-instr-${row.id}`} className="text-[12px] text-muted-foreground">
+          Instruction
+        </Label>
+        {nearLimit && (
+          <span className={cn('text-[11px] tabular-nums', len >= INSTRUCTION_MAX ? 'font-semibold text-destructive' : 'text-muted-foreground/60')}>
+            {len}/{INSTRUCTION_MAX}
+          </span>
+        )}
+      </div>
       <Textarea
         id={`act-instr-${row.id}`}
         value={row.instruction}
         onChange={(e) => onChange({ instruction: e.target.value })}
         placeholder="Draft a warm, personal intro and reference their interest."
+        maxLength={INSTRUCTION_MAX}
         rows={3}
       />
     </div>
