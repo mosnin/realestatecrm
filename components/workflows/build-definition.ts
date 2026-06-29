@@ -225,7 +225,8 @@ function buildAction(row: ActionRowState): WorkflowAction {
         ...(note ? { note } : {}),
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
-    case 'schedule_message':
+    case 'schedule_message': {
+      const smMultiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
       return {
         type: 'schedule_message',
         ...(label ? { label } : {}),
@@ -233,9 +234,10 @@ function buildAction(row: ActionRowState): WorkflowAction {
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
-          delayMinutes: toNumber(row.delayMinutes),
+          delayMinutes: toNumber(row.delayMinutes) * smMultiplier,
         },
       };
+    }
     case 'create_task':
       return {
         type: 'create_task',

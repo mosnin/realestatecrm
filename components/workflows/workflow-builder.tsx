@@ -381,7 +381,10 @@ function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours
 
 function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
   return actions.map((a) => {
-    const delayDisplay = a.type === 'delay' ? minutesToDisplay(a.config.delayMinutes) : null;
+    const delayDisplay =
+      a.type === 'delay' || a.type === 'schedule_message'
+        ? minutesToDisplay(a.config.delayMinutes)
+        : null;
     return {
       id: nextRowId('act'),
       type: a.type,
@@ -394,12 +397,10 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
           ? a.config.instruction
           : '',
       delayMinutes:
-        a.type === 'schedule_message'
-          ? String(a.config.delayMinutes)
-          : a.type === 'delay'
-            ? (delayDisplay?.amount ?? '')
-            : '',
-      delayUnit: delayDisplay?.unit ?? 'minutes',
+        a.type === 'schedule_message' || a.type === 'delay'
+          ? (delayDisplay?.amount ?? '')
+          : '',
+      delayUnit: delayDisplay?.unit ?? 'hours',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -2139,7 +2140,8 @@ function ActionConfig({
         </FieldRow>
         <InstructionField row={row} onChange={onChange} triggerType={triggerType} />
         {row.type === 'schedule_message' && (
-          <FieldRow label="Delay (minutes)" htmlFor={`act-delay-${row.id}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="text-[12px] text-muted-foreground">Send after</Label>
             <Input
               id={`act-delay-${row.id}`}
               type="number"
@@ -2147,10 +2149,19 @@ function ActionConfig({
               min={0}
               value={row.delayMinutes}
               onChange={(e) => onChange({ delayMinutes: e.target.value })}
-              placeholder="60"
-              className="h-8 w-28"
+              placeholder="2"
+              className="h-8 w-20"
             />
-          </FieldRow>
+            <MiniSelect
+              value={row.delayUnit ?? 'hours'}
+              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
+              options={[
+                { value: 'minutes', label: 'minutes' },
+                { value: 'hours', label: 'hours' },
+                { value: 'days', label: 'days' },
+              ]}
+            />
+          </div>
         )}
       </div>
     );
