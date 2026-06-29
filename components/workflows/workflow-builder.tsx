@@ -2125,6 +2125,107 @@ function ConditionRowEditor({
   );
 }
 
+function FilterActionConfig({
+  row,
+  onChange,
+  triggerType,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+}) {
+  const attributes = useMemo(() => attributesForTrigger(triggerType), [triggerType]);
+  const activeAttr = findAttributeByField(row.filterField);
+  const [forcedCustom, setForcedCustom] = useState(false);
+  const isCustom = forcedCustom || activeAttr === null;
+
+  const needsValue = !VALUELESS_OPERATORS.has(row.filterOperator);
+
+  function selectAttribute(attr: ConditionAttribute) {
+    setForcedCustom(false);
+    const operatorValid = attr.operators.includes(row.filterOperator);
+    const nextOperator = operatorValid ? row.filterOperator : attr.operators[0];
+    const keepValue =
+      attr.valueType === 'text' ||
+      (attr.valueType === 'enum' && attr.options?.some((o) => o.value === row.filterValue)) ||
+      (attr.valueType === 'number' && /^-?\d+(\.\d+)?$/.test(row.filterValue.trim()));
+    onChange({
+      filterField: attr.field,
+      filterOperator: nextOperator,
+      ...(keepValue ? {} : { filterValue: '' }),
+    });
+  }
+
+  const attributeSelectValue = isCustom ? CUSTOM_ATTRIBUTE : (activeAttr?.key ?? CUSTOM_ATTRIBUTE);
+  const operatorOptions = isCustom ? OPERATORS : (activeAttr?.operators ?? OPERATORS);
+
+  return (
+    <div className="space-y-2.5">
+      <p className={CAPTION}>
+        Only continue if this condition is true — otherwise the automation stops here.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <MiniSelect
+          aria-label="Attribute"
+          value={attributeSelectValue}
+          onValueChange={(v) => {
+            if (v === CUSTOM_ATTRIBUTE) {
+              setForcedCustom(true);
+              return;
+            }
+            const attr = attributes.find((a) => a.key === v);
+            if (attr) selectAttribute(attr);
+          }}
+          className="w-[11rem]"
+          options={[
+            ...attributes.map((a) => ({ value: a.key, label: a.label })),
+            { value: CUSTOM_ATTRIBUTE, label: 'Custom field…' },
+          ]}
+        />
+
+        {isCustom && (
+          <Input
+            aria-label="Field"
+            value={row.filterField}
+            onChange={(e) => onChange({ filterField: e.target.value })}
+            placeholder="lead.score"
+            className="h-8 flex-1 min-w-[8rem]"
+          />
+        )}
+
+        <MiniSelect
+          aria-label="Operator"
+          value={row.filterOperator}
+          onValueChange={(v) => onChange({ filterOperator: v as Operator })}
+          className="w-[9.5rem]"
+          options={operatorOptions.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+        />
+
+        {needsValue &&
+          (!isCustom && activeAttr?.valueType === 'enum' && activeAttr.options ? (
+            <MiniSelect
+              aria-label="Value"
+              value={row.filterValue}
+              onValueChange={(v) => onChange({ filterValue: v })}
+              className="flex-1 min-w-[6rem]"
+              options={activeAttr.options}
+            />
+          ) : (
+            <Input
+              aria-label="Value"
+              type={!isCustom && activeAttr?.valueType === 'number' ? 'number' : 'text'}
+              inputMode={!isCustom && activeAttr?.valueType === 'number' ? 'numeric' : undefined}
+              value={row.filterValue}
+              onChange={(e) => onChange({ filterValue: e.target.value })}
+              placeholder="80"
+              className="h-8 flex-1 min-w-[6rem]"
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -2249,38 +2350,7 @@ function ActionConfig({
   }
 
   if (row.type === 'filter') {
-    return (
-      <div className="space-y-2.5">
-        <p className={CAPTION}>
-          Only continue if this condition is true — otherwise the automation stops here.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            value={row.filterField}
-            onChange={(e) => onChange({ filterField: e.target.value })}
-            placeholder="lead.score"
-            className="h-8 w-32"
-            aria-label="Field"
-          />
-          <MiniSelect
-            value={row.filterOperator}
-            onValueChange={(v) => onChange({ filterOperator: v as Operator })}
-            options={OPERATORS.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
-            className="min-w-[8rem]"
-            aria-label="Operator"
-          />
-          {!VALUELESS_OPERATORS.has(row.filterOperator) && (
-            <Input
-              value={row.filterValue}
-              onChange={(e) => onChange({ filterValue: e.target.value })}
-              placeholder="80"
-              className="h-8 w-24"
-              aria-label="Value"
-            />
-          )}
-        </div>
-      </div>
-    );
+    return <FilterActionConfig row={row} onChange={onChange} triggerType={triggerType} />;
   }
 
   // call_integration — app + action lead; show connected apps picker when apps
