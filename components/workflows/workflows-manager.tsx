@@ -429,7 +429,7 @@ export function WorkflowsManager() {
         trigger: parsed.definition.trigger,
         conditions: parsed.definition.conditions ?? { op: 'and', rules: [] },
         actions: parsed.definition.actions ?? [],
-        autonomy: parsed.definition.autonomy ?? 'supervised',
+        autonomy: parsed.definition.autonomy ?? 'draft',
         graph: parsed.definition.graph ?? null,
         lastRunAt: null,
         lastRunStatus: null,
@@ -1464,7 +1464,9 @@ function WorkflowRow({
                 {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
               </span>
             )}
-            {workflow.enabled && workflow.actions.length === 0 && !workflow.graph && (
+            {workflow.enabled &&
+              workflow.actions.length === 0 &&
+              (!workflow.graph || workflow.graph.nodes.every((n) => n.kind !== 'action')) && (
               <span
                 title="Workflow is on but has no actions — add at least one step"
                 className="inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"

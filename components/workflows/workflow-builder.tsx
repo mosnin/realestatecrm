@@ -2013,6 +2013,13 @@ export function WorkflowBuilder({
             </div>
           )}
 
+          {/* Empty step hint — shown only before the first step is added. */}
+          {state.actions.length === 0 && !addPickerOpen && (
+            <p className={cn(CAPTION, 'text-center py-1')}>
+              Add at least one step — draft a message, create a task, or send a push alert.
+            </p>
+          )}
+
           {/* Action cards — each step gets its own card; draggable to reorder. */}
           {state.actions.map((row, i) => (
             <div
@@ -3504,6 +3511,12 @@ function ActionConfig({
 
   return (
     <div className="space-y-2.5">
+      {connectedApps.status === 'loading' && (
+        <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+          <Loader2 size={12} className="animate-spin" aria-hidden />
+          Loading connected apps…
+        </p>
+      )}
       {connectedApps.status === 'ready' && !hasApps && (
         <p className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[12px] text-muted-foreground text-center">
           No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.

@@ -55,9 +55,9 @@ export function edgeId(e: { from: string; to: string; branch?: 'true' | 'false' 
 }
 
 /**
- * Layered left→right layout: depth = longest path from the trigger (so a node
- * sits to the right of every parent); nodes within a depth are stacked. Returns
- * a depth per node id; unreachable nodes land in a trailing column so they're
+ * Layered top-down layout: depth = longest path from the trigger (so a node
+ * sits below every parent); nodes within a depth are spread horizontally. Returns
+ * a depth per node id; unreachable nodes land in a trailing row so they're
  * still visible and draggable rather than stacked at the origin.
  */
 function computeDepths(graph: WorkflowGraph): Map<string, number> {
