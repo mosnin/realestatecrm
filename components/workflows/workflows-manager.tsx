@@ -642,6 +642,8 @@ export function WorkflowsManager() {
                   initialEnabled={editing.enabled}
                   saving={busyId === editingId}
                   workflowId={editingId}
+                  lastRunAt={editing.lastRunAt}
+                  lastRunStatus={editing.lastRunStatus}
                   onSave={(payload) => saveEdit(editingId, payload)}
                   onCancel={() => setEditingId(null)}
                 />

@@ -67,6 +67,7 @@ import {
   type ConditionAttribute,
 } from './field-catalog';
 import { summarizeFormState } from './form-summary';
+import { timeAgo } from '@/lib/formatting';
 
 // ── Friendly labels for the schema's enums ───────────────────────────────────
 
@@ -91,6 +92,83 @@ const TRIGGER_ORDER: TriggerType[] = [
   'schedule',
   'webhook',
 ];
+
+/** Sample trigger event data shown in the "Test trigger" panel. Each entry is a
+ *  flat key → value map the user can reference when building conditions/messages. */
+const TRIGGER_SAMPLE_DATA: Record<TriggerType, Record<string, string | number>> = {
+  lead_created: {
+    'lead.name': 'Jane Smith',
+    'lead.email': 'jane@example.com',
+    'lead.phone': '+1 555 123 4567',
+    'lead.score': 55,
+    'lead.source': 'Zillow',
+    'lead.assignedAgent': 'Alex Johnson',
+    'lead.propertyInterest': '3BR in Austin',
+    'lead.createdAt': '2025-06-15T09:31:00Z',
+  },
+  lead_score_threshold: {
+    'lead.name': 'Marcus Lee',
+    'lead.email': 'marcus@example.com',
+    'lead.phone': '+1 555 987 6543',
+    'lead.score': 84,
+    'lead.source': 'Realtor.com',
+    'lead.assignedAgent': 'Alex Johnson',
+    'lead.propertyInterest': '4BR in North Austin',
+    'lead.previousScore': 72,
+  },
+  inbound_message: {
+    'message.channel': 'sms',
+    'message.body': 'Hey, I saw the listing on Oak Ave — is it still available?',
+    'message.from': '+1 512 555 0192',
+    'lead.name': 'Priya Patel',
+    'lead.email': 'priya@example.com',
+    'lead.score': 61,
+    'message.receivedAt': '2025-06-15T14:20:00Z',
+  },
+  tour_completed: {
+    'lead.name': 'Chris Nguyen',
+    'lead.email': 'chris@example.com',
+    'lead.phone': '+1 512 555 7788',
+    'lead.score': 78,
+    'property.address': '1204 Oak Ave, Austin TX 78703',
+    'property.price': 585000,
+    'tour.scheduledAt': '2025-06-15T11:00:00Z',
+    'tour.completedAt': '2025-06-15T11:45:00Z',
+  },
+  deal_stage_changed: {
+    'lead.name': 'Sam Torres',
+    'lead.email': 'sam@example.com',
+    'deal.stage': 'offer',
+    'deal.previousStage': 'showing',
+    'property.address': '340 Maple Dr, Austin TX 78704',
+    'property.price': 620000,
+    'deal.changedAt': '2025-06-15T16:05:00Z',
+  },
+  integration_event: {
+    'event.toolkit': 'gmail',
+    'event.name': 'new_message',
+    'contact.email': 'buyer@example.com',
+    'contact.name': 'Taylor Reed',
+    'email.subject': 'Re: Oak Ave listing',
+    'email.snippet': "Thanks for the info — can we schedule a tour?",
+    'event.receivedAt': '2025-06-15T08:44:00Z',
+  },
+  schedule: {
+    'schedule.firedAt': '2025-06-15T08:00:00Z',
+    'schedule.cadence': 'weekdays',
+    'schedule.dayOfWeek': 'Monday',
+    'space.name': 'My CRM',
+    'agent.name': 'Alex Johnson',
+  },
+  webhook: {
+    'webhook.source': 'external-app',
+    'payload.lead_id': 'lead_9a3f77',
+    'payload.event': 'form_submitted',
+    'payload.name': 'River Brooks',
+    'payload.email': 'river@example.com',
+    'payload.receivedAt': '2025-06-15T10:12:00Z',
+  },
+};
 
 const OPERATOR_LABELS: Record<Operator, string> = {
   eq: 'equals',
@@ -488,6 +566,93 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
 }
 
 /**
+ * Collapsible "Test trigger" panel shown below the trigger config — like Zapier's
+ * step 1 "Find data" that shows what a sample event looks like. Helps the user
+ * understand what fields are available for conditions and {{token}} insertions.
+ */
+function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const data = TRIGGER_SAMPLE_DATA[triggerType];
+
+  function copyJson() {
+    const obj: Record<string, string | number> = {};
+    Object.entries(data).forEach(([k, v]) => {
+      const key = k.split('.').pop()!;
+      obj[key] = v;
+    });
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="border-t border-border/30 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 text-left"
+        aria-expanded={open}
+      >
+        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
+          <CheckIcon size={11} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+        </span>
+        <span className="flex-1 text-[12px] font-medium text-foreground">
+          {open ? 'Hide' : 'Show'} sample trigger data
+        </span>
+        <ChevronDown
+          size={13}
+          className={cn(
+            'flex-shrink-0 text-muted-foreground/50 transition-transform',
+            open && 'rotate-180',
+          )}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Sample event fields
+              </p>
+              <button
+                type="button"
+                onClick={copyJson}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+              >
+                {copied ? (
+                  <><CheckIcon size={11} /> Copied</>
+                ) : (
+                  <><Copy size={11} /> Copy JSON</>
+                )}
+              </button>
+            </div>
+            <dl className="space-y-1.5">
+              {Object.entries(data).map(([key, val]) => (
+                <div key={key} className="flex items-center gap-2 text-[12px]">
+                  <dt className="flex-shrink-0 font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
+                    {`{{${key}}}`}
+                  </dt>
+                  <dd className="ml-auto flex-shrink-0 truncate text-muted-foreground">
+                    {String(val)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <p className={CAPTION}>
+            These are example values — real events will carry actual lead and deal data.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Zapier-style large step card: colored left border, numbered badge, icon, and a
  * header / body split. Each step in the builder is one of these.
  */
@@ -802,6 +967,16 @@ function AddStepPicker({
   onSelect: (type: WorkflowActionType) => void;
   onClose: () => void;
 }) {
+  const [query, setQuery] = useState('');
+  const q = query.toLowerCase().trim();
+  const filtered = q
+    ? ACTION_ORDER.filter(
+        (t) =>
+          ACTION_LABELS[t].toLowerCase().includes(q) ||
+          ACTION_DESCRIPTIONS[t].toLowerCase().includes(q),
+      )
+    : ACTION_ORDER;
+
   return (
     <div className="rounded-xl border border-border/60 bg-card shadow-md">
       <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
@@ -815,29 +990,45 @@ function AddStepPicker({
           <X size={13} aria-hidden />
         </button>
       </div>
+      <div className="border-b border-border/40 px-3 py-2">
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search actions…"
+          className="h-8 text-[12.5px]"
+          aria-label="Search actions"
+        />
+      </div>
       <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
-        {ACTION_ORDER.map((type) => {
-          const Icon = ACTION_ICONS[type];
-          const cl = actionAccent(type);
-          return (
-            <button
-              key={type}
-              type="button"
-              onClick={() => onSelect(type)}
-              className="flex items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-border/60 hover:bg-accent"
-            >
-              <span className={cn('mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
-                <Icon size={15} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[12.5px] font-semibold text-foreground">{ACTION_LABELS[type]}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                  {ACTION_DESCRIPTIONS[type]}
-                </p>
-              </div>
-            </button>
-          );
-        })}
+        {filtered.length === 0 ? (
+          <p className="col-span-2 py-4 text-center text-[12px] text-muted-foreground">
+            No actions match "{query}"
+          </p>
+        ) : (
+          filtered.map((type) => {
+            const Icon = ACTION_ICONS[type];
+            const cl = actionAccent(type);
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onSelect(type)}
+                className="flex items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-border/60 hover:bg-accent"
+              >
+                <span className={cn('mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
+                  <Icon size={15} aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold text-foreground">{ACTION_LABELS[type]}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    {ACTION_DESCRIPTIONS[type]}
+                  </p>
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -1057,6 +1248,8 @@ export function WorkflowBuilder({
   initialEnabled,
   saving,
   workflowId,
+  lastRunAt,
+  lastRunStatus,
   onSave,
   onCancel,
 }: {
@@ -1067,6 +1260,9 @@ export function WorkflowBuilder({
   /** The id of the workflow being edited (if editing an existing one). Used to
    *  display the webhook URL for webhook-triggered workflows. */
   workflowId?: string;
+  /** Last execution time / status — shown in the builder footer for existing workflows. */
+  lastRunAt?: string | null;
+  lastRunStatus?: 'ok' | 'error' | 'skipped' | null;
   /** Receives the validated definition + name + enabled; the manager owns the fetch. */
   onSave: (payload: { name: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
   onCancel: () => void;
@@ -1356,6 +1552,7 @@ export function WorkflowBuilder({
             triggerOptions={triggerOptions}
             workflowId={workflowId}
           />
+          <TriggerSampleData triggerType={state.trigger.type} />
         </div>
       </ZapCard>
 
@@ -1688,6 +1885,28 @@ export function WorkflowBuilder({
             className="ml-0.5"
           />
         </label>
+
+        {lastRunAt && (
+          <span
+            className={cn(
+              'hidden sm:flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+              lastRunStatus === 'error'
+                ? 'border-rose-300/60 bg-rose-50 text-rose-600 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-400'
+                : lastRunStatus === 'ok'
+                  ? 'border-emerald-300/60 bg-emerald-50 text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-400'
+                  : 'border-border/60 bg-muted/30 text-muted-foreground',
+            )}
+          >
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full flex-shrink-0',
+                lastRunStatus === 'error' ? 'bg-rose-500' : lastRunStatus === 'ok' ? 'bg-emerald-500' : 'bg-muted-foreground/40',
+              )}
+              aria-hidden
+            />
+            {lastRunStatus === 'error' ? 'Last run failed' : 'Last run'} · {timeAgo(lastRunAt)}
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <button
