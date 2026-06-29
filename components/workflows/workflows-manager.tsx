@@ -2566,6 +2566,26 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-orange-100 dark:bg-orange-950/40',
     dot: 'text-orange-500 dark:text-orange-400',
   },
+  'post-close-30day-checkin': {
+    icon: Home,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'offer-accepted-celebration': {
+    icon: Sparkles,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'facebook-lead-funnel': {
+    icon: Target,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-600 dark:text-blue-400',
+  },
+  'end-of-month-pipeline-close': {
+    icon: TrendingUp,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-600 dark:text-violet-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {

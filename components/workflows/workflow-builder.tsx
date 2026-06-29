@@ -1990,6 +1990,29 @@ export function WorkflowBuilder({
 
           <StepConnector />
 
+          {/* Then section header — only when 2+ steps */}
+          {state.actions.length > 1 && (
+            <div className="flex items-center justify-between px-0.5 pb-0.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                Then — {state.actions.length} steps
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const allCollapsed = state.actions.every((a) => collapsedSteps.has(a.id));
+                  if (allCollapsed) {
+                    setCollapsedSteps(new Set());
+                  } else {
+                    setCollapsedSteps(new Set(state.actions.map((a) => a.id)));
+                  }
+                }}
+                className="text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
+              >
+                {state.actions.every((a) => collapsedSteps.has(a.id)) ? 'Expand all' : 'Collapse all'}
+              </button>
+            </div>
+          )}
+
           {/* Action cards — each step gets its own card; draggable to reorder. */}
           {state.actions.map((row, i) => (
             <div
@@ -2319,6 +2342,37 @@ function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
   );
 }
 
+// ── Schedule helpers ─────────────────────────────────────────────────────────
+
+function computeNextRun(cadence: 'hourly' | 'daily' | 'weekdays', hour: string): string {
+  const h = parseInt(hour || '9', 10);
+  const now = new Date();
+  if (cadence === 'hourly') {
+    const next = new Date(now);
+    next.setMinutes(0, 0, 0);
+    next.setHours(next.getHours() + 1);
+    const diffMin = Math.round((next.getTime() - now.getTime()) / 60000);
+    return diffMin <= 1 ? 'in about a minute' : `in ${diffMin} minutes`;
+  }
+  const candidate = new Date(now);
+  candidate.setHours(h, 0, 0, 0);
+  if (candidate <= now) candidate.setDate(candidate.getDate() + 1);
+  if (cadence === 'weekdays') {
+    while (candidate.getDay() === 0 || candidate.getDay() === 6) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+  }
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const timeStr = `${h12}:00 ${ampm}`;
+  const todayMid = new Date(now); todayMid.setHours(0, 0, 0, 0);
+  const candMid = new Date(candidate); candMid.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((candMid.getTime() - todayMid.getTime()) / 86400000);
+  if (dayDiff === 0) return `today at ${timeStr}`;
+  if (dayDiff === 1) return `tomorrow at ${timeStr}`;
+  return `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][candidate.getDay()]} at ${timeStr}`;
+}
+
 // ── Trigger config — per-type fields ─────────────────────────────────────────
 
 function TriggerConfig({
@@ -2425,6 +2479,12 @@ function TriggerConfig({
             />
           </FieldRow>
         )}
+        <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+          <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <span className="text-[12px] text-amber-700 dark:text-amber-300">
+            Next run: <span className="font-medium">{computeNextRun(t.cadence, t.hour || '9')}</span>
+          </span>
+        </div>
       </div>
     );
   }
@@ -3257,6 +3317,21 @@ function ActionConfig({
   }
 
   if (row.type === 'delay') {
+    const n = parseFloat(row.delayMinutes);
+    const unit = row.delayUnit ?? 'minutes';
+    const delayHint = row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
+      if (unit === 'minutes') {
+        if (n < 60) return `${n} minute${n === 1 ? '' : 's'}`;
+        const hrs = n / 60;
+        return `${hrs % 1 === 0 ? hrs : hrs.toFixed(1)} hour${hrs === 1 ? '' : 's'}`;
+      }
+      if (unit === 'hours') {
+        if (n < 24) return `${n} hour${n === 1 ? '' : 's'}`;
+        const days = n / 24;
+        return `${days % 1 === 0 ? days : days.toFixed(1)} day${days === 1 ? '' : 's'}`;
+      }
+      return `${n} day${n === 1 ? '' : 's'}`;
+    })() : null;
     return (
       <div className="space-y-2.5">
         <p className={CAPTION}>
@@ -3277,7 +3352,7 @@ function ActionConfig({
             className="h-8 w-20"
           />
           <MiniSelect
-            value={row.delayUnit ?? 'minutes'}
+            value={unit}
             onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
             options={[
               { value: 'minutes', label: 'minutes' },
@@ -3286,6 +3361,14 @@ function ActionConfig({
             ]}
           />
         </div>
+        {delayHint && (
+          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+              This step will pause for <span className="font-medium">{delayHint}</span>
+            </span>
+          </div>
+        )}
       </div>
     );
   }

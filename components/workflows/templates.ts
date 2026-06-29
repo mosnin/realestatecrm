@@ -1012,6 +1012,145 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'auto',
     },
   },
+
+  // ── Post-close lifecycle ───────────────────────────────────────────────────
+
+  {
+    id: 'post-close-30day-checkin',
+    name: 'Post-close 30-day anniversary check-in',
+    description: 'One month after closing, automatically draft a personal check-in to keep the relationship warm.',
+    category: 'Follow-up',
+    popular: true,
+    state: {
+      name: 'Post-close 30-day anniversary check-in',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'closed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'tag_add',
+          updateValue: 'past-client',
+        },
+        {
+          ...blankAction(),
+          type: 'delay',
+          delayMinutes: '43200',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'It has been 30 days since {{lead.name}} closed on their home. Draft a warm personal check-in asking how they are settling in, if everything is going smoothly, and whether they know anyone else who might be looking to buy or sell soon. Keep it short and genuinely warm — not salesy.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'offer-accepted-celebration',
+    name: 'Offer accepted → celebrate + close prep',
+    description: 'When an offer is accepted, push yourself an alert, congratulate the client, and create a closing checklist.',
+    category: 'Follow-up',
+    state: {
+      name: 'Offer accepted → celebrate + close prep',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'accepted' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: '🎉 Offer accepted — {{lead.name}}',
+          notifyBody: 'Time to celebrate and kick off the closing process.',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft an excited congratulations message to the client — their offer was just accepted! Acknowledge what a big moment this is, and let them know you will guide them through every step of the closing process.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Schedule inspection within 7 days',
+          dueInDays: '2',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Send closing timeline to client',
+          dueInDays: '1',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'facebook-lead-funnel',
+    name: 'Facebook lead → high-touch funnel',
+    description: 'When a Facebook Ads lead comes in, send a fast personal response and set aggressive follow-up tasks.',
+    category: 'New leads',
+    state: {
+      name: 'Facebook lead → high-touch funnel',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [condition('lead.source', 'eq', 'facebook')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: '📣 New Facebook lead: {{lead.name}}',
+          notifyBody: 'Respond within 5 minutes — Facebook leads go cold fast.',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a super-fast, personal welcome text to this Facebook lead. Mention you saw their inquiry just came through, you would love to help them find what they are looking for, and ask when they are free for a quick 5-minute call today. Speed is everything here.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Call {{lead.name}} within 5 minutes — Facebook lead',
+          dueInDays: '0',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'end-of-month-pipeline-close',
+    name: 'End of month → pipeline push',
+    description: 'On the last weekday of the month, Chippi drafts outreach to your most likely-to-close leads.',
+    category: 'Scheduling',
+    state: {
+      name: 'End of month → pipeline push',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '8' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'It is end of month. Review every active lead in the pipeline and identify who is closest to transacting — either scheduling a showing, writing an offer, or moving from discussion to commitment. For each top-5 lead, draft a personalized, low-pressure nudge that moves them one step forward. Focus on creating urgency without being pushy.',
+        },
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: '📊 End-of-month pipeline push ready',
+          notifyBody: 'Chippi has drafted outreach for your top leads — review before sending.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
 ];
 
 /**
