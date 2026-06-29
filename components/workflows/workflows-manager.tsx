@@ -52,6 +52,9 @@ import {
   Webhook,
   ArrowUpDown,
   Filter,
+  Download,
+  Upload,
+  RotateCcw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -254,6 +257,7 @@ export function WorkflowsManager() {
   const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun' | 'modified'>('created');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   /** Unique trigger types present in the current workflow list for the filter dropdown. */
   const triggerTypes = useMemo(() => {
@@ -337,6 +341,73 @@ export function WorkflowsManager() {
     setComposer('new');
     setActionError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function exportWorkflow(workflow: WorkflowRecord) {
+    const payload = {
+      name: workflow.name,
+      ...(workflow.description ? { description: workflow.description } : {}),
+      definition: {
+        trigger: workflow.trigger,
+        conditions: workflow.conditions,
+        actions: workflow.actions,
+        autonomy: workflow.autonomy,
+        ...(workflow.graph ? { graph: workflow.graph } : {}),
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function importWorkflowFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        name?: string;
+        description?: string;
+        definition?: {
+          trigger: WorkflowTrigger;
+          conditions: ConditionGroup;
+          actions: WorkflowAction[];
+          autonomy: WorkflowAutonomy;
+          graph?: WorkflowGraph | null;
+        };
+      };
+      if (!parsed.name || !parsed.definition) {
+        setActionError('Invalid workflow file — expected { name, definition }.');
+        return;
+      }
+      const fakeRecord: WorkflowRecord = {
+        id: '',
+        name: parsed.name,
+        description: parsed.description ?? null,
+        enabled: true,
+        trigger: parsed.definition.trigger,
+        conditions: parsed.definition.conditions ?? { op: 'and', rules: [] },
+        actions: parsed.definition.actions ?? [],
+        autonomy: parsed.definition.autonomy ?? 'supervised',
+        graph: parsed.definition.graph ?? null,
+        lastRunAt: null,
+        lastRunStatus: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const formState = recordToFormState(fakeRecord);
+      setComposerInitial({ ...formState, name: `${formState.name} (imported)` });
+      setEditingId(null);
+      setComposer('new');
+      setActionError('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      setActionError("Couldn't read the file — make sure it's a valid JSON workflow export.");
+    }
   }
 
   function closeComposer() {
@@ -615,6 +686,26 @@ export function WorkflowsManager() {
               Templates
             </Button>
             <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => importFileRef.current?.click()}
+              title="Import a workflow from a JSON file"
+            >
+              <Upload size={14} />
+              Import
+            </Button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void importWorkflowFile(file);
+                e.target.value = '';
+              }}
+            />
+            <Button
               size="sm"
               onClick={openBlank}
               className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
@@ -805,6 +896,7 @@ export function WorkflowsManager() {
                     onToggle={() => toggleWorkflow(workflow)}
                     onTest={() => testWorkflow(workflow.id)}
                     onDuplicate={() => duplicateWorkflow(workflow)}
+                    onExport={() => exportWorkflow(workflow)}
                     onDelete={() => deleteWorkflow(workflow.id)}
                     onRename={(name) => renameWorkflow(workflow.id, name)}
                   />
@@ -1019,6 +1111,7 @@ function WorkflowRow({
   onToggle,
   onTest,
   onDuplicate,
+  onExport,
   onDelete,
   onRename,
 }: {
@@ -1036,6 +1129,7 @@ function WorkflowRow({
   onToggle: () => void;
   onTest: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
 }) {
@@ -1269,6 +1363,12 @@ function WorkflowRow({
                 disabled={busy || testing}
               />
               <RowAction
+                icon={Download}
+                label="Export JSON"
+                onClick={onExport}
+                disabled={busy || testing}
+              />
+              <RowAction
                 icon={Pencil}
                 label="Edit"
                 onClick={onEdit}
@@ -1295,7 +1395,7 @@ function WorkflowRow({
 
           {/* Run history (audit trail) — what fired, when, and what each step did. */}
           {showHistory && (
-            <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} />
+            <RunHistoryPanel runs={runs} loading={runsLoading} error={runsError} workflowId={workflow.id} />
           )}
         </div>
       )}
@@ -1309,10 +1409,12 @@ function RunHistoryPanel({
   runs,
   loading,
   error,
+  workflowId,
 }: {
   runs: WorkflowRun[] | null;
   loading: boolean;
   error: boolean;
+  workflowId: string;
 }) {
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
@@ -1339,7 +1441,7 @@ function RunHistoryPanel({
       ) : (
         <ul className="space-y-1.5">
           {runs.map((run) => (
-            <RunHistoryItem key={run.id} run={run} />
+            <RunHistoryItem key={run.id} run={run} workflowId={workflowId} />
           ))}
         </ul>
       )}
@@ -1358,9 +1460,31 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   condition: 'Condition check',
 };
 
-function RunHistoryItem({ run }: { run: WorkflowRun }) {
+function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: string }) {
   const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const hasSteps = run.steps.length > 0;
+
+  async function retryRun(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const res = await fetch(`${API_BASE}/${workflowId}/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        toast.success('Re-run triggered', { description: 'Check the test panel above for results.' });
+      } else {
+        toast.error('Re-run failed — try again.');
+      }
+    } catch {
+      toast.error('Re-run failed — try again.');
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   const durationMs =
     run.finishedAt ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime() : null;
@@ -1371,77 +1495,97 @@ function RunHistoryItem({ run }: { run: WorkflowRun }) {
 
   return (
     <li className="overflow-hidden rounded-lg border border-border/50 bg-card/40">
-      {/* Run header row */}
-      <button
-        type="button"
-        onClick={() => hasSteps && setOpen((o) => !o)}
-        disabled={!hasSteps}
-        className={cn(
-          'flex w-full items-center gap-2.5 px-3 py-2.5 text-left',
-          hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
-          !hasSteps && 'cursor-default',
-        )}
-      >
-        {/* Status icon */}
-        <span
+      {/* Run header row — flex wrapper so the retry button can sit outside the toggle */}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => hasSteps && setOpen((o) => !o)}
+          disabled={!hasSteps}
           className={cn(
-            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
-            run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
-            run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
-            run.status === 'skipped' && 'bg-muted text-muted-foreground',
-            run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+            'flex flex-1 items-center gap-2.5 px-3 py-2.5 text-left',
+            hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
+            !hasSteps && 'cursor-default',
           )}
-          aria-hidden
         >
-          {run.status === 'completed' && <Check size={11} strokeWidth={2.5} />}
-          {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
-          {run.status === 'skipped' && <ArrowUpDown size={9} />}
-          {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className={cn(
-              'text-[12.5px] font-medium',
-              run.status === 'completed' && 'text-foreground',
-              run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
-              run.status === 'running' && 'text-amber-700 dark:text-amber-400',
-              run.status === 'skipped' && 'text-muted-foreground',
-            )}>
-              {run.status === 'completed' ? 'Completed' : run.status === 'failed' ? 'Failed' : run.status === 'running' ? 'Running' : 'Skipped'}
-            </span>
-            <span className="text-[11px] text-muted-foreground/60">
-              {timeAgo(run.startedAt)}
-            </span>
-            {durationLabel && (
-              <span className="text-[11px] tabular-nums text-muted-foreground/50">
-                · {durationLabel}
-              </span>
+          {/* Status icon */}
+          <span
+            className={cn(
+              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+              run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+              run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+              run.status === 'skipped' && 'bg-muted text-muted-foreground',
+              run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
             )}
-            {hasSteps && (
-              <span className="ml-auto text-[11px] text-muted-foreground/50">
-                {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+            aria-hidden
+          >
+            {run.status === 'completed' && <Check size={11} strokeWidth={2.5} />}
+            {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
+            {run.status === 'skipped' && <ArrowUpDown size={9} />}
+            {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className={cn(
+                'text-[12.5px] font-medium',
+                run.status === 'completed' && 'text-foreground',
+                run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                run.status === 'running' && 'text-amber-700 dark:text-amber-400',
+                run.status === 'skipped' && 'text-muted-foreground',
+              )}>
+                {run.status === 'completed' ? 'Completed' : run.status === 'failed' ? 'Failed' : run.status === 'running' ? 'Running' : 'Skipped'}
+              </span>
+              <span className="text-[11px] text-muted-foreground/60">
+                {timeAgo(run.startedAt)}
+              </span>
+              {durationLabel && (
+                <span className="text-[11px] tabular-nums text-muted-foreground/50">
+                  · {durationLabel}
+                </span>
+              )}
+              {hasSteps && (
+                <span className="ml-auto text-[11px] text-muted-foreground/50">
+                  {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </span>
+            {(run.error || run.summary) && (
+              <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
+                {run.error ?? run.summary}
               </span>
             )}
           </span>
-          {(run.error || run.summary) && (
-            <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
-              {run.error ?? run.summary}
-            </span>
-          )}
-        </span>
 
-        {hasSteps && (
-          <ChevronRight
-            size={13}
-            aria-hidden
-            className={cn(
-              'flex-shrink-0 text-muted-foreground/40 transition-transform',
-              open && 'rotate-90',
-            )}
-          />
+          {hasSteps && (
+            <ChevronRight
+              size={13}
+              aria-hidden
+              className={cn(
+                'flex-shrink-0 text-muted-foreground/40 transition-transform',
+                open && 'rotate-90',
+              )}
+            />
+          )}
+        </button>
+
+        {/* Retry button — only visible on failed runs */}
+        {run.status === 'failed' && (
+          <button
+            type="button"
+            onClick={retryRun}
+            disabled={retrying}
+            aria-label="Retry this run"
+            title="Re-run this workflow (test mode)"
+            className="flex flex-shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border/40 px-2.5 text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            {retrying
+              ? <Loader2 size={11} className="animate-spin" />
+              : <RotateCcw size={11} />
+            }
+            <span className="text-[9px] font-medium">Retry</span>
+          </button>
         )}
-      </button>
+      </div>
 
       {/* Step timeline */}
       {open && hasSteps && (
