@@ -1602,6 +1602,8 @@ export function WorkflowBuilder({
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');
+  /** Whether the name heading is in edit mode (input) vs display mode (heading). */
+  const [nameEditing, setNameEditing] = useState(() => !initial || !state.name.trim());
   /** Turns true after the user makes any edit — gates incomplete badges so a
    *  blank form doesn't open covered in warnings. */
   const [dirty, setDirty] = useState(false);
@@ -1836,80 +1838,95 @@ export function WorkflowBuilder({
 
   return (
     <div className="space-y-4">
+      {/* Zapier-style inline-editable workflow name heading */}
+      <div className="space-y-1.5">
+        {nameEditing ? (
+          <input
+            autoFocus
+            value={state.name}
+            onChange={(e) => { patch({ name: e.target.value }); if (nameError) setNameError(''); }}
+            onBlur={() => { if (state.name.trim()) setNameEditing(false); }}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === 'Escape') && state.name.trim()) {
+                setNameEditing(false);
+                e.preventDefault();
+              }
+            }}
+            placeholder="Name your workflow…"
+            maxLength={120}
+            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-orange-400 pb-0.5 placeholder:text-muted-foreground/40 caret-orange-500"
+            aria-label="Workflow name"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNameEditing(true)}
+            className="group flex items-center gap-2 text-left w-full"
+            aria-label={`Edit workflow name: ${state.name}`}
+          >
+            <span className="text-xl font-semibold text-foreground">{state.name}</span>
+            <PencilLine size={14} className="flex-shrink-0 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+          </button>
+        )}
+        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+        <Textarea
+          value={state.description ?? ''}
+          onChange={(e) => patch({ description: e.target.value || undefined })}
+          placeholder="Add a description… (optional)"
+          rows={1}
+          maxLength={300}
+          className="resize-none text-[12.5px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground"
+        />
+      </div>
+
       {/* Live preview */}
       <WorkflowPreview state={state} />
 
-      {/* Name + Mode — side by side */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[180px] flex-1 space-y-1.5">
-          <Label htmlFor="wf-name" className="text-[12.5px] font-medium text-foreground">
-            Name
-          </Label>
-          <Input
-            id="wf-name"
-            value={state.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder="Hot lead → instant draft"
-            maxLength={120}
-            autoFocus
-          />
-          {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-        </div>
-        <div className="w-full basis-full">
-          <Textarea
-            value={state.description ?? ''}
-            onChange={(e) => patch({ description: e.target.value || undefined })}
-            placeholder="Add a description… (optional — shown on the workflow list)"
-            rows={1}
-            maxLength={300}
-            className="resize-none text-[12.5px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground"
-          />
-        </div>
-        <div className="flex-shrink-0 space-y-1.5">
-          <div
-            className="inline-flex rounded-md border border-border/60 p-0.5"
-            role="group"
-            aria-label="Builder mode"
+      {/* Mode toggle — Simple vs Advanced */}
+      <div className="flex items-center gap-3">
+        <div
+          className="inline-flex rounded-md border border-border/60 p-0.5"
+          role="group"
+          aria-label="Builder mode"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'simple') return;
+              if (graphIsLinear) exitAdvanced();
+            }}
+            aria-pressed={mode === 'simple'}
+            disabled={mode === 'advanced' && !graphIsLinear}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'simple'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+              mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+            )}
           >
-            <button
-              type="button"
-              onClick={() => {
-                if (mode === 'simple') return;
-                if (graphIsLinear) exitAdvanced();
-              }}
-              aria-pressed={mode === 'simple'}
-              disabled={mode === 'advanced' && !graphIsLinear}
-              className={cn(
-                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-                mode === 'simple'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-                mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
-              )}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (mode === 'advanced') return;
-                enterAdvanced();
-              }}
-              aria-pressed={mode === 'advanced'}
-              className={cn(
-                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-                mode === 'advanced'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              Advanced
-            </button>
-          </div>
-          {mode === 'advanced' && !graphIsLinear && (
-            <p className={CAPTION}>This automation branches — edit on the canvas.</p>
-          )}
+            Simple
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'advanced') return;
+              enterAdvanced();
+            }}
+            aria-pressed={mode === 'advanced'}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'advanced'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Advanced
+          </button>
         </div>
+        {mode === 'advanced' && !graphIsLinear && (
+          <p className={CAPTION}>This automation branches — edit on the canvas.</p>
+        )}
       </div>
 
       {/* 1. Trigger step card */}
