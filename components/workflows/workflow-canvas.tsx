@@ -1007,7 +1007,7 @@ function Inspector({
 
           {node.data.kind === 'trigger' && (
             <p className={cn(CAPTION, 'leading-relaxed')}>
-              This is where it starts. The trigger's settings live on the workflow
+              This is where it starts. The trigger&apos;s settings live on the workflow
               itself — this node just anchors the graph.
             </p>
           )}

@@ -721,7 +721,7 @@ export function WorkflowsManager() {
   if (loadError) {
     return (
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">Couldn't load your workflows.</p>
+        <p className="text-sm text-foreground">Couldn&apos;t load your workflows.</p>
         <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
       </div>
     );
@@ -1660,7 +1660,7 @@ function RunHistoryPanel({
           Loading runs…
         </div>
       ) : error ? (
-        <p className={CAPTION}>Couldn't load the run history — try again in a moment.</p>
+        <p className={CAPTION}>Couldn&apos;t load the run history — try again in a moment.</p>
       ) : !runs || runs.length === 0 ? (
         <div className="flex flex-col items-center py-4 text-center">
           <History size={22} className="mb-1.5 text-muted-foreground/30" />
@@ -2759,7 +2759,7 @@ function TemplateGallery({
           </motion.ul>
 
           <div className="flex items-center justify-center gap-3 pt-2 border-t border-border/40">
-            <span className={CAPTION}>Don't see what you need?</span>
+            <span className={CAPTION}>Don&apos;t see what you need?</span>
             <button
               type="button"
               onClick={onScratch}

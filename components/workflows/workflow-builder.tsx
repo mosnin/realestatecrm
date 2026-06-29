@@ -618,7 +618,7 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
               <span className="text-foreground">{summary.conditions}</span>
             </>
           )}
-          <span className="text-muted-foreground/80">, I'll </span>
+          <span className="text-muted-foreground/80">{", I'll "}</span>
           <span className="font-medium text-foreground">{summary.then}</span>
           <span className="text-muted-foreground/80">.</span>
         </p>
@@ -1171,7 +1171,7 @@ function AddStepPicker({
       <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
         {filtered.length === 0 ? (
           <p className="col-span-2 py-4 text-center text-[12px] text-muted-foreground">
-            No actions match "{query}"
+            No actions match &quot;{query}&quot;
           </p>
         ) : (
           filtered.map((type) => {
@@ -3207,7 +3207,7 @@ function UpdateLeadActionConfig({
   const fieldOpt = UPDATE_LEAD_FIELD_OPTIONS.find((o) => o.value === row.updateField);
   return (
     <div className="space-y-3">
-      <p className={CAPTION}>Write a field back to this lead's contact record in the CRM.</p>
+      <p className={CAPTION}>Write a field back to this lead&apos;s contact record in the CRM.</p>
       <FieldRow label="Field to update" htmlFor={`act-uf-${row.id}`}>
         <Select
           value={row.updateField}
