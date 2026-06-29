@@ -415,6 +415,151 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       graph: hotVsWarmGraph(),
     },
   },
+  {
+    id: 'first-contact-drip',
+    name: 'New lead → 3-step nurture sequence',
+    description: 'Greet, follow up in 2 days, then send a listing pick at day 5.',
+    category: 'New leads',
+    popular: true,
+    state: {
+      name: 'New lead → 3-step nurture sequence',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a short, warm welcome text to this brand-new lead. Mention you saw their inquiry, offer to help, and invite them to reply with what they are looking for.',
+        },
+        {
+          ...blankAction(),
+          type: 'delay',
+          delayMinutes: '2880',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Two days have passed since first contact. Draft a gentle check-in asking if they had a chance to browse listings and if they have any questions.',
+        },
+        {
+          ...blankAction(),
+          type: 'delay',
+          delayMinutes: '4320',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Five days in. Find 2–3 listings that match what this lead said they are looking for and draft a brief, personalised message sharing those picks with a note on why each one fits their criteria.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'price-drop-alert',
+    name: 'Price drop webhook → notify lead',
+    description: 'When your MLS fires a price-drop webhook, draft a personalised alert to the right lead.',
+    category: 'Integrations',
+    state: {
+      name: 'Price drop webhook → notify lead',
+      trigger: { ...baseTrigger(), type: 'webhook' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'A price-drop webhook just arrived with the property details and lead id in the payload. Draft a concise, excited message to the matched lead saying the property they are interested in just dropped in price, and ask if they would like to schedule a tour.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Call lead about price drop',
+          dueInDays: '1',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'high-intent-call-reminder',
+    name: 'Hot lead score → call reminder',
+    description: 'When a lead hits score 80, create an urgent call task and draft a text while you dial.',
+    category: 'New leads',
+    state: {
+      name: 'Hot lead score → call reminder',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '80')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Call {{lead.name}} — hot lead!',
+          dueInDays: '0',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a short, friendly text to send while you try to reach this hot lead by phone. Mention you noticed they are very interested and would love to help — keep it under 3 sentences.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'saturday-open-house-prep',
+    name: 'Weekly Saturday → open-house prep',
+    description: 'Every Saturday morning, Chippi drafts briefing notes for your upcoming open houses.',
+    category: 'Scheduling',
+    state: {
+      name: 'Weekly Saturday → open-house prep',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '7' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'It is Saturday morning. Review any open houses scheduled for today and this weekend. For each one, draft a short briefing: key features of the property, talking points to highlight, and a list of leads who have shown interest in similar homes to personally invite.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'monthly-market-update',
+    name: 'Monthly market update to database',
+    description: 'On the first weekday of the month, draft a market update email for your entire contact list.',
+    category: 'Scheduling',
+    state: {
+      name: 'Monthly market update to database',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '9' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Draft a concise, professional monthly market update email for a real estate database. Include: 3 key market trends for this month, a brief observation on buyer vs seller conditions in Austin TX, and a soft call-to-action to book a call to discuss their situation. Keep it under 250 words and make it sound like it comes from a trusted local expert.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
 ];
 
 /**

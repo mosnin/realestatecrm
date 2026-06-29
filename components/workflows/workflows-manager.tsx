@@ -1569,6 +1569,31 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-blue-100 dark:bg-blue-950/40',
     dot: 'text-blue-600 dark:text-blue-400',
   },
+  'first-contact-drip': {
+    icon: ArrowRight,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'price-drop-alert': {
+    icon: TrendingUp,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'high-intent-call-reminder': {
+    icon: Zap,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'saturday-open-house-prep': {
+    icon: Home,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-500 dark:text-violet-400',
+  },
+  'monthly-market-update': {
+    icon: Mail,
+    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
+    dot: 'text-indigo-500 dark:text-indigo-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {
