@@ -84,6 +84,12 @@ function blankAction(): WorkflowFormState['actions'][number] {
     filterField: '',
     filterOperator: 'eq',
     filterValue: '',
+    formatterInput: '',
+    formatterOperation: 'uppercase',
+    formatterFind: '',
+    formatterReplace: '',
+    formatterFormat: 'MM/DD/YYYY',
+    formatterToFixed: '',
   };
 }
 

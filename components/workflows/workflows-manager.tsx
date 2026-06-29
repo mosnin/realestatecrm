@@ -55,6 +55,7 @@ import {
   Download,
   Upload,
   RotateCcw,
+  Wand2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -235,6 +236,12 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       filterOperator: a.type === 'filter' ? a.config.operator : 'eq' as const,
       filterValue:
         a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
+      formatterInput: a.type === 'formatter' ? a.config.input : '',
+      formatterOperation: a.type === 'formatter' ? a.config.operation : 'uppercase' as const,
+      formatterFind: a.type === 'formatter' ? (a.config.find ?? '') : '',
+      formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
+      formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
+      formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow
@@ -1176,6 +1183,7 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
   filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
 };
 
 /**
@@ -1650,6 +1658,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   create_task: 'Create task',
   call_integration: 'Call integration',
   run_chippi: 'Run Chippi',
+  formatter: 'Format data',
   delay: 'Delay',
   filter: 'Filter',
   condition: 'Condition check',
@@ -2697,6 +2706,12 @@ function AIWorkflowGenerator({
           filterField: typeof a.filterField === 'string' ? a.filterField : '',
           filterOperator: (typeof a.filterOperator === 'string' ? a.filterOperator : 'eq') as WorkflowFormState['actions'][number]['filterOperator'],
           filterValue: typeof a.filterValue === 'string' ? a.filterValue : '',
+          formatterInput: typeof a.input === 'string' ? a.input : '',
+          formatterOperation: (typeof a.operation === 'string' ? a.operation : 'uppercase') as WorkflowFormState['actions'][number]['formatterOperation'],
+          formatterFind: typeof a.find === 'string' ? a.find : '',
+          formatterReplace: typeof a.replacement === 'string' ? a.replacement : '',
+          formatterFormat: typeof a.format === 'string' ? a.format : 'MM/DD/YYYY',
+          formatterToFixed: typeof a.toFixed === 'string' ? a.toFixed : typeof a.toFixed === 'number' ? String(a.toFixed) : '',
         })),
         autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
           ? (raw.autonomy as WorkflowAutonomy)

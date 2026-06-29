@@ -22,7 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
-import { evaluateConditions } from './conditions';
+import { evaluateConditions, resolveField } from './conditions';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 
 /**
@@ -370,6 +370,97 @@ function runFilter(
 }
 
 /**
+ * Simple date formatter. Supports common patterns used in real estate: US date,
+ * ISO date, long-form, and relative. Falls back to locale default for unknowns.
+ */
+function formatDateValue(date: Date, format: string): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  switch (format) {
+    case 'MM/DD/YYYY': return `${m}/${d}/${y}`;
+    case 'DD/MM/YYYY': return `${d}/${m}/${y}`;
+    case 'YYYY-MM-DD': return `${y}-${m}-${d}`;
+    case 'Month D, YYYY': return `${monthNames[date.getMonth()]} ${date.getDate()}, ${y}`;
+    case 'Mon D, YYYY': return `${monthNames[date.getMonth()].slice(0, 3)} ${date.getDate()}, ${y}`;
+    case 'relative': {
+      const diffMs = Date.now() - date.getTime();
+      const diffDays = Math.round(diffMs / 86400000);
+      if (Math.abs(diffDays) === 0) return 'today';
+      if (diffDays === 1) return 'yesterday';
+      if (diffDays === -1) return 'tomorrow';
+      if (diffDays > 0) return `${diffDays} days ago`;
+      return `in ${Math.abs(diffDays)} days`;
+    }
+    default: return date.toLocaleDateString();
+  }
+}
+
+/**
+ * formatter — transform a context value (text/number/date) and store the result
+ * in context.formatter.output so subsequent steps can reference it. Always
+ * returns 'ok' — a failed parse returns the original value rather than halting.
+ */
+function runFormatter(
+  action: Extract<WorkflowAction, { type: 'formatter' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { input, operation, find, replacement, format, toFixed } = action.config;
+  const resolved = resolveField(context as Record<string, unknown>, input);
+  const strValue = String(resolved !== undefined && resolved !== null ? resolved : input);
+
+  let output: unknown = strValue;
+  switch (operation) {
+    case 'uppercase': output = strValue.toUpperCase(); break;
+    case 'lowercase': output = strValue.toLowerCase(); break;
+    case 'capitalize': output = strValue.charAt(0).toUpperCase() + strValue.slice(1).toLowerCase(); break;
+    case 'trim': output = strValue.trim(); break;
+    case 'replace': {
+      const needle = find ?? '';
+      if (!needle) { output = strValue; break; }
+      const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      output = strValue.replace(new RegExp(escaped, 'g'), replacement ?? '');
+      break;
+    }
+    case 'number_format': {
+      const num = parseFloat(strValue);
+      if (Number.isNaN(num)) { output = strValue; break; }
+      output = toFixed !== undefined ? num.toFixed(toFixed) : num.toLocaleString();
+      break;
+    }
+    case 'date_format': {
+      const date = new Date(strValue);
+      if (Number.isNaN(date.getTime())) { output = strValue; break; }
+      output = format ? formatDateValue(date, format) : date.toLocaleDateString();
+      break;
+    }
+    case 'extract_number': {
+      const m = strValue.match(/-?\d+(?:\.\d+)?/);
+      output = m ? m[0] : '';
+      break;
+    }
+    case 'extract_email': {
+      const m = strValue.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+      output = m ? m[0] : '';
+      break;
+    }
+    case 'extract_phone': {
+      const m = strValue.match(/[+]?[(]?\d{3}[)]?[-\s.]?\d{3}[-\s.]\d{4,6}/);
+      output = m ? m[0] : '';
+      break;
+    }
+    default: output = strValue;
+  }
+
+  // Stash result in context so later steps can read 'formatter.output'.
+  (context as Record<string, unknown>).formatter = { output, input, operation };
+
+  return { status: 'ok', detail: { input, operation, output, inputResolved: resolved } };
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -394,6 +485,8 @@ export async function executeAction(
         return runDelay(action);
       case 'filter':
         return runFilter(action, context);
+      case 'formatter':
+        return runFormatter(action, context);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

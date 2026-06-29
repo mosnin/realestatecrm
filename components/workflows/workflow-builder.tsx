@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,11 +37,13 @@ import {
 import { cn } from '@/lib/utils';
 import { CAPTION, SECTION_LABEL, PRIMARY_PILL } from '@/lib/typography';
 import {
+  FORMATTER_OPERATIONS,
   MAX_ACTIONS,
   OPERATORS,
   parseWorkflowDefinition,
   WorkflowDefinitionError,
   type ConditionGroup,
+  type FormatterOperation,
   type Operator,
   type TriggerType,
   type WorkflowAction,
@@ -197,6 +199,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   run_chippi: 'Ask Chippi to do something',
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
+  formatter: 'Format data',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -205,6 +208,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'create_task',
   'schedule_message',
   'filter',
+  'formatter',
   'delay',
   'call_integration',
 ];
@@ -217,6 +221,7 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   run_chippi: Sparkles,
   delay: Clock,
   filter: Filter,
+  formatter: Wand2,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -227,7 +232,30 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   run_chippi: 'Ask Chippi to research, summarize, or reason',
   delay: 'Pause the workflow before the next step',
   filter: 'Stop the run if a condition is not met',
+  formatter: 'Transform text, numbers, or dates before the next step',
 };
+
+const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
+  uppercase: 'Uppercase',
+  lowercase: 'Lowercase',
+  capitalize: 'Capitalize',
+  trim: 'Trim whitespace',
+  replace: 'Find & replace',
+  number_format: 'Format number',
+  date_format: 'Format date',
+  extract_number: 'Extract number',
+  extract_email: 'Extract email',
+  extract_phone: 'Extract phone',
+};
+
+const DATE_FORMAT_OPTIONS = [
+  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (e.g. 06/28/2025)' },
+  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (e.g. 28/06/2025)' },
+  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO, e.g. 2025-06-28)' },
+  { value: 'Month D, YYYY', label: 'Month D, YYYY (e.g. June 28, 2025)' },
+  { value: 'Mon D, YYYY', label: 'Mon D, YYYY (e.g. Jun 28, 2025)' },
+  { value: 'relative', label: 'Relative (e.g. 3 days ago)' },
+];
 
 const AUTONOMY_OPTIONS: { value: WorkflowAutonomy; label: string }[] = [
   { value: 'draft', label: 'Draft only — I approve' },
@@ -420,6 +448,12 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     filterField: '',
     filterOperator: 'eq',
     filterValue: '',
+    formatterInput: '',
+    formatterOperation: 'uppercase',
+    formatterFind: '',
+    formatterReplace: '',
+    formatterFormat: 'MM/DD/YYYY',
+    formatterToFixed: '',
   };
 }
 
@@ -494,6 +528,12 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       filterOperator: a.type === 'filter' ? a.config.operator : 'eq',
       filterValue:
         a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
+      formatterInput: a.type === 'formatter' ? a.config.input : '',
+      formatterOperation: a.type === 'formatter' ? a.config.operation : 'uppercase',
+      formatterFind: a.type === 'formatter' ? (a.config.find ?? '') : '',
+      formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
+      formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
+      formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
     };
   });
 }
@@ -744,12 +784,16 @@ function actionSummary(row: ActionRowState): string {
         : 'No filter set';
     case 'call_integration':
       return [row.toolkit, row.action].filter(Boolean).join(' / ') || 'No app selected';
+    case 'formatter':
+      return row.formatterInput
+        ? `${FORMATTER_OPERATION_LABELS[row.formatterOperation]}: ${row.formatterInput}`
+        : 'No input set';
     default:
       return '';
   }
 }
 
-/** Per-action-type accent colors: delay = amber, filter = sky, else violet. */
+/** Per-action-type accent colors: delay = amber, filter = sky, formatter = teal, else violet. */
 function actionAccent(type: WorkflowActionType) {
   if (type === 'delay') {
     return {
@@ -763,6 +807,13 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-sky-400 dark:border-l-sky-500/70',
       badge: 'bg-sky-500',
       icon: 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400',
+    };
+  }
+  if (type === 'formatter') {
+    return {
+      border: 'border-l-teal-400 dark:border-l-teal-500/70',
+      badge: 'bg-teal-500',
+      icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
     };
   }
   return {
@@ -1412,6 +1463,7 @@ export function WorkflowBuilder({
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
     if (row.type === 'delay') return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
     if (row.type === 'filter') return !row.filterField.trim();
+    if (row.type === 'formatter') return !row.formatterInput.trim();
     return false;
   }
 
@@ -2378,6 +2430,93 @@ function ConditionRowEditor({
   );
 }
 
+function FormatterActionConfig({
+  row,
+  onChange,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+}) {
+  const op = row.formatterOperation;
+  const needsReplace = op === 'replace';
+  const needsFormat = op === 'date_format';
+  const needsToFixed = op === 'number_format';
+
+  return (
+    <div className="space-y-2.5">
+      <p className={CAPTION}>
+        Transform a value and make it available as <code className="rounded bg-muted px-1 py-px text-[10px]">formatter.output</code> for the next step.
+      </p>
+      <FieldRow label="Input (field path or literal)" htmlFor={`fmt-input-${row.id}`}>
+        <Input
+          id={`fmt-input-${row.id}`}
+          value={row.formatterInput}
+          onChange={(e) => onChange({ formatterInput: e.target.value })}
+          placeholder="lead.name  or  Austin TX"
+          className="h-8"
+        />
+      </FieldRow>
+      <FieldRow label="Operation" htmlFor={`fmt-op-${row.id}`}>
+        <MiniSelect
+          id={`fmt-op-${row.id}`}
+          value={op}
+          onValueChange={(v) => onChange({ formatterOperation: v as FormatterOperation })}
+          className="w-[14rem]"
+          options={FORMATTER_OPERATIONS.map((o) => ({ value: o, label: FORMATTER_OPERATION_LABELS[o] }))}
+        />
+      </FieldRow>
+      {needsReplace && (
+        <>
+          <FieldRow label="Find" htmlFor={`fmt-find-${row.id}`}>
+            <Input
+              id={`fmt-find-${row.id}`}
+              value={row.formatterFind}
+              onChange={(e) => onChange({ formatterFind: e.target.value })}
+              placeholder="Austin"
+              className="h-8"
+            />
+          </FieldRow>
+          <FieldRow label="Replace with" htmlFor={`fmt-repl-${row.id}`}>
+            <Input
+              id={`fmt-repl-${row.id}`}
+              value={row.formatterReplace}
+              onChange={(e) => onChange({ formatterReplace: e.target.value })}
+              placeholder="(leave blank to delete)"
+              className="h-8"
+            />
+          </FieldRow>
+        </>
+      )}
+      {needsFormat && (
+        <FieldRow label="Date format" htmlFor={`fmt-fmt-${row.id}`}>
+          <MiniSelect
+            id={`fmt-fmt-${row.id}`}
+            value={row.formatterFormat || 'MM/DD/YYYY'}
+            onValueChange={(v) => onChange({ formatterFormat: v })}
+            className="w-[16rem]"
+            options={DATE_FORMAT_OPTIONS}
+          />
+        </FieldRow>
+      )}
+      {needsToFixed && (
+        <FieldRow label="Decimal places (optional)" htmlFor={`fmt-fixed-${row.id}`}>
+          <Input
+            id={`fmt-fixed-${row.id}`}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={20}
+            value={row.formatterToFixed}
+            onChange={(e) => onChange({ formatterToFixed: e.target.value })}
+            placeholder="2"
+            className="h-8 w-24"
+          />
+        </FieldRow>
+      )}
+    </div>
+  );
+}
+
 function FilterActionConfig({
   row,
   onChange,
@@ -2604,6 +2743,10 @@ function ActionConfig({
 
   if (row.type === 'filter') {
     return <FilterActionConfig row={row} onChange={onChange} triggerType={triggerType} />;
+  }
+
+  if (row.type === 'formatter') {
+    return <FormatterActionConfig row={row} onChange={onChange} />;
   }
 
   // call_integration — app + action lead; show connected apps picker when apps

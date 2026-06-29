@@ -66,6 +66,8 @@ function actionPhrase(action: WorkflowAction): string {
     }
     case 'filter':
       return `check a filter condition (${action.config.field} ${action.config.operator})`;
+    case 'formatter':
+      return `${action.config.operation.replace(/_/g, ' ')} "${action.config.input}"`;
     default:
       return 'run an action';
   }

@@ -169,6 +169,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   run_chippi: 'Ask Chippi to do something',
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
+  formatter: 'Format data',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -177,6 +178,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'create_task',
   'schedule_message',
   'filter',
+  'formatter',
   'delay',
   'call_integration',
 ];

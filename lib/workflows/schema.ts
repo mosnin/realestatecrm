@@ -187,7 +187,33 @@ export type WorkflowActionType =
   | 'call_integration'
   | 'run_chippi'
   | 'delay'
-  | 'filter';
+  | 'filter'
+  | 'formatter';
+
+export type FormatterOperation =
+  | 'uppercase'
+  | 'lowercase'
+  | 'capitalize'
+  | 'trim'
+  | 'replace'
+  | 'number_format'
+  | 'date_format'
+  | 'extract_number'
+  | 'extract_email'
+  | 'extract_phone';
+
+export const FORMATTER_OPERATIONS = [
+  'uppercase',
+  'lowercase',
+  'capitalize',
+  'trim',
+  'replace',
+  'number_format',
+  'date_format',
+  'extract_number',
+  'extract_email',
+  'extract_phone',
+] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
 const instructionField = z.string().trim().min(1).max(LONG_TEXT);
@@ -278,6 +304,23 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
         field: z.string().trim().min(1).max(SHORT_TEXT),
         operator: operatorSchema,
         value: z.unknown().optional(),
+      })
+      .strict(),
+  }),
+  // formatter: transform a value (text/number/date) before the next step uses it.
+  z.object({
+    type: z.literal('formatter'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        input: z.string().trim().min(1).max(SHORT_TEXT),
+        operation: z.enum(FORMATTER_OPERATIONS),
+        find: z.string().max(200).optional(),
+        replacement: z.string().max(200).optional(),
+        format: z.string().max(100).optional(),
+        toFixed: z.number().int().min(0).max(20).optional(),
       })
       .strict(),
   }),

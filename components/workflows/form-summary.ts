@@ -125,6 +125,11 @@ function actionPhrase(a: ActionRowState): string {
       const f = a.filterField.trim();
       return f ? `filter on ${f}` : 'check a filter condition';
     }
+    case 'formatter': {
+      const input = a.formatterInput.trim();
+      const op = a.formatterOperation.replace(/_/g, ' ');
+      return input ? `${op} ${input}` : 'format a value';
+    }
     default:
       return 'take an action';
   }

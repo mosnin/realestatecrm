@@ -44,6 +44,7 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - run_chippi: run an AI agent with instructions (config: { instruction: string })
 - delay: wait before the next step (config: { delayMinutes: number })
 - filter: stop workflow if condition not met (config: { field: string, operator: "eq"|"neq"|"gt"|"gte"|"lt"|"lte"|"exists"|"not_exists", value?: string|number })
+- formatter: transform a value — text/number/date (config: { input: string (field path like "lead.name" or literal), operation: "uppercase"|"lowercase"|"capitalize"|"trim"|"replace"|"number_format"|"date_format"|"extract_number"|"extract_email"|"extract_phone", find?: string, replacement?: string, format?: "MM/DD/YYYY"|"YYYY-MM-DD"|"Month D, YYYY"|"relative", toFixed?: number })
 - call_integration: call a connected app (config: { toolkit: string, action: string })
 
 AUTONOMY (how much AI acts without human review):
@@ -74,7 +75,10 @@ Return ONLY a JSON object with these exact fields:
       "title": "<task title, for create_task>",
       "dueInDays": "<number as string, for create_task>",
       "toolkit": "<app name, for call_integration>",
-      "action": "<action slug, for call_integration>"
+      "action": "<action slug, for call_integration>",
+      "input": "<field path or literal, for formatter>",
+      "operation": "<formatter operation, for formatter>",
+      "format": "<date format string, for formatter date_format>"
     }
   ],
   "autonomy": "draft"

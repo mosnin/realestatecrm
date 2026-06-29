@@ -32,6 +32,7 @@
 import type {
   ConditionGroup,
   ConditionRule,
+  FormatterOperation,
   Operator,
   TriggerType,
   WorkflowAction,
@@ -100,6 +101,18 @@ export interface ActionRowState {
   filterOperator: Operator;
   /** filter: comparison value (string; coerced on build). */
   filterValue: string;
+  /** formatter: dotted path or literal value to transform (e.g. 'lead.name'). */
+  formatterInput: string;
+  /** formatter: the transform to apply. */
+  formatterOperation: FormatterOperation;
+  /** formatter: search string for 'replace'. */
+  formatterFind: string;
+  /** formatter: replacement string for 'replace'. */
+  formatterReplace: string;
+  /** formatter: date format string for 'date_format' (e.g. 'MM/DD/YYYY'). */
+  formatterFormat: string;
+  /** formatter: decimal places for 'number_format' (as string off a number input). */
+  formatterToFixed: string;
 }
 
 export interface WorkflowFormState {
@@ -296,6 +309,33 @@ function buildAction(row: ActionRowState): WorkflowAction {
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },
+      };
+    }
+    case 'formatter': {
+      const op = row.formatterOperation;
+      type FormatterConfig = {
+        input: string;
+        operation: FormatterOperation;
+        find?: string;
+        replacement?: string;
+        format?: string;
+        toFixed?: number;
+      };
+      const cfg: FormatterConfig = { input: row.formatterInput.trim(), operation: op };
+      if (op === 'replace') {
+        if (row.formatterFind) cfg.find = row.formatterFind;
+        cfg.replacement = row.formatterReplace;
+      }
+      if (op === 'date_format' && row.formatterFormat.trim()) cfg.format = row.formatterFormat.trim();
+      if (op === 'number_format' && row.formatterToFixed.trim() !== '') {
+        cfg.toFixed = toNumber(row.formatterToFixed);
+      }
+      return {
+        type: 'formatter',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: cfg,
       };
     }
     default: {
