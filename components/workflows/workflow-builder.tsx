@@ -376,6 +376,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       id: nextRowId('act'),
       type: a.type,
       label: a.label,
+      note: a.note,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
       instruction:
@@ -779,6 +780,62 @@ function TokenPicker({
 }
 
 /**
+ * Private notes field for an action step (Zapier-style "Note on this step").
+ * Collapsed by default; expands inline below the config body when clicked.
+ */
+function StepNotes({
+  note,
+  onChange,
+  rowId,
+}: {
+  note: string;
+  onChange: (note: string) => void;
+  rowId: string;
+}) {
+  const [open, setOpen] = useState(!!note);
+  return (
+    <div className="border-t border-border/30 pt-2">
+      {open ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label htmlFor={`step-note-${rowId}`} className="text-[11px] text-muted-foreground/70">
+              Step note (private)
+            </Label>
+            {!note && (
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                Hide
+              </button>
+            )}
+          </div>
+          <Textarea
+            id={`step-note-${rowId}`}
+            value={note}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Add a private note — why this step exists, edge cases to watch, etc."
+            maxLength={500}
+            rows={2}
+            className="text-[12px]"
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+        >
+          <Plus size={11} aria-hidden />
+          Add note
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * One action step card. The action type selector lives in the card header so
  * the realtor sees at a glance what each step does — identical to how Zapier
  * shows each action as its own titled card.
@@ -920,8 +977,9 @@ function ActionZapCard({
         {canRemove && <RemoveButton label="Remove action" onClick={onRemove} />}
       </div>
       {!collapsed && (
-        <div className="px-4 py-4">
+        <div className="px-4 py-4 space-y-3">
           <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} triggerType={triggerType} />
+          <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
         </div>
       )}
     </div>

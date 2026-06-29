@@ -74,6 +74,8 @@ export interface ActionRowState {
   type: WorkflowActionType;
   /** Optional custom step name shown in the card header (Zapier-style). */
   label?: string;
+  /** Optional private note for internal documentation — not executed or sent. */
+  note?: string;
   /** draft_message / schedule_message. */
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
@@ -214,17 +216,20 @@ function coerceConditionValue(raw: string): unknown {
 /** Map one action row to a WorkflowAction by its type's config shape. */
 function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
+  const note = row.note?.trim() || undefined;
   switch (row.type) {
     case 'draft_message':
       return {
         type: 'draft_message',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message':
       return {
         type: 'schedule_message',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
@@ -235,6 +240,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       return {
         type: 'create_task',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config:
           row.dueInDays.trim() === ''
             ? { title: row.title.trim() }
@@ -244,6 +250,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       return {
         type: 'call_integration',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: {
           toolkit: row.toolkit.trim(),
           action: row.action.trim(),
@@ -254,6 +261,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       return {
         type: 'run_chippi',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
@@ -261,6 +269,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       return {
         type: 'delay',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: { delayMinutes: toNumber(row.delayMinutes) * multiplier },
       };
     }
@@ -269,6 +278,7 @@ function buildAction(row: ActionRowState): WorkflowAction {
       return {
         type: 'filter',
         ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },

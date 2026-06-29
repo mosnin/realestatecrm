@@ -194,11 +194,14 @@ const instructionField = z.string().trim().min(1).max(LONG_TEXT);
 
 /** Optional step label — a custom name the realtor gives a step (like Zapier's "Step name"). */
 const stepLabel = z.string().trim().max(100).optional();
+/** Optional private note on a step — for internal documentation, not sent anywhere. */
+const stepNote = z.string().trim().max(500).optional();
 
 export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
     label: stepLabel,
+    note: stepNote,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
@@ -206,6 +209,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('schedule_message'),
     label: stepLabel,
+    note: stepNote,
     config: z
       .object({
         channel: channelSchema,
@@ -217,6 +221,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('create_task'),
     label: stepLabel,
+    note: stepNote,
     config: z
       .object({
         title: shortText,
@@ -227,6 +232,7 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('call_integration'),
     label: stepLabel,
+    note: stepNote,
     config: z
       .object({
         toolkit: shortText,
@@ -238,18 +244,21 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('run_chippi'),
     label: stepLabel,
+    note: stepNote,
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
   z.object({
     type: z.literal('delay'),
     label: stepLabel,
+    note: stepNote,
     config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
   }),
   // filter: stop the run if the field condition is not met.
   z.object({
     type: z.literal('filter'),
     label: stepLabel,
+    note: stepNote,
     config: z
       .object({
         field: z.string().trim().min(1).max(SHORT_TEXT),
