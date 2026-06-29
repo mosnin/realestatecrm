@@ -89,7 +89,10 @@ function isFilledCondition(row: ConditionRowState): boolean {
 }
 
 function conditionClause(state: WorkflowFormState): string | null {
-  const filled = state.conditions.filter(isFilledCondition).length;
+  const flatRows = state.conditions.filter(
+    (r): r is ConditionRowState => !('type' in r && r.type === 'group'),
+  );
+  const filled = flatRows.filter(isFilledCondition).length;
   if (filled === 0) return null;
   const joiner = state.conditionOp === 'or' ? 'any' : 'all';
   if (filled === 1) return 'only if 1 condition matches';

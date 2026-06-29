@@ -71,6 +71,15 @@ export interface ConditionRowState {
   value: string;
 }
 
+/** A nested condition group (AND block within an OR list, or vice-versa). */
+export interface ConditionGroupFormState {
+  id: string;
+  /** Discriminant that separates this from a flat ConditionRowState. */
+  type: 'group';
+  op: 'and' | 'or';
+  rules: ConditionRowState[];
+}
+
 export interface ActionRowState {
   id: string;
   type: WorkflowActionType;
@@ -136,7 +145,8 @@ export interface WorkflowFormState {
   description?: string;
   trigger: TriggerFormState;
   conditionOp: 'and' | 'or';
-  conditions: ConditionRowState[];
+  /** Flat rules + optional nested groups (at most one level deep). */
+  conditions: Array<ConditionRowState | ConditionGroupFormState>;
   actions: ActionRowState[];
   autonomy: WorkflowAutonomy;
   /**
@@ -434,7 +444,12 @@ export function buildDefinition(state: WorkflowFormState): WorkflowDefinition {
 
   const conditions: ConditionGroup = {
     op: state.conditionOp,
-    rules: state.conditions.map(buildRule),
+    rules: state.conditions.map((item) => {
+      if ('type' in item && item.type === 'group') {
+        return { op: item.op, rules: item.rules.map(buildRule) } satisfies ConditionGroup;
+      }
+      return buildRule(item as ConditionRowState);
+    }),
   };
 
   return {

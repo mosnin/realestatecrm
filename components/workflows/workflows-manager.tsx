@@ -78,7 +78,7 @@ import type {
   WorkflowTrigger,
 } from '@/lib/workflows/schema';
 import { WorkflowBuilder } from './workflow-builder';
-import type { WorkflowFormState } from './build-definition';
+import type { ConditionRowState, WorkflowFormState } from './build-definition';
 import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
 import type { TemplateCategory } from './templates';
@@ -2743,7 +2743,7 @@ function TemplatePreviewModal({
                   Only if ({(template.state.conditionOp ?? 'and').toUpperCase()})
                 </p>
                 <ul className="mt-0.5 space-y-0.5">
-                  {template.state.conditions.slice(0, 3).map((cond, i) => (
+                  {template.state.conditions.filter((c): c is ConditionRowState => !('type' in c && c.type === 'group')).slice(0, 3).map((cond, i) => (
                     <li key={i} className="text-[12.5px] text-muted-foreground">
                       {`${cond.field.replace(/_/g, ' ')} ${cond.operator} ${String(cond.value).slice(0, 30)}`}
                     </li>
@@ -3106,7 +3106,7 @@ function AIWorkflowGenerator({
         conditions: rawConditions.map((c) => ({
           id: aiGenRowId(),
           field: typeof c.field === 'string' ? c.field : '',
-          operator: (typeof c.operator === 'string' ? c.operator : 'eq') as WorkflowFormState['conditions'][number]['operator'],
+          operator: (typeof c.operator === 'string' ? c.operator : 'eq') as ConditionRowState['operator'],
           value: typeof c.value === 'string' ? c.value : typeof c.value === 'number' ? String(c.value) : '',
         })),
         actions: rawActions.map((a) => ({

@@ -14,7 +14,7 @@
  * a scheduled morning follow-up sweep.
  */
 
-import type { WorkflowFormState } from './build-definition';
+import type { ConditionRowState, WorkflowFormState } from './build-definition';
 import type { WorkflowGraph } from '@/lib/workflows/schema';
 
 export type TemplateCategory =
@@ -61,9 +61,9 @@ function rowId(prefix: string): string {
 /** A condition row pre-filled. */
 function condition(
   field: string,
-  operator: WorkflowFormState['conditions'][number]['operator'],
+  operator: ConditionRowState['operator'],
   value: string,
-): WorkflowFormState['conditions'][number] {
+): ConditionRowState {
   return { id: rowId('cond'), field, operator, value };
 }
 

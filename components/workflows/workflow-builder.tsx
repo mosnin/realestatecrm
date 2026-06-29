@@ -61,6 +61,7 @@ import {
   buildDefinition,
   type ActionRowState,
   type ConditionRowState,
+  type ConditionGroupFormState,
   type WorkflowFormState,
 } from './build-definition';
 import {
@@ -527,22 +528,33 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
 const emptyGraph: WorkflowGraph = { nodes: [{ id: 't', kind: 'trigger' }], edges: [] };
 
 /**
- * Map a stored ConditionGroup back into the builder's flat condition ROWS — the
- * inverse used by the manager's recordToFormState. Flat group only: any nested
- * sub-group is skipped (v1 doesn't author them). Reused when converting a LINEAR
- * graph back to Simple mode so the realtor's branches-free work is preserved.
+ * Map a stored ConditionGroup back into the builder's condition items. Flat rules
+ * become ConditionRowState; nested sub-groups become ConditionGroupFormState.
  */
-function conditionsToRows(group: ConditionGroup): ConditionRowState[] {
-  return group.rules.flatMap((r) => {
-    if ('rules' in r) return [];
-    return [
-      {
-        id: nextRowId('cond'),
-        field: r.field,
-        operator: r.operator as Operator,
-        value: r.value === undefined || r.value === null ? '' : String(r.value),
-      },
-    ];
+function conditionsToRows(group: ConditionGroup): Array<ConditionRowState | ConditionGroupFormState> {
+  return group.rules.map((r) => {
+    if ('rules' in r) {
+      return {
+        id: nextRowId('grp'),
+        type: 'group' as const,
+        op: r.op,
+        rules: r.rules.flatMap((sub) => {
+          if ('rules' in sub) return [];
+          return [{
+            id: nextRowId('cond'),
+            field: sub.field,
+            operator: sub.operator as Operator,
+            value: sub.value === undefined || sub.value === null ? '' : String(sub.value),
+          }];
+        }),
+      };
+    }
+    return {
+      id: nextRowId('cond'),
+      field: r.field,
+      operator: r.operator as Operator,
+      value: r.value === undefined || r.value === null ? '' : String(r.value),
+    };
   });
 }
 
@@ -2125,7 +2137,18 @@ export function WorkflowBuilder({
     setDirty(true);
     setState((s) => ({
       ...s,
-      conditions: s.conditions.map((c) => (c.id === id ? { ...c, ...next } : c)),
+      conditions: s.conditions.map((c) =>
+        c.id === id && !('type' in c && c.type === 'group') ? { ...c, ...next } : c
+      ),
+    }));
+  }
+  function updateConditionGroup(groupId: string, next: Partial<Omit<ConditionGroupFormState, 'id' | 'type'>>) {
+    setDirty(true);
+    setState((s) => ({
+      ...s,
+      conditions: s.conditions.map((c) =>
+        c.id === groupId && 'type' in c && c.type === 'group' ? { ...c, ...next } : c
+      ),
     }));
   }
   function updateAction(id: string, next: Partial<ActionRowState>) {
@@ -2449,30 +2472,65 @@ export function WorkflowBuilder({
             ) : (
               <>
                 <ul className="space-y-2">
-                  {state.conditions.map((row) => (
-                    <ConditionRowEditor
-                      key={row.id}
-                      row={row}
-                      triggerType={state.trigger.type}
-                      onChange={(next) => updateCondition(row.id, next)}
-                      onRemove={() =>
-                        patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
-                      }
-                    />
-                  ))}
+                  {state.conditions.map((row) => {
+                    if ('type' in row && row.type === 'group') {
+                      return (
+                        <ConditionGroupEditor
+                          key={row.id}
+                          group={row as ConditionGroupFormState}
+                          triggerType={state.trigger.type}
+                          onChange={(next) => updateConditionGroup(row.id, next)}
+                          onRemove={() => patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })}
+                        />
+                      );
+                    }
+                    return (
+                      <ConditionRowEditor
+                        key={row.id}
+                        row={row as ConditionRowState}
+                        triggerType={state.trigger.type}
+                        onChange={(next) => updateCondition(row.id, next)}
+                        onRemove={() =>
+                          patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
+                        }
+                      />
+                    );
+                  })}
                 </ul>
-                <button
-                  type="button"
-                  onClick={() =>
-                    patch({
-                      conditions: [...state.conditions, newConditionRow(state.trigger.type)],
-                    })
-                  }
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Plus size={13} aria-hidden />
-                  Add condition
-                </button>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        conditions: [...state.conditions, newConditionRow(state.trigger.type)],
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Plus size={13} aria-hidden />
+                    Add condition
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        conditions: [
+                          ...state.conditions,
+                          {
+                            id: nextRowId('grp'),
+                            type: 'group' as const,
+                            op: state.conditionOp === 'and' ? 'or' : 'and',
+                            rules: [newConditionRow(state.trigger.type)],
+                          },
+                        ],
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Plus size={13} aria-hidden />
+                    Add condition group
+                  </button>
+                </div>
               </>
             )}
           </ZapCard>
@@ -3315,6 +3373,93 @@ function ConditionRowEditor({
         ))}
 
       <RemoveButton label="Remove condition" onClick={onRemove} />
+    </li>
+  );
+}
+
+/** A boxed nested condition group — renders its own op toggle + sub-rows.
+ *
+ * The outer list uses ConditionRowEditor for flat rules; whenever a rule is a
+ * ConditionGroupFormState (type === 'group') this component is used instead.
+ * It creates a visually distinct indented block so the realtor can reason about
+ * "all of THESE must match" vs the outer list's op. Zapier calls this a "Filter
+ * group" — we call it a "Condition group" in our copy. */
+function ConditionGroupEditor({
+  group,
+  triggerType,
+  onChange,
+  onRemove,
+}: {
+  group: ConditionGroupFormState;
+  triggerType: TriggerType;
+  onChange: (next: Partial<Omit<ConditionGroupFormState, 'id' | 'type'>>) => void;
+  onRemove: () => void;
+}) {
+  function addRow() {
+    onChange({ rules: [...group.rules, newConditionRow(triggerType)] });
+  }
+
+  function removeRow(id: string) {
+    onChange({ rules: group.rules.filter((r) => r.id !== id) });
+  }
+
+  function updateRow(id: string, next: Partial<ConditionRowState>) {
+    onChange({ rules: group.rules.map((r) => (r.id === id ? { ...r, ...next } : r)) });
+  }
+
+  return (
+    <li className="rounded-lg border border-amber-300/60 bg-amber-50/30 dark:border-amber-700/40 dark:bg-amber-950/10 p-2">
+      {/* Group header row */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+          Group
+        </span>
+        {/* Op toggle — opposite of outer to make nesting useful */}
+        <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5">
+          {(['and', 'or'] as const).map((op) => (
+            <button
+              key={op}
+              type="button"
+              onClick={() => onChange({ op })}
+              aria-pressed={group.op === op}
+              className={cn(
+                'rounded-[4px] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
+                group.op === op
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {op}
+            </button>
+          ))}
+        </div>
+        <span className="flex-1 text-[10px] text-muted-foreground">
+          {group.op === 'and' ? 'All of these must match' : 'Any of these must match'}
+        </span>
+        <RemoveButton label="Remove group" onClick={onRemove} />
+      </div>
+
+      {/* Sub-rows */}
+      <ul className="space-y-1.5 pl-1">
+        {group.rules.map((row) => (
+          <ConditionRowEditor
+            key={row.id}
+            row={row}
+            triggerType={triggerType}
+            onChange={(next) => updateRow(row.id, next)}
+            onRemove={() => removeRow(row.id)}
+          />
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={addRow}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 transition-colors hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+      >
+        <Plus size={11} aria-hidden />
+        Add row to group
+      </button>
     </li>
   );
 }
