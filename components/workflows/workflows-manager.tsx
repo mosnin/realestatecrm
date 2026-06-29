@@ -1305,7 +1305,14 @@ function RunHistoryPanel({
 }) {
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-      <p className={cn(SECTION_LABEL, 'mb-2')}>Run history</p>
+      <div className="mb-2.5 flex items-center justify-between">
+        <p className={SECTION_LABEL}>Run history</p>
+        {runs && runs.length > 0 && (
+          <span className="text-[11px] text-muted-foreground/60">
+            Last {runs.length} run{runs.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
       {loading ? (
         <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
           <Loader2 size={13} className="animate-spin" />
@@ -1314,7 +1321,10 @@ function RunHistoryPanel({
       ) : error ? (
         <p className={CAPTION}>Couldn't load the run history — try again in a moment.</p>
       ) : !runs || runs.length === 0 ? (
-        <p className={CAPTION}>No runs yet.</p>
+        <div className="flex flex-col items-center py-4 text-center">
+          <History size={22} className="mb-1.5 text-muted-foreground/30" />
+          <p className={CAPTION}>No runs yet — this workflow hasn&apos;t fired.</p>
+        </div>
       ) : (
         <ul className="space-y-1.5">
           {runs.map((run) => (
@@ -1326,69 +1336,166 @@ function RunHistoryPanel({
   );
 }
 
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  draft_message: 'Draft message',
+  schedule_message: 'Schedule message',
+  create_task: 'Create task',
+  call_integration: 'Call integration',
+  run_chippi: 'Run Chippi',
+  delay: 'Delay',
+  filter: 'Filter',
+  condition: 'Condition check',
+};
+
 function RunHistoryItem({ run }: { run: WorkflowRun }) {
   const [open, setOpen] = useState(false);
   const hasSteps = run.steps.length > 0;
 
+  const durationMs =
+    run.finishedAt ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime() : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
   return (
-    <li className="rounded-md border border-border/50 bg-card/40">
+    <li className="overflow-hidden rounded-lg border border-border/50 bg-card/40">
+      {/* Run header row */}
       <button
         type="button"
         onClick={() => hasSteps && setOpen((o) => !o)}
         disabled={!hasSteps}
         className={cn(
-          'flex w-full items-start gap-2 px-2.5 py-2 text-left',
+          'flex w-full items-center gap-2.5 px-3 py-2.5 text-left',
           hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
           !hasSteps && 'cursor-default',
         )}
       >
-        <ChevronRight
-          size={13}
-          aria-hidden
+        {/* Status icon */}
+        <span
           className={cn(
-            'mt-0.5 flex-shrink-0 text-muted-foreground/50 transition-transform',
-            !hasSteps && 'opacity-0',
-            open && 'rotate-90',
+            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+            run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+            run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+            run.status === 'skipped' && 'bg-muted text-muted-foreground',
+            run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
           )}
-        />
+          aria-hidden
+        >
+          {run.status === 'completed' && <Check size={11} strokeWidth={2.5} />}
+          {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
+          {run.status === 'skipped' && <ArrowUpDown size={9} />}
+          {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
+        </span>
+
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <RunStatusPill status={run.status} />
-            <span className="tabular-nums text-[11px] text-muted-foreground/70">
+            <span className={cn(
+              'text-[12.5px] font-medium',
+              run.status === 'completed' && 'text-foreground',
+              run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+              run.status === 'running' && 'text-amber-700 dark:text-amber-400',
+              run.status === 'skipped' && 'text-muted-foreground',
+            )}>
+              {run.status === 'completed' ? 'Completed' : run.status === 'failed' ? 'Failed' : run.status === 'running' ? 'Running' : 'Skipped'}
+            </span>
+            <span className="text-[11px] text-muted-foreground/60">
               {timeAgo(run.startedAt)}
             </span>
+            {durationLabel && (
+              <span className="text-[11px] tabular-nums text-muted-foreground/50">
+                · {durationLabel}
+              </span>
+            )}
+            {hasSteps && (
+              <span className="ml-auto text-[11px] text-muted-foreground/50">
+                {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </span>
-          {(run.summary || run.error) && (
-            <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
+          {(run.error || run.summary) && (
+            <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
               {run.error ?? run.summary}
             </span>
           )}
         </span>
+
+        {hasSteps && (
+          <ChevronRight
+            size={13}
+            aria-hidden
+            className={cn(
+              'flex-shrink-0 text-muted-foreground/40 transition-transform',
+              open && 'rotate-90',
+            )}
+          />
+        )}
       </button>
 
+      {/* Step timeline */}
       {open && hasSteps && (
-        <ul className="space-y-1.5 border-t border-border/50 px-3 py-2 pl-7">
-          {run.steps.map((step) => (
-            <li
-              key={step.id}
-              className="flex items-start gap-2 text-[12px] leading-snug"
-            >
-              <StepStatusDot status={step.status} />
-              <span className="tabular-nums text-muted-foreground/50">
-                {step.stepIndex + 1}.
-              </span>
-              <span className="font-medium text-foreground">
-                {step.actionType ?? step.kind}
-              </span>
-              <span className="text-muted-foreground">{step.status}</span>
-              {detailLine(step.detail) && (
-                <span className="min-w-0 flex-1 truncate text-muted-foreground/80">
-                  {detailLine(step.detail)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="border-t border-border/40 bg-muted/10 px-3 py-2.5">
+          <ul className="relative space-y-0">
+            {run.steps.map((step, idx) => {
+              const isLast = idx === run.steps.length - 1;
+              const ai = step.actionType ? ACTION_ICON_MAP[step.actionType] : null;
+              const AIcon = ai?.icon;
+              const detail = detailLine(step.detail);
+              return (
+                <li key={step.id} className="relative flex gap-3 pb-3 last:pb-0">
+                  {/* Vertical connector line */}
+                  {!isLast && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[9px] top-5 w-px bg-border/50"
+                      style={{ height: 'calc(100% - 4px)' }}
+                    />
+                  )}
+                  {/* Step status dot */}
+                  <span
+                    className={cn(
+                      'relative z-10 mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px]',
+                      step.status === 'ok' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+                      step.status === 'failed' && 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+                      step.status === 'skipped' && 'bg-muted text-muted-foreground',
+                    )}
+                    aria-label={step.status}
+                  >
+                    {step.status === 'ok' && <Check size={9} strokeWidth={2.5} />}
+                    {step.status === 'failed' && <X size={9} strokeWidth={2.5} />}
+                    {step.status === 'skipped' && <span>–</span>}
+                  </span>
+                  {/* Step info */}
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {AIcon && (
+                        <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai!.cls)}>
+                          <AIcon size={9} aria-hidden />
+                        </span>
+                      )}
+                      <span className="text-[12px] font-medium text-foreground">
+                        {ACTION_TYPE_LABELS[step.actionType ?? step.kind] ?? (step.actionType ?? step.kind)}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] font-medium uppercase tracking-wide',
+                        step.status === 'ok' && 'text-emerald-600 dark:text-emerald-400',
+                        step.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                        step.status === 'skipped' && 'text-muted-foreground',
+                      )}>
+                        {step.status === 'ok' ? 'OK' : step.status === 'failed' ? 'Error' : 'Skipped'}
+                      </span>
+                    </div>
+                    {detail && (
+                      <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
+                        {detail}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </li>
   );
@@ -1413,38 +1520,6 @@ function detailLine(detail: unknown): string {
   } catch {
     return '';
   }
-}
-
-function RunStatusPill({ status }: { status: WorkflowRun['status'] }) {
-  const map: Record<WorkflowRun['status'], { label: string; cls: string }> = {
-    completed: {
-      label: 'Completed',
-      cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
-    },
-    failed: {
-      label: 'Failed',
-      cls: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
-    },
-    skipped: {
-      label: 'Skipped',
-      cls: 'bg-muted text-muted-foreground',
-    },
-    running: {
-      label: 'Running',
-      cls: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400',
-    },
-  };
-  const { label, cls } = map[status] ?? map.skipped;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-        cls,
-      )}
-    >
-      {label}
-    </span>
-  );
 }
 
 function TestResultPanel({
