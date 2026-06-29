@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog, Play } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog, Play, History, RotateCcw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -221,6 +221,17 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'formatter',
   'delay',
   'webhook_post',
+];
+
+const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
+  {
+    label: 'Actions',
+    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post'],
+  },
+  {
+    label: 'Logic',
+    keys: ['filter', 'formatter', 'delay'],
+  },
 ];
 
 const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
@@ -1136,14 +1147,22 @@ function AddStepPicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<'All' | 'Actions' | 'Logic'>('All');
   const q = query.toLowerCase().trim();
+
+  const pool = q
+    ? ACTION_ORDER
+    : category === 'All'
+      ? ACTION_ORDER
+      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys ?? ACTION_ORDER);
+
   const filtered = q
-    ? ACTION_ORDER.filter(
+    ? pool.filter(
         (t) =>
           ACTION_LABELS[t].toLowerCase().includes(q) ||
           ACTION_DESCRIPTIONS[t].toLowerCase().includes(q),
       )
-    : ACTION_ORDER;
+    : pool;
 
   return (
     <div className="rounded-xl border border-border/60 bg-card shadow-md">
@@ -1168,6 +1187,25 @@ function AddStepPicker({
           aria-label="Search actions"
         />
       </div>
+      {!q && (
+        <div className="flex gap-1 border-b border-border/40 px-3 py-2">
+          {(['All', 'Actions', 'Logic'] as const).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategory(cat)}
+              className={cn(
+                'rounded-full px-3 py-1 text-[11.5px] font-medium transition-colors',
+                category === cat
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
         {filtered.length === 0 ? (
           <p className="col-span-2 py-4 text-center text-[12px] text-muted-foreground">
@@ -1581,6 +1619,23 @@ export function WorkflowBuilder({
   const [insertPickerAt, setInsertPickerAt] = useState<number | null>(null);
   /** Per-action test results keyed by action row id. */
   const [stepTests, setStepTests] = useState<Record<string, { loading: boolean; status?: 'ok' | 'failed'; detail?: unknown; durationMs?: number; error?: string }>>({});
+  /** Whether the run history panel is open (only available for saved workflows). */
+  const [showHistory, setShowHistory] = useState(false);
+  type BuilderRun = { id: string; status: string; summary: string | null; startedAt: string; error: string | null };
+  const [historyRuns, setHistoryRuns] = useState<BuilderRun[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!showHistory || !workflowId) return;
+    let live = true;
+    setHistoryLoading(true);
+    fetch(`/api/workflows/${workflowId}/runs`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { runs: BuilderRun[] }) => { if (live) setHistoryRuns(d.runs); })
+      .catch(() => {})
+      .finally(() => { if (live) setHistoryLoading(false); });
+    return () => { live = false; };
+  }, [showHistory, workflowId]);
 
   async function testStep(row: ActionRowState) {
     if (!workflowId) return;
@@ -2225,8 +2280,80 @@ export function WorkflowBuilder({
         </div>
       )}
 
+      {/* Run history panel — Zapier-style audit trail inside the editor */}
+      {showHistory && workflowId && (
+        <div className="rounded-xl border border-border/60 bg-muted/20">
+          <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+            <p className="text-[12.5px] font-semibold text-foreground">Run history</p>
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryLoading(true);
+                fetch(`/api/workflows/${workflowId}/runs`)
+                  .then((r) => (r.ok ? r.json() : Promise.reject()))
+                  .then((d: { runs: BuilderRun[] }) => setHistoryRuns(d.runs))
+                  .catch(() => {})
+                  .finally(() => setHistoryLoading(false));
+              }}
+              disabled={historyLoading}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground disabled:opacity-40"
+            >
+              <RotateCcw size={11} aria-hidden className={historyLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <div className="p-3">
+            {historyLoading ? (
+              <div className="flex items-center gap-2 py-3">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                <span className="text-[12px] text-muted-foreground">Loading…</span>
+              </div>
+            ) : historyRuns.length === 0 ? (
+              <p className="py-3 text-center text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {historyRuns.map((run) => (
+                  <div key={run.id} className="flex items-center gap-2.5 rounded-lg border border-border/40 bg-card px-3 py-2">
+                    <span
+                      className={cn(
+                        'h-2 w-2 flex-shrink-0 rounded-full',
+                        run.status === 'completed' ? 'bg-emerald-500' :
+                        run.status === 'failed' ? 'bg-rose-500' :
+                        run.status === 'skipped' ? 'bg-amber-400' : 'bg-muted-foreground/40',
+                      )}
+                      aria-hidden
+                    />
+                    <span className="flex-1 min-w-0 truncate text-[12px] text-foreground">
+                      {run.summary ?? (run.status === 'failed' ? (run.error ?? 'Failed') : 'Completed')}
+                    </span>
+                    <span className="flex-shrink-0 text-[11px] capitalize text-muted-foreground">{run.status}</span>
+                    <span className="flex-shrink-0 text-[11px] text-muted-foreground/60">{timeAgo(run.startedAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer: Enable toggle + Save/Cancel — sticky so it's always reachable */}
       <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-3 border-t border-border/60 bg-card/95 px-4 py-3 backdrop-blur-sm">
+        {/* History toggle button — only for saved workflows */}
+        {workflowId && (
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
+              showHistory
+                ? 'border-orange-300/60 bg-orange-50 text-orange-700 dark:border-orange-700/40 dark:bg-orange-950/30 dark:text-orange-400'
+                : 'border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <History size={12} aria-hidden />
+            History
+          </button>
+        )}
         {/* Zapier-style "Turn on" toggle */}
         <label
           htmlFor="wf-enabled-toggle"
@@ -3167,26 +3294,15 @@ function WebhookPostActionConfig({
         />
       </div>
 
-      {/* Headers — advanced */}
-      <details className="group/adv">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-          <Plus size={12} aria-hidden className="transition-transform group-open/adv:rotate-45" />
-          Custom headers (optional)
-        </summary>
-        <div className="mt-2 space-y-1.5">
-          <Label htmlFor={`wh-headers-${row.id}`} className="text-[12px] text-muted-foreground">
-            Headers (JSON object)
-          </Label>
-          <Textarea
-            id={`wh-headers-${row.id}`}
-            value={row.webhookHeaders}
-            onChange={(e) => onChange({ webhookHeaders: e.target.value })}
-            placeholder={'{ "Authorization": "Bearer YOUR_TOKEN" }'}
-            rows={2}
-            className="font-mono text-[12px]"
-          />
-        </div>
-      </details>
+      <KeyValueEditor
+        label="Headers (optional)"
+        addLabel="Add header"
+        emptyText="No headers — add e.g. Authorization = Bearer YOUR_TOKEN"
+        value={row.webhookHeaders}
+        onChange={(v) => onChange({ webhookHeaders: v })}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+      />
     </div>
   );
 }
@@ -3365,11 +3481,17 @@ function KeyValueEditor({
   onChange,
   triggerType,
   prevSteps = [],
+  label = 'Parameters (optional)',
+  addLabel = 'Add parameter',
+  emptyText,
 }: {
   value: string;
   onChange: (v: string) => void;
   triggerType: TriggerType;
   prevSteps?: ActionRowState[];
+  label?: string;
+  addLabel?: string;
+  emptyText?: string;
 }) {
   const [rows, setRows] = useState<{ id: string; key: string; val: string }[]>(() =>
     parseParamsToRows(value),
@@ -3384,7 +3506,7 @@ function KeyValueEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-[12px] text-muted-foreground">Parameters (optional)</Label>
+        <Label className="text-[12px] text-muted-foreground">{label}</Label>
         <button
           type="button"
           onClick={() => setShowRaw((v) => !v)}
@@ -3454,11 +3576,11 @@ function KeyValueEditor({
             className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
           >
             <Plus size={11} aria-hidden />
-            Add parameter
+            {addLabel}
           </button>
           {rows.length === 0 && (
             <p className="text-[11px] text-muted-foreground/50">
-              No parameters — add key/value pairs the action expects, e.g. <code className="font-mono">channel</code> = <code className="font-mono">#leads</code>
+              {emptyText ?? <>No parameters — add key/value pairs the action expects, e.g. <code className="font-mono">channel</code> = <code className="font-mono">#leads</code></>}
             </p>
           )}
         </div>
