@@ -89,8 +89,8 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
 };
 
 const TRIGGER_ORDER: TriggerType[] = [
-  'lead_score_threshold',
   'lead_created',
+  'lead_score_threshold',
   'inbound_message',
   'tour_completed',
   'deal_stage_changed',
@@ -1556,10 +1556,10 @@ export function WorkflowBuilder({
    * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
    * Open on the canvas when we're handed a graph-backed workflow (edit/template).
    */
-  // Default new workflows to the canvas so it's immediately visible.
-  // Editing a linear workflow starts simple; editing a graph workflow starts advanced.
+  // New workflows start in simple mode (Zapier-style linear builder).
+  // Editing a linear workflow stays simple; editing a graph workflow opens advanced.
   const [mode, setMode] = useState<'simple' | 'advanced'>(
-    initial ? (initial.graph ? 'advanced' : 'simple') : 'advanced',
+    initial ? (initial.graph ? 'advanced' : 'simple') : 'simple',
   );
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
@@ -1691,9 +1691,10 @@ export function WorkflowBuilder({
   const triggerIncomplete = useMemo(() => {
     if (!dirty) return false;
     const t = state.trigger;
+    // integration_event requires both toolkit and event to be set
     if (t.type === 'integration_event') return !t.toolkit || !t.event;
-    if (t.type === 'deal_stage_changed') return !t.toStage;
-    if (t.type === 'schedule') return !t.hour;
+    // lead_score_threshold requires a minimum score
+    if (t.type === 'lead_score_threshold') return !t.min.trim() || Number(t.min) < 1 || Number(t.min) > 100;
     return false;
   }, [dirty, state.trigger]);
 
