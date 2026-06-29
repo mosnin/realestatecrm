@@ -21,6 +21,7 @@ import {
   listWorkflows,
   createWorkflow,
   countWorkflows,
+  countRunsPerWorkflow,
   MAX_WORKFLOWS_PER_SPACE,
 } from '@/lib/workflows/store';
 import { validateIntegrationTrigger } from '@/lib/integrations/trigger-catalog';
@@ -38,8 +39,12 @@ export async function GET() {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
-    const workflows = await listWorkflows(space.id);
-    return NextResponse.json({ workflows });
+    const [workflows, runCounts] = await Promise.all([
+      listWorkflows(space.id),
+      countRunsPerWorkflow(space.id),
+    ]);
+    const result = workflows.map((w) => ({ ...w, runCount: runCounts.get(w.id) ?? 0 }));
+    return NextResponse.json({ workflows: result });
   } catch (error) {
     logger.error('[workflows] list failed', { spaceId: space.id }, error);
     return NextResponse.json({ error: 'Load failed' }, { status: 500 });

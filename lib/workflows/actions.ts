@@ -81,6 +81,47 @@ function sanitizeRecipientText(name: string): string {
 }
 
 /**
+ * Resolve `{{token}}` placeholders in an instruction string against the
+ * workflow context. Supports lead.*, trigger.*, and step#.* tokens written
+ * by the builder's TokenPicker. Unknown tokens are left as-is so the LLM
+ * sees them (rather than a blank) and can handle them gracefully.
+ *
+ * All resolved values are sanitized through sanitizeRecipientText to prevent
+ * prompt injection via untrusted lead data.
+ */
+function resolveTokens(template: string, context: WorkflowContext): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
+    const parts = path.trim().split('.');
+    if (parts.length < 2) return _match;
+
+    const ns = parts[0];
+    const rest = parts.slice(1).join('.');
+
+    let value: unknown = undefined;
+
+    if (ns === 'lead') {
+      value = resolveField(context.lead ?? context.contact ?? {}, rest);
+    } else if (ns === 'trigger') {
+      value = resolveField(context.event ?? {}, rest);
+    } else if (/^step\d+$/.test(ns)) {
+      const stepData = context[ns];
+      if (stepData && typeof stepData === 'object') {
+        value = resolveField(stepData as Record<string, unknown>, rest);
+      }
+    } else if (ns === 'formatter') {
+      const fmtData = context.formatter;
+      if (fmtData && typeof fmtData === 'object') {
+        value = resolveField(fmtData as Record<string, unknown>, rest);
+      }
+    }
+
+    if (value === undefined || value === null) return _match;
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    return sanitizeRecipientText(str);
+  });
+}
+
+/**
  * Best-effort display name for the contact/lead an action addresses, for
  * building the model instruction. Prefers a human name, falls back to an id, so
  * the agent always has SOMETHING to resolve the recipient from.
@@ -123,7 +164,8 @@ async function runDraftMessage(
 ): Promise<ActionStepResult> {
   const { channel, instruction } = action.config;
   const recipient = describeRecipient(context);
-  const composed = `Draft a ${channel} to ${recipient}: ${instruction}`;
+  const resolved = resolveTokens(instruction, context);
+  const composed = `Draft a ${channel} to ${recipient}: ${resolved}`;
   const result = await runAutonomousInstruction({ spaceId, instruction: composed });
   return {
     status: result.ok ? 'ok' : 'failed',
@@ -143,11 +185,12 @@ async function runDraftMessage(
  */
 async function runChippi(
   action: Extract<WorkflowAction, { type: 'run_chippi' }>,
+  context: WorkflowContext,
   spaceId: string,
 ): Promise<ActionStepResult> {
   const result = await runAutonomousInstruction({
     spaceId,
-    instruction: action.config.instruction,
+    instruction: resolveTokens(action.config.instruction, context),
   });
   return {
     status: result.ok ? 'ok' : 'failed',
@@ -474,7 +517,7 @@ export async function executeAction(
       case 'draft_message':
         return await runDraftMessage(action, context, opts.spaceId);
       case 'run_chippi':
-        return await runChippi(action, opts.spaceId);
+        return await runChippi(action, context, opts.spaceId);
       case 'create_task':
         return await runCreateTask(action, context, opts.spaceId);
       case 'schedule_message':

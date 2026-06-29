@@ -901,11 +901,61 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
   },
 };
 
+/** Build step-output token groups from the previous action rows. */
+function stepOutputGroups(prevSteps: ActionRowState[]): TokenGroup[] {
+  return prevSteps
+    .map((s, i): TokenGroup | null => {
+      const n = i + 1;
+      const label = s.label || ACTION_LABELS[s.type] || `Step ${n}`;
+      const base: TokenDef[] = [{ label: 'Status', token: `{{step${n}.status}}`, hint: 'ok / failed / skipped' }];
+      if (s.type === 'formatter') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Formatted output', token: `{{step${n}.output}}`, hint: 'result of the format operation' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'run_chippi') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: "Chippi's response", token: `{{step${n}.response}}`, hint: "text Chippi returned" },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'call_integration') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Result (JSON)', token: `{{step${n}.result}}`, hint: 'raw JSON from the integration' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'create_task') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Task ID', token: `{{step${n}.taskId}}`, hint: 'ID of the created task' },
+            ...base,
+          ],
+        };
+      }
+      return null;
+    })
+    .filter((g): g is TokenGroup => g !== null);
+}
+
 function TokenPicker({
   triggerType,
+  prevSteps = [],
   onInsert,
 }: {
   triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
   onInsert: (token: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -915,6 +965,7 @@ function TokenPicker({
   const groups: TokenGroup[] = [
     LEAD_TOKEN_GROUP,
     ...(triggerGroup ? [triggerGroup] : []),
+    ...stepOutputGroups(prevSteps),
   ];
 
   const q = search.trim().toLowerCase();
@@ -1157,6 +1208,7 @@ function ActionZapCard({
   collapsed,
   showDragHandle,
   triggerType,
+  prevSteps = [],
   onChange,
   onRemove,
   onDuplicate,
@@ -1170,6 +1222,7 @@ function ActionZapCard({
   collapsed?: boolean;
   showDragHandle?: boolean;
   triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
   onChange: (next: Partial<ActionRowState>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -1284,7 +1337,7 @@ function ActionZapCard({
       </div>
       {!collapsed && (
         <div className="px-4 py-4 space-y-3">
-          <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} triggerType={triggerType} />
+          <ActionConfig row={row} onChange={onChange} connectedApps={connectedApps} triggerType={triggerType} prevSteps={prevSteps} />
           <div className="border-t border-border/30 pt-2 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12px] text-muted-foreground">On error:</span>
@@ -1825,6 +1878,7 @@ export function WorkflowBuilder({
                 collapsed={collapsedSteps.has(row.id)}
                 showDragHandle={state.actions.length > 1}
                 triggerType={state.trigger.type}
+                prevSteps={state.actions.slice(0, i)}
                 onChange={(next) => updateAction(row.id, next)}
                 onRemove={() =>
                   patch({ actions: state.actions.filter((a) => a.id !== row.id) })
@@ -2433,10 +2487,38 @@ function ConditionRowEditor({
 function FormatterActionConfig({
   row,
   onChange,
+  triggerType = 'lead_created',
+  prevSteps = [],
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
+  triggerType?: TriggerType;
+  prevSteps?: ActionRowState[];
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  function saveInputSel() {
+    const el = inputRef.current;
+    if (el) selRef.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+  }
+
+  function insertInputToken(token: string) {
+    const { start, end } = selRef.current;
+    const cur = row.formatterInput;
+    const next = cur.slice(0, start) + token + cur.slice(end);
+    onChange({ formatterInput: next });
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+        selRef.current = { start: pos, end: pos };
+      }
+    });
+  }
+
   const op = row.formatterOperation;
   const needsReplace = op === 'replace';
   const needsFormat = op === 'date_format';
@@ -2445,17 +2527,27 @@ function FormatterActionConfig({
   return (
     <div className="space-y-2.5">
       <p className={CAPTION}>
-        Transform a value and make it available as <code className="rounded bg-muted px-1 py-px text-[10px]">formatter.output</code> for the next step.
+        Transform a value and make it available as <code className="rounded bg-muted px-1 py-px text-[10px]">{'{{step#.output}}'}</code> for the next step.
       </p>
-      <FieldRow label="Input (field path or literal)" htmlFor={`fmt-input-${row.id}`}>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`fmt-input-${row.id}`} className="text-[12px] text-muted-foreground">
+            Input (field path or literal)
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertInputToken} />
+        </div>
         <Input
+          ref={inputRef}
           id={`fmt-input-${row.id}`}
           value={row.formatterInput}
           onChange={(e) => onChange({ formatterInput: e.target.value })}
-          placeholder="lead.name  or  Austin TX"
+          onSelect={saveInputSel}
+          onKeyUp={saveInputSel}
+          onClick={saveInputSel}
+          placeholder="lead.name  or  Austin TX  or  {{step1.output}}"
           className="h-8"
         />
-      </FieldRow>
+      </div>
       <FieldRow label="Operation" htmlFor={`fmt-op-${row.id}`}>
         <MiniSelect
           id={`fmt-op-${row.id}`}
@@ -2623,11 +2715,13 @@ function ActionConfig({
   onChange,
   connectedApps,
   triggerType,
+  prevSteps = [],
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
   connectedApps: ConnectedAppsState;
   triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
 }) {
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
@@ -2643,7 +2737,7 @@ function ActionConfig({
             ]}
           />
         </FieldRow>
-        <InstructionField row={row} onChange={onChange} triggerType={triggerType} />
+        <InstructionField row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />
         {row.type === 'schedule_message' && (
           <div className="flex flex-wrap items-center gap-2">
             <Label className="text-[12px] text-muted-foreground">Send after</Label>
@@ -2673,7 +2767,7 @@ function ActionConfig({
   }
 
   if (row.type === 'run_chippi') {
-    return <InstructionField row={row} onChange={onChange} triggerType={triggerType} />;
+    return <InstructionField row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
   if (row.type === 'create_task') {
@@ -2746,7 +2840,7 @@ function ActionConfig({
   }
 
   if (row.type === 'formatter') {
-    return <FormatterActionConfig row={row} onChange={onChange} />;
+    return <FormatterActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
   // call_integration — app + action lead; show connected apps picker when apps
@@ -2851,10 +2945,12 @@ function InstructionField({
   row,
   onChange,
   triggerType,
+  prevSteps = [],
 }: {
   row: ActionRowState;
   onChange: (next: Partial<ActionRowState>) => void;
   triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Track the last cursor/selection position so token insertion lands at cursor.
@@ -2896,7 +2992,7 @@ function InstructionField({
               {len}/{INSTRUCTION_MAX}
             </span>
           )}
-          <TokenPicker triggerType={triggerType} onInsert={insertToken} />
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertToken} />
         </div>
       </div>
       <Textarea

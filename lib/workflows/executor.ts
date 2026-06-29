@@ -228,6 +228,11 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         autonomy: workflow.autonomy,
         runId,
       });
+      // Stash step output in context so later steps can reference {{step#.*}}.
+      (context as Record<string, unknown>)[`step${i + 1}`] = {
+        status: result.status,
+        ...result.detail,
+      };
       const failedAndStop = result.status === 'failed' && action.onError !== 'skip';
       if (result.status === 'failed') anyFailed = true;
       await writeStep({

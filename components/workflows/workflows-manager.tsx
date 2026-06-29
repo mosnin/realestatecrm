@@ -56,6 +56,7 @@ import {
   Upload,
   RotateCcw,
   Wand2,
+  Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,7 @@ interface WorkflowRecord {
   lastRunStatus: 'ok' | 'error' | 'skipped' | null;
   createdAt: string;
   updatedAt: string;
+  runCount?: number;
 }
 
 interface TestStep {
@@ -1491,7 +1493,7 @@ function WorkflowRow({
           </span>
         </div>
 
-        {/* Col 3 — Run health + time + modified */}
+        {/* Col 3 — Run health + time + total runs + modified */}
         <div className="flex flex-col gap-0.5 pr-2">
           <div className="flex items-center gap-1.5">
             <RunHealthChip status={workflow.lastRunStatus} />
@@ -1503,11 +1505,22 @@ function WorkflowRow({
               <span className="text-[11px] text-muted-foreground/40">Never</span>
             )}
           </div>
-          {workflow.updatedAt !== workflow.createdAt && (
-            <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
-              Edited {timeAgo(workflow.updatedAt)}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {typeof workflow.runCount === 'number' && workflow.runCount > 0 && (
+              <span
+                title={`${workflow.runCount.toLocaleString()} total run${workflow.runCount === 1 ? '' : 's'}`}
+                className="inline-flex items-center gap-0.5 rounded bg-muted/70 px-1 py-px text-[10px] tabular-nums text-muted-foreground/70"
+              >
+                <Activity size={8} aria-hidden />
+                {workflow.runCount.toLocaleString()}
+              </span>
+            )}
+            {workflow.updatedAt !== workflow.createdAt && (
+              <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
+                Edited {timeAgo(workflow.updatedAt)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Col 4 — Toggle */}

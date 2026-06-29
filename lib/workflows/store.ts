@@ -193,6 +193,21 @@ export async function countWorkflows(spaceId: string): Promise<number> {
   return count ?? 0;
 }
 
+/** Return a map of workflowId → total run count for the space's workflows. */
+export async function countRunsPerWorkflow(spaceId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('WorkflowRun')
+    .select('workflowId')
+    .eq('spaceId', spaceId);
+  if (error) throw error;
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const id = (row as { workflowId: string }).workflowId;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 // ── Run history (read-only audit trail) ──────────────────────────────────────
 //
 // The executor writes WorkflowRun + WorkflowRunStep rows as it runs; these
