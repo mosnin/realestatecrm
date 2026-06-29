@@ -3331,6 +3331,142 @@ function NotifyAgentActionConfig({
   );
 }
 
+// ── Key-value params editor (call_integration) ───────────────────────────────
+
+function parseParamsToRows(json: string): { id: string; key: string; val: string }[] {
+  if (!json.trim()) return [];
+  try {
+    const obj = JSON.parse(json) as Record<string, unknown>;
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v], i) => ({
+        id: `pr-${i}-${k}`,
+        key: k,
+        val: typeof v === 'string' ? v : JSON.stringify(v),
+      }));
+    }
+  } catch {}
+  return [];
+}
+
+function rowsToParamsJson(rows: { key: string; val: string }[]): string {
+  const valid = rows.filter((r) => r.key.trim());
+  if (valid.length === 0) return '';
+  const obj = Object.fromEntries(valid.map((r) => [r.key.trim(), r.val]));
+  return JSON.stringify(obj, null, 2);
+}
+
+/**
+ * Zapier-style key-value parameter editor for call_integration actions.
+ * Shows structured field rows (key = value) that serialize to/from JSON,
+ * with a "Raw JSON" escape hatch for advanced users.
+ */
+function KeyValueEditor({
+  value,
+  onChange,
+  triggerType,
+  prevSteps = [],
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+}) {
+  const [rows, setRows] = useState<{ id: string; key: string; val: string }[]>(() =>
+    parseParamsToRows(value),
+  );
+  const [showRaw, setShowRaw] = useState(false);
+
+  function updateRows(next: { id: string; key: string; val: string }[]) {
+    setRows(next);
+    onChange(rowsToParamsJson(next));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-[12px] text-muted-foreground">Parameters (optional)</Label>
+        <button
+          type="button"
+          onClick={() => setShowRaw((v) => !v)}
+          className="text-[11px] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+        >
+          {showRaw ? 'Field view' : 'Raw JSON'}
+        </button>
+      </div>
+
+      {showRaw ? (
+        <Textarea
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            const parsed = parseParamsToRows(e.target.value);
+            if (parsed.length > 0) setRows(parsed);
+          }}
+          placeholder={'{ "channel": "#leads", "message": "New lead: {{lead.name}}" }'}
+          rows={3}
+          className="font-mono text-[12px]"
+        />
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-start gap-1.5">
+              <Input
+                value={r.key}
+                onChange={(e) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, key: e.target.value } : x)))
+                }
+                placeholder="param"
+                aria-label="Parameter name"
+                className="h-7 w-[8rem] flex-shrink-0 font-mono text-[12px]"
+              />
+              <span className="mt-1.5 flex-shrink-0 text-[12px] text-muted-foreground/50">=</span>
+              <Input
+                value={r.val}
+                onChange={(e) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, val: e.target.value } : x)))
+                }
+                placeholder="value or {{token}}"
+                aria-label="Parameter value"
+                className="h-7 flex-1 text-[12px]"
+              />
+              <TokenPicker
+                triggerType={triggerType}
+                prevSteps={prevSteps}
+                onInsert={(token) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, val: x.val + token } : x)))
+                }
+              />
+              <button
+                type="button"
+                onClick={() => updateRows(rows.filter((x) => x.id !== r.id))}
+                aria-label="Remove parameter"
+                className="mt-0.5 flex-shrink-0 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-destructive"
+              >
+                <X size={12} aria-hidden />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              updateRows([...rows, { id: `pr-${rows.length}-${Date.now().toString(36)}`, key: '', val: '' }])
+            }
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            <Plus size={11} aria-hidden />
+            Add parameter
+          </button>
+          {rows.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/50">
+              No parameters — add key/value pairs the action expects, e.g. <code className="font-mono">channel</code> = <code className="font-mono">#leads</code>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -3344,6 +3480,12 @@ function ActionConfig({
   triggerType: TriggerType;
   prevSteps?: ActionRowState[];
 }) {
+  // useParams here (before any early returns) so we can build the config link
+  // for the call_integration "no apps" state. React rules of hooks allow this
+  // at the function top level before conditional returns.
+  const routeParams = useParams();
+  const slug = routeParams?.slug as string | undefined;
+  const automationsConfigHref = slug ? `/s/${slug}/automations/settings` : '/automations/settings';
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
       <div className="space-y-2.5">
@@ -3488,8 +3630,9 @@ function ActionConfig({
     return <NotifyAgentActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
-  // call_integration — app + action lead; show connected apps picker when apps
-  // are available, else fall back to free-text so authoring is never blocked.
+  // call_integration — app + action picker; key-value params editor.
+  // Falls back to free-text inputs when no apps are connected so authoring is
+  // never blocked, with a direct link to the configuration page.
   const hasApps =
     connectedApps.status === 'ready' && connectedApps.apps.length > 0;
   const selectedApp =
@@ -3507,8 +3650,15 @@ function ActionConfig({
         </p>
       )}
       {connectedApps.status === 'ready' && !hasApps && (
-        <p className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[12px] text-muted-foreground text-center">
-          No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.
+        <p className="rounded-lg border border-dashed border-border/60 px-3 py-2.5 text-[12px] text-muted-foreground text-center">
+          No apps connected yet.{' '}
+          <a
+            href={automationsConfigHref}
+            className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+          >
+            Connect Gmail, Slack, or Outlook
+          </a>{' '}
+          to use this action.
         </p>
       )}
 
@@ -3522,7 +3672,6 @@ function ActionConfig({
               const app = connectedApps.apps.find((a) => a.toolkit === next);
               onChange({
                 toolkit: next,
-                // Reset action when toolkit changes
                 action: app?.actions[0]?.value ?? '',
               });
             }}
@@ -3563,29 +3712,13 @@ function ActionConfig({
           />
         )}
       </FieldRow>
-      <details className="group/adv">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-          <Plus
-            size={12}
-            aria-hidden
-            className="transition-transform group-open/adv:rotate-45"
-          />
-          Advanced — params (optional JSON)
-        </summary>
-        <div className="mt-2 space-y-1.5">
-          <Label htmlFor={`act-params-${row.id}`} className="sr-only">
-            Params (optional JSON)
-          </Label>
-          <Textarea
-            id={`act-params-${row.id}`}
-            value={row.paramsJson}
-            onChange={(e) => onChange({ paramsJson: e.target.value })}
-            placeholder='{ "channel": "#leads" }'
-            rows={2}
-            className="font-mono text-xs"
-          />
-        </div>
-      </details>
+
+      <KeyValueEditor
+        value={row.paramsJson}
+        onChange={(v) => onChange({ paramsJson: v })}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+      />
     </div>
   );
 }

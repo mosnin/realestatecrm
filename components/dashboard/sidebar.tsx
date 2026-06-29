@@ -1071,6 +1071,7 @@ function RealtorNav({
   overdueFollowUpCount,
   pendingDraftCount,
   activePropertyCount,
+  activeWorkflowCount,
   isBrokerageMember,
 }: {
   slug: string;
@@ -1752,6 +1753,7 @@ function RealtorSidebarShell({
   overdueFollowUpCount,
   pendingDraftCount,
   activePropertyCount,
+  activeWorkflowCount = 0,
   brokerageMemberships,
   isOnBrokerPage,
   displayName,
@@ -1768,6 +1770,7 @@ function RealtorSidebarShell({
   overdueFollowUpCount: number;
   pendingDraftCount: number;
   activePropertyCount: number;
+  activeWorkflowCount?: number;
   brokerageMemberships: { id: string; name: string; role: string }[];
   isOnBrokerPage: boolean;
   displayName: string;
