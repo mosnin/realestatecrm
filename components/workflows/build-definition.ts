@@ -71,6 +71,15 @@ export interface ConditionRowState {
   value: string;
 }
 
+/** A nested condition group (AND block within an OR list, or vice-versa). */
+export interface ConditionGroupFormState {
+  id: string;
+  /** Discriminant that separates this from a flat ConditionRowState. */
+  type: 'group';
+  op: 'and' | 'or';
+  rules: ConditionRowState[];
+}
+
 export interface ActionRowState {
   id: string;
   type: WorkflowActionType;
@@ -84,10 +93,16 @@ export interface ActionRowState {
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
   instruction: string;
-  /** schedule_message / delay: numeric amount (string off a number input). */
+  /** schedule_message / delay (relative mode): numeric amount (string off a number input). */
   delayMinutes: string;
   /** delay: the display unit. Converted to minutes by buildAction. */
-  delayUnit: 'minutes' | 'hours' | 'days';
+  delayUnit: 'minutes' | 'hours' | 'days' | 'weeks';
+  /** delay: mode — 'relative' (wait N units) or 'until_weekday' (wait until day+time). */
+  delayMode: 'relative' | 'until_weekday';
+  /** delay (until_weekday mode): 0=Sun … 6=Sat. */
+  untilWeekday: string;
+  /** delay (until_weekday mode): 0-23 hour. */
+  untilHour: string;
   /** create_task. */
   title: string;
   dueInDays: string;
@@ -114,6 +129,16 @@ export interface ActionRowState {
   formatterFormat: string;
   /** formatter: decimal places for 'number_format' (as string off a number input). */
   formatterToFixed: string;
+  /** formatter: fallback value used when input is blank ('default_value'). */
+  formatterFallback: string;
+  /** formatter: max character count for 'truncate' (string off number input). */
+  formatterTruncateLength: string;
+  /** formatter: suffix appended after truncating, e.g. '…' ('truncate'). */
+  formatterTruncateSuffix: string;
+  /** formatter: delimiter for 'split'. */
+  formatterSplitSeparator: string;
+  /** formatter: 1-based part index for 'split'. */
+  formatterSplitIndex: string;
   /** webhook_post: target HTTPS URL. */
   webhookUrl: string;
   /** webhook_post: JSON body template (optional, {{tokens}} supported). */
@@ -136,7 +161,8 @@ export interface WorkflowFormState {
   description?: string;
   trigger: TriggerFormState;
   conditionOp: 'and' | 'or';
-  conditions: ConditionRowState[];
+  /** Flat rules + optional nested groups (at most one level deep). */
+  conditions: Array<ConditionRowState | ConditionGroupFormState>;
   actions: ActionRowState[];
   autonomy: WorkflowAutonomy;
   /**
@@ -192,6 +218,10 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
       };
     case 'tour_completed':
       return { type: 'tour_completed', config: {} };
+    case 'deal_created':
+      return { type: 'deal_created', config: {} };
+    case 'contact_updated':
+      return { type: 'contact_updated', config: {} };
     case 'deal_stage_changed':
       return {
         type: 'deal_stage_changed',
@@ -260,7 +290,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message': {
-      const smMultiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
+      const smMultiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
       return {
         type: 'schedule_message',
         ...(label ? { label } : {}),
@@ -305,13 +335,23 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
-      const multiplier = row.delayUnit === 'hours' ? 60 : row.delayUnit === 'days' ? 1440 : 1;
+      const multiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
+      const isUntil = row.delayMode === 'until_weekday';
       return {
         type: 'delay',
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
-        config: { delayMinutes: toNumber(row.delayMinutes) * multiplier },
+        config: isUntil
+          ? {
+              delayMode: 'until_weekday' as const,
+              untilWeekday: toNumber(row.untilWeekday),
+              untilHour: toNumber(row.untilHour),
+            }
+          : {
+              delayMode: 'relative' as const,
+              delayMinutes: toNumber(row.delayMinutes) * multiplier,
+            },
       };
     }
     case 'filter': {
@@ -365,6 +405,11 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         replacement?: string;
         format?: string;
         toFixed?: number;
+        fallback?: string;
+        truncateLength?: number;
+        truncateSuffix?: string;
+        splitSeparator?: string;
+        splitIndex?: number;
       };
       const cfg: FormatterConfig = { input: row.formatterInput.trim(), operation: op };
       if (op === 'replace') {
@@ -374,6 +419,15 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       if (op === 'date_format' && row.formatterFormat.trim()) cfg.format = row.formatterFormat.trim();
       if (op === 'number_format' && row.formatterToFixed.trim() !== '') {
         cfg.toFixed = toNumber(row.formatterToFixed);
+      }
+      if (op === 'default_value') cfg.fallback = row.formatterFallback;
+      if (op === 'truncate') {
+        if (row.formatterTruncateLength.trim() !== '') cfg.truncateLength = toNumber(row.formatterTruncateLength);
+        if (row.formatterTruncateSuffix !== '') cfg.truncateSuffix = row.formatterTruncateSuffix;
+      }
+      if (op === 'split') {
+        cfg.splitSeparator = row.formatterSplitSeparator || ',';
+        if (row.formatterSplitIndex.trim() !== '') cfg.splitIndex = toNumber(row.formatterSplitIndex);
       }
       return {
         type: 'formatter',
@@ -430,7 +484,12 @@ export function buildDefinition(state: WorkflowFormState): WorkflowDefinition {
 
   const conditions: ConditionGroup = {
     op: state.conditionOp,
-    rules: state.conditions.map(buildRule),
+    rules: state.conditions.map((item) => {
+      if ('type' in item && item.type === 'group') {
+        return { op: item.op, rules: item.rules.map(buildRule) } satisfies ConditionGroup;
+      }
+      return buildRule(item as ConditionRowState);
+    }),
   };
 
   return {

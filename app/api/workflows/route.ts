@@ -105,9 +105,10 @@ export async function POST(req: NextRequest) {
     }
 
     const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+    const notifyOnError = typeof body.notifyOnError === 'boolean' ? body.notifyOnError : false;
     const description =
       typeof body.description === 'string' ? body.description.trim() || undefined : undefined;
-    const workflow = await createWorkflow(space.id, { name, description, definition, enabled });
+    const workflow = await createWorkflow(space.id, { name, description, definition, enabled, notifyOnError });
 
     // Best-effort: heal any missing Composio subscription this workflow's
     // integration_event trigger depends on (drift if the slug was curated after

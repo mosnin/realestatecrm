@@ -66,7 +66,7 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'lead.score',
     valueType: 'number',
     operators: NUMBER_OPERATORS,
-    appliesTo: ['lead_created', 'lead_score_threshold', 'tour_completed'],
+    appliesTo: ['lead_created', 'lead_score_threshold', 'tour_completed', 'contact_updated'],
   },
   {
     key: 'lead_source',
@@ -74,7 +74,7 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'lead.source',
     valueType: 'text',
     operators: TEXT_OPERATORS,
-    appliesTo: ['lead_created', 'lead_score_threshold'],
+    appliesTo: ['lead_created', 'lead_score_threshold', 'contact_updated'],
   },
   {
     key: 'lead_name',
@@ -82,7 +82,7 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'lead.name',
     valueType: 'text',
     operators: TEXT_OPERATORS,
-    appliesTo: ['lead_created', 'lead_score_threshold'],
+    appliesTo: ['lead_created', 'lead_score_threshold', 'contact_updated', 'deal_created'],
   },
   {
     key: 'lead_email',
@@ -90,7 +90,7 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'lead.email',
     valueType: 'text',
     operators: TEXT_OPERATORS,
-    appliesTo: ['lead_created', 'lead_score_threshold'],
+    appliesTo: ['lead_created', 'lead_score_threshold', 'contact_updated', 'deal_created'],
   },
   {
     key: 'contact_name',
@@ -113,7 +113,6 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'message.channel',
     valueType: 'enum',
     options: [
-      { value: 'sms', label: 'SMS' },
       { value: 'email', label: 'Email' },
     ],
     operators: ENUM_OPERATORS,
@@ -125,7 +124,15 @@ export const CONDITION_ATTRIBUTES: ConditionAttribute[] = [
     field: 'deal.stage',
     valueType: 'text',
     operators: TEXT_OPERATORS,
-    appliesTo: ['tour_completed', 'deal_stage_changed'],
+    appliesTo: ['tour_completed', 'deal_stage_changed', 'deal_created'],
+  },
+  {
+    key: 'deal_amount',
+    label: 'Deal value ($)',
+    field: 'deal.amount',
+    valueType: 'number',
+    operators: NUMBER_OPERATORS,
+    appliesTo: ['deal_created', 'deal_stage_changed'],
   },
   {
     key: 'event_to_stage',

@@ -59,7 +59,14 @@ function actionPhrase(action: WorkflowAction): string {
     case 'run_chippi':
       return 'ask Chippi to take it from there';
     case 'delay': {
-      const m = action.config.delayMinutes;
+      if (action.config.delayMode === 'until_weekday') {
+        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const day = DAYS[action.config.untilWeekday ?? 1] ?? 'Monday';
+        const h = action.config.untilHour ?? 9;
+        const ampm = h < 12 ? 'AM' : 'PM';
+        return `wait until ${day} at ${((h + 11) % 12) + 1}:00 ${ampm}`;
+      }
+      const m = action.config.delayMinutes ?? 0;
       if (m % 1440 === 0) return `wait ${m / 1440} ${m / 1440 === 1 ? 'day' : 'days'}`;
       if (m % 60 === 0) return `wait ${m / 60} ${m / 60 === 1 ? 'hour' : 'hours'}`;
       return `wait ${m} minutes`;

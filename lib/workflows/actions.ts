@@ -377,14 +377,37 @@ async function runCallIntegration(
  * the delay cannot actually block; the run note makes the intent observable in
  * the audit trail. A future scheduler (DelayedResume table + cron) can honour
  * long delays by replaying remaining actions after the specified interval.
+ *
+ * until_weekday mode: the intended delay is computed at execution time so that
+ * "wait until Monday 9am" always means the NEXT Monday when the step runs,
+ * not the Monday computed when the workflow was saved.
  */
+function minutesUntilWeekdayHour(weekday: number, hour: number): number {
+  const now = new Date();
+  const target = new Date(now);
+  const daysUntil = (weekday - now.getDay() + 7) % 7;
+  // If today is the target weekday but we've already passed the hour, go 7 days out.
+  const adjustedDays = daysUntil === 0 && now.getHours() >= hour ? 7 : daysUntil;
+  target.setDate(now.getDate() + adjustedDays);
+  target.setHours(hour, 0, 0, 0);
+  return Math.max(1, Math.round((target.getTime() - now.getTime()) / 60_000));
+}
+
 function runDelay(
   action: Extract<WorkflowAction, { type: 'delay' }>,
 ): ActionStepResult {
+  const { delayMode, delayMinutes, untilWeekday, untilHour } = action.config;
+  const mode = delayMode ?? 'relative';
+  const computedMinutes =
+    mode === 'until_weekday' && untilWeekday !== undefined && untilHour !== undefined
+      ? minutesUntilWeekdayHour(untilWeekday, untilHour)
+      : (delayMinutes ?? 1);
+
   return {
     status: 'ok',
     detail: {
-      delayMinutes: action.config.delayMinutes,
+      delayMode: mode,
+      delayMinutes: computedMinutes,
       note: 'Delay recorded. Async resumption is not yet active — subsequent steps ran immediately.',
     },
   };
@@ -452,7 +475,7 @@ function runFormatter(
   action: Extract<WorkflowAction, { type: 'formatter' }>,
   context: WorkflowContext,
 ): ActionStepResult {
-  const { input, operation, find, replacement, format, toFixed } = action.config;
+  const { input, operation, find, replacement, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
   const resolved = resolveField(context as Record<string, unknown>, input);
   const strValue = String(resolved !== undefined && resolved !== null ? resolved : input);
 
@@ -494,6 +517,32 @@ function runFormatter(
     case 'extract_phone': {
       const m = strValue.match(/[+]?[(]?\d{3}[)]?[-\s.]?\d{3}[-\s.]\d{4,6}/);
       output = m ? m[0] : '';
+      break;
+    }
+    case 'default_value': {
+      output = strValue.trim() !== '' ? strValue : (fallback ?? '');
+      break;
+    }
+    case 'truncate': {
+      const maxLen = truncateLength ?? 100;
+      if (strValue.length <= maxLen) { output = strValue; break; }
+      const suffix = truncateSuffix ?? '…';
+      output = strValue.slice(0, Math.max(0, maxLen - suffix.length)) + suffix;
+      break;
+    }
+    case 'length': {
+      output = String(strValue.length);
+      break;
+    }
+    case 'split': {
+      const sep = splitSeparator ?? ',';
+      const idx = (splitIndex ?? 1) - 1; // 1-based in config, 0-based internally
+      const parts = strValue.split(sep);
+      output = parts[idx]?.trim() ?? '';
+      break;
+    }
+    case 'url_encode': {
+      output = encodeURIComponent(strValue);
       break;
     }
     default: output = strValue;

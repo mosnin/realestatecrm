@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   try {
     const llm = getLLMClient();
     const completion = await llm.chat.completions.create({
-      model: openaiModel('gpt-4o-mini'),
+      model: 'qwen/qwen3.7-plus',
       response_format: { type: 'json_object' },
       temperature: 0.3,
       max_tokens: 1000,

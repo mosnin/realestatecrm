@@ -44,6 +44,8 @@ export type TriggerType =
   | 'inbound_message'
   | 'tour_completed'
   | 'deal_stage_changed'
+  | 'deal_created'
+  | 'contact_updated'
   | 'integration_event'
   | 'schedule'
   | 'webhook';
@@ -81,6 +83,10 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // deal_created: fires when a new deal is opened in the CRM.
+  z.object({ type: z.literal('deal_created'), config: z.object({}).strict() }),
+  // contact_updated: fires when an existing contact record is edited.
+  z.object({ type: z.literal('contact_updated'), config: z.object({}).strict() }),
   // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
   // config is empty — the URL is derived from the workflow id at display time.
   z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),
@@ -221,7 +227,12 @@ export type FormatterOperation =
   | 'date_format'
   | 'extract_number'
   | 'extract_email'
-  | 'extract_phone';
+  | 'extract_phone'
+  | 'default_value'
+  | 'truncate'
+  | 'length'
+  | 'split'
+  | 'url_encode';
 
 export const FORMATTER_OPERATIONS = [
   'uppercase',
@@ -234,6 +245,11 @@ export const FORMATTER_OPERATIONS = [
   'extract_number',
   'extract_email',
   'extract_phone',
+  'default_value',
+  'truncate',
+  'length',
+  'split',
+  'url_encode',
 ] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
@@ -307,12 +323,36 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
+  // Two modes: relative (wait N minutes) or until_weekday (wait until the next
+  // occurrence of a given weekday + hour). The executor computes the actual
+  // delay minutes at runtime for until_weekday so the intent survives.
   z.object({
     type: z.literal('delay'),
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
-    config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
+    config: z
+      .object({
+        delayMode: z.enum(['relative', 'until_weekday']).optional(),
+        delayMinutes: z.number().int().min(1).optional(),
+        untilWeekday: z.number().int().min(0).max(6).optional(),
+        untilHour: z.number().int().min(0).max(23).optional(),
+      })
+      .superRefine((cfg, ctx) => {
+        const mode = cfg.delayMode ?? 'relative';
+        if (mode === 'relative') {
+          if (cfg.delayMinutes === undefined || cfg.delayMinutes < 1) {
+            ctx.addIssue({ code: 'custom', path: ['delayMinutes'], message: 'delayMinutes required for relative delay.' });
+          }
+        } else if (mode === 'until_weekday') {
+          if (cfg.untilWeekday === undefined) {
+            ctx.addIssue({ code: 'custom', path: ['untilWeekday'], message: 'untilWeekday required.' });
+          }
+          if (cfg.untilHour === undefined) {
+            ctx.addIssue({ code: 'custom', path: ['untilHour'], message: 'untilHour required.' });
+          }
+        }
+      }),
   }),
   // filter: stop the run if the field condition is not met.
   z.object({
@@ -342,6 +382,11 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
         replacement: z.string().max(200).optional(),
         format: z.string().max(100).optional(),
         toFixed: z.number().int().min(0).max(20).optional(),
+        fallback: z.string().max(500).optional(),
+        truncateLength: z.number().int().min(1).max(10000).optional(),
+        truncateSuffix: z.string().max(20).optional(),
+        splitSeparator: z.string().max(50).optional(),
+        splitIndex: z.number().int().min(1).optional(),
       })
       .strict(),
   }),

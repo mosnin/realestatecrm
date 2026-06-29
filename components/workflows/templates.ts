@@ -9,12 +9,12 @@
  * had typed it.
  *
  * The marquee template — "Hot lead → instant draft" — is the demo: a lead
- * crosses score 80, Chippi drafts a warm SMS intro, and (draft autonomy) the
+ * crosses score 80, Chippi drafts a warm email intro, and (draft autonomy) the
  * realtor approves it. The others show the breadth: an inbound Gmail reply and
  * a scheduled morning follow-up sweep.
  */
 
-import type { WorkflowFormState } from './build-definition';
+import type { ConditionRowState, WorkflowFormState } from './build-definition';
 import type { WorkflowGraph } from '@/lib/workflows/schema';
 
 export type TemplateCategory =
@@ -61,9 +61,9 @@ function rowId(prefix: string): string {
 /** A condition row pre-filled. */
 function condition(
   field: string,
-  operator: WorkflowFormState['conditions'][number]['operator'],
+  operator: ConditionRowState['operator'],
   value: string,
-): WorkflowFormState['conditions'][number] {
+): ConditionRowState {
   return { id: rowId('cond'), field, operator, value };
 }
 
@@ -72,10 +72,13 @@ function blankAction(): WorkflowFormState['actions'][number] {
   return {
     id: rowId('act'),
     type: 'draft_message',
-    channel: 'sms',
+    channel: 'email',
     instruction: '',
     delayMinutes: '',
     delayUnit: 'minutes',
+    delayMode: 'relative',
+    untilWeekday: '1',
+    untilHour: '9',
     title: '',
     dueInDays: '',
     toolkit: '',
@@ -90,6 +93,11 @@ function blankAction(): WorkflowFormState['actions'][number] {
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
     formatterToFixed: '',
+    formatterFallback: '',
+    formatterTruncateLength: '',
+    formatterTruncateSuffix: '',
+    formatterSplitSeparator: '',
+    formatterSplitIndex: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
@@ -116,7 +124,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm, personal intro to this new high-intent lead and reference their interest.',
         },
@@ -187,7 +195,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm thank-you for the tour and ask for their honest take on the home.',
         },
@@ -1151,12 +1159,126 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'draft',
     },
   },
+
+
+  // ── New trigger types: deal_created + contact_updated ─────────────────────
+
+  {
+    id: 'new-deal-welcome-packet',
+    name: 'New deal created → send welcome packet',
+    description: 'The moment a deal is created, draft a personalized welcome email with next steps.',
+    category: 'New leads',
+    popular: true,
+    state: {
+      name: 'New deal created → send welcome packet',
+      trigger: { ...baseTrigger(), type: 'deal_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'email',
+          instruction:
+            'Draft a warm welcome email for this new deal, congratulating them on starting the process, outlining the next steps (pre-approval, property search, first showing), and letting them know you are their dedicated agent.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Schedule initial consultation call for {{lead.name}}',
+          dueInDays: '2',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+
+  {
+    id: 'new-deal-push-alert',
+    name: 'New deal created → instant push alert',
+    description: 'Get a push notification the instant a new deal enters your pipeline.',
+    category: 'New leads',
+    state: {
+      name: 'New deal created → push alert',
+      trigger: { ...baseTrigger(), type: 'deal_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: 'New deal in pipeline',
+          notifyBody: 'A new deal has been created — review it and schedule the first call.',
+        },
+      ],
+      autonomy: 'auto',
+    },
+  },
+
+  {
+    id: 'contact-updated-score-check',
+    name: 'Contact updated → re-score and follow up',
+    description: 'When a contact record is updated, check if their score crossed a threshold and draft a follow-up.',
+    category: 'Follow-up',
+    state: {
+      name: 'Contact updated → re-score check',
+      trigger: { ...baseTrigger(), type: 'contact_updated' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '75')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'score_label',
+          updateValue: 'hot',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'email',
+          instruction:
+            'This contact was just updated and now has a high score. Draft a warm, personal outreach message referencing their property interest and offering to schedule a call.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+
+  {
+    id: 'contact-updated-zapier-webhook',
+    name: 'Contact updated → sync to external CRM',
+    description: 'POST contact data to your CRM, Zapier, or Make.com the moment a record changes.',
+    category: 'Integrations',
+    state: {
+      name: 'Contact updated → external CRM sync',
+      trigger: { ...baseTrigger(), type: 'contact_updated' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'webhook_post',
+          webhookUrl: 'https://hooks.zapier.com/hooks/catch/YOUR_HOOK_ID/',
+          webhookBody: JSON.stringify({
+            name: '{{lead.name}}',
+            email: '{{lead.email}}',
+            phone: '{{lead.phone}}',
+            score: '{{lead.score}}',
+            source: '{{lead.source}}',
+            updatedAt: '{{lead.updatedAt}}',
+          }, null, 2),
+          webhookHeaders: '',
+        },
+      ],
+      autonomy: 'auto',
+    },
+  },
 ];
 
 /**
  * The branching graph for the "Hot vs warm" template:
  *   trigger → condition(lead.score ≥ 80)
- *     true  → draft an SMS now
+ *     true  → draft an email now
  *     false → schedule a follow-up message
  */
 function hotVsWarmGraph(): WorkflowGraph {
@@ -1174,7 +1296,7 @@ function hotVsWarmGraph(): WorkflowGraph {
         action: {
           type: 'draft_message',
           config: {
-            channel: 'sms',
+            channel: 'email',
             instruction:
               'Draft a warm, personal intro to this hot lead and reference their interest — send it now.',
           },
@@ -1186,7 +1308,7 @@ function hotVsWarmGraph(): WorkflowGraph {
         action: {
           type: 'schedule_message',
           config: {
-            channel: 'sms',
+            channel: 'email',
             instruction:
               'Draft a friendly check-in for this warm lead to go out in a couple of days.',
             delayMinutes: 2880,

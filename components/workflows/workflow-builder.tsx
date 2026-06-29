@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog, Play } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,7 +30,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -59,6 +61,7 @@ import {
   buildDefinition,
   type ActionRowState,
   type ConditionRowState,
+  type ConditionGroupFormState,
   type WorkflowFormState,
 } from './build-definition';
 import {
@@ -83,20 +86,31 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
   inbound_message: 'An inbound message arrives',
   tour_completed: 'A tour is completed',
   deal_stage_changed: 'A deal changes stage',
+  deal_created: 'A new deal is created',
+  contact_updated: "A contact's info is updated",
   integration_event: 'A connected app fires an event',
   schedule: 'On a schedule',
   webhook: 'Webhook — any HTTP POST',
 };
 
 const TRIGGER_ORDER: TriggerType[] = [
-  'lead_score_threshold',
   'lead_created',
+  'lead_score_threshold',
+  'contact_updated',
   'inbound_message',
   'tour_completed',
   'deal_stage_changed',
+  'deal_created',
   'integration_event',
   'schedule',
   'webhook',
+];
+
+const TRIGGER_CATEGORIES: { label: string; keys: TriggerType[] }[] = [
+  { label: 'Lead Events', keys: ['lead_created', 'lead_score_threshold', 'contact_updated'] },
+  { label: 'Deal Events', keys: ['deal_created', 'deal_stage_changed', 'tour_completed'] },
+  { label: 'Conversation', keys: ['inbound_message'] },
+  { label: 'External / Scheduled', keys: ['integration_event', 'schedule', 'webhook'] },
 ];
 
 /** Sample trigger event data shown in the "Test trigger" panel. Each entry is a
@@ -123,7 +137,7 @@ const TRIGGER_SAMPLE_DATA: Record<TriggerType, Record<string, string | number>> 
     'lead.previousScore': 72,
   },
   inbound_message: {
-    'message.channel': 'sms',
+    'message.channel': 'email',
     'message.body': 'Hey, I saw the listing on Oak Ave — is it still available?',
     'message.from': '+1 512 555 0192',
     'lead.name': 'Priya Patel',
@@ -149,6 +163,23 @@ const TRIGGER_SAMPLE_DATA: Record<TriggerType, Record<string, string | number>> 
     'property.address': '340 Maple Dr, Austin TX 78704',
     'property.price': 620000,
     'deal.changedAt': '2025-06-15T16:05:00Z',
+  },
+  deal_created: {
+    'deal.stage': 'prospect',
+    'deal.amount': 650000,
+    'lead.name': 'Morgan Davis',
+    'lead.email': 'morgan@example.com',
+    'lead.phone': '+1 512 555 3344',
+    'deal.createdAt': '2025-06-15T13:00:00Z',
+  },
+  contact_updated: {
+    'lead.name': 'Jordan Kim',
+    'lead.email': 'jordan@example.com',
+    'lead.phone': '+1 512 555 8899',
+    'lead.score': 67,
+    'lead.source': 'Referral',
+    'lead.propertyInterest': '2BR condo in South Austin',
+    'lead.updatedAt': '2025-06-15T15:30:00Z',
   },
   integration_event: {
     'event.toolkit': 'gmail',
@@ -196,10 +227,10 @@ const OPERATOR_LABELS: Record<Operator, string> = {
 const VALUELESS_OPERATORS = new Set<Operator>(['exists', 'not_exists']);
 
 const ACTION_LABELS: Record<WorkflowActionType, string> = {
-  draft_message: 'Draft a message',
+  call_integration: 'Send via connected app (Gmail, Slack…)',
+  draft_message: 'AI draft — compose for review',
   schedule_message: 'Schedule a message',
   create_task: 'Create a task',
-  call_integration: 'Call a connected app',
   run_chippi: 'Ask Chippi to do something',
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
@@ -210,6 +241,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
+  'call_integration',
   'draft_message',
   'run_chippi',
   'create_task',
@@ -219,8 +251,18 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'filter',
   'formatter',
   'delay',
-  'call_integration',
   'webhook_post',
+];
+
+const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
+  {
+    label: 'Actions',
+    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post'],
+  },
+  {
+    label: 'Logic',
+    keys: ['filter', 'formatter', 'delay'],
+  },
 ];
 
 const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
@@ -238,10 +280,10 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
-  draft_message: 'Compose an SMS or email for you to review before sending',
-  schedule_message: 'Auto-send a message after a delay',
+  call_integration: 'Send email or message via your connected Gmail, Slack, Outlook, and more',
+  draft_message: 'Ask Chippi to draft an email — you review and approve before it sends',
+  schedule_message: 'Queue an AI-drafted email to auto-send after a delay',
   create_task: 'Create a follow-up task for you or your team',
-  call_integration: 'Trigger an action in a connected app',
   run_chippi: 'Ask Chippi to research, summarize, or reason',
   delay: 'Pause the workflow before the next step',
   filter: 'Stop the run if a condition is not met',
@@ -262,6 +304,11 @@ const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
   extract_number: 'Extract number',
   extract_email: 'Extract email',
   extract_phone: 'Extract phone',
+  default_value: 'Default value',
+  truncate: 'Truncate text',
+  length: 'Text length',
+  split: 'Split text',
+  url_encode: 'URL encode',
 };
 
 const DATE_FORMAT_OPTIONS = [
@@ -415,8 +462,8 @@ export function emptyFormState(): WorkflowFormState {
   return {
     name: '',
     trigger: {
-      type: 'lead_score_threshold',
-      min: '80',
+      type: 'lead_created',
+      min: '',
       channel: 'any',
       toolkit: '',
       event: '',
@@ -452,7 +499,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
   return {
     id: nextRowId('act'),
     type,
-    channel: 'sms',
+    channel: 'email',
     instruction: '',
     delayMinutes: '',
     delayUnit: 'minutes',
@@ -466,10 +513,18 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     filterValue: '',
     formatterInput: '',
     formatterOperation: 'uppercase',
+    delayMode: 'relative',
+    untilWeekday: '1',
+    untilHour: '9',
     formatterFind: '',
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
     formatterToFixed: '',
+    formatterFallback: '',
+    formatterTruncateLength: '',
+    formatterTruncateSuffix: '',
+    formatterSplitSeparator: '',
+    formatterSplitIndex: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
@@ -486,29 +541,41 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
 const emptyGraph: WorkflowGraph = { nodes: [{ id: 't', kind: 'trigger' }], edges: [] };
 
 /**
- * Map a stored ConditionGroup back into the builder's flat condition ROWS — the
- * inverse used by the manager's recordToFormState. Flat group only: any nested
- * sub-group is skipped (v1 doesn't author them). Reused when converting a LINEAR
- * graph back to Simple mode so the realtor's branches-free work is preserved.
+ * Map a stored ConditionGroup back into the builder's condition items. Flat rules
+ * become ConditionRowState; nested sub-groups become ConditionGroupFormState.
  */
-function conditionsToRows(group: ConditionGroup): ConditionRowState[] {
-  return group.rules.flatMap((r) => {
-    if ('rules' in r) return [];
-    return [
-      {
-        id: nextRowId('cond'),
-        field: r.field,
-        operator: r.operator as Operator,
-        value: r.value === undefined || r.value === null ? '' : String(r.value),
-      },
-    ];
+function conditionsToRows(group: ConditionGroup): Array<ConditionRowState | ConditionGroupFormState> {
+  return group.rules.map((r) => {
+    if ('rules' in r) {
+      return {
+        id: nextRowId('grp'),
+        type: 'group' as const,
+        op: r.op,
+        rules: r.rules.flatMap((sub) => {
+          if ('rules' in sub) return [];
+          return [{
+            id: nextRowId('cond'),
+            field: sub.field,
+            operator: sub.operator as Operator,
+            value: sub.value === undefined || sub.value === null ? '' : String(sub.value),
+          }];
+        }),
+      };
+    }
+    return {
+      id: nextRowId('cond'),
+      field: r.field,
+      operator: r.operator as Operator,
+      value: r.value === undefined || r.value === null ? '' : String(r.value),
+    };
   });
 }
 
 /** Map stored WorkflowActions back into the builder's action ROWS (mirrors
  *  recordToFormState's action mapping). */
 /** Convert stored delayMinutes back to a user-friendly amount + unit. */
-function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours' | 'days' } {
+function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours' | 'days' | 'weeks' } {
+  if (m % 10080 === 0 && m >= 10080) return { amount: String(m / 10080), unit: 'weeks' };
   if (m % 1440 === 0) return { amount: String(m / 1440), unit: 'days' };
   if (m % 60 === 0) return { amount: String(m / 60), unit: 'hours' };
   return { amount: String(m), unit: 'minutes' };
@@ -516,9 +583,16 @@ function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours
 
 function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
   return actions.map((a) => {
+    const isDelayUntil = a.type === 'delay' && a.config.delayMode === 'until_weekday';
+    const relativeDelayMinutes =
+      a.type === 'delay' && !isDelayUntil
+        ? (a.config.delayMinutes ?? 0)
+        : a.type === 'schedule_message'
+          ? a.config.delayMinutes
+          : 0;
     const delayDisplay =
-      a.type === 'delay' || a.type === 'schedule_message'
-        ? minutesToDisplay(a.config.delayMinutes)
+      (a.type === 'delay' && !isDelayUntil) || a.type === 'schedule_message'
+        ? minutesToDisplay(relativeDelayMinutes)
         : null;
     return {
       id: nextRowId('act'),
@@ -526,16 +600,19 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       label: a.label,
       note: a.note,
       channel:
-        a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'sms',
+        a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'email',
       instruction:
         a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
           ? a.config.instruction
           : '',
       delayMinutes:
-        a.type === 'schedule_message' || a.type === 'delay'
+        a.type === 'schedule_message' || (a.type === 'delay' && !isDelayUntil)
           ? (delayDisplay?.amount ?? '')
           : '',
       delayUnit: delayDisplay?.unit ?? 'hours',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      untilWeekday: a.type === 'delay' && isDelayUntil && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
+      untilHour: a.type === 'delay' && isDelayUntil && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -557,6 +634,11 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
       formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
       formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
+      formatterFallback: a.type === 'formatter' ? (a.config.fallback ?? '') : '',
+      formatterTruncateLength: a.type === 'formatter' && a.config.truncateLength !== undefined ? String(a.config.truncateLength) : '',
+      formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
+      formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
+      formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -643,14 +725,27 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
 function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const data = TRIGGER_SAMPLE_DATA[triggerType];
+  const [realData, setRealData] = useState<Record<string, string | number> | null>(null);
+  const [loadingReal, setLoadingReal] = useState(false);
+  const staticData = TRIGGER_SAMPLE_DATA[triggerType];
+  const data = realData ?? staticData;
+  const isReal = realData !== null;
+
+  // Trigger types that have real DB records to load
+  const canLoadReal = !['schedule', 'webhook', 'integration_event'].includes(triggerType);
+
+  function loadReal() {
+    setLoadingReal(true);
+    fetch(`/api/workflows/sample-trigger?type=${encodeURIComponent(triggerType)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d: { data: Record<string, string | number>; isReal: boolean }) => {
+        if (d.isReal && Object.keys(d.data).length > 0) setRealData(d.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingReal(false));
+  }
 
   function copyJson() {
-    const obj: Record<string, string | number> = {};
-    Object.entries(data).forEach(([k, v]) => {
-      const key = k.split('.').pop()!;
-      obj[key] = v;
-    });
     navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -669,8 +764,13 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
           <CheckIcon size={11} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
         </span>
         <span className="flex-1 text-[12px] font-medium text-foreground">
-          {open ? 'Hide' : 'Show'} sample trigger data
+          {open ? 'Hide' : 'Show'} trigger data
         </span>
+        {isReal && (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+            Live
+          </span>
+        )}
         <ChevronDown
           size={13}
           className={cn(
@@ -686,19 +786,45 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
           <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Sample event fields
+                {isReal ? 'Live — your most recent record' : 'Sample event fields'}
               </p>
-              <button
-                type="button"
-                onClick={copyJson}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-              >
-                {copied ? (
-                  <><CheckIcon size={11} /> Copied</>
-                ) : (
-                  <><Copy size={11} /> Copy JSON</>
+              <div className="flex items-center gap-2">
+                {canLoadReal && !isReal && (
+                  <button
+                    type="button"
+                    onClick={loadReal}
+                    disabled={loadingReal}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                  >
+                    {loadingReal ? (
+                      <Loader2 size={11} className="animate-spin" aria-hidden />
+                    ) : (
+                      <Play size={11} aria-hidden />
+                    )}
+                    {loadingReal ? 'Loading…' : 'Load real data'}
+                  </button>
                 )}
-              </button>
+                {isReal && (
+                  <button
+                    type="button"
+                    onClick={() => setRealData(null)}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                  >
+                    Use sample
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={copyJson}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                >
+                  {copied ? (
+                    <><CheckIcon size={11} /> Copied</>
+                  ) : (
+                    <><Copy size={11} /> Copy JSON</>
+                  )}
+                </button>
+              </div>
             </div>
             <dl className="space-y-1.5">
               {Object.entries(data).map(([key, val]) => (
@@ -714,7 +840,9 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
             </dl>
           </div>
           <p className={CAPTION}>
-            These are example values — real events will carry actual lead and deal data.
+            {isReal
+              ? 'Real data from your CRM — tokens resolve to these values when the trigger fires.'
+              : 'Example values — click "Load real data" to use a live record from your CRM.'}
           </p>
         </div>
       )}
@@ -806,8 +934,17 @@ function actionSummary(row: ActionRowState): string {
       return row.title ? `Task: ${trunc(row.title)}` : 'No title set';
     case 'run_chippi':
       return trunc(row.instruction) || 'no instruction';
-    case 'delay':
+    case 'delay': {
+      if (row.delayMode === 'until_weekday') {
+        const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const day = DAYS[parseInt(row.untilWeekday, 10)] ?? 'Day';
+        const h = parseInt(row.untilHour, 10);
+        const ampm = h < 12 ? 'AM' : 'PM';
+        const h12 = ((h + 11) % 12) + 1;
+        return `Wait until ${day} at ${h12}:00 ${ampm}`;
+      }
       return `Wait ${row.delayMinutes || '?'} ${row.delayUnit}`;
+    }
     case 'filter':
       return row.filterField
         ? `${row.filterField} ${row.filterOperator}${row.filterValue ? ` ${row.filterValue}` : ''}`
@@ -849,9 +986,9 @@ function actionAccent(type: WorkflowActionType) {
   }
   if (type === 'filter') {
     return {
-      border: 'border-l-sky-400 dark:border-l-sky-500/70',
-      badge: 'bg-sky-500',
-      icon: 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400',
+      border: 'border-l-yellow-400 dark:border-l-yellow-500/70',
+      badge: 'bg-yellow-500',
+      icon: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-400',
     };
   }
   if (type === 'formatter') {
@@ -931,7 +1068,7 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     label: 'Trigger',
     tokens: [
       { label: 'Message text', token: '{{trigger.message}}', hint: 'the raw message body' },
-      { label: 'Channel', token: '{{trigger.channel}}', hint: 'sms or email' },
+      { label: 'Channel', token: '{{trigger.channel}}', hint: 'e.g. email' },
     ],
   },
   tour_completed: {
@@ -1136,14 +1273,22 @@ function AddStepPicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<'All' | 'Actions' | 'Logic'>('All');
   const q = query.toLowerCase().trim();
+
+  const pool = q
+    ? ACTION_ORDER
+    : category === 'All'
+      ? ACTION_ORDER
+      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys ?? ACTION_ORDER);
+
   const filtered = q
-    ? ACTION_ORDER.filter(
+    ? pool.filter(
         (t) =>
           ACTION_LABELS[t].toLowerCase().includes(q) ||
           ACTION_DESCRIPTIONS[t].toLowerCase().includes(q),
       )
-    : ACTION_ORDER;
+    : pool;
 
   return (
     <div className="rounded-xl border border-border/60 bg-card shadow-md">
@@ -1168,6 +1313,25 @@ function AddStepPicker({
           aria-label="Search actions"
         />
       </div>
+      {!q && (
+        <div className="flex gap-1 border-b border-border/40 px-3 py-2">
+          {(['All', 'Actions', 'Logic'] as const).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategory(cat)}
+              className={cn(
+                'rounded-full px-3 py-1 text-[11.5px] font-medium transition-colors',
+                category === cat
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
         {filtered.length === 0 ? (
           <p className="col-span-2 py-4 text-center text-[12px] text-muted-foreground">
@@ -1523,11 +1687,341 @@ function ActionZapCard({
   );
 }
 
+// ── Builder run-history types + sub-components ───────────────────────────────
+
+interface BuilderRunStep {
+  id: string;
+  stepIndex: number;
+  kind: string;
+  actionType: string | null;
+  status: string;
+  detail: unknown;
+  createdAt: string;
+}
+
+interface BuilderRunRecord {
+  id: string;
+  status: string;
+  summary: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+  triggerEvent: unknown;
+  steps: BuilderRunStep[];
+}
+
+const BUILDER_ACTION_LABELS: Record<string, string> = {
+  draft_message: 'Draft message',
+  schedule_message: 'Schedule message',
+  create_task: 'Create task',
+  call_integration: 'Call integration',
+  run_chippi: 'Run Chippi',
+  formatter: 'Format data',
+  delay: 'Delay',
+  filter: 'Filter',
+  webhook_post: 'Webhook POST',
+  update_lead: 'Update lead',
+  notify_agent: 'Push alert',
+  condition: 'Condition check',
+};
+
+const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
+  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
+  filter:           { icon: Filter,       cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400' },
+  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
+  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+};
+
+function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
+  if (detail == null || typeof detail !== 'object') return null;
+  const obj = detail as Record<string, unknown>;
+
+  type Row = { key: string; value: string };
+  const rows: Row[] = [];
+
+  function add(key: string, value: unknown) {
+    if (value === undefined || value === null) return;
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    if (str.trim()) rows.push({ key, value: str.trim() });
+  }
+
+  if (actionType === 'formatter') {
+    add('operation', obj.operation);
+    add('input', obj.inputResolved ?? obj.input);
+    add('output', obj.output);
+  } else if (actionType === 'draft_message' || actionType === 'schedule_message') {
+    add('channel', obj.channel);
+    add('recipient', obj.recipient);
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'create_task') {
+    add('title', obj.title);
+    add('due', obj.dueAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'run_chippi') {
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'call_integration') {
+    add('toolkit', obj.toolkit);
+    add('action', obj.action);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'delay') {
+    add('waited', obj.waited ?? obj.delayMinutes);
+  } else if (actionType === 'filter') {
+    add('field', obj.field);
+    add('result', obj.passed !== undefined ? (obj.passed ? 'passed' : 'blocked') : undefined);
+    if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'webhook_post') {
+    add('url', obj.url);
+    add('status', obj.statusCode);
+    add('response', obj.responseSnippet);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'update_lead') {
+    add('field', obj.field);
+    add('value', obj.value ?? obj.tag ?? obj.days);
+    if (obj.followUpAt) add('followUpAt', obj.followUpAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'notify_agent') {
+    add('title', obj.title);
+    if (obj.body) add('body', obj.body);
+    add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
+    if (obj.note) add('note', obj.note);
+  } else {
+    for (const [k, v] of Object.entries(obj).slice(0, 4)) {
+      if (typeof v !== 'object') add(k, v);
+    }
+  }
+
+  if (rows.length === 0) return null;
+  return (
+    <dl className="mt-1 flex flex-col gap-0.5">
+      {rows.map(({ key, value }) => (
+        <div key={key} className="flex items-start gap-1.5 text-[11px]">
+          <dt className="min-w-[52px] flex-shrink-0 capitalize font-medium text-muted-foreground/60">{key}</dt>
+          <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function BuilderRunItem({ run, workflowId }: { run: BuilderRunRecord; workflowId: string }) {
+  const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const hasSteps = run.steps.length > 0;
+
+  const durationMs = run.finishedAt
+    ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()
+    : null;
+  const durationLabel =
+    durationMs === null ? null
+    : durationMs < 1000 ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+
+  async function retryRun(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        toast.success('Re-run triggered', { description: 'Check the test panel above for results.' });
+      } else {
+        toast.error('Re-run failed — try again.');
+      }
+    } catch {
+      toast.error('Re-run failed — try again.');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  return (
+    <li className="overflow-hidden rounded-lg border border-border/50 bg-card/40">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => hasSteps && setOpen((o) => !o)}
+          disabled={!hasSteps}
+          className={cn(
+            'flex flex-1 items-center gap-2.5 px-3 py-2.5 text-left',
+            hasSteps && 'transition-colors hover:bg-foreground/[0.03]',
+            !hasSteps && 'cursor-default',
+          )}
+        >
+          {/* Status icon */}
+          <span
+            className={cn(
+              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+              run.status === 'completed' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+              run.status === 'failed' && 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+              run.status === 'skipped' && 'bg-muted text-muted-foreground',
+              run.status === 'running' && 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+            )}
+            aria-hidden
+          >
+            {run.status === 'completed' && <CheckIcon size={11} strokeWidth={2.5} />}
+            {run.status === 'failed' && <X size={11} strokeWidth={2.5} />}
+            {run.status === 'skipped' && <ArrowUpDown size={9} />}
+            {run.status === 'running' && <Loader2 size={10} className="animate-spin" />}
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className={cn(
+                'text-[12.5px] font-medium',
+                run.status === 'completed' && 'text-foreground',
+                run.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                run.status === 'running' && 'text-amber-700 dark:text-amber-400',
+                run.status === 'skipped' && 'text-muted-foreground',
+              )}>
+                {run.status === 'completed' ? 'Completed'
+                  : run.status === 'failed' ? 'Failed'
+                  : run.status === 'running' ? 'Running'
+                  : 'Skipped'}
+              </span>
+              <span className="text-[11px] text-muted-foreground/60">{timeAgo(run.startedAt)}</span>
+              {durationLabel && (
+                <span className="text-[11px] tabular-nums text-muted-foreground/50">· {durationLabel}</span>
+              )}
+              {hasSteps && (
+                <span className="ml-auto text-[11px] text-muted-foreground/50">
+                  {run.steps.length} step{run.steps.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </span>
+            {(run.error || run.summary) && (
+              <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted-foreground/80">
+                {run.error ?? run.summary}
+              </span>
+            )}
+          </span>
+
+          {hasSteps && (
+            <ChevronRight
+              size={13}
+              aria-hidden
+              className={cn('flex-shrink-0 text-muted-foreground/40 transition-transform', open && 'rotate-90')}
+            />
+          )}
+        </button>
+
+        {/* Retry button — only visible on failed runs */}
+        {run.status === 'failed' && (
+          <button
+            type="button"
+            onClick={retryRun}
+            disabled={retrying}
+            aria-label="Retry this run"
+            title="Re-run this workflow (test mode)"
+            className="flex flex-shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border/40 px-2.5 text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            {retrying ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+            <span className="text-[9px] font-medium">Retry</span>
+          </button>
+        )}
+      </div>
+
+      {/* Expanded detail — trigger event + step timeline */}
+      {open && hasSteps && (
+        <div className="border-t border-border/40 bg-muted/10 px-3 py-2.5">
+          {/* Trigger data */}
+          {((): React.ReactNode => {
+            if (!run.triggerEvent || typeof run.triggerEvent !== 'object' || Array.isArray(run.triggerEvent)) return null;
+            const ev = run.triggerEvent as Record<string, unknown>;
+            const entries = Object.entries(ev).filter(([, v]) => v !== undefined && v !== null).slice(0, 6);
+            if (entries.length === 0) return null;
+            return (
+              <div className="mb-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Trigger data</p>
+                <dl className="overflow-hidden rounded-md border border-border/40 bg-background/60 text-[11px]">
+                  {entries.map(([k, v], i) => (
+                    <div key={k} className={cn('flex items-start gap-2 px-2.5 py-1', i !== entries.length - 1 && 'border-b border-border/30')}>
+                      <dt className="w-24 flex-shrink-0 capitalize font-medium text-muted-foreground/70">{k.replace(/_/g, ' ')}</dt>
+                      <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">
+                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })()}
+          {/* Step timeline */}
+          <ul className="relative space-y-0">
+            {run.steps.map((step, idx) => {
+              const isLast = idx === run.steps.length - 1;
+              const ai = step.actionType ? BUILDER_ACTION_ICON_MAP[step.actionType] : null;
+              const AIcon = ai?.icon;
+              return (
+                <li key={step.id} className="relative flex gap-3 pb-3 last:pb-0">
+                  {!isLast && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[9px] top-5 w-px bg-border/50"
+                      style={{ height: 'calc(100% - 4px)' }}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      'relative z-10 mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px]',
+                      step.status === 'ok' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+                      step.status === 'failed' && 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+                      step.status === 'skipped' && 'bg-muted text-muted-foreground',
+                    )}
+                    aria-label={step.status}
+                  >
+                    {step.status === 'ok' && <CheckIcon size={9} strokeWidth={2.5} />}
+                    {step.status === 'failed' && <X size={9} strokeWidth={2.5} />}
+                    {step.status === 'skipped' && <span>–</span>}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {AIcon && (
+                        <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai!.cls)}>
+                          <AIcon size={9} aria-hidden />
+                        </span>
+                      )}
+                      <span className="text-[12px] font-medium text-foreground">
+                        {BUILDER_ACTION_LABELS[step.actionType ?? step.kind] ?? (step.actionType ?? step.kind)}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] font-medium uppercase tracking-wide',
+                        step.status === 'ok' && 'text-emerald-600 dark:text-emerald-400',
+                        step.status === 'failed' && 'text-rose-600 dark:text-rose-400',
+                        step.status === 'skipped' && 'text-muted-foreground',
+                      )}>
+                        {step.status === 'ok' ? 'OK' : step.status === 'failed' ? 'Error' : 'Skipped'}
+                      </span>
+                    </div>
+                    <BuilderStepDetailTable detail={step.detail} actionType={step.actionType} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </li>
+  );
+}
+
 // ── The builder ──────────────────────────────────────────────────────────────
 
 export function WorkflowBuilder({
   initial,
   initialEnabled,
+  initialNotifyOnError,
   saving,
   workflowId,
   lastRunAt,
@@ -1538,6 +2032,8 @@ export function WorkflowBuilder({
   initial?: WorkflowFormState;
   /** Starting value for the "Turn on when saved" toggle. Defaults to true for new workflows. */
   initialEnabled?: boolean;
+  /** Starting value for the "Notify me on failure" toggle. Defaults to false. */
+  initialNotifyOnError?: boolean;
   saving: boolean;
   /** The id of the workflow being edited (if editing an existing one). Used to
    *  display the webhook URL for webhook-triggered workflows. */
@@ -1545,25 +2041,28 @@ export function WorkflowBuilder({
   /** Last execution time / status — shown in the builder footer for existing workflows. */
   lastRunAt?: string | null;
   lastRunStatus?: 'ok' | 'error' | 'skipped' | null;
-  /** Receives the validated definition + name + description + enabled; the manager owns the fetch. */
-  onSave: (payload: { name: string; description?: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
+  /** Receives the validated definition + name + description + enabled + notifyOnError; the manager owns the fetch. */
+  onSave: (payload: { name: string; description?: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean; notifyOnError: boolean }) => void;
   onCancel: () => void;
 }) {
   const [state, setState] = useState<WorkflowFormState>(() => initial ?? emptyFormState());
   const [enabled, setEnabled] = useState(() => initialEnabled ?? true);
+  const [notifyOnError, setNotifyOnError] = useState(() => initialNotifyOnError ?? false);
   /**
    * 'simple'  → the When / If / Then linear composer (state.graph stays null).
    * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
    * Open on the canvas when we're handed a graph-backed workflow (edit/template).
    */
-  // Default new workflows to the canvas so it's immediately visible.
-  // Editing a linear workflow starts simple; editing a graph workflow starts advanced.
+  // New workflows start in simple mode (Zapier-style linear builder).
+  // Editing a linear workflow stays simple; editing a graph workflow opens advanced.
   const [mode, setMode] = useState<'simple' | 'advanced'>(
-    initial ? (initial.graph ? 'advanced' : 'simple') : 'advanced',
+    initial ? (initial.graph ? 'advanced' : 'simple') : 'simple',
   );
   /** Validation message surfaced from parseWorkflowDefinition (client guard). */
   const [issues, setIssues] = useState<string[]>([]);
   const [nameError, setNameError] = useState('');
+  /** Whether the name heading is in edit mode (input) vs display mode (heading). */
+  const [nameEditing, setNameEditing] = useState(() => !initial || !state.name.trim());
   /** Turns true after the user makes any edit — gates incomplete badges so a
    *  blank form doesn't open covered in warnings. */
   const [dirty, setDirty] = useState(false);
@@ -1581,6 +2080,22 @@ export function WorkflowBuilder({
   const [insertPickerAt, setInsertPickerAt] = useState<number | null>(null);
   /** Per-action test results keyed by action row id. */
   const [stepTests, setStepTests] = useState<Record<string, { loading: boolean; status?: 'ok' | 'failed'; detail?: unknown; durationMs?: number; error?: string }>>({});
+  /** Whether the run history panel is open (only available for saved workflows). */
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRuns, setHistoryRuns] = useState<BuilderRunRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!showHistory || !workflowId) return;
+    let live = true;
+    setHistoryLoading(true);
+    fetch(`/api/workflows/${workflowId}/runs`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { runs: BuilderRunRecord[] }) => { if (live) setHistoryRuns(d.runs); })
+      .catch(() => {})
+      .finally(() => { if (live) setHistoryLoading(false); });
+    return () => { live = false; };
+  }, [showHistory, workflowId]);
 
   async function testStep(row: ActionRowState) {
     if (!workflowId) return;
@@ -1659,7 +2174,18 @@ export function WorkflowBuilder({
     setDirty(true);
     setState((s) => ({
       ...s,
-      conditions: s.conditions.map((c) => (c.id === id ? { ...c, ...next } : c)),
+      conditions: s.conditions.map((c) =>
+        c.id === id && !('type' in c && c.type === 'group') ? { ...c, ...next } : c
+      ),
+    }));
+  }
+  function updateConditionGroup(groupId: string, next: Partial<Omit<ConditionGroupFormState, 'id' | 'type'>>) {
+    setDirty(true);
+    setState((s) => ({
+      ...s,
+      conditions: s.conditions.map((c) =>
+        c.id === groupId && 'type' in c && c.type === 'group' ? { ...c, ...next } : c
+      ),
     }));
   }
   function updateAction(id: string, next: Partial<ActionRowState>) {
@@ -1691,9 +2217,10 @@ export function WorkflowBuilder({
   const triggerIncomplete = useMemo(() => {
     if (!dirty) return false;
     const t = state.trigger;
+    // integration_event requires both toolkit and event to be set
     if (t.type === 'integration_event') return !t.toolkit || !t.event;
-    if (t.type === 'deal_stage_changed') return !t.toStage;
-    if (t.type === 'schedule') return !t.hour;
+    // lead_score_threshold requires a minimum score
+    if (t.type === 'lead_score_threshold') return !t.min.trim() || Number(t.min) < 1 || Number(t.min) > 100;
     return false;
   }, [dirty, state.trigger]);
 
@@ -1703,7 +2230,10 @@ export function WorkflowBuilder({
       return !row.instruction.trim();
     if (row.type === 'create_task') return !row.title.trim();
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
-    if (row.type === 'delay') return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
+    if (row.type === 'delay') {
+      if (row.delayMode === 'until_weekday') return row.untilWeekday === '' || row.untilHour === '';
+      return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
+    }
     if (row.type === 'filter') return !row.filterField.trim();
     if (row.type === 'formatter') return !row.formatterInput.trim();
     if (row.type === 'webhook_post') return !row.webhookUrl.trim();
@@ -1775,85 +2305,100 @@ export function WorkflowBuilder({
     }
 
     const description = state.description?.trim() || undefined;
-    onSave({ name, description, definition, enabled });
+    onSave({ name, description, definition, enabled, notifyOnError });
   }
 
   return (
     <div className="space-y-4">
+      {/* Zapier-style inline-editable workflow name heading */}
+      <div className="space-y-1.5">
+        {nameEditing ? (
+          <input
+            autoFocus
+            value={state.name}
+            onChange={(e) => { patch({ name: e.target.value }); if (nameError) setNameError(''); }}
+            onBlur={() => { if (state.name.trim()) setNameEditing(false); }}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === 'Escape') && state.name.trim()) {
+                setNameEditing(false);
+                e.preventDefault();
+              }
+            }}
+            placeholder="Name your workflow…"
+            maxLength={120}
+            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-orange-400 pb-0.5 placeholder:text-muted-foreground/40 caret-orange-500"
+            aria-label="Workflow name"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNameEditing(true)}
+            className="group flex items-center gap-2 text-left w-full"
+            aria-label={`Edit workflow name: ${state.name}`}
+          >
+            <span className="text-xl font-semibold text-foreground">{state.name}</span>
+            <PencilLine size={14} className="flex-shrink-0 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+          </button>
+        )}
+        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+        <Textarea
+          value={state.description ?? ''}
+          onChange={(e) => patch({ description: e.target.value || undefined })}
+          placeholder="Add a description… (optional)"
+          rows={1}
+          maxLength={300}
+          className="resize-none text-[12.5px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground"
+        />
+      </div>
+
       {/* Live preview */}
       <WorkflowPreview state={state} />
 
-      {/* Name + Mode — side by side */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[180px] flex-1 space-y-1.5">
-          <Label htmlFor="wf-name" className="text-[12.5px] font-medium text-foreground">
-            Name
-          </Label>
-          <Input
-            id="wf-name"
-            value={state.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder="Hot lead → instant draft"
-            maxLength={120}
-            autoFocus
-          />
-          {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-        </div>
-        <div className="w-full basis-full">
-          <Textarea
-            value={state.description ?? ''}
-            onChange={(e) => patch({ description: e.target.value || undefined })}
-            placeholder="Add a description… (optional — shown on the workflow list)"
-            rows={1}
-            maxLength={300}
-            className="resize-none text-[12.5px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground"
-          />
-        </div>
-        <div className="flex-shrink-0 space-y-1.5">
-          <div
-            className="inline-flex rounded-md border border-border/60 p-0.5"
-            role="group"
-            aria-label="Builder mode"
+      {/* Mode toggle — Simple vs Advanced */}
+      <div className="flex items-center gap-3">
+        <div
+          className="inline-flex rounded-md border border-border/60 p-0.5"
+          role="group"
+          aria-label="Builder mode"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'simple') return;
+              if (graphIsLinear) exitAdvanced();
+            }}
+            aria-pressed={mode === 'simple'}
+            disabled={mode === 'advanced' && !graphIsLinear}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'simple'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+              mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+            )}
           >
-            <button
-              type="button"
-              onClick={() => {
-                if (mode === 'simple') return;
-                if (graphIsLinear) exitAdvanced();
-              }}
-              aria-pressed={mode === 'simple'}
-              disabled={mode === 'advanced' && !graphIsLinear}
-              className={cn(
-                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-                mode === 'simple'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-                mode === 'advanced' && !graphIsLinear && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
-              )}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (mode === 'advanced') return;
-                enterAdvanced();
-              }}
-              aria-pressed={mode === 'advanced'}
-              className={cn(
-                'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
-                mode === 'advanced'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              Advanced
-            </button>
-          </div>
-          {mode === 'advanced' && !graphIsLinear && (
-            <p className={CAPTION}>This automation branches — edit on the canvas.</p>
-          )}
+            Simple
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'advanced') return;
+              enterAdvanced();
+            }}
+            aria-pressed={mode === 'advanced'}
+            className={cn(
+              'rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors',
+              mode === 'advanced'
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Advanced
+          </button>
         </div>
+        {mode === 'advanced' && !graphIsLinear && (
+          <p className={CAPTION}>This automation branches — edit on the canvas.</p>
+        )}
       </div>
 
       {/* 1. Trigger step card */}
@@ -1870,10 +2415,17 @@ export function WorkflowBuilder({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TRIGGER_ORDER.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TRIGGER_LABELS[t]}
-                </SelectItem>
+              {TRIGGER_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.label}>
+                  <SelectLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-2 py-1.5">
+                    {cat.label}
+                  </SelectLabel>
+                  {cat.keys.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TRIGGER_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -1960,30 +2512,65 @@ export function WorkflowBuilder({
             ) : (
               <>
                 <ul className="space-y-2">
-                  {state.conditions.map((row) => (
-                    <ConditionRowEditor
-                      key={row.id}
-                      row={row}
-                      triggerType={state.trigger.type}
-                      onChange={(next) => updateCondition(row.id, next)}
-                      onRemove={() =>
-                        patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
-                      }
-                    />
-                  ))}
+                  {state.conditions.map((row) => {
+                    if ('type' in row && row.type === 'group') {
+                      return (
+                        <ConditionGroupEditor
+                          key={row.id}
+                          group={row as ConditionGroupFormState}
+                          triggerType={state.trigger.type}
+                          onChange={(next) => updateConditionGroup(row.id, next)}
+                          onRemove={() => patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })}
+                        />
+                      );
+                    }
+                    return (
+                      <ConditionRowEditor
+                        key={row.id}
+                        row={row as ConditionRowState}
+                        triggerType={state.trigger.type}
+                        onChange={(next) => updateCondition(row.id, next)}
+                        onRemove={() =>
+                          patch({ conditions: state.conditions.filter((c) => c.id !== row.id) })
+                        }
+                      />
+                    );
+                  })}
                 </ul>
-                <button
-                  type="button"
-                  onClick={() =>
-                    patch({
-                      conditions: [...state.conditions, newConditionRow(state.trigger.type)],
-                    })
-                  }
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Plus size={13} aria-hidden />
-                  Add condition
-                </button>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        conditions: [...state.conditions, newConditionRow(state.trigger.type)],
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Plus size={13} aria-hidden />
+                    Add condition
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        conditions: [
+                          ...state.conditions,
+                          {
+                            id: nextRowId('grp'),
+                            type: 'group' as const,
+                            op: state.conditionOp === 'and' ? 'or' : 'and',
+                            rules: [newConditionRow(state.trigger.type)],
+                          },
+                        ],
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Plus size={13} aria-hidden />
+                    Add condition group
+                  </button>
+                </div>
               </>
             )}
           </ZapCard>
@@ -2224,8 +2811,68 @@ export function WorkflowBuilder({
         </div>
       )}
 
+      {/* Run history panel — Zapier-style audit trail inside the editor */}
+      {showHistory && workflowId && (
+        <div className="rounded-xl border border-border/60 bg-muted/20">
+          <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+            <p className="text-[12.5px] font-semibold text-foreground">Run history</p>
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryLoading(true);
+                fetch(`/api/workflows/${workflowId}/runs`)
+                  .then((r) => (r.ok ? r.json() : Promise.reject()))
+                  .then((d: { runs: BuilderRunRecord[] }) => setHistoryRuns(d.runs))
+                  .catch(() => {})
+                  .finally(() => setHistoryLoading(false));
+              }}
+              disabled={historyLoading}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground disabled:opacity-40"
+            >
+              <RotateCcw size={11} aria-hidden className={historyLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <div className="p-3">
+            {historyLoading ? (
+              <div className="flex items-center gap-2 py-3">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                <span className="text-[12px] text-muted-foreground">Loading…</span>
+              </div>
+            ) : historyRuns.length === 0 ? (
+              <div className="flex flex-col items-center py-4 text-center">
+                <History size={22} className="mb-1.5 text-muted-foreground/30" />
+                <p className="text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {historyRuns.map((run) => (
+                  <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer: Enable toggle + Save/Cancel — sticky so it's always reachable */}
       <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-3 border-t border-border/60 bg-card/95 px-4 py-3 backdrop-blur-sm">
+        {/* History toggle button — only for saved workflows */}
+        {workflowId && (
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
+              showHistory
+                ? 'border-orange-300/60 bg-orange-50 text-orange-700 dark:border-orange-700/40 dark:bg-orange-950/30 dark:text-orange-400'
+                : 'border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <History size={12} aria-hidden />
+            History
+          </button>
+        )}
         {/* Zapier-style "Turn on" toggle */}
         <label
           htmlFor="wf-enabled-toggle"
@@ -2246,6 +2893,31 @@ export function WorkflowBuilder({
             id="wf-enabled-toggle"
             checked={enabled}
             onCheckedChange={setEnabled}
+            disabled={saving}
+            className="ml-0.5"
+          />
+        </label>
+
+        {/* Notify on failure toggle — Zapier-style "Alert me when this fails" */}
+        <label
+          htmlFor="wf-notify-error-toggle"
+          className={cn(
+            'flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
+            notifyOnError
+              ? 'border-rose-300/60 bg-rose-50 text-rose-700 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-400'
+              : 'border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <BellRing
+            size={12}
+            className={notifyOnError ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground/60'}
+            aria-hidden
+          />
+          <span>Alert on failure</span>
+          <Switch
+            id="wf-notify-error-toggle"
+            checked={notifyOnError}
+            onCheckedChange={setNotifyOnError}
             disabled={saving}
             className="ml-0.5"
           />
@@ -2417,10 +3089,9 @@ function TriggerConfig({
         <MiniSelect
           id="wf-channel"
           value={t.channel}
-          onValueChange={(v) => patchTrigger({ channel: v as 'sms' | 'email' | 'any' })}
+          onValueChange={(v) => patchTrigger({ channel: v as 'email' | 'any' })}
           options={[
             { value: 'any', label: 'Any channel' },
-            { value: 'sms', label: 'SMS' },
             { value: 'email', label: 'Email' },
           ]}
         />
@@ -2746,6 +3417,93 @@ function ConditionRowEditor({
   );
 }
 
+/** A boxed nested condition group — renders its own op toggle + sub-rows.
+ *
+ * The outer list uses ConditionRowEditor for flat rules; whenever a rule is a
+ * ConditionGroupFormState (type === 'group') this component is used instead.
+ * It creates a visually distinct indented block so the realtor can reason about
+ * "all of THESE must match" vs the outer list's op. Zapier calls this a "Filter
+ * group" — we call it a "Condition group" in our copy. */
+function ConditionGroupEditor({
+  group,
+  triggerType,
+  onChange,
+  onRemove,
+}: {
+  group: ConditionGroupFormState;
+  triggerType: TriggerType;
+  onChange: (next: Partial<Omit<ConditionGroupFormState, 'id' | 'type'>>) => void;
+  onRemove: () => void;
+}) {
+  function addRow() {
+    onChange({ rules: [...group.rules, newConditionRow(triggerType)] });
+  }
+
+  function removeRow(id: string) {
+    onChange({ rules: group.rules.filter((r) => r.id !== id) });
+  }
+
+  function updateRow(id: string, next: Partial<ConditionRowState>) {
+    onChange({ rules: group.rules.map((r) => (r.id === id ? { ...r, ...next } : r)) });
+  }
+
+  return (
+    <li className="rounded-lg border border-amber-300/60 bg-amber-50/30 dark:border-amber-700/40 dark:bg-amber-950/10 p-2">
+      {/* Group header row */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+          Group
+        </span>
+        {/* Op toggle — opposite of outer to make nesting useful */}
+        <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5">
+          {(['and', 'or'] as const).map((op) => (
+            <button
+              key={op}
+              type="button"
+              onClick={() => onChange({ op })}
+              aria-pressed={group.op === op}
+              className={cn(
+                'rounded-[4px] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
+                group.op === op
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {op}
+            </button>
+          ))}
+        </div>
+        <span className="flex-1 text-[10px] text-muted-foreground">
+          {group.op === 'and' ? 'All of these must match' : 'Any of these must match'}
+        </span>
+        <RemoveButton label="Remove group" onClick={onRemove} />
+      </div>
+
+      {/* Sub-rows */}
+      <ul className="space-y-1.5 pl-1">
+        {group.rules.map((row) => (
+          <ConditionRowEditor
+            key={row.id}
+            row={row}
+            triggerType={triggerType}
+            onChange={(next) => updateRow(row.id, next)}
+            onRemove={() => removeRow(row.id)}
+          />
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={addRow}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 transition-colors hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+      >
+        <Plus size={11} aria-hidden />
+        Add row to group
+      </button>
+    </li>
+  );
+}
+
 /** Compute a sample output for the formatter so the user can see what it does. */
 function computeFormatterPreview(
   row: ActionRowState,
@@ -2825,6 +3583,24 @@ function computeFormatterPreview(
         const m = sample.match(/[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}/);
         return m ? m[0] : null;
       }
+      case 'default_value':
+        return sample.trim() !== '' ? sample : (row.formatterFallback || '(fallback)');
+      case 'truncate': {
+        const maxLen = parseInt(row.formatterTruncateLength, 10) || 100;
+        if (sample.length <= maxLen) return sample;
+        const suffix = row.formatterTruncateSuffix !== '' ? row.formatterTruncateSuffix : '…';
+        return sample.slice(0, Math.max(0, maxLen - suffix.length)) + suffix;
+      }
+      case 'length':
+        return String(sample.length);
+      case 'split': {
+        const sep = row.formatterSplitSeparator || ',';
+        const idx = (parseInt(row.formatterSplitIndex, 10) || 1) - 1;
+        const parts = sample.split(sep);
+        return parts[idx]?.trim() ?? '';
+      }
+      case 'url_encode':
+        return encodeURIComponent(sample);
       default: return null;
     }
   } catch { return null; }
@@ -2869,6 +3645,9 @@ function FormatterActionConfig({
   const needsReplace = op === 'replace';
   const needsFormat = op === 'date_format';
   const needsToFixed = op === 'number_format';
+  const needsFallback = op === 'default_value';
+  const needsTruncate = op === 'truncate';
+  const needsSplit = op === 'split';
 
   return (
     <div className="space-y-2.5">
@@ -2950,6 +3729,67 @@ function FormatterActionConfig({
             className="h-8 w-24"
           />
         </FieldRow>
+      )}
+      {needsFallback && (
+        <FieldRow label="Fallback value" htmlFor={`fmt-fallback-${row.id}`}>
+          <Input
+            id={`fmt-fallback-${row.id}`}
+            value={row.formatterFallback}
+            onChange={(e) => onChange({ formatterFallback: e.target.value })}
+            placeholder="Unknown"
+            className="h-8"
+          />
+        </FieldRow>
+      )}
+      {needsTruncate && (
+        <>
+          <FieldRow label="Max characters" htmlFor={`fmt-tlen-${row.id}`}>
+            <Input
+              id={`fmt-tlen-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.formatterTruncateLength}
+              onChange={(e) => onChange({ formatterTruncateLength: e.target.value })}
+              placeholder="100"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+          <FieldRow label="Suffix (optional)" htmlFor={`fmt-tsuf-${row.id}`}>
+            <Input
+              id={`fmt-tsuf-${row.id}`}
+              value={row.formatterTruncateSuffix}
+              onChange={(e) => onChange({ formatterTruncateSuffix: e.target.value })}
+              placeholder="…"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+        </>
+      )}
+      {needsSplit && (
+        <>
+          <FieldRow label="Separator" htmlFor={`fmt-sep-${row.id}`}>
+            <Input
+              id={`fmt-sep-${row.id}`}
+              value={row.formatterSplitSeparator}
+              onChange={(e) => onChange({ formatterSplitSeparator: e.target.value })}
+              placeholder=", (comma)"
+              className="h-8 w-32"
+            />
+          </FieldRow>
+          <FieldRow label="Part # (1 = first)" htmlFor={`fmt-sidx-${row.id}`}>
+            <Input
+              id={`fmt-sidx-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.formatterSplitIndex}
+              onChange={(e) => onChange({ formatterSplitIndex: e.target.value })}
+              placeholder="1"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+        </>
       )}
       {/* Live sample output — Zapier's "Test output" preview */}
       {(() => {
@@ -3167,26 +4007,15 @@ function WebhookPostActionConfig({
         />
       </div>
 
-      {/* Headers — advanced */}
-      <details className="group/adv">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-          <Plus size={12} aria-hidden className="transition-transform group-open/adv:rotate-45" />
-          Custom headers (optional)
-        </summary>
-        <div className="mt-2 space-y-1.5">
-          <Label htmlFor={`wh-headers-${row.id}`} className="text-[12px] text-muted-foreground">
-            Headers (JSON object)
-          </Label>
-          <Textarea
-            id={`wh-headers-${row.id}`}
-            value={row.webhookHeaders}
-            onChange={(e) => onChange({ webhookHeaders: e.target.value })}
-            placeholder={'{ "Authorization": "Bearer YOUR_TOKEN" }'}
-            rows={2}
-            className="font-mono text-[12px]"
-          />
-        </div>
-      </details>
+      <KeyValueEditor
+        label="Headers (optional)"
+        addLabel="Add header"
+        emptyText="No headers — add e.g. Authorization = Bearer YOUR_TOKEN"
+        value={row.webhookHeaders}
+        onChange={(v) => onChange({ webhookHeaders: v })}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+      />
     </div>
   );
 }
@@ -3331,6 +4160,148 @@ function NotifyAgentActionConfig({
   );
 }
 
+// ── Key-value params editor (call_integration) ───────────────────────────────
+
+function parseParamsToRows(json: string): { id: string; key: string; val: string }[] {
+  if (!json.trim()) return [];
+  try {
+    const obj = JSON.parse(json) as Record<string, unknown>;
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v], i) => ({
+        id: `pr-${i}-${k}`,
+        key: k,
+        val: typeof v === 'string' ? v : JSON.stringify(v),
+      }));
+    }
+  } catch {}
+  return [];
+}
+
+function rowsToParamsJson(rows: { key: string; val: string }[]): string {
+  const valid = rows.filter((r) => r.key.trim());
+  if (valid.length === 0) return '';
+  const obj = Object.fromEntries(valid.map((r) => [r.key.trim(), r.val]));
+  return JSON.stringify(obj, null, 2);
+}
+
+/**
+ * Zapier-style key-value parameter editor for call_integration actions.
+ * Shows structured field rows (key = value) that serialize to/from JSON,
+ * with a "Raw JSON" escape hatch for advanced users.
+ */
+function KeyValueEditor({
+  value,
+  onChange,
+  triggerType,
+  prevSteps = [],
+  label = 'Parameters (optional)',
+  addLabel = 'Add parameter',
+  emptyText,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+  label?: string;
+  addLabel?: string;
+  emptyText?: string;
+}) {
+  const [rows, setRows] = useState<{ id: string; key: string; val: string }[]>(() =>
+    parseParamsToRows(value),
+  );
+  const [showRaw, setShowRaw] = useState(false);
+
+  function updateRows(next: { id: string; key: string; val: string }[]) {
+    setRows(next);
+    onChange(rowsToParamsJson(next));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-[12px] text-muted-foreground">{label}</Label>
+        <button
+          type="button"
+          onClick={() => setShowRaw((v) => !v)}
+          className="text-[11px] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+        >
+          {showRaw ? 'Field view' : 'Raw JSON'}
+        </button>
+      </div>
+
+      {showRaw ? (
+        <Textarea
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            const parsed = parseParamsToRows(e.target.value);
+            if (parsed.length > 0) setRows(parsed);
+          }}
+          placeholder={'{ "channel": "#leads", "message": "New lead: {{lead.name}}" }'}
+          rows={3}
+          className="font-mono text-[12px]"
+        />
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-start gap-1.5">
+              <Input
+                value={r.key}
+                onChange={(e) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, key: e.target.value } : x)))
+                }
+                placeholder="param"
+                aria-label="Parameter name"
+                className="h-7 w-[8rem] flex-shrink-0 font-mono text-[12px]"
+              />
+              <span className="mt-1.5 flex-shrink-0 text-[12px] text-muted-foreground/50">=</span>
+              <Input
+                value={r.val}
+                onChange={(e) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, val: e.target.value } : x)))
+                }
+                placeholder="value or {{token}}"
+                aria-label="Parameter value"
+                className="h-7 flex-1 text-[12px]"
+              />
+              <TokenPicker
+                triggerType={triggerType}
+                prevSteps={prevSteps}
+                onInsert={(token) =>
+                  updateRows(rows.map((x) => (x.id === r.id ? { ...x, val: x.val + token } : x)))
+                }
+              />
+              <button
+                type="button"
+                onClick={() => updateRows(rows.filter((x) => x.id !== r.id))}
+                aria-label="Remove parameter"
+                className="mt-0.5 flex-shrink-0 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-destructive"
+              >
+                <X size={12} aria-hidden />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              updateRows([...rows, { id: `pr-${rows.length}-${Date.now().toString(36)}`, key: '', val: '' }])
+            }
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            <Plus size={11} aria-hidden />
+            {addLabel}
+          </button>
+          {rows.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/50">
+              {emptyText ?? <>No parameters — add key/value pairs the action expects, e.g. <code className="font-mono">channel</code> = <code className="font-mono">#leads</code></>}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -3344,20 +4315,15 @@ function ActionConfig({
   triggerType: TriggerType;
   prevSteps?: ActionRowState[];
 }) {
+  // useParams here (before any early returns) so we can build the config link
+  // for the call_integration "no apps" state. React rules of hooks allow this
+  // at the function top level before conditional returns.
+  const routeParams = useParams();
+  const slug = routeParams?.slug as string | undefined;
+  const automationsConfigHref = slug ? `/s/${slug}/automations/settings` : '/automations/settings';
   if (row.type === 'draft_message' || row.type === 'schedule_message') {
     return (
       <div className="space-y-2.5">
-        <FieldRow label="Channel" htmlFor={`act-ch-${row.id}`}>
-          <MiniSelect
-            id={`act-ch-${row.id}`}
-            value={row.channel}
-            onValueChange={(v) => onChange({ channel: v as 'sms' | 'email' })}
-            options={[
-              { value: 'sms', label: 'SMS' },
-              { value: 'email', label: 'Email' },
-            ]}
-          />
-        </FieldRow>
         <InstructionField row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />
         {row.type === 'schedule_message' && (
           <div className="flex flex-wrap items-center gap-2">
@@ -3374,11 +4340,12 @@ function ActionConfig({
             />
             <MiniSelect
               value={row.delayUnit ?? 'hours'}
-              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
+              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
               options={[
                 { value: 'minutes', label: 'minutes' },
                 { value: 'hours', label: 'hours' },
                 { value: 'days', label: 'days' },
+                { value: 'weeks', label: 'weeks' },
               ]}
             />
           </div>
@@ -3423,9 +4390,12 @@ function ActionConfig({
   }
 
   if (row.type === 'delay') {
+    const mode = row.delayMode ?? 'relative';
     const n = parseFloat(row.delayMinutes);
     const unit = row.delayUnit ?? 'minutes';
-    const delayHint = row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
+    const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const delayHint = mode === 'relative' && row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
+      if (unit === 'weeks') return `${n} week${n === 1 ? '' : 's'} (${n * 7} days)`;
       if (unit === 'minutes') {
         if (n < 60) return `${n} minute${n === 1 ? '' : 's'}`;
         const hrs = n / 60;
@@ -3440,38 +4410,92 @@ function ActionConfig({
     })() : null;
     return (
       <div className="space-y-2.5">
-        <p className={CAPTION}>
-          Pause the automation before the next step runs.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={`act-delay-amt-${row.id}`} className="text-[12px] text-muted-foreground">
-            Wait for
-          </Label>
-          <Input
-            id={`act-delay-amt-${row.id}`}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={row.delayMinutes}
-            onChange={(e) => onChange({ delayMinutes: e.target.value })}
-            placeholder="2"
-            className="h-8 w-20"
-          />
-          <MiniSelect
-            value={unit}
-            onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' })}
-            options={[
-              { value: 'minutes', label: 'minutes' },
-              { value: 'hours', label: 'hours' },
-              { value: 'days', label: 'days' },
-            ]}
-          />
+        <p className={CAPTION}>Pause the automation before the next step runs.</p>
+        {/* Mode toggle: relative vs until weekday */}
+        <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 w-fit">
+          {(['relative', 'until_weekday'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onChange({ delayMode: m })}
+              aria-pressed={mode === m}
+              className={cn(
+                'rounded-[5px] px-3 py-1 text-xs font-medium transition-colors',
+                mode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {m === 'relative' ? 'Wait duration' : 'Wait until day'}
+            </button>
+          ))}
         </div>
+
+        {mode === 'relative' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`act-delay-amt-${row.id}`} className="text-[12px] text-muted-foreground">
+              Wait for
+            </Label>
+            <Input
+              id={`act-delay-amt-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.delayMinutes}
+              onChange={(e) => onChange({ delayMinutes: e.target.value })}
+              placeholder="2"
+              className="h-8 w-20"
+            />
+            <MiniSelect
+              value={unit}
+              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
+              options={[
+                { value: 'minutes', label: 'minutes' },
+                { value: 'hours', label: 'hours' },
+                { value: 'days', label: 'days' },
+                { value: 'weeks', label: 'weeks' },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="text-[12px] text-muted-foreground">Until next</Label>
+            <MiniSelect
+              value={row.untilWeekday}
+              onValueChange={(v) => onChange({ untilWeekday: v })}
+              className="w-[8rem]"
+              options={WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))}
+            />
+            <Label className="text-[12px] text-muted-foreground">at</Label>
+            <MiniSelect
+              value={row.untilHour}
+              onValueChange={(v) => onChange({ untilHour: v })}
+              className="w-[7rem]"
+              options={Array.from({ length: 24 }, (_, h) => {
+                const ampm = h < 12 ? 'AM' : 'PM';
+                const h12 = ((h + 11) % 12) + 1;
+                return { value: String(h), label: `${h12}:00 ${ampm}` };
+              })}
+            />
+          </div>
+        )}
+
         {delayHint && (
           <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
             <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
             <span className="text-[12px] text-amber-700 dark:text-amber-300">
               This step will pause for <span className="font-medium">{delayHint}</span>
+            </span>
+          </div>
+        )}
+        {mode === 'until_weekday' && (
+          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+              Waits until the next <span className="font-medium">{WEEKDAYS[parseInt(row.untilWeekday, 10)] ?? 'day'}</span>{' '}
+              at <span className="font-medium">{(() => {
+                const h = parseInt(row.untilHour, 10);
+                const ampm = h < 12 ? 'AM' : 'PM';
+                return `${((h + 11) % 12) + 1}:00 ${ampm}`;
+              })()}</span>
             </span>
           </div>
         )}
@@ -3499,8 +4523,9 @@ function ActionConfig({
     return <NotifyAgentActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
-  // call_integration — app + action lead; show connected apps picker when apps
-  // are available, else fall back to free-text so authoring is never blocked.
+  // call_integration — app + action picker; key-value params editor.
+  // Falls back to free-text inputs when no apps are connected so authoring is
+  // never blocked, with a direct link to the configuration page.
   const hasApps =
     connectedApps.status === 'ready' && connectedApps.apps.length > 0;
   const selectedApp =
@@ -3518,8 +4543,15 @@ function ActionConfig({
         </p>
       )}
       {connectedApps.status === 'ready' && !hasApps && (
-        <p className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[12px] text-muted-foreground text-center">
-          No apps connected. Go to Automations → Configuration to connect Gmail, Slack, and more.
+        <p className="rounded-lg border border-dashed border-border/60 px-3 py-2.5 text-[12px] text-muted-foreground text-center">
+          No apps connected yet.{' '}
+          <a
+            href={automationsConfigHref}
+            className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+          >
+            Connect Gmail, Slack, or Outlook
+          </a>{' '}
+          to use this action.
         </p>
       )}
 
@@ -3533,7 +4565,6 @@ function ActionConfig({
               const app = connectedApps.apps.find((a) => a.toolkit === next);
               onChange({
                 toolkit: next,
-                // Reset action when toolkit changes
                 action: app?.actions[0]?.value ?? '',
               });
             }}
@@ -3574,29 +4605,13 @@ function ActionConfig({
           />
         )}
       </FieldRow>
-      <details className="group/adv">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-          <Plus
-            size={12}
-            aria-hidden
-            className="transition-transform group-open/adv:rotate-45"
-          />
-          Advanced — params (optional JSON)
-        </summary>
-        <div className="mt-2 space-y-1.5">
-          <Label htmlFor={`act-params-${row.id}`} className="sr-only">
-            Params (optional JSON)
-          </Label>
-          <Textarea
-            id={`act-params-${row.id}`}
-            value={row.paramsJson}
-            onChange={(e) => onChange({ paramsJson: e.target.value })}
-            placeholder='{ "channel": "#leads" }'
-            rows={2}
-            className="font-mono text-xs"
-          />
-        </div>
-      </details>
+
+      <KeyValueEditor
+        value={row.paramsJson}
+        onChange={(v) => onChange({ paramsJson: v })}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+      />
     </div>
   );
 }

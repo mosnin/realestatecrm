@@ -47,11 +47,14 @@ function triggerPhrase(t: TriggerFormState): string {
       return min ? `a lead's score reaches ${min}` : "a lead's score crosses your threshold";
     }
     case 'inbound_message':
-      if (t.channel === 'sms') return 'a lead texts you';
       if (t.channel === 'email') return 'a lead emails you';
       return 'a lead messages you';
     case 'tour_completed':
       return 'a tour wraps up';
+    case 'deal_created':
+      return 'a new deal is created';
+    case 'contact_updated':
+      return "a contact's record is updated";
     case 'deal_stage_changed': {
       const stage = t.toStage.trim();
       return stage ? `a deal moves to ${stage}` : 'a deal changes stage';
@@ -86,7 +89,10 @@ function isFilledCondition(row: ConditionRowState): boolean {
 }
 
 function conditionClause(state: WorkflowFormState): string | null {
-  const filled = state.conditions.filter(isFilledCondition).length;
+  const flatRows = state.conditions.filter(
+    (r): r is ConditionRowState => !('type' in r && r.type === 'group'),
+  );
+  const filled = flatRows.filter(isFilledCondition).length;
   if (filled === 0) return null;
   const joiner = state.conditionOp === 'or' ? 'any' : 'all';
   if (filled === 1) return 'only if 1 condition matches';
