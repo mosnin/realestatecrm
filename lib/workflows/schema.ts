@@ -323,12 +323,36 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
+  // Two modes: relative (wait N minutes) or until_weekday (wait until the next
+  // occurrence of a given weekday + hour). The executor computes the actual
+  // delay minutes at runtime for until_weekday so the intent survives.
   z.object({
     type: z.literal('delay'),
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
-    config: z.object({ delayMinutes: z.number().int().min(1) }).strict(),
+    config: z
+      .object({
+        delayMode: z.enum(['relative', 'until_weekday']).optional(),
+        delayMinutes: z.number().int().min(1).optional(),
+        untilWeekday: z.number().int().min(0).max(6).optional(),
+        untilHour: z.number().int().min(0).max(23).optional(),
+      })
+      .superRefine((cfg, ctx) => {
+        const mode = cfg.delayMode ?? 'relative';
+        if (mode === 'relative') {
+          if (cfg.delayMinutes === undefined || cfg.delayMinutes < 1) {
+            ctx.addIssue({ code: 'custom', path: ['delayMinutes'], message: 'delayMinutes required for relative delay.' });
+          }
+        } else if (mode === 'until_weekday') {
+          if (cfg.untilWeekday === undefined) {
+            ctx.addIssue({ code: 'custom', path: ['untilWeekday'], message: 'untilWeekday required.' });
+          }
+          if (cfg.untilHour === undefined) {
+            ctx.addIssue({ code: 'custom', path: ['untilHour'], message: 'untilHour required.' });
+          }
+        }
+      }),
   }),
   // filter: stop the run if the field condition is not met.
   z.object({

@@ -377,14 +377,37 @@ async function runCallIntegration(
  * the delay cannot actually block; the run note makes the intent observable in
  * the audit trail. A future scheduler (DelayedResume table + cron) can honour
  * long delays by replaying remaining actions after the specified interval.
+ *
+ * until_weekday mode: the intended delay is computed at execution time so that
+ * "wait until Monday 9am" always means the NEXT Monday when the step runs,
+ * not the Monday computed when the workflow was saved.
  */
+function minutesUntilWeekdayHour(weekday: number, hour: number): number {
+  const now = new Date();
+  const target = new Date(now);
+  const daysUntil = (weekday - now.getDay() + 7) % 7;
+  // If today is the target weekday but we've already passed the hour, go 7 days out.
+  const adjustedDays = daysUntil === 0 && now.getHours() >= hour ? 7 : daysUntil;
+  target.setDate(now.getDate() + adjustedDays);
+  target.setHours(hour, 0, 0, 0);
+  return Math.max(1, Math.round((target.getTime() - now.getTime()) / 60_000));
+}
+
 function runDelay(
   action: Extract<WorkflowAction, { type: 'delay' }>,
 ): ActionStepResult {
+  const { delayMode, delayMinutes, untilWeekday, untilHour } = action.config;
+  const mode = delayMode ?? 'relative';
+  const computedMinutes =
+    mode === 'until_weekday' && untilWeekday !== undefined && untilHour !== undefined
+      ? minutesUntilWeekdayHour(untilWeekday, untilHour)
+      : (delayMinutes ?? 1);
+
   return {
     status: 'ok',
     detail: {
-      delayMinutes: action.config.delayMinutes,
+      delayMode: mode,
+      delayMinutes: computedMinutes,
       note: 'Delay recorded. Async resumption is not yet active — subsequent steps ran immediately.',
     },
   };

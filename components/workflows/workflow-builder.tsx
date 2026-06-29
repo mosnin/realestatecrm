@@ -513,6 +513,9 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     filterValue: '',
     formatterInput: '',
     formatterOperation: 'uppercase',
+    delayMode: 'relative',
+    untilWeekday: '1',
+    untilHour: '9',
     formatterFind: '',
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
@@ -580,9 +583,16 @@ function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours
 
 function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
   return actions.map((a) => {
+    const isDelayUntil = a.type === 'delay' && a.config.delayMode === 'until_weekday';
+    const relativeDelayMinutes =
+      a.type === 'delay' && !isDelayUntil
+        ? (a.config.delayMinutes ?? 0)
+        : a.type === 'schedule_message'
+          ? a.config.delayMinutes
+          : 0;
     const delayDisplay =
-      a.type === 'delay' || a.type === 'schedule_message'
-        ? minutesToDisplay(a.config.delayMinutes)
+      (a.type === 'delay' && !isDelayUntil) || a.type === 'schedule_message'
+        ? minutesToDisplay(relativeDelayMinutes)
         : null;
     return {
       id: nextRowId('act'),
@@ -596,10 +606,13 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
           ? a.config.instruction
           : '',
       delayMinutes:
-        a.type === 'schedule_message' || a.type === 'delay'
+        a.type === 'schedule_message' || (a.type === 'delay' && !isDelayUntil)
           ? (delayDisplay?.amount ?? '')
           : '',
       delayUnit: delayDisplay?.unit ?? 'hours',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      untilWeekday: a.type === 'delay' && isDelayUntil && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
+      untilHour: a.type === 'delay' && isDelayUntil && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -921,8 +934,17 @@ function actionSummary(row: ActionRowState): string {
       return row.title ? `Task: ${trunc(row.title)}` : 'No title set';
     case 'run_chippi':
       return trunc(row.instruction) || 'no instruction';
-    case 'delay':
+    case 'delay': {
+      if (row.delayMode === 'until_weekday') {
+        const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const day = DAYS[parseInt(row.untilWeekday, 10)] ?? 'Day';
+        const h = parseInt(row.untilHour, 10);
+        const ampm = h < 12 ? 'AM' : 'PM';
+        const h12 = ((h + 11) % 12) + 1;
+        return `Wait until ${day} at ${h12}:00 ${ampm}`;
+      }
       return `Wait ${row.delayMinutes || '?'} ${row.delayUnit}`;
+    }
     case 'filter':
       return row.filterField
         ? `${row.filterField} ${row.filterOperator}${row.filterValue ? ` ${row.filterValue}` : ''}`
@@ -2208,7 +2230,10 @@ export function WorkflowBuilder({
       return !row.instruction.trim();
     if (row.type === 'create_task') return !row.title.trim();
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
-    if (row.type === 'delay') return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
+    if (row.type === 'delay') {
+      if (row.delayMode === 'until_weekday') return row.untilWeekday === '' || row.untilHour === '';
+      return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
+    }
     if (row.type === 'filter') return !row.filterField.trim();
     if (row.type === 'formatter') return !row.formatterInput.trim();
     if (row.type === 'webhook_post') return !row.webhookUrl.trim();
@@ -4365,9 +4390,11 @@ function ActionConfig({
   }
 
   if (row.type === 'delay') {
+    const mode = row.delayMode ?? 'relative';
     const n = parseFloat(row.delayMinutes);
     const unit = row.delayUnit ?? 'minutes';
-    const delayHint = row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
+    const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const delayHint = mode === 'relative' && row.delayMinutes && !isNaN(n) && n > 0 ? (() => {
       if (unit === 'weeks') return `${n} week${n === 1 ? '' : 's'} (${n * 7} days)`;
       if (unit === 'minutes') {
         if (n < 60) return `${n} minute${n === 1 ? '' : 's'}`;
@@ -4383,39 +4410,92 @@ function ActionConfig({
     })() : null;
     return (
       <div className="space-y-2.5">
-        <p className={CAPTION}>
-          Pause the automation before the next step runs.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={`act-delay-amt-${row.id}`} className="text-[12px] text-muted-foreground">
-            Wait for
-          </Label>
-          <Input
-            id={`act-delay-amt-${row.id}`}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={row.delayMinutes}
-            onChange={(e) => onChange({ delayMinutes: e.target.value })}
-            placeholder="2"
-            className="h-8 w-20"
-          />
-          <MiniSelect
-            value={unit}
-            onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
-            options={[
-              { value: 'minutes', label: 'minutes' },
-              { value: 'hours', label: 'hours' },
-              { value: 'days', label: 'days' },
-              { value: 'weeks', label: 'weeks' },
-            ]}
-          />
+        <p className={CAPTION}>Pause the automation before the next step runs.</p>
+        {/* Mode toggle: relative vs until weekday */}
+        <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 w-fit">
+          {(['relative', 'until_weekday'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onChange({ delayMode: m })}
+              aria-pressed={mode === m}
+              className={cn(
+                'rounded-[5px] px-3 py-1 text-xs font-medium transition-colors',
+                mode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {m === 'relative' ? 'Wait duration' : 'Wait until day'}
+            </button>
+          ))}
         </div>
+
+        {mode === 'relative' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`act-delay-amt-${row.id}`} className="text-[12px] text-muted-foreground">
+              Wait for
+            </Label>
+            <Input
+              id={`act-delay-amt-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.delayMinutes}
+              onChange={(e) => onChange({ delayMinutes: e.target.value })}
+              placeholder="2"
+              className="h-8 w-20"
+            />
+            <MiniSelect
+              value={unit}
+              onValueChange={(v) => onChange({ delayUnit: v as 'minutes' | 'hours' | 'days' | 'weeks' })}
+              options={[
+                { value: 'minutes', label: 'minutes' },
+                { value: 'hours', label: 'hours' },
+                { value: 'days', label: 'days' },
+                { value: 'weeks', label: 'weeks' },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="text-[12px] text-muted-foreground">Until next</Label>
+            <MiniSelect
+              value={row.untilWeekday}
+              onValueChange={(v) => onChange({ untilWeekday: v })}
+              className="w-[8rem]"
+              options={WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))}
+            />
+            <Label className="text-[12px] text-muted-foreground">at</Label>
+            <MiniSelect
+              value={row.untilHour}
+              onValueChange={(v) => onChange({ untilHour: v })}
+              className="w-[7rem]"
+              options={Array.from({ length: 24 }, (_, h) => {
+                const ampm = h < 12 ? 'AM' : 'PM';
+                const h12 = ((h + 11) % 12) + 1;
+                return { value: String(h), label: `${h12}:00 ${ampm}` };
+              })}
+            />
+          </div>
+        )}
+
         {delayHint && (
           <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
             <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
             <span className="text-[12px] text-amber-700 dark:text-amber-300">
               This step will pause for <span className="font-medium">{delayHint}</span>
+            </span>
+          </div>
+        )}
+        {mode === 'until_weekday' && (
+          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+              Waits until the next <span className="font-medium">{WEEKDAYS[parseInt(row.untilWeekday, 10)] ?? 'day'}</span>{' '}
+              at <span className="font-medium">{(() => {
+                const h = parseInt(row.untilHour, 10);
+                const ampm = h < 12 ? 'AM' : 'PM';
+                return `${((h + 11) % 12) + 1}:00 ${ampm}`;
+              })()}</span>
             </span>
           </div>
         )}
