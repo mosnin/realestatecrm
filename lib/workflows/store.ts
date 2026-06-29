@@ -29,8 +29,10 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * executor and the routes need (the executor's WorkflowRow plus the
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
+// notifyOnError is omitted here until migration 20260807000000_workflow_notify_on_error.sql
+// is applied to production. The column defaults false in the app layer (mapRow below).
 const SELECT =
-  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, notifyOnError, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
+  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
 /**
  * The full persisted row as the routes surface it — the executor's WorkflowRow
@@ -51,7 +53,7 @@ export interface WorkflowRecord extends WorkflowRow {
 
 /** Map a raw DB row (jsonb columns already objects) to a WorkflowRecord. */
 function mapRow(row: Record<string, unknown>): WorkflowRecord {
-  return row as unknown as WorkflowRecord;
+  return { notifyOnError: false, ...row } as unknown as WorkflowRecord;
 }
 
 /** List the space's workflows, newest first. */
@@ -89,7 +91,7 @@ export async function createWorkflow(
   spaceId: string,
   input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean; notifyOnError?: boolean },
 ): Promise<WorkflowRecord> {
-  const { name, description, definition, enabled = true, notifyOnError = false } = input;
+  const { name, description, definition, enabled = true } = input;
   const { data, error } = await supabase
     .from('Workflow')
     .insert({
@@ -97,7 +99,6 @@ export async function createWorkflow(
       name,
       ...(description ? { description } : {}),
       enabled,
-      notifyOnError,
       trigger: definition.trigger,
       conditions: definition.conditions,
       actions: definition.actions,
@@ -136,7 +137,6 @@ export async function updateWorkflow(
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.description !== undefined) update.description = patch.description ?? null;
   if (patch.enabled !== undefined) update.enabled = patch.enabled;
-  if (patch.notifyOnError !== undefined) update.notifyOnError = patch.notifyOnError;
   if (patch.definition) {
     update.trigger = patch.definition.trigger;
     update.conditions = patch.definition.conditions;
