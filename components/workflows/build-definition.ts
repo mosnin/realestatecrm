@@ -123,6 +123,16 @@ export interface ActionRowState {
   formatterFormat: string;
   /** formatter: decimal places for 'number_format' (as string off a number input). */
   formatterToFixed: string;
+  /** formatter: fallback value used when input is blank ('default_value'). */
+  formatterFallback: string;
+  /** formatter: max character count for 'truncate' (string off number input). */
+  formatterTruncateLength: string;
+  /** formatter: suffix appended after truncating, e.g. '…' ('truncate'). */
+  formatterTruncateSuffix: string;
+  /** formatter: delimiter for 'split'. */
+  formatterSplitSeparator: string;
+  /** formatter: 1-based part index for 'split'. */
+  formatterSplitIndex: string;
   /** webhook_post: target HTTPS URL. */
   webhookUrl: string;
   /** webhook_post: JSON body template (optional, {{tokens}} supported). */
@@ -379,6 +389,11 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         replacement?: string;
         format?: string;
         toFixed?: number;
+        fallback?: string;
+        truncateLength?: number;
+        truncateSuffix?: string;
+        splitSeparator?: string;
+        splitIndex?: number;
       };
       const cfg: FormatterConfig = { input: row.formatterInput.trim(), operation: op };
       if (op === 'replace') {
@@ -388,6 +403,15 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       if (op === 'date_format' && row.formatterFormat.trim()) cfg.format = row.formatterFormat.trim();
       if (op === 'number_format' && row.formatterToFixed.trim() !== '') {
         cfg.toFixed = toNumber(row.formatterToFixed);
+      }
+      if (op === 'default_value') cfg.fallback = row.formatterFallback;
+      if (op === 'truncate') {
+        if (row.formatterTruncateLength.trim() !== '') cfg.truncateLength = toNumber(row.formatterTruncateLength);
+        if (row.formatterTruncateSuffix !== '') cfg.truncateSuffix = row.formatterTruncateSuffix;
+      }
+      if (op === 'split') {
+        cfg.splitSeparator = row.formatterSplitSeparator || ',';
+        if (row.formatterSplitIndex.trim() !== '') cfg.splitIndex = toNumber(row.formatterSplitIndex);
       }
       return {
         type: 'formatter',

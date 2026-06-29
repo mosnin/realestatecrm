@@ -452,7 +452,7 @@ function runFormatter(
   action: Extract<WorkflowAction, { type: 'formatter' }>,
   context: WorkflowContext,
 ): ActionStepResult {
-  const { input, operation, find, replacement, format, toFixed } = action.config;
+  const { input, operation, find, replacement, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
   const resolved = resolveField(context as Record<string, unknown>, input);
   const strValue = String(resolved !== undefined && resolved !== null ? resolved : input);
 
@@ -494,6 +494,32 @@ function runFormatter(
     case 'extract_phone': {
       const m = strValue.match(/[+]?[(]?\d{3}[)]?[-\s.]?\d{3}[-\s.]\d{4,6}/);
       output = m ? m[0] : '';
+      break;
+    }
+    case 'default_value': {
+      output = strValue.trim() !== '' ? strValue : (fallback ?? '');
+      break;
+    }
+    case 'truncate': {
+      const maxLen = truncateLength ?? 100;
+      if (strValue.length <= maxLen) { output = strValue; break; }
+      const suffix = truncateSuffix ?? '…';
+      output = strValue.slice(0, Math.max(0, maxLen - suffix.length)) + suffix;
+      break;
+    }
+    case 'length': {
+      output = String(strValue.length);
+      break;
+    }
+    case 'split': {
+      const sep = splitSeparator ?? ',';
+      const idx = (splitIndex ?? 1) - 1; // 1-based in config, 0-based internally
+      const parts = strValue.split(sep);
+      output = parts[idx]?.trim() ?? '';
+      break;
+    }
+    case 'url_encode': {
+      output = encodeURIComponent(strValue);
       break;
     }
     default: output = strValue;

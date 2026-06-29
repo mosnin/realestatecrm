@@ -227,7 +227,12 @@ export type FormatterOperation =
   | 'date_format'
   | 'extract_number'
   | 'extract_email'
-  | 'extract_phone';
+  | 'extract_phone'
+  | 'default_value'
+  | 'truncate'
+  | 'length'
+  | 'split'
+  | 'url_encode';
 
 export const FORMATTER_OPERATIONS = [
   'uppercase',
@@ -240,6 +245,11 @@ export const FORMATTER_OPERATIONS = [
   'extract_number',
   'extract_email',
   'extract_phone',
+  'default_value',
+  'truncate',
+  'length',
+  'split',
+  'url_encode',
 ] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
@@ -348,6 +358,11 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
         replacement: z.string().max(200).optional(),
         format: z.string().max(100).optional(),
         toFixed: z.number().int().min(0).max(20).optional(),
+        fallback: z.string().max(500).optional(),
+        truncateLength: z.number().int().min(1).max(10000).optional(),
+        truncateSuffix: z.string().max(20).optional(),
+        splitSeparator: z.string().max(50).optional(),
+        splitIndex: z.number().int().min(1).optional(),
       })
       .strict(),
   }),

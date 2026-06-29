@@ -304,6 +304,11 @@ const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
   extract_number: 'Extract number',
   extract_email: 'Extract email',
   extract_phone: 'Extract phone',
+  default_value: 'Default value',
+  truncate: 'Truncate text',
+  length: 'Text length',
+  split: 'Split text',
+  url_encode: 'URL encode',
 };
 
 const DATE_FORMAT_OPTIONS = [
@@ -512,6 +517,11 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
     formatterToFixed: '',
+    formatterFallback: '',
+    formatterTruncateLength: '',
+    formatterTruncateSuffix: '',
+    formatterSplitSeparator: '',
+    formatterSplitIndex: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
@@ -611,6 +621,11 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
       formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
       formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
+      formatterFallback: a.type === 'formatter' ? (a.config.fallback ?? '') : '',
+      formatterTruncateLength: a.type === 'formatter' && a.config.truncateLength !== undefined ? String(a.config.truncateLength) : '',
+      formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
+      formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
+      formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -3543,6 +3558,24 @@ function computeFormatterPreview(
         const m = sample.match(/[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}/);
         return m ? m[0] : null;
       }
+      case 'default_value':
+        return sample.trim() !== '' ? sample : (row.formatterFallback || '(fallback)');
+      case 'truncate': {
+        const maxLen = parseInt(row.formatterTruncateLength, 10) || 100;
+        if (sample.length <= maxLen) return sample;
+        const suffix = row.formatterTruncateSuffix !== '' ? row.formatterTruncateSuffix : '…';
+        return sample.slice(0, Math.max(0, maxLen - suffix.length)) + suffix;
+      }
+      case 'length':
+        return String(sample.length);
+      case 'split': {
+        const sep = row.formatterSplitSeparator || ',';
+        const idx = (parseInt(row.formatterSplitIndex, 10) || 1) - 1;
+        const parts = sample.split(sep);
+        return parts[idx]?.trim() ?? '';
+      }
+      case 'url_encode':
+        return encodeURIComponent(sample);
       default: return null;
     }
   } catch { return null; }
@@ -3587,6 +3620,9 @@ function FormatterActionConfig({
   const needsReplace = op === 'replace';
   const needsFormat = op === 'date_format';
   const needsToFixed = op === 'number_format';
+  const needsFallback = op === 'default_value';
+  const needsTruncate = op === 'truncate';
+  const needsSplit = op === 'split';
 
   return (
     <div className="space-y-2.5">
@@ -3668,6 +3704,67 @@ function FormatterActionConfig({
             className="h-8 w-24"
           />
         </FieldRow>
+      )}
+      {needsFallback && (
+        <FieldRow label="Fallback value" htmlFor={`fmt-fallback-${row.id}`}>
+          <Input
+            id={`fmt-fallback-${row.id}`}
+            value={row.formatterFallback}
+            onChange={(e) => onChange({ formatterFallback: e.target.value })}
+            placeholder="Unknown"
+            className="h-8"
+          />
+        </FieldRow>
+      )}
+      {needsTruncate && (
+        <>
+          <FieldRow label="Max characters" htmlFor={`fmt-tlen-${row.id}`}>
+            <Input
+              id={`fmt-tlen-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.formatterTruncateLength}
+              onChange={(e) => onChange({ formatterTruncateLength: e.target.value })}
+              placeholder="100"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+          <FieldRow label="Suffix (optional)" htmlFor={`fmt-tsuf-${row.id}`}>
+            <Input
+              id={`fmt-tsuf-${row.id}`}
+              value={row.formatterTruncateSuffix}
+              onChange={(e) => onChange({ formatterTruncateSuffix: e.target.value })}
+              placeholder="…"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+        </>
+      )}
+      {needsSplit && (
+        <>
+          <FieldRow label="Separator" htmlFor={`fmt-sep-${row.id}`}>
+            <Input
+              id={`fmt-sep-${row.id}`}
+              value={row.formatterSplitSeparator}
+              onChange={(e) => onChange({ formatterSplitSeparator: e.target.value })}
+              placeholder=", (comma)"
+              className="h-8 w-32"
+            />
+          </FieldRow>
+          <FieldRow label="Part # (1 = first)" htmlFor={`fmt-sidx-${row.id}`}>
+            <Input
+              id={`fmt-sidx-${row.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={row.formatterSplitIndex}
+              onChange={(e) => onChange({ formatterSplitIndex: e.target.value })}
+              placeholder="1"
+              className="h-8 w-24"
+            />
+          </FieldRow>
+        </>
       )}
       {/* Live sample output — Zapier's "Test output" preview */}
       {(() => {
