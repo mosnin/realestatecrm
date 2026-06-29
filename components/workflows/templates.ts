@@ -818,6 +818,146 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'auto',
     },
   },
+
+  // ── update_lead templates ──────────────────────────────────────────────────
+
+  {
+    id: 'tour-tag-and-follow-up',
+    name: 'Tour completed → tag + follow-up date',
+    description: 'After a tour, tag the lead as "toured" and schedule a follow-up in 2 days.',
+    category: 'Follow-up',
+    popular: true,
+    state: {
+      name: 'Tour completed → tag + follow-up date',
+      trigger: { ...baseTrigger(), type: 'tour_completed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'tag_add',
+          updateValue: 'toured',
+        },
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'follow_up_in_days',
+          updateValue: '2',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a warm thank-you for the tour and ask what they thought about the home. Keep it short and personal.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'hot-lead-score-tag',
+    name: 'Hot lead → mark hot + set follow-up',
+    description: 'When a lead scores 80+, mark them hot in the CRM and set a same-day follow-up.',
+    category: 'New leads',
+    state: {
+      name: 'Hot lead → mark hot + set follow-up',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '80')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'score_label',
+          updateValue: 'hot',
+        },
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'follow_up_in_days',
+          updateValue: '0',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a warm, personal intro to this hot lead — mention you noticed their strong interest and invite them to connect today.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'closed-deal-tag',
+    name: 'Deal closed → tag contact as client',
+    description: 'When a deal closes, tag the contact "past-client" and send congrats.',
+    category: 'Follow-up',
+    state: {
+      name: 'Deal closed → tag contact as client',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'closed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'tag_add',
+          updateValue: 'past-client',
+        },
+        {
+          ...blankAction(),
+          type: 'update_lead',
+          updateField: 'score_label',
+          updateValue: 'warm',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft heartfelt congratulations on the closing. Mention it was a pleasure working together and that you are here for any future real estate needs or referrals.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+
+  // ── webhook_post templates ─────────────────────────────────────────────────
+
+  {
+    id: 'hot-lead-crm-sync',
+    name: 'Hot lead → sync to external CRM',
+    description: 'When a lead scores 80+, POST their details to your external CRM or Zapier webhook.',
+    category: 'Integrations',
+    state: {
+      name: 'Hot lead → sync to external CRM',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '80')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'webhook_post',
+          webhookUrl: 'https://hooks.zapier.com/hooks/catch/YOUR_HOOK_ID',
+          webhookBody: JSON.stringify(
+            { name: '{{lead.name}}', email: '{{lead.email}}', phone: '{{lead.phone}}', score: '{{lead.score}}', source: 'chippi' },
+            null,
+            2,
+          ),
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction: 'Draft a warm intro text to this hot lead while the CRM sync runs in the background.',
+        },
+      ],
+      autonomy: 'auto',
+    },
+  },
 ];
 
 /**
